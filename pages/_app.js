@@ -2,7 +2,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'react-bootstrap-typeahead/css/Typeahead.css';
 import Header from './layouts/header';
 
-function MyApp({ Component, pageProps }) {
+function Gallformers({ Component, pageProps }) {
   return (
     <>
       <Header />
@@ -11,4 +11,4 @@ function MyApp({ Component, pageProps }) {
   )
 }
 
-export default MyApp
+export default Gallformers

@@ -1,13 +1,13 @@
-import sqlite3 from 'sqlite3'
-import { open } from 'sqlite'
 
-export async function database() {
-  const database = await open({
-    filename: './gallformers.sqlite',
-    driver: sqlite3.Database
-  });
-  
-  await database.migrate( { force: true } );
-
-  return database;
-}
+const Database = require('better-sqlite3-helper');
+export const DB = new Database({
+  path: './gallformers.sqlite',
+  readonly: false,
+  fileMustExist: false,
+  WAL: true,
+  migrate: {
+    force: true,
+    table: 'migration',
+    migrationPath: './migrations'
+  }
+})

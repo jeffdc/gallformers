@@ -8,6 +8,7 @@ You must have npm installed for any of this to work. Go do that.
 Now you can run the development server:
 
 ```bash
+npm install
 npm run dev
 ```
 

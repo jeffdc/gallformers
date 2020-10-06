@@ -1,4 +1,9 @@
 -- Up
+CREATE TABLE galllocation(
+    id INTEGER PRIMARY KEY NOT NULL,
+    loc TEXT
+);
+
 CREATE TABLE gall(
     id INTEGER PRIMARY KEY NOT NULL,
     name TEXT UNIQUE NOT NULL , 
@@ -6,12 +11,13 @@ CREATE TABLE gall(
     genus TEXT NOT NULL ,
     family TEXT NOT NULL,
     description TEXT,
-    location TEXT,
     detachable INTEGER,
     texture TEXT,
     alignment TEXT,
     walls TEXT,
-    abundance TEXT
+    abundance TEXT,
+    galllocid INTEGER,
+    FOREIGN KEY(galllocid) REFERENCES galllocation(id)
 );
 
 CREATE TABLE host(
@@ -45,9 +51,20 @@ CREATE TABLE gallsource(
     FOREIGN KEY(sourceid) REFERENCES source(id)
 );
 
+
+INSERT INTO galllocation VALUES(NULL, 'bud');
+INSERT INTO galllocation VALUES(NULL, 'stem');
+INSERT INTO galllocation VALUES(NULL, 'root');
+INSERT INTO galllocation VALUES(NULL, 'upper leaf - on veins');
+INSERT INTO galllocation VALUES(NULL, 'upper leaf - between veins');
+INSERT INTO galllocation VALUES(NULL, 'upper leaf - vein angles');
+INSERT INTO galllocation VALUES(NULL, 'lower leaf - on veins');
+INSERT INTO galllocation VALUES(NULL, 'lower leaf - between veins');
+INSERT INTO galllocation VALUES(NULL, 'lower leaf - vein angles');
+
 INSERT INTO "gall" VALUES(NULL, 'Andricus apiarium', NULL, 'Andricus', 'Cynipidae', 
                            'Solitary, sessile, on underside of leaf close to edge in October, shaped like an old-fashioned straw beehive, white or pinkish, measuring up to 4.6 mm broad by 4.0 mm high. Inside is a large cavity with a transverse larval cell at very base. During the winter on the ground the outer fleshy layer shrivels and the gall becomes more cylindrical.',
-                           'leaf', '1', 'waxy', '', '', 'uncommon');
+                           '1', 'hairless', 'erect', 'thick', 'uncommon', (SELECT id FROM galllocation WHERE loc = 'lower leaf - between veins'));
                            
 INSERT INTO "host" VALUES(NULL, 'Quercus alba', 'White Oak', 'Quercus', 'Fagaceae');
 INSERT INTO "host" VALUES(NULL, 'Quercus phellos', 'Willow Oak', 'Quercus', 'Fagaceae');
@@ -70,3 +87,4 @@ DROP TABLE source;
 DROP TABLE gallhost;
 DROP TABLE host;
 DROP TABLE gall;
+DROP TABLE galllocation;
