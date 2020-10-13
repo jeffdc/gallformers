@@ -5,6 +5,11 @@ export default async function getHostsByGallId(req, res) {
         res.status(405).json({message: "Only GET is supported."});
     }
 
-    const hosts = DB.prepare('SELECT * from gallhost INNER JOIN host ON gallhost.hostid = host.id WHERE id = ?').all(req.query.id);
+    const sql = `SELECT hostsp.name, hostsp.synonyms, hostsp.commonnames
+            FROM host 
+            INNER JOIN species as hostsp ON (host.host_species_id = hostsp.species_id) 
+            INNER JOIN species ON (host.species_id = species.species_id)
+            WHERE host.species_id = ?`
+    const hosts = DB.prepare(sql).all(req.query.id);
     res.json(hosts);
 }

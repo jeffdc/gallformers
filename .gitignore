@@ -1,3 +1,6 @@
 node_modules
 .next
 .DS_store
+*.sqlite-wal
+*.sqlite-shm
+.vscode

@@ -6,6 +6,20 @@ export default async function getHosts(req, res) {
         res.status(405).json({message: "Only GET is supported."});
     }
 
-    const hosts = DB.prepare('SELECT * from host ORDER BY name').all();
+    const sql =
+        `SELECT DISTINCT hostsp.name, hostsp.synonyms, hostsp.commonnames
+        FROM host 
+        INNER JOIN species as hostsp ON (host.host_species_id = hostsp.species_id) 
+        INNER JOIN species ON (host.species_id = species.species_id)
+        ORDER BY hostsp.name`;
+    const hosts = DB.prepare(sql).all();
     res.json(hosts);
 }
+
+/*
+SELECT DISTINCT hostsp.name, hostsp.synonyms, hostsp.commonnames
+        FROM host 
+        INNER JOIN species as hostsp ON (host.host_species_id = hostsp.species_id) 
+        INNER JOIN species ON (host.species_id = species.species_id)
+        ORDER BY hostsp.name;
+*/

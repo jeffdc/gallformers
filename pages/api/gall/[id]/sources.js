@@ -5,7 +5,11 @@ export default async function getSourcesByGallId(req, res) {
         res.status(405).json({message: "Only GET is supported."});
     }
 
-    const hosts = DB.prepare(
-        'SELECT * from gallsource INNER JOIN source ON gallsource.sourceid = source.id WHERE id = ?').all(req.query.id);
+    const sql = `
+        SELECT * 
+        FROM speciessource 
+        INNER JOIN source ON (speciessource.source_id = source.source_id)
+        WHERE species_id = ?`
+    const hosts = DB.prepare(sql).all(req.query.id);
     res.json(hosts);
 }

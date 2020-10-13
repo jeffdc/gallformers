@@ -4,7 +4,7 @@ import { Typeahead } from 'react-bootstrap-typeahead';
 import { Container, Button, Form, Col } from 'react-bootstrap';
 import {useRouter} from "next/router";
 
-const Id = ({ hosts, locations }, {action = '/search'}) => {
+const Id = ({ hosts, hostNameMap, locations }) => {
     const router = useRouter(); 
     const [host, setHost] = useState("");
     const [location, setLocation] = useState("");
@@ -16,9 +16,9 @@ const Id = ({ hosts, locations }, {action = '/search'}) => {
     const handleSubmit = e => {
         e.preventDefault();
         router.push({
-            pathname: action,
+            pathname: '/search',
             query: {
-                host: host,
+                host: hostNameMap[host] ? hostNameMap[host] : host,
                 location: location,
                 detachable: detachable,
                 texture: texture,
@@ -46,17 +46,18 @@ const Id = ({ hosts, locations }, {action = '/search'}) => {
                             placeholder="What is the host species?"
                         />
                     </Form.Group>
-                    <Form.Group  as={Col} controlId="formLocation">
+                    <Form.Group as={Col} controlId="formLocation">
                         <Form.Label>Location</Form.Label>
                         <Typeahead
                             id="location"
+                            multiple
                             labelKey="loc"
                             onChange={setLocation}
                             options={locations}
                             placeholder="Where is the gall located?"
                         />
                     </Form.Group>
-                    <Form.Group  as={Col} controlId="formDetachable">
+                    <Form.Group as={Col} controlId="formDetachable">
                         <Form.Check 
                             id="detachable" 
                             label="Detachable?" 
@@ -65,7 +66,7 @@ const Id = ({ hosts, locations }, {action = '/search'}) => {
                     </Form.Group>
                 </Form.Row>
                 <Form.Row>
-                    <Form.Group  as={Col} controlId="formTexture">
+                    <Form.Group as={Col} controlId="formTexture">
                         <Form.Label>Texture</Form.Label>
                         <Typeahead
                             id="texture"
@@ -75,7 +76,7 @@ const Id = ({ hosts, locations }, {action = '/search'}) => {
                             placeholder="What is the texture of the gall?"
                         />
                     </Form.Group>   
-                    <Form.Group  as={Col} controlId="formAlignment">
+                    <Form.Group as={Col} controlId="formAlignment">
                         <Form.Label>Alignment</Form.Label>
                         <Typeahead
                             id="alignment"
@@ -85,7 +86,7 @@ const Id = ({ hosts, locations }, {action = '/search'}) => {
                             placeholder="What is the alignment of the gall?"
                         />
                     </Form.Group>
-                    <Form.Group  as={Col} controlId="formWalls">
+                    <Form.Group as={Col} controlId="formWalls">
                         <Form.Label>Walls</Form.Label>
                         <Typeahead
                             id="walls"
@@ -110,9 +111,12 @@ async function fetchHosts() {
     const response = await fetch('http://localhost:3000/api/host');
     const h = await response.json();
 
-    return h.flatMap ( h =>
-        [h.name, h.commonname]
-    ).sort()
+    let hosts = h.flatMap ( h =>
+        [h.name, h.commonNames]
+    ).filter(h => h).sort();
+    let hostNameMap = h.reduce ( (m, h) => (m[h.commonname] = h.name, m), {} );
+    
+    return { hosts, hostNameMap };
 }
 
 async function fetchGallLocations() {
@@ -124,8 +128,10 @@ async function fetchGallLocations() {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export async function getStaticProps() {
+    let { hosts, hostNameMap } = await fetchHosts();
     return { props: {
-           hosts: await fetchHosts(),
+           hosts: hosts,
+           hostNameMap: hostNameMap,
            locations: await fetchGallLocations()
         }
     }

@@ -1,4 +1,5 @@
-import { Container, Toast, Spinner } from 'react-bootstrap';
+import Link from 'next/link';
+import { Toast, Spinner, ListGroup } from 'react-bootstrap';
 import useSearch from '../hooks/use-search';
 import { useRouter } from 'next/router';
 
@@ -33,10 +34,18 @@ const Search = () => {
         )
     }
 
-    return (<Container>{data}</Container>)
+    return (
+        <ListGroup>
+            {data.map((gall) =>
+                <ListGroup.Item key={gall.species_id}>
+                    <Link href={'gall/'+gall.species_id}><a>{gall.name}</a></Link>
+                </ListGroup.Item>
+            )}
+        </ListGroup>
+    )
 }
 
-// Need this, apparently, for next.js 9.5, I suffered a lot to find this "answer".
+// Need this, apparently, for next.js 9.5, I "suffered" a lot to find this "answer".
 // see: https://github.com/facebook/react/issues/13991#issuecomment-669171027
 const S = () => <Search />;
 export default S;
