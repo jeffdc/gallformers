@@ -1,7 +1,40 @@
 -- Up
+
+-- These are static tables that hold various constants and what not. While it is tempting to slam them
+-- all together into one giant lookup table this leads to other problems.. see: https://www.red-gate.com/simple-talk/sql/database-administration/five-simple-database-design-errors-you-should-avoid/
 CREATE TABLE galllocation(
     loc_id INTEGER PRIMARY KEY NOT NULL,
-    loc TEXT
+    loc TEXT,
+    description TEXT
+);
+
+CREATE TALE texture(
+    texture_id INTEGER PRIMARY KEY NOT NULL,
+    texture text,
+    description TEXT
+);
+
+CREATE TABLE color(
+    color_id INTEGER PRIMARY KEY NOT NULL,
+    color text
+);
+
+CREATE TABLE walls(
+    walls_id INTEGER PRIMARY KEY NOT NULL,
+    walls text,
+    description TEXT
+);
+
+CREATE TABLE cells(
+    cells_id INTEGER PRIMARY KEY NOT NULL,
+    cells text,
+    description TEXT
+);
+
+CREATE table shape(
+    shape_id INTEGER PRIMARY KEY NOT NULL,
+    shape text,
+    description TEXT
 );
 
 CREATE TABLE abundance(
@@ -35,14 +68,20 @@ CREATE TABLE species(
 CREATE TABLE gall(
     species_id INTEGER NOT NULL,
     taxoncode TEXT NOT NULL CHECK (taxoncode = 'gall'),
-    detachable INTEGER,
-    texture TEXT,
-    alignment TEXT,
-    walls TEXT,
+    detachable INTEGER, -- boolean: 0 = false; 1 = true, standard sqlite
+    texture_id INTEGER,
+    alignment_id INTEGER,
+    walls_id INTEGER,
+    color_id INTEGER,
+    shape_id INTEGER,
     loc_id INTEGER,
     FOREIGN KEY(species_id) REFERENCES species(species_id)
     FOREIGN KEY(taxonCode) REFERENCES taxontype(taxonCode)
     FOREIGN KEY(loc_id) REFERENCES galllocation(loc_id)
+    FOREIGN KEY(walls_id) REFERENCES walls(walls_id)
+    FOREIGN KEY(color_id) REFERENCES color(color_id)
+    FOREIGN KEY(loc_id) REFERENCES shape(shape_id)
+    FOREIGN KEY(loc_id) REFERENCES alignment(alignment_id)
 );
 
 -- a host is just a many-to-many relationship between species
@@ -73,33 +112,60 @@ CREATE TABLE speciessource(
 INSERT INTO taxontype VALUES('gall', 'an abnormal outgrowth of plant tissue usually due to insect or mite parasites or fungi');
 
 INSERT INTO galllocation VALUES(NULL, 'bud');
-INSERT INTO galllocation VALUES(NULL, 'stem');
+INSERT INTO galllocation VALUES(NULL, 'petiole');
 INSERT INTO galllocation VALUES(NULL, 'root');
-INSERT INTO galllocation VALUES(NULL, 'upper leaf - on veins');
-INSERT INTO galllocation VALUES(NULL, 'upper leaf - between veins');
-INSERT INTO galllocation VALUES(NULL, 'upper leaf - vein angles');
-INSERT INTO galllocation VALUES(NULL, 'lower leaf - on veins');
-INSERT INTO galllocation VALUES(NULL, 'lower leaf - between veins');
-INSERT INTO galllocation VALUES(NULL, 'lower leaf - vein angles');
+INSERT INTO galllocation VALUES(NULL, 'upper leaf');
+INSERT INTO galllocation VALUES(NULL, 'lower leaf');
+INSERT INTO galllocation VALUES(NULL, 'leaf midrib');
+INSERT INTO galllocation VALUES(NULL, 'on leaf veins');
+INSERT INTO galllocation VALUES(NULL, 'between leaf veins');
+INSERT INTO galllocation VALUES(NULL, 'at leaf vein angles');
+INSERT INTO galllocation VALUES(NULL, 'flower'); -- is there a generic word to fill in for things like samara, catakin, etc.?
+INSERT INTO galllocation VALUES(NULL, 'fruit');
 
--- INSERT INTO "gall" VALUES(NULL, 'Andricus apiarium', NULL, 'Andricus', 'Cynipidae', 
---                            'Solitary, sessile, on underside of leaf close to edge in October, shaped like an old-fashioned straw beehive, white or pinkish, measuring up to 4.6 mm broad by 4.0 mm high. Inside is a large cavity with a transverse larval cell at very base. During the winter on the ground the outer fleshy layer shrivels and the gall becomes more cylindrical.',
---                            '1', 'hairless', 'erect', 'thick', 'uncommon', (SELECT id FROM galllocation WHERE loc = 'lower leaf - between veins'));
-                           
--- INSERT INTO "host" VALUES(NULL, 'Quercus alba', 'White Oak', 'Quercus', 'Fagaceae');
--- INSERT INTO "host" VALUES(NULL, 'Quercus phellos', 'Willow Oak', 'Quercus', 'Fagaceae');
--- INSERT INTO "host" VALUES(NULL, 'Quercus stellata', 'Post Oak', 'Quercus', 'Fagaceae');
+INSERT INTO walls VALUES(NULL, 'thin');
+INSERT INTO walls VALUES(NULL, 'thick');
+INSERT INTO walls VALUES(NULL, 'broken');
+INSERT INTO walls VALUES(NULL, 'false chamber');
 
--- INSERT INTO "gallhost" VALUES((SELECT id FROM host WHERE name = 'Quercus alba'), 
---                               (SELECT id from gall WHERE name = 'Andricus apiarium')
---                              );
+INSERT INTO cells VALUES(NULL, 'single');
+INSERT INTO cells VALUES(NULL, 'cluster');
+INSERT INTO cells VALUES(NULL, 'scattered');
+INSERT INTO cells VALUES(NULL, '2-10');
 
--- INSERT INTO "source" VALUES(NULL, 'New American Cynipid Wasps From Galls', 'Weld, L.H.', '1952-01-01 00:00;00.000', 
---                              'https://www.biodiversitylibrary.org/page/15672479#page/372/mode/1up',
---                              'Weld, Lewis H. "New American cynipid wasps from galls." Proceedings of the United States National Museum (1952).');
--- INSERT INTO "gallsource" VALUES((SELECT id from gall WHERE name = 'Andricus apiarium'),
---                                 (SELECT id from source WHERE title = 'New American Cynipid Wasps From Galls')
---                                );
+INSERT INTO alignment VALUES(NULL, 'erect');
+INSERT INTO alignment VALUES(NULL, 'drooping');
+INSERT INTO alignment VALUES(NULL, 'supine');
+INSERT INTO alignment VALUES(NULL, 'integral');
+
+INSERT INTO color VALUES(NULL, 'brown');
+INSERT INTO color VALUES(NULL, 'gray');
+INSERT INTO color VALUES(NULL, 'orange');
+INSERT INTO color VALUES(NULL, 'pink');
+INSERT INTO color VALUES(NULL, 'red');
+INSERT INTO color VALUES(NULL, 'white');
+INSERT INTO color VALUES(NULL, 'yellow');
+
+INSERT INTO texture VALUES(NULL, 'felt');
+INSERT INTO texture VALUES(NULL, 'pubescent');
+INSERT INTO texture VALUES(NULL, 'stiff');
+INSERT INTO texture VALUES(NULL, 'wooly');
+INSERT INTO texture VALUES(NULL, 'sticky');
+INSERT INTO texture VALUES(NULL, 'bumpy');
+INSERT INTO texture VALUES(NULL, 'waxy');
+INSERT INTO texture VALUES(NULL, 'areola');
+INSERT INTO texture VALUES(NULL, 'glaucous');
+INSERT INTO texture VALUES(NULL, 'hairy');
+INSERT INTO texture VALUES(NULL, 'hairless');
+INSERT INTO texture VALUES(NULL, 'resinous dots');
+
+INSERT INTO shape VALUES(NULL, 'compact');
+INSERT INTO shape VALUES(NULL, 'conical');
+INSERT INTO shape VALUES(NULL, 'globular');
+INSERT INTO shape VALUES(NULL, 'linear');
+INSERT INTO shape VALUES(NULL, 'sphere');
+INSERT INTO shape VALUES(NULL, 'tuft');
+
 
 -- Down
 -- DROP TABLE gallsource;

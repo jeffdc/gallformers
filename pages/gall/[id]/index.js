@@ -1,10 +1,16 @@
+import Link from 'next/link';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row} from 'react-bootstrap';
+
+function hostAsLink(h) {
+    return ( <Link key={h.species_id} href={"/host/[id]"} as={`/host/${h.species_id}`}><a>{h.name} </a></Link> )
+}
 
 const Gall = ({ gall }) => {
     return (    
     <div style={{
-        marginBottom: '5%'
+        marginBottom: '5%',
+        marginRight: '5%'
     }}>
         <Media>
             <img
@@ -12,7 +18,7 @@ const Gall = ({ gall }) => {
                 height={128}
                 className="mr-3"
                 src=""
-                alt={gall.name + '\nPhoto pending'}
+                alt={gall.name}
             />
             <Media.Body>
                 <Container className='p-3 border'>
@@ -25,7 +31,7 @@ const Gall = ({ gall }) => {
                     </Row>
                     <Row>
                         <Col>
-                            Hosts: {gall.hosts.map(h => h.name).join(', ')}
+                            Hosts: { gall.hosts.map(hostAsLink) }
                         </Col>
                     </Row>
                     <Row>
@@ -42,7 +48,9 @@ const Gall = ({ gall }) => {
                         <Col>Further Information: 
                             <ListGroup>
                                 {gall.sources.map((source) =>
-                                    <ListGroup.Item key={source.id} action href={source.link}>{source.citation}</ListGroup.Item>
+                                    <ListGroup.Item key={source.source_id}>
+                                        <a href={source.link}>{source.citation}</a>
+                                    </ListGroup.Item>
                                 )}
                             </ListGroup>
                         </Col>
@@ -56,14 +64,14 @@ const Gall = ({ gall }) => {
 
 
 async function fetchGall(id) {
-    const url = 'http://localhost:3000/api/gall/' + id;
+    const url = `http://localhost:3000/api/gall/${id}`;
     const resGall = await fetch(url);
     const gall = await resGall.json();
 
-    const resHosts = await fetch(url + '/hosts');
+    const resHosts = await fetch(`${url}/hosts`);
     gall.hosts = await resHosts.json();
 
-    const resSources = await fetch(url + '/sources');
+    const resSources = await fetch(`${url}/sources`);
     gall.sources = await resSources.json();
 
     return gall

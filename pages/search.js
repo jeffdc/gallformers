@@ -38,7 +38,7 @@ const Search = () => {
         <ListGroup>
             {data.map((gall) =>
                 <ListGroup.Item key={gall.species_id}>
-                    <Link href={'gall/'+gall.species_id}><a>{gall.name}</a></Link>
+                    <Link href={"gall/[id]"} as={`gall/${gall.species_id}`}><a>{gall.name}</a></Link>
                 </ListGroup.Item>
             )}
         </ListGroup>

@@ -6,11 +6,10 @@ export default async function getHostById(req, res) {
     }
 
     const sql = 
-        `SELECT hostsp.name, hostsp.synonyms, hostsp.commonnames
+        `SELECT DISTINCT species.* 
         FROM host 
-        INNER JOIN species as hostsp ON (host.host_species_id = hostsp.species_id) 
-        INNER JOIN species ON (host.spcies_id = species.specis_id)
-        WHERE id = ?`;
-    const host = DB.prepare(sql).all(req.query.id);
+        INNER JOIN species ON (species.species_id = host.host_species_id)
+        WHERE species.species_id = ?`;
+    const host = DB.prepare(sql).get(req.query.id);
     res.json(host);
 }

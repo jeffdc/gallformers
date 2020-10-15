@@ -6,7 +6,7 @@ export default async function getSourcesByGallId(req, res) {
     }
 
     const sql = `
-        SELECT * 
+        SELECT DISTINCT * 
         FROM speciessource 
         INNER JOIN source ON (speciessource.source_id = source.source_id)
         WHERE species_id = ?`

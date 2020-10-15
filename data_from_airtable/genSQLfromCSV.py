@@ -1,5 +1,6 @@
 import csv
 import pprint
+import re
 import sqlite3
 
 def csvtodict(filename):
@@ -47,48 +48,71 @@ def lookupspeciesid(sp):
 
     return r[0]
 
+def lookupsourceid(s):
+    cursor = db.cursor()
+    print(f'trying to lookup {s}')
+    tup = s,
+    cursor.execute("SELECT source_id FROM source WHERE title LIKE ?", tup)
+    r = cursor.fetchone()
+    if r == None:
+        print(f'Failed to lookup source_id for {s}')
+
+    return r[0]
+
+
 # sources is a dict so we are just getting the key when map it
-def sourcetosqlvals(i):
-    s = sources[i]
-    return (None, s["Title"], s["Author"], s["Year of publication"], s["Hyperlink"], s["Citation (MLA)"])
-db.executemany('INSERT INTO source VALUES(?,?,?,?,?,?)', map(sourcetosqlvals, sources))
+# def sourcetosqlvals(i):
+#     s = sources[i]
+#     return (None, s["Title"], s["Author"], s["Year of publication"], s["Hyperlink"], s["Citation (MLA)"])
+# db.executemany('INSERT INTO source VALUES(?,?,?,?,?,?)', map(sourcetosqlvals, sources))
 
-def hoststosqlvals(i):
-    h = hosts[i]
-    #                                     synonyms, common names                               desc, abundance
-    return (None, None, h["Specific Name"], None, None, h["Genus"], h["Family (from Taxonomy)"], None, None)
-db.executemany('INSERT INTO species VALUES(?,?,?,?,?,?,?,?,?)', map(hoststosqlvals, hosts))
+# def hoststosqlvals(i):
+#     h = hosts[i]
+#     #                                     synonyms, common names                               desc, abundance
+#     return (None, None, h["Specific Name"], None, None, h["Genus"], h["Family (from Taxonomy)"], None, None)
+# db.executemany('INSERT INTO species VALUES(?,?,?,?,?,?,?,?,?)', map(hoststosqlvals, hosts))
 
-def gallstospeciessqlvals(i):
-    g = galls[i]
-    name = g["Gall"]
-    genus = name.split(' ')[0]
-    family = lookupfamily(genus)
-    if family == "":
-        print(f'Failed to lookup family for {i} - {name}')
+# def gallstospeciessqlvals(i):
+#     g = galls[i]
+#     name = g["Gall"]
+#     genus = name.split(' ')[0]
+#     family = lookupfamily(genus)
+#     if family == "":
+#         print(f'Failed to lookup family for {i} - {name}')
 
-    #                              synonyms, common names                                        , abundance
-    return (None, 'gall', g["Gall"], None, None, genus, family, g["Description (from Source Contents)"], None)
-db.executemany('INSERT INTO species VALUES(?,?,?,?,?,?,?,?,?)', map(gallstospeciessqlvals, galls))
+#     #                              synonyms, common names                                        , abundance
+#     return (None, 'gall', g["Gall"], None, None, genus, family, g["Description (from Source Contents)"], None)
+# db.executemany('INSERT INTO species VALUES(?,?,?,?,?,?,?,?,?)', map(gallstospeciessqlvals, galls))
 
-def gallstogallsqlvals(i):
+# def gallstogallsqlvals(i):
+#     g = galls[i]
+#     speciesid = lookupspeciesid(g["Gall"])
+#     locid = lookuplocid(g["Location"])
+#     #                                           Texture
+#     return (speciesid, 'gall', g["Detachable"], None, g["Alignment"], g["Walls"], locid)
+# db.executemany('INSERT INTO gall VALUES(?,?,?,?,?,?,?)', map(gallstogallsqlvals, galls))
+
+# def gallhoststosqlvals(i):
+#     g = galls[i]
+#     speciesid = lookupspeciesid(g["Gall"])
+#     hs = filter(None, g["Host associations mentioned (from Descriptions)"].split(','))
+
+#     vals = [(lookupspeciesid(h), speciesid) for h in hs]
+#     db.executemany('INSERT INTO host VALUES(?,?)', vals)
+
+# v = map(gallhoststosqlvals, galls)
+# print(len(list(v)))
+
+def sourcetogallsqlvals(i):
     g = galls[i]
     speciesid = lookupspeciesid(g["Gall"])
-    locid = lookuplocid(g["Location"])
-    #                                           Texture
-    return (speciesid, 'gall', g["Detachable"], None, g["Alignment"], g["Walls"], locid)
-db.executemany('INSERT INTO gall VALUES(?,?,?,?,?,?,?)', map(gallstogallsqlvals, galls))
+    rawsources = g["Source (from Source Contents)"]
+    reader = csv.reader([rawsources], delimiter=',', quotechar='"')
+    for sources in reader:
+        vals = [(speciesid, lookupsourceid(s)) for s in filter(None, sources)]
+        db.executemany('INSERT INTO speciessource VALUES(?,?)', vals)
 
-def gallhoststosqlvals(i):
-    g = galls[i]
-    speciesid = lookupspeciesid(g["Gall"])
-    hs = filter(None, g["Host associations mentioned (from Descriptions)"].split(','))
-
-    vals = [(lookupspeciesid(h), speciesid) for h in hs]
-    print(vals)
-    db.executemany('INSERT INTO host VALUES(?,?)', vals)
-
-v = map(gallhoststosqlvals, galls)
+v = map(sourcetogallsqlvals, galls)
 print(len(list(v)))
 
 db.commit()
