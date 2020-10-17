@@ -12,22 +12,17 @@ export default async function search(req, res) {
     let q = req.query;
 
     let sql = 
-        `SELECT DISTINCT species.*, 
-                gall.detachable, gall.texture, gall.alignment, gall.walls,
-                hostsp.name as hostname, host.host_species_id as hostid,
-                galllocation.loc
-        FROM gall 
-        INNER JOIN host ON (host.species_id = gall.species_id)
-        INNER JOIN species ON (gall.species_id = species.species_id)
-        INNER JOIN species as hostsp ON (hostsp.species_id = host.host_species_id)
-        INNER JOIN galllocation ON (galllocation.loc_id = gall.loc_id) 
-        WHERE gall.detachable = ? AND 
-            (gall.texture LIKE ? OR gall.texture IS NULL) AND 
-            (gall.alignment LIKE ? OR gall.alignment IS NULL) AND 
-            (gall.walls LIKE ? OR gall.walls IS NULL) AND 
+        `SELECT DISTINCT v_gall.*, hostsp.name as host_name, hostsp.species_id AS host_species_id
+        FROM v_gall
+        INNER JOIN host ON (v_gall.species_id = host.species_id)
+        INNER JOIN species AS hostsp ON (hostsp.species_id = host.host_species_id)
+        WHERE (detachable = ? OR detachable is NOT NULL) AND 
+            (texture LIKE ? OR texture IS NULL) AND 
+            (alignment LIKE ? OR alignment IS NULL) AND 
+            (walls LIKE ? OR walls IS NULL) AND 
             hostsp.name LIKE ? AND 
-            (galllocation.loc LIKE ? OR galllocation.loc IS NULL)
-        ORDER BY species.name ASC`;
+            (loc LIKE ? OR loc IS NULL)
+        ORDER BY v_gall.name ASC`;
     var stmt = DB.prepare(sql);
     const galls = stmt.all(q.detachable ? 0 : 1, allIfNull(q.texture), allIfNull(q.alignment), allIfNull(q.walls), 
              allIfNull(q.host), allIfNull(q.location));
@@ -36,22 +31,17 @@ export default async function search(req, res) {
 }
 
 /*
-        SELECT species.*, 
-                gall.detachable, gall.texture, gall.alignment, gall.walls,
-                hostsp.name as hostname, host.host_species_id as hostid,
-                galllocation.loc
-        FROM gall 
-        INNER JOIN host ON (host.species_id = gall.species_id)
-        INNER JOIN species ON (gall.species_id = species.species_id)
-        INNER JOIN species as hostsp ON (hostsp.species_id = host.host_species_id)
-        INNER JOIN galllocation ON (galllocation.loc_id = gall.loc_id) 
-        WHERE gall.detachable = 0 AND 
-            (gall.texture LIKE '%' OR gall.texture IS NULL) AND 
-            (gall.alignment LIKE '%' OR gall.alignment IS NULL) AND 
-            (gall.walls LIKE '%' OR gall.walls IS NULL) AND 
-            hostsp.name LIKE 'Quercus alba' AND 
-            (galllocation.loc LIKE '%' OR galllocation.loc IS NULL)
-        ORDER BY species.name ASC;
+        SELECT DISTINCT v_gall.*, hostsp.name as host_name, hostsp.species_id AS host_species_id
+        FROM v_gall
+        INNER JOIN host ON (v_gall.species_id = host.species_id)
+        INNER JOIN species AS hostsp ON (hostsp.species_id = host.host_species_id)
+        WHERE (detachable = 0 OR detachable IS NOT NULL) AND 
+            (texture LIKE '%' OR texture IS NULL) AND 
+            (alignment LIKE '%' OR alignment IS NULL) AND 
+            (walls LIKE '%' OR walls IS NULL) AND 
+            hostsp.name LIKE 'Quercus velutina' AND 
+            (loc LIKE '%' OR loc IS NULL)
+        ORDER BY v_gall.name ASC;
 
 
  */

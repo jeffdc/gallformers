@@ -4,14 +4,17 @@ import { Typeahead } from 'react-bootstrap-typeahead';
 import { Container, Button, Form, Col } from 'react-bootstrap';
 import {useRouter} from "next/router";
 
-const Id = ({ hosts, hostNameMap, locations }) => {
+const Id = ({ hosts, hostNameMap, locations, textures, colors, alignments, shapes, cells, walls }) => {
     const router = useRouter(); 
     const [host, setHost] = useState("");
     const [location, setLocation] = useState("");
-    const [detachable, setDetachable] = useState(false);
+    const [detachable, setDetachable] = useState("");
     const [texture, setTexture] = useState("");
     const [alignment, setAlignment] = useState("");
-    const [walls, setWalls] = useState("");
+    const [wall, setWall] = useState("");
+    const [cell, setCell] = useState("");
+    const [color, setColor] = useState("");
+    const [shape, setShape] = useState("");
 
     const handleSubmit = e => {
         e.preventDefault();
@@ -23,7 +26,10 @@ const Id = ({ hosts, hostNameMap, locations }) => {
                 detachable: detachable,
                 texture: texture,
                 alignment: alignment,
-                walls: walls,                
+                walls: wall,
+                cells: cell,
+                color: color,
+                shape: shape                
             },
         })
     }
@@ -70,9 +76,10 @@ const Id = ({ hosts, hostNameMap, locations }) => {
                         <Form.Label>Texture</Form.Label>
                         <Typeahead
                             id="texture"
+                            multiple
                             labelKey="t"
                             onChange={setTexture}
-                            options={[ {t:"hairless"}, {t:"hairy"}]}
+                            options={textures}
                             placeholder="What is the texture of the gall?"
                         />
                     </Form.Group>   
@@ -82,7 +89,7 @@ const Id = ({ hosts, hostNameMap, locations }) => {
                             id="alignment"
                             labelKey="a"
                             onChange={setAlignment}
-                            options={[ {a:"erect"}, {a:"droopping"}]}
+                            options={alignments}
                             placeholder="What is the alignment of the gall?"
                         />
                     </Form.Group>
@@ -91,9 +98,41 @@ const Id = ({ hosts, hostNameMap, locations }) => {
                         <Typeahead
                             id="walls"
                             labelKey="w"
-                            onChange={setWalls}
-                            options={[ {w:"thin"}, {w:"thick"}, {w:"broken"}]}
+                            onChange={setWall}
+                            options={walls}
                             placeholder="What are the walls of the gall like?"
+                        />
+                    </Form.Group>
+                </Form.Row>
+                <Form.Row>
+                    <Form.Group as={Col} controlId="formCells">
+                        <Form.Label>Cells</Form.Label>
+                        <Typeahead
+                            id="cells"
+                            labelKey="c"
+                            onChange={setCell}
+                            options={cells}
+                            placeholder="How many cells in the gall?"
+                        />
+                    </Form.Group>   
+                    <Form.Group as={Col} controlId="formColor">
+                        <Form.Label>Color</Form.Label>
+                        <Typeahead
+                            id="color"
+                            labelKey="cl"
+                            onChange={setColor}
+                            options={colors}
+                            placeholder="What color is the gall?"
+                        />
+                    </Form.Group>
+                    <Form.Group as={Col} controlId="formShape">
+                        <Form.Label>Shape</Form.Label>
+                        <Typeahead
+                            id="shape"
+                            labelKey="p"
+                            onChange={setShape}
+                            options={shapes}
+                            placeholder="What shape is the gall?"
                         />
                     </Form.Group>
                 </Form.Row>
@@ -112,18 +151,19 @@ async function fetchHosts() {
     const h = await response.json();
 
     let hosts = h.flatMap ( h =>
-        [h.name, h.commonNames]
+        [h.name, h.commonnames]
     ).filter(h => h).sort();
     let hostNameMap = h.reduce ( (m, h) => (m[h.commonname] = h.name, m), {} );
     
     return { hosts, hostNameMap };
 }
 
-async function fetchGallLocations() {
-    const response = await fetch('http://localhost:3000/api/galllocation');
+// helper that fetches the static lookup data at url and then returns the the results mapped using the function f
+async function fetchLookups(url, f) {
+    const response = await fetch(url);
     const j = await response.json();
 
-    return j.map(l => l.loc)
+    return j.map(f)
 }
 
 // Use static so that this stuff can be built once on the server-side and then cached.
@@ -132,7 +172,13 @@ export async function getStaticProps() {
     return { props: {
            hosts: hosts,
            hostNameMap: hostNameMap,
-           locations: await fetchGallLocations()
+           locations: await fetchLookups('http://localhost:3000/api/gall/location', (l => l.loc)),
+           colors: await fetchLookups('http://localhost:3000/api/gall/color', (c => c.color)),
+           shapes: await fetchLookups('http://localhost:3000/api/gall/shape', (s => s.shape)),
+           textures: await fetchLookups('http://localhost:3000/api/gall/texture', (t => t.texture)),
+           alignments: await fetchLookups('http://localhost:3000/api/gall/alignment', (a => a.alignment)),
+           walls: await fetchLookups('http://localhost:3000/api/gall/walls', (w => w.walls)),
+           cells: await fetchLookups('http://localhost:3000/api/gall/cells', (c => c.cells))
         }
     }
 }

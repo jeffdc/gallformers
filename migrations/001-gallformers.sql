@@ -2,13 +2,13 @@
 
 -- These are static tables that hold various constants and what not. While it is tempting to slam them
 -- all together into one giant lookup table this leads to other problems.. see: https://www.red-gate.com/simple-talk/sql/database-administration/five-simple-database-design-errors-you-should-avoid/
-CREATE TABLE galllocation(
+CREATE TABLE location(
     loc_id INTEGER PRIMARY KEY NOT NULL,
     loc TEXT,
     description TEXT
 );
 
-CREATE TALE texture(
+CREATE TABLE texture(
     texture_id INTEGER PRIMARY KEY NOT NULL,
     texture text,
     description TEXT
@@ -31,14 +31,21 @@ CREATE TABLE cells(
     description TEXT
 );
 
-CREATE table shape(
+CREATE TABLE alignment(
+    alignment_id INTEGER PRIMARY KEY NOT NULL,
+    alignment text,
+    description TEXT
+);
+
+CREATE TABLE shape(
     shape_id INTEGER PRIMARY KEY NOT NULL,
     shape text,
     description TEXT
 );
 
 CREATE TABLE abundance(
-    adundancecode TEXT PRIMARY KEY NOT NULL,
+    abundance_id INTEGER PRIMARY KEY NOT NULL,
+    abundance TEXT,
     description TEXT,
     reference TEXT -- URL to 
 );
@@ -51,18 +58,25 @@ CREATE TABLE taxontype(
     description TEXT NOT NULL
 );
 
+CREATE TABLE family(
+    family_id INTEGER PRIMARY KEY NOT NULL,
+    name TEXT,
+    description TEXT
+);
+
 CREATE TABLE species(
     species_id INTEGER PRIMARY KEY NOT NULL,
     taxoncode TEXT,
     name TEXT NOT NULL, -- this is the accepted binomial 'Genus species' name
     synonyms TEXT, -- CSV text
-    commonNames TEXT, -- CSV text
+    commonnames TEXT, -- CSV text
     genus TEXT NOT NULL,
-    family TEXT NOT NULL,
+    family_id INTEGER NOT NULL,
     description TEXT,
-    abundancecode TEXT,
+    abundance_id INTEGER,
     FOREIGN KEY(taxoncode) REFERENCES taxontype(taxonCode),
-    FOREIGN KEY(abundancecode) REFERENCES abundance(abundancecode)
+    FOREIGN KEY(abundance_id) REFERENCES abundance(abundance_id),
+    FOREIGN KEY(family_id) REFERENCES family(family_id)
 );
 
 CREATE TABLE gall(
@@ -72,13 +86,15 @@ CREATE TABLE gall(
     texture_id INTEGER,
     alignment_id INTEGER,
     walls_id INTEGER,
+    cells_id INTEGER,
     color_id INTEGER,
     shape_id INTEGER,
     loc_id INTEGER,
     FOREIGN KEY(species_id) REFERENCES species(species_id)
     FOREIGN KEY(taxonCode) REFERENCES taxontype(taxonCode)
-    FOREIGN KEY(loc_id) REFERENCES galllocation(loc_id)
+    FOREIGN KEY(loc_id) REFERENCES location(loc_id)
     FOREIGN KEY(walls_id) REFERENCES walls(walls_id)
+    FOREIGN KEY(cells_id) REFERENCES walls(cells_id)
     FOREIGN KEY(color_id) REFERENCES color(color_id)
     FOREIGN KEY(loc_id) REFERENCES shape(shape_id)
     FOREIGN KEY(loc_id) REFERENCES alignment(alignment_id)
@@ -108,35 +124,68 @@ CREATE TABLE speciessource(
     FOREIGN KEY(source_id) REFERENCES source(source_id)
 );
 
+
+-- Here are some view defintions to make working with the relational model a bit simpler
+CREATE VIEW v_gall
+AS
+SELECT DISTINCT
+    gall.*,
+    location.loc,
+    walls.walls,
+    color.color,
+    alignment.alignment,
+    texture.texture,
+    shape.shape,
+    cells.cells,
+    species.name,
+    species.synonyms,
+    species.commonnames,
+    species.genus,
+    species.description,
+    abundance.abundance, 
+    family.name as family
+FROM
+    gall
+INNER JOIN species ON (species.species_id = gall.species_id)
+INNER JOIN family ON (species.family_id = family.family_id)
+LEFT JOIN location ON (location.loc_id = gall.loc_id)
+LEFT JOIN walls ON (walls.walls_id = gall.walls_id)
+LEFT JOIN color ON (color.color_id = gall.color_id)
+LEFT JOIN alignment ON (alignment.alignment_id = gall.alignment_id)
+LEFT JOIN texture ON (texture.texture_id = gall.texture_id)
+LEFT JOIN shape ON (shape.shape_id = gall.shape_id)
+LEFT JOIN cells ON (cells.cells_id = gall.cells_id)
+LEFT JOIN abundance ON (abundance.abundance_id = species.abundance_id);
+
 -- This is all static data that is not curated outside of this system.
 INSERT INTO taxontype VALUES('gall', 'an abnormal outgrowth of plant tissue usually due to insect or mite parasites or fungi');
 
-INSERT INTO galllocation VALUES(NULL, 'bud');
-INSERT INTO galllocation VALUES(NULL, 'petiole');
-INSERT INTO galllocation VALUES(NULL, 'root');
-INSERT INTO galllocation VALUES(NULL, 'upper leaf');
-INSERT INTO galllocation VALUES(NULL, 'lower leaf');
-INSERT INTO galllocation VALUES(NULL, 'leaf midrib');
-INSERT INTO galllocation VALUES(NULL, 'on leaf veins');
-INSERT INTO galllocation VALUES(NULL, 'between leaf veins');
-INSERT INTO galllocation VALUES(NULL, 'at leaf vein angles');
-INSERT INTO galllocation VALUES(NULL, 'flower'); -- is there a generic word to fill in for things like samara, catakin, etc.?
-INSERT INTO galllocation VALUES(NULL, 'fruit');
+INSERT INTO location VALUES(NULL, 'bud', '');
+INSERT INTO location VALUES(NULL, 'petiole', '');
+INSERT INTO location VALUES(NULL, 'root', '');
+INSERT INTO location VALUES(NULL, 'upper leaf', '');
+INSERT INTO location VALUES(NULL, 'lower leaf', '');
+INSERT INTO location VALUES(NULL, 'leaf midrib', '');
+INSERT INTO location VALUES(NULL, 'on leaf veins', '');
+INSERT INTO location VALUES(NULL, 'between leaf veins', '');
+INSERT INTO location VALUES(NULL, 'at leaf vein angles', '');
+INSERT INTO location VALUES(NULL, 'flower', ''); -- is there a generic word to fill in for things like samara, catakin, etc.?
+INSERT INTO location VALUES(NULL, 'fruit', '');
 
-INSERT INTO walls VALUES(NULL, 'thin');
-INSERT INTO walls VALUES(NULL, 'thick');
-INSERT INTO walls VALUES(NULL, 'broken');
-INSERT INTO walls VALUES(NULL, 'false chamber');
+INSERT INTO walls VALUES(NULL, 'thin', '');
+INSERT INTO walls VALUES(NULL, 'thick', '');
+INSERT INTO walls VALUES(NULL, 'broken', '');
+INSERT INTO walls VALUES(NULL, 'false chamber', '');
 
-INSERT INTO cells VALUES(NULL, 'single');
-INSERT INTO cells VALUES(NULL, 'cluster');
-INSERT INTO cells VALUES(NULL, 'scattered');
-INSERT INTO cells VALUES(NULL, '2-10');
+INSERT INTO cells VALUES(NULL, 'single', '');
+INSERT INTO cells VALUES(NULL, 'cluster', '');
+INSERT INTO cells VALUES(NULL, 'scattered', '');
+INSERT INTO cells VALUES(NULL, '2-10', '');
 
-INSERT INTO alignment VALUES(NULL, 'erect');
-INSERT INTO alignment VALUES(NULL, 'drooping');
-INSERT INTO alignment VALUES(NULL, 'supine');
-INSERT INTO alignment VALUES(NULL, 'integral');
+INSERT INTO alignment VALUES(NULL, 'erect', '');
+INSERT INTO alignment VALUES(NULL, 'drooping', '');
+INSERT INTO alignment VALUES(NULL, 'supine', '');
+INSERT INTO alignment VALUES(NULL, 'integral', '');
 
 INSERT INTO color VALUES(NULL, 'brown');
 INSERT INTO color VALUES(NULL, 'gray');
@@ -146,25 +195,25 @@ INSERT INTO color VALUES(NULL, 'red');
 INSERT INTO color VALUES(NULL, 'white');
 INSERT INTO color VALUES(NULL, 'yellow');
 
-INSERT INTO texture VALUES(NULL, 'felt');
-INSERT INTO texture VALUES(NULL, 'pubescent');
-INSERT INTO texture VALUES(NULL, 'stiff');
-INSERT INTO texture VALUES(NULL, 'wooly');
-INSERT INTO texture VALUES(NULL, 'sticky');
-INSERT INTO texture VALUES(NULL, 'bumpy');
-INSERT INTO texture VALUES(NULL, 'waxy');
-INSERT INTO texture VALUES(NULL, 'areola');
-INSERT INTO texture VALUES(NULL, 'glaucous');
-INSERT INTO texture VALUES(NULL, 'hairy');
-INSERT INTO texture VALUES(NULL, 'hairless');
-INSERT INTO texture VALUES(NULL, 'resinous dots');
+INSERT INTO texture VALUES(NULL, 'felt', '');
+INSERT INTO texture VALUES(NULL, 'pubescent', '');
+INSERT INTO texture VALUES(NULL, 'stiff', '');
+INSERT INTO texture VALUES(NULL, 'wooly', '');
+INSERT INTO texture VALUES(NULL, 'sticky', '');
+INSERT INTO texture VALUES(NULL, 'bumpy', '');
+INSERT INTO texture VALUES(NULL, 'waxy', '');
+INSERT INTO texture VALUES(NULL, 'areola', '');
+INSERT INTO texture VALUES(NULL, 'glaucous', '');
+INSERT INTO texture VALUES(NULL, 'hairy', '');
+INSERT INTO texture VALUES(NULL, 'hairless', '');
+INSERT INTO texture VALUES(NULL, 'resinous dots', '');
 
-INSERT INTO shape VALUES(NULL, 'compact');
-INSERT INTO shape VALUES(NULL, 'conical');
-INSERT INTO shape VALUES(NULL, 'globular');
-INSERT INTO shape VALUES(NULL, 'linear');
-INSERT INTO shape VALUES(NULL, 'sphere');
-INSERT INTO shape VALUES(NULL, 'tuft');
+INSERT INTO shape VALUES(NULL, 'compact', '');
+INSERT INTO shape VALUES(NULL, 'conical', '');
+INSERT INTO shape VALUES(NULL, 'globular', '');
+INSERT INTO shape VALUES(NULL, 'linear', '');
+INSERT INTO shape VALUES(NULL, 'sphere', '');
+INSERT INTO shape VALUES(NULL, 'tuft', '');
 
 
 -- Down
@@ -173,4 +222,4 @@ INSERT INTO shape VALUES(NULL, 'tuft');
 -- DROP TABLE gallhost;
 -- DROP TABLE host;
 -- DROP TABLE gall;
--- DROP TABLE galllocation;
+-- DROP TABLE location;

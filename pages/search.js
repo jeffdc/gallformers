@@ -1,7 +1,9 @@
 import Link from 'next/link';
-import { Toast, Spinner, ListGroup } from 'react-bootstrap';
+import { Toast, Spinner, Card, CardColumns, Collapse, Button } from 'react-bootstrap';
 import useSearch from '../hooks/use-search';
 import { useRouter } from 'next/router';
+import CardTextCollapse from './components/cardcollapse';
+import SearchBar from './components/searchbar';
 
 const Search = () => {
     const router = useRouter();
@@ -12,6 +14,9 @@ const Search = () => {
         texture: router.query.texture,
         alignment: router.query.alignment,
         walls: router.query.walls,
+        color: router.query.color,
+        shape: router.query.shape,
+        cells: router.query.cells,
     };
 
     const { data, error } = useSearch(search);
@@ -35,13 +40,20 @@ const Search = () => {
     }
 
     return (
-        <ListGroup>
-            {data.map((gall) =>
-                <ListGroup.Item key={gall.species_id}>
-                    <Link href={"gall/[id]"} as={`gall/${gall.species_id}`}><a>{gall.name}</a></Link>
-                </ListGroup.Item>
-            )}
-        </ListGroup>
+        <div>
+            <CardColumns className='m-2 p-2'>
+                {data.map((gall) =>
+                    <Card key={gall.species_id} className="shadow-sm">
+                        <Card.Img variant="top" width="200px" src="/images/gall.jpg" />
+                        <Card.Body>
+                            <Card.Title><Link href={"gall/[id]"} as={`gall/${gall.species_id}`}><a>{gall.name}</a></Link></Card.Title>
+                            <CardTextCollapse text={gall.description} />
+                        </Card.Body>
+                    </Card>
+                )}
+            </CardColumns>
+            <SearchBar search={search}></SearchBar>
+        </div>
     )
 }
 

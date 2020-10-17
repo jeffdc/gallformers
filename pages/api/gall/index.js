@@ -6,10 +6,8 @@ export default async function getGalls(req, res) {
     }
 
     const sql =
-        `SELECT gall.detachable, gall.texture, gall.alignment, gall.walls, gl.loc, species.*
-        FROM gall
-        INNER JOIN galllocation AS gl ON (gl.loc_id = gall.loc_id)
-        INNER JOIN species ON (species.species_id = gall.species_id)
+        `SELECT v_gall.*
+        FROM v_gall
         ORDER BY name ASC`;
     const galls = DB.prepare(sql).all();
     res.json(galls);
