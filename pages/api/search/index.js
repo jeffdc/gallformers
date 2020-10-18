@@ -24,7 +24,8 @@ export default async function search(req, res) {
             (loc LIKE ? OR loc IS NULL)
         ORDER BY v_gall.name ASC`;
     var stmt = DB.prepare(sql);
-    const galls = stmt.all(q.detachable ? 0 : 1, allIfNull(q.texture), allIfNull(q.alignment), allIfNull(q.walls), 
+    const detachable = allIfNull(q.detachable) === 'no' ? 0 : 1;
+    const galls = stmt.all(detachable, allIfNull(q.texture), allIfNull(q.alignment), allIfNull(q.walls), 
              allIfNull(q.host), allIfNull(q.location));
 
     res.json(galls);

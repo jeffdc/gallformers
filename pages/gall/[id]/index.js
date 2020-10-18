@@ -17,7 +17,7 @@ const Gall = ({ gall }) => {
                 width={170}
                 height={128}
                 className="mr-3"
-                src=""
+                src="/images/gall.jpg"
                 alt={gall.name}
             />
             <Media.Body>

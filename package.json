@@ -11,6 +11,7 @@
     "better-sqlite3": "^7.1.1",
     "better-sqlite3-helper": "^3.1.1",
     "bootstrap": "^4.5.2",
+    "formik": "^2.2.0",
     "isomorphic-unfetch": "^3.0.0",
     "next": "9.5.3",
     "react": "16.13.1",
@@ -18,6 +19,10 @@
     "react-bootstrap-typeahead": "^5.1.1",
     "react-dom": "16.13.1",
     "sqlite": "^4.0.15",
-    "swr": "^0.3.5"
+    "swr": "^0.3.5",
+    "yup": "^0.29.3"
+  },
+  "devDependencies": {
+    "@types/yup": "^0.29.8"
   }
 }

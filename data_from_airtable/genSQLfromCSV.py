@@ -28,6 +28,11 @@ validnames = csvtodict('data_from_airtable/valid-names.csv') # Current Name	Reco
 # pprint.PrettyPrinter(indent=2).pprint(sources)
 db = sqlite3.connect('gallformers.sqlite')
 
+# blow away any data that exists
+for table in ['speciessource', 'host', 'gall', 'source', 'species', 'family']:
+    db.execute(f'DELETE FROM {table}')
+db.commit()
+
 def lookupfamily(family):
     cursor = db.cursor()
     tup = family, # sure is hacky
@@ -82,20 +87,16 @@ def lookupsourceid(s):
 
     return r[0]
 
-familyvals = [(None, family[i]["Family"], family[i]["Type"]) for i in family if family[i]["Family"] != ""]
-db.executemany('INSERT INTO family VALUES(?,?,?)', familyvals)
-print(f'Adding {len(familyvals)} families...')
+# grab (map) all unique (set) family names, with their type (tuple), that are not an empty string (filter)
+familyset = set(filter(lambda f: f[0] != "", map(lambda i: (family[i]["Family"], family[i]["Type"]), family)))
+print(f'Starting with {len(familyset)} families from family-upper-level...')
 
-def familyfromhost(i):
-    return hosts[i]["Family (from Taxonomy)"]
+familiesfromhosts = set(map(lambda f: (f, 'Plant'), set(map(lambda i: hosts[i]["Family (from Taxonomy)"], hosts))))
+print(f'Checking {len(familiesfromhosts)} more families from hosts...')
+familyset = familiesfromhosts.union(familyset)
+print(f'Adding {len(familyset)} families...')
+db.executemany('INSERT INTO family VALUES(?,?,?)', [(None, f[0], f[1]) for f in familyset])
 
-familiesfromhosts = set(map(familyfromhost, hosts))
-familyvals = [(None, f, "Plant") for f in familiesfromhosts]
-db.executemany('INSERT INTO family VALUES(?,?,?)', familyvals)
-print(f'Adding {len(familiesfromhosts)} families from hosts records...')
-#################
-db.commit()
-#################
 sourcevals = [(None, sources[i]["Title"], sources[i]["Author"], sources[i]["Year of publication"], sources[i]["Hyperlink"], sources[i]["Citation (MLA)"]) for i in sources]
 db.executemany('INSERT INTO source VALUES(?,?,?,?,?,?)', sourcevals)
 print(f'Adding {len(sourcevals)} sources...')
@@ -118,10 +119,13 @@ totalgallhosts = 0
 for i in galls:
     g = galls[i]
     speciesid = lookupspeciesid(g["Gall"])
-    hs = filter(None, g["Host associations mentioned (from Descriptions)"].split(','))
+    hs = [h for h in g["Host Plant"].split(',') if h]
+    hs2 = [h for h in g["Host associations mentioned (from Descriptions)"].split(',') if h]
+    hs = set(hs).union(set(hs2))
     totalgallhosts = totalgallhosts + len(list(hs))
 
     vals = [(lookupspeciesid(h), speciesid) for h in hs]
+    print(f'spid = {speciesid} and hosts {list(vals)}')
     db.executemany('INSERT INTO host VALUES(?,?)', vals)
 
 print(f'added {totalgallhosts} host-gall relationships')

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Toast, Spinner, Card, CardColumns, Collapse, Button } from 'react-bootstrap';
+import { Toast, Spinner, Card, CardColumns } from 'react-bootstrap';
 import useSearch from '../hooks/use-search';
 import { useRouter } from 'next/router';
 import CardTextCollapse from './components/cardcollapse';

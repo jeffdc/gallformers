@@ -6,9 +6,9 @@ export default async function getFamilies(req, res) {
     }
 
     const sql =
-        `SELECT DISTINCT v_gall.family
-        FROM v_gall
-        ORDER BY family ASC`;
+        `SELECT *
+        FROM family
+        ORDER BY name ASC`;
     const families = DB.prepare(sql).all();
     res.json(families);
 }

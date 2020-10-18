@@ -1,8 +1,7 @@
 import { Container, Col, Row } from 'react-bootstrap';
-import { useState } from 'react';
 
 function anyIfEmptyString(x) {
-    return x.length <= 0 || x == null ? 'Any' : x
+    return x == null || x === undefined || x.length <= 0 ? 'Any' : x
 }
 
 const SearchBar = props => {
