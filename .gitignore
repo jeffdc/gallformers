@@ -1,7 +1,8 @@
 node_modules
 .next
 .DS_store
-*.sqlite-wal
-*.sqlite-shm
+gallformers.sqlite-wal
+gallformers.sqlite-shm
 .vscode
 .env.local
+.vercel

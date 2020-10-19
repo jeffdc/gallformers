@@ -58,10 +58,10 @@ const fetcher = async (url) => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export async function getStaticProps() {
-    const response = await fetch(`${process.env.API_URL}/gall/family`);
+    const response = await fetch(`${process.env.API_URL}/api/gall/family`);
     const families = await response.json();
 
-    const gresp = await fetch(`${process.env.API_URL}/gall`);
+    const gresp = await fetch(`${process.env.API_URL}/api/gall`);
     const galls = await gresp.json();
     function g(acc, cur) {
         if (acc.get(cur['family'])) {
