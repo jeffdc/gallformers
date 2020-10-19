@@ -64,7 +64,7 @@ const Gall = ({ gall }) => {
 
 
 async function fetchGall(id) {
-    const url = `http://localhost:3000/api/gall/${id}`;
+    const url = `${process.env.API_URL}/gall/${id}`;
     const resGall = await fetch(url);
     const gall = await resGall.json();
 
@@ -86,7 +86,7 @@ export async function getStaticProps(context) {
 }
 
 export async function getStaticPaths() {
-    const res = await fetch('http://localhost:3000/api/gall');
+    const res = await fetch(`${process.env.API_URL}/gall`);
     const galls = await res.json();
 
     const paths = galls.map((gall) => ({

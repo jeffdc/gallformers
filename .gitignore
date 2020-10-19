@@ -4,3 +4,4 @@ node_modules
 *.sqlite-wal
 *.sqlite-shm
 .vscode
+.env.local

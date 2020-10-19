@@ -46,7 +46,7 @@ const Host = ({ host }) => {
 
 
 async function fetchHost(id) {
-    const url = `http://localhost:3000/api/host/${id}`;
+    const url = `${process.env.API_URL}/host/${id}`;
     const resHost = await fetch(url);
     const host = await resHost.json();
 
@@ -65,7 +65,7 @@ export async function getStaticProps(context) {
 }
 
 export async function getStaticPaths() {
-    const res = await fetch('http://localhost:3000/api/host');
+    const res = await fetch(`${process.env.API_URL}/host`);
     const hosts = await res.json();
 
     const paths = hosts.map((host) => ({
