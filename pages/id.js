@@ -83,6 +83,7 @@ const Id = ({ hosts, hostNameMap, locations, textures, colors, alignments, shape
                                     errors={errors}
                                     options={locations}
                                     placeholder="Where is the gall located?"
+                                    multiple
                                 />
                             </Form.Group>
                             <Form.Group as={Col} controlId="detachable">
@@ -107,6 +108,7 @@ const Id = ({ hosts, hostNameMap, locations, textures, colors, alignments, shape
                                     errors={errors}
                                     options={textures}
                                     placeholder="What is the texture of the gall?"
+                                    multiple
                                 />
                             </Form.Group>   
                             <Form.Group as={Col} controlId="formAlignment">
@@ -180,7 +182,7 @@ const Id = ({ hosts, hostNameMap, locations, textures, colors, alignments, shape
 
 
 async function fetchHosts() {
-    const response = await fetch('http://localhost:3000/api/host');
+    const response = await fetch(`${process.env.API_URL}/host`);
     const h = await response.json();
 
     let hosts = h.flatMap ( h =>
@@ -201,17 +203,18 @@ async function fetchLookups(url, f) {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export async function getStaticProps() {
+    const api = process.env.API_URL;
     let { hosts, hostNameMap } = await fetchHosts();
     return { props: {
            hosts: hosts,
            hostNameMap: hostNameMap,
-           locations: await fetchLookups('http://localhost:3000/api/gall/location', (l => l.loc)),
-           colors: await fetchLookups('http://localhost:3000/api/gall/color', (c => c.color)),
-           shapes: await fetchLookups('http://localhost:3000/api/gall/shape', (s => s.shape)),
-           textures: await fetchLookups('http://localhost:3000/api/gall/texture', (t => t.texture)),
-           alignments: await fetchLookups('http://localhost:3000/api/gall/alignment', (a => a.alignment)),
-           walls: await fetchLookups('http://localhost:3000/api/gall/walls', (w => w.walls)),
-           cells: await fetchLookups('http://localhost:3000/api/gall/cells', (c => c.cells))
+           locations: await fetchLookups(`${api}/gall/location`, (l => l.loc)),
+           colors: await fetchLookups(`${api}/gall/color`, (c => c.color)),
+           shapes: await fetchLookups(`${api}/gall/shape`, (s => s.shape)),
+           textures: await fetchLookups(`${api}/gall/texture`, (t => t.texture)),
+           alignments: await fetchLookups(`${api}/gall/alignment`, (a => a.alignment)),
+           walls: await fetchLookups(`${api}/gall/walls`, (w => w.walls)),
+           cells: await fetchLookups(`${api}/gall/cells`, (c => c.cells))
         }
     }
 }

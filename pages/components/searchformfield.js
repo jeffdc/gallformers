@@ -3,7 +3,7 @@ import { Field } from 'formik';
 
 // A form field used on the search page. It uses Formix and Typeahead.
 // Must wrap the Typeahead in a Formix Field so that we can access Formix managed state
-const SearchFormField = ( {name, touched, errors, options, placeholder} ) => {
+const SearchFormField = ( {name, touched, errors, options, placeholder, multiple} ) => {
     return (
         <>
             <Field name={name}>
@@ -16,6 +16,7 @@ const SearchFormField = ( {name, touched, errors, options, placeholder} ) => {
                         value={field.value}
                         placeholder={placeholder}
                         isInvalid={!!form.errors[name]}
+                        multiple={multiple}
                 />                                    
                 }
             </Field>
