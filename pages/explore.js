@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { Card, Nav, Button, ListGroup, Accordion } from 'react-bootstrap';
-import useSWR from 'swr';
 
 const Explore = ({families, gallsByFamily}) => {
     return (
@@ -59,10 +58,6 @@ const fetcher = async (url) => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export async function getStaticProps() {
-    // const { families, error } = useSWR( () =>
-    //     '/api/gall/family',
-    //     fetcher
-    // );
     const response = await fetch(`${process.env.API_URL}/gall/family`);
     const families = await response.json();
 
