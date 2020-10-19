@@ -86,6 +86,9 @@ export async function getStaticProps(context) {
 }
 
 export async function getStaticPaths() {
+    console.log('======================')
+    console.log(process);
+    console.log(process.env);
     const res = await fetch(`${process.env.API_URL}/gall`);
     const galls = await res.json();
 
