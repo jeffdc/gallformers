@@ -64,7 +64,7 @@ const Gall = ({ gall }) => {
 
 
 async function fetchGall(id) {
-    const url = `${process.env.API_URL}/gall/${id}`;
+    const url = `${process.env.API_URL}/api/gall/${id}`;
     const resGall = await fetch(url);
     const gall = await resGall.json();
 
@@ -86,10 +86,10 @@ export async function getStaticProps(context) {
 }
 
 export async function getStaticPaths() {
-    console.log('======================')
-    console.log(process);
-    console.log(process.env);
-    const res = await fetch(`${process.env.API_URL}/gall`);
+    console.log("FUCK VERCEL=============================================================================================");
+    console.log(`${process.env.API_URL}/api/gall`);
+    const res = await fetch(`${process.env.API_URL}/api/gall`);
+    console.log(res);
     const galls = await res.json();
 
     const paths = galls.map((gall) => ({

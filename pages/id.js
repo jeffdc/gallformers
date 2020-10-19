@@ -182,7 +182,7 @@ const Id = ({ hosts, hostNameMap, locations, textures, colors, alignments, shape
 
 
 async function fetchHosts() {
-    const response = await fetch(`${process.env.API_URL}/host`);
+    const response = await fetch(`${process.env.API_URL}/api/host`);
     const h = await response.json();
 
     let hosts = h.flatMap ( h =>
@@ -196,6 +196,9 @@ async function fetchHosts() {
 // helper that fetches the static lookup data at url and then returns the the results mapped using the function f
 async function fetchLookups(url, f) {
     const response = await fetch(url);
+    if (response.status != 200) {
+        throw new Error(response);
+    }
     const j = await response.json();
 
     return j.map(f)
@@ -208,13 +211,13 @@ export async function getStaticProps() {
     return { props: {
            hosts: hosts,
            hostNameMap: hostNameMap,
-           locations: await fetchLookups(`${api}/gall/location`, (l => l.loc)),
-           colors: await fetchLookups(`${api}/gall/color`, (c => c.color)),
-           shapes: await fetchLookups(`${api}/gall/shape`, (s => s.shape)),
-           textures: await fetchLookups(`${api}/gall/texture`, (t => t.texture)),
-           alignments: await fetchLookups(`${api}/gall/alignment`, (a => a.alignment)),
-           walls: await fetchLookups(`${api}/gall/walls`, (w => w.walls)),
-           cells: await fetchLookups(`${api}/gall/cells`, (c => c.cells))
+           locations: await fetchLookups(`${api}/api/gall/location`, (l => l.loc)),
+           colors: await fetchLookups(`${api}/api/gall/color`, (c => c.color)),
+           shapes: await fetchLookups(`${api}/api/gall/shape`, (s => s.shape)),
+           textures: await fetchLookups(`${api}/api/gall/texture`, (t => t.texture)),
+           alignments: await fetchLookups(`${api}/api/gall/alignment`, (a => a.alignment)),
+           walls: await fetchLookups(`${api}/api/gall/walls`, (w => w.walls)),
+           cells: await fetchLookups(`${api}/api/gall/cells`, (c => c.cells))
         }
     }
 }
