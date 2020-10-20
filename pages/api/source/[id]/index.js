@@ -1,10 +1,9 @@
-import { DB } from '../../../../database';
+import { getSource } from '../../../../database';
 
-export default async function getSourceById(req, res) {
+export default async function getSourceHTTP(req, res) {
     if (req.method !== 'GET') {
         res.status(405).json({message: "Only GET is supported."});
     }
-
-    const source = DB.prepare('SELECT * from source WHERE id = ?').all(req.query.id);
-    res.json(source);
+   
+    res.json(await getSource(req.query.id));
 }

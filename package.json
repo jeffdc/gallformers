@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@prisma/client": "^2.9.0",
     "better-sqlite3": "^7.1.1",
     "better-sqlite3-helper": "^3.1.1",
     "bootstrap": "^4.5.2",
@@ -23,6 +24,7 @@
     "yup": "^0.29.3"
   },
   "devDependencies": {
+    "@prisma/cli": "^2.9.0",
     "@types/yup": "^0.29.8"
   }
 }

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import React from 'react';
-import { Col, Container, ListGroup, Media, Row} from 'react-bootstrap';
+import { Col, Container, Media, Row} from 'react-bootstrap';
+import { getGallsByHost, getHost, getHosts } from '../../../database';
 
 function gallAsLink(g) {
     return ( <Link key={g.species_id} href={"/gall/[id]"} as={`/gall/${g.species_id}`}><a>{g.name} </a></Link> )
@@ -46,12 +47,8 @@ const Host = ({ host }) => {
 
 
 async function fetchHost(id) {
-    const url = `${process.env.API_URL}/api/host/${id}`;
-    const resHost = await fetch(url);
-    const host = await resHost.json();
-
-    const resGalls = await fetch(`${url}/galls`);
-    host.galls = await resGalls.json();
+    const host = await getHost(id);
+    host.galls = await getGallsByHost(id);
 
     return host
 }
@@ -65,8 +62,7 @@ export async function getStaticProps(context) {
 }
 
 export async function getStaticPaths() {
-    const res = await fetch(`${process.env.API_URL}/api/host`);
-    const hosts = await res.json();
+    const hosts = await getHosts();
 
     const paths = hosts.map((host) => ({
         params: { id: host.species_id.toString() },

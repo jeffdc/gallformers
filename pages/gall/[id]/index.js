@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row} from 'react-bootstrap';
+import { getGalls, getGall, getHostsByGall, getSourcesByGall } from '../../../database';
 
 function hostAsLink(h) {
     return ( <Link key={h.species_id} href={"/host/[id]"} as={`/host/${h.species_id}`}><a>{h.name} </a></Link> )
@@ -64,15 +65,9 @@ const Gall = ({ gall }) => {
 
 
 async function fetchGall(id) {
-    const url = `${process.env.API_URL}/api/gall/${id}`;
-    const resGall = await fetch(url);
-    const gall = await resGall.json();
-
-    const resHosts = await fetch(`${url}/hosts`);
-    gall.hosts = await resHosts.json();
-
-    const resSources = await fetch(`${url}/sources`);
-    gall.sources = await resSources.json();
+    const gall = await getGall(id);
+    gall.hosts = await getHostsByGall(id);
+    gall.sources = await getSourcesByGall(id);
 
     return gall
 }
@@ -86,11 +81,7 @@ export async function getStaticProps(context) {
 }
 
 export async function getStaticPaths() {
-    console.log("FUCK VERCEL=============================================================================================");
-    console.log(`${process.env.API_URL}/api/gall`);
-    const res = await fetch(`${process.env.API_URL}/api/gall`);
-    console.log(res);
-    const galls = await res.json();
+    const galls = await getGalls();
 
     const paths = galls.map((gall) => ({
         params: { id: gall.species_id.toString() },

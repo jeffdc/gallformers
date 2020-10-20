@@ -1,10 +1,9 @@
-import { DB } from '../../../../database';
+import { getAlignments } from '../../../../database';
 
-export default async function getAlignments(req, res) {
+export default async function getAlignmentsHTTP(req, res) {
     if (req.method !== 'GET') {
         res.status(405).json({message: "Only GET is supported."});
     }
 
-    const data = DB.prepare('SELECT * from alignment ORDER BY alignment ASC').all();
-    res.json(data);
+    res.json(await getAlignments());
 }

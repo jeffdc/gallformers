@@ -4,8 +4,9 @@ import { Container,Form, Button, Col } from 'react-bootstrap';
 import {useRouter} from "next/router";
 import { Formik } from 'formik';
 import * as yup from 'yup';
-import InfoTip from './components/infotip';
-import SearchFormField from './components/searchformfield';
+import InfoTip from '../components/infotip';
+import SearchFormField from '../components/searchformfield';
+import { getAlignments, getCells, getColors, getHosts, getLocations, getShapes, getTextures, getWalls } from '../database';
 
 const schema = yup.object({
     hostName: yup.string().required('You must provide a host name.'),
@@ -31,7 +32,6 @@ const Id = ({ hosts, hostNameMap, locations, textures, colors, alignments, shape
             validationSchema={schema}
             onSubmit={ (values, {setSubmitting, resetForm}) => {
                 setSubmitting(true);
-                console.log("SUBMIT YO");
                 router.push({
                     pathname: '/search',
                     query: {
@@ -182,8 +182,7 @@ const Id = ({ hosts, hostNameMap, locations, textures, colors, alignments, shape
 
 
 async function fetchHosts() {
-    const response = await fetch(`${process.env.API_URL}/api/host`);
-    const h = await response.json();
+    const h = await getHosts();
 
     let hosts = h.flatMap ( h =>
         [h.name, h.commonnames]
@@ -193,17 +192,6 @@ async function fetchHosts() {
     return { hosts, hostNameMap };
 }
 
-// helper that fetches the static lookup data at url and then returns the the results mapped using the function f
-async function fetchLookups(url, f) {
-    const response = await fetch(url);
-    if (response.status != 200) {
-        throw new Error(response);
-    }
-    const j = await response.json();
-
-    return j.map(f)
-}
-
 // Use static so that this stuff can be built once on the server-side and then cached.
 export async function getStaticProps() {
     const api = process.env.API_URL;
@@ -211,13 +199,13 @@ export async function getStaticProps() {
     return { props: {
            hosts: hosts,
            hostNameMap: hostNameMap,
-           locations: await fetchLookups(`${api}/api/gall/location`, (l => l.loc)),
-           colors: await fetchLookups(`${api}/api/gall/color`, (c => c.color)),
-           shapes: await fetchLookups(`${api}/api/gall/shape`, (s => s.shape)),
-           textures: await fetchLookups(`${api}/api/gall/texture`, (t => t.texture)),
-           alignments: await fetchLookups(`${api}/api/gall/alignment`, (a => a.alignment)),
-           walls: await fetchLookups(`${api}/api/gall/walls`, (w => w.walls)),
-           cells: await fetchLookups(`${api}/api/gall/cells`, (c => c.cells))
+           locations: (await getLocations()).map(l => l.loc),
+           colors: (await getColors()).map(c => c.color),
+           shapes: (await getShapes()).map(s => s.shape),
+           textures: (await getTextures()).map(t => t.texture),
+           alignments: (await getAlignments()).map(a => a.alignment),
+           walls: (await getWalls()).map(w => w.walls),
+           cells: (await getCells()).map(c => c.cells),
         }
     }
 }
