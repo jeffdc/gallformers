@@ -80,6 +80,7 @@ CREATE TABLE species(
 );
 
 CREATE TABLE gall(
+    gall_id INTEGER PRIMARY KEY NOT NULL,
     species_id INTEGER NOT NULL,
     taxoncode TEXT NOT NULL CHECK (taxoncode = 'gall'),
     detachable INTEGER, -- boolean: 0 = false; 1 = true, standard sqlite
@@ -102,6 +103,7 @@ CREATE TABLE gall(
 
 -- a host is just a many-to-many relationship between species
 CREATE TABLE host(
+    host_id INTEGER PRIMARY KEY NOT NULL,
     host_species_id INTEGER,
     species_id INTEGER,
     FOREIGN KEY(host_species_id) REFERENCES species(species_id),
@@ -118,6 +120,7 @@ CREATE TABLE source(
 );
 
 CREATE TABLE speciessource(
+    speciessource_id INTEGER PRIMARY KEY NOT NULL,
     species_id INTEGER,
     source_id INTEGER,
     FOREIGN KEY(species_id) REFERENCES species(species_id),

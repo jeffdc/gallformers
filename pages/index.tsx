@@ -48,3 +48,14 @@ export default function Home() {
     </div>
   )
 }
+
+export async function getStaticProps() {
+  // force the DB migrations to run -- this is a hack and needs a better way
+  const { DB } = require('../database');
+  console.log(`Initing DB ${DB}`);
+  return {
+    props: {
+      
+    }
+  }
+}

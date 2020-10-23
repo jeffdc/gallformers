@@ -2,20 +2,30 @@
 const Database = require('better-sqlite3-helper');
 // future self (or others) must use process.cwd() here as Vercel deploys to a diff dir
 // https://nextjs.org/docs/basic-features/data-fetching#reading-files-use-processcwd
-const dbPath = `${process.cwd()}/gallformers.sqlite`;
-console.log(`Trying to open the database at "${dbPath}"`);
+const dbPath = `${process.cwd()}/prisma/gallformers.sqlite`;
+// console.log(`Trying to open the database at "${dbPath}"`);
 
-export const DB = new Database({
+const config = {
   path: dbPath,
   readonly: false,
   fileMustExist: false,
-  WAL: true,
+  migrate: true,
+  WAL: false,
   migrate: {
     force: true,
     table: 'migration',
     migrationPath: './migrations'
   }
-})
+};
+
+// hack to force flush migrations. :(
+const hack = new Database(config);
+hack.close();
+export const DB = new Database(config);
+// console.log(`The DB is ${JSON.stringify(DB, null, '  ')}`);
+
+// const tables = DB.query("SELECT * from sqlite_master WHERE type='table'");
+// console.log(`DB tables: ${JSON.stringify(tables.map(t => t.name), null, '  ')}`);
 
 // local helpers
 function allIfNull(x) {
@@ -33,9 +43,14 @@ export async function getFamilies() {
   return families    
 }
 
+export async function getFamily(id) {
+  return DB.prepare('SELECT * from family WHERE family_id = ?').get(id);
+}
+
 export async function getLocations() {
-  const locs = DB.prepare('SELECT * from location ORDER BY loc ASC').all();
-  return locs;
+  return newdb.location.findMany({});
+  // const locs = DB.prepare('SELECT * from location ORDER BY loc ASC').all();
+  // return locs;
 }
 
 export async function getAlignments() {
@@ -66,6 +81,19 @@ export async function getTextures() {
 export async function getWalls() {
   const data = DB.prepare('SELECT * from walls ORDER BY walls ASC').all();
   return data;
+}
+
+export async function getSpecies() {
+  const sql =
+      `SELECT *
+      FROM species;`
+  
+  const species = DB.prepare(sql).all();
+  return species;
+}
+
+export async function getSpeciesById(id) {
+  return DB.prepare('SELECT * from species WHERE species_id = ?').get(id);
 }
 
 export async function getGalls() {
@@ -148,13 +176,18 @@ export async function getHost(id) {
 }
 
 export async function getHosts() {
-  const sql =
-    `SELECT DISTINCT species.*
-    FROM host 
-    INNER JOIN species ON (host.host_species_id = species.species_id)
-    ORDER BY species.name ASC`;
-  const hosts = DB.prepare(sql).all();
-  return hosts;
+  return newdb.host.findMany({
+    include: {
+      hostspecies: {}
+    }
+  });
+  // const sql =
+  //   `SELECT DISTINCT species.*
+  //   FROM host 
+  //   INNER JOIN species ON (host.host_species_id = species.species_id)
+  //   ORDER BY species.name ASC`;
+  // const hosts = DB.prepare(sql).all();
+  // return hosts;
 }
 
 export async function getSource(id) {

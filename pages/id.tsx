@@ -1,12 +1,11 @@
-import fetch from 'isomorphic-unfetch';
-import React from 'react';
-import { Container,Form, Button, Col } from 'react-bootstrap';
-import {useRouter} from "next/router";
+import { HostDistinctFieldEnum, PrismaClient } from '@prisma/client';
 import { Formik } from 'formik';
+import { useRouter } from "next/router";
+import React from 'react';
+import { Button, Col, Container, Form } from 'react-bootstrap';
 import * as yup from 'yup';
 import InfoTip from '../components/infotip';
 import SearchFormField from '../components/searchformfield';
-import { getAlignments, getCells, getColors, getHosts, getLocations, getShapes, getTextures, getWalls } from '../database';
 
 const schema = yup.object({
     hostName: yup.string().required('You must provide a host name.'),
@@ -20,7 +19,7 @@ const schema = yup.object({
     shape: yup.string(),
 });
 
-const Id = ({ hosts, hostNameMap, locations, textures, colors, alignments, shapes, cells, walls }) => {
+const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, walls }) => {
     const router = useRouter();
 
     return (    
@@ -35,7 +34,7 @@ const Id = ({ hosts, hostNameMap, locations, textures, colors, alignments, shape
                 router.push({
                     pathname: '/search',
                     query: {
-                        host: hostNameMap[values.hostName] ? hostNameMap[values.hostName] : values.hostName,
+                        host: values.hostName,
                         location: values.location,
                         // we display 'unsure' to the user, but it is easier to treat it as an empty string from here on out
                         detachable: values.detachable === 'unsure' ? '' : values.detachable,
@@ -181,31 +180,30 @@ const Id = ({ hosts, hostNameMap, locations, textures, colors, alignments, shape
 };
 
 
-async function fetchHosts() {
-    const h = await getHosts();
-
-    let hosts = h.flatMap ( h =>
-        [h.name, h.commonnames]
-    ).filter(h => h).sort();
-    let hostNameMap = h.reduce ( (m, h) => (m[h.commonname] = h.name, m), {} );
-    
-    return { hosts, hostNameMap };
-}
-
 // Use static so that this stuff can be built once on the server-side and then cached.
 export async function getStaticProps() {
-    const api = process.env.API_URL;
-    let { hosts, hostNameMap } = await fetchHosts();
+    const newdb = new PrismaClient();
+
+    const h = await newdb.host.findMany({
+        include: {
+          hostspecies: {
+          },
+        },
+        distinct: [HostDistinctFieldEnum.host_species_id]
+      });
+    const hosts = h.flatMap ( (h) =>
+        [h. hostspecies.name, h.hostspecies.commonnames]
+    ).filter(h => h).sort();
+
     return { props: {
            hosts: hosts,
-           hostNameMap: hostNameMap,
-           locations: (await getLocations()).map(l => l.loc),
-           colors: (await getColors()).map(c => c.color),
-           shapes: (await getShapes()).map(s => s.shape),
-           textures: (await getTextures()).map(t => t.texture),
-           alignments: (await getAlignments()).map(a => a.alignment),
-           walls: (await getWalls()).map(w => w.walls),
-           cells: (await getCells()).map(c => c.cells),
+           locations: ((await newdb.location.findMany({})).map(l => l.loc).sort()),
+           colors: ((await newdb.color.findMany({})).map(l => l.color).sort()),
+           shapes: ((await newdb.shape.findMany({})).map(l => l.shape).sort()),
+           textures: ((await newdb.texture.findMany({})).map(l => l.texture).sort()),
+           alignments: ((await newdb.alignment.findMany({})).map(l => l.alignment).sort()),
+           walls: ((await newdb.walls.findMany({})).map(l => l.walls).sort()),
+           cells: ((await newdb.cells.findMany({})).map(l => l.cells).sort()),
         }
     }
 }

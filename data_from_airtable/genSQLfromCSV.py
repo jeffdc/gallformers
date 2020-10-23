@@ -26,22 +26,27 @@ taxnames = csvtodict('data_from_airtable/taxonomic-names.csv') # Name	Record	Des
 validnames = csvtodict('data_from_airtable/valid-names.csv') # Current Name	Record	Synonyms (including current name)	Galls	Genus	Species																				
 
 # pprint.PrettyPrinter(indent=2).pprint(sources)
-db = sqlite3.connect('gallformers.sqlite')
+db = sqlite3.connect('prisma/gallformers.sqlite')
 
 # blow away any data that exists
 for table in ['speciessource', 'host', 'gall', 'source', 'species', 'family']:
+    # if db.execute(f'SELECT count(*) FROM sqlite_master WHERE type=\'table\' AND name=\'{table}\'').rowcount > 0:
     db.execute(f'DELETE FROM {table}')
 db.commit()
 
-def lookupfamily(family):
+def lookup(table, idfield, compfield, compvalue):
     cursor = db.cursor()
-    tup = family, # sure is hacky
-    cursor.execute("SELECT family_id from family WHERE name LIKE ?", tup)
+    tup = compvalue, # sure is hacky
+    cursor.execute(f'SELECT {idfield} from {table} WHERE {compfield} LIKE ?', tup)
     r = cursor.fetchone()
     if r == None:
-        print(f'Failed to lookup family_id for {family}')
+        # print(f'Failed to lookup {idfield} in {table} for {compvalue}')
+        return None
 
     return r[0]
+
+def lookupfamily(family):
+    return lookup('family', 'family_id', 'name', family)
     
 def lookupfamilyfromgenus(genus):
     # look in the 2 csv files, hopefully we find the family name given the genus
@@ -55,37 +60,33 @@ def lookupfamilyfromgenus(genus):
 
     print(f'Failed to lookup Family (and the id) for {genus}')
 
+    
 def lookuplocid(loc):
-    #TODO need to move location to a many=to-many
-    return 0
-    # cursor = db.cursor()
-    # tup = loc, # sure is hacky
-    # cursor.execute("SELECT loc_id from location WHERE loc LIKE ?", tup)
-    # r = cursor.fetchone()
-    # if r == None:
-    #     print(f'Failed to lookup loc_id for {loc}')
-
-    # return r[0]
+    return lookup('location', 'loc_id', 'loc', loc)
 
 def lookupspeciesid(sp):
-    cursor = db.cursor()
-    tup = sp, # sure is hacky
-    cursor.execute("SELECT species_id from species WHERE name = ?", tup)
-    r = cursor.fetchone()
-    if r == None:
-        print(f'Failed to lookup species_id for {sp}')
-
-    return r[0]
+    return lookup('species', 'species_id', 'name', sp)
 
 def lookupsourceid(s):
-    cursor = db.cursor()
-    tup = s,
-    cursor.execute("SELECT source_id FROM source WHERE title LIKE ?", tup)
-    r = cursor.fetchone()
-    if r == None:
-        print(f'Failed to lookup source_id for {s}')
+    return lookup('source', 'source_id', 'title', s)
 
-    return r[0]
+def lookupcolorid(c):
+    return lookup('color', 'color_id', 'color', c)
+
+def lookupshapeid(s):
+    return lookup('shape', 'shape_id', 'shape', s)
+
+def lookupwallsid(w):
+    return lookup('walls', 'walls_id', 'walls', w)
+
+def lookupcellsid(c):
+    return lookup('cells', 'cells_id', 'cells', c)
+
+def lookuptextureid(t):
+    return lookup('texture', 'texture_id', 'texture', t)
+
+def lookupalignmentid(a):
+    return lookup('alignment', 'alignment_id', 'alignment', a)
 
 # grab (map) all unique (set) family names, with their type (tuple), that are not an empty string (filter)
 familyset = set(filter(lambda f: f[0] != "", map(lambda i: (family[i]["Family"], family[i]["Type"]), family)))
@@ -111,8 +112,27 @@ gallvals = [(None, 'gall', galls[i]["Gall"], None, None, galls[i]["Gall"].split(
 db.executemany('INSERT INTO species VALUES(?,?,?,?,?,?,?,?,?)', gallvals)
 print(f'Adding {len(gallvals)} galls as species...')
 
-gallgallvals = [(lookupspeciesid(galls[i]["Gall"]), 'gall', galls[i]["Detachable"], None, galls[i]["Alignment"], galls[i]["Walls"], None, lookuplocid(galls[i]["Location"]), None, None) for i in galls]
-db.executemany('INSERT INTO gall VALUES(?,?,?,?,?,?,?,?,?,?)', gallgallvals)
+def formatDetachableForDB(d):
+    if d == 'yes': return 1
+    else: return 0
+
+# gall_id INTEGER PRIMARY KEY NOT NULL,
+# species_id INTEGER NOT NULL,
+# taxoncode TEXT NOT NULL CHECK (taxoncode = 'gall'),
+# detachable INTEGER, -- boolean: 0 = false; 1 = true, standard sqlite
+# texture_id INTEGER,
+# alignment_id INTEGER,
+# walls_id INTEGER,
+# cells_id INTEGER,
+# color_id INTEGER,
+# shape_id INTEGER,
+# loc_id INTEGER,
+
+gallgallvals = [(None, lookupspeciesid(galls[i]["Gall"]), 'gall', \
+                formatDetachableForDB(galls[i]["Detachable"]), None, \
+                lookupalignmentid(galls[i]["Alignment"]), lookupwallsid(galls[i]["Walls"]), \
+                None, None, None, lookuplocid(galls[i]["Location"])) for i in galls]
+db.executemany('INSERT INTO gall VALUES(?,?,?,?,?,?,?,?,?,?,?)', gallgallvals)
 print(f'Adding {len(gallgallvals)} galls as galls...')
 
 totalgallhosts = 0
@@ -124,9 +144,9 @@ for i in galls:
     hs = set(hs).union(set(hs2))
     totalgallhosts = totalgallhosts + len(list(hs))
 
-    vals = [(lookupspeciesid(h), speciesid) for h in hs]
-    print(f'spid = {speciesid} and hosts {list(vals)}')
-    db.executemany('INSERT INTO host VALUES(?,?)', vals)
+    vals = [(None, lookupspeciesid(h), speciesid) for h in hs]
+    # print(f'spid = {speciesid} and hosts {list(vals)}')
+    db.executemany('INSERT INTO host VALUES(?,?,?)', vals)
 
 print(f'added {totalgallhosts} host-gall relationships')
 
@@ -138,8 +158,8 @@ for i in galls:
     reader = csv.reader([rawsources], delimiter=',', quotechar='"')
     for sources in reader:
         totalgallsources = totalgallsources + 1
-        vals = [(speciesid, lookupsourceid(s)) for s in filter(None, sources)]
-        db.executemany('INSERT INTO speciessource VALUES(?,?)', vals)
+        vals = [(None, speciesid, lookupsourceid(s)) for s in filter(None, sources)]
+        db.executemany('INSERT INTO speciessource VALUES(?,?,?)', vals)
 
 print(f'added {totalgallsources} source-gall relationships')
 

@@ -1,9 +1,19 @@
 import { Typeahead } from 'react-bootstrap-typeahead';
-import { Field } from 'formik';
+import { Field, FormikErrors, FormikTouched } from 'formik';
+import { SearchQuery } from './searchbar';
+
+type Props = {
+    name: string,
+    touched: FormikTouched<SearchQuery>,
+    errors: FormikErrors<SearchQuery>
+    options: Array<string>,
+    placeholder: string,
+    multiple?: boolean
+}
 
 // A form field used on the search page. It uses Formix and Typeahead.
 // Must wrap the Typeahead in a Formix Field so that we can access Formix managed state
-const SearchFormField = ( {name, touched, errors, options, placeholder, multiple} ) => {
+const SearchFormField = ( {name, touched, errors, options, placeholder, multiple}: Props) => {
     return (
         <>
             <Field name={name}>

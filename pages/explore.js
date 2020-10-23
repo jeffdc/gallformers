@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Card, Nav, Button, ListGroup, Accordion } from 'react-bootstrap';
-import { getGalls, getGallFamilies } from '../database';
+import { array } from 'yup';
 
 const Explore = ({families, gallsByFamily}) => {
     return (
@@ -49,22 +49,46 @@ const Explore = ({families, gallsByFamily}) => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export async function getStaticProps() {
-    const families = await getGallFamilies();
-    const galls = await getGalls();
+    // hack to avoid tree-shaking issue in next.js. see:
+    // https://github.com/vercel/next.js/issues/16153) and https://github.com/prisma/prisma/issues/3252
+    const { newdb } = require('../database');
 
-    function g(acc, cur) {
-        if (acc.get(cur['family'])) {
-            acc.get(cur['family']).push(cur)
+    const galls = await newdb.gall.findMany({
+        include: {
+            species: {
+                select: {
+                    name: true, 
+                    synonyms: true, 
+                    commonnames: true, 
+                    genus: true, 
+                    description: true,
+                    family: { select: { name: true } }
+                }
+            },
+            location: {},
+            color: {},
+            alignment: {},
+            shape: {},
+            walls: {},
+            cells: {},
+            texture: {}
+        }
+    });
+    function familyToGall(acc, gall) {
+        const familyname = gall.species.family.name;
+        if (acc[familyname]) {
+            acc[familyname].push(gall)
         } else {
-            acc.set(cur['family'], [cur])
+            acc[familyname] = [gall]
         }
         return acc;
     }
-    const gallsByFamily = galls.reduce(g, new Map());
 
+    const gallsByFamily = galls.reduce(familyToGall, {});
+    gallsByFamily.map(g => console.log(g));
     return { props: {
-           families: families,
-           gallsByFamily: Object.fromEntries(gallsByFamily),
+           families:  gallsByFamily.map(g => g),
+           gallsByFamily: gallsByFamily,
         }
     }
 }
