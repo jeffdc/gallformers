@@ -63,13 +63,15 @@ const Gall = ({ gall }: Props) => {
                     </Row>
                     <Row>
                         <Col>Detachable: {gall.detachable == 1 ? 'yes' : 'no'}</Col>
-                        <Col>Texture: {gall.texture}</Col>
-                        <Col>Alignment: {gall.alignment}</Col>
+                        <Col>Texture: {gall.texture?.texture}</Col>
+                        <Col>Color: {gall.color?.color}</Col>
+                        <Col>Alignment: {gall.alignment?.alignment}</Col>
                     </Row>
                     <Row>
-                        <Col>Location: {gall.location}</Col>
-                        <Col>Walls: {gall.walls}</Col>
-                        <Col>Abdundance: {gall.species.abundance}</Col>
+                        <Col>Location: {gall.location?.loc}</Col>
+                        <Col>Walls: {gall.walls?.walls}</Col>
+                        <Col>Abdundance: {gall.species?.abundance}</Col>
+                        <Col>Shape: {gall.shape?.shape}</Col>
                     </Row>
                     <Row>
                         <Col>Further Information: 

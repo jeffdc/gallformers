@@ -31,7 +31,7 @@ const Search = ({ data, query }: Props) => {
                             <Card.Title>
                                 <Link href={"gall/[id]"} as={`gall/${gall.species_id}`}><a>{gall.species.name}</a></Link>
                             </Card.Title>
-                            <CardTextCollapse text={gall.species.description} />
+                            <CardTextCollapse text={gall.species.description as any} />
                         </Card.Body>
                     </Card>
                 )}

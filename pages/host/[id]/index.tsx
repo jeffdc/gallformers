@@ -100,8 +100,8 @@ export async function getStaticPaths() {
         }
     });
 
-    const paths = hosts.map((host) => ({
-        params: { id: host.host_species_id.toString() },
+    const paths = hosts.map( host => ({
+        params: { id: host.host_species_id?.toString() },
     }));
 
     return { paths, fallback: false }

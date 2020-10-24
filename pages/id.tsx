@@ -1,4 +1,4 @@
-import { HostDistinctFieldEnum, PrismaClient } from '@prisma/client';
+import { alignment, cells, color, HostDistinctFieldEnum, location, PrismaClient, shape, texture, walls } from '@prisma/client';
 import { Formik } from 'formik';
 import { useRouter } from "next/router";
 import React from 'react';
@@ -19,7 +19,25 @@ const schema = yup.object({
     shape: yup.string(),
 });
 
-const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, walls }) => {
+type Props = {
+    hosts: string[],
+    locations: string[],
+    textures: string[],
+    colors: string[],
+    alignments: string[],
+    shapes: string[],
+    cells: string[],
+    walls: string[]
+}
+
+type FormProps = {
+    handleSubmit: (e: React.FormEvent<HTMLInputElement>) => void,
+    isSubmitting: boolean,
+    touched: any,
+    errors: any
+}
+
+const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, walls }: Props) => {
     const router = useRouter();
 
     return (    
@@ -55,12 +73,12 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
                 isSubmitting,
                 touched,
                 errors,
-            }) => (
+            }: FormProps ) => (
                 <Container className="pt-4">
                     <p><i>
                         To help ID a gall we need to gather some info. Fill in as much as you can but at a minimum we need to know the host species.
                     </i></p>
-                    <Form noValidate onSubmit={handleSubmit}>
+                    <Form noValidate onSubmit={handleSubmit} >
                         <Form.Row>
                             <Form.Group as={Col} controlId="formHost">
                                 <Form.Label>Host Species (required)</Form.Label>
@@ -191,9 +209,12 @@ export async function getStaticProps() {
         },
         distinct: [HostDistinctFieldEnum.host_species_id]
       });
-    const hosts = h.flatMap ( (h) =>
-        [h. hostspecies.name, h.hostspecies.commonnames]
-    ).filter(h => h).sort();
+    const hosts = h.flatMap ( (h) => {
+        if (h.hostspecies != null)
+            return [h.hostspecies.name, h.hostspecies.commonnames]
+        else 
+            return []
+    }).filter(h => h).sort();
 
     return { props: {
            hosts: hosts,

@@ -3,7 +3,7 @@ import { AppProps } from 'next/app';
 import 'react-bootstrap-typeahead/css/Typeahead.css';
 import Header from './layouts/header';
 
-function Gallformers({ Component, pageProps }): AppProps {
+function Gallformers({ Component, pageProps }: AppProps) {
   return (
     <>
       <Header />

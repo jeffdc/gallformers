@@ -1,6 +1,10 @@
 import { OverlayTrigger, Badge, Tooltip } from 'react-bootstrap';
 
-const InfoTip = ({id, text}) => {
+type Props = {
+    id: string,
+    text: string
+}
+const InfoTip = ({id, text}: Props) => {
     return (
         <OverlayTrigger 
             placement="top"

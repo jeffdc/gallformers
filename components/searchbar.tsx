@@ -1,6 +1,6 @@
 import { Container, Col, Row } from 'react-bootstrap';
 
-function anyIfEmptyString(x) {
+function anyIfEmptyString(x: string | null | undefined): string {
     return x == null || x === undefined || x.length <= 0 ? 'Any' : x
 }
 
