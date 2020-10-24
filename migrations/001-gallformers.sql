@@ -92,7 +92,7 @@ CREATE TABLE gall(
     FOREIGN KEY(species_id) REFERENCES species(id)
     FOREIGN KEY(taxonCode) REFERENCES taxontype(taxonCode)
     FOREIGN KEY(walls_id) REFERENCES walls(id)
-    FOREIGN KEY(cells_id) REFERENCES walls(id)
+    FOREIGN KEY(cells_id) REFERENCES cells(id)
     FOREIGN KEY(color_id) REFERENCES color(id)
     FOREIGN KEY(shape_id) REFERENCES shape(id)
     FOREIGN KEY(alignment_id) REFERENCES alignment(id)

@@ -32,13 +32,13 @@ const Explore = ({families}: Props) => {
             </Card.Text>
             <Accordion>
                 {families.map( (f) =>
-                    <Card key={f.family_id}>
+                    <Card key={f.id}>
                         <Card.Header>
-                            <Accordion.Toggle as={Button} variant="light" eventKey={f.family_id.toString()}>
+                            <Accordion.Toggle as={Button} variant="light" eventKey={f.id.toString()}>
                                 <i>{f.name}</i> - {f.description}
                             </Accordion.Toggle>
                         </Card.Header>
-                        <Accordion.Collapse eventKey={f.family_id.toString()}>
+                        <Accordion.Collapse eventKey={f.id.toString()}>
                             <Card.Body>
                                 <ListGroup>
                                     { f.species.map( s =>
@@ -66,7 +66,7 @@ export async function getStaticProps() {
         include: {
             species: {
                 select: {
-                    species_id: true,
+                    id: true,
                     name: true,
                     gall: {
                         select: {

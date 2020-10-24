@@ -29,24 +29,23 @@ validnames = csvtodict('data_from_airtable/valid-names.csv') # Current Name	Reco
 db = sqlite3.connect('prisma/gallformers.sqlite')
 
 # blow away any data that exists
-for table in ['speciessource', 'host', 'gall', 'source', 'species', 'family']:
+for table in ['speciessource', 'host', 'gall', 'source', 'species', 'family', 'galllocation']:
     # if db.execute(f'SELECT count(*) FROM sqlite_master WHERE type=\'table\' AND name=\'{table}\'').rowcount > 0:
     db.execute(f'DELETE FROM {table}')
 db.commit()
 
-def lookup(table, idfield, compfield, compvalue):
+def lookup(table, compfield, compvalue):
     cursor = db.cursor()
     tup = compvalue, # sure is hacky
-    cursor.execute(f'SELECT {idfield} from {table} WHERE {compfield} LIKE ?', tup)
+    cursor.execute(f'SELECT id from {table} WHERE {compfield} LIKE ?', tup)
     r = cursor.fetchone()
     if r == None:
-        # print(f'Failed to lookup {idfield} in {table} for {compvalue}')
         return None
 
     return r[0]
 
 def lookupfamily(family):
-    return lookup('family', 'family_id', 'name', family)
+    return lookup('family', 'name', family)
     
 def lookupfamilyfromgenus(genus):
     # look in the 2 csv files, hopefully we find the family name given the genus
@@ -62,31 +61,31 @@ def lookupfamilyfromgenus(genus):
 
     
 def lookuplocid(loc):
-    return lookup('location', 'loc_id', 'loc', loc)
+    return lookup('location', 'location', loc)
 
 def lookupspeciesid(sp):
-    return lookup('species', 'species_id', 'name', sp)
+    return lookup('species', 'name', sp)
 
 def lookupsourceid(s):
-    return lookup('source', 'source_id', 'title', s)
+    return lookup('source', 'title', s)
 
 def lookupcolorid(c):
-    return lookup('color', 'color_id', 'color', c)
+    return lookup('color', 'color', c)
 
 def lookupshapeid(s):
-    return lookup('shape', 'shape_id', 'shape', s)
+    return lookup('shape', 'shape', s)
 
 def lookupwallsid(w):
-    return lookup('walls', 'walls_id', 'walls', w)
+    return lookup('walls', 'walls', w)
 
 def lookupcellsid(c):
-    return lookup('cells', 'cells_id', 'cells', c)
+    return lookup('cells', 'cells', c)
 
 def lookuptextureid(t):
-    return lookup('texture', 'texture_id', 'texture', t)
+    return lookup('texture', 'texture', t)
 
 def lookupalignmentid(a):
-    return lookup('alignment', 'alignment_id', 'alignment', a)
+    return lookup('alignment', 'alignment', a)
 
 # grab (map) all unique (set) family names, with their type (tuple), that are not an empty string (filter)
 familyset = set(filter(lambda f: f[0] != "", map(lambda i: (family[i]["Family"], family[i]["Type"]), family)))
@@ -116,23 +115,21 @@ def formatDetachableForDB(d):
     if d == 'yes': return 1
     else: return 0
 
-# gall_id INTEGER PRIMARY KEY NOT NULL,
+# Gall table looks like this
+# id INTEGER PRIMARY KEY NOT NULL,
 # species_id INTEGER NOT NULL,
 # taxoncode TEXT NOT NULL CHECK (taxoncode = 'gall'),
 # detachable INTEGER, -- boolean: 0 = false; 1 = true, standard sqlite
-# texture_id INTEGER,
 # alignment_id INTEGER,
 # walls_id INTEGER,
 # cells_id INTEGER,
 # color_id INTEGER,
 # shape_id INTEGER,
-# loc_id INTEGER,
-
 gallgallvals = [(None, lookupspeciesid(galls[i]["Gall"]), 'gall', \
-                formatDetachableForDB(galls[i]["Detachable"]), None, \
+                formatDetachableForDB(galls[i]["Detachable"]), \
                 lookupalignmentid(galls[i]["Alignment"]), lookupwallsid(galls[i]["Walls"]), \
-                None, None, None, lookuplocid(galls[i]["Location"])) for i in galls]
-db.executemany('INSERT INTO gall VALUES(?,?,?,?,?,?,?,?,?,?,?)', gallgallvals)
+                None, None, None) for i in galls]
+db.executemany('INSERT INTO gall VALUES(?,?,?,?,?,?,?,?,?)', gallgallvals)
 print(f'Adding {len(gallgallvals)} galls as galls...')
 
 totalgallhosts = 0
@@ -144,6 +141,10 @@ for i in galls:
     hs = set(hs).union(set(hs2))
     totalgallhosts = totalgallhosts + len(list(hs))
 
+    # gall table:
+    #  id INTEGER PRIMARY KEY NOT NULL,
+    #  host_species_id INTEGER,
+    #  gall_species_id INTEGER,
     vals = [(None, lookupspeciesid(h), speciesid) for h in hs]
     # print(f'spid = {speciesid} and hosts {list(vals)}')
     db.executemany('INSERT INTO host VALUES(?,?,?)', vals)
@@ -162,6 +163,17 @@ for i in galls:
         db.executemany('INSERT INTO speciessource VALUES(?,?,?)', vals)
 
 print(f'added {totalgallsources} source-gall relationships')
+
+# Process Gall Locations which are many to many
+for i in galls:
+    g = galls[i]
+    gallid = lookup("gall", "species_id", lookupspeciesid(g["Gall"]))
+    reader = csv.reader([g["Location"]], delimiter=',', quotechar='"')
+    for locations in reader:
+        vals = [(None, gallid, lookuplocid(l)) for l in filter(None, locations)]
+        db.executemany('INSERT INTO galllocation VALUES(?,?,?)', vals)
+
+    # texture is not present in the source data so we do not have to process it. if we did it would look just like location
 
 db.commit()
 db.close()

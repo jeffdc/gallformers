@@ -1,4 +1,4 @@
-import { abundance, alignment, cells, color, family, gall, host, location, PrismaClient, shape, source, species, speciessource, texture, walls } from '@prisma/client';
+import { abundance, alignment, cells, color, family, gall, galllocation, host, location, PrismaClient, shape, source, species, speciessource, texture, walls } from '@prisma/client';
 import Link from 'next/link';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
@@ -15,14 +15,17 @@ type SpeciesProps = species & {
     hosts: HostProp[],
     speciessource: SourceProp[]
 }
+type LocationProps = galllocation & [] & {
+    location: location[]
+}
 type GallProps = gall & {
     species: SpeciesProps,
     alignment: alignment,
     cells: cells,
     color: color,
-    location: location,
+    galllocation: LocationProps,
     shape: shape,
-    texture: texture,
+    galltexture: texture,
     walls: walls
 }
 type Props = {
@@ -34,6 +37,13 @@ function hostAsLink(h: HostProp) {
 }
 
 const Gall = ({ gall }: Props) => {
+    const locs = gall.galllocation.reduce(
+        (acc: string, l: location) => {
+            // super confused how to sort the types here. it runs as expected but it confuses TS. the mismatch betweeb what Prisma
+            // returns and what I can figure out to how model in TS seems to cause the issue.
+            return `${l.location?.location} ${acc}` 
+        }, '');
+
     return (    
     <div style={{
         marginBottom: '5%',
@@ -68,7 +78,7 @@ const Gall = ({ gall }: Props) => {
                         <Col>Alignment: {gall.alignment?.alignment}</Col>
                     </Row>
                     <Row>
-                        <Col>Location: {gall.location?.loc}</Col>
+                        <Col>Location: {locs}</Col>
                         <Col>Walls: {gall.walls?.walls}</Col>
                         <Col>Abdundance: {gall.species?.abundance}</Col>
                         <Col>Shape: {gall.shape?.shape}</Col>
@@ -123,15 +133,18 @@ export async function getStaticProps(context: { params: { id: string; }; }) {
             alignment: true,
             cells: true,
             color: true,
-            location: true,
+            galllocation: {
+                select: { location: true }
+            },
             shape: true,
-            texture: true,
+            galltexture: true,
             walls: true,
         },
         where: {
             species_id: { equals: parseInt(context.params.id) }
         }
     });
+
     return { props: {
            gall: gall,
         }

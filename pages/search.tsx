@@ -25,7 +25,7 @@ const Search = ({ data, query }: Props) => {
         <div>
             <CardColumns className='m-2 p-2'>
                 {data.map((gall) =>
-                    <Card key={gall.gall_id} className="shadow-sm">
+                    <Card key={gall.id} className="shadow-sm">
                         <Card.Img variant="top" width="200px" src="/images/gall.jpg" />
                         <Card.Body>
                             <Card.Title>
@@ -58,14 +58,14 @@ export async function getServerSideProps(context: { query: any; }) {
             alignment: {},
             cells: {},
             color: {},
-            location: {},
+            galllocation: {},
             shape: {},
             species: {
                 include: {
                     hosts: true,
                 }
             },
-            texture: {},
+            galltexture: {},
             walls: {},
         },
         where: {
@@ -76,24 +76,31 @@ export async function getServerSideProps(context: { query: any; }) {
                 dontCare(q.shape) ? {} : { shape: { shape: { equals: q.shape } } },
                 dontCare(q.cells) ? {} : { cells: { cells: { equals: q.cells } } },
                 dontCare(q.walls) ? {} : { walls: { walls: { equals: q.walls } } },
-                dontCare(q.texture) ? {} : { texture: { texture: { equals: q.texture } } },
-                dontCare(q.location) ? {} : { location: { loc: { equals: q.location } } },
-                { 
-                    species : {
-                        hosts: {
+                dontCare(q.texture) ? {} : { galltexture: { some: { texture: { is: q.texture } } } },
+                dontCare(q.location) ? {} : { galllocation: { some: { location: { is: q.location } } } },
+                {
+                    species: {
+                        host_galls: {
                             every: {
                                 hostspecies: {
-                                    name : { equals: q.host } 
+                                    name: { equals: q.host }
                                 }
                             }
                         }
-                    } 
+                    }                            
                 },
             ]
         },
-        distinct: [GallDistinctFieldEnum.species_id]
+        distinct: [GallDistinctFieldEnum.species_id],
     });
-    console.log(`Data Yo: ${data.length}`);
+
+    // due to a limitation in Prisma it is not possible to sort on a related field, so we have to sort now
+    data.sort((g1,g2) => {
+        if (g1.species.name < g2.species.name) return -1
+        if (g1.species.name > g2.species.name) return 1
+        return 0
+    });
+
     return {
         props: {
             data: data,
@@ -103,19 +110,3 @@ export async function getServerSideProps(context: { query: any; }) {
 }
 
 export default Search;
-
-
-/*
-    `SELECT DISTINCT v_gall.*, hostsp.name as host_name, hostsp.species_id AS host_species_id
-    FROM v_gall
-    INNER JOIN host ON (v_gall.species_id = host.species_id)
-    INNER JOIN species AS hostsp ON (hostsp.species_id = host.host_species_id)
-    WHERE (detachable = ? OR detachable is NOT NULL) AND 
-        (texture LIKE ? OR texture IS NULL) AND 
-        (alignment LIKE ? OR alignment IS NULL) AND 
-        (walls LIKE ? OR walls IS NULL) AND 
-        hostsp.name LIKE ? AND 
-        (loc LIKE ? OR loc IS NULL)
-    ORDER BY v_gall.name ASC`;
-
-*/

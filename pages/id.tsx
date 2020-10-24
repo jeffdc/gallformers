@@ -218,7 +218,7 @@ export async function getStaticProps() {
 
     return { props: {
            hosts: hosts,
-           locations: ((await newdb.location.findMany({})).map(l => l.loc).sort()),
+           locations: ((await newdb.location.findMany({})).map(l => l.location).sort()),
            colors: ((await newdb.color.findMany({})).map(l => l.color).sort()),
            shapes: ((await newdb.shape.findMany({})).map(l => l.shape).sort()),
            textures: ((await newdb.texture.findMany({})).map(l => l.texture).sort()),

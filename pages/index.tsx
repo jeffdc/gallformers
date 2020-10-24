@@ -50,9 +50,29 @@ export default function Home() {
 }
 
 export async function getStaticProps() {
-  // force the DB migrations to run -- this is a hack and needs a better way
-  const { DB } = require('../database');
-  console.log(`Initing DB ${DB}`);
+  const Database = require('better-sqlite3-helper');
+  const dbPath = `${process.cwd()}/prisma/gallformers.sqlite`;
+
+  const config = {
+    path: dbPath,
+    readonly: false,
+    fileMustExist: false,
+    WAL: false,
+    migrate: {
+      force: true,
+      table: 'migration',
+      migrationPath: './migrations'
+    }
+  };
+
+  // hack to force flush migrations. :(
+  const hack = new Database(config);
+  const colors = hack.prepare("select * from color;").all();
+  console.log(`colors: ${JSON.stringify(colors, null, '  ')})`);
+  hack.close();
+  const DB = new Database(config);
+  console.log(`Initing DB ${JSON.stringify(DB, null, '  ')}`);
+
   return {
     props: {
       
