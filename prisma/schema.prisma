@@ -1,0 +1,153 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["connectOrCreate"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model migration {
+  id   Int    @id @default(autoincrement())
+  name String
+  up   String
+  down String
+}
+
+model location {
+  loc_id      Int     @id @default(autoincrement())
+  loc         String?
+  description String?
+  gall        gall[]
+}
+
+model texture {
+  texture_id  Int     @id @default(autoincrement())
+  texture     String?
+  description String?
+}
+
+model color {
+  color_id Int     @id @default(autoincrement())
+  color    String?
+  gall     gall[]
+}
+
+model walls {
+  walls_id                  Int     @id @default(autoincrement())
+  walls                     String?
+  description               String?
+  gall     gall[]
+}
+
+model cells {
+  cells_id    Int     @id @default(autoincrement())
+  cells       String?
+  description String?
+  gall     gall[]
+}
+
+model alignment {
+  alignment_id Int     @id @default(autoincrement())
+  alignment    String?
+  description  String?
+  gall         gall[]
+}
+
+model shape {
+  shape_id    Int     @id @default(autoincrement())
+  shape       String?
+  description String?
+  gall        gall[]
+}
+
+model abundance {
+  abundance_id Int       @id @default(autoincrement())
+  abundance    String?
+  description  String?
+  reference    String?
+  species      species[]
+}
+
+model taxontype {
+  taxoncode   String    @id
+  description String
+  species     species[]
+  gall        gall[]
+}
+
+model family {
+  family_id   Int       @id @default(autoincrement())
+  name        String?
+  description String?
+  species     species[]
+}
+
+model species {
+  species_id                         Int             @id @default(autoincrement())
+  taxoncode                          String?
+  name                               String
+  synonyms                           String?
+  commonnames                        String?
+  genus                              String
+  family_id                          Int
+  description                        String?
+  abundance_id                       Int?
+  abundance                          abundance?      @relation(fields: [abundance_id], references: [abundance_id])
+  family                             family          @relation(fields: [family_id], references: [family_id])
+  taxontype                          taxontype?      @relation(fields: [taxoncode], references: [taxoncode])
+  gall                               gall[]
+  host_galls                         host[]          @relation("host_host_species_idTospecies")
+  hosts                              host[]          @relation("host_species_idTospecies")
+  speciessource                      speciessource[]
+}
+
+model gall {
+  gall_id                    Int        @id @default(autoincrement())
+  species_id                 Int
+  taxoncode                  String
+  detachable                 Int?
+  texture_id                 Int?
+  alignment_id               Int?
+  walls_id                   Int?
+  cells_id                   Int?
+  color_id                   Int?
+  shape_id                   Int?
+  loc_id                     Int?
+  cells                      cells?     @relation(fields: [cells_id], references: [cells_id])
+  color                      color?     @relation(fields: [color_id], references: [color_id])
+  texture                    texture?   @relation(fields: [texture_id], references: [texture_id])
+  shape                      shape?     @relation(fields: [loc_id], references: [shape_id])
+  location                   location?  @relation(fields: [loc_id], references: [loc_id])
+  alignment                  alignment? @relation(fields: [loc_id], references: [alignment_id])
+  species                    species    @relation(fields: [species_id], references: [species_id])
+  taxontype                  taxontype  @relation(fields: [taxoncode], references: [taxoncode])
+  walls                      walls?     @relation(fields: [walls_id], references: [walls_id])
+}
+
+model host {
+  host_id                               Int      @id @default(autoincrement())
+  host_species_id                       Int?
+  species_id                            Int?
+  hostspecies          species? @relation("host_host_species_idTospecies", fields: [host_species_id], references: [species_id])
+  species                 species? @relation("host_species_idTospecies", fields: [species_id], references: [species_id])
+}
+
+model source {
+  source_id     Int             @id @default(autoincrement())
+  title         String          @unique
+  author        String?
+  pubyear       String?
+  link          String?
+  citation      String?
+  speciessource speciessource[]
+}
+
+model speciessource {
+  speciessource_id Int      @id @default(autoincrement())
+  species_id       Int?
+  source_id        Int?
+  source           source?  @relation(fields: [source_id], references: [source_id])
+  species          species? @relation(fields: [species_id], references: [species_id])
+}
