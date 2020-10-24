@@ -4,13 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && copydb",
     "start": "next start",
     "generate": "npx prisma generate",
-    "migrate": "npm run migrate:save && npm run migrate:up && npm run generate",
-    "migrate:save": "npx prisma migrate save --experimental",
-    "migrate:up": "npx prisma migrate up --experimental",
-    "move": "node prisma/movedata.js"
+    "copydb": "copyfiles prisma/gallformers.sqlite /var/task/"
   },
   "dependencies": {
     "@prisma/client": "^2.9.0",
