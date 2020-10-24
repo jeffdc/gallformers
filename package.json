@@ -4,10 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && copydb",
+    "build": "next build",
     "start": "next start",
-    "generate": "npx prisma generate",
-    "copydb": "copyfiles prisma/gallformers.sqlite /var/task/"
+    "generate": "npx prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^2.9.0",
