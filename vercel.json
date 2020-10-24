@@ -1,10 +1,10 @@
 {
     "env": {
-        "DATABASE_URL": "/var/task/gallformers.sqlite"
+        "DATABASE_URL": "file:/var/task/gallformers.sqlite"
     },
     "build": {
         "env": {
-            "DATABASE_URL": "var/task/gallformers.sqlite"
+            "DATABASE_URL": "file:/var/task/gallformers.sqlite"
         }
     }
 }
