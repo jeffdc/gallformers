@@ -8,21 +8,30 @@ type Props = {
 const CardTextCollapse = ( { text }:Props ) => {
     const [open, setOpen] = useState(false);
     const truncated = text.split(' ').splice(0, 40).join(' ');
+    const start = text.substring(truncated.length, text.length + 1)
 
-    return (
-        <Container>
-            <Card.Text>{truncated + '...'}</Card.Text>
-            <Collapse in={open}>
-                <Card.Text>{ text.substring(truncated.length, text.length + 1) }</Card.Text>
-            </Collapse>
-            <Button 
-                onClick={() => setOpen(!open)} 
-                aria-controls='' 
-                aria-expanded={open}>
-                    { open ? 'Show Less...' : 'Show More...' }
-                </Button>
+    if (text.length - 40 <= truncated.length) {
+        return (
+            <Container>
+                <Card.Text>{text}</Card.Text>
         </Container>
-    )
+        )
+    } else {
+        return (
+            <Container>
+                <Card.Text>{truncated + '...'}</Card.Text>
+                <Collapse in={open}>
+                    <Card.Text>{ start }</Card.Text>
+                </Collapse>
+                <Button 
+                    onClick={() => setOpen(!open)} 
+                    aria-controls='' 
+                    aria-expanded={open}>
+                        { open ? 'Show Less...' : 'Show More...' }
+                    </Button>
+            </Container>
+        )
+    }
 };
   
 export default CardTextCollapse;

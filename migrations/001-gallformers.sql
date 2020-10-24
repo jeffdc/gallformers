@@ -3,48 +3,48 @@
 -- These are static tables that hold various constants and what not. While it is tempting to slam them
 -- all together into one giant lookup table this leads to other problems.. see: https://www.red-gate.com/simple-talk/sql/database-administration/five-simple-database-design-errors-you-should-avoid/
 CREATE TABLE location(
-    loc_id INTEGER PRIMARY KEY NOT NULL,
-    loc TEXT,
+    id INTEGER PRIMARY KEY NOT NULL,
+    location TEXT,
     description TEXT
 );
 
 CREATE TABLE texture(
-    texture_id INTEGER PRIMARY KEY NOT NULL,
+    id INTEGER PRIMARY KEY NOT NULL,
     texture text,
     description TEXT
 );
 
 CREATE TABLE color(
-    color_id INTEGER PRIMARY KEY NOT NULL,
+    id INTEGER PRIMARY KEY NOT NULL,
     color text
 );
 
 CREATE TABLE walls(
-    walls_id INTEGER PRIMARY KEY NOT NULL,
+    id INTEGER PRIMARY KEY NOT NULL,
     walls text,
     description TEXT
 );
 
 CREATE TABLE cells(
-    cells_id INTEGER PRIMARY KEY NOT NULL,
+    id INTEGER PRIMARY KEY NOT NULL,
     cells text,
     description TEXT
 );
 
 CREATE TABLE alignment(
-    alignment_id INTEGER PRIMARY KEY NOT NULL,
+    id INTEGER PRIMARY KEY NOT NULL,
     alignment text,
     description TEXT
 );
 
 CREATE TABLE shape(
-    shape_id INTEGER PRIMARY KEY NOT NULL,
+    id INTEGER PRIMARY KEY NOT NULL,
     shape text,
     description TEXT
 );
 
 CREATE TABLE abundance(
-    abundance_id INTEGER PRIMARY KEY NOT NULL,
+    id INTEGER PRIMARY KEY NOT NULL,
     abundance TEXT,
     description TEXT,
     reference TEXT -- URL to 
@@ -59,13 +59,13 @@ CREATE TABLE taxontype(
 );
 
 CREATE TABLE family(
-    family_id INTEGER PRIMARY KEY NOT NULL,
+    id INTEGER PRIMARY KEY NOT NULL,
     name TEXT,
     description TEXT
 );
 
 CREATE TABLE species(
-    species_id INTEGER PRIMARY KEY NOT NULL,
+    id INTEGER PRIMARY KEY NOT NULL,
     taxoncode TEXT,
     name TEXT NOT NULL, -- this is the accepted binomial 'Genus species' name
     synonyms TEXT, -- CSV text
@@ -75,43 +75,56 @@ CREATE TABLE species(
     description TEXT,
     abundance_id INTEGER,
     FOREIGN KEY(taxoncode) REFERENCES taxontype(taxonCode),
-    FOREIGN KEY(abundance_id) REFERENCES abundance(abundance_id),
-    FOREIGN KEY(family_id) REFERENCES family(family_id)
+    FOREIGN KEY(abundance_id) REFERENCES abundance(id),
+    FOREIGN KEY(family_id) REFERENCES family(id)
 );
 
 CREATE TABLE gall(
-    gall_id INTEGER PRIMARY KEY NOT NULL,
+    id INTEGER PRIMARY KEY NOT NULL,
     species_id INTEGER NOT NULL,
     taxoncode TEXT NOT NULL CHECK (taxoncode = 'gall'),
     detachable INTEGER, -- boolean: 0 = false; 1 = true, standard sqlite
-    texture_id INTEGER,
     alignment_id INTEGER,
     walls_id INTEGER,
     cells_id INTEGER,
     color_id INTEGER,
     shape_id INTEGER,
-    loc_id INTEGER,
-    FOREIGN KEY(species_id) REFERENCES species(species_id)
+    FOREIGN KEY(species_id) REFERENCES species(id)
     FOREIGN KEY(taxonCode) REFERENCES taxontype(taxonCode)
-    FOREIGN KEY(loc_id) REFERENCES location(loc_id)
-    FOREIGN KEY(walls_id) REFERENCES walls(walls_id)
-    FOREIGN KEY(cells_id) REFERENCES walls(cells_id)
-    FOREIGN KEY(color_id) REFERENCES color(color_id)
-    FOREIGN KEY(loc_id) REFERENCES shape(shape_id)
-    FOREIGN KEY(loc_id) REFERENCES alignment(alignment_id)
+    FOREIGN KEY(walls_id) REFERENCES walls(id)
+    FOREIGN KEY(cells_id) REFERENCES walls(id)
+    FOREIGN KEY(color_id) REFERENCES color(id)
+    FOREIGN KEY(shape_id) REFERENCES shape(id)
+    FOREIGN KEY(alignment_id) REFERENCES alignment(id)
+);
+
+CREATE TABLE galllocation(
+    id INTEGER PRIMARY KEY NOT NULL,
+    gall_id INTEGER,
+    location_id INTEGER,
+    FOREIGN KEY(gall_id) REFERENCES gall(id),
+    FOREIGN KEY(location_id) REFERENCES location(id)
+);
+
+CREATE TABLE galltexture(
+    id INTEGER PRIMARY KEY NOT NULL,
+    gall_id INTEGER,
+    texture_id INTEGER,
+    FOREIGN KEY(gall_id) REFERENCES gall(id),
+    FOREIGN KEY(texture_id) REFERENCES texture(id)
 );
 
 -- a host is just a many-to-many relationship between species
 CREATE TABLE host(
-    host_id INTEGER PRIMARY KEY NOT NULL,
+    id INTEGER PRIMARY KEY NOT NULL,
     host_species_id INTEGER,
-    species_id INTEGER,
-    FOREIGN KEY(host_species_id) REFERENCES species(species_id),
-    FOREIGN KEY(species_id) REFERENCES species(species_id)
+    gall_species_id INTEGER,
+    FOREIGN KEY(host_species_id) REFERENCES species(id),
+    FOREIGN KEY(gall_species_id) REFERENCES species(id)
 );
 
 CREATE TABLE source(
-    source_id INTEGER PRIMARY KEY NOT NULL,
+    id INTEGER PRIMARY KEY NOT NULL,
     title TEXT UNIQUE NOT NULL , 
     author TEXT,
     pubyear TEXT,
@@ -120,45 +133,12 @@ CREATE TABLE source(
 );
 
 CREATE TABLE speciessource(
-    speciessource_id INTEGER PRIMARY KEY NOT NULL,
+    id INTEGER PRIMARY KEY NOT NULL,
     species_id INTEGER,
     source_id INTEGER,
-    FOREIGN KEY(species_id) REFERENCES species(species_id),
-    FOREIGN KEY(source_id) REFERENCES source(source_id)
+    FOREIGN KEY(species_id) REFERENCES species(id),
+    FOREIGN KEY(source_id) REFERENCES source(id)
 );
-
-
--- Here are some view defintions to make working with the relational model a bit simpler
-CREATE VIEW v_gall
-AS
-SELECT DISTINCT
-    gall.*,
-    location.loc,
-    walls.walls,
-    color.color,
-    alignment.alignment,
-    texture.texture,
-    shape.shape,
-    cells.cells,
-    species.name,
-    species.synonyms,
-    species.commonnames,
-    species.genus,
-    species.description,
-    abundance.abundance, 
-    family.name as family
-FROM
-    gall
-INNER JOIN species ON (species.species_id = gall.species_id)
-INNER JOIN family ON (species.family_id = family.family_id)
-LEFT JOIN location ON (location.loc_id = gall.loc_id)
-LEFT JOIN walls ON (walls.walls_id = gall.walls_id)
-LEFT JOIN color ON (color.color_id = gall.color_id)
-LEFT JOIN alignment ON (alignment.alignment_id = gall.alignment_id)
-LEFT JOIN texture ON (texture.texture_id = gall.texture_id)
-LEFT JOIN shape ON (shape.shape_id = gall.shape_id)
-LEFT JOIN cells ON (cells.cells_id = gall.cells_id)
-LEFT JOIN abundance ON (abundance.abundance_id = species.abundance_id);
 
 -- This is all static data that is not curated outside of this system.
 INSERT INTO taxontype VALUES('gall', 'an abnormal outgrowth of plant tissue usually due to insect or mite parasites or fungi');
@@ -172,7 +152,7 @@ INSERT INTO location VALUES(NULL, 'leaf midrib', '');
 INSERT INTO location VALUES(NULL, 'on leaf veins', '');
 INSERT INTO location VALUES(NULL, 'between leaf veins', '');
 INSERT INTO location VALUES(NULL, 'at leaf vein angles', '');
-INSERT INTO location VALUES(NULL, 'flower', ''); -- is there a generic word to fill in for things like samara, catakin, etc.?
+INSERT INTO location VALUES(NULL, 'flower', '');
 INSERT INTO location VALUES(NULL, 'fruit', '');
 
 INSERT INTO walls VALUES(NULL, 'thin', '');

@@ -156,7 +156,7 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
                                 <Form.Label>Cells</Form.Label>
                                 <InfoTip id="cells" text="How many cells (where the larvae are) are there in the gall?" />
                                 <SearchFormField 
-                                    name="texture"
+                                    name="cells"
                                     touched={touched}
                                     errors={errors}
                                     options={cells}
@@ -167,7 +167,7 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
                                 <Form.Label>Color</Form.Label>
                                 <InfoTip id="color" text="What color is the gall?" />
                                 <SearchFormField 
-                                    name="texture"
+                                    name="color"
                                     touched={touched}
                                     errors={errors}
                                     options={colors}
@@ -178,7 +178,7 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
                                 <Form.Label>Shape</Form.Label>
                                 <InfoTip id="shape" text="What is the shape of the gall?" />
                                 <SearchFormField 
-                                    name="texture"
+                                    name="shape"
                                     touched={touched}
                                     errors={errors}
                                     options={shapes}

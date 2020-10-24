@@ -42,13 +42,17 @@ const Search = ({ data, query }: Props) => {
 }
 
 export async function getServerSideProps(context: { query: any; }) {
-    const newdb = new PrismaClient();
+    const newdb = new PrismaClient({log: ['query']});
     const q = context.query;
+    function dontCare(field: string) {
+        return field === null || field === undefined || field === ''
+    }
+    // detachable is odd case since it is Int (boolean)
     const detachableWhere =  
-        q.detachable != 0 || q.detachable != 1 ?
-            null
+        (q.detachable !== '0' && q.detachable !== '1') ?
+            {}
         :
-            { OR: [ {detachable: { not: null }}, {detachable: { equals: q.detachable }} ] };
+            { OR: [ {detachable: { equals: null }}, {detachable: { equals: parseInt(q.detachable) }} ] };
     const data = await newdb.gall.findMany({
         include: {
             alignment: {},
@@ -56,27 +60,40 @@ export async function getServerSideProps(context: { query: any; }) {
             color: {},
             location: {},
             shape: {},
-            species: {},
+            species: {
+                include: {
+                    hosts: true,
+                }
+            },
             texture: {},
             walls: {},
         },
         where: {
-            // AND: [
-                // detachableWhere,
-                // { OR: [ {color: { is: q.color } }, { color: { isNot: null } } ] },
-                // { OR: [ {shape: { is: q.shape } }, { shape: { isNot: null } } ] },
-                // { OR: [ {alignment: { is: q.alignment } }, { alignment: { isNot: null } } ] },
-                // { OR: [ {cells: { is: q.cells } }, { cells: { isNot: null } } ] },
-                // { OR: [ {walls: { is: q.walls } }, { walls: { isNot: null } } ] },
-                // { OR: [ {location: { is: q.loc } }, { location: { isNot: null } } ] },
-                // { 
-                    // species: { name : { equals: q.host } } 
-                // },
-            // ]
+            AND: [
+                detachableWhere,
+                dontCare(q.color) ? {} : { color: { color: { equals: q.color } } },
+                dontCare(q.alignment) ? {} : { alignment: { alignment: { equals: q.alignemnt } } },
+                dontCare(q.shape) ? {} : { shape: { shape: { equals: q.shape } } },
+                dontCare(q.cells) ? {} : { cells: { cells: { equals: q.cells } } },
+                dontCare(q.walls) ? {} : { walls: { walls: { equals: q.walls } } },
+                dontCare(q.texture) ? {} : { texture: { texture: { equals: q.texture } } },
+                dontCare(q.location) ? {} : { location: { loc: { equals: q.location } } },
+                { 
+                    species : {
+                        hosts: {
+                            every: {
+                                hostspecies: {
+                                    name : { equals: q.host } 
+                                }
+                            }
+                        }
+                    } 
+                },
+            ]
         },
         distinct: [GallDistinctFieldEnum.species_id]
     });
-    // console.log(`Data Yo: ${JSON.stringify(data, null, '  ')}`);
+    console.log(`Data Yo: ${data.length}`);
     return {
         props: {
             data: data,

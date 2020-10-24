@@ -117,9 +117,9 @@ model gall {
   loc_id                     Int?
   cells                      cells?     @relation(fields: [cells_id], references: [cells_id])
   color                      color?     @relation(fields: [color_id], references: [color_id])
-  texture                    texture?   @relation(fields: [texture_id], references: [texture_id])
+  texture                    texture[]  //?   @relation(fields: [texture_id], references: [texture_id])
   shape                      shape?     @relation(fields: [loc_id], references: [shape_id])
-  location                   location?  @relation(fields: [loc_id], references: [loc_id])
+  location                   location[] //?  @relation(fields: [loc_id], references: [loc_id])
   alignment                  alignment? @relation(fields: [loc_id], references: [alignment_id])
   species                    species    @relation(fields: [species_id], references: [species_id])
   taxontype                  taxontype  @relation(fields: [taxoncode], references: [taxoncode])
