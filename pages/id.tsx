@@ -64,7 +64,7 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
                         <Form.Row>
                             <Form.Group as={Col} controlId="formHost">
                                 <Form.Label>Host Species (required)</Form.Label>
-                                <InfoTip text="The host plant that the gall is found on." />
+                                <InfoTip id="host" text="The host plant that the gall is found on." />
                                 <SearchFormField 
                                     name="hostName"
                                     touched={touched}
@@ -75,7 +75,7 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
                             </Form.Group>
                             <Form.Group as={Col} controlId="formLocation">
                                 <Form.Label>Location</Form.Label>
-                                <InfoTip text="Where on the host plant is the gall found? You can select multiple properties." />
+                                <InfoTip id="location" text="Where on the host plant is the gall found? You can select multiple properties." />
                                 <SearchFormField 
                                     name="location"
                                     touched={touched}
@@ -87,7 +87,7 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
                             </Form.Group>
                             <Form.Group as={Col} controlId="detachable">
                                 <Form.Label>Detachable</Form.Label>
-                                <InfoTip text="Can the gall be removed from the host plant or is it integral?" />
+                                <InfoTip id="detachable" text="Can the gall be removed from the host plant or is it integral?" />
                                 <SearchFormField 
                                     name="detachable"
                                     touched={touched}
@@ -100,7 +100,7 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
                         <Form.Row>
                             <Form.Group as={Col} controlId="formTexture">
                                 <Form.Label>Texture</Form.Label>
-                                <InfoTip text="The overall look and feel of the gall." />
+                                <InfoTip id="texture" text="The overall look and feel of the gall." />
                                 <SearchFormField 
                                     name="texture"
                                     touched={touched}
@@ -112,7 +112,7 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
                             </Form.Group>   
                             <Form.Group as={Col} controlId="formAlignment">
                                 <Form.Label>Alignment</Form.Label>
-                                <InfoTip text="Is the gall straight up and down, leaning, etc.?" />
+                                <InfoTip id="alignment" text="Is the gall straight up and down, leaning, etc.?" />
                                 <SearchFormField 
                                     name="alignment"
                                     touched={touched}
@@ -123,7 +123,7 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
                             </Form.Group>
                             <Form.Group as={Col} controlId="formWalls">
                                 <Form.Label>Walls</Form.Label>
-                                <InfoTip text="If the gall is cut open what are the walls like?" />
+                                <InfoTip id="walls" text="If the gall is cut open what are the walls like?" />
                                 <SearchFormField 
                                     name="walls"
                                     touched={touched}
@@ -136,7 +136,7 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
                         <Form.Row>
                             <Form.Group as={Col} controlId="formCells">
                                 <Form.Label>Cells</Form.Label>
-                                <InfoTip text="How many cells (where the larvae are) are there in the gall?" />
+                                <InfoTip id="cells" text="How many cells (where the larvae are) are there in the gall?" />
                                 <SearchFormField 
                                     name="texture"
                                     touched={touched}
@@ -147,7 +147,7 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
                             </Form.Group>   
                             <Form.Group as={Col} controlId="formColor">
                                 <Form.Label>Color</Form.Label>
-                                <InfoTip text="What color is the gall?" />
+                                <InfoTip id="color" text="What color is the gall?" />
                                 <SearchFormField 
                                     name="texture"
                                     touched={touched}
@@ -158,7 +158,7 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
                             </Form.Group>
                             <Form.Group as={Col} controlId="formShape">
                                 <Form.Label>Shape</Form.Label>
-                                <InfoTip text="What is the shape of the gall?" />
+                                <InfoTip id="shape" text="What is the shape of the gall?" />
                                 <SearchFormField 
                                     name="texture"
                                     touched={touched}

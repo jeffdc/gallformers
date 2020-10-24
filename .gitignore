@@ -6,3 +6,4 @@ gallformers.sqlite-shm
 .vscode
 .env.local
 .vercel
+log.log

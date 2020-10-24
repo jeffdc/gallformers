@@ -4,8 +4,7 @@ import { Card, CardColumns } from 'react-bootstrap';
 import CardTextCollapse from '../components/cardcollapse';
 import { SearchBar, SearchQuery } from '../components/searchbar';
 
-type GallProp = {
-    gall: gall,
+type GallProp = gall & {
     alignment: alignment,
     cells: cells,
     color: color,
@@ -26,10 +25,12 @@ const Search = ({ data, query }: Props) => {
         <div>
             <CardColumns className='m-2 p-2'>
                 {data.map((gall) =>
-                    <Card key={gall.species_id} className="shadow-sm">
+                    <Card key={gall.gall_id} className="shadow-sm">
                         <Card.Img variant="top" width="200px" src="/images/gall.jpg" />
                         <Card.Body>
-                            <Card.Title><Link href={"gall/[id]"} as={`gall/${gall.species_id}`}><a>{gall.name}</a></Link></Card.Title>
+                            <Card.Title>
+                                <Link href={"gall/[id]"} as={`gall/${gall.species_id}`}><a>{gall.species.name}</a></Link>
+                            </Card.Title>
                             <CardTextCollapse text={gall.species.description} />
                         </Card.Body>
                     </Card>

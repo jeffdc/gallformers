@@ -1,15 +1,19 @@
 import { Card, Button, Collapse, Container } from 'react-bootstrap';
 import { useState } from 'react';
 
-const CardTextCollapse = props => {
+//TODO This component is kind of janky and was really just a quick hack. We should make it better.
+type Props = {
+    text: string
+}
+const CardTextCollapse = ( { text }:Props ) => {
     const [open, setOpen] = useState(false);
-    const [truncated, setTruncated] = useState(props.text.split(' ').splice(0, 40).join(' '));
+    const truncated = text.split(' ').splice(0, 40).join(' ');
 
     return (
         <Container>
             <Card.Text>{truncated + '...'}</Card.Text>
             <Collapse in={open}>
-                <Card.Text>{ props.text.substring(truncated.length, props.text.length + 1)}</Card.Text>
+                <Card.Text>{ text.substring(truncated.length, text.length + 1) }</Card.Text>
             </Collapse>
             <Button 
                 onClick={() => setOpen(!open)} 

@@ -8,6 +8,7 @@ Now you can run the development server:
 
 ```bash
 npm install
+npx prisma generate
 npm run dev
 ```
 

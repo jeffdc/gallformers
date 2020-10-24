@@ -1,11 +1,11 @@
 import { OverlayTrigger, Badge, Tooltip } from 'react-bootstrap';
 
-const InfoTip = ({text}) => {
+const InfoTip = ({id, text}) => {
     return (
         <OverlayTrigger 
             placement="top"
             overlay={
-                <Tooltip>{text}</Tooltip>
+                <Tooltip id={id}>{text}</Tooltip>
             }
         >
             <sup><Badge pill variant="info" className="m-1">i</Badge></sup>

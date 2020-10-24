@@ -98,8 +98,8 @@ model species {
   family                             family          @relation(fields: [family_id], references: [family_id])
   taxontype                          taxontype?      @relation(fields: [taxoncode], references: [taxoncode])
   gall                               gall[]
-  host_host_host_species_idTospecies host[]          @relation("host_host_species_idTospecies")
-  host_host_species_idTospecies      host[]          @relation("host_species_idTospecies")
+  host_galls                         host[]          @relation("host_host_species_idTospecies")
+  hosts                              host[]          @relation("host_species_idTospecies")
   speciessource                      speciessource[]
 }
 
@@ -131,7 +131,7 @@ model host {
   host_species_id                       Int?
   species_id                            Int?
   hostspecies          species? @relation("host_host_species_idTospecies", fields: [host_species_id], references: [species_id])
-  host                 species? @relation("host_species_idTospecies", fields: [species_id], references: [species_id])
+  species                 species? @relation("host_species_idTospecies", fields: [species_id], references: [species_id])
 }
 
 model source {
