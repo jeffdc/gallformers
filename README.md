@@ -2,17 +2,38 @@
 The gallformers site
 
 ## Getting Started
-You must have [npm](https://www.npmjs.com/get-npm) installed for any of this to work. Go do that. I highly recommend using a node version manager of some kind.
-
-Now you can run the development server:
-
+You must have [npm](https://www.npmjs.com/get-npm) and yarn installed for any of this to work. Go do that. I highly recommend using a node version manager of some kind.
+Installing yarn is easy once you have npm:
 ```bash
-npm install
-npx prisma generate
-npm run dev
+npm install -g yarn
 ```
 
+Get setup:
+```bash
+yarn install
+npx prisma generate
+```
+
+You will need to run `generate` again if the DB [schema](prisma/schema.prisma) is changed.
+
+Now you can run the development server:
+```bash
+yarn dev
+```
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can build and run the prod version of the site:
+```bash
+yarn build
+yarn start
+```
+To run in the docker container:
+```bash
+docker build -t [name:tag] .
+docker run --name gallformers -p 3002:3000 -d [name:tag] <-- from previous step
+docker start gallformers
+```
+This should now make the site accessible on your local machine at [http://localhost:3002](http://localhost:3002)
 
 ## Technical Overview
 The whole site is built using [next.js](nextjs.org/). 
@@ -28,7 +49,4 @@ There is a totally separate data curation step that is not discussed here.  The 
 The front-end is mostly static pages as we expect most of this data to not change frequently.  next.js is built on [React](https://reactjs.org/) so you will need some familiarity with that to work on the site. The look-and-feel is built with [react-bootstrap](https://react-bootstrap.github.io/). Custom components are placed in the [pages/components](pages/components) directory and global layout components in [pages/layouts](pages/layouts). 
 
 ### Production and Staging (non-dev) Deployments
-~The plan is to use [Vercel](https://vercel.com) to host the main site. This is a WIP so no details yet.~
-Vercel is not going to work due to technical limitations. I am investigating alternatives after spending *way* too much time fighting with Vercel.
-
-Current thinking is that we will *not* use Vercel for image hosting, however this is an open item.
+TODO
