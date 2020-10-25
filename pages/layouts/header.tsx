@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import { Button, Form, FormControl, Nav, Navbar } from 'react-bootstrap';
 
-const Header = () => (
+const Header = (): JSX.Element => (
     <div style={{
         marginBottom: '5%'
     }}>

@@ -1,10 +1,10 @@
-import { Field, FieldInputProps, FormikProps } from 'formik';
-import { Typeahead } from 'react-bootstrap-typeahead';
-
+import { Field, FieldInputProps, FormikErrors, FormikProps, FormikTouched } from 'formik';
+import { Typeahead, TypeaheadModel } from 'react-bootstrap-typeahead';
+ 
 type Props = {
     name: string,
-    touched: any,
-    errors: any,  // not sure how to do better than this
+    touched: FormikTouched<TypeaheadModel>,
+    errors: FormikErrors<TypeaheadModel>,
     options: Array<string>,
     placeholder: string,
     multiple?: boolean
@@ -16,13 +16,10 @@ const SearchFormField = ( {name, touched, errors, options, placeholder, multiple
     if (name == undefined || name == null) {
         throw new Error('Name must be defined.')
     }
-
-        // I tried to genericize the component on V, however I could not get past the fact that the Typeahead
-        // componenet can not be typed to some type V. This ends up with the field form values being typed with 'any'.
-        return (
+    return (
         <>
             <Field name={name}>
-                {({ field, form }: {field: FieldInputProps<any>, form:FormikProps<any>}) =>
+                {({ field, form }: {field: FieldInputProps<TypeaheadModel>, form:FormikProps<TypeaheadModel>}) =>
                     <Typeahead
                         id={name}
                         // this makes no sense to me why this has to be cast to any :(
@@ -30,7 +27,7 @@ const SearchFormField = ( {name, touched, errors, options, placeholder, multiple
                         onChange={v => form.setFieldValue(name, v)}
                         options={options}
                         // i am unsure what is going on here. if i use value it works but will not compile as strict TS, 
-                        // if use selected it breaks in multiple ways. I thas something to do with multiple selections vs
+                        // if use selected it breaks in multiple ways. It has something to do with multiple selections vs
                         // single selections and the way the data is managed in the form vs in the Typeahead component.
                         // selected={[field.value]}
                         value={field.value}

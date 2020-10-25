@@ -1,9 +1,10 @@
 import { HostDistinctFieldEnum, PrismaClient } from '@prisma/client';
-import { Formik } from 'formik';
+import { Formik, FormikErrors, FormikTouched } from 'formik';
 import { GetStaticProps } from 'next';
 import { useRouter } from "next/router";
 import React from 'react';
 import { Button, Col, Container, Form } from 'react-bootstrap';
+import { TypeaheadModel } from 'react-bootstrap-typeahead';
 import * as yup from 'yup';
 import InfoTip from '../components/infotip';
 import SearchFormField from '../components/searchformfield';
@@ -34,8 +35,8 @@ type Props = {
 type FormProps = {
     handleSubmit: (e: React.FormEvent<HTMLInputElement>) => void,
     isSubmitting: boolean,
-    touched: unknown,
-    errors: any
+    touched: FormikTouched<TypeaheadModel>,
+    errors: FormikErrors<TypeaheadModel>
 }
 
 const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, walls }: Props): JSX.Element => {
