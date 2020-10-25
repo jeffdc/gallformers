@@ -1,5 +1,6 @@
-import { alignment, cells, color, HostDistinctFieldEnum, location, PrismaClient, shape, texture, walls } from '@prisma/client';
+import { HostDistinctFieldEnum, PrismaClient } from '@prisma/client';
 import { Formik } from 'formik';
+import { GetStaticProps } from 'next';
 import { useRouter } from "next/router";
 import React from 'react';
 import { Button, Col, Container, Form } from 'react-bootstrap';
@@ -33,11 +34,11 @@ type Props = {
 type FormProps = {
     handleSubmit: (e: React.FormEvent<HTMLInputElement>) => void,
     isSubmitting: boolean,
-    touched: any,
+    touched: unknown,
     errors: any
 }
 
-const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, walls }: Props) => {
+const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, walls }: Props): JSX.Element => {
     const router = useRouter();
 
     return (    
@@ -47,24 +48,23 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
         <Formik
             initialValues={{ hostName:"", location:"", detachable:"", texture:"", alignment:"", walls:"", cells:"", color:"", shape:""}}
             validationSchema={schema}
-            onSubmit={ (values, {setSubmitting, resetForm}) => {
+            onSubmit={ (values, {setSubmitting}) => {
                 setSubmitting(true);
                 router.push({
                     pathname: '/search',
                     query: {
                         host: values.hostName,
-                        location: values.location,
                         // we display 'unsure' to the user, but it is easier to treat it as an empty string from here on out
                         detachable: values.detachable === 'unsure' ? '' : values.detachable,
-                        texture: values.texture,
                         alignment: values.alignment,
                         walls: values.walls,
-                        cells: values.cells,
+                        locations: values.location,
+                        textures: values.texture,
                         color: values.color,
-                        shape: values.shape                
+                        shape: values.shape, 
+                        cells: values.cells,
                     },
                 });
-                // resetForm();
                 setSubmitting(false);
             }}
         >
@@ -199,7 +199,7 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
 
 
 // Use static so that this stuff can be built once on the server-side and then cached.
-export async function getStaticProps() {
+export const getStaticProps: GetStaticProps = async() => {
     const newdb = new PrismaClient();
 
     const h = await newdb.host.findMany({

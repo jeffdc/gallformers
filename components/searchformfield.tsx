@@ -12,7 +12,7 @@ type Props = {
 
 // A form field used on the search page. It uses Formix and Typeahead.
 // Must wrap the Typeahead in a Formix Field so that we can access Formix managed state
-function SearchFormField( {name, touched, errors, options, placeholder, multiple}: Props) {
+const SearchFormField = ( {name, touched, errors, options, placeholder, multiple}: Props): JSX.Element => {
     if (name == undefined || name == null) {
         throw new Error('Name must be defined.')
     }

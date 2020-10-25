@@ -2,7 +2,7 @@ import Head from 'next/head'
 import Link from 'next/link'
 import { Card, Col, Container, Row } from 'react-bootstrap'
 
-export default function Home() {
+export default function Home(): JSX.Element {
   return (
     <div>
       <Head>
@@ -50,6 +50,8 @@ export default function Home() {
 }
 
 export async function getStaticProps() {
+  //TODO all of this needs to go away and a better way to handle migrations that is not dependent on better-sqlite-helper is needed
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const Database = require('better-sqlite3-helper');
   const dbPath = `${process.cwd()}/prisma/gallformers.sqlite`;
 

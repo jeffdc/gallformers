@@ -99,8 +99,8 @@ model species {
   family                             family          @relation(fields: [family_id], references: [id])
   taxontype                          taxontype?      @relation(fields: [taxoncode], references: [taxoncode])
   gall                               gall[]
-  host_galls host[]          @relation("host_gall_species_idTospecies")
-  hosts host[]          @relation("host_host_species_idTospecies")
+  hosts host[]                       @relation("host_gall_species_idTospecies")
+  host_galls host[]                  @relation("host_host_species_idTospecies")
   speciessource                      speciessource[]
 }
 

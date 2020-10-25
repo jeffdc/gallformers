@@ -1,6 +1,6 @@
-import { gall, family, PrismaClient, species } from '@prisma/client';
+import { family, gall, PrismaClient, species } from '@prisma/client';
 import Link from 'next/link';
-import { Card, Nav, Button, ListGroup, Accordion } from 'react-bootstrap';
+import { Accordion, Button, Card, ListGroup, Nav } from 'react-bootstrap';
 
 type SpeciesProp = species & {
     gall: gall[]
@@ -12,7 +12,7 @@ type Props = {
     families: FamilyProp[],
 }
 
-const Explore = ({families}: Props) => {
+const Explore = ({families}: Props): JSX.Element => {
     return (
         <Card>
         <Card.Header>

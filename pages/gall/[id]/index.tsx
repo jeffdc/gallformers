@@ -1,4 +1,5 @@
-import { abundance, alignment, cells, color, family, gall, galllocation, host, location, PrismaClient, shape, source, species, speciessource, texture, walls } from '@prisma/client';
+import { abundance, alignment, cells, color, family, gall, galllocation, galltexture, host, location, PrismaClient, shape, source, species, speciessource, texture, walls } from '@prisma/client';
+import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
@@ -18,6 +19,10 @@ type SpeciesProps = species & {
 type LocationProps = galllocation & [] & {
     location: location[]
 }
+type TextureProps = galltexture & [] & {
+    texture: texture[]
+}
+
 type GallProps = gall & {
     species: SpeciesProps,
     alignment: alignment,
@@ -25,7 +30,7 @@ type GallProps = gall & {
     color: color,
     galllocation: LocationProps,
     shape: shape,
-    galltexture: texture,
+    galltexture: TextureProps,
     walls: walls
 }
 type Props = {
@@ -36,14 +41,7 @@ function hostAsLink(h: HostProp) {
     return ( <Link key={h.host_species_id} href={"/host/[id]"} as={`/host/${h.host_species_id}`}><a>{h.hostspecies.name} </a></Link> )
 }
 
-const Gall = ({ gall }: Props) => {
-    const locs = gall.galllocation.reduce(
-        (acc: string, l: location) => {
-            // super confused how to sort the types here. it runs as expected but it confuses TS. the mismatch betweeb what Prisma
-            // returns and what I can figure out to how model in TS seems to cause the issue.
-            return `${l.location?.location} ${acc}` 
-        }, '');
-
+const Gall = ({ gall }: Props): JSX.Element => {
     return (    
     <div style={{
         marginBottom: '5%',
@@ -61,7 +59,12 @@ const Gall = ({ gall }: Props) => {
                 <Container className='p-3 border'>
                     <Row>
                         <Col><h1>{gall.species.name}</h1></Col>
-                        <Col className='text-right font-italic'>Family: {gall.species.family.name}</Col>
+                        <Col className='text-right font-italic'>
+                            Family: 
+                            <Link key={gall.species.family.id} href={"/family/[id]"} as={`/family/${gall.species.family.id}`}>
+                                <a> {gall.species.family.name}</a>
+                            </Link>
+                        </Col>
                     </Row>
                     <Row>
                         <Col className='lead p-3'>{gall.species.description}</Col>
@@ -73,12 +76,12 @@ const Gall = ({ gall }: Props) => {
                     </Row>
                     <Row>
                         <Col>Detachable: {gall.detachable == 1 ? 'yes' : 'no'}</Col>
-                        <Col>Texture: {gall.texture?.texture}</Col>
+                        <Col>Texture: {gall.galltexture.map(t => t.texture).join(",")}</Col>
                         <Col>Color: {gall.color?.color}</Col>
                         <Col>Alignment: {gall.alignment?.alignment}</Col>
                     </Row>
                     <Row>
-                        <Col>Location: {locs}</Col>
+                        <Col>Location: {gall.galllocation.map(l => l.location).join(",")}</Col>
                         <Col>Walls: {gall.walls?.walls}</Col>
                         <Col>Abdundance: {gall.species?.abundance}</Col>
                         <Col>Shape: {gall.shape?.shape}</Col>
@@ -110,7 +113,7 @@ const Gall = ({ gall }: Props) => {
 
 
 // Use static so that this stuff can be built once on the server-side and then cached.
-export async function getStaticProps(context: { params: { id: string; }; }) {
+export const getStaticProps: GetStaticProps = async (context: { params: { id: string; }; }) => {
     const newdb = new PrismaClient();
     const gall = await newdb.gall.findFirst({
         include: {
@@ -151,7 +154,7 @@ export async function getStaticProps(context: { params: { id: string; }; }) {
     }
 }
 
-export async function getStaticPaths() {
+export const getStaticPaths: GetStaticPaths = async () => {
     const newdb = new PrismaClient();
     const galls = await newdb.gall.findMany({
         select: {

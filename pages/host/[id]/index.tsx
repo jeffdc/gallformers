@@ -1,10 +1,11 @@
-import { abundance, family, gall, host, PrismaClient, species } from '@prisma/client';
+import { abundance, family, host, PrismaClient, species } from '@prisma/client';
+import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React from 'react';
 import { Col, Container, Media, Row } from 'react-bootstrap';
 
-type GallProp = gall & {
-    species: species
+type GallProp = species & {
+    gallspecies: species
 }
 
 type HostSpeciesProp = species & {
@@ -20,10 +21,10 @@ type Props = {
 }
 
 function gallAsLink(g: GallProp) {
-    return ( <Link key={g.species_id} href={"/gall/[id]"} as={`/gall/${g.species_id}`}><a>{g.species.name} </a></Link> )
+    return ( <Link key={g.gallspecies.id} href={"/gall/[id]"} as={`/gall/${g.gallspecies.id}`}><a>{g.gallspecies.name} </a></Link> )
 }
 
-const Host = ({ host }: Props) => {
+const Host = ({ host }: Props): JSX.Element => {
     return (    
     <div style={{
         marginBottom: '5%',
@@ -41,14 +42,17 @@ const Host = ({ host }: Props) => {
                 <Container className='p-3 border'>
                     <Row>
                         <Col><h1>{host.hostspecies.name}</h1></Col>
-                        <Col className='text-right font-italic'>Family: {host.hostspecies.family.name}</Col>
+                        Family: 
+                        <Link key={host.hostspecies.family.id} href={"/family/[id]"} as={`/family/${host.hostspecies.family.id}`}>
+                            <a> {host.hostspecies.family.name}</a>
+                        </Link>
                     </Row>
                     <Row>
                         <Col className='lead p-3'>{host.hostspecies.description}</Col>
                     </Row>
                     <Row>
                         <Col>
-                            Galls: { host.hostspecies.host_galls.map(gallAsLink) }
+                            Galls: {host.hostspecies.host_galls.map(gallAsLink)}
                         </Col>
                     </Row>
                     <Row>
@@ -63,7 +67,12 @@ const Host = ({ host }: Props) => {
 
 
 // Use static so that this stuff can be built once on the server-side and then cached.
-export async function getStaticProps(context: { params: { id: string; }; }) {
+export const getStaticProps: GetStaticProps = async (context) => {
+    if (context === undefined || context.params === undefined || context.params.id === undefined) {
+        throw new Error(`Host id can not be undefined.`)
+    } else if (Array.isArray(context.params.id)) {
+        throw new Error(`Expected single id but got an array of ids ${context.params.id}.`)
+    }
     const newdb = new PrismaClient();
     const host = await newdb.host.findFirst({
         include: {
@@ -73,7 +82,7 @@ export async function getStaticProps(context: { params: { id: string; }; }) {
                     family: true,
                     host_galls: {
                         include: {
-                            species: true,
+                            gallspecies: true,
                         }
                     }
                 }
@@ -88,13 +97,13 @@ export async function getStaticProps(context: { params: { id: string; }; }) {
     }
 }
 
-export async function getStaticPaths() {
+export const getStaticPaths: GetStaticPaths = async () => {
     const newdb = new PrismaClient();
     const hosts = await newdb.host.findMany({
         include: {
             hostspecies: {
                 select: {
-                    species_id: true,
+                    id: true,
                 }
             }
         }

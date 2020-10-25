@@ -1,4 +1,5 @@
 import { alignment, cells, color, gall, GallDistinctFieldEnum, location, PrismaClient, shape, species, texture, walls } from '@prisma/client';
+import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { Card, CardColumns } from 'react-bootstrap';
 import CardTextCollapse from '../components/cardcollapse';
@@ -20,7 +21,7 @@ type Props = {
     query: SearchQuery
 };
 
-const Search = ({ data, query }: Props) => {
+const Search = ({ data, query }: Props): JSX.Element => {
     return (
         <div>
             <CardColumns className='m-2 p-2'>
@@ -41,7 +42,7 @@ const Search = ({ data, query }: Props) => {
     )
 }
 
-export async function getServerSideProps(context: { query: any; }) {
+export const getServerSideProps: GetServerSideProps = async (context: { query: any; }) => {
     const newdb = new PrismaClient({log: ['query']});
     const q = context.query;
     function dontCare(field: string) {
