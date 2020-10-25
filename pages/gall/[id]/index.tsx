@@ -16,11 +16,11 @@ type SpeciesProps = species & {
     hosts: HostProp[],
     speciessource: SourceProp[]
 }
-type LocationProps = galllocation & [] & {
-    location: location[]
+type LocationProps = galllocation & {
+    location: location
 }
-type TextureProps = galltexture & [] & {
-    texture: texture[]
+type TextureProps = galltexture & {
+    texture: texture
 }
 
 type GallProps = gall & {
@@ -28,9 +28,9 @@ type GallProps = gall & {
     alignment: alignment,
     cells: cells,
     color: color,
-    galllocation: LocationProps,
+    galllocation: LocationProps[],
     shape: shape,
-    galltexture: TextureProps,
+    galltexture: TextureProps[],
     walls: walls
 }
 type Props = {
@@ -140,7 +140,9 @@ export const getStaticProps: GetStaticProps = async (context: { params: { id: st
                 select: { location: true }
             },
             shape: true,
-            galltexture: true,
+            galltexture: {
+                select: { texture: true }
+            },
             walls: true,
         },
         where: {

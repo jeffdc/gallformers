@@ -33,7 +33,7 @@ type Props = {
 }
 
 type FormProps = {
-    handleSubmit: (e: React.FormEvent<HTMLInputElement>) => void,
+    handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void,
     isSubmitting: boolean,
     touched: FormikTouched<TypeaheadModel>,
     errors: FormikErrors<TypeaheadModel>

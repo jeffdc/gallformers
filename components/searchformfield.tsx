@@ -1,10 +1,10 @@
-import { Field, FieldInputProps, FormikErrors, FormikProps, FormikTouched } from 'formik';
-import { Typeahead, TypeaheadModel } from 'react-bootstrap-typeahead';
+import { Field } from 'formik';
+import { Typeahead } from 'react-bootstrap-typeahead';
  
 type Props = {
     name: string,
-    touched: FormikTouched<TypeaheadModel>,
-    errors: FormikErrors<TypeaheadModel>,
+    touched: any,
+    errors: any,
     options: Array<string>,
     placeholder: string,
     multiple?: boolean
@@ -19,18 +19,18 @@ const SearchFormField = ( {name, touched, errors, options, placeholder, multiple
     return (
         <>
             <Field name={name}>
-                {({ field, form }: {field: FieldInputProps<TypeaheadModel>, form:FormikProps<TypeaheadModel>}) =>
+                {({ field, form }: {field: any, form: any}) =>
                     <Typeahead
                         id={name}
                         // this makes no sense to me why this has to be cast to any :(
-                        labelKey={name as any}
+                        // labelKey={name}
                         onChange={v => form.setFieldValue(name, v)}
                         options={options}
-                        // i am unsure what is going on here. if i use value it works but will not compile as strict TS, 
+                        // i am unsure what is going on here. if i use value it works but will not compile as TS (though it will run), 
                         // if use selected it breaks in multiple ways. It has something to do with multiple selections vs
                         // single selections and the way the data is managed in the form vs in the Typeahead component.
-                        // selected={[field.value]}
-                        value={field.value}
+                        selected={[field.value]}
+                        // value={field.value}
                         placeholder={placeholder}
                         isInvalid={!!form.errors[name]}
                         multiple={multiple}
