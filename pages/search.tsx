@@ -1,6 +1,7 @@
 import { alignment, cells, color, gall, GallDistinctFieldEnum, location, PrismaClient, shape, species, texture, walls } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
+import { ParsedUrlQuery } from 'querystring';
 import { Card, CardColumns } from 'react-bootstrap';
 import CardTextCollapse from '../components/cardcollapse';
 import { SearchBar, SearchQuery } from '../components/searchbar';
@@ -32,7 +33,7 @@ const Search = ({ data, query }: Props): JSX.Element => {
                             <Card.Title>
                                 <Link href={"gall/[id]"} as={`gall/${gall.species_id}`}><a>{gall.species.name}</a></Link>
                             </Card.Title>
-                            <CardTextCollapse text={gall.species.description as any} />
+                            <CardTextCollapse text={gall.species.description} />
                         </Card.Body>
                     </Card>
                 )}
@@ -42,11 +43,29 @@ const Search = ({ data, query }: Props): JSX.Element => {
     )
 }
 
-export const getServerSideProps: GetServerSideProps = async (context: { query: any; }) => {
-    const newdb = new PrismaClient({log: ['query']});
-    const q = context.query;
-    function dontCare(field: string) {
-        return field === null || field === undefined || field === ''
+// Keep TS compiler happy. SearchQuery is our custom type and ParsedUrlQuery is what next.js uses. Both are just
+// K-V dictionaries.
+type Query = SearchQuery | ParsedUrlQuery;
+
+export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery; }) => {
+    // Useful for logging SQL that is genereated for debugging the search
+    // const newdb = new PrismaClient({log: ['query']}); 
+    const newdb = new PrismaClient();
+
+    // the locations and textures come in as encoded JSON arrays so we need to parse them
+    context.query.locations = JSON.parse(context.query.locations.toString());
+    context.query.textures = JSON.parse(context.query.textures.toString());
+
+    // If we do this cast, then we get type checking thoughtout. Already found 2 bugs becuase of this!
+    const q = context.query as SearchQuery;
+
+    // helper to create Where clauses
+    function whereDontCare(field: string | string[], o) {
+        if (field === null || field === undefined || field === '' || (Array.isArray(field) && field.length === 0)) {
+            return {}
+        } else {
+            return o
+        }
     }
     // detachable is odd case since it is Int (boolean)
     const detachableWhere =  
@@ -54,12 +73,15 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: a
             {}
         :
             { OR: [ {detachable: { equals: null }}, {detachable: { equals: parseInt(q.detachable) }} ] };
+
     const data = await newdb.gall.findMany({
         include: {
             alignment: {},
             cells: {},
             color: {},
-            galllocation: {},
+            galllocation: {
+                include: { location: {} }
+            },
             shape: {},
             species: {
                 include: {
@@ -72,17 +94,17 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: a
         where: {
             AND: [
                 detachableWhere,
-                dontCare(q.color) ? {} : { color: { color: { equals: q.color } } },
-                dontCare(q.alignment) ? {} : { alignment: { alignment: { equals: q.alignemnt } } },
-                dontCare(q.shape) ? {} : { shape: { shape: { equals: q.shape } } },
-                dontCare(q.cells) ? {} : { cells: { cells: { equals: q.cells } } },
-                dontCare(q.walls) ? {} : { walls: { walls: { equals: q.walls } } },
-                dontCare(q.texture) ? {} : { galltexture: { some: { texture: { is: q.texture } } } },
-                dontCare(q.location) ? {} : { galllocation: { some: { location: { is: q.location } } } },
+                whereDontCare(q.color, { color: { color: { equals: q.color } } }),
+                whereDontCare(q.alignment, { alignment: { alignment: { equals: q.alignment } } }),
+                whereDontCare(q.shape, { shape: { shape: { equals: q.shape } } }),
+                whereDontCare(q.cells, { cells: { cells: { equals: q.cells } } }),
+                whereDontCare(q.walls, { walls: { walls: { equals: q.walls } } }),
+                whereDontCare(q.textures, { galltexture: { some: { texture: { texture: { in: q.textures } } } } }),
+                whereDontCare(q.locations, { galllocation: { some: { location: { location: { in: q.locations } } } } }),
                 {
                     species: {
-                        host_galls: {
-                            every: {
+                        hosts: {
+                            some: {
                                 hostspecies: {
                                     name: { equals: q.host }
                                 }
@@ -94,6 +116,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: a
         },
         distinct: [GallDistinctFieldEnum.species_id],
     });
+ 
 
     // due to a limitation in Prisma it is not possible to sort on a related field, so we have to sort now
     data.sort((g1,g2) => {

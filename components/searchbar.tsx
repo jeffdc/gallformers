@@ -5,7 +5,7 @@ function anyIfEmptyString(x: string | null | undefined): string {
 }
 
 function arrayToString(a: string[] | null | undefined): string {
-    if (a !== null && a !== undefined && a.length > 0) {
+    if (a !== null && a !== undefined && Array.isArray(a) && a.length > 0) {
         return a.join(',')
     } else {
         return 'Any'

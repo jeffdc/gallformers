@@ -81,7 +81,7 @@ const Gall = ({ gall }: Props): JSX.Element => {
                         <Col>Alignment: {gall.alignment?.alignment}</Col>
                     </Row>
                     <Row>
-                        <Col>Location: {gall.galllocation.map(l => l.location).join(",")}</Col>
+                        <Col>Location: {gall.galllocation.map(l => l.location.location).join(", ")}</Col>
                         <Col>Walls: {gall.walls?.walls}</Col>
                         <Col>Abdundance: {gall.species?.abundance}</Col>
                         <Col>Shape: {gall.shape?.shape}</Col>

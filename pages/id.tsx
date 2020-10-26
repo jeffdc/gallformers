@@ -4,10 +4,10 @@ import { GetStaticProps } from 'next';
 import { useRouter } from "next/router";
 import React from 'react';
 import { Button, Col, Container, Form } from 'react-bootstrap';
-import { TypeaheadModel } from 'react-bootstrap-typeahead';
 import * as yup from 'yup';
 import InfoTip from '../components/infotip';
-import SearchFormField from '../components/searchformfield';
+import { SearchQuery } from '../components/searchbar';
+import SearchFormField, { FieldValueType } from '../components/searchformfield';
 
 const schema = yup.object({
     hostName: yup.string().required('You must provide a host name.'),
@@ -35,8 +35,8 @@ type Props = {
 type FormProps = {
     handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void,
     isSubmitting: boolean,
-    touched: FormikTouched<TypeaheadModel>,
-    errors: FormikErrors<TypeaheadModel>
+    touched: FormikTouched<FieldValueType>,
+    errors: FormikErrors<FieldValueType>
 }
 
 const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, walls }: Props): JSX.Element => {
@@ -54,16 +54,16 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
                 router.push({
                     pathname: '/search',
                     query: {
-                        host: values.hostName,
+                        host: values.hostName[0],
                         // we display 'unsure' to the user, but it is easier to treat it as an empty string from here on out
-                        detachable: values.detachable === 'unsure' ? '' : values.detachable,
-                        alignment: values.alignment,
-                        walls: values.walls,
-                        locations: values.location,
-                        textures: values.texture,
-                        color: values.color,
-                        shape: values.shape, 
-                        cells: values.cells,
+                        // detachable: values.detachable[0].detachable === 'unsure' ? '' : values.detachable[0].detachable,
+                        alignment: values.alignment[0],
+                        walls: values.walls[0],
+                        locations: JSON.stringify(values.location),
+                        textures: JSON.stringify(values.texture),
+                        color: values.color[0],
+                        shape: values.shape[0], 
+                        cells: values.cells[0],
                     },
                 });
                 setSubmitting(false);
