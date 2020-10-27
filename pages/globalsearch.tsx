@@ -36,7 +36,7 @@ const GlobalSearch = ({ species, query }: Props): JSX.Element => {
                             <Card.Title>
                                 { speciesLink(species) }
                             </Card.Title>
-                            <CardTextCollapse text={species.description} />
+                            <CardTextCollapse text={species.description === null ? '' : species.description} />
                         </Card.Body>
                     </Card>
                 )}

@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { useState } from 'react';
+import { KeyboardEvent, useState } from 'react';
 import { Button, Form, FormControl, Nav, Navbar } from 'react-bootstrap';
 
 const Header = (): JSX.Element => {
@@ -18,7 +18,7 @@ const Header = (): JSX.Element => {
         }
     }
     
-    const handleSearchKeyUp = event => {
+    const handleSearchKeyUp = (event: KeyboardEvent<HTMLInputElement>) => {
         event.preventDefault();
         if (event.key === 'Enter' && event.keyCode === 13) {
             submitSearch();

@@ -113,7 +113,12 @@ const Gall = ({ gall }: Props): JSX.Element => {
 
 
 // Use static so that this stuff can be built once on the server-side and then cached.
-export const getStaticProps: GetStaticProps = async (context: { params: { id: string; }; }) => {
+export const getStaticProps: GetStaticProps = async (context) => {
+    if (context === undefined || context.params === undefined || context.params.id === undefined) {
+        throw new Error('An id must be passed to gall/[id]!');
+    }
+    
+    const id = context.params.id as string;
     const newdb = new PrismaClient();
     const gall = await newdb.gall.findFirst({
         include: {
@@ -146,7 +151,7 @@ export const getStaticProps: GetStaticProps = async (context: { params: { id: st
             walls: true,
         },
         where: {
-            species_id: { equals: parseInt(context.params.id) }
+            species_id: { equals: parseInt(id) }
         }
     });
 

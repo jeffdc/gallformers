@@ -56,7 +56,7 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
                     query: {
                         host: values.hostName[0],
                         // we display 'unsure' to the user, but it is easier to treat it as an empty string from here on out
-                        // detachable: values.detachable[0].detachable === 'unsure' ? '' : values.detachable[0].detachable,
+                        detachable: values.detachable[0] === 'unsure' ? '' : values.detachable[0],
                         alignment: values.alignment[0],
                         walls: values.walls[0],
                         locations: JSON.stringify(values.location),

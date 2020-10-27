@@ -1,4 +1,4 @@
-import { alignment, cells, color, gall, GallDistinctFieldEnum, location, PrismaClient, shape, species, texture, walls } from '@prisma/client';
+import { alignment, cells, color, gall, GallDistinctFieldEnum, gallWhereInput, location, PrismaClient, shape, species, texture, walls } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
@@ -33,7 +33,7 @@ const Search = ({ data, query }: Props): JSX.Element => {
                             <Card.Title>
                                 <Link href={"gall/[id]"} as={`gall/${gall.species_id}`}><a>{gall.species.name}</a></Link>
                             </Card.Title>
-                            <CardTextCollapse text={gall.species.description} />
+                            <CardTextCollapse text={gall.species.description === null ? '' : gall.species.description} />
                         </Card.Body>
                     </Card>
                 )}
@@ -43,24 +43,24 @@ const Search = ({ data, query }: Props): JSX.Element => {
     )
 }
 
-// Keep TS compiler happy. SearchQuery is our custom type and ParsedUrlQuery is what next.js uses. Both are just
-// K-V dictionaries.
-type Query = SearchQuery | ParsedUrlQuery;
-
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery; }) => {
+    if (context === undefined || context.query === undefined) {
+        throw new Error('Must pass a valid query object to Search!')
+    }
+
     // Useful for logging SQL that is genereated for debugging the search
     // const newdb = new PrismaClient({log: ['query']}); 
     const newdb = new PrismaClient();
 
     // the locations and textures come in as encoded JSON arrays so we need to parse them
-    context.query.locations = JSON.parse(context.query.locations.toString());
-    context.query.textures = JSON.parse(context.query.textures.toString());
+    context.query.locations = JSON.parse(context.query.locations === undefined ? '' : context.query.locations.toString());
+    context.query.textures = JSON.parse(context.query.textures === undefined ? '' : context.query.textures.toString());
 
     // If we do this cast, then we get type checking thoughtout. Already found 2 bugs becuase of this!
     const q = context.query as SearchQuery;
 
     // helper to create Where clauses
-    function whereDontCare(field: string | string[], o) {
+    function whereDontCare(field: string | string[] | undefined, o: gallWhereInput) {
         if (field === null || field === undefined || field === '' || (Array.isArray(field) && field.length === 0)) {
             return {}
         } else {

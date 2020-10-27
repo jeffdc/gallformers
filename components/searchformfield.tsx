@@ -29,14 +29,16 @@ const SearchFormField = ( {name, touched, errors, options, placeholder, multiple
                         options={options}
                         selected={field.value ? field.value : []}
                         placeholder={placeholder}
-                        isInvalid={!!form.errors[name]}
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        isInvalid={!!(form.errors as any)[name]}
                         multiple={multiple}
                 />                                    
                 }
             </Field>
-            { touched[name] && errors[name] ? (
-                <div>{errors[name]}</div>
-            ) : null }
+            { 
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (touched as any)[name] && (errors as any)[name] ? (<div>{(errors as any)[name]}</div>) : null 
+            }
         </>
     )
 };
