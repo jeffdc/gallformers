@@ -29,8 +29,8 @@ yarn start
 ```
 To run in the docker container:
 ```bash
-docker build -t [name:tag] .
-docker run --name gallformers -p 3002:3000 -d [name:tag] <-- from previous step
+docker build -t gallformers:latest .
+docker run --name gallformers -p 3002:3000 -d gallformers:latest <-- from previous step
 docker start gallformers
 ```
 This should now make the site accessible on your local machine at [http://localhost:3002](http://localhost:3002)

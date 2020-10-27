@@ -1,5 +1,5 @@
 # docker pull node:current-alpine3.11
-FROM node:alpine
+FROM node:alpine as build
 RUN apk update && apk upgrade
 
 # look at https://gist.github.com/armand1m/b8061bcc9e8e9a5c1303854290c7d61e
@@ -10,15 +10,28 @@ WORKDIR /usr/src/app
 COPY package.json ./
 COPY yarn.lock ./
 # RUN node --stack-size=6000 $(which npm) --verbose install
-RUN yarn install
+RUN yarn install 
 
 # copy all the stuff
 COPY . .
 
 # generate the prisma client, then run the build which will generate the static site and all other assets
-RUN npx prisma generate && yarn build
+RUN npx prisma generate && yarn add --dev typescript @types/node && yarn build
+# prune reduces the image some bits more :)
+RUN npm prune --production
+
+
+## Shrink final image, copy built nextjs and startup the server
+FROM node:12-alpine
+
+WORKDIR /usr/src/app
+
+# copy from build image
+COPY --from=build /usr/src/app/package.json ./package.json
+COPY --from=build /usr/src/app/node_modules ./node_modules
+COPY --from=build /usr/src/app/prisma ./prisma
+COPY --from=build /usr/src/app/.next ./.next
 
 EXPOSE 3000
 CMD ["yarn", "start"]
 
-# RUN apk --update add nginx
