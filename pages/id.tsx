@@ -6,7 +6,6 @@ import React from 'react';
 import { Button, Col, Container, Form } from 'react-bootstrap';
 import * as yup from 'yup';
 import InfoTip from '../components/infotip';
-import { SearchQuery } from '../components/searchbar';
 import SearchFormField, { FieldValueType } from '../components/searchformfield';
 
 const schema = yup.object({

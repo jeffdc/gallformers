@@ -4,7 +4,7 @@ type Props = {
     id: string,
     text: string
 }
-const InfoTip = ({id, text}: Props) => {
+const InfoTip = ({id, text}: Props): JSX.Element => {
     return (
         <OverlayTrigger 
             placement="top"
