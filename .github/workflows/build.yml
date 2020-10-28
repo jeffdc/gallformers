@@ -1,4 +1,4 @@
-name: Docker
+name: Build gallformers project
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
 
 jobs:
 
-  push:
+  build:
     
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
