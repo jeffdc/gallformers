@@ -1,10 +1,6 @@
 name: Build gallformers project
 
-on:
-  push:
-    # Publish `main` as Docker `latest` image.
-    branches:
-      - main
+on: [push, pull_request]
 
   # Run tests for any PRs.
   #pull_request:
