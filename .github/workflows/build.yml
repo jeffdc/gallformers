@@ -1,0 +1,22 @@
+name: Docker
+
+on:
+  push:
+    # Publish `main` as Docker `latest` image.
+    branches:
+      - main
+
+  # Run tests for any PRs.
+  #pull_request:
+
+jobs:
+
+  push:
+    
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build gallformers image
+        run: make build
