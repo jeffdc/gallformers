@@ -1,0 +1,15 @@
+version: '3.7'
+
+services:
+    gallformers:
+        build:
+            context: .
+            dockerfile: ./Dockerfile
+        image: gallformers:latest
+        container_name: gallformer_app
+        restart: unless-stopped
+        environment:
+            PORT: 3000
+        command: yarn start
+
+    
