@@ -1,10 +1,11 @@
-import { Field, FieldInputProps, FormikErrors, FormikProps, FormikTouched } from 'formik';
-import { Typeahead, TypeaheadModel } from 'react-bootstrap-typeahead';
- 
+import { Field, FieldConfig, FormikErrors, FormikProps, FormikTouched } from 'formik';
+import { Typeahead } from 'react-bootstrap-typeahead';
+
+export type FieldValueType = string | string[];
 type Props = {
     name: string,
-    touched: FormikTouched<TypeaheadModel>,
-    errors: FormikErrors<TypeaheadModel>,
+    touched: FormikTouched<FieldValueType>,
+    errors: FormikErrors<FieldValueType>,
     options: Array<string>,
     placeholder: string,
     multiple?: boolean
@@ -16,30 +17,28 @@ const SearchFormField = ( {name, touched, errors, options, placeholder, multiple
     if (name == undefined || name == null) {
         throw new Error('Name must be defined.')
     }
+
     return (
         <>
             <Field name={name}>
-                {({ field, form }: {field: FieldInputProps<TypeaheadModel>, form:FormikProps<TypeaheadModel>}) =>
+                {({ field, form }: {field: FieldConfig, form: FormikProps<FieldValueType>}) =>
                     <Typeahead
                         id={name}
-                        // this makes no sense to me why this has to be cast to any :(
-                        labelKey={name as any}
-                        onChange={v => form.setFieldValue(name, v)}
+                        // labelKey={name}
+                        onChange={(v: FieldValueType) => form.setFieldValue(name, v)}
                         options={options}
-                        // i am unsure what is going on here. if i use value it works but will not compile as strict TS, 
-                        // if use selected it breaks in multiple ways. It has something to do with multiple selections vs
-                        // single selections and the way the data is managed in the form vs in the Typeahead component.
-                        // selected={[field.value]}
-                        value={field.value}
+                        selected={field.value ? field.value : []}
                         placeholder={placeholder}
-                        isInvalid={!!form.errors[name]}
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        isInvalid={!!(form.errors as any)[name]}
                         multiple={multiple}
                 />                                    
                 }
             </Field>
-            { touched[name] && errors[name] ? (
-                <div>{errors[name]}</div>
-            ) : null }
+            { 
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (touched as any)[name] && (errors as any)[name] ? (<div>{(errors as any)[name]}</div>) : null 
+            }
         </>
     )
 };

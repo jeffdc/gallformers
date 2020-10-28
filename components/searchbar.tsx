@@ -5,7 +5,7 @@ function anyIfEmptyString(x: string | null | undefined): string {
 }
 
 function arrayToString(a: string[] | null | undefined): string {
-    if (a !== null && a !== undefined && a.length > 0) {
+    if (a !== null && a !== undefined && Array.isArray(a) && a.length > 0) {
         return a.join(',')
     } else {
         return 'Any'
@@ -32,7 +32,7 @@ export const SearchBar = ( {query}: Props): JSX.Element => {
     return (
         <Container fluid className='m-1'>
             <Row className='small border border-secondary bg-dark rounded-sm fixed-bottom text-light text-center mt-5'>
-                <Col className="border align-items-center d-flex">Host: <i>{query.host}</i></Col>
+                <Col className="border align-items-center d-flex">Host: <i>{anyIfEmptyString(query.host)}</i></Col>
                 <Col className="border align-items-center d-flex">Detachable: {anyIfEmptyString(query.detachable)}</Col>
                 <Col className="border align-items-center d-flex">Location(s): {arrayToString(query.locations)}</Col>
                 <Col className="border align-items-center d-flex">Alignment: {anyIfEmptyString(query.alignment)}</Col>

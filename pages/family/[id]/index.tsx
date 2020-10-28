@@ -4,19 +4,17 @@ import Link from 'next/link';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
 
-type SpeciesProp = species & {
-    family: family
-}
 type Props = {
-    species: SpeciesProp[]
+    family: family,
+    species: species[]
 }
 
-function makeSpeciesLink(s: SpeciesProp) {
+function makeSpeciesLink(s: species) {
     const speciesType = s.taxoncode === 'gall' ? 'gall': 'host';
     return ( <Link key={s.id} href={`/${speciesType}/[id]`} as={`/${speciesType}/${s.id}`}><a>{s.name} </a></Link> )
 }
 
-const Family = ({ species }: Props): JSX.Element => {
+const Family = ({ family, species }: Props): JSX.Element => {
     return (    
     <div style={{
         marginBottom: '5%',
@@ -33,10 +31,10 @@ const Family = ({ species }: Props): JSX.Element => {
             <Media.Body>
                 <Container className='p-3 border'>
                     <Row>
-                        <Col><h1>{species[0].family.name}</h1></Col>
+                        <Col><h1>{family.name}</h1></Col>
                     </Row>
                     <Row>
-                        <Col className='lead p-3'>{species[0].family.description}</Col>
+                        <Col className='lead p-3'>{family.description}</Col>
                     </Row>
                     <Row>
                         <ListGroup>
@@ -63,18 +61,16 @@ export const getStaticProps: GetStaticProps = async (context) => {
         throw new Error(`Expected single id but got an array of ids ${context.params.id}.`)
     }
     const newdb = new PrismaClient();
+    const family = await newdb.family.findFirst({});
     const species = await newdb.species.findMany({
-        include: {
-            family: true,
-        },
         where: { family_id: { equals: parseInt(context.params.id) } },
         orderBy: { name: 'asc' },
     });
 
     return { props: {
-           species: species,
-        }
-    }
+        family: family,
+        species: species,
+    }}   
 }
 
 export const getStaticPaths: GetStaticPaths = async () => {

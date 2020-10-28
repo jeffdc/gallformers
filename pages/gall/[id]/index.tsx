@@ -16,11 +16,11 @@ type SpeciesProps = species & {
     hosts: HostProp[],
     speciessource: SourceProp[]
 }
-type LocationProps = galllocation & [] & {
-    location: location[]
+type LocationProps = galllocation & {
+    location: location
 }
-type TextureProps = galltexture & [] & {
-    texture: texture[]
+type TextureProps = galltexture & {
+    texture: texture
 }
 
 type GallProps = gall & {
@@ -28,9 +28,9 @@ type GallProps = gall & {
     alignment: alignment,
     cells: cells,
     color: color,
-    galllocation: LocationProps,
+    galllocation: LocationProps[],
     shape: shape,
-    galltexture: TextureProps,
+    galltexture: TextureProps[],
     walls: walls
 }
 type Props = {
@@ -81,7 +81,7 @@ const Gall = ({ gall }: Props): JSX.Element => {
                         <Col>Alignment: {gall.alignment?.alignment}</Col>
                     </Row>
                     <Row>
-                        <Col>Location: {gall.galllocation.map(l => l.location).join(",")}</Col>
+                        <Col>Location: {gall.galllocation.map(l => l.location.location).join(", ")}</Col>
                         <Col>Walls: {gall.walls?.walls}</Col>
                         <Col>Abdundance: {gall.species?.abundance}</Col>
                         <Col>Shape: {gall.shape?.shape}</Col>
@@ -113,7 +113,12 @@ const Gall = ({ gall }: Props): JSX.Element => {
 
 
 // Use static so that this stuff can be built once on the server-side and then cached.
-export const getStaticProps: GetStaticProps = async (context: { params: { id: string; }; }) => {
+export const getStaticProps: GetStaticProps = async (context) => {
+    if (context === undefined || context.params === undefined || context.params.id === undefined) {
+        throw new Error('An id must be passed to gall/[id]!');
+    }
+    
+    const id = context.params.id as string;
     const newdb = new PrismaClient();
     const gall = await newdb.gall.findFirst({
         include: {
@@ -140,11 +145,13 @@ export const getStaticProps: GetStaticProps = async (context: { params: { id: st
                 select: { location: true }
             },
             shape: true,
-            galltexture: true,
+            galltexture: {
+                select: { texture: true }
+            },
             walls: true,
         },
         where: {
-            species_id: { equals: parseInt(context.params.id) }
+            species_id: { equals: parseInt(id) }
         }
     });
 

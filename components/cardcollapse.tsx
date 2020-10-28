@@ -5,17 +5,22 @@ import { useState } from 'react';
 type Props = {
     text: string
 }
-const CardTextCollapse = ( { text }:Props ) => {
+const CardTextCollapse = ( { text }:Props ): JSX.Element => {
     const [open, setOpen] = useState(false);
+    const noCollapse = (
+        <Container>
+            <Card.Text>{text}</Card.Text>
+        </Container>
+    );
+    if (text === null || text === undefined || text.length === 0) {
+        return noCollapse
+    }
+
     const truncated = text.split(' ').splice(0, 40).join(' ');
     const start = text.substring(truncated.length, text.length + 1)
 
     if (text.length - 40 <= truncated.length) {
-        return (
-            <Container>
-                <Card.Text>{text}</Card.Text>
-        </Container>
-        )
+        return noCollapse
     } else {
         return (
             <Container>
