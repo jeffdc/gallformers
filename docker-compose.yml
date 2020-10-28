@@ -11,5 +11,41 @@ services:
         environment:
             PORT: 3000
         command: yarn start
+        networks: 
+            - app-network
 
-    
+    webserver:
+        image: nginx:mainline-alpine
+        container_name: webserver
+        restart: unless-stopped
+        ports: 
+            - "80:80"
+        volumes: 
+            - web-root:/var/www/html
+            - ./nginx-conf:/etc/nginx/conf.d
+            - certbot-etc:/etc/letsencrypt
+            - certbot-var:/var/lib/letsencrypt
+        depends_on: 
+            - gallformers
+        networks: 
+            - app-network
+
+    certbot:
+        image: certbot/certbot
+        container_name: certbot
+        volumes: 
+            - certbot-etc:/etc/letsencrypt
+            - certbot-var:/var/lib/letsencrypt
+            - web-root:/var/www/html
+        depends_on: 
+            - webserver
+        command: certonly --webroot --webroot-path=/var/www/html --email admin@nothoo.com --agree-tos --no-eff-email --staging -d gallformers.org  -d www.gallformers.org -d gallformers.com -d www.gallformers.com
+
+volumes:
+    certbot-etc:
+    certbot-var:
+    web-root:
+        
+networks:
+    app-network:
+        driver: bridge

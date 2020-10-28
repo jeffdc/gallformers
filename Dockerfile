@@ -1,4 +1,3 @@
-# docker pull node:current-alpine3.11
 FROM node:alpine as build
 RUN apk update && apk upgrade
 
@@ -9,7 +8,6 @@ WORKDIR /usr/src/app
 # create a layer with all the dependencies so that we can rely on the docker cache unless package.jspn changes
 COPY package.json ./
 COPY yarn.lock ./
-# RUN node --stack-size=6000 $(which npm) --verbose install
 RUN yarn install 
 
 # copy all the stuff
