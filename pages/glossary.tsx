@@ -1,4 +1,4 @@
-import { GetServerSideProps } from 'next';
+import { GetServerSideProps, GetStaticProps } from 'next';
 import React from 'react';
 import { ListGroup } from 'react-bootstrap';
 import { linkTextFromGlossary } from '../libs/textglossarylinker';
@@ -50,7 +50,7 @@ const Glossary = ({ es }: Props ): JSX.Element => {
     )
 }
 
-export const getServerSideProps: GetServerSideProps = async () => {
+export const getStaticProps: GetStaticProps = async () => {
     // function that generates functions to pass to the glossary linker so that we do not link to the word being defined in its own
     // defintion.
     const curryUnless = (w1: string) => { 
