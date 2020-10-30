@@ -1,10 +1,13 @@
 import { stems, makelink } from './glossary'
 import { WordTokenizer, PorterStemmer } from 'natural'
 
+const falsefunc = (_s: string) => false;
 // Given the input text, add links to any word that occurs in the global glossary.
 // returns an array of strings/JSX.Elements. 
-export const  linkTextFromGlossary = (text: string, unless: ((w: string) => boolean)): (string | JSX.Element)[] => {
-    const els: (string | JSX.Element)[] = [];
+export function linkTextFromGlossary(text: (string | null | undefined), 
+                                     unless: ((w: string) => boolean) = (falsefunc),
+                                     samepage = false): (string | JSX.Element)[] {
+    const els: (string | JSX.Element)[] = []
 
     if (text != undefined && text !== null && (text as string).length > 0) {
         let curr = 0;
@@ -20,7 +23,7 @@ export const  linkTextFromGlossary = (text: string, unless: ((w: string) => bool
 // console.log(`\t left: '${left}' -- curr: '${curr}' -- raw: ${raw} -- stem: '${JSON.stringify(stem)}'`);
 
                     els.push(left);
-                    els.push(makelink(stem.word, raw));
+                    els.push(makelink(stem.word, raw, samepage));
                 }
             });
         });

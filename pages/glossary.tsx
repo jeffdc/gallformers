@@ -62,7 +62,7 @@ export const getServerSideProps: GetServerSideProps = async () => {
     const es = entries.map( e => {
         const entry: E = {
             word: e.word,
-            definition: serialize(linkTextFromGlossary(e.definition, curryUnless(e.word))),
+            definition: serialize(linkTextFromGlossary(e.definition, curryUnless(e.word), true)),
             urls: e.urls,
             seealso: e.seealso
         }

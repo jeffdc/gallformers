@@ -12,8 +12,9 @@ export type Entry = {
 // ugly but I was unsure how to avoid this and keep TS happy
 export const entries: Entry[] = (glossary as any)["default"].map( (e: Entry) => e);
 
-export const makelink = (linkname: string, display: string): JSX.Element => { 
-    return React.createElement('a', { href: `#${linkname}`}, display) 
+export const makelink = (linkname: string, display: string, samepage: boolean): JSX.Element => { 
+    const href = samepage ? `#${linkname}` : `/glossary/#${linkname}`;
+    return React.createElement('a', { href: href}, display) 
 };
 
 export interface MapEntry {

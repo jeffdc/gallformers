@@ -42,7 +42,11 @@ export function serialize(element: ReactNode): string {
  * @param {string|object} data
  * @returns {ReactNode}
  */
-export function deserialize(data: (string | object)): ReactNode {
+export function deserialize(data: (string | object | undefined | null)): ReactNode {
+  if (data == null || data == undefined) {
+    return undefined
+  }
+
   if (typeof data === "string") {
     data = JSON.parse(data)
   }

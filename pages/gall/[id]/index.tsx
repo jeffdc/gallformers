@@ -3,6 +3,8 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
+import { deserialize, serialize } from '../../../libs/reactserialize';
+import { linkTextFromGlossary } from '../../../libs/textglossarylinker';
 
 type SourceProp = speciessource & {
     source: source
@@ -67,7 +69,7 @@ const Gall = ({ gall }: Props): JSX.Element => {
                         </Col>
                     </Row>
                     <Row>
-                        <Col className='lead p-3'>{gall.species.description}</Col>
+                        <Col className='lead p-3'>{deserialize(gall.species.description)}</Col>
                     </Row>
                     <Row>
                         <Col>
@@ -154,6 +156,10 @@ export const getStaticProps: GetStaticProps = async (context) => {
             species_id: { equals: parseInt(id) }
         }
     });
+
+    if (gall != null || gall != undefined) {
+        gall.species.description = serialize(linkTextFromGlossary(gall?.species.description))
+    }
 
     return { props: {
            gall: gall,
