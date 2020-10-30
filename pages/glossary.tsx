@@ -1,16 +1,20 @@
 import { GetServerSideProps } from 'next';
-import React, { Fragment } from 'react';
+import React from 'react';
 import { ListGroup } from 'react-bootstrap';
-import * as glossary from './glossary.json'
+import { linkTextFromGlossary } from '../libs/textglossarylinker';
+import { entries } from '../libs/glossary'
+import { serialize, deserialize } from '../libs/reactserialize'
+import { PorterStemmer } from 'natural';
 
-type Word = {
+export type E = {
     word: string,
-    defintion: JSX.Element,
+    definition: (string | JSX.Element[]),
     urls: string[],
-    seealso : string[]
+    seealso: string[]
 }
+
 type Props = {
-    words: Word[]
+    es: E[]
 }
 
 const renderrefs = (urls: string[]) => {
@@ -25,15 +29,19 @@ const renderrefs = (urls: string[]) => {
     return refs
 }
 
-const Glossary = ({ words }: Props ): JSX.Element => {
+const Glossary = ({ es }: Props ): JSX.Element => {
+    if (es == undefined || es == null) {
+        throw new Error('Invalid props passed to Glossary.')
+    }
     return (
         <div>
+            <h1 className='ml-3 pt-3'>A Glossary of Gall Related Terminology</h1>
             <ListGroup className='m-2 p-2'>
-                {words.map( w =>
-                    <ListGroup.Item key={w.word}>
-                        <span id={w.word}>
-                            <b>{w.word} - </b>{w.defintion}
-                            {renderrefs(w.urls)}
+                {es.map( e =>
+                    <ListGroup.Item key={e.word}>
+                        <span id={e.word}>
+                            <b>{e.word} - </b>{deserialize(e.definition)}
+                            {renderrefs(e.urls)}
                         </span>
                     </ListGroup.Item>
                 )}
@@ -42,22 +50,28 @@ const Glossary = ({ words }: Props ): JSX.Element => {
     )
 }
 
-type Entry = {
-    word: string,
-    defintion: string,
-    urls: string[],
-    seealso: string[]
-}
-
 export const getServerSideProps: GetServerSideProps = async () => {
-    // add links to all words that appear in the glossary that are part of another word's definition
-    // ugly but I was unsure how to avoid this and keep TS happy
-    const entries: Entry[] = (glossary as any)["default"].map( (e: Entry) => e);
+    // function that generates functions to pass to the glossary linker so that we do not link to the word being defined in its own
+    // defintion.
+    const curryUnless = (w1: string) => { 
+        return (w: string) => { 
+            return PorterStemmer.stem(w1) === w 
+        } 
+    };
 
-    
+    const es = entries.map( e => {
+        const entry: E = {
+            word: e.word,
+            definition: serialize(linkTextFromGlossary(e.definition, curryUnless(e.word))),
+            urls: e.urls,
+            seealso: e.seealso
+        }
+        return entry
+    });
+
     return {
         props: {
-           words: entries
+           es: es
         }
     }
 }
