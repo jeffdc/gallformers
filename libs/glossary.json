@@ -30,6 +30,16 @@
         ] 
     },
     { 
+        "word": "fusiform", 
+        "definition": "Spindle-like shape that is wide in the middle and tapers at both ends.",
+        "urls": [
+            "https://en.wikipedia.org/wiki/Fusiform"
+        ],
+        "seealso": [
+
+        ] 
+    },
+    { 
         "word": "gall", 
         "definition": "Plant galls are abnormal outgrowths[1] of plant tissues, similar to benign tumors or warts in animals. They can be caused by various parasites, from viruses, fungi and bacteria, to other plants, insects and mites. Plant galls are often highly organized structures so that the cause of the gall can often be determined without the actual agent being identified. This applies particularly to some insect and mite plant galls.",
         "urls": [
@@ -73,6 +83,30 @@
         ] 
     },
     { 
+        "word": "monothalamous", 
+        "definition": "Single-chambered.",
+        "urls": [
+            "https://www.thefreedictionary.com/monothalamous"
+        ],
+        "seealso": []
+    },
+    { 
+        "word": "papilla", 
+        "definition": "A small projecting body part similar to a nipple in form.",
+        "urls": [
+            "https://www.merriam-webster.com/dictionary/papilla"
+        ],
+        "seealso": []
+    },
+    { 
+        "word": "papillose", 
+        "definition": "Full of papilla.",
+        "urls": [
+            "https://en.wikipedia.org/wiki/Parasitism"
+        ],
+        "seealso": []
+    },
+    { 
         "word": "parasitism", 
         "definition": "A symbiotic relationship between species, where one organism, the parasite, lives on or inside another organism, the host, causing it some harm, and is adapted structurally to this way of life.",
         "urls": [
@@ -80,6 +114,14 @@
             "https://biologydictionary.net/parasitism/"
         ],
         "seealso": []
+    },
+    {
+        "word": "pedicel",
+        "definition": "A narrow attachment point for a gall to its host.",
+        "urls": [
+            "https://www.merriam-webster.com/dictionary/pedicel"
+        ],
+        "seealso": [ "pedicle" ]
     },
     {
         "word": "peduncle",
@@ -95,6 +137,22 @@
         "definition": "The stalk that attaches the leaf blade to the stem.",
         "urls": [
             "https://en.wikipedia.org/wiki/Petiole_(botany)"
+        ],
+        "seealso": []
+    },
+    { 
+        "word": "prolate", 
+        "definition": "A shape where the distance between the poles is longer than the equatorial diameter.",
+        "urls": [
+            "https://www.thefreedictionary.com/prolate"
+        ],
+        "seealso": []
+    },
+    { 
+        "word": "pubescent", 
+        "definition": "Covered with short hairs or soft down.",
+        "urls": [
+            "https://www.thefreedictionary.com/pubescent"
         ],
         "seealso": []
     },

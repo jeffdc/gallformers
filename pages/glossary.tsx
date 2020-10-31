@@ -1,20 +1,11 @@
-import { GetServerSideProps, GetStaticProps } from 'next';
+import { GetStaticProps } from 'next';
 import React from 'react';
 import { ListGroup } from 'react-bootstrap';
-import { linkTextFromGlossary } from '../libs/textglossarylinker';
-import { entries } from '../libs/glossary'
-import { serialize, deserialize } from '../libs/reactserialize'
-import { PorterStemmer } from 'natural';
-
-export type E = {
-    word: string,
-    definition: (string | JSX.Element[]),
-    urls: string[],
-    seealso: string[]
-}
+import { entriesWithLinkedDefs, EntryLinked } from '../libs/glossary';
+import { deserialize } from '../libs/reactserialize';
 
 type Props = {
-    es: E[]
+    es: EntryLinked[]
 }
 
 const renderrefs = (urls: string[]) => {
@@ -40,7 +31,7 @@ const Glossary = ({ es }: Props ): JSX.Element => {
                 {es.map( e =>
                     <ListGroup.Item key={e.word}>
                         <span id={e.word}>
-                            <b>{e.word} - </b>{deserialize(e.definition)}
+                            <b>{e.word} - </b>{deserialize(e.linkedDefinition)}
                             {renderrefs(e.urls)}
                         </span>
                     </ListGroup.Item>
@@ -51,27 +42,9 @@ const Glossary = ({ es }: Props ): JSX.Element => {
 }
 
 export const getStaticProps: GetStaticProps = async () => {
-    // function that generates functions to pass to the glossary linker so that we do not link to the word being defined in its own
-    // defintion.
-    const curryUnless = (w1: string) => { 
-        return (w: string) => { 
-            return PorterStemmer.stem(w1) === w 
-        } 
-    };
-
-    const es = entries.map( e => {
-        const entry: E = {
-            word: e.word,
-            definition: serialize(linkTextFromGlossary(e.definition, curryUnless(e.word), true)),
-            urls: e.urls,
-            seealso: e.seealso
-        }
-        return entry
-    });
-
     return {
         props: {
-           es: es
+           es: entriesWithLinkedDefs
         }
     }
 }
