@@ -31,7 +31,7 @@ export type Props = {
 export const SearchBar = ( {query}: Props): JSX.Element => {
     return (
         <Container fluid className='m-1'>
-            <Row className='small border border-secondary bg-dark rounded-sm fixed-bottom text-light text-center mt-5'>
+            <Row className='small border border-secondary bg-dark rounded-sm fixed-top text-light text-center mt-5'>
                 <Col className="border align-items-center d-flex">Host: <i>{anyIfEmptyString(query.host)}</i></Col>
                 <Col className="border align-items-center d-flex">Detachable: {anyIfEmptyString(query.detachable)}</Col>
                 <Col className="border align-items-center d-flex">Location(s): {arrayToString(query.locations)}</Col>
