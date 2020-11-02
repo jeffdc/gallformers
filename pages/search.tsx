@@ -1,10 +1,12 @@
 import { alignment, cells, color, gall, GallDistinctFieldEnum, gallWhereInput, location, PrismaClient, shape, species, texture, walls } from '@prisma/client';
 import { GetServerSideProps } from 'next';
+import { Container } from 'next/app';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
-import { Card, CardColumns } from 'react-bootstrap';
+import React from 'react';
+import { Card, CardColumns, Col, Row } from 'react-bootstrap';
 import CardTextCollapse from '../components/cardcollapse';
-import { SearchBar, SearchQuery } from '../components/searchbar';
+import { SearchQuery } from './layouts/searchfacets';
 
 type GallProp = gall & {
     alignment: alignment,
@@ -25,21 +27,26 @@ type Props = {
 const Search = ({ data, query }: Props): JSX.Element => {
     return (
         <div>
-            <CardColumns className='m-2 p-2'>
-                {data.map((gall) =>
-                    <Card key={gall.id} className="shadow-sm">
-                        <Card.Img variant="top" width="200px" src="/images/gall.jpg" />
-                        <Card.Body>
-                            <Card.Title>
-                                <Link href={"gall/[id]"} as={`gall/${gall.species_id}`}><a>{gall.species.name}</a></Link>
-                            </Card.Title>
-                            <CardTextCollapse text={gall.species.description === null ? '' : gall.species.description} />
-                        </Card.Body>
-                    </Card>
-                )}
-            </CardColumns>
-            <SearchBar query={ {...query} }></SearchBar>
-        </div>
+            <Container>
+                <Row>
+                    <Col>
+                        <CardColumns className='m-2 p-2'>
+                            {data.map((gall) =>
+                                <Card key={gall.id} className="shadow-sm">
+                                    <Card.Img variant="top" width="200px" src="/images/gall.jpg" />
+                                    <Card.Body>
+                                        <Card.Title>
+                                            <Link href={"gall/[id]"} as={`gall/${gall.species_id}`}><a>{gall.species.name}</a></Link>
+                                        </Card.Title>
+                                        <CardTextCollapse text={gall.species.description === null ? '' : gall.species.description} />
+                                    </Card.Body>
+                                </Card>
+                            )}
+                        </CardColumns>
+                    </Col>
+                </Row>
+            </Container>
+         </div>
     )
 }
 
@@ -48,7 +55,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
         throw new Error('Must pass a valid query object to Search!')
     }
 
-    // Useful for logging SQL that is genereated for debugging the search
+    // Useful for logging SQL that is generated for debugging the search
     // const newdb = new PrismaClient({log: ['query']}); 
     const newdb = new PrismaClient();
 
@@ -56,7 +63,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     context.query.locations = JSON.parse(context.query.locations === undefined ? '' : context.query.locations.toString());
     context.query.textures = JSON.parse(context.query.textures === undefined ? '' : context.query.textures.toString());
 
-    // If we do this cast, then we get type checking thoughtout. Already found 2 bugs becuase of this!
+    // If we do this cast, then we get type checking throughout. Already found 2 bugs because of this!
     const q = context.query as SearchQuery;
 
     // helper to create Where clauses

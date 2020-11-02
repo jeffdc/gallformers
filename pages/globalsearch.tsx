@@ -5,9 +5,9 @@ import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
 import { Card, CardColumns, ListGroup } from 'react-bootstrap';
 import CardTextCollapse from '../components/cardcollapse';
-import { SearchBar, SearchQuery } from '../components/searchbar';
 import { entriesWithLinkedDefs, EntryLinked } from '../libs/glossary';
 import { deserialize } from '../libs/reactserialize';
+import { SearchQuery } from './layouts/searchfacets';
 
 type SpeciesProp = species & {
     gall: gall[],
@@ -65,7 +65,6 @@ const GlobalSearch = ({ species, query, glossary }: Props): JSX.Element => {
                     </Card>
                 )}
             </CardColumns>
-            <SearchBar query={ {...query} }></SearchBar>
         </div>
     )
 }
