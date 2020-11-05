@@ -1,9 +1,10 @@
 import { Formik, FormikErrors, FormikTouched } from 'formik';
 import { useRouter } from 'next/router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Col, Container, Form } from 'react-bootstrap';
 import * as yup from 'yup';
 import SearchFormField, { FieldValueType } from '../../components/searchformfield';
+import { SearchQuery } from '../../libs/types';
 import { hasProp } from '../../libs/util';
 
 export type SearchInitialProps = {
@@ -15,18 +16,6 @@ export type SearchInitialProps = {
     shapes: string[],
     cells: string[],
     walls: string[]
-};
-
-export type SearchQuery = {
-    host: string,
-    detachable?: string,
-    alignment?: string,
-    walls?: string,
-    locations?: string[],
-    textures?: string[],
-    color?: string,
-    shape?: string,
-    cells?: string
 };
 
 export type SearchProps = SearchInitialProps & {
@@ -60,11 +49,11 @@ export const SearchFacets = ({doSearch, hosts, locations, textures, colors, alig
     const [q, setQ] = useState(query);
 
     // this helper seems to be needed as setting real initial values on the typeahead via Formik causes an error :(
-    const initalValue = (field: string, multiple = false): string | string[] => {
-        const prop = hasProp(query, field);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return prop && (query as any)[field] ? (query as any)[field]: (multiple ? [] : '')
-    }
+    // const initalValue = (field: string, multiple = false): string | string[] => {
+    //     const prop = hasProp(query, field);
+    //     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    //     return prop && (query as any)[field] ? (query as any)[field]: (multiple ? [] : '')
+    // }
 
     const onChange = (name: string, selected: string | string[]) => {
         const newQ: SearchQuery = { ...q };
@@ -74,6 +63,19 @@ export const SearchFacets = ({doSearch, hosts, locations, textures, colors, alig
         setQ(newQ);
         doSearch(q);
     };
+
+    // this is not great but for now...
+    const onHostChange = (name: string, selected: string | string[]) => {
+        useEffect( () => {
+            router.push({
+                pathname: '/search2',
+                query: {
+                    host: selected,
+                },
+            });
+            console.log(`r.q: ${JSON.stringify(router.query, null, '  ')}`);    
+        })
+    }
 
     return (
         <Container className='fixed-left border p-0 mt-2'>
@@ -102,8 +104,8 @@ export const SearchFacets = ({doSearch, hosts, locations, textures, colors, alig
                                     errors={errors}
                                     options={hosts}
                                     placeholder="Gall host?"
-                                    defaultInputValue={ initalValue('host') as string }
-                                    onChange={onChange}
+                                    // defaultInputValue={ initalValue('host') as string }
+                                    onChange={onHostChange}
                                 />                        
                             </Form.Group>
                             <Form.Group as={Col} controlId="formLocation">
@@ -116,7 +118,7 @@ export const SearchFacets = ({doSearch, hosts, locations, textures, colors, alig
                                     options={locations}
                                     placeholder="Gall location?"
                                     multiple
-                                    defaultInputValue={ initalValue('locations') as string[] }
+                                    // defaultInputValue={ initalValue('locations') as string[] }
                                     onChange={onChange}
                                 />
                             </Form.Group>
@@ -129,7 +131,7 @@ export const SearchFacets = ({doSearch, hosts, locations, textures, colors, alig
                                     errors={errors}
                                     options={['unsure', 'yes', 'no']}
                                     placeholder="Gall detachable?"
-                                    defaultInputValue={ initalValue('detachable') as string }
+                                    // defaultInputValue={ initalValue('detachable') as string }
                                     onChange={onChange}
                                 />
                             </Form.Group>
@@ -143,7 +145,7 @@ export const SearchFacets = ({doSearch, hosts, locations, textures, colors, alig
                                     options={textures}
                                     placeholder="Gall texture?"
                                     multiple
-                                    defaultInputValue={ initalValue('textures') as string[] }
+                                    // defaultInputValue={ initalValue('textures') as string[] }
                                     onChange={onChange}
                                 />
                             </Form.Group>   
@@ -156,7 +158,7 @@ export const SearchFacets = ({doSearch, hosts, locations, textures, colors, alig
                                     errors={errors}
                                     options={alignments}
                                     placeholder="Gall alignment?"
-                                    defaultInputValue={ initalValue('alignment') as string }
+                                    // defaultInputValue={ initalValue('alignment') as string }
                                     onChange={onChange}
                                 />
                             </Form.Group>
@@ -169,7 +171,7 @@ export const SearchFacets = ({doSearch, hosts, locations, textures, colors, alig
                                     errors={errors}
                                     options={walls}
                                     placeholder="Gall walls?"
-                                    defaultInputValue={ initalValue('walls') as string }
+                                    // defaultInputValue={ initalValue('walls') as string }
                                     onChange={onChange}
                                />
                             </Form.Group>
@@ -182,7 +184,7 @@ export const SearchFacets = ({doSearch, hosts, locations, textures, colors, alig
                                     errors={errors}
                                     options={cells}
                                     placeholder="Gall cells?"
-                                    defaultInputValue={ initalValue('cells') as string }
+                                    // defaultInputValue={ initalValue('cells') as string }
                                     onChange={onChange}
                                 />
                             </Form.Group>   
@@ -195,7 +197,7 @@ export const SearchFacets = ({doSearch, hosts, locations, textures, colors, alig
                                     errors={errors}
                                     options={colors}
                                     placeholder="Gall color?"
-                                    defaultInputValue={ initalValue('color') as string }
+                                    // defaultInputValue={ initalValue('color') as string }
                                     onChange={onChange}
                                 />
                             </Form.Group>
@@ -208,7 +210,7 @@ export const SearchFacets = ({doSearch, hosts, locations, textures, colors, alig
                                     errors={errors}
                                     options={shapes}
                                     placeholder="Gall shape?"
-                                    defaultInputValue={ initalValue('shape') as string }
+                                    // defaultInputValue={ initalValue('shape') as string }
                                     onChange={onChange}
                                 />
                             </Form.Group>
