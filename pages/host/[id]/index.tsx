@@ -1,4 +1,4 @@
-import { abundance, family, host, PrismaClient, species } from '@prisma/client';
+import { abundance, family, PrismaClient, species } from '@prisma/client';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React from 'react';
@@ -13,11 +13,9 @@ type HostSpeciesProp = species & {
     abundance: abundance,
     host_galls: GallProp[]
 }
-type HostProps = host & {
-    hostspecies: HostSpeciesProp
-}
+
 type Props = {
-    host: HostProps
+    host: HostSpeciesProp
 }
 
 function gallAsLink(g: GallProp) {
@@ -36,27 +34,27 @@ const Host = ({ host }: Props): JSX.Element => {
                 height={128}
                 className="mr-3"
                 src=""
-                alt={host.hostspecies.name}
+                alt={host.name}
             />
             <Media.Body>
                 <Container className='p-3 border'>
                     <Row>
-                        <Col><h1>{host.hostspecies.name}</h1></Col>
+                        <Col><h1>{host.name}</h1></Col>
                         Family: 
-                        <Link key={host.hostspecies.family.id} href={"/family/[id]"} as={`/family/${host.hostspecies.family.id}`}>
-                            <a> {host.hostspecies.family.name}</a>
+                        <Link key={host.family.id} href={"/family/[id]"} as={`/family/${host.family.id}`}>
+                            <a> {host.family.name}</a>
                         </Link>
                     </Row>
                     <Row>
-                        <Col className='lead p-3'>{host.hostspecies.description}</Col>
+                        <Col className='lead p-3'>{host.description}</Col>
                     </Row>
                     <Row>
                         <Col>
-                            Galls: {host.hostspecies.host_galls.map(gallAsLink)}
+                            Galls: {host.host_galls.map(gallAsLink)}
                         </Col>
                     </Row>
                     <Row>
-                        <Col>Abdundance: {host.hostspecies.abundance}</Col>
+                        <Col>Abdundance: {host.abundance}</Col>
                     </Row>
                 </Container>
             </Media.Body>
@@ -73,24 +71,22 @@ export const getStaticProps: GetStaticProps = async (context) => {
     } else if (Array.isArray(context.params.id)) {
         throw new Error(`Expected single id but got an array of ids ${context.params.id}.`)
     }
-    const newdb = new PrismaClient();
-    const host = await newdb.host.findFirst({
+    const db = new PrismaClient();
+
+    const host = await db.species.findFirst({
         include: {
-            hostspecies: {
+            abundance: true,
+            family: true,
+            host_galls: {
                 include: {
-                    abundance: true,
-                    family: true,
-                    host_galls: {
-                        include: {
-                            gallspecies: true,
-                        }
-                    }
+                    gallspecies: true,
                 }
             }
         },
-        where: { host_species_id: { equals: parseInt(context.params.id) } }
-    });
-
+        where: {
+            id: { equals: parseInt(context.params.id) }
+        }
+    })
     return { props: {
            host: host,
         }
@@ -98,19 +94,20 @@ export const getStaticProps: GetStaticProps = async (context) => {
 }
 
 export const getStaticPaths: GetStaticPaths = async () => {
-    const newdb = new PrismaClient();
-    const hosts = await newdb.host.findMany({
+    const db = new PrismaClient();
+    const hosts = await db.species.findMany({
         include: {
-            hostspecies: {
-                select: {
-                    id: true,
-                }
+            family: { },
+        },
+        where: {
+            family: {
+                description: { equals: "Plant" }
             }
         }
     });
 
     const paths = hosts.map( host => ({
-        params: { id: host.host_species_id?.toString() },
+        params: { id: host.id?.toString() },
     }));
 
     return { paths, fallback: false }
