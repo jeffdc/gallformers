@@ -7,9 +7,12 @@ import React, { useState } from 'react';
 import { Col, ListGroup, Row } from 'react-bootstrap';
 import { Typeahead } from 'react-bootstrap-typeahead';
 import { Controller, useForm } from 'react-hook-form';
+import { ErrorMessage } from '@hookform/error-message';
+import { yupResolver } from '@hookform/resolvers/yup';
 import { searchGalls } from '../libs/search';
 import { Gall, GallLocation, GallTexture, SearchQuery } from '../libs/types';
 import { SearchInitialProps } from './layouts/searchfacets';
+import * as yup from 'yup';
 
 const dontCare = (o: string | string[] | undefined) => {
     const truthy = !!o;
@@ -41,6 +44,9 @@ const checkGall = (g: Gall, q: SearchQuery): boolean => {
     return alignment && cells && color && detachable && shape && walls && location && texture
 };
 
+const schema = yup.object().shape({
+    host: yup.string().required(),
+});
 
 type Props = SearchInitialProps & {
     galls: Gall[]
@@ -55,7 +61,10 @@ const Search2 = (props: Props): JSX.Element => {
 
     console.log(`rendering with ${JSON.stringify(query)} and ${galls.length} galls.`);
 
-    const { register, handleSubmit, errors, control } = useForm();
+    const { errors, control } = useForm({
+        defaultValues: { host: query.host },
+        resolver: yupResolver(schema),
+    });
    
     const updateQuery = (f: string, v: string | string[]): SearchQuery => {
         const qq = {...query} as SearchQuery;
@@ -82,11 +91,12 @@ const Search2 = (props: Props): JSX.Element => {
         }
     }
 
-    const makeFormInput = (field: string, opts: string[]) => {
+    const makeFormInput = (field: string, opts: string[], rules = {}) => {
         return (<Controller
             control={control}
-            name={`typeahead_${field}`}
+            name={field}
             defaultValue={[]}
+            rules={rules}
             render={({ value, onChange}) =>
                 <Typeahead
                     onChange={(e: string | string[]) => {
@@ -108,8 +118,9 @@ const Search2 = (props: Props): JSX.Element => {
             <Row>
                 <Col xs={3}>
                     <form className='fixed-left border p-2 mt-2'>
-                        Host:
-                        {makeFormInput('host', props.hosts)}
+                        Host: {'ERRA: ' + JSON.stringify(errors)}
+                        <ErrorMessage errors={errors} name='host-error' />
+                        {makeFormInput('host', props.hosts, { required: 'Must select a host.' })}
                         Location:
                         {makeFormInput('locations', props.locations)}
                         Detachable:

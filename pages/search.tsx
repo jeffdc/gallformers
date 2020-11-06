@@ -13,7 +13,7 @@ type Props = {
     query: SearchQuery
 };
 
-const Search = ({ data, query }: Props): JSX.Element => {
+const Search = ({ data }: Props): JSX.Element => {
     return (
         <div>
             <Container>

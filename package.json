@@ -9,6 +9,8 @@
     "generate": "npx prisma generate"
   },
   "dependencies": {
+    "@hookform/error-message": "^0.0.4",
+    "@hookform/resolvers": "^1.0.0",
     "@prisma/client": "^2.9.0",
     "@types/natural": "^2.1.0",
     "bootstrap": "^4.5.2",

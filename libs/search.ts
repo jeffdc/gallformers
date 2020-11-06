@@ -24,7 +24,8 @@ export const searchGalls = async (query: SearchQuery): Promise<Gall[]> => {
 
     // helper to create Where clauses
     function whereDontCare(field: string | string[] | undefined, o: gallWhereInput) {
-        if (field === null || field === undefined || field === '' || (Array.isArray(field) && field.length === 0)) {
+        if (field === null || field === undefined || field === '' || 
+            (Array.isArray(field) && field.length === 0)) {
             return {}
         } else {
             return o
