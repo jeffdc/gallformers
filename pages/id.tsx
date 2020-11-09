@@ -6,7 +6,6 @@ import React from 'react';
 import { Button, Col, Container, Form } from 'react-bootstrap';
 import * as yup from 'yup';
 import InfoTip from '../components/infotip';
-import { SearchQuery } from '../components/searchbar';
 import SearchFormField, { FieldValueType } from '../components/searchformfield';
 
 const schema = yup.object({
@@ -59,8 +58,8 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
                         detachable: values.detachable[0] === 'unsure' ? '' : values.detachable[0],
                         alignment: values.alignment[0],
                         walls: values.walls[0],
-                        locations: JSON.stringify(values.location),
-                        textures: JSON.stringify(values.texture),
+                        locations: values.location !== '' ? JSON.stringify(values.location) : [],
+                        textures: values.texture !== '' ? JSON.stringify(values.texture) : [],
                         color: values.color[0],
                         shape: values.shape[0], 
                         cells: values.cells[0],

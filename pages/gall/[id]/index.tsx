@@ -3,6 +3,9 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
+import { deserialize, serialize } from '../../../libs/reactserialize';
+import { linkTextFromGlossary } from '../../../libs/glossary';
+import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/util';
 
 type SourceProp = speciessource & {
     source: source
@@ -67,27 +70,28 @@ const Gall = ({ gall }: Props): JSX.Element => {
                         </Col>
                     </Row>
                     <Row>
-                        <Col className='lead p-3'>{gall.species.description}</Col>
+                        <Col className='lead p-3'>{deserialize(gall.species.description)}</Col>
                     </Row>
                     <Row>
                         <Col>
-                            Hosts: { gall.species.hosts.map(hostAsLink) }
+                            <strong>Hosts:</strong> { gall.species.hosts.map(hostAsLink) }
                         </Col>
                     </Row>
                     <Row>
-                        <Col>Detachable: {gall.detachable == 1 ? 'yes' : 'no'}</Col>
-                        <Col>Texture: {gall.galltexture.map(t => t.texture).join(",")}</Col>
-                        <Col>Color: {gall.color?.color}</Col>
-                        <Col>Alignment: {gall.alignment?.alignment}</Col>
+                        <Col><strong>Detachable:</strong> {gall.detachable == 1 ? 'yes' : 'no'}</Col>
+                        <Col><strong>Texture:</strong> {gall.galltexture.map(t => t.texture).join(",")}</Col>
+                        <Col><strong>Color:</strong> {gall.color?.color}</Col>
+                        <Col><strong>Alignment:</strong> {gall.alignment?.alignment}</Col>
                     </Row>
                     <Row>
-                        <Col>Location: {gall.galllocation.map(l => l.location.location).join(", ")}</Col>
-                        <Col>Walls: {gall.walls?.walls}</Col>
-                        <Col>Abdundance: {gall.species?.abundance}</Col>
-                        <Col>Shape: {gall.shape?.shape}</Col>
+                        <Col><strong>Location:</strong> {gall.galllocation.map(l => l.location.location).join(", ")}</Col>
+                        <Col><strong>Walls:</strong> {gall.walls?.walls}</Col>
+                        <Col><strong>Abdundance:</strong> {gall.species?.abundance}</Col>
+                        <Col><strong>Shape:</strong> {gall.shape?.shape}</Col>
                     </Row>
                     <Row>
-                        <Col>Further Information: 
+                        <Col>
+                        <strong>Further Information:</strong>
                             <ListGroup>
                                 {gall.species.speciessource.map((speciessource) =>
                                     <ListGroup.Item key={speciessource.source_id}>
@@ -102,6 +106,26 @@ const Gall = ({ gall }: Props): JSX.Element => {
                                     </ListGroup.Item>
                                 )}
                             </ListGroup>
+                            <hr />
+                            <Row className="">
+                                <Col className="align-self-center"><strong>See Also:</strong></Col>
+                                <Col className="align-self-center">
+                                    <a href={iNatUrl(gall.species.name)} target="_blank" rel="noreferrer">
+                                        <img src="/images/inatlogo-small.png" />
+                                    </a>
+                                </Col>
+                                <Col className="align-self-center">
+                                    <a href={bugguideUrl(gall.species.name)} target="_blank"  rel="noreferrer">
+                                        <img src="/images/bugguide-small.png" />
+                                    </a>
+                                </Col>
+                                <Col className="align-self-center">
+                                    <a href={gScholarUrl(gall.species.name)} target="_blank" rel="noreferrer">
+                                        <img src="/images/gscholar-small.png" />
+                                    </a>
+                                </Col>
+                            </Row>
+                             
                         </Col>
                     </Row>
                 </Container>
@@ -154,6 +178,10 @@ export const getStaticProps: GetStaticProps = async (context) => {
             species_id: { equals: parseInt(id) }
         }
     });
+
+    if (gall != null || gall != undefined) {
+        gall.species.description = serialize(linkTextFromGlossary(gall?.species.description))
+    }
 
     return { props: {
            gall: gall,

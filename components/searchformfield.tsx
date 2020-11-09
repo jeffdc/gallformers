@@ -9,11 +9,14 @@ type Props = {
     options: Array<string>,
     placeholder: string,
     multiple?: boolean
+    defaultInputValue?: string | string[]
+    onChange?: (name: string, selected: string | Array<string>) => void
 }
 
 // A form field used on the search page. It uses Formix and Typeahead.
 // Must wrap the Typeahead in a Formix Field so that we can access Formix managed state
-const SearchFormField = ( {name, touched, errors, options, placeholder, multiple}: Props): JSX.Element => {
+const SearchFormField = ( {name, touched, errors, options, placeholder, multiple, defaultInputValue, onChange}: 
+                Props): JSX.Element => {
     if (name == undefined || name == null) {
         throw new Error('Name must be defined.')
     }
@@ -25,13 +28,14 @@ const SearchFormField = ( {name, touched, errors, options, placeholder, multiple
                     <Typeahead
                         id={name}
                         // labelKey={name}
-                        onChange={(v: FieldValueType) => form.setFieldValue(name, v)}
+                        onChange={(v: FieldValueType) => { if (onChange) onChange(name, v) ; form.setFieldValue(name, v) } }
                         options={options}
                         selected={field.value ? field.value : []}
                         placeholder={placeholder}
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         isInvalid={!!(form.errors as any)[name]}
                         multiple={multiple}
+                        defaultInputValue={defaultInputValue ? defaultInputValue : ''}
                 />                                    
                 }
             </Field>

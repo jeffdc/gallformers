@@ -1,14 +1,36 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { AppProps } from 'next/app';
 import 'react-bootstrap-typeahead/css/Typeahead.css';
+import { AppProps } from 'next/app';
+import Head from 'next/head';
+import { CSSProperties } from 'react';
+import Footer from './layouts/footer';
 import Header from './layouts/header';
 
-function Gallformers({ Component, pageProps }: AppProps) {
+const layoutStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  minHeight: '100vh',
+}
+
+const contentStyle: CSSProperties = {
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+}
+
+function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
   return (
-    <>
+    <div className="Layout" style={layoutStyle}>
+      <Head>
+        <title>Gallformers</title>
+        <link rel="icon" href="/favicon.ico" />
+      </Head>
       <Header />
-      <Component {...pageProps} />
-    </>
+        <div style={contentStyle}>
+          <Component {...pageProps} />
+        </div>
+      <Footer />
+    </div>
   )
 }
 

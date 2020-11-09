@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 //TODO This component is kind of janky and was really just a quick hack. We should make it better.
 type Props = {
-    text: string
+    text: string | undefined
 }
 const CardTextCollapse = ( { text }:Props ): JSX.Element => {
     const [open, setOpen] = useState(false);

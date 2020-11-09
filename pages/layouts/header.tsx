@@ -1,7 +1,8 @@
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { KeyboardEvent, useState } from 'react';
-import { Button, Form, FormControl, Nav, Navbar } from 'react-bootstrap';
+import React, { KeyboardEvent, useState } from 'react';
+import { Button, Form, FormControl, Nav, Navbar, OverlayTrigger, Tooltip } from 'react-bootstrap';
+
 
 const Header = (): JSX.Element => {
     const [searchText, setSearchText] = useState("");
@@ -34,10 +35,14 @@ const Header = (): JSX.Element => {
             <link rel="icon" href="/favicon.ico" />
         </Head>
         <Navbar fixed="top" collapseOnSelect expand="lg" bg="dark" variant="dark">
-            <Navbar.Brand href="/">Gallformers</Navbar.Brand>
+            <Navbar.Brand href="/">
+                <img src="./images/fly.svg" width="25px" height="25px" />
+                { ' ' }
+                Gallformers
+            </Navbar.Brand>
             <Nav.Link href="/id">Id</Nav.Link>
             <Nav.Link href="/explore">Explore</Nav.Link>
-            <Form inline onSubmit={ e => e.preventDefault() }>
+            <Form inline onSubmit={ e => e.preventDefault() } className="ml-auto">
                 <FormControl 
                     onChange={ e => { setSearchText(e.target.value) } }
                     value={searchText}
@@ -48,6 +53,14 @@ const Header = (): JSX.Element => {
                 />
                 <Button variant="outline-success">Search</Button>
             </Form>
+            <OverlayTrigger
+                placement="bottom"
+                overlay={
+                    <Tooltip id='glossary'>Glossary</Tooltip>
+                }
+            >
+                <Nav.Link href="/glossary">?</Nav.Link>
+            </OverlayTrigger>
         </Navbar>
         </div>
   )};

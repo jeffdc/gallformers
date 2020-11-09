@@ -2,9 +2,12 @@ import { gall, PrismaClient, species } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
-import { Card, CardColumns } from 'react-bootstrap';
+import React from 'react';
+import { Card, CardColumns, ListGroup } from 'react-bootstrap';
 import CardTextCollapse from '../components/cardcollapse';
-import { SearchBar, SearchQuery } from '../components/searchbar';
+import { entriesWithLinkedDefs, EntryLinked } from '../libs/glossary';
+import { deserialize } from '../libs/reactserialize';
+import { SearchQuery } from '../libs/types';
 
 type SpeciesProp = species & {
     gall: gall[],
@@ -14,7 +17,8 @@ type SpeciesProp = species & {
 
 type Props = {
     species: SpeciesProp[],
-    query: SearchQuery
+    query: SearchQuery,
+    glossary: EntryLinked[]
 };
 
 const speciesLink = (species: SpeciesProp) => {
@@ -25,9 +29,29 @@ const speciesLink = (species: SpeciesProp) => {
     }
 
 }
-const GlobalSearch = ({ species, query }: Props): JSX.Element => {
+
+const glossaryEntries = (entries: EntryLinked[]) => {
+    if (entries.length > 0) {
+        return (
+            <ListGroup>
+                {entries.map( e =>
+                    <ListGroup.Item key={e.word}>{e.word} - {deserialize(e.linkedDefinition)}</ListGroup.Item>
+                )}
+            </ListGroup>
+        )
+    } else {
+        return undefined
+    }
+}
+
+const GlobalSearch = ({ species, query, glossary }: Props): JSX.Element => {
+    if (species.length == 0 && glossary.length == 0) {
+        return (<h1>No results</h1>)
+    }
+
     return (
         <div>
+            {glossaryEntries(glossary)}
             <CardColumns className='m-2 p-2'>
                 {species.map( species =>
                     <Card key={species.id} className="shadow-sm">
@@ -41,14 +65,14 @@ const GlobalSearch = ({ species, query }: Props): JSX.Element => {
                     </Card>
                 )}
             </CardColumns>
-            <SearchBar query={ {...query} }></SearchBar>
         </div>
     )
 }
 
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery; }) => {
+    const search = context.query.searchText as string;
     // add wildcards to search phrase
-    const q = `%${context.query.searchText as string}%`;
+    const q = `%${search}%`;
     // Useful for logging SQL that is genereated for debugging the search
     // const newdb = new PrismaClient({log: ['query']}); 
     const newdb = new PrismaClient();
@@ -69,10 +93,15 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
         }
     });
 
+    const glossary = entriesWithLinkedDefs.filter( e => {
+        return e.word === search || e.definition.includes(search)
+    });
+    
     return {
         props: {
             species: species,
             query: q,
+            glossary: glossary == undefined ? [] : glossary
         }
     }
 }
