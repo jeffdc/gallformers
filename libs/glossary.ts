@@ -4,57 +4,57 @@ import * as glossary from './glossary.json';
 import { serialize } from './reactserialize';
 
 export type Entry = {
-    word: string,
-    definition: string,
-    urls: string[],
-    seealso: string[]
-}
+    word: string;
+    definition: string;
+    urls: string[];
+    seealso: string[];
+};
 
 export type EntryLinked = {
-    word: string,
-    linkedDefinition: (string | JSX.Element[]),
-    definition: string,
-    urls: string[],
-    seealso: string[]
-}
+    word: string;
+    linkedDefinition: string | JSX.Element[];
+    definition: string;
+    urls: string[];
+    seealso: string[];
+};
 
 // ugly but I was unsure how to avoid this and keep TS happy
-export const entries: Entry[] = (glossary as any)["default"].map( (e: Entry) => e);
+export const entries: Entry[] = (glossary as any)['default'].map((e: Entry) => e);
 
 export interface WordStem {
-    word: string,
-    stem: string
+    word: string;
+    stem: string;
 }
 
-export const stems = entries.map( e => {
-    return <WordStem> {
+export const stems = entries.map((e) => {
+    return <WordStem>{
         word: e.word,
-        stem: PorterStemmer.stem(e.word)
-    }
+        stem: PorterStemmer.stem(e.word),
+    };
 });
 
-const makelink = (linkname: string, display: string, samepage: boolean): JSX.Element => { 
+const makelink = (linkname: string, display: string, samepage: boolean): JSX.Element => {
     const href = samepage ? `#${linkname}` : `/glossary/#${linkname}`;
-    return React.createElement('a', { href: href}, display) 
+    return React.createElement('a', { href: href }, display);
 };
 
 // Given the input text, add links to any word that occurs in the global glossary.
-// returns an array of strings/JSX.Elements. 
-export function linkTextFromGlossary(text: (string | null | undefined), samepage = false): (string | JSX.Element)[] {
-    const els: (string | JSX.Element)[] = []
+// returns an array of strings/JSX.Elements.
+export function linkTextFromGlossary(text: string | null | undefined, samepage = false): (string | JSX.Element)[] {
+    const els: (string | JSX.Element)[] = [];
 
     if (text != undefined && text !== null && (text as string).length > 0) {
         let curr = 0;
         const tokens = new WordTokenizer().tokenize(text);
-        tokens.forEach( (t, i) => {
+        tokens.forEach((t, i) => {
             const stemmed = PorterStemmer.stem(t);
             const raw = tokens[i];
-//  console.log(`t: '${t}' -- i: '${i}' -- stemmed: '${stemmed}' -- raw: '${raw}'`);
-            stems.forEach( stem => {
+            //  console.log(`t: '${t}' -- i: '${i}' -- stemmed: '${stemmed}' -- raw: '${raw}'`);
+            stems.forEach((stem) => {
                 if (stem.stem === stemmed) {
                     const left = text.substring(curr, text.indexOf(raw, curr));
                     curr = curr + left.length + raw.length;
-// console.log(`\t left: '${left}' -- curr: '${curr}' -- raw: ${raw} -- stem: '${JSON.stringify(stem)}'`);
+                    // console.log(`\t left: '${left}' -- curr: '${curr}' -- raw: ${raw} -- stem: '${JSON.stringify(stem)}'`);
 
                     els.push(left);
                     els.push(makelink(stem.word, raw, samepage));
@@ -71,19 +71,19 @@ export function linkTextFromGlossary(text: (string | null | undefined), samepage
         }
     }
 
-    return els
+    return els;
 }
 
 /**
  * All of the Glossary entries with the definitions linked.
  */
-export const entriesWithLinkedDefs: EntryLinked[] = entries.map( e => {
+export const entriesWithLinkedDefs: EntryLinked[] = entries.map((e) => {
     const entry: EntryLinked = {
         word: e.word,
         linkedDefinition: serialize(linkTextFromGlossary(e.definition, true)),
         definition: e.definition,
         urls: e.urls,
-        seealso: e.seealso
-    }
-    return entry
+        seealso: e.seealso,
+    };
+    return entry;
 });

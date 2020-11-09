@@ -10,22 +10,22 @@ export function hasProp<T extends unknown, K extends PropertyKey>(o: T, prop: K)
 }
 
 export function bugguideUrl(species: string): string {
-    return `https://bugguide.net/index.php?q=search&keys=${encodeURI(species)}&search=Search`
+    return `https://bugguide.net/index.php?q=search&keys=${encodeURI(species)}&search=Search`;
 }
 
 export function iNatUrl(species: string): string {
-    return `https://www.inaturalist.org/search?q=${encodeURI(species)}`
+    return `https://www.inaturalist.org/search?q=${encodeURI(species)}`;
 }
 
 export function gScholarUrl(species: string): string {
-    return `https://scholar.google.com/scholar?hl=en&q=${species}`
+    return `https://scholar.google.com/scholar?hl=en&q=${species}`;
 }
 
 /**
  * Returns a random integer between [min, max]
- * @param min 
- * @param max 
+ * @param min
+ * @param max
  */
-export function randInt(min: number, max: number): number { 
-      return Math.floor(Math.random() * (max - min + 1) + min);
+export function randInt(min: number, max: number): number {
+    return Math.floor(Math.random() * (max - min + 1) + min);
 }
