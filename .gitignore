@@ -7,3 +7,4 @@ gallformers.sqlite-shm
 .env.local
 .vercel
 log.log
+yarn-error.log

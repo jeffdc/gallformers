@@ -1,18 +1,17 @@
+import { ErrorMessage } from '@hookform/error-message';
+import { yupResolver } from '@hookform/resolvers/yup';
 import { HostDistinctFieldEnum, PrismaClient } from '@prisma/client';
 import { GetServerSideProps } from 'next';
-import { Container } from 'next/app';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
 import { Col, ListGroup, Row } from 'react-bootstrap';
 import { Typeahead } from 'react-bootstrap-typeahead';
 import { Controller, useForm } from 'react-hook-form';
-import { ErrorMessage } from '@hookform/error-message';
-import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
 import { searchGalls } from '../libs/search';
 import { Gall, GallLocation, GallTexture, SearchQuery } from '../libs/types';
 import { SearchInitialProps } from './layouts/searchfacets';
-import * as yup from 'yup';
 
 const dontCare = (o: string | string[] | undefined) => {
     const truthy = !!o;
@@ -62,7 +61,10 @@ const Search2 = (props: Props): JSX.Element => {
     console.log(`rendering with ${JSON.stringify(query)} and ${galls.length} galls.`);
 
     const { errors, control } = useForm({
-        defaultValues: { host: query.host },
+        defaultValues: { 
+            host: query.host, locations: '', detachable: '', textures: '', 
+            alignment: '', walls: '', cells: '', shape: '', color: ''
+        },
         resolver: yupResolver(schema),
     });
    
@@ -82,7 +84,7 @@ const Search2 = (props: Props): JSX.Element => {
             };
             console.log(`HOSTCHANGE: ${JSON.stringify(x, null, '  ')}`);
             router.push(x);
-            // router.reload();
+//            router.reload();
         } else {
             const filtered = props.galls.filter( g => checkGall(g, newq) );
             console.log(`filtered galls: ${JSON.stringify(filtered.map(x=>x.species?.name), null, '  ')}`);
@@ -91,7 +93,18 @@ const Search2 = (props: Props): JSX.Element => {
         }
     }
 
-    const makeFormInput = (field: string, opts: string[], rules = {}) => {
+    // React Hook Forms and Typeahead sometimes do not agree on the selected value as a string or an array. 
+    // This normalizes to an array.
+    const normalizeToArray = (v: string | string[] | undefined): string[] => {
+        if (v == undefined) return []
+        if (!Array.isArray(v)) return [v]
+        return v
+    }
+
+    // keep TS happy since the allowable field values are bound when we set the defaultValues above in the useForm() call.
+    type FieldNames = 'host' | 'locations' | 'detachable' | 'textures' | 'alignment' | 'walls' | 'cells' | 'shape' | 'color';
+    
+    const makeFormInput = (field: FieldNames, opts: string[], rules = {}) => {
         return (<Controller
             control={control}
             name={field}
@@ -103,7 +116,7 @@ const Search2 = (props: Props): JSX.Element => {
                         onChange(e);
                         doSearch(field, e ? e : []);
                     }}
-                    selected={ field === 'host' ? (query.host ? [query.host] : []) : value ? value : []}
+                    selected={ normalizeToArray(value) }
                     placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
                     id={field}
                     clearButton={field !== 'host'}
@@ -114,13 +127,13 @@ const Search2 = (props: Props): JSX.Element => {
     }
 
     return (
-        <Container>
+        <>
             <Row>
                 <Col xs={3}>
                     <form className='fixed-left border p-2 mt-2'>
-                        Host: {'ERRA: ' + JSON.stringify(errors)}
-                        <ErrorMessage errors={errors} name='host-error' />
+                        Host:
                         {makeFormInput('host', props.hosts, { required: 'Must select a host.' })}
+                        <ErrorMessage errors={errors} name='host-error' />
                         Location:
                         {makeFormInput('locations', props.locations)}
                         Detachable:
@@ -140,10 +153,14 @@ const Search2 = (props: Props): JSX.Element => {
                     </form>
                 </Col>
                 <Col className='border mt-2'>
-                    <Row className='border m-2'><p className='text-right'>Pager TODO</p></Row>
-                    <Row className= 'border m-2'>
+                    {/* <Row className='border m-2'><p className='text-right'>Pager TODO</p></Row> */}
+                    <Row className= 'm-2'>
                         <ListGroup>
-                            { galls.map( g => (
+                            { galls.length == 0 ? 
+                                query.host == undefined ?
+                                  <p>To begin with select a Host to see matching galls.</p>
+                                : <p>There are no galls that match your filter.</p>
+                            : galls.map( g => (
                                 <ListGroup.Item key={g.species_id}>
                                     <img src='images/gall.jpg' width='75px' height='75px' />{' '}
                                     <Link href={`gall/${g.species_id}`}><a>{g.species?.name}</a></Link>
@@ -154,7 +171,7 @@ const Search2 = (props: Props): JSX.Element => {
                     </Row>
                 </Col>
             </Row>
-        </Container>
+        </>
     )
 }
 
@@ -180,8 +197,7 @@ export const getServerSideProps: GetServerSideProps = async(context) => {
     // get all of the data for the typeahead boxes
     const h = await newdb.host.findMany({
         include: {
-          hostspecies: {
-          },
+            hostspecies: {},
         },
         distinct: [HostDistinctFieldEnum.host_species_id]
       });

@@ -1,5 +1,4 @@
 import { GetServerSideProps } from 'next';
-import { Container } from 'next/app';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
@@ -16,7 +15,7 @@ type Props = {
 const Search = ({ data }: Props): JSX.Element => {
     return (
         <div>
-            <Container>
+            <>
                 <Row>
                     <Col>
                         <CardColumns className='m-2 p-2'>
@@ -34,7 +33,7 @@ const Search = ({ data }: Props): JSX.Element => {
                         </CardColumns>
                     </Col>
                 </Row>
-            </Container>
+            </>
          </div>
     )
 }

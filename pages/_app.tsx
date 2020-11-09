@@ -1,17 +1,34 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { AppProps } from 'next/app';
 import 'react-bootstrap-typeahead/css/Typeahead.css';
+import { AppProps } from 'next/app';
+import Head from 'next/head';
+import { CSSProperties } from 'react';
 import Footer from './layouts/footer';
 import Header from './layouts/header';
 
+const layoutStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  minHeight: '100vh',
+}
+
+const contentStyle: CSSProperties = {
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+}
+
 function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
-  // style stuff is to push the footer to the bottom when the page does not fill the screen
   return (
-    <div style={ { display: 'flex', flexDirection: 'column', minHeight: '100vh' } }>
+    <div className="Layout" style={layoutStyle}>
+      <Head>
+        <title>Gallformers</title>
+        <link rel="icon" href="/favicon.ico" />
+      </Head>
       <Header />
-      <div style={{flex: 1}}>
-        <Component {...pageProps} />
-      </div>
+        <div style={contentStyle}>
+          <Component {...pageProps} />
+        </div>
       <Footer />
     </div>
   )

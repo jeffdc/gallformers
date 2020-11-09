@@ -1,15 +1,9 @@
-import Head from 'next/head'
 import Link from 'next/link'
 import { Card, Col, Container, Row } from 'react-bootstrap'
 
 export default function Home(): JSX.Element {
   return (
     <div>
-      <Head>
-        <title>Gallformers</title>
-        <link rel="icon" href="/favicon.ico" />
-      </Head>
-
       <Container className="text-center p-5 ">
         <Row>
           <Col><h1>Welcome to Gallformers</h1></Col></Row>

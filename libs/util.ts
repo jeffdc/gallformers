@@ -20,3 +20,12 @@ export function iNatUrl(species: string): string {
 export function gScholarUrl(species: string): string {
     return `https://scholar.google.com/scholar?hl=en&q=${species}`
 }
+
+/**
+ * Returns a random integer between [min, max]
+ * @param min 
+ * @param max 
+ */
+export function randInt(min: number, max: number): number { 
+      return Math.floor(Math.random() * (max - min + 1) + min);
+}
