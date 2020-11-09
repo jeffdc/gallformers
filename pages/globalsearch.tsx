@@ -7,7 +7,7 @@ import { Card, CardColumns, ListGroup } from 'react-bootstrap';
 import CardTextCollapse from '../components/cardcollapse';
 import { entriesWithLinkedDefs, EntryLinked } from '../libs/glossary';
 import { deserialize } from '../libs/reactserialize';
-import { SearchQuery } from './layouts/searchfacets';
+import { SearchQuery } from '../libs/types';
 
 type SpeciesProp = species & {
     gall: gall[],
