@@ -5,9 +5,12 @@ const Footer = (): JSX.Element => {
     return (
         <div className="">
             <Navbar collapseOnSelect expand="lg" bg="light" variant="light">
-                <Nav.Link className="ml-auto" href="/about">About</Nav.Link>
+                <Nav.Link className="ml-auto" href="/about">
+                    About
+                </Nav.Link>
             </Navbar>
         </div>
-  )};
-  
-  export default Footer;
+    );
+};
+
+export default Footer;
