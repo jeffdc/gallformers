@@ -23,7 +23,7 @@ import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
 import { deserialize, serialize } from '../../../libs/reactserialize';
 import { linkTextFromGlossary } from '../../../libs/glossary';
-import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/util';
+import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type SourceProp = speciessource & {
     source: source;

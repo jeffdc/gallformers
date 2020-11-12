@@ -37,7 +37,7 @@ const Header = (): JSX.Element => {
             </Head>
             <Navbar fixed="top" collapseOnSelect expand="lg" bg="dark" variant="dark">
                 <Navbar.Brand href="/">
-                    <img src="./images/fly.svg" width="25px" height="25px" /> Gallformers
+                    <img src="../images/fly.svg" width="25px" height="25px" /> Gallformers
                 </Navbar.Brand>
                 <Nav.Link href="/id">Id</Nav.Link>
                 <Nav.Link href="/explore">Explore</Nav.Link>

@@ -17,55 +17,55 @@ model migration {
 
 model location {
   id           Int            @id @default(autoincrement())
-  location     String?
+  location     String?        @unique
   description  String?
   galllocation galllocation[]
 }
 
 model texture {
   id          Int           @id @default(autoincrement())
-  texture     String?
+  texture     String?       @unique
   description String?
   galltexture galltexture[]
 }
 
 model color {
   id    Int     @id @default(autoincrement())
-  color String?
+  color String? @unique
   gall  gall[]
 }
 
 model walls {
   id          Int     @id @default(autoincrement())
-  walls       String?
+  walls       String? @unique
   description String?
   gall        gall[]
 }
 
 model cells {
   id          Int     @id @default(autoincrement())
-  cells       String?
+  cells       String? @unique 
   description String?
   gall        gall[]
 }
 
 model alignment {
   id          Int     @id @default(autoincrement())
-  alignment   String?
+  alignment   String? @unique
   description String?
   gall        gall[]
 }
 
 model shape {
   id          Int     @id @default(autoincrement())
-  shape       String?
+  shape       String? @unique
   description String?
   gall        gall[]
 }
 
 model abundance {
   id          Int       @id @default(autoincrement())
-  abundance   String?
+  abundance   String?   @unique
   description String?
   reference   String?
   species     species[]
@@ -73,14 +73,14 @@ model abundance {
 
 model taxontype {
   taxoncode   String    @id
-  description String
+  description String    @unique
   species     species[]
   gall        gall[]
 }
 
 model family {
   id          Int       @id @default(autoincrement())
-  name        String?
+  name        String?   @unique
   description String?
   species     species[]
 }
@@ -88,7 +88,7 @@ model family {
 model species {
   id                                 Int             @id @default(autoincrement())
   taxoncode                          String?
-  name                               String
+  name                               String          @unique
   synonyms                           String?
   commonnames                        String?
   genus                              String

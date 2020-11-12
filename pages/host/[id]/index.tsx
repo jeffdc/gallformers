@@ -3,6 +3,7 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React from 'react';
 import { Col, Container, Media, Row } from 'react-bootstrap';
+import { formatCSV, mightBeNull } from '../../../libs/db/utils';
 
 type GallProp = species & {
     gallspecies: species;
@@ -40,7 +41,10 @@ const Host = ({ host }: Props): JSX.Element => {
                     <Container className="p-3 border">
                         <Row>
                             <Col>
-                                <h1>{host.name}</h1>
+                                <h1>
+                                    {host.name}
+                                    {host.commonnames ? ` - (${formatCSV(host.commonnames)})` : ''}
+                                </h1>
                             </Col>
                             Family:
                             <Link key={host.family.id} href={'/family/[id]'} as={`/family/${host.family.id}`}>
@@ -54,7 +58,7 @@ const Host = ({ host }: Props): JSX.Element => {
                             <Col>Galls: {host.host_galls.map(gallAsLink)}</Col>
                         </Row>
                         <Row>
-                            <Col>Abdundance: {host.abundance}</Col>
+                            <Col>Abdundance: {mightBeNull(host.abundance?.abundance)}</Col>
                         </Row>
                     </Container>
                 </Media.Body>
