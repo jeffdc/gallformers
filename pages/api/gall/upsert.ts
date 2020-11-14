@@ -29,6 +29,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
                 synonyms: gall.synonyms,
                 commonnames: gall.commonnames,
                 description: gall.description,
+                taxontype: { connect: { taxoncode: 'gall' } },
                 gall: {
                     create: {
                         alignment: { connect: { alignment: gall.alignment } },
@@ -54,6 +55,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
                 synonyms: gall.synonyms,
                 commonnames: gall.commonnames,
                 description: gall.description,
+                taxontype: { connect: { taxoncode: 'gall' } },
                 gall: {
                     create: {
                         alignment: connectIfNotNull('alignment', gall.alignment),

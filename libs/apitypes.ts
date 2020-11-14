@@ -22,3 +22,21 @@ export type GallUpsertFields = SpeciesUpsertFields & {
     cells: string;
     detachable: string;
 };
+
+export type SourceUpsertFields = {
+    title: string;
+    author: string;
+    pubyear: string;
+    link: string;
+    citation: string;
+};
+
+export type SpeciesSourceInsertFields = {
+    species: number[];
+    sources: number[];
+};
+
+export type FamilyUpsertFields = {
+    name: string;
+    description: string;
+};

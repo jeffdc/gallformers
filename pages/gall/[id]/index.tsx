@@ -102,7 +102,7 @@ const Gall = ({ gall }: Props): JSX.Element => {
                                 <strong>Detachable:</strong> {gall.detachable == 1 ? 'yes' : 'no'}
                             </Col>
                             <Col>
-                                <strong>Texture:</strong> {gall.galltexture.map((t) => t.texture).join(',')}
+                                <strong>Texture:</strong> {gall.galltexture.map((t) => t.texture?.texture).join(',')}
                             </Col>
                             <Col>
                                 <strong>Color:</strong> {gall.color?.color}

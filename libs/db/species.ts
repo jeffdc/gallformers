@@ -1,4 +1,4 @@
-import { abundance, PrismaClient } from '@prisma/client';
+import { abundance, PrismaClient, species } from '@prisma/client';
 
 const db = new PrismaClient();
 
@@ -7,5 +7,11 @@ export const abundances = async (): Promise<abundance[]> => {
         orderBy: {
             abundance: 'asc',
         },
+    });
+};
+
+export const allSpecies = async (): Promise<species[]> => {
+    return db.species.findMany({
+        orderBy: { name: 'asc' },
     });
 };

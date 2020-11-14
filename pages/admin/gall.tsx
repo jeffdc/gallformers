@@ -1,17 +1,5 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import {
-    abundance,
-    alignment,
-    color,
-    HostDistinctFieldEnum,
-    location,
-    PrismaClient,
-    shape,
-    texture,
-    walls as ws,
-    cells as cs,
-    family,
-} from '@prisma/client';
+import { abundance, alignment, color, location, shape, texture, walls as ws, cells as cs, family } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
 import React from 'react';
@@ -51,6 +39,7 @@ const Schema = yup.object().shape({
     name: yup.string().matches(/([A-Z][a-z]+ [a-z]+$)/),
     family: yup.string().required(),
     description: yup.string().required(),
+    hosts: yup.array().required(),
 });
 
 const extractGenus = (n: string): string => {
@@ -172,18 +161,19 @@ const Gall = ({
                             control={control}
                             name="hosts"
                             defaultValue={[]}
-                            rules={{ required: true }}
-                            render={({ value, onChange }) => (
+                            render={({ value, onChange, onBlur }) => (
                                 <Typeahead
                                     onChange={(e: string | string[]) => {
                                         onChange(e);
                                     }}
+                                    onBlur={onBlur}
                                     selected={normalizeToArray(value)}
                                     placeholder="Hosts"
                                     id="Hosts"
                                     options={hosts.map((h) => h.name)}
                                     multiple
                                     clearButton
+                                    isInvalid={!!errors.hosts}
                                 />
                             )}
                         />
