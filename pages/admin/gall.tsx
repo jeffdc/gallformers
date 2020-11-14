@@ -7,6 +7,7 @@ import { Col, Row } from 'react-bootstrap';
 import { Typeahead } from 'react-bootstrap-typeahead';
 import { Controller, useForm } from 'react-hook-form';
 import * as yup from 'yup';
+import Auth from '../../components/auth';
 import { GallUpsertFields } from '../../libs/apitypes';
 import { allFamilies } from '../../libs/db/family';
 import { alignments, cells, colors, locations, shapes, textures, walls } from '../../libs/db/gall';
@@ -95,7 +96,7 @@ const Gall = ({
     };
 
     return (
-        <>
+        <Auth>
             <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                 <h4>Add A Gall</h4>
                 <Row className="form-group">
@@ -280,7 +281,7 @@ const Gall = ({
                 </Row>
                 <input type="submit" className="button" />
             </form>
-        </>
+        </Auth>
     );
 };
 

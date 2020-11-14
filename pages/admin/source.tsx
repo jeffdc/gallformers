@@ -4,6 +4,7 @@ import React from 'react';
 import { Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
+import Auth from '../../components/auth';
 import { SpeciesUpsertFields } from '../../libs/apitypes';
 
 const Schema = yup.object().shape({
@@ -43,7 +44,7 @@ const Host = (): JSX.Element => {
     };
 
     return (
-        <>
+        <Auth>
             <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                 <h4>Add A Source</h4>
                 <Row className="form-group">
@@ -83,7 +84,7 @@ const Host = (): JSX.Element => {
                 </Row>
                 <input type="submit" className="button" />
             </form>
-        </>
+        </Auth>
     );
 };
 

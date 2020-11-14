@@ -8,6 +8,7 @@ import { Col, ListGroup, ListGroupItem, Row } from 'react-bootstrap';
 import { Typeahead } from 'react-bootstrap-typeahead';
 import { Controller, useForm } from 'react-hook-form';
 import * as yup from 'yup';
+import Auth from '../../components/auth';
 import { SpeciesSourceInsertFields } from '../../libs/apitypes';
 import { allSources } from '../../libs/db/source';
 import { allSpecies } from '../../libs/db/species';
@@ -63,7 +64,7 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
     };
 
     return (
-        <>
+        <Auth>
             <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                 <h4>Map Species & Sources</h4>
                 <Row className="form-group">
@@ -151,7 +152,7 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                     </>
                 )}
             </form>
-        </>
+        </Auth>
     );
 };
 

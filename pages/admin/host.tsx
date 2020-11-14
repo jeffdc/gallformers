@@ -10,6 +10,7 @@ import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { useRouter } from 'next/router';
 import { SpeciesUpsertFields } from '../../libs/apitypes';
+import Auth from '../../components/auth';
 
 type Props = {
     families: family[];
@@ -55,7 +56,7 @@ const Host = ({ families, abundances }: Props): JSX.Element => {
     };
 
     return (
-        <>
+        <Auth>
             <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                 <h4>Add A Host</h4>
                 <Row className="form-group">
@@ -129,7 +130,7 @@ const Host = ({ families, abundances }: Props): JSX.Element => {
                 </Row>
                 <input type="submit" className="button" />
             </form>
-        </>
+        </Auth>
     );
 };
 

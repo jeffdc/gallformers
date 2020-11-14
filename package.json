@@ -10,6 +10,7 @@
     "lint": "eslint '*/**/*.{js,ts,tsx}' --quiet --fix"
   },
   "dependencies": {
+    "@auth0/auth0-react": "^1.2.0",
     "@hookform/error-message": "^0.0.4",
     "@hookform/resolvers": "^1.0.0",
     "@prisma/client": "^2.9.0",
