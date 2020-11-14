@@ -16,7 +16,7 @@ RUN yarn install
 COPY . .
 
 # generate the prisma client, then run the build which will generate the static site and all other assets
-RUN npx prisma generate && yarn add --dev typescript @types/node && yarn build
+RUN NODE_OPTIONS="--max_old_space_size=1024 --report-on-fatalerror" npx prisma generate && yarn add --dev typescript @types/node && yarn build
 # prune reduces the image some bits more :)
 RUN npm prune --production
 
