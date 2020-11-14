@@ -21,7 +21,7 @@ type Props = {
 
 function gallAsLink(g: GallProp) {
     return (
-        <Link key={g.gallspecies.id} href={'/gall/[id]'} as={`/gall/${g.gallspecies.id}`}>
+        <Link key={g.gallspecies.id} href={`/gall/${g.gallspecies.id}`}>
             <a>{g.gallspecies.name} </a>
         </Link>
     );
@@ -47,7 +47,7 @@ const Host = ({ host }: Props): JSX.Element => {
                                 </h1>
                             </Col>
                             Family:
-                            <Link key={host.family.id} href={'/family/[id]'} as={`/family/${host.family.id}`}>
+                            <Link key={host.family.id} href={`/family/${host.family.id}`}>
                                 <a> {host.family.name}</a>
                             </Link>
                         </Row>
@@ -94,6 +94,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
         props: {
             host: host,
         },
+        revalidate: 1,
     };
 };
 

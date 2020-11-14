@@ -53,6 +53,7 @@ export const getStaticProps: GetStaticProps = async () => {
         props: {
             es: entriesWithLinkedDefs,
         },
+        revalidate: 1,
     };
 };
 

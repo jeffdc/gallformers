@@ -136,11 +136,11 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                                 return (
                                     <ListGroupItem key={r.id}>
                                         Added{' '}
-                                        <Link href={'source/[id]'} as={`/source/${r.source_id}`}>
+                                        <Link href={`/source/${r.source_id}`}>
                                             <a>source</a>
                                         </Link>{' '}
                                         to{' '}
-                                        <Link href={'gall/[id]'} as={`/gall/${r.species_id}`}>
+                                        <Link href={`/gall/${r.species_id}`}>
                                             <a>species</a>
                                         </Link>
                                         .

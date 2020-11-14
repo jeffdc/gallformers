@@ -60,7 +60,7 @@ type Props = {
 
 function hostAsLink(h: HostProp) {
     return (
-        <Link key={h.host_species_id} href={'/host/[id]'} as={`/host/${h.host_species_id}`}>
+        <Link key={h.host_species_id} href={`/host/${h.host_species_id}`}>
             <a>{h.hostspecies.name} </a>
         </Link>
     );
@@ -84,7 +84,7 @@ const Gall = ({ gall }: Props): JSX.Element => {
                             </Col>
                             <Col className="text-right font-italic">
                                 Family:
-                                <Link key={gall.species.family.id} href={'/family/[id]'} as={`/family/${gall.species.family.id}`}>
+                                <Link key={gall.species.family.id} href={`/family/${gall.species.family.id}`}>
                                     <a> {gall.species.family.name}</a>
                                 </Link>
                             </Col>
@@ -136,7 +136,9 @@ const Gall = ({ gall }: Props): JSX.Element => {
                                             speciessource.source.link.length === 0 ? (
                                                 speciessource.source.citation + ' (no link)'
                                             ) : (
-                                                <a href={speciessource.source.link}>{speciessource.source.citation}</a>
+                                                <Link href={`/source/${speciessource.source.id}`}>
+                                                    <a>{speciessource.source.citation}</a>
+                                                </Link>
                                             )}
                                         </ListGroup.Item>
                                     ))}
@@ -222,6 +224,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
         props: {
             gall: gall,
         },
+        revalidate: 1,
     };
 };
 

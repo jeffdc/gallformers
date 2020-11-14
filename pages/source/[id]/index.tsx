@@ -51,6 +51,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
         props: {
             source: await sourceById(parseInt(context.params.id)),
         },
+        revalidate: 1,
     };
 };
 

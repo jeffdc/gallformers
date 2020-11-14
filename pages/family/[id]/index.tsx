@@ -13,7 +13,7 @@ type Props = {
 function makeSpeciesLink(s: species) {
     const speciesType = s.taxoncode === 'gall' ? 'gall' : 'host';
     return (
-        <Link key={s.id} href={`/${speciesType}/[id]`} as={`/${speciesType}/${s.id}`}>
+        <Link key={s.id} href={`/${speciesType}/${s.id}`}>
             <a>{s.name} </a>
         </Link>
     );
@@ -74,6 +74,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
             family: await familyById(familyId),
             species: await speciesByFamily(familyId),
         },
+        revalidate: 1,
     };
 };
 

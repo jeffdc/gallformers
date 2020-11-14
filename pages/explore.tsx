@@ -19,7 +19,7 @@ const gallLister = (f: Family) => {
         .map((s) =>
             s.gall.map((g) => (
                 <ListGroup.Item key={g.species_id}>
-                    <Link href={'gall/[id]'} as={`gall/${g.species_id}`}>
+                    <Link href={`gall/${g.species_id}`}>
                         <a>{s.name}</a>
                     </Link>
                 </ListGroup.Item>
@@ -31,7 +31,7 @@ const gallLister = (f: Family) => {
 const hostLister = (f: Family) => {
     return f.species.map((s) => (
         <ListGroup.Item key={s.id}>
-            <Link href={'host/[id]'} as={`host/${s.id}`}>
+            <Link href={`host/${s.id}`}>
                 <a>{s.name}</a>
             </Link>
         </ListGroup.Item>
@@ -121,6 +121,7 @@ export const getStaticProps: GetStaticProps = async () => {
             gallmakers: gallmakers,
             hosts: hosts,
         },
+        revalidate: 1,
     };
 };
 

@@ -24,7 +24,7 @@ const Search = ({ data }: Props): JSX.Element => {
                                     <Card.Img variant="top" width="200px" src="/images/gall.jpg" />
                                     <Card.Body>
                                         <Card.Title>
-                                            <Link href={'gall/[id]'} as={`gall/${gall.species_id}`}>
+                                            <Link href={`gall/${gall.species_id}`}>
                                                 <a>{gall.species?.name}</a>
                                             </Link>
                                         </Card.Title>
