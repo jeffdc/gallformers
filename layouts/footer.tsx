@@ -1,14 +1,14 @@
-import { useAuth0 } from '@auth0/auth0-react';
+import { signOut, useSession } from 'next-auth/client';
 import React from 'react';
 import { Nav, Navbar, NavbarBrand } from 'react-bootstrap';
-import LogoutButton from '../components/logout';
 
 const Footer = (): JSX.Element => {
-    const { user, isAuthenticated, isLoading } = useAuth0();
+    const [session, loading] = useSession();
 
     const logoff = () => {
-        if (isAuthenticated && !isLoading) {
-            return <LogoutButton />;
+        if (session && !loading) {
+            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+            return <button onClick={signOut as any}>Log Off</button>;
         } else {
             <></>;
         }
@@ -18,7 +18,7 @@ const Footer = (): JSX.Element => {
         <div className="">
             <Navbar collapseOnSelect expand="lg" bg="light" variant="light">
                 <NavbarBrand>
-                    {isAuthenticated && <img src={user.picture} alt={user.name} width="25px" height="25px" />}
+                    {session && <img src={session.user.image} alt={session.user.name} width="25px" height="25px" />}
                 </NavbarBrand>
                 <Nav>{logoff()}</Nav>
                 <Nav.Link className="ml-auto" href="/about">

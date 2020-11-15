@@ -1,4 +1,3 @@
-import { Auth0Provider } from '@auth0/auth0-react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { AppProps } from 'next/app';
 import Head from 'next/head';
@@ -21,23 +20,17 @@ const contentStyle: CSSProperties = {
 
 function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
     return (
-        <Auth0Provider
-            domain={'dev-sur--xbk.us.auth0.com'}
-            clientId={'UfsN055usaBcyW2UrEKfH2y78IMzZgw6'}
-            redirectUri={`${process.env.APP_URL}/admin`}
-        >
-            <div className="Layout" style={layoutStyle}>
-                <Head>
-                    <title>Gallformers</title>
-                    <link rel="icon" href="/favicon.ico" />
-                </Head>
-                <Header />
-                <div style={contentStyle}>
-                    <Component {...pageProps} />
-                </div>
-                <Footer />
+        <div className="Layout" style={layoutStyle}>
+            <Head>
+                <title>Gallformers</title>
+                <link rel="icon" href="/favicon.ico" />
+            </Head>
+            <Header />
+            <div style={contentStyle}>
+                <Component {...pageProps} />
             </div>
-        </Auth0Provider>
+            <Footer />
+        </div>
     );
 }
 

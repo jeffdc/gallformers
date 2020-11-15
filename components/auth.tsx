@@ -1,23 +1,23 @@
-import { useAuth0 } from '@auth0/auth0-react';
+import { signIn, useSession } from 'next-auth/client';
 import React from 'react';
-import LoginButton from './login';
 
 const Auth = ({ children }: { children: JSX.Element }): JSX.Element => {
-    const { isAuthenticated, isLoading } = useAuth0();
+    const [session, loading] = useSession();
 
-    if (!isAuthenticated) {
+    if (!session) {
         return (
             <div className="m-3 p-3">
                 <p>
                     These are not the droids you are looking for. If you think that you really do want some droids, then login
                     first.
                 </p>
-                <LoginButton />
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                <button onClick={signIn as any}>Log In</button>
             </div>
         );
     }
 
-    if (isLoading) {
+    if (loading) {
         return <p className="m-3 p-3">Hold tight. Working on vetting you...</p>;
     }
 
