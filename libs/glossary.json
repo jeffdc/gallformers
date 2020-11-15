@@ -1,0 +1,175 @@
+[
+    { 
+        "word": "binomial nomenclature", 
+        "definition": "(\"two-term naming system\"), also called binominal nomenclature (\"two-name naming system\") or binary nomenclature, is a formal system of naming species of living things by giving each a name composed of two parts, both of which use Latin grammatical forms, although they can be based on words from other languages. Such a name is called a binomial name (which may be shortened to just \"binomial\"), a binomen, binominal name or a scientific name; more informally it is also called a Latin name. The first part of the name – the generic name – identifies the genus to which the species belongs, while the second part – the specific name or specific epithet – identifies the species within the genus.",
+        "urls": [
+            "https://en.wikipedia.org/wiki/Binomial_nomenclature"
+        ],
+        "seealso": [
+
+        ] 
+    },
+    { 
+        "word": "catkin", 
+        "definition": "A slim, cylindrical flower cluster (a spike), with inconspicuous or no petals.",
+        "urls": [
+            "https://en.wikipedia.org/wiki/Catkin"
+        ],
+        "seealso": [
+
+        ] 
+    },
+    { 
+        "word": "cecidiology", 
+        "definition": "A branch of biology that is concerned with the galls produced on plants by insects, mites, and fungi.",
+        "urls": [
+            "https://www.merriam-webster.com/dictionary/cecodiology"
+        ],
+        "seealso": [
+
+        ] 
+    },
+    { 
+        "word": "fusiform", 
+        "definition": "Spindle-like shape that is wide in the middle and tapers at both ends.",
+        "urls": [
+            "https://en.wikipedia.org/wiki/Fusiform"
+        ],
+        "seealso": [
+
+        ] 
+    },
+    { 
+        "word": "gall", 
+        "definition": "Plant galls are abnormal outgrowths[1] of plant tissues, similar to benign tumors or warts in animals. They can be caused by various parasites, from viruses, fungi and bacteria, to other plants, insects and mites. Plant galls are often highly organized structures so that the cause of the gall can often be determined without the actual agent being identified. This applies particularly to some insect and mite plant galls.",
+        "urls": [
+            "https://en.wikipedia.org/wiki/Gall",
+            "https://www.merriam-webster.com/dictionary/gall"
+        ],
+        "seealso": [
+
+        ] 
+    },
+    { 
+        "word": "genus", 
+        "definition": "(plural genera) is a taxonomic rank used in the biological classification of living and fossil organisms, as well as viruses,[1] in biology. In the hierarchy of biological classification, genus comes above species and below family. In binomial nomenclature, the genus name forms the first part of the binomial species name for each species within the genus.",
+        "urls": [
+            "https://en.wikipedia.org/wiki/Genus"
+        ],
+        "seealso": [
+
+        ] 
+    },
+    { 
+        "word": "host", 
+        "definition": "A plant on which a gall is formed.",
+        "urls": [
+            "https://www.merriam-webster.com/dictionary/host"
+        ],
+        "seealso": [
+
+        ] 
+    },
+    { 
+        "word": "inquiline", 
+        "definition": "Specialized moths, weevils, beetles, wasps, and other insects that feed on gall tissue.",
+        "urls": [
+            "https://en.wikisource.org/wiki/The_Encyclopedia_Americana_(1920)/Inquiline",
+            "https://en.wikipedia.org/wiki/Inquiline",
+            "https://www.merriam-webster.com/dictionary/inquiline"
+        ],
+        "seealso": [
+
+        ] 
+    },
+    { 
+        "word": "monothalamous", 
+        "definition": "Single-chambered.",
+        "urls": [
+            "https://www.thefreedictionary.com/monothalamous"
+        ],
+        "seealso": []
+    },
+    { 
+        "word": "papilla", 
+        "definition": "A small projecting body part similar to a nipple in form.",
+        "urls": [
+            "https://www.merriam-webster.com/dictionary/papilla"
+        ],
+        "seealso": []
+    },
+    { 
+        "word": "papillose", 
+        "definition": "Full of papilla.",
+        "urls": [
+            "https://en.wikipedia.org/wiki/Parasitism"
+        ],
+        "seealso": []
+    },
+    { 
+        "word": "parasitism", 
+        "definition": "A symbiotic relationship between species, where one organism, the parasite, lives on or inside another organism, the host, causing it some harm, and is adapted structurally to this way of life.",
+        "urls": [
+            "https://en.wikipedia.org/wiki/Parasitism",
+            "https://biologydictionary.net/parasitism/"
+        ],
+        "seealso": []
+    },
+    {
+        "word": "pedicel",
+        "definition": "A narrow attachment point for a gall to its host.",
+        "urls": [
+            "https://www.merriam-webster.com/dictionary/pedicel"
+        ],
+        "seealso": [ "pedicle" ]
+    },
+    {
+        "word": "peduncle",
+        "definition": "A narrow part by which some larger part or the whole body of an organism is attached.",
+        "urls": [
+            "https://www.merriam-webster.com/dictionary/peduncle",
+            "https://en.wikipedia.org/wiki/Peduncle_(anatomy)"
+        ],
+        "seealso": []
+    },
+    { 
+        "word": "petiole", 
+        "definition": "The stalk that attaches the leaf blade to the stem.",
+        "urls": [
+            "https://en.wikipedia.org/wiki/Petiole_(botany)"
+        ],
+        "seealso": []
+    },
+    { 
+        "word": "prolate", 
+        "definition": "A shape where the distance between the poles is longer than the equatorial diameter.",
+        "urls": [
+            "https://www.thefreedictionary.com/prolate"
+        ],
+        "seealso": []
+    },
+    { 
+        "word": "pubescent", 
+        "definition": "Covered with short hairs or soft down.",
+        "urls": [
+            "https://www.thefreedictionary.com/pubescent"
+        ],
+        "seealso": []
+    },
+    { 
+        "word": "sessile", 
+        "definition": "Attached directly by the base : not raised upon a stalk or peduncle.",
+        "urls": [
+            "https://www.merriam-webster.com/dictionary/sessile",
+            "https://en.wikipedia.org/wiki/Sessility_%28botany%29"
+        ],
+        "seealso": []
+    },
+    { 
+        "word": "test", 
+        "definition": "Sessile should be capitalized. A second sessile should not bork things. Things with a peduncle and stuff. Test should not get linked. Parasites should not be parasitism. And this should end with a period, inquiline.",
+        "urls": [
+        ],
+        "seealso": []
+    }
+]

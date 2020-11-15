@@ -1,4 +1,0 @@
-   "better-sqlite3": "^7.1.1",
-    "better-sqlite3-helper": "^3.1.1",
-    "sqlite": "^4.0.15",
- 
