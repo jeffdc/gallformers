@@ -1,8 +1,9 @@
-import { family, PrismaClient, species } from '@prisma/client';
+import { family, species } from '@prisma/client';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
+import { allFamilies, familyById, speciesByFamily } from '../../../libs/db/family';
 
 type Props = {
     family: family;
@@ -12,7 +13,7 @@ type Props = {
 function makeSpeciesLink(s: species) {
     const speciesType = s.taxoncode === 'gall' ? 'gall' : 'host';
     return (
-        <Link key={s.id} href={`/${speciesType}/[id]`} as={`/${speciesType}/${s.id}`}>
+        <Link key={s.id} href={`/${speciesType}/${s.id}`}>
             <a>{s.name} </a>
         </Link>
     );
@@ -65,28 +66,20 @@ export const getStaticProps: GetStaticProps = async (context) => {
     } else if (Array.isArray(context.params.id)) {
         throw new Error(`Expected single id but got an array of ids ${context.params.id}.`);
     }
-    const newdb = new PrismaClient();
-    const family = await newdb.family.findFirst({});
-    const species = await newdb.species.findMany({
-        where: { family_id: { equals: parseInt(context.params.id) } },
-        orderBy: { name: 'asc' },
-    });
+
+    const familyId = parseInt(context.params.id);
 
     return {
         props: {
-            family: family,
-            species: species,
+            family: await familyById(familyId),
+            species: await speciesByFamily(familyId),
         },
+        revalidate: 1,
     };
 };
 
 export const getStaticPaths: GetStaticPaths = async () => {
-    const newdb = new PrismaClient();
-    const families = await newdb.family.findMany({
-        select: {
-            id: true,
-        },
-    });
+    const families = await allFamilies();
 
     const paths = families.map((f) => ({
         params: { id: f.id?.toString() },

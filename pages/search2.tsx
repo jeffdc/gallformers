@@ -11,7 +11,9 @@ import { Controller, useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import { searchGalls } from '../libs/search';
 import { Gall, GallLocation, GallTexture, SearchQuery } from '../libs/types';
-import { SearchInitialProps } from './layouts/searchfacets';
+import { SearchInitialProps } from '../layouts/searchfacets';
+import { normalizeToArray } from '../libs/utils/forms';
+import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
 
 const dontCare = (o: string | string[] | undefined) => {
     const truthy = !!o;
@@ -104,14 +106,6 @@ const Search2 = (props: Props): JSX.Element => {
             setGalls(filtered);
             setQuery(newq);
         }
-    };
-
-    // React Hook Forms and Typeahead sometimes do not agree on the selected value as a string or an array.
-    // This normalizes to an array.
-    const normalizeToArray = (v: string | string[] | undefined): string[] => {
-        if (v == undefined) return [];
-        if (!Array.isArray(v)) return [v];
-        return v;
     };
 
     // keep TS happy since the allowable field values are bound when we set the defaultValues above in the useForm() call.
@@ -234,13 +228,13 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
         props: {
             galls: galls,
             hosts: hosts,
-            locations: (await newdb.location.findMany({})).map((l) => l.location).sort(),
-            colors: (await newdb.color.findMany({})).map((l) => l.color).sort(),
-            shapes: (await newdb.shape.findMany({})).map((l) => l.shape).sort(),
-            textures: (await newdb.texture.findMany({})).map((l) => l.texture).sort(),
-            alignments: (await newdb.alignment.findMany({})).map((l) => l.alignment).sort(),
-            walls: (await newdb.walls.findMany({})).map((l) => l.walls).sort(),
-            cells: (await newdb.cells.findMany({})).map((l) => l.cells).sort(),
+            locations: await locations(),
+            colors: await colors(),
+            shapes: await shapes(),
+            textures: await textures(),
+            alignments: await alignments(),
+            walls: await walls(),
+            cells: await cells(),
         },
     };
 };

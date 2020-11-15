@@ -3,9 +3,9 @@ import { useRouter } from 'next/router';
 import React, { useEffect, useState } from 'react';
 import { Col, Container, Form } from 'react-bootstrap';
 import * as yup from 'yup';
-import SearchFormField, { FieldValueType } from '../../components/searchformfield';
-import { SearchQuery } from '../../libs/types';
-import { hasProp } from '../../libs/util';
+import SearchFormField, { FieldValueType } from '../components/searchformfield';
+import { SearchQuery } from '../libs/types';
+import { hasProp } from '../libs/utils/util';
 
 export type SearchInitialProps = {
     hosts: string[];

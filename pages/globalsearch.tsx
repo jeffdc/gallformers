@@ -24,13 +24,13 @@ type Props = {
 const speciesLink = (species: SpeciesProp) => {
     if (species.taxoncode === 'gall') {
         return (
-            <Link href={'gall/[id]'} as={`gall/${species.id}`}>
+            <Link href={`gall/${species.id}`}>
                 <a>{species.name}</a>
             </Link>
         );
     } else {
         return (
-            <Link href={'host/[id]'} as={`host/${species.id}`}>
+            <Link href={`host/${species.id}`}>
                 <a>{species.name}</a>
             </Link>
         );

@@ -50,3 +50,13 @@ The front-end is mostly static pages as we expect most of this data to not chang
 
 ### Production and Staging (non-dev) Deployments
 TODO
+
+### NTS RE Fake Prod Deployments
+Locally:
+`make build`
+`docker save gallformers:latest > gallformers.tar`
+`scp gallformers-docker.tar user@serverIP:`
+On the server:
+`sudo docker load < gallformers.tar`
+`sudo docker run --name gallformers -p 3000:3000 -d gallformers:latest`
+`sudo docker start gallformers`

@@ -1,10 +1,10 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
-import 'react-bootstrap-typeahead/css/Typeahead.css';
 import { AppProps } from 'next/app';
 import Head from 'next/head';
-import { CSSProperties } from 'react';
-import Footer from './layouts/footer';
-import Header from './layouts/header';
+import React, { CSSProperties } from 'react';
+import 'react-bootstrap-typeahead/css/Typeahead.css';
+import Footer from '../layouts/footer';
+import Header from '../layouts/header';
 
 const layoutStyle: CSSProperties = {
     display: 'flex',

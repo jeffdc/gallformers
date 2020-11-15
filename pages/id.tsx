@@ -242,6 +242,7 @@ export const getStaticProps: GetStaticProps = async () => {
             walls: (await newdb.walls.findMany({})).map((l) => l.walls).sort(),
             cells: (await newdb.cells.findMany({})).map((l) => l.cells).sort(),
         },
+        revalidate: 1,
     };
 };
 
