@@ -16,7 +16,8 @@ RUN yarn install
 COPY . .
 
 # generate the prisma client, then run the build which will generate the static site and all other assets
-RUN NODE_OPTIONS="--max_old_space_size=1024 --report-on-fatalerror" npx prisma generate && yarn add --dev typescript @types/node && yarn build
+ENV NEXT_TELEMETRY_DISABLED 1
+RUN npx prisma generate && yarn add --dev typescript @types/node && yarn build
 # prune reduces the image some bits more :)
 RUN npm prune --production
 
@@ -27,11 +28,10 @@ FROM node:12-alpine
 WORKDIR /usr/src/app
 
 # copy from build image
-COPY --from=build /usr/src/app/package.json /package.json
-COPY --from=build /usr/src/app/node_modules /node_modules
-COPY --from=build /usr/src/app/prisma /prisma
-COPY --from=build /usr/src/app/.next /.next
-COPY --from=build /usr/src/app/public /public
+COPY --from=build /usr/src/app/package.json /usr/src/app/package.json
+COPY --from=build /usr/src/app/node_modules /usr/src/app/node_modules
+COPY --from=build /usr/src/app/.next /usr/src/app/.next
+COPY --from=build /usr/src/app/public /usr/src/app/public
 
 
 EXPOSE 3000

@@ -1,4 +1,5 @@
 import { GallDistinctFieldEnum, gallWhereInput, PrismaClient } from '@prisma/client';
+import db from './db/db';
 import { Gall, SearchQuery } from './types';
 
 /**
@@ -7,10 +8,6 @@ import { Gall, SearchQuery } from './types';
  * @returns a Promise<Gall[]> with found galls, if any.
  */
 export const searchGalls = async (query: SearchQuery): Promise<Gall[]> => {
-    // Useful for logging SQL that is generated for debugging the search
-    // const newdb = new PrismaClient({log: ['query']});
-    const newdb = new PrismaClient();
-
     console.log(`Searching for galls with '${JSON.stringify(query, null, '  ')}'`);
 
     // the locations and textures *might* come in as encoded JSON arrays so we need to parse them
@@ -36,7 +33,7 @@ export const searchGalls = async (query: SearchQuery): Promise<Gall[]> => {
             ? {}
             : { OR: [{ detachable: { equals: null } }, { detachable: { equals: parseInt(query.detachable) } }] };
 
-    const data: Promise<Gall[]> = newdb.gall
+    const data: Promise<Gall[]> = db.gall
         .findMany({
             include: {
                 alignment: {},

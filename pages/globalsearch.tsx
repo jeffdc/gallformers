@@ -1,10 +1,11 @@
-import { gall, PrismaClient, species } from '@prisma/client';
+import { gall, species } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
 import { Card, CardColumns, ListGroup } from 'react-bootstrap';
 import CardTextCollapse from '../components/cardcollapse';
+import db from '../libs/db/db';
 import { entriesWithLinkedDefs, EntryLinked } from '../libs/glossary';
 import { deserialize } from '../libs/reactserialize';
 import { SearchQuery } from '../libs/types';
@@ -80,11 +81,8 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     const search = context.query.searchText as string;
     // add wildcards to search phrase
     const q = `%${search}%`;
-    // Useful for logging SQL that is genereated for debugging the search
-    // const newdb = new PrismaClient({log: ['query']});
-    const newdb = new PrismaClient();
 
-    const species = await newdb.species.findMany({
+    const species = await db.species.findMany({
         include: {
             host_galls: true,
             hosts: true,

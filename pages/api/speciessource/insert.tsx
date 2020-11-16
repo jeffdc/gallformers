@@ -1,11 +1,10 @@
-import { PrismaClient } from '@prisma/client';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { SpeciesSourceInsertFields } from '../../../libs/apitypes';
+import db from '../../../libs/db/db';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     try {
         const sourcespecies = req.body as SpeciesSourceInsertFields;
-        const db = new PrismaClient({ log: ['query'] });
 
         const results = await Promise.all(
             sourcespecies.species

@@ -3,6 +3,7 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React from 'react';
 import { Col, Container, Media, Row } from 'react-bootstrap';
+import db from '../../../libs/db/db';
 import { formatCSV, mightBeNull } from '../../../libs/db/utils';
 
 type GallProp = species & {
@@ -74,7 +75,6 @@ export const getStaticProps: GetStaticProps = async (context) => {
     } else if (Array.isArray(context.params.id)) {
         throw new Error(`Expected single id but got an array of ids ${context.params.id}.`);
     }
-    const db = new PrismaClient();
 
     const host = await db.species.findFirst({
         include: {
@@ -99,7 +99,6 @@ export const getStaticProps: GetStaticProps = async (context) => {
 };
 
 export const getStaticPaths: GetStaticPaths = async () => {
-    const db = new PrismaClient();
     const hosts = await db.species.findMany({
         include: {
             family: {},

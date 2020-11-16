@@ -36,6 +36,11 @@ export type SpeciesSourceInsertFields = {
     sources: number[];
 };
 
+export type HostInsertFields = {
+    galls: number[];
+    hosts: number[];
+};
+
 export type FamilyUpsertFields = {
     name: string;
     description: string;

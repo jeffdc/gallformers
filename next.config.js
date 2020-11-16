@@ -3,18 +3,11 @@ const { PHASE_DEVELOPMENT_SERVER } = require('next/constants');
 
 module.exports = (phase) => {
     return {
-        env: {
-            APP_URL: (() => {
-                if (phase === PHASE_DEVELOPMENT_SERVER) {
-                    return 'http://localhost:3000';
-                } else {
-                    return 'http://gallformers.org:3000';
-                }
-            })(),
-        },
-        experimental: {
-            cpus: PHASE_DEVELOPMENT_SERVER ? true : 1,
-        },
+        env: {},
+        // experimental: {
+        //     cpus: PHASE_DEVELOPMENT_SERVER ? true : 1,
+        //     profiling: true,
+        // },
         webpack: function (config, webpack) {
             config.plugins
                 .push

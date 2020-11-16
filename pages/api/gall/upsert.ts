@@ -1,11 +1,10 @@
-import { PrismaClient } from '@prisma/client';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { GallUpsertFields } from '../../../libs/apitypes';
+import db from '../../../libs/db/db';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     try {
         const gall = req.body as GallUpsertFields;
-        const db = new PrismaClient({ log: ['query'] });
 
         const connectIfNotNull = (fieldName: string, value: string | undefined) => {
             if (value) {
@@ -69,8 +68,8 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
                         galltexture: { create: createFromIds('texture', gall.textures) },
                     },
                 },
-                host_galls: {
-                    create: createFromIds('gallspecies', gall.hosts),
+                hosts: {
+                    create: createFromIds('hostspecies', gall.hosts),
                 },
             },
         });

@@ -1,6 +1,5 @@
-import { PrismaClient, source } from '@prisma/client';
-
-const db = new PrismaClient();
+import { source } from '@prisma/client';
+import db from './db';
 
 export const sourceById = async (id: number): Promise<source | null> => {
     return db.source.findFirst({
