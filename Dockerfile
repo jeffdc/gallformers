@@ -28,11 +28,11 @@ FROM node:12-alpine
 WORKDIR /usr/src/app
 
 # copy from build image
-COPY --from=build /usr/src/app/package.json /package.json
-COPY --from=build /usr/src/app/node_modules /node_modules
+COPY --from=build /usr/src/app/package.json /usr/src/app/package.json
+COPY --from=build /usr/src/app/node_modules /usr/src/app/node_modules
 # COPY --from=build /usr/src/app/prisma /prisma
-COPY --from=build /usr/src/app/.next /.next
-COPY --from=build /usr/src/app/public /public
+COPY --from=build /usr/src/app/.next /usr/src/app/.next
+COPY --from=build /usr/src/app/public /usr/src/app/public
 
 
 EXPOSE 3000

@@ -1,4 +1,7 @@
 SERVICE_NAME := gallformers
+SRC := ${PWD}/prisma
+DST := /usr/src/app/prisma
+DATA_VOL := prisma
 
 .PHONY: build
 build: 
@@ -6,13 +9,16 @@ build:
 
 .PHONY: run-local
 run-local:
-	docker run -v "/usr/src/data:prisma/" --env-file .env.local --name $(SERVICE_NAME) -p 3000:3000 -d $(SERVICE_NAME):latest
+	docker volume create --driver local --opt type=none --opt device=$(SRC) --opt o=bind --name=$(DATA_VOL)
+	docker run --mount source=prisma,target=$(DST) --env-file .env.local --name $(SERVICE_NAME) -p 3000:3000 -d $(SERVICE_NAME):latest
+	# docker run -v $(SRC):$(DST) --env-file .env.local --name $(SERVICE_NAME) -p 3000:3000 -d $(SERVICE_NAME):latest
 	docker start $(SERVICE_NAME)
 
 .PHONY: stop
 stop:
 	docker stop $(SERVICE_NAME)
 	docker rm $(SERVICE_NAME)
+	docker volume rm $(DATA_VOL)
 
 .PHONY: restart-local
 restart-local: stop run-local
