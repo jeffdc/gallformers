@@ -1,4 +1,5 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
+import { Provider } from 'next-auth/client';
 import { AppProps } from 'next/app';
 import Head from 'next/head';
 import React, { CSSProperties } from 'react';
@@ -20,17 +21,19 @@ const contentStyle: CSSProperties = {
 
 function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
     return (
-        <div className="Layout" style={layoutStyle}>
-            <Head>
-                <title>Gallformers</title>
-                <link rel="icon" href="/favicon.ico" />
-            </Head>
-            <Header />
-            <div style={contentStyle}>
-                <Component {...pageProps} />
+        <Provider session={pageProps.session}>
+            <div className="Layout" style={layoutStyle}>
+                <Head>
+                    <title>Gallformers</title>
+                    <link rel="icon" href="/favicon.ico" />
+                </Head>
+                <Header />
+                <div style={contentStyle}>
+                    <Component {...pageProps} />
+                </div>
+                <Footer />
             </div>
-            <Footer />
-        </div>
+        </Provider>
     );
 }
 

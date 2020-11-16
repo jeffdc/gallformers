@@ -3,19 +3,18 @@ LOCAL_SRC := ${PWD}/prisma
 SERVER_SRC := /mnt/gallformers_data/prisma
 DST := /usr/src/app/prisma
 
-.PHONY: env-file
-env-file:
-ifeq (,$(wildcard .env))
-	$(error You must have an .env file to build and run!)
+env:
+ifeq (,$(wildcard .env-local))
+	$(error You must have an .env-local file to build and run!)
 endif
 
 .PHONY: build
-build: env-file-local
+build:
 	docker-compose build
 
 .PHONY: run-local
-run-local: env-file-local
-	docker run -v $(LOCAL_SRC):$(DST) --env-file .env.local --name $(SERVICE_NAME) -p 3000:3000 -d $(SERVICE_NAME):latest
+run-local:
+	docker run -v $(LOCAL_SRC):$(DST) --env-file .env.local --env-file .env.development --name $(SERVICE_NAME) -p 3000:3000 -d $(SERVICE_NAME):latest
 	docker start $(SERVICE_NAME)
 
 .PHONY: stop
@@ -33,12 +32,12 @@ save-image:
 
 
 ##### The rest of this stuff is for the server side.
-.PHONY: redeploy-and-run:
+.PHONY: redeploy-and-run
 redeploy-and-run: load-image run
 
 .PHONY: run
-run: env-file
-	docker run -v $(SERVER_SRC):$(DST) --env-file .env --name $(SERVICE_NAME) -p 3000:3000 -d $(SERVICE_NAME):latest
+run:
+	docker run -v $(SERVER_SRC):$(DST) --env-file .env.local --env-file .env.production --name $(SERVICE_NAME) -p 3000:3000 -d $(SERVICE_NAME):latest
 	docker start $(SERVICE_NAME)
 
 .PHONY: restart
