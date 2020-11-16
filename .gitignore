@@ -4,7 +4,7 @@ node_modules
 gallformers.sqlite-wal
 gallformers.sqlite-shm
 .vscode
-.env.local
+.env*
 .vercel
 log.log
 yarn-error.log
