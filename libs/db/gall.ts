@@ -1,6 +1,12 @@
-import { alignment, cells as cs, color, location, shape, texture, walls as ws } from '@prisma/client';
+import { alignment, cells as cs, color, location, shape, species, texture, walls as ws } from '@prisma/client';
 import db from './db';
 
+export const allGalls = async (): Promise<species[]> => {
+    return db.species.findMany({
+        where: { taxoncode: { equals: 'gall' } },
+        orderBy: { name: 'asc' },
+    });
+};
 export const locations = async (): Promise<location[]> => {
     return db.location.findMany({
         orderBy: {

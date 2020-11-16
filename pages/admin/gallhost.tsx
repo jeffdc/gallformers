@@ -1,5 +1,5 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { source, species, speciessource } from '@prisma/client';
+import { host, species, speciessource } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import React, { useState } from 'react';
@@ -8,43 +8,43 @@ import { Typeahead } from 'react-bootstrap-typeahead';
 import { Controller, useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
-import { SpeciesSourceInsertFields } from '../../libs/apitypes';
-import { allSources } from '../../libs/db/source';
-import { allSpecies } from '../../libs/db/species';
+import { HostInsertFields, SpeciesSourceInsertFields } from '../../libs/apitypes';
+import { allGalls } from '../../libs/db/gall';
+import { allHosts } from '../../libs/db/host';
 import { normalizeToArray } from '../../libs/utils/forms';
 
 type Props = {
-    species: species[];
-    sources: source[];
+    galls: species[];
+    hosts: species[];
 };
 
 const Schema = yup.object().shape({
-    species: yup.array().required(),
-    sources: yup.array().required(),
+    galls: yup.array().required(),
+    hosts: yup.array().required(),
 });
 
-const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
-    const [results, setResults] = useState(new Array<speciessource>());
+const GallHost = ({ galls, hosts }: Props): JSX.Element => {
+    const [results, setResults] = useState(new Array<host>());
     const { handleSubmit, errors, control } = useForm({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
 
-    const onSubmit = async (data: { species: string[]; sources: string[] }) => {
+    const onSubmit = async (data: { galls: string[]; hosts: string[] }) => {
         try {
-            const insertData: SpeciesSourceInsertFields = {
-                species: data.species.map((s) => {
+            const insertData: HostInsertFields = {
+                galls: data.galls.map((s) => {
                     // i hate null... :( these should be safe since the text values came from the same place as the ids
                     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                    return species.find((sp) => s === sp.name)!.id;
+                    return galls.find((sp) => s === sp.name)!.id;
                 }),
-                sources: data.sources.map((s) => {
+                hosts: data.hosts.map((s) => {
                     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                    return sources.find((so) => s === so.title)!.id;
+                    return hosts.find((so) => s === so.name)!.id;
                 }),
             };
 
-            const res = await fetch('../api/speciessource/insert', {
+            const res = await fetch('../api/gallhost/insert', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -55,7 +55,9 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
             if (res.status === 200) {
                 setResults(await res.json());
             } else {
-                throw new Error(await res.text());
+                const text = await res.text();
+                console.log(`Got an error back code: ${res.status} and text: ${text}.`);
+                throw new Error(text);
             }
         } catch (e) {
             console.log(e);
@@ -65,13 +67,13 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
     return (
         <Auth>
             <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
-                <h4>Map Species & Sources</h4>
+                <h4>Map Galls & Hosts</h4>
                 <Row className="form-group">
                     <Col>
-                        Species:
+                        Gall:
                         <Controller
                             control={control}
-                            name="species"
+                            name="galls"
                             defaultValue={[]}
                             render={({ value, onChange, onBlur }) => (
                                 <Typeahead
@@ -80,16 +82,16 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                                     }}
                                     onBlur={onBlur}
                                     selected={normalizeToArray(value)}
-                                    placeholder="Species"
-                                    id="Species"
-                                    options={species.map((h) => h.name)}
+                                    placeholder="Gall"
+                                    id="Gall"
+                                    options={galls.map((h) => h.name)}
                                     multiple
                                     clearButton
-                                    isInvalid={!!errors.species}
+                                    isInvalid={!!errors.galls}
                                 />
                             )}
                         />
-                        {errors.species && <span className="text-danger">You must provide a least one species to map.</span>}
+                        {errors.galls && <span className="text-danger">You must provide a least one gall to map.</span>}
                     </Col>
                 </Row>
                 <Row>
@@ -99,10 +101,10 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        Source:
+                        Host:
                         <Controller
                             control={control}
-                            name="sources"
+                            name="hosts"
                             defaultValue={[]}
                             render={({ value, onChange, onBlur }) => (
                                 <Typeahead
@@ -111,16 +113,16 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                                     }}
                                     onBlur={onBlur}
                                     selected={normalizeToArray(value)}
-                                    placeholder="Sources"
-                                    id="Sources"
-                                    options={sources.map((h) => h.title)}
+                                    placeholder="Hosts"
+                                    id="Hosts"
+                                    options={hosts.map((h) => h.name)}
                                     multiple
                                     clearButton
-                                    isInvalid={!!errors.species}
+                                    isInvalid={!!errors.hosts}
                                 />
                             )}
                         />
-                        {errors.sources && <span className="text-danger">You must provide a least one source to map.</span>}
+                        {errors.hosts && <span className="text-danger">You must provide a least one host to map.</span>}
                     </Col>
                 </Row>
                 <Row className="form-group">
@@ -130,18 +132,18 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                 </Row>
                 {results.length > 0 && (
                     <>
-                        <span>Wrote {results.length} species-source mappings.</span>
+                        <span>Wrote {results.length} gall-host mappings.</span>
                         <ListGroup>
                             {results.map((r) => {
                                 return (
                                     <ListGroupItem key={r.id}>
                                         Added{' '}
-                                        <Link href={`/source/${r.source_id}`}>
-                                            <a>source</a>
+                                        <Link href={`/gall/${r.gall_species_id}`}>
+                                            <a>gall</a>
                                         </Link>{' '}
                                         to{' '}
-                                        <Link href={`/gall/${r.species_id}`}>
-                                            <a>species</a>
+                                        <Link href={`/host/${r.host_species_id}`}>
+                                            <a>host</a>
                                         </Link>
                                         .
                                     </ListGroupItem>
@@ -158,10 +160,10 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
-            species: await allSpecies(),
-            sources: await allSources(),
+            galls: await allGalls(),
+            hosts: await allHosts(),
         },
     };
 };
 
-export default SpeciesSource;
+export default GallHost;

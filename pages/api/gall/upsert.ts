@@ -68,8 +68,8 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
                         galltexture: { create: createFromIds('texture', gall.textures) },
                     },
                 },
-                host_galls: {
-                    create: createFromIds('gallspecies', gall.hosts),
+                hosts: {
+                    create: createFromIds('hostspecies', gall.hosts),
                 },
             },
         });
