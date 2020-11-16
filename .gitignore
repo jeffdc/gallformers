@@ -8,4 +8,4 @@ gallformers.sqlite-shm
 .vercel
 log.log
 yarn-error.log
-gallformers.tar
+gallformers-docker.tar

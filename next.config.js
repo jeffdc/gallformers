@@ -4,11 +4,11 @@ const { PHASE_DEVELOPMENT_SERVER } = require('next/constants');
 module.exports = (phase) => {
     return {
         env: {
-            APP_URL: (() => {
+            DBPATH: (() => {
                 if (phase === PHASE_DEVELOPMENT_SERVER) {
-                    return 'http://localhost:3000';
+                    return 'prisma/gallformers.sqlite';
                 } else {
-                    return 'http://gallformers.org:3000';
+                    return 'data/gallformers.sqlite';
                 }
             })(),
         },

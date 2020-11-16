@@ -29,34 +29,33 @@ yarn start
 ```
 To run in the docker container:
 ```bash
-docker build -t gallformers:latest .
-docker run --name gallformers -p 3002:3000 -d gallformers:latest
-docker start gallformers
+make build
+make run-local
 ```
-This should now make the site accessible on your local machine at [http://localhost:3002](http://localhost:3002)
+This should now make the site accessible on your local machine at [http://localhost:3000](http://localhost:3000)
+
+You can also create a tar of the docker image by running:
+```
+make save-image
+```
+
+The other commands are meant to be used on the server (at least until we get some deployment automation in place).
 
 ## Technical Overview
 The whole site is built using [next.js](nextjs.org/). 
 
 ### Back-end and Database
-The datastore is a [sqlite](https://sqlite.org/index.html) database. The schema can be seen in the [initial migration script](migrations/001-gallformers.sql). The actual DB is committed to the repo. When the server starts the migrations are run. The initial data load was taken from a bunch of CSV files that were exported out of AirTable. The schema from AirTable was very wonky so the [script](data_from_airtable/genSQLfromCSV.py) to import the CSVs is a mess. Once we get a satisfactory initial load this code should no longer be needed and can deleted along with the CSV files.
+The datastore is a [sqlite](https://sqlite.org/index.html) database. The schema can be seen in the [initial migration script](migrations/001-gallformers.sql). There is a copy of the DB committed to the repo for ease of testing etc. The prod database is on a volume attached to the server.
 
 The APIs for accessing the data from the front-end are implemented in [Prisma](https://www.prisma.io/) and are all called from the server (either statically rendered at build time or rendered on request if they could not be build statically, e.g., the search results).
 
-There is a totally separate data curation step that is not discussed here.  The gallformers.sqlite DB that is on the main branch in this repo is the current production data.
+### Backup Strategy
+TBD. For now manual snapshots of the block volume are all we have. All of the source is on github and the site can easily be re-created from scratch on a new instance from the files there. The only real back up needed is the database.
 
 ### Front-End
 The front-end is mostly static pages as we expect most of this data to not change frequently.  next.js is built on [React](https://reactjs.org/) so you will need some familiarity with that to work on the site. The look-and-feel is built with [react-bootstrap](https://react-bootstrap.github.io/). Custom components are placed in the [pages/components](pages/components) directory and global layout components in [pages/layouts](pages/layouts). 
 
 ### Production and Staging (non-dev) Deployments
-TODO
+The site is deployed on a Digital Ocean droplet with a mounted volume that contains the database. Details of how to access this etc. are not appropriate for this README.
 
-### NTS RE Fake Prod Deployments
-Locally:
-`make build`
-`docker save gallformers:latest > gallformers.tar`
-`scp gallformers-docker.tar user@serverIP:`
-On the server:
-`sudo docker load < gallformers.tar`
-`sudo docker run --name gallformers -p 3000:3000 -d gallformers:latest`
-`sudo docker start gallformers`
+Currently user management is handled via Auth0. They have a reasonable free-tier that gives us whta we need for our current minimal needs. All user management happens via the Auth0 management console. The site is generally meant to be accessed with authentication. Authentication and authorization is only needed for data management/curation features.
