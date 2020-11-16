@@ -1,6 +1,6 @@
 import { ErrorMessage } from '@hookform/error-message';
 import { yupResolver } from '@hookform/resolvers/yup';
-import { HostDistinctFieldEnum, PrismaClient } from '@prisma/client';
+import { HostDistinctFieldEnum } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -9,11 +9,12 @@ import { Col, ListGroup, Row } from 'react-bootstrap';
 import { Typeahead } from 'react-bootstrap-typeahead';
 import { Controller, useForm } from 'react-hook-form';
 import * as yup from 'yup';
+import { SearchInitialProps } from '../layouts/searchfacets';
+import db from '../libs/db/db';
+import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
 import { searchGalls } from '../libs/search';
 import { Gall, GallLocation, GallTexture, SearchQuery } from '../libs/types';
-import { SearchInitialProps } from '../layouts/searchfacets';
 import { normalizeToArray } from '../libs/utils/forms';
-import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
 
 const dontCare = (o: string | string[] | undefined) => {
     const truthy = !!o;
@@ -202,15 +203,13 @@ const gallDescription = (g: Gall): string => {
 };
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-    const newdb = new PrismaClient();
-
     // get the list of galls for the host if there is a host passed in
     const q = context.query as SearchQuery;
     const galls = q.host ? await searchGalls(q) : new Array<Gall>();
     console.log(`Got ${galls.length} galls`);
 
     // get all of the data for the typeahead boxes
-    const h = await newdb.host.findMany({
+    const h = await db.host.findMany({
         include: {
             hostspecies: {},
         },

@@ -1,6 +1,5 @@
-import { abundance, PrismaClient, species } from '@prisma/client';
-
-const db = new PrismaClient();
+import { abundance, species } from '@prisma/client';
+import db from './db';
 
 export const abundances = async (): Promise<abundance[]> => {
     return db.abundance.findMany({

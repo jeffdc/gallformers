@@ -21,8 +21,9 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
-import { deserialize, serialize } from '../../../libs/reactserialize';
+import db from '../../../libs/db/db';
 import { linkTextFromGlossary } from '../../../libs/glossary';
+import { deserialize, serialize } from '../../../libs/reactserialize';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type SourceProp = speciessource & {
@@ -180,8 +181,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
     }
 
     const id = context.params.id as string;
-    const newdb = new PrismaClient();
-    const gall = await newdb.gall.findFirst({
+    const gall = await db.gall.findFirst({
         include: {
             species: {
                 include: {
@@ -229,8 +229,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
 };
 
 export const getStaticPaths: GetStaticPaths = async () => {
-    const newdb = new PrismaClient();
-    const galls = await newdb.gall.findMany({
+    const galls = await db.gall.findMany({
         select: {
             species_id: true,
         },

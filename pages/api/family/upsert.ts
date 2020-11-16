@@ -1,10 +1,9 @@
-import { PrismaClient } from '@prisma/client';
 import { NextApiRequest, NextApiResponse } from 'next';
+import db from '../../../libs/db/db';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     try {
         const h = req.body;
-        const db = new PrismaClient();
 
         const f = await db.family.upsert({
             where: { name: h.name },

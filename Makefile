@@ -2,7 +2,7 @@ SERVICE_NAME := gallformers
 
 .PHONY: build
 build: 
-	docker build
+	docker-compose build
 
 .PHONY: run-local
 run-local:
@@ -12,6 +12,7 @@ run-local:
 .PHONY: stop
 stop:
 	docker stop $(SERVICE_NAME)
+	docker rm $(SERVICE_NAME)
 
 .PHONY: restart-local
 restart-local: stop run-local
@@ -23,7 +24,7 @@ save-image:
 
 .PHONY: run
 run: 
-	docker run -v "/usr/src/data:/mnt/gallformers_data" --env-file .env --name $(SERVICE_NAME) -p 3000:3000 \
+	docker run -v "/usr/src/prisma:/mnt/gallformers_data" --env-file .env --name $(SERVICE_NAME) -p 3000:3000 \
 		        -d $(SERVICE_NAME):latest
 	docker start $(SERVICE_NAME)
 
@@ -33,9 +34,13 @@ restart: stop run
 # TODO this is not the step we really want, should pull new image from repo
 .PHONY: load-image
 load-image: stop
-	docker rm $(SERVICE_NAME)
 	docker load < $(SERVICE_NAME)-docker.tar
 
+
+# copy the database to the mounted volume
+.PHONY: update-database
+update-database:
+	cp -r prisma /mnt/gallformers_data 
 
 
 # this is for getting the server setup initially
@@ -60,6 +65,4 @@ bootstrap:
 	# gets the certs and installs them changing the nginx configuration
 	certbot --nginx
 
-	# copy the database to the mounted volume
-	cp prisma/gallformers.sqlite /mnt/gallformers_data 
 	

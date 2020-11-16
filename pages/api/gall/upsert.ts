@@ -1,11 +1,10 @@
-import { PrismaClient } from '@prisma/client';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { GallUpsertFields } from '../../../libs/apitypes';
+import db from '../../../libs/db/db';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     try {
         const gall = req.body as GallUpsertFields;
-        const db = new PrismaClient({ log: ['query'] });
 
         const connectIfNotNull = (fieldName: string, value: string | undefined) => {
             if (value) {

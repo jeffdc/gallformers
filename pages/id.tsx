@@ -1,4 +1,4 @@
-import { HostDistinctFieldEnum, PrismaClient } from '@prisma/client';
+import { HostDistinctFieldEnum } from '@prisma/client';
 import { Formik, FormikErrors, FormikTouched } from 'formik';
 import { GetStaticProps } from 'next';
 import { useRouter } from 'next/router';
@@ -7,6 +7,8 @@ import { Button, Col, Container, Form } from 'react-bootstrap';
 import * as yup from 'yup';
 import InfoTip from '../components/infotip';
 import SearchFormField, { FieldValueType } from '../components/searchformfield';
+import db from '../libs/db/db';
+import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
 
 const schema = yup.object({
     hostName: yup.string().required('You must provide a host name.'),
@@ -215,9 +217,7 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async () => {
-    const newdb = new PrismaClient();
-
-    const h = await newdb.host.findMany({
+    const h = await db.host.findMany({
         include: {
             hostspecies: {},
         },
@@ -234,13 +234,13 @@ export const getStaticProps: GetStaticProps = async () => {
     return {
         props: {
             hosts: hosts,
-            locations: (await newdb.location.findMany({})).map((l) => l.location).sort(),
-            colors: (await newdb.color.findMany({})).map((l) => l.color).sort(),
-            shapes: (await newdb.shape.findMany({})).map((l) => l.shape).sort(),
-            textures: (await newdb.texture.findMany({})).map((l) => l.texture).sort(),
-            alignments: (await newdb.alignment.findMany({})).map((l) => l.alignment).sort(),
-            walls: (await newdb.walls.findMany({})).map((l) => l.walls).sort(),
-            cells: (await newdb.cells.findMany({})).map((l) => l.cells).sort(),
+            locations: await locations(),
+            colors: await colors(),
+            shapes: await shapes(),
+            textures: await textures(),
+            alignments: await alignments(),
+            walls: await walls(),
+            cells: await cells(),
         },
         revalidate: 1,
     };

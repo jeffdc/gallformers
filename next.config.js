@@ -3,18 +3,11 @@ const { PHASE_DEVELOPMENT_SERVER } = require('next/constants');
 
 module.exports = (phase) => {
     return {
-        env: {
-            DBPATH: (() => {
-                if (phase === PHASE_DEVELOPMENT_SERVER) {
-                    return 'prisma/gallformers.sqlite';
-                } else {
-                    return 'data/gallformers.sqlite';
-                }
-            })(),
-        },
-        experimental: {
-            cpus: PHASE_DEVELOPMENT_SERVER ? true : 1,
-        },
+        env: {},
+        // experimental: {
+        //     cpus: PHASE_DEVELOPMENT_SERVER ? true : 1,
+        //     profiling: true,
+        // },
         webpack: function (config, webpack) {
             config.plugins
                 .push

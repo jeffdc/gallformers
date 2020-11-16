@@ -1,6 +1,5 @@
-import { alignment, cells as cs, color, location, PrismaClient, shape, texture, walls as ws } from '@prisma/client';
-
-const db = new PrismaClient();
+import { alignment, cells as cs, color, location, shape, texture, walls as ws } from '@prisma/client';
+import db from './db';
 
 export const locations = async (): Promise<location[]> => {
     return db.location.findMany({

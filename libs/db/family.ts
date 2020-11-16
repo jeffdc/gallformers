@@ -1,6 +1,5 @@
-import { family, PrismaClient, species } from '@prisma/client';
-
-const db = new PrismaClient();
+import { family, species } from '@prisma/client';
+import db from './db';
 
 export const familyById = async (id: number): Promise<family | null> => {
     return db.family.findFirst({

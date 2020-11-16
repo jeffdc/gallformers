@@ -1,7 +1,8 @@
-import { family, gall, PrismaClient, species } from '@prisma/client';
+import { family, gall, species } from '@prisma/client';
 import { GetStaticProps } from 'next';
 import Link from 'next/link';
 import { Accordion, Button, Card, ListGroup, Tab, Tabs } from 'react-bootstrap';
+import db from '../libs/db/db';
 
 type Species = species & {
     gall: gall[];
@@ -82,8 +83,7 @@ const Explore = ({ gallmakers, hosts }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async () => {
-    const newdb = new PrismaClient();
-    const gallmakers = await newdb.family.findMany({
+    const gallmakers = await db.family.findMany({
         include: {
             species: {
                 select: {
@@ -102,7 +102,7 @@ export const getStaticProps: GetStaticProps = async () => {
         where: { description: { not: 'Plant' } },
     });
 
-    const hosts = await newdb.family.findMany({
+    const hosts = await db.family.findMany({
         include: {
             species: {
                 select: {
