@@ -24,6 +24,11 @@ function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
         <Provider session={pageProps.session}>
             <div className="Layout" style={layoutStyle}>
                 <Head>
+                    <script type="text/javascript">
+                        {/* Fix for Firefox autofocus CSS bug See:
+                        http://stackoverflow.com/questions/18943276/html-5-autofocus-messes-up-css-loading/18945951#18945951 */}
+                    </script>
+
                     <title>Gallformers</title>
                     <link rel="icon" href="/favicon.ico" />
                 </Head>
