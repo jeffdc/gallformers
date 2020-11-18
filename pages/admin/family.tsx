@@ -64,7 +64,7 @@ const Family = ({ families }: Props): JSX.Element => {
                         Name:
                         <ControlledTypeahead
                             control={control}
-                            id="name"
+                            name="name"
                             onChange={(e) => {
                                 const f = families.find((f) => f.name === e[0]);
                                 if (f) {

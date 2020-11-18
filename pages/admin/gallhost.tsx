@@ -72,7 +72,7 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
                         Gall:
                         <ControlledTypeahead
                             control={control}
-                            id="galls"
+                            name="galls"
                             placeholder="Gall"
                             options={galls.map((h) => h.name)}
                             multiple
@@ -92,7 +92,7 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
                         Host:
                         <ControlledTypeahead
                             control={control}
-                            id="hosts"
+                            name="hosts"
                             placeholder="Hosts"
                             options={hosts.map((h) => h.name)}
                             multiple
