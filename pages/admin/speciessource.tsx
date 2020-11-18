@@ -4,14 +4,13 @@ import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import React, { useState } from 'react';
 import { Col, ListGroup, ListGroupItem, Row } from 'react-bootstrap';
-import { Typeahead } from 'react-bootstrap-typeahead';
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
+import ControlledTypeahead from '../../components/controlledtypeahead';
 import { SpeciesSourceInsertFields } from '../../libs/apitypes';
 import { allSources } from '../../libs/db/source';
 import { allSpecies } from '../../libs/db/species';
-import { normalizeToArray } from '../../libs/utils/forms';
 
 type Props = {
     species: species[];
@@ -69,25 +68,14 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                 <Row className="form-group">
                     <Col>
                         Species:
-                        <Controller
+                        <ControlledTypeahead
                             control={control}
                             name="species"
-                            defaultValue={[]}
-                            render={({ value, onChange, onBlur }) => (
-                                <Typeahead
-                                    onChange={(e: string | string[]) => {
-                                        onChange(e);
-                                    }}
-                                    onBlur={onBlur}
-                                    selected={normalizeToArray(value)}
-                                    placeholder="Species"
-                                    id="Species"
-                                    options={species.map((h) => h.name)}
-                                    multiple
-                                    clearButton
-                                    isInvalid={!!errors.species}
-                                />
-                            )}
+                            placeholder="Species"
+                            options={species.map((h) => h.name)}
+                            multiple
+                            clearButton
+                            isInvalid={!!errors.species}
                         />
                         {errors.species && <span className="text-danger">You must provide a least one species to map.</span>}
                     </Col>
@@ -100,25 +88,14 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                 <Row className="form-group">
                     <Col>
                         Source:
-                        <Controller
+                        <ControlledTypeahead
                             control={control}
                             name="sources"
-                            defaultValue={[]}
-                            render={({ value, onChange, onBlur }) => (
-                                <Typeahead
-                                    onChange={(e: string | string[]) => {
-                                        onChange(e);
-                                    }}
-                                    onBlur={onBlur}
-                                    selected={normalizeToArray(value)}
-                                    placeholder="Sources"
-                                    id="Sources"
-                                    options={sources.map((h) => h.title)}
-                                    multiple
-                                    clearButton
-                                    isInvalid={!!errors.species}
-                                />
-                            )}
+                            placeholder="Sources"
+                            options={sources.map((h) => h.title)}
+                            multiple
+                            clearButton
+                            isInvalid={!!errors.sources}
                         />
                         {errors.sources && <span className="text-danger">You must provide a least one source to map.</span>}
                     </Col>

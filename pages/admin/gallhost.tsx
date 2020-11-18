@@ -1,17 +1,16 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { host, species, speciessource } from '@prisma/client';
+import { host, species } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import React, { useState } from 'react';
 import { Col, ListGroup, ListGroupItem, Row } from 'react-bootstrap';
-import { Typeahead } from 'react-bootstrap-typeahead';
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
-import { HostInsertFields, SpeciesSourceInsertFields } from '../../libs/apitypes';
+import ControlledTypeahead from '../../components/controlledtypeahead';
+import { HostInsertFields } from '../../libs/apitypes';
 import { allGalls } from '../../libs/db/gall';
 import { allHosts } from '../../libs/db/host';
-import { normalizeToArray } from '../../libs/utils/forms';
 
 type Props = {
     galls: species[];
@@ -71,25 +70,14 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
                 <Row className="form-group">
                     <Col>
                         Gall:
-                        <Controller
+                        <ControlledTypeahead
                             control={control}
-                            name="galls"
-                            defaultValue={[]}
-                            render={({ value, onChange, onBlur }) => (
-                                <Typeahead
-                                    onChange={(e: string | string[]) => {
-                                        onChange(e);
-                                    }}
-                                    onBlur={onBlur}
-                                    selected={normalizeToArray(value)}
-                                    placeholder="Gall"
-                                    id="Gall"
-                                    options={galls.map((h) => h.name)}
-                                    multiple
-                                    clearButton
-                                    isInvalid={!!errors.galls}
-                                />
-                            )}
+                            id="galls"
+                            placeholder="Gall"
+                            options={galls.map((h) => h.name)}
+                            multiple
+                            clearButton
+                            isInvalid={!!errors.galls}
                         />
                         {errors.galls && <span className="text-danger">You must provide a least one gall to map.</span>}
                     </Col>
@@ -102,25 +90,14 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
                 <Row className="form-group">
                     <Col>
                         Host:
-                        <Controller
+                        <ControlledTypeahead
                             control={control}
-                            name="hosts"
-                            defaultValue={[]}
-                            render={({ value, onChange, onBlur }) => (
-                                <Typeahead
-                                    onChange={(e: string | string[]) => {
-                                        onChange(e);
-                                    }}
-                                    onBlur={onBlur}
-                                    selected={normalizeToArray(value)}
-                                    placeholder="Hosts"
-                                    id="Hosts"
-                                    options={hosts.map((h) => h.name)}
-                                    multiple
-                                    clearButton
-                                    isInvalid={!!errors.hosts}
-                                />
-                            )}
+                            id="hosts"
+                            placeholder="Hosts"
+                            options={hosts.map((h) => h.name)}
+                            multiple
+                            clearButton
+                            isInvalid={!!errors.hosts}
                         />
                         {errors.hosts && <span className="text-danger">You must provide a least one host to map.</span>}
                     </Col>

@@ -1,11 +1,14 @@
 import { yupResolver } from '@hookform/resolvers/yup';
+import { family } from '@prisma/client';
+import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
 import React from 'react';
 import { Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
-import { FamilyUpsertFields } from '../../libs/apitypes';
+import ControlledTypeahead from '../../components/controlledtypeahead';
+import { allFamilies } from '../../libs/db/family';
 import { genOptions } from '../../libs/utils/forms';
 
 const Schema = yup.object().shape({
@@ -13,15 +16,26 @@ const Schema = yup.object().shape({
     description: yup.string().required(),
 });
 
-const Family = (): JSX.Element => {
-    const { register, handleSubmit, errors } = useForm({
+type Family = {
+    id: number;
+    description: string;
+};
+
+type Props = {
+    families: family[];
+};
+
+const Family = ({ families }: Props): JSX.Element => {
+    if (!families) throw new Error(`The input props for families can not be null or undefined.`);
+
+    const { register, handleSubmit, errors, control, setValue } = useForm({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
 
     const router = useRouter();
 
-    const onSubmit = async (data: FamilyUpsertFields) => {
+    const onSubmit = async (data: { name: string; description: string }) => {
         try {
             const res = await fetch('../api/family/upsert', {
                 method: 'POST',
@@ -44,12 +58,27 @@ const Family = (): JSX.Element => {
     return (
         <Auth>
             <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
-                <h4>Add A Source</h4>
+                <h4>Add A Family</h4>
                 <Row className="form-group">
                     <Col>
                         Name:
-                        <input type="text" placeholder="Name" name="name" className="form-control" ref={register} />
-                        {errors.name && <span className="text-danger">The Name is required.</span>}
+                        <ControlledTypeahead
+                            control={control}
+                            id="name"
+                            onChange={(e) => {
+                                const f = families.find((f) => f.name === e[0]);
+                                if (f) {
+                                    setValue('description', f.description);
+                                }
+                            }}
+                            placeholder="Name"
+                            options={families.map((f) => f.name)}
+                            clearButton
+                            isInvalid={!!errors.name}
+                            newSelectionPrefix="Add a new Family: "
+                            allowNew={true}
+                        />
+                        {errors.name && <span className="text-danger">The Name is required. {JSON.stringify(errors)}</span>}
                     </Col>
                 </Row>
                 <Row className="form-group">
@@ -67,4 +96,11 @@ const Family = (): JSX.Element => {
     );
 };
 
+export const getServerSideProps: GetServerSideProps = async () => {
+    return {
+        props: {
+            families: await allFamilies(),
+        },
+    };
+};
 export default Family;

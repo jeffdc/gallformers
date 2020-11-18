@@ -1,11 +1,3 @@
-// React Hook Forms and Typeahead sometimes do not agree on the selected value as a string or an array.
-// This normalizes to an array.
-export const normalizeToArray = (v: string | string[] | undefined): string[] => {
-    if (v == undefined) return [];
-    if (!Array.isArray(v)) return [v];
-    return v;
-};
-
 export const genOptions = (opts: string[]): JSX.Element => {
     if (opts == undefined || opts == null) {
         throw new Error('Must have a valid list of options to render.');

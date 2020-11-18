@@ -120,7 +120,7 @@ const Gall = ({ gall }: Props): JSX.Element => {
                                 <strong>Walls:</strong> {gall.walls?.walls}
                             </Col>
                             <Col>
-                                <strong>Abdundance:</strong> {gall.species?.abundance}
+                                <strong>Abdundance:</strong> {gall.species?.abundance?.abundance}
                             </Col>
                             <Col>
                                 <strong>Shape:</strong> {gall.shape?.shape}

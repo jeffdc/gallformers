@@ -1,4 +1,4 @@
-import { abundance, family } from '@prisma/client';
+import { abundance, family, species } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import React from 'react';
 import { Col, Row } from 'react-bootstrap';
@@ -11,8 +11,11 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { useRouter } from 'next/router';
 import { SpeciesUpsertFields } from '../../libs/apitypes';
 import Auth from '../../components/auth';
+import ControlledTypeahead from '../../components/controlledtypeahead';
+import { allHosts } from '../../libs/db/host';
 
 type Props = {
+    hosts: species[];
     families: family[];
     abundances: abundance[];
 };
@@ -27,13 +30,22 @@ const Schema = yup.object().shape({
     description: yup.string().required(),
 });
 
-const Host = ({ families, abundances }: Props): JSX.Element => {
-    const { register, handleSubmit, setValue, errors } = useForm({
+const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
+    const { register, handleSubmit, setValue, errors, control } = useForm({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
 
     const router = useRouter();
+
+    const setFamily = (id: number): void => {
+        const family = families.find((f) => f.id === id);
+        if (family) setValue('family', family.name);
+    };
+    const setAbundance = (id: number | null): void => {
+        const abundance = families.find((f) => f.id === id);
+        if (abundance) setValue('family', abundance.name);
+    };
 
     const onSubmit = async (data: SpeciesUpsertFields) => {
         try {
@@ -62,13 +74,30 @@ const Host = ({ families, abundances }: Props): JSX.Element => {
                 <Row className="form-group">
                     <Col>
                         Name (binomial):
-                        <input
-                            type="text"
-                            placeholder="Name"
+                        <ControlledTypeahead
+                            control={control}
                             name="name"
-                            className="form-control"
-                            onBlur={(e) => (!errors.name ? setValue('genus', extractGenus(e.target.value)) : undefined)}
-                            ref={register}
+                            onChange={(e) => {
+                                const f = hosts.find((f) => f.name === e[0]);
+                                if (f) {
+                                    setFamily(f.family_id);
+                                    setAbundance(f.abundance_id);
+                                    setValue('commonnames', f.commonnames);
+                                    setValue('synonyms', f.synonyms);
+                                    setValue('description', f.description);
+                                }
+                            }}
+                            onBlur={(e) => {
+                                if (!errors.name) {
+                                    setValue('genus', extractGenus(e.target.value));
+                                }
+                            }}
+                            placeholder="Name"
+                            options={hosts.map((f) => f.name)}
+                            clearButton
+                            isInvalid={!!errors.name}
+                            newSelectionPrefix="Add a new Host: "
+                            allowNew={true}
                         />
                         {errors.name && (
                             <span className="text-danger">
@@ -137,6 +166,7 @@ const Host = ({ families, abundances }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
+            hosts: await allHosts(),
             families: await allFamilies(),
             abundances: await abundances(),
         },

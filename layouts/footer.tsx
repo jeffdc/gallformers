@@ -1,4 +1,5 @@
 import { signOut, useSession } from 'next-auth/client';
+import Link from 'next/link';
 import React from 'react';
 import { Nav, Navbar, NavbarBrand } from 'react-bootstrap';
 
@@ -20,7 +21,14 @@ const Footer = (): JSX.Element => {
                 <NavbarBrand>
                     {session && <img src={session.user.image} alt={session.user.name} width="25px" height="25px" />}
                 </NavbarBrand>
-                <Nav>{logoff()}</Nav>
+                <Nav className="p-1">
+                    {session && (
+                        <Link href="/admin">
+                            <a>Administration</a>
+                        </Link>
+                    )}
+                </Nav>
+                <Nav>{session && logoff()}</Nav>
                 <Nav.Link className="ml-auto" href="/about">
                     About
                 </Nav.Link>

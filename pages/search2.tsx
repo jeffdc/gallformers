@@ -6,15 +6,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
 import { Col, ListGroup, Row } from 'react-bootstrap';
-import { Typeahead } from 'react-bootstrap-typeahead';
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
+import ControlledTypeahead from '../components/controlledtypeahead';
 import { SearchInitialProps } from '../layouts/searchfacets';
 import db from '../libs/db/db';
 import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
 import { searchGalls } from '../libs/search';
 import { Gall, GallLocation, GallTexture, SearchQuery } from '../libs/types';
-import { normalizeToArray } from '../libs/utils/forms';
 
 const dontCare = (o: string | string[] | undefined) => {
     const truthy = !!o;
@@ -114,24 +113,15 @@ const Search2 = (props: Props): JSX.Element => {
 
     const makeFormInput = (field: FieldNames, opts: string[], rules = {}) => {
         return (
-            <Controller
+            <ControlledTypeahead
                 control={control}
                 name={field}
-                defaultValue={[]}
-                rules={rules}
-                render={({ value, onChange }) => (
-                    <Typeahead
-                        onChange={(e: string | string[]) => {
-                            onChange(e);
-                            doSearch(field, e ? e : []);
-                        }}
-                        selected={normalizeToArray(value)}
-                        placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
-                        id={field}
-                        clearButton={field !== 'host'}
-                        options={opts}
-                    />
-                )}
+                onChange={(e) => {
+                    doSearch(field, e ? (e as string[]) : []);
+                }}
+                placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
+                clearButton={field !== 'host'}
+                options={opts}
             />
         );
     };
@@ -142,7 +132,7 @@ const Search2 = (props: Props): JSX.Element => {
                 <Col xs={3}>
                     <form className="fixed-left border p-2 mt-2">
                         Host:
-                        {makeFormInput('host', props.hosts, { required: 'Must select a host.' })}
+                        {makeFormInput('host', props.hosts)}
                         <ErrorMessage errors={errors} name="host-error" />
                         Location:
                         {makeFormInput('locations', props.locations)}

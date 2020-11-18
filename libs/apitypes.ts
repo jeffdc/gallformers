@@ -3,6 +3,7 @@
  */
 
 export type SpeciesUpsertFields = {
+    id?: number;
     name: string;
     commonnames: string;
     synonyms: string;
@@ -21,6 +22,21 @@ export type GallUpsertFields = SpeciesUpsertFields & {
     walls: string;
     cells: string;
     detachable: string;
+};
+
+export type GallRes = {
+    id: number;
+    species_id: number;
+    taxoncode: string;
+    detachable: number | undefined;
+    alignment_id: number | undefined;
+    walls_id: number | undefined;
+    cells_id: number | undefined;
+    color_id: number | undefined;
+    shape_id: number | undefined;
+    locations: (number | null)[] | undefined;
+    textures: (number | null)[] | undefined;
+    hosts: (number | null)[] | undefined;
 };
 
 export type SourceUpsertFields = {

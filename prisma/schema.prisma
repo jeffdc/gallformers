@@ -106,7 +106,7 @@ model species {
 
 model gall {
   id           Int            @id @default(autoincrement())
-  species_id   Int
+  species_id   Int            @unique
   taxoncode    String
   detachable   Int?
   alignment_id Int?

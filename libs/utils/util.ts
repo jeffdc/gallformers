@@ -6,6 +6,8 @@
  * @param prop the prop to check for
  */
 export function hasProp<T extends unknown, K extends PropertyKey>(o: T, prop: K): o is T & Record<K, unknown> {
+    if (!o) return false;
+
     return Object.prototype.hasOwnProperty.call(o, prop);
 }
 

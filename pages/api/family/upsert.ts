@@ -1,18 +1,19 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { FamilyUpsertFields } from '../../../libs/apitypes';
 import db from '../../../libs/db/db';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     try {
-        const h = req.body;
+        const family = req.body as FamilyUpsertFields;
 
         const f = await db.family.upsert({
-            where: { name: h.name },
+            where: { name: family.name },
             update: {
-                description: h.description,
+                description: family.description,
             },
             create: {
-                name: h.name,
-                description: h.description,
+                name: family.name,
+                description: family.description,
             },
         });
 
