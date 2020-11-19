@@ -1,10 +1,16 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { getSession } from 'next-auth/client';
 import { GallUpsertFields } from '../../../libs/apitypes';
 import db from '../../../libs/db/db';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     const gall = req.body as GallUpsertFields;
     try {
+        const session = await getSession({ req });
+        if (!session) {
+            res.status(401).end();
+        }
+
         const connectIfNotNull = (fieldName: string, value: string | undefined) => {
             if (value) {
                 return { connect: { [fieldName]: value } };

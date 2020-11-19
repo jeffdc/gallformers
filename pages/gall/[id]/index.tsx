@@ -22,6 +22,7 @@ import Link from 'next/link';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
 import db from '../../../libs/db/db';
+import { formatCSV } from '../../../libs/db/utils';
 import { linkTextFromGlossary } from '../../../libs/glossary';
 import { deserialize, serialize } from '../../../libs/reactserialize';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
@@ -81,7 +82,8 @@ const Gall = ({ gall }: Props): JSX.Element => {
                     <Container className="p-3 border">
                         <Row>
                             <Col>
-                                <h1>{gall.species.name}</h1>
+                                <h2>{gall.species.name}</h2>
+                                {gall.species.commonnames ? `(${formatCSV(gall.species.commonnames)})` : ''}
                             </Col>
                             <Col className="text-right font-italic">
                                 Family:
@@ -132,15 +134,9 @@ const Gall = ({ gall }: Props): JSX.Element => {
                                 <ListGroup>
                                     {gall.species.speciessource.map((speciessource) => (
                                         <ListGroup.Item key={speciessource.source_id}>
-                                            {speciessource.source.link === null ||
-                                            speciessource.source.link === undefined ||
-                                            speciessource.source.link.length === 0 ? (
-                                                speciessource.source.citation + ' (no link)'
-                                            ) : (
-                                                <Link href={`/source/${speciessource.source.id}`}>
-                                                    <a>{speciessource.source.citation}</a>
-                                                </Link>
-                                            )}
+                                            <Link href={`/source/${speciessource.source.id}`}>
+                                                <a>{speciessource.source.citation}</a>
+                                            </Link>
                                         </ListGroup.Item>
                                     ))}
                                 </ListGroup>

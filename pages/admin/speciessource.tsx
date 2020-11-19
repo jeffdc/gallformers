@@ -24,7 +24,7 @@ const Schema = yup.object().shape({
 
 const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
     const [results, setResults] = useState(new Array<speciessource>());
-    const { handleSubmit, errors, control } = useForm({
+    const { handleSubmit, errors, control, register } = useForm({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
@@ -98,6 +98,12 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                             isInvalid={!!errors.sources}
                         />
                         {errors.sources && <span className="text-danger">You must provide a least one source to map.</span>}
+                    </Col>
+                </Row>
+                <Row className="form-group">
+                    <Col>
+                        Description (this is the relevant info from the selected Source about the selected Species):
+                        <textarea name="description" className="form-control" ref={register} rows={8} />
                     </Col>
                 </Row>
                 <Row className="form-group">

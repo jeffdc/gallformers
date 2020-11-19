@@ -45,37 +45,3 @@ export default function Home(): JSX.Element {
         </div>
     );
 }
-
-//TODO was using this a hack way to run migrations when needed in development. this is obviosuly not sustainable.
-// export async function getStaticProps() {
-//   //TODO all of this needs to go away and a better way to handle migrations that is not dependent on better-sqlite-helper is needed
-//   // eslint-disable-next-line @typescript-eslint/no-var-requires
-//   const Database = require('better-sqlite3-helper');
-//   const dbPath = `${process.cwd()}/prisma/gallformers.sqlite`;
-
-//   const config = {
-//     path: dbPath,
-//     readonly: false,
-//     fileMustExist: false,
-//     WAL: false,
-//     migrate: {
-//       force: true,
-//       table: 'migration',
-//       migrationPath: './migrations'
-//     }
-//   };
-
-//   // hack to force flush migrations. :(
-//   const hack = new Database(config);
-//   const colors = hack.prepare("select * from color;").all();
-//   console.log(`colors: ${JSON.stringify(colors, null, '  ')})`);
-//   hack.close();
-//   const DB = new Database(config);
-//   console.log(`Initing DB ${JSON.stringify(DB, null, '  ')}`);
-
-//   return {
-//     props: {
-
-//     }
-//   }
-// }

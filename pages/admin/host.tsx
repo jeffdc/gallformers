@@ -1,6 +1,6 @@
 import { abundance, family, species } from '@prisma/client';
 import { GetServerSideProps } from 'next';
-import React from 'react';
+import React, { useState } from 'react';
 import { Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import { allFamilies } from '../../libs/db/family';
@@ -31,6 +31,9 @@ const Schema = yup.object().shape({
 });
 
 const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
+    const [existing, setExisting] = useState(false);
+    const [deleteResults, setDeleteResults] = useState();
+
     const { register, handleSubmit, setValue, errors, control } = useForm({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
@@ -49,21 +52,34 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
 
     const onSubmit = async (data: SpeciesUpsertFields) => {
         try {
-            const res = await fetch('../api/host/upsert', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data),
-            });
+            if (data.delete) {
+                const id = hosts.find((h) => h.name === data.name)?.id;
+                const res = await fetch(`../api/host/${id}`, {
+                    method: 'DELETE',
+                });
 
-            if (res.status === 200) {
-                router.push(res.url);
+                if (res.status === 200) {
+                    setDeleteResults(await res.json());
+                } else {
+                    throw new Error(await res.text());
+                }
             } else {
-                throw new Error(await res.text());
+                const res = await fetch('../api/host/upsert', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                });
+
+                if (res.status === 200) {
+                    router.push(res.url);
+                } else {
+                    throw new Error(await res.text());
+                }
             }
         } catch (e) {
-            console.log(e);
+            console.error(e);
         }
     };
 
@@ -78,8 +94,10 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
                             control={control}
                             name="name"
                             onChange={(e) => {
+                                setExisting(false);
                                 const f = hosts.find((f) => f.name === e[0]);
                                 if (f) {
+                                    setExisting(true);
                                     setFamily(f.family_id);
                                     setAbundance(f.abundance_id);
                                     setValue('commonnames', f.commonnames);
@@ -149,7 +167,7 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
                 <Row className="form-group">
                     <Col>
                         <p>Description:</p>
-                        <textarea name="description" className="form-control" ref={register} />
+                        <textarea name="description" className="form-control" ref={register} rows={8} />
                         {errors.description && (
                             <span className="text-danger">
                                 You must provide a description. You can add source references separately.
@@ -157,7 +175,20 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
                         )}
                     </Col>
                 </Row>
-                <input type="submit" className="button" />
+                <Row className="fromGroup" hidden={!existing}>
+                    <Col xs="1">Delete?:</Col>
+                    <Col className="mr-auto">
+                        <input name="delete" type="checkbox" className="form-check-input" ref={register} />
+                    </Col>
+                </Row>
+                <Row className="formGroup">
+                    <Col>
+                        <input type="submit" className="button" />
+                    </Col>
+                </Row>
+                <Row hidden={!deleteResults}>
+                    <Col>{`Deleted ${deleteResults ? deleteResults.name : 'host'}.`}</Col>
+                </Row>
             </form>
         </Auth>
     );

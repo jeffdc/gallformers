@@ -2,7 +2,11 @@
  * Types for calling the APIs. These are to be used by browser code when it calls the APIs.
  */
 
-export type SpeciesUpsertFields = {
+export type Deletable = {
+    delete: boolean;
+};
+
+export type SpeciesUpsertFields = Deletable & {
     id?: number;
     name: string;
     commonnames: string;

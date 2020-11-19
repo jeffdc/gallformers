@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "generate": "npx prisma generate",
-    "lint": "eslint '*/**/*.{js,ts,tsx}' --quiet --fix"
+    "lint": "eslint '*/**/*.{js,ts,tsx}' --quiet --fix",
+    "migrate": "node migrate.js",
+    "migrate-debug": "node --nolazy --inspect-brk=9229 migrate.js"
   },
   "dependencies": {
     "@hookform/error-message": "^0.0.4",
@@ -43,7 +45,10 @@
     "eslint-plugin-prettier": "^3.1.4",
     "eslint-plugin-react": "^7.21.5",
     "prettier": "^2.1.2",
-    "typescript": "^4.0.3"
+    "typescript": "^4.0.3",
+    "better-sqlite3": "^7.1.1",
+    "better-sqlite3-helper": "^3.1.1",
+    "sqlite": "^4.0.15"
   },
   "typings": "types/react-bootstrap-typeahead.d.ts"
 }

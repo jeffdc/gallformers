@@ -165,4 +165,5 @@ model speciessource {
   source_id  Int?
   source     source?  @relation(fields: [source_id], references: [id])
   species    species? @relation(fields: [species_id], references: [id])
+  description String?
 }

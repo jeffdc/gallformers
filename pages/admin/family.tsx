@@ -78,7 +78,7 @@ const Family = ({ families }: Props): JSX.Element => {
                             newSelectionPrefix="Add a new Family: "
                             allowNew={true}
                         />
-                        {errors.name && <span className="text-danger">The Name is required. {JSON.stringify(errors)}</span>}
+                        {errors.name && <span className="text-danger">The Name is required.</span>}
                     </Col>
                 </Row>
                 <Row className="form-group">
