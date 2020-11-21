@@ -118,3 +118,9 @@ export type FamilyUpsertFields = {
 export type DeleteResults = {
     name: string;
 };
+
+export type GlossaryEntryUpsertFields = Deletable & {
+    word: string;
+    definition: string;
+    urls: string; // newline separated
+};

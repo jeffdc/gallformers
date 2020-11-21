@@ -31,6 +31,9 @@ const Admin = (): JSX.Element => {
                             <ListGroupItem>
                                 Create <Link href="./admin/speciessource">Species-Source Mappings</Link>
                             </ListGroupItem>
+                            <ListGroupItem>
+                                Create/modify <Link href="./admin/glossary">Glossary Entries</Link>
+                            </ListGroupItem>
                         </ListGroup>
                     </Col>
                 </Row>

@@ -16,7 +16,7 @@ export const allGlossaryEntries = async (): Promise<Entry[]> => {
             return gs.map((g) => {
                 return {
                     ...g,
-                    urls: g.urls.split('\t'),
+                    urls: g.urls.split('\n'),
                 };
             });
         });

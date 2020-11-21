@@ -49,6 +49,16 @@ The datastore is a [sqlite](https://sqlite.org/index.html) database. The schema 
 
 The APIs for accessing the data from the front-end are implemented in [Prisma](https://www.prisma.io/) and are all called from the server (either statically rendered at build time or rendered on request if they could not be build statically, e.g., the search results).
 
+#### Database Schema Upates (Migrations)
+Changes to the schema must involve the follwoing steps:
+
+1. Create a new migration script in [migrations](migrations). It must be named such that it is one larger than the latest.
+1. Add all schema changes to the script. There is an `Up` and `Down` sections. The `Up` section is where all of the changes go and then use the `Down` section to undo those changes. This is so that if the `Up` part fails the migration can rollback the changes.
+1. Make the schema changes in the [schema.prisma](prisma/schema.prisma) file. These need to match the changes in the migration script.
+1. Test, test, test. It is recommend that that you run your `Up` script against a copy of the database to make sure it works as expected.
+1. Run `yarn migrate` to execute a migration.
+1. Run `yarn generate` to generate a new Prisma client.
+
 ### Backup Strategy
 TBD. For now manual snapshots of the block volume are all we have. All of the source is on github and the site can easily be re-created from scratch on a new instance from the files there. The only real back up needed is the database.
 
