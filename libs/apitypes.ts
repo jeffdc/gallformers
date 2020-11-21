@@ -91,9 +91,6 @@ export type GallApi =
           species: GallSpecies;
       })
     | null;
-/**
- * gall & { alignment: alignment | null; cells: cells | null; color: color | null; shape: shape | null; species: species & { ...; }; walls: walls | null; galllocation: { ...; }[]; galltexture: { ...; }[]; }) | null>
- */
 
 export type SourceUpsertFields = {
     title: string;

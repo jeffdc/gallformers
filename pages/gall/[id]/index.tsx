@@ -137,7 +137,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
     const gall: GallApi = await gallById(id);
 
     if (gall != null || gall != undefined) {
-        gall.species.description = serialize(linkTextFromGlossary(gall?.species.description));
+        gall.species.description = serialize(await linkTextFromGlossary(gall?.species.description));
     }
 
     return {

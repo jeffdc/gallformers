@@ -51,7 +51,7 @@ const Glossary = ({ es }: Props): JSX.Element => {
 export const getStaticProps: GetStaticProps = async () => {
     return {
         props: {
-            es: entriesWithLinkedDefs,
+            es: await entriesWithLinkedDefs(),
         },
         revalidate: 1,
     };

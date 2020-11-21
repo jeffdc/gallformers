@@ -167,3 +167,11 @@ model speciessource {
   species    species? @relation(fields: [species_id], references: [id])
   description String?
 }
+
+// Added in 003-gallformers.sql migration
+model glossary {
+  id          Int @id @default(autoincrement())
+  word        String @unique
+  definition  String
+  urls        String
+}

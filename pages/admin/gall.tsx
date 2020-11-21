@@ -11,22 +11,17 @@ import ControlledTypeahead from '../../components/controlledtypeahead';
 import { DeleteResults, GallRes, GallUpsertFields } from '../../libs/apitypes';
 import { allFamilies } from '../../libs/db/family';
 import { alignments, allGalls, cells, colors, locations, shapes, textures, walls } from '../../libs/db/gall';
-import { allHosts } from '../../libs/db/host';
+import { allHostsSimple, HostSimple } from '../../libs/db/host';
 import { abundances } from '../../libs/db/species';
 import { mightBeNull } from '../../libs/db/utils';
 import { GallFormFields, genOptions } from '../../libs/utils/forms';
 
 //TODO factor out the species form and allow it to be extended with what is needed for a gall as this code violates DRY a lot!
-type Host = {
-    id: number;
-    name: string;
-    commonnames: string;
-};
 
 type Props = {
     galls: species[];
     abundances: abundance[];
-    hosts: Host[];
+    hosts: HostSimple[];
     locations: location[];
     colors: color[];
     shapes: shape[];
@@ -88,7 +83,7 @@ const Gall = ({
     const [existing, setExisting] = useState(false);
     const [deleteResults, setDeleteResults] = useState<DeleteResults>();
 
-    function setValueForLookup<T>(
+    function setValueForLookup(
         field: FormFields,
         ids: (number | null | undefined)[] | undefined,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -370,21 +365,10 @@ const Gall = ({
 };
 
 export const getServerSideProps: GetServerSideProps = async () => {
-    const h = await allHosts();
-    const hosts: Host[] = h
-        .map((h) => {
-            return {
-                name: h.name,
-                id: h.id,
-                commonnames: mightBeNull(h.commonnames),
-            };
-        })
-        .sort((a, b) => a.name?.localeCompare(b.name));
-
     return {
         props: {
             galls: await allGalls(),
-            hosts: hosts,
+            hosts: await allHostsSimple(),
             families: await allFamilies(),
             locations: await locations(),
             colors: await colors(),
