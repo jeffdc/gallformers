@@ -1,9 +1,15 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { getSession } from 'next-auth/client';
 import { SpeciesSourceInsertFields } from '../../../libs/apitypes';
 import db from '../../../libs/db/db';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     try {
+        const session = await getSession({ req });
+        if (!session) {
+            res.status(401).end();
+        }
+
         const sourcespecies = req.body as SpeciesSourceInsertFields;
 
         const results = await Promise.all(

@@ -1,22 +1,29 @@
 import { yupResolver } from '@hookform/resolvers/yup';
+import { source } from '@prisma/client';
+import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
 import React from 'react';
 import { Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
+import ControlledTypeahead from '../../components/controlledtypeahead';
 import { SpeciesUpsertFields } from '../../libs/apitypes';
+import { allSources } from '../../libs/db/source';
 
 const Schema = yup.object().shape({
     title: yup.string().required(),
     author: yup.string().required(),
     pubyear: yup.string().matches(/([12][0-9]{3})/),
-    link: yup.string().url().required(),
     citation: yup.string().required(),
 });
 
-const Host = (): JSX.Element => {
-    const { register, handleSubmit, errors } = useForm({
+type Props = {
+    sources: source[];
+};
+
+const Host = ({ sources }: Props): JSX.Element => {
+    const { register, handleSubmit, errors, control, setValue } = useForm({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
@@ -39,7 +46,7 @@ const Host = (): JSX.Element => {
                 throw new Error(await res.text());
             }
         } catch (e) {
-            console.log(e);
+            console.error(e);
         }
     };
 
@@ -50,7 +57,25 @@ const Host = (): JSX.Element => {
                 <Row className="form-group">
                     <Col>
                         Title:
-                        <input type="text" placeholder="Title" name="title" className="form-control" ref={register} />
+                        <ControlledTypeahead
+                            control={control}
+                            name="title"
+                            onChange={(e) => {
+                                const f = sources.find((f) => f.title === e[0]);
+                                if (f) {
+                                    setValue('author', f.author);
+                                    setValue('pubyear', f.pubyear);
+                                    setValue('link', f.link);
+                                    setValue('citation', f.citation);
+                                }
+                            }}
+                            placeholder="Title"
+                            options={sources.map((f) => f.title)}
+                            clearButton
+                            isInvalid={!!errors.title}
+                            newSelectionPrefix="Add a new Source: "
+                            allowNew={true}
+                        />
                         {errors.title && <span className="text-danger">The Title is required.</span>}
                     </Col>
                 </Row>
@@ -70,13 +95,16 @@ const Host = (): JSX.Element => {
                     <Col>
                         Reference Link:
                         <input type="text" placeholder="Link" name="link" className="form-control" ref={register} />
-                        {errors.link && <span className="text-danger">You must provide a valid URL link.</span>}
                     </Col>
                 </Row>
                 <Row className="form-group">
                     <Col>
                         <p>
-                            Citation (<a href="https://www.mybib.com/tools/mla-citation-generator">MLA Form</a>):
+                            Citation (
+                            <a href="https://www.mybib.com/tools/mla-citation-generator" target="_blank" rel="noreferrer">
+                                MLA Form
+                            </a>
+                            ):
                         </p>
                         <input type="text" placeholder="Citation" name="citation" className="form-control" ref={register} />
                         {errors.citation && <span className="text-danger">You must provide a citation in MLA form.</span>}
@@ -86,6 +114,14 @@ const Host = (): JSX.Element => {
             </form>
         </Auth>
     );
+};
+
+export const getServerSideProps: GetServerSideProps = async () => {
+    return {
+        props: {
+            sources: await allSources(),
+        },
+    };
 };
 
 export default Host;

@@ -42,10 +42,8 @@ const Host = ({ host }: Props): JSX.Element => {
                     <Container className="p-3 border">
                         <Row>
                             <Col>
-                                <h1>
-                                    {host.name}
-                                    {host.commonnames ? ` - (${formatCSV(host.commonnames)})` : ''}
-                                </h1>
+                                <h2>{host.name}</h2>
+                                {host.commonnames ? `(${formatCSV(host.commonnames)})` : ''}
                             </Col>
                             Family:
                             <Link key={host.family.id} href={`/family/${host.family.id}`}>

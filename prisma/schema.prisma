@@ -1,6 +1,6 @@
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["connectOrCreate", "transactionApi"]
+  previewFeatures = ["transactionApi"]
 }
 
 datasource db {
@@ -106,7 +106,7 @@ model species {
 
 model gall {
   id           Int            @id @default(autoincrement())
-  species_id   Int
+  species_id   Int            @unique
   taxoncode    String
   detachable   Int?
   alignment_id Int?
@@ -165,4 +165,13 @@ model speciessource {
   source_id  Int?
   source     source?  @relation(fields: [source_id], references: [id])
   species    species? @relation(fields: [species_id], references: [id])
+  description String?
+}
+
+// Added in 003-gallformers.sql migration
+model glossary {
+  id          Int @id @default(autoincrement())
+  word        String @unique
+  definition  String
+  urls        String
 }

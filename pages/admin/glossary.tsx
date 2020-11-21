@@ -1,5 +1,4 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { family } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
@@ -8,26 +7,21 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { DeleteResults } from '../../libs/apitypes';
-import { allFamilies } from '../../libs/db/family';
-import { genOptions } from '../../libs/utils/forms';
+import { DeleteResults, GlossaryEntryUpsertFields } from '../../libs/apitypes';
+import { allGlossaryEntries, Entry } from '../../libs/db/glossary';
 
 const Schema = yup.object().shape({
-    name: yup.string().required(),
-    description: yup.string().required(),
+    word: yup.string().required(),
+    definition: yup.string().required(),
+    urls: yup.string().required(),
 });
 
-type Family = {
-    id: number;
-    description: string;
-};
-
 type Props = {
-    families: family[];
+    glossary: Entry[];
 };
 
-const Family = ({ families }: Props): JSX.Element => {
-    if (!families) throw new Error(`The input props for families can not be null or undefined.`);
+const Glossary = ({ glossary }: Props): JSX.Element => {
+    if (!glossary) throw new Error(`The input props for glossary edit can not be null or undefined.`);
 
     const [existing, setExisting] = useState(false);
     const [deleteResults, setDeleteResults] = useState<DeleteResults>();
@@ -39,11 +33,11 @@ const Family = ({ families }: Props): JSX.Element => {
 
     const router = useRouter();
 
-    const onSubmit = async (data: { name: string; description: string; delete: boolean }) => {
+    const onSubmit = async (data: GlossaryEntryUpsertFields) => {
         try {
             if (data.delete) {
-                const id = families.find((f) => f.name === data.name)?.id;
-                const res = await fetch(`../api/family/${id}`, {
+                const id = glossary.find((e) => e.word === data.word)?.id;
+                const res = await fetch(`../api/glossary/${id}`, {
                     method: 'DELETE',
                 });
 
@@ -53,7 +47,7 @@ const Family = ({ families }: Props): JSX.Element => {
                     throw new Error(await res.text());
                 }
             } else {
-                const res = await fetch('../api/family/upsert', {
+                const res = await fetch('../api/glossary/upsert', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -76,38 +70,46 @@ const Family = ({ families }: Props): JSX.Element => {
     return (
         <Auth>
             <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
-                <h4>Add A Family</h4>
+                <h4>Add/Modify Glossary Entries</h4>
                 <Row className="form-group">
                     <Col>
                         Name:
                         <ControlledTypeahead
                             control={control}
-                            name="name"
+                            name="word"
                             onChange={(e) => {
                                 setExisting(false);
-                                const f = families.find((f) => f.name === e[0]);
+                                const f = glossary.find((f) => f.word === e[0]);
                                 if (f) {
                                     setExisting(true);
-                                    setValue('description', f.description);
+                                    setValue('definition', f.definition);
+                                    setValue('urls', f.urls.join('\n'));
+                                } else {
+                                    setValue('definition', '');
+                                    setValue('urls', '');
                                 }
                             }}
-                            placeholder="Name"
-                            options={families.map((f) => f.name)}
+                            placeholder="Word"
+                            options={glossary.map((f) => f.word)}
                             clearButton
-                            isInvalid={!!errors.name}
-                            newSelectionPrefix="Add a new Family: "
+                            isInvalid={!!errors.word}
+                            newSelectionPrefix="Add a new Word: "
                             allowNew={true}
                         />
-                        {errors.name && <span className="text-danger">The Name is required.</span>}
+                        {errors.word && <span className="text-danger">The Word is required.</span>}
                     </Col>
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        Description:
-                        <select name="description" className="form-control" ref={register}>
-                            {genOptions(['Beetle', 'Fly', 'Midge', 'Mite', 'Moth', 'Plant', 'Scale', 'Wasp'])}
-                        </select>
-                        {errors.description && <span className="text-danger">You must provide the description.</span>}
+                        Definition:
+                        <textarea name="definition" className="form-control" ref={register} rows={4} />
+                        {errors.defintion && <span className="text-danger">You must provide the defintion.</span>}
+                    </Col>
+                </Row>
+                <Row className="form-group">
+                    <Col>
+                        URLs (separated by a newline [enter]):
+                        <textarea name="urls" className="form-control" ref={register} rows={3} />
                     </Col>
                 </Row>
                 <Row className="fromGroup" hidden={!existing}>
@@ -132,8 +134,8 @@ const Family = ({ families }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
-            families: await allFamilies(),
+            glossary: await allGlossaryEntries(),
         },
     };
 };
-export default Family;
+export default Glossary;

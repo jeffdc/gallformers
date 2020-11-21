@@ -1,73 +1,31 @@
-import {
-    abundance,
-    alignment,
-    cells,
-    color,
-    family,
-    gall,
-    galllocation,
-    galltexture,
-    host,
-    location,
-    PrismaClient,
-    shape,
-    source,
-    species,
-    speciessource,
-    texture,
-    walls,
-} from '@prisma/client';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
-import db from '../../../libs/db/db';
+import { GallApi, GallHost } from '../../../libs/apitypes';
+import { allGallIds, gallById } from '../../../libs/db/gall';
+import { formatCSV } from '../../../libs/db/utils';
 import { linkTextFromGlossary } from '../../../libs/glossary';
 import { deserialize, serialize } from '../../../libs/reactserialize';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
-type SourceProp = speciessource & {
-    source: source;
-};
-type HostProp = host & {
-    hostspecies: species;
-};
-type SpeciesProps = species & {
-    abundance: abundance;
-    family: family;
-    hosts: HostProp[];
-    speciessource: SourceProp[];
-};
-type LocationProps = galllocation & {
-    location: location;
-};
-type TextureProps = galltexture & {
-    texture: texture;
-};
-
-type GallProps = gall & {
-    species: SpeciesProps;
-    alignment: alignment;
-    cells: cells;
-    color: color;
-    galllocation: LocationProps[];
-    shape: shape;
-    galltexture: TextureProps[];
-    walls: walls;
-};
 type Props = {
-    gall: GallProps;
+    gall: GallApi;
 };
 
-function hostAsLink(h: HostProp) {
+function hostAsLink(h: GallHost) {
     return (
         <Link key={h.host_species_id} href={`/host/${h.host_species_id}`}>
-            <a>{h.hostspecies.name} </a>
+            <a>{h.hostspecies?.name} </a>
         </Link>
     );
 }
 
 const Gall = ({ gall }: Props): JSX.Element => {
+    if (!gall) {
+        console.error('Failed to fetch gall from backend.');
+        return <div>Oops</div>;
+    }
     return (
         <div
             style={{
@@ -81,7 +39,8 @@ const Gall = ({ gall }: Props): JSX.Element => {
                     <Container className="p-3 border">
                         <Row>
                             <Col>
-                                <h1>{gall.species.name}</h1>
+                                <h2>{gall.species.name}</h2>
+                                {gall.species.commonnames ? `(${formatCSV(gall.species.commonnames)})` : ''}
                             </Col>
                             <Col className="text-right font-italic">
                                 Family:
@@ -114,13 +73,13 @@ const Gall = ({ gall }: Props): JSX.Element => {
                         </Row>
                         <Row>
                             <Col>
-                                <strong>Location:</strong> {gall.galllocation.map((l) => l.location.location).join(', ')}
+                                <strong>Location:</strong> {gall.galllocation.map((l) => l.location?.location).join(', ')}
                             </Col>
                             <Col>
                                 <strong>Walls:</strong> {gall.walls?.walls}
                             </Col>
                             <Col>
-                                <strong>Abdundance:</strong> {gall.species?.abundance}
+                                <strong>Abdundance:</strong> {gall.species?.abundance?.abundance}
                             </Col>
                             <Col>
                                 <strong>Shape:</strong> {gall.shape?.shape}
@@ -132,15 +91,9 @@ const Gall = ({ gall }: Props): JSX.Element => {
                                 <ListGroup>
                                     {gall.species.speciessource.map((speciessource) => (
                                         <ListGroup.Item key={speciessource.source_id}>
-                                            {speciessource.source.link === null ||
-                                            speciessource.source.link === undefined ||
-                                            speciessource.source.link.length === 0 ? (
-                                                speciessource.source.citation + ' (no link)'
-                                            ) : (
-                                                <Link href={`/source/${speciessource.source.id}`}>
-                                                    <a>{speciessource.source.citation}</a>
-                                                </Link>
-                                            )}
+                                            <Link href={`/source/${speciessource.source?.id}`}>
+                                                <a>{speciessource.source?.citation}</a>
+                                            </Link>
                                         </ListGroup.Item>
                                     ))}
                                 </ListGroup>
@@ -181,43 +134,10 @@ export const getStaticProps: GetStaticProps = async (context) => {
     }
 
     const id = context.params.id as string;
-    const gall = await db.gall.findFirst({
-        include: {
-            species: {
-                include: {
-                    abundance: true,
-                    family: true,
-                    speciessource: {
-                        include: {
-                            source: true,
-                        },
-                    },
-                    hosts: {
-                        include: {
-                            hostspecies: true,
-                        },
-                    },
-                },
-            },
-            alignment: true,
-            cells: true,
-            color: true,
-            galllocation: {
-                select: { location: true },
-            },
-            shape: true,
-            galltexture: {
-                select: { texture: true },
-            },
-            walls: true,
-        },
-        where: {
-            species_id: { equals: parseInt(id) },
-        },
-    });
+    const gall: GallApi = await gallById(id);
 
     if (gall != null || gall != undefined) {
-        gall.species.description = serialize(linkTextFromGlossary(gall?.species.description));
+        gall.species.description = serialize(await linkTextFromGlossary(gall?.species.description));
     }
 
     return {
@@ -229,14 +149,10 @@ export const getStaticProps: GetStaticProps = async (context) => {
 };
 
 export const getStaticPaths: GetStaticPaths = async () => {
-    const galls = await db.gall.findMany({
-        select: {
-            species_id: true,
-        },
-    });
+    const galls = await allGallIds();
 
-    const paths = galls.map((gall) => ({
-        params: { id: gall.species_id.toString() },
+    const paths = galls.map((id) => ({
+        params: { id: id },
     }));
 
     return { paths, fallback: false };

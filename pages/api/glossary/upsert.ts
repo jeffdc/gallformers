@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from 'next-auth/client';
-import { FamilyUpsertFields } from '../../../libs/apitypes';
+import { GlossaryEntryUpsertFields } from '../../../libs/apitypes';
 import db from '../../../libs/db/db';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
@@ -10,20 +10,22 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             res.status(401).end();
         }
 
-        const family = req.body as FamilyUpsertFields;
+        const entry = req.body as GlossaryEntryUpsertFields;
 
-        const f = await db.family.upsert({
-            where: { name: family.name },
+        const f = await db.glossary.upsert({
+            where: { word: entry.word },
             update: {
-                description: family.description,
+                definition: entry.definition,
+                urls: entry.urls,
             },
             create: {
-                name: family.name,
-                description: family.description,
+                word: entry.word,
+                definition: entry.definition,
+                urls: entry.urls,
             },
         });
 
-        res.status(200).redirect(`/family/${f.id}`).end();
+        res.status(200).redirect(`/glossary#${entry.word}`).end();
     } catch (e) {
         res.status(500).json({ error: e.message });
     }

@@ -8,7 +8,6 @@ import CardTextCollapse from '../components/cardcollapse';
 import db from '../libs/db/db';
 import { entriesWithLinkedDefs, EntryLinked } from '../libs/glossary';
 import { deserialize } from '../libs/reactserialize';
-import { SearchQuery } from '../libs/types';
 
 type SpeciesProp = species & {
     gall: gall[];
@@ -18,7 +17,6 @@ type SpeciesProp = species & {
 
 type Props = {
     species: SpeciesProp[];
-    query: SearchQuery;
     glossary: EntryLinked[];
 };
 
@@ -54,7 +52,7 @@ const glossaryEntries = (entries: EntryLinked[]) => {
     }
 };
 
-const GlobalSearch = ({ species, query, glossary }: Props): JSX.Element => {
+const GlobalSearch = ({ species, glossary }: Props): JSX.Element => {
     if (species.length == 0 && glossary.length == 0) {
         return <h1>No results</h1>;
     }
@@ -98,14 +96,13 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
         },
     });
 
-    const glossary = entriesWithLinkedDefs.filter((e) => {
+    const glossary = (await entriesWithLinkedDefs()).filter((e) => {
         return e.word === search || e.definition.includes(search);
     });
 
     return {
         props: {
             species: species,
-            query: q,
             glossary: glossary == undefined ? [] : glossary,
         },
     };

@@ -1,31 +1,27 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { abundance, alignment, color, location, shape, texture, walls as ws, cells as cs, family } from '@prisma/client';
+import { abundance, alignment, cells as cs, color, family, location, shape, species, texture, walls as ws } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
-import React from 'react';
+import React, { useState } from 'react';
 import { Col, Row } from 'react-bootstrap';
-import { Typeahead } from 'react-bootstrap-typeahead';
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
-import { GallUpsertFields } from '../../libs/apitypes';
+import ControlledTypeahead from '../../components/controlledtypeahead';
+import { DeleteResults, GallRes, GallUpsertFields } from '../../libs/apitypes';
 import { allFamilies } from '../../libs/db/family';
-import { alignments, cells, colors, locations, shapes, textures, walls } from '../../libs/db/gall';
-import { allHosts } from '../../libs/db/host';
+import { alignments, allGalls, cells, colors, locations, shapes, textures, walls } from '../../libs/db/gall';
+import { allHostsSimple, HostSimple } from '../../libs/db/host';
 import { abundances } from '../../libs/db/species';
 import { mightBeNull } from '../../libs/db/utils';
-import { GallFormFields, genOptions, normalizeToArray } from '../../libs/utils/forms';
+import { GallFormFields, genOptions } from '../../libs/utils/forms';
 
 //TODO factor out the species form and allow it to be extended with what is needed for a gall as this code violates DRY a lot!
-type Host = {
-    id: number;
-    name: string;
-    commonnames: string;
-};
 
 type Props = {
+    galls: species[];
     abundances: abundance[];
-    hosts: Host[];
+    hosts: HostSimple[];
     locations: location[];
     colors: color[];
     shapes: shape[];
@@ -47,7 +43,26 @@ const extractGenus = (n: string): string => {
     return n.split(' ')[0];
 };
 
+type FormFields =
+    | 'name'
+    | 'genus'
+    | 'family'
+    | 'abundance'
+    | 'commonnames'
+    | 'synonmys'
+    | 'hosts'
+    | 'detachable'
+    | 'walls'
+    | 'cells'
+    | 'alignment'
+    | 'shape'
+    | 'color'
+    | 'locations'
+    | 'textures'
+    | 'description';
+
 const Gall = ({
+    galls,
     hosts,
     locations,
     colors,
@@ -65,7 +80,69 @@ const Gall = ({
     });
     const router = useRouter();
 
+    const [existing, setExisting] = useState(false);
+    const [deleteResults, setDeleteResults] = useState<DeleteResults>();
+
+    function setValueForLookup(
+        field: FormFields,
+        ids: (number | null | undefined)[] | undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        lookup: any[],
+        valField: string,
+    ) {
+        if (!ids) return;
+
+        const vals = ids.map((id) => {
+            const val = lookup.find((v) => v.id === id);
+            if (val) {
+                return val[valField];
+            } else if (!id) {
+                // was an invalid id so do not care
+                return undefined;
+            } else {
+                throw new Error(`Failed to lookup for ${field}.`);
+            }
+        });
+        if (vals && vals.length > 0 && vals[0]) {
+            setValue(field, vals);
+        }
+    }
+
+    const setGallDetails = async (spid: number): Promise<void> => {
+        try {
+            const res = await fetch(`../api/gall?speciesid=${spid}`);
+            const gall = (await res.json()) as GallRes;
+
+            setValue('detachable', gall.detachable);
+            setValueForLookup('walls', [gall.walls_id], walls, 'walls');
+            setValueForLookup('cells', [gall.cells_id], cells, 'cells');
+            setValueForLookup('alignment', [gall.alignment_id], alignments, 'alignment');
+            setValueForLookup('color', [gall.color_id], colors, 'color');
+            setValueForLookup('shape', [gall.shape_id], shapes, 'shape');
+            setValueForLookup('locations', gall.locations, locations, 'location');
+            setValueForLookup('textures', gall.textures, textures, 'texture');
+            setValueForLookup('hosts', gall.hosts, hosts, 'name');
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
     const onSubmit = async (data: GallFormFields) => {
+        if (data.delete) {
+            const id = galls.find((g) => g.name === data.name)?.id;
+            const res = await fetch(`../api/gall/${id}`, {
+                method: 'DELETE',
+            });
+
+            if (res.status === 200) {
+                setDeleteResults(await res.json());
+            } else {
+                throw new Error(await res.text());
+            }
+        }
+
+        const species = galls.find((g) => g.name === data.name);
+
         const submitData: GallUpsertFields = {
             ...data,
             // i hate null... :( these should be safe since the text values came from the same place as the ids
@@ -75,6 +152,7 @@ const Gall = ({
             locations: data.locations.map((l) => locations.find((ll) => ll.location === l)!.id),
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             textures: data.textures.map((t) => textures.find((tt) => tt.texture === t)!.id),
+            id: species ? species.id : undefined,
         };
         try {
             const res = await fetch('../api/gall/upsert', {
@@ -91,7 +169,7 @@ const Gall = ({
                 throw new Error(await res.text());
             }
         } catch (e) {
-            console.log(e);
+            console.error(e);
         }
     };
 
@@ -102,13 +180,33 @@ const Gall = ({
                 <Row className="form-group">
                     <Col>
                         Name (binomial):
-                        <input
-                            type="text"
-                            placeholder="Name"
+                        <ControlledTypeahead
+                            control={control}
                             name="name"
-                            className="form-control"
-                            onBlur={(e) => (!errors.name ? setValue('genus', extractGenus(e.target.value)) : undefined)}
-                            ref={register}
+                            onChange={(e) => {
+                                const f = galls.find((f) => f.name === e[0]);
+                                setExisting(false);
+                                if (f) {
+                                    setExisting(true);
+                                    setValueForLookup('family', [f.family_id], families, 'name');
+                                    setValueForLookup('abundance', [f.abundance_id as number | undefined], abundances, 'name');
+                                    setValue('commonnames', f.commonnames);
+                                    setValue('synonyms', f.synonyms);
+                                    setGallDetails(f.id);
+                                    setValue('description', f.description);
+                                }
+                            }}
+                            onBlur={(e) => {
+                                if (!errors.name) {
+                                    setValue('genus', extractGenus(e.target.value));
+                                }
+                            }}
+                            placeholder="Name"
+                            options={galls.map((f) => f.name)}
+                            clearButton
+                            isInvalid={!!errors.name}
+                            newSelectionPrefix="Add a new Gall: "
+                            allowNew={true}
                         />
                         {errors.name && (
                             <span className="text-danger">
@@ -158,25 +256,13 @@ const Gall = ({
                 <Row className="form-group">
                     <Col>
                         Hosts:
-                        <Controller
+                        <ControlledTypeahead
                             control={control}
                             name="hosts"
-                            defaultValue={[]}
-                            render={({ value, onChange, onBlur }) => (
-                                <Typeahead
-                                    onChange={(e: string | string[]) => {
-                                        onChange(e);
-                                    }}
-                                    onBlur={onBlur}
-                                    selected={normalizeToArray(value)}
-                                    placeholder="Hosts"
-                                    id="Hosts"
-                                    options={hosts.map((h) => h.name)}
-                                    multiple
-                                    clearButton
-                                    isInvalid={!!errors.hosts}
-                                />
-                            )}
+                            placeholder="Hosts"
+                            options={hosts.map((h) => h.name)}
+                            multiple
+                            clearButton
                         />
                     </Col>
                 </Row>
@@ -227,51 +313,31 @@ const Gall = ({
                 <Row className="form-group">
                     <Col>
                         Location(s):
-                        <Controller
+                        <ControlledTypeahead
                             control={control}
                             name="locations"
-                            defaultValue={[]}
-                            render={({ value, onChange }) => (
-                                <Typeahead
-                                    onChange={(e: string | string[]) => {
-                                        onChange(e);
-                                    }}
-                                    selected={normalizeToArray(value)}
-                                    placeholder="Location(s)"
-                                    id="Locations"
-                                    options={locations.map((l) => l.location)}
-                                    multiple
-                                    clearButton
-                                />
-                            )}
+                            placeholder="Location(s)"
+                            options={locations.map((l) => l.location)}
+                            multiple
+                            clearButton
                         />
                     </Col>
                     <Col>
                         Texture(s):
-                        <Controller
+                        <ControlledTypeahead
                             control={control}
                             name="textures"
-                            defaultValue={[]}
-                            render={({ value, onChange }) => (
-                                <Typeahead
-                                    onChange={(e: string | string[]) => {
-                                        onChange(e);
-                                    }}
-                                    selected={normalizeToArray(value)}
-                                    placeholder="Texture(s)"
-                                    id="Textures"
-                                    options={textures.map((t) => t.texture)}
-                                    multiple
-                                    clearButton
-                                />
-                            )}
+                            placeholder="Texture(s)"
+                            options={textures.map((t) => t.texture)}
+                            multiple
+                            clearButton
                         />
                     </Col>
                 </Row>
                 <Row className="form-group">
                     <Col>
                         Description:
-                        <textarea name="description" className="form-control" ref={register} />
+                        <textarea name="description" className="form-control" ref={register} rows={8} />
                         {errors.description && (
                             <span className="text-danger">
                                 You must provide a description. You can add source references separately.
@@ -279,27 +345,30 @@ const Gall = ({
                         )}
                     </Col>
                 </Row>
-                <input type="submit" className="button" />
+                <Row className="fromGroup" hidden={!existing}>
+                    <Col xs="1">Delete?:</Col>
+                    <Col className="mr-auto">
+                        <input name="delete" type="checkbox" className="form-check-input" ref={register} />
+                    </Col>
+                </Row>
+                <Row className="formGroup">
+                    <Col>
+                        <input type="submit" className="button" />
+                    </Col>
+                </Row>
+                <Row hidden={!deleteResults}>
+                    <Col>{`Deleted ${deleteResults?.name}.`}</Col>
+                </Row>
             </form>
         </Auth>
     );
 };
 
 export const getServerSideProps: GetServerSideProps = async () => {
-    const h = await allHosts();
-    const hosts: Host[] = h
-        .map((h) => {
-            return {
-                name: h.name,
-                id: h.id,
-                commonnames: mightBeNull(h.commonnames),
-            };
-        })
-        .sort((a, b) => a.name?.localeCompare(b.name));
-
     return {
         props: {
-            hosts: hosts,
+            galls: await allGalls(),
+            hosts: await allHostsSimple(),
             families: await allFamilies(),
             locations: await locations(),
             colors: await colors(),
