@@ -10,7 +10,7 @@ WORKDIR /usr/src/app
 COPY package.json ./
 COPY yarn.lock ./
 # RUN node --stack-size=6000 $(which npm) --verbose install
-RUN yarn install 
+RUN yarn install --production=true
 
 # copy all the stuff
 COPY . .
