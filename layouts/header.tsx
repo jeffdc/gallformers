@@ -39,7 +39,7 @@ const Header = (): JSX.Element => {
                 <Navbar.Brand href="/">
                     <img src="../images/fly.svg" width="25px" height="25px" /> Gallformers
                 </Navbar.Brand>
-                <Nav.Link href="/id">Id</Nav.Link>
+                <Nav.Link href="/search2">Id</Nav.Link>
                 <Nav.Link href="/explore">Explore</Nav.Link>
                 <Form inline onSubmit={(e) => e.preventDefault()} className="ml-auto">
                     <FormControl

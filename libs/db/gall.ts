@@ -1,5 +1,24 @@
-import { alignment, cells as cs, color, location, shape, species, texture, walls as ws } from '@prisma/client';
+import {
+    alignment,
+    cells as cs,
+    color,
+    location,
+    shape,
+    species,
+    SpeciesDistinctFieldEnum,
+    texture,
+    walls as ws,
+} from '@prisma/client';
+import { GallApi } from '../apitypes';
 import db from './db';
+
+export const allGallIds = async (): Promise<string[]> => {
+    return db.species
+        .findMany({
+            where: { taxoncode: { equals: 'gall' } },
+        })
+        .then((sp) => sp.map((s) => s.id.toString()));
+};
 
 export const allGalls = async (): Promise<species[]> => {
     return db.species.findMany({
@@ -7,6 +26,58 @@ export const allGalls = async (): Promise<species[]> => {
         orderBy: { name: 'asc' },
     });
 };
+
+export const gallById = (id: string): Promise<GallApi> => {
+    return db.gall.findFirst({
+        include: {
+            alignment: true,
+            cells: true,
+            color: true,
+            walls: true,
+            shape: true,
+            species: {
+                include: {
+                    taxontype: true,
+                    family: true,
+                    abundance: true,
+                    speciessource: {
+                        include: {
+                            source: true,
+                        },
+                    },
+                    hosts: {
+                        include: {
+                            hostspecies: true,
+                        },
+                    },
+                },
+            },
+            galllocation: {
+                select: { location: true },
+            },
+            galltexture: {
+                select: { texture: true },
+            },
+        },
+        where: {
+            species_id: { equals: parseInt(id) },
+        },
+    });
+};
+
+export const allGallGenera = async (): Promise<string[]> => {
+    return db.species
+        .findMany({
+            select: {
+                genus: true,
+            },
+            distinct: [SpeciesDistinctFieldEnum.genus],
+            where: { taxoncode: { equals: 'gall' } },
+            orderBy: { genus: 'asc' },
+        })
+        .then((g) => g.map((g) => g.genus));
+};
+
 export const locations = async (): Promise<location[]> => {
     return db.location.findMany({
         orderBy: {

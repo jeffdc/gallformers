@@ -1,6 +1,6 @@
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["connectOrCreate", "transactionApi"]
+  previewFeatures = ["transactionApi"]
 }
 
 datasource db {

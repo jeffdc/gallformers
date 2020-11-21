@@ -9,7 +9,7 @@ import { genOptions } from '../../libs/utils/forms';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { useRouter } from 'next/router';
-import { SpeciesUpsertFields } from '../../libs/apitypes';
+import { DeleteResults, SpeciesUpsertFields } from '../../libs/apitypes';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import { allHosts } from '../../libs/db/host';
@@ -32,9 +32,9 @@ const Schema = yup.object().shape({
 
 const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
     const [existing, setExisting] = useState(false);
-    const [deleteResults, setDeleteResults] = useState();
+    const [deleteResults, setDeleteResults] = useState<DeleteResults>();
 
-    const { register, handleSubmit, setValue, errors, control } = useForm({
+    const { register, handleSubmit, setValue, errors, control, reset } = useForm({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
@@ -78,6 +78,7 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
                     throw new Error(await res.text());
                 }
             }
+            reset();
         } catch (e) {
             console.error(e);
         }
@@ -187,7 +188,7 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
                     </Col>
                 </Row>
                 <Row hidden={!deleteResults}>
-                    <Col>{`Deleted ${deleteResults ? deleteResults.name : 'host'}.`}</Col>
+                    <Col>{`Deleted ${deleteResults?.name}.`}</Col>
                 </Row>
             </form>
         </Auth>

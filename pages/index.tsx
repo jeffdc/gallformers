@@ -19,7 +19,7 @@ export default function Home(): JSX.Element {
                     <Col>
                         <Card>
                             <Card.Body>
-                                <Link href="id">
+                                <Link href="search2">
                                     <a>
                                         <h3>ID a Gall &rarr;</h3>
                                         <p>Try and get an ID for a gall by providing known information.</p>

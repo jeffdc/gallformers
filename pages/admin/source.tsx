@@ -46,7 +46,7 @@ const Host = ({ sources }: Props): JSX.Element => {
                 throw new Error(await res.text());
             }
         } catch (e) {
-            console.log(e);
+            console.error(e);
         }
     };
 

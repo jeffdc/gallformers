@@ -35,4 +35,5 @@ export type GallFormFields = SpeciesFormFields & {
     walls: string;
     cells: string;
     detachable: string;
+    delete?: boolean;
 };

@@ -2,12 +2,13 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { family } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
-import React from 'react';
+import React, { useState } from 'react';
 import { Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
+import { DeleteResults } from '../../libs/apitypes';
 import { allFamilies } from '../../libs/db/family';
 import { genOptions } from '../../libs/utils/forms';
 
@@ -28,28 +29,45 @@ type Props = {
 const Family = ({ families }: Props): JSX.Element => {
     if (!families) throw new Error(`The input props for families can not be null or undefined.`);
 
-    const { register, handleSubmit, errors, control, setValue } = useForm({
+    const [existing, setExisting] = useState(false);
+    const [deleteResults, setDeleteResults] = useState<DeleteResults>();
+
+    const { register, handleSubmit, errors, control, setValue, reset } = useForm({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
 
     const router = useRouter();
 
-    const onSubmit = async (data: { name: string; description: string }) => {
+    const onSubmit = async (data: { name: string; description: string; delete: boolean }) => {
         try {
-            const res = await fetch('../api/family/upsert', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data),
-            });
+            if (data.delete) {
+                const id = families.find((f) => f.name === data.name)?.id;
+                const res = await fetch(`../api/family/${id}`, {
+                    method: 'DELETE',
+                });
 
-            if (res.status === 200) {
-                router.push(res.url);
+                if (res.status === 200) {
+                    setDeleteResults(await res.json());
+                } else {
+                    throw new Error(await res.text());
+                }
             } else {
-                throw new Error(await res.text());
+                const res = await fetch('../api/family/upsert', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                });
+
+                if (res.status === 200) {
+                    router.push(res.url);
+                } else {
+                    throw new Error(await res.text());
+                }
             }
+            reset();
         } catch (e) {
             console.log(e);
         }
@@ -66,8 +84,10 @@ const Family = ({ families }: Props): JSX.Element => {
                             control={control}
                             name="name"
                             onChange={(e) => {
+                                setExisting(false);
                                 const f = families.find((f) => f.name === e[0]);
                                 if (f) {
+                                    setExisting(true);
                                     setValue('description', f.description);
                                 }
                             }}
@@ -90,7 +110,20 @@ const Family = ({ families }: Props): JSX.Element => {
                         {errors.description && <span className="text-danger">You must provide the description.</span>}
                     </Col>
                 </Row>
-                <input type="submit" className="button" />
+                <Row className="fromGroup" hidden={!existing}>
+                    <Col xs="1">Delete?:</Col>
+                    <Col className="mr-auto">
+                        <input name="delete" type="checkbox" className="form-check-input" ref={register} />
+                    </Col>
+                </Row>
+                <Row className="form-input">
+                    <Col>
+                        <input type="submit" className="button" />
+                    </Col>
+                </Row>
+                <Row hidden={!deleteResults}>
+                    <Col>{`Deleted ${deleteResults?.name}.`}</Col>☹️
+                </Row>
             </form>
         </Auth>
     );

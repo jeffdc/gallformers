@@ -2,13 +2,13 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { abundance, alignment, cells as cs, color, family, location, shape, species, texture, walls as ws } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
-import React from 'react';
+import React, { useState } from 'react';
 import { Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { GallRes, GallUpsertFields } from '../../libs/apitypes';
+import { DeleteResults, GallRes, GallUpsertFields } from '../../libs/apitypes';
 import { allFamilies } from '../../libs/db/family';
 import { alignments, allGalls, cells, colors, locations, shapes, textures, walls } from '../../libs/db/gall';
 import { allHosts } from '../../libs/db/host';
@@ -85,12 +85,16 @@ const Gall = ({
     });
     const router = useRouter();
 
-    const setValueForLookup = (
+    const [existing, setExisting] = useState(false);
+    const [deleteResults, setDeleteResults] = useState<DeleteResults>();
+
+    function setValueForLookup<T>(
         field: FormFields,
         ids: (number | null | undefined)[] | undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         lookup: any[],
         valField: string,
-    ) => {
+    ) {
         if (!ids) return;
 
         const vals = ids.map((id) => {
@@ -107,7 +111,7 @@ const Gall = ({
         if (vals && vals.length > 0 && vals[0]) {
             setValue(field, vals);
         }
-    };
+    }
 
     const setGallDetails = async (spid: number): Promise<void> => {
         try {
@@ -129,6 +133,19 @@ const Gall = ({
     };
 
     const onSubmit = async (data: GallFormFields) => {
+        if (data.delete) {
+            const id = galls.find((g) => g.name === data.name)?.id;
+            const res = await fetch(`../api/gall/${id}`, {
+                method: 'DELETE',
+            });
+
+            if (res.status === 200) {
+                setDeleteResults(await res.json());
+            } else {
+                throw new Error(await res.text());
+            }
+        }
+
         const species = galls.find((g) => g.name === data.name);
 
         const submitData: GallUpsertFields = {
@@ -173,7 +190,9 @@ const Gall = ({
                             name="name"
                             onChange={(e) => {
                                 const f = galls.find((f) => f.name === e[0]);
+                                setExisting(false);
                                 if (f) {
+                                    setExisting(true);
                                     setValueForLookup('family', [f.family_id], families, 'name');
                                     setValueForLookup('abundance', [f.abundance_id as number | undefined], abundances, 'name');
                                     setValue('commonnames', f.commonnames);
@@ -331,7 +350,20 @@ const Gall = ({
                         )}
                     </Col>
                 </Row>
-                <input type="submit" className="button" />
+                <Row className="fromGroup" hidden={!existing}>
+                    <Col xs="1">Delete?:</Col>
+                    <Col className="mr-auto">
+                        <input name="delete" type="checkbox" className="form-check-input" ref={register} />
+                    </Col>
+                </Row>
+                <Row className="formGroup">
+                    <Col>
+                        <input type="submit" className="button" />
+                    </Col>
+                </Row>
+                <Row hidden={!deleteResults}>
+                    <Col>{`Deleted ${deleteResults?.name}.`}</Col>
+                </Row>
             </form>
         </Auth>
     );

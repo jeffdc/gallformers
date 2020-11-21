@@ -2,8 +2,25 @@
  * Types for calling the APIs. These are to be used by browser code when it calls the APIs.
  */
 
+import {
+    abundance,
+    alignment,
+    cells,
+    color,
+    family,
+    gall,
+    host,
+    location,
+    shape,
+    source,
+    species,
+    speciessource,
+    texture,
+    walls,
+} from '@prisma/client';
+
 export type Deletable = {
-    delete: boolean;
+    delete?: boolean;
 };
 
 export type SpeciesUpsertFields = Deletable & {
@@ -43,6 +60,41 @@ export type GallRes = {
     hosts: (number | null)[] | undefined;
 };
 
+export type Source = speciessource & {
+    source: source | null;
+};
+export type GallHost = host & {
+    hostspecies: species | null;
+};
+export type GallSpecies = species & {
+    abundance: abundance | null;
+    family: family;
+    hosts: GallHost[];
+    speciessource: Source[];
+};
+export type GallLocation = {
+    location: location | null;
+};
+export type GallTexture = {
+    texture: texture | null;
+};
+
+export type GallApi =
+    | (gall & {
+          alignment: alignment | null;
+          cells: cells | null;
+          color: color | null;
+          shape: shape | null;
+          walls: walls | null;
+          galltexture: GallTexture[];
+          galllocation: GallLocation[];
+          species: GallSpecies;
+      })
+    | null;
+/**
+ * gall & { alignment: alignment | null; cells: cells | null; color: color | null; shape: shape | null; species: species & { ...; }; walls: walls | null; galllocation: { ...; }[]; galltexture: { ...; }[]; }) | null>
+ */
+
 export type SourceUpsertFields = {
     title: string;
     author: string;
@@ -64,4 +116,8 @@ export type HostInsertFields = {
 export type FamilyUpsertFields = {
     name: string;
     description: string;
+};
+
+export type DeleteResults = {
+    name: string;
 };

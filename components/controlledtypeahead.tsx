@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { FocusEvent, KeyboardEvent } from 'react';
 import { Typeahead } from 'react-bootstrap-typeahead';
 import { Control, Controller } from 'react-hook-form';
 
@@ -16,24 +16,21 @@ type TypeaheadCustomOption = {
     id: string;
 };
 
-export type BlurEvent = {
-    target: { value: string };
-};
-
-export type ChangeEvent = string | TypeaheadCustomOption | null;
-
-type Props = {
+export type ControlledTypeaheadProps = {
     name: string;
     placeholder: string;
-    control: Control<Record<string, any>>;
+    control: Control<Record<string, unknown>>;
     options: (string | null)[];
     multiple?: boolean;
     clearButton?: boolean;
     isInvalid?: boolean;
     allowNew?: boolean;
     newSelectionPrefix?: string;
-    onChange?: (e: ChangeEvent[]) => void;
-    onBlur?: (e: BlurEvent) => void;
+    disabled?: boolean;
+    onChange?: (e: string[]) => void;
+    onBlur?: (e: FocusEvent<HTMLInputElement>) => void;
+    onInputChange?: (text: string, e: Event) => void;
+    onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
 };
 
 /**
@@ -42,6 +39,8 @@ type Props = {
 const ControlledTypeahead = ({
     onChange,
     onBlur,
+    onInputChange,
+    onKeyDown,
     options,
     placeholder,
     name,
@@ -51,7 +50,8 @@ const ControlledTypeahead = ({
     isInvalid,
     allowNew,
     newSelectionPrefix,
-}: Props): JSX.Element => {
+    disabled,
+}: ControlledTypeaheadProps): JSX.Element => {
     return (
         <Controller
             control={control}
@@ -59,19 +59,27 @@ const ControlledTypeahead = ({
             defaultValue={[]}
             render={(data) => (
                 <Typeahead
-                    onChange={(e: ChangeEvent[]) => {
-                        if (onChange) onChange(e);
-
+                    onChange={(e: string[] | TypeaheadCustomOption[]) => {
                         // deal with the fact that we are allowing new values - I could not divine a better way.
-                        if (e && Array.isArray(e) && typeof e[0] === 'object') {
-                            data.onChange(e[0]?.label);
+                        console.log(e);
+                        if (e && e[0] && typeof e[0] === 'object') {
+                            const ee = (e[0] as TypeaheadCustomOption).label;
+                            if (onChange) onChange([ee]);
+                            data.onChange(ee);
                         } else {
-                            data.onChange(e);
+                            if (onChange) onChange(e as string[]);
+                            data.onChange(e as string[]);
                         }
                     }}
-                    onBlur={(e: BlurEvent) => {
+                    onInputChange={(text: string, e: Event) => {
+                        if (onInputChange) onInputChange(text, e);
+                    }}
+                    onBlur={(e: FocusEvent<HTMLInputElement>) => {
                         if (onBlur) onBlur(e);
                         data.onBlur();
+                    }}
+                    onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
+                        if (onKeyDown) onKeyDown(e);
                     }}
                     selected={normalizeToArray(data.value)}
                     placeholder={placeholder}
@@ -82,6 +90,7 @@ const ControlledTypeahead = ({
                     isInvalid={isInvalid}
                     allowNew={allowNew}
                     newSelectionPrefix={newSelectionPrefix}
+                    disabled={disabled}
                 />
             )}
         />
