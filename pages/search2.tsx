@@ -103,8 +103,6 @@ const Search2 = (props: Props): JSX.Element => {
     const [galls, setGalls] = useState(new Array<Gall>());
     const [query, setQuery] = useState(router.query as SearchQuery);
 
-    console.log(`rendering with ${JSON.stringify(query)} and ${galls.length} galls.`);
-
     // this is the search form on sepcies or genus
     const { control, setValue, handleSubmit, errors } = useForm({
         mode: 'onBlur',

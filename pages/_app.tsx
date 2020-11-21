@@ -3,6 +3,7 @@ import { Provider } from 'next-auth/client';
 import { AppProps } from 'next/app';
 import Head from 'next/head';
 import React, { CSSProperties } from 'react';
+import { Col, Row } from 'react-bootstrap';
 import 'react-bootstrap-typeahead/css/Typeahead.css';
 import Footer from '../layouts/footer';
 import Header from '../layouts/header';
@@ -32,10 +33,16 @@ function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
                     <title>Gallformers</title>
                     <link rel="icon" href="/favicon.ico" />
                 </Head>
-                <Header />
-                <div style={contentStyle}>
-                    <Component {...pageProps} />
-                </div>
+                <Row>
+                    <Col>
+                        <Header />
+                    </Col>
+                </Row>
+                <Row className="pt-4" style={contentStyle}>
+                    <Col>
+                        <Component {...pageProps} />
+                    </Col>
+                </Row>
                 <Footer />
             </div>
         </Provider>

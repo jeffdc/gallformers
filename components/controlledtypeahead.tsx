@@ -61,7 +61,6 @@ const ControlledTypeahead = ({
                 <Typeahead
                     onChange={(e: string[] | TypeaheadCustomOption[]) => {
                         // deal with the fact that we are allowing new values - I could not divine a better way.
-                        console.log(e);
                         if (e && e[0] && typeof e[0] === 'object') {
                             const ee = (e[0] as TypeaheadCustomOption).label;
                             if (onChange) onChange([ee]);
