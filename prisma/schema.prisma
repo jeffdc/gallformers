@@ -17,56 +17,56 @@ model migration {
 
 model location {
   id           Int            @id @default(autoincrement())
-  location     String?        @unique
+  location     String        @unique
   description  String?
   galllocation galllocation[]
 }
 
 model texture {
   id          Int           @id @default(autoincrement())
-  texture     String?       @unique
+  texture     String       @unique
   description String?
   galltexture galltexture[]
 }
 
 model color {
   id    Int     @id @default(autoincrement())
-  color String? @unique
+  color String @unique
   gall  gall[]
 }
 
 model walls {
   id          Int     @id @default(autoincrement())
-  walls       String? @unique
+  walls       String @unique
   description String?
   gall        gall[]
 }
 
 model cells {
   id          Int     @id @default(autoincrement())
-  cells       String? @unique 
+  cells       String @unique 
   description String?
   gall        gall[]
 }
 
 model alignment {
   id          Int     @id @default(autoincrement())
-  alignment   String? @unique
+  alignment   String @unique
   description String?
   gall        gall[]
 }
 
 model shape {
   id          Int     @id @default(autoincrement())
-  shape       String? @unique
+  shape       String @unique
   description String?
   gall        gall[]
 }
 
 model abundance {
   id          Int       @id @default(autoincrement())
-  abundance   String?   @unique
-  description String?
+  abundance   String   @unique
+  description String
   reference   String?
   species     species[]
 }
@@ -80,8 +80,8 @@ model taxontype {
 
 model family {
   id          Int       @id @default(autoincrement())
-  name        String?   @unique
-  description String?
+  name        String   @unique
+  description String
   species     species[]
 }
 
@@ -127,45 +127,48 @@ model gall {
 
 model galllocation {
   id          Int       @id @default(autoincrement())
-  gall_id     Int?
-  location_id Int?
-  gall        gall?     @relation(fields: [gall_id], references: [id])
-  location    location? @relation(fields: [location_id], references: [id])
+  gall_id     Int
+  location_id Int
+  gall        gall     @relation(fields: [gall_id], references: [id])
+  location    location @relation(fields: [location_id], references: [id])
 }
 
 model galltexture {
   id         Int      @id @default(autoincrement())
-  gall_id    Int?
-  texture_id Int?
-  gall       gall?    @relation(fields: [gall_id], references: [id])
-  texture    texture? @relation(fields: [texture_id], references: [id])
+  gall_id    Int
+  texture_id Int
+  gall       gall    @relation(fields: [gall_id], references: [id])
+  texture    texture @relation(fields: [texture_id], references: [id])
 }
 
 model host {
   id                 Int      @id @default(autoincrement())
-  host_species_id    Int?
-  gall_species_id    Int?
-  gallspecies        species? @relation("host_gall_species_idTospecies", fields: [gall_species_id], references: [id])
-  hostspecies        species? @relation("host_host_species_idTospecies", fields: [host_species_id], references: [id])
+  host_species_id    Int
+  gall_species_id    Int
+  gallspecies        species @relation("host_gall_species_idTospecies", fields: [gall_species_id], references: [id])
+  hostspecies        species @relation("host_host_species_idTospecies", fields: [host_species_id], references: [id])
 }
 
 model source {
   id            Int             @id @default(autoincrement())
   title         String          @unique
-  author        String?
-  pubyear       String?
-  link          String?
-  citation      String?
+  author        String
+  pubyear       String
+  link          String
+  citation      String
   speciessource speciessource[]
 }
 
 model speciessource {
   id         Int      @id @default(autoincrement())
-  species_id Int?
-  source_id  Int?
-  source     source?  @relation(fields: [source_id], references: [id])
-  species    species? @relation(fields: [species_id], references: [id])
+  species_id Int
+  source_id  Int
+  source     source  @relation(fields: [source_id], references: [id])
+  species    species @relation(fields: [species_id], references: [id])
+  // added in 003-gallformers.sql migration
   description String?
+  // added in 004-gallformers.sql migration
+  useasdefault Int @default(0)
 }
 
 // Added in 003-gallformers.sql migration

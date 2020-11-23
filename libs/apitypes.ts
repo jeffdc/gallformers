@@ -61,7 +61,7 @@ export type GallRes = {
 };
 
 export type Source = speciessource & {
-    source: source | null;
+    source: source;
 };
 export type GallHost = host & {
     hostspecies: species | null;

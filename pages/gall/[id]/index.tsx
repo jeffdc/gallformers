@@ -1,6 +1,6 @@
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
-import React from 'react';
+import React, { MouseEvent, useState } from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
 import { GallApi, GallHost } from '../../../libs/apitypes';
 import { allGallIds, gallById } from '../../../libs/db/gall';
@@ -26,6 +26,17 @@ const Gall = ({ gall }: Props): JSX.Element => {
         console.error('Failed to fetch gall from backend.');
         return <div>Oops</div>;
     }
+
+    const source = gall.species.speciessource.find((s) => s.useasdefault !== 0);
+    const [selectedSource, setSelectedSource] = useState(source);
+
+    const changeDescription = (e: MouseEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+        const id = e.currentTarget.id;
+        const s = gall.species.speciessource.find((s) => s.source_id.toString() === id);
+        setSelectedSource(s);
+    };
+
     return (
         <div
             style={{
@@ -50,7 +61,9 @@ const Gall = ({ gall }: Props): JSX.Element => {
                             </Col>
                         </Row>
                         <Row>
-                            <Col className="lead p-3">{deserialize(gall.species.description)}</Col>
+                            <Col id="description" className="lead p-3">
+                                {deserialize(selectedSource?.description)}
+                            </Col>
                         </Row>
                         <Row>
                             <Col>
@@ -88,14 +101,22 @@ const Gall = ({ gall }: Props): JSX.Element => {
                         <Row>
                             <Col>
                                 <strong>Further Information:</strong>
-                                <ListGroup>
-                                    {gall.species.speciessource.map((speciessource) => (
-                                        <ListGroup.Item key={speciessource.source_id}>
-                                            <Link href={`/source/${speciessource.source?.id}`}>
-                                                <a>{speciessource.source?.citation}</a>
-                                            </Link>
-                                        </ListGroup.Item>
-                                    ))}
+                                <ListGroup variant="flush" defaultActiveKey={selectedSource?.source_id}>
+                                    {gall.species.speciessource
+                                        .sort((a, b) => a.source.citation.localeCompare(b.source.citation))
+                                        .map((speciessource) => (
+                                            <ListGroup.Item
+                                                key={speciessource.source_id}
+                                                id={speciessource.source_id.toString()}
+                                                action
+                                                onClick={changeDescription}
+                                                variant={speciessource.source_id === selectedSource?.source_id ? 'dark' : ''}
+                                            >
+                                                <Link href={`/source/${speciessource.source?.id}`}>
+                                                    <a>{speciessource.source?.citation}</a>
+                                                </Link>
+                                            </ListGroup.Item>
+                                        ))}
                                 </ListGroup>
                                 <hr />
                                 <Row className="">
@@ -137,7 +158,10 @@ export const getStaticProps: GetStaticProps = async (context) => {
     const gall: GallApi = await gallById(id);
 
     if (gall != null || gall != undefined) {
-        gall.species.description = serialize(await linkTextFromGlossary(gall?.species.description));
+        // markup the descriptions with glossary links
+        for (const s of gall.species.speciessource) {
+            s.description = serialize(await linkTextFromGlossary(s.description));
+        }
     }
 
     return {

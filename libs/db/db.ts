@@ -5,13 +5,8 @@ import { PrismaClient } from '@prisma/client';
  */
 
 // Useful for logging SQL that is generated for debugging the search
-// const db = new PrismaClient({ log: ['query'] });
+//const db = new PrismaClient({ log: ['query'] });
 // db.$on('query', (e) => {
-//     e.timestamp;
-//     e.query;
-//     e.params;
-//     e.duration;
-//     e.target;
 //     console.log(e);
 // });
 
