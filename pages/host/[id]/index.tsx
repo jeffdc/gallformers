@@ -1,26 +1,19 @@
-import { abundance, family, PrismaClient, species } from '@prisma/client';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
-import React from 'react';
-import { Col, Container, Media, Row } from 'react-bootstrap';
-import db from '../../../libs/db/db';
-import { formatCSV, mightBeNull } from '../../../libs/db/utils';
-
-type GallProp = species & {
-    gallspecies: species;
-};
-
-type HostSpeciesProp = species & {
-    family: family;
-    abundance: abundance;
-    host_galls: GallProp[];
-};
+import React, { MouseEvent, useState } from 'react';
+import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
+import { HostApi, HostGall } from '../../../libs/apitypes';
+import { allHostIds, hostById } from '../../../libs/db/host';
+import { mightBeNull } from '../../../libs/db/utils';
+import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
-    host: HostSpeciesProp;
+    host: HostApi;
 };
 
-function gallAsLink(g: GallProp) {
+function gallAsLink(g: HostGall) {
+    if (!g.gallspecies) throw new Error('Recieved invalid gall for host.');
+
     return (
         <Link key={g.gallspecies.id} href={`/gall/${g.gallspecies.id}`}>
             <a>{g.gallspecies.name} </a>
@@ -29,6 +22,21 @@ function gallAsLink(g: GallProp) {
 }
 
 const Host = ({ host }: Props): JSX.Element => {
+    if (!host) {
+        console.error('Failed to fetch host from backend.');
+        return <div>Oops</div>;
+    }
+
+    const source = host.speciessource.find((s) => s.useasdefault !== 0);
+    const [selectedSource, setSelectedSource] = useState(source);
+
+    const changeDescription = (e: MouseEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+        const id = e.currentTarget.id;
+        const s = host.speciessource.find((s) => s.source_id.toString() === id);
+        setSelectedSource(s);
+    };
+
     return (
         <div
             style={{
@@ -43,7 +51,7 @@ const Host = ({ host }: Props): JSX.Element => {
                         <Row>
                             <Col>
                                 <h2>{host.name}</h2>
-                                {host.commonnames ? `(${formatCSV(host.commonnames)})` : ''}
+                                {host.commonnames ? `(${host.commonnames})` : ''}
                             </Col>
                             Family:
                             <Link key={host.family.id} href={`/family/${host.family.id}`}>
@@ -51,13 +59,56 @@ const Host = ({ host }: Props): JSX.Element => {
                             </Link>
                         </Row>
                         <Row>
-                            <Col className="lead p-3">{host.description}</Col>
+                            <Col className="lead p-3">{source?.description}</Col>
                         </Row>
                         <Row>
                             <Col>Galls: {host.host_galls.map(gallAsLink)}</Col>
                         </Row>
                         <Row>
                             <Col>Abdundance: {mightBeNull(host.abundance?.abundance)}</Col>
+                        </Row>
+                        <Row>
+                            <Col>
+                                <strong>Further Information:</strong>
+                                <ListGroup variant="flush" defaultActiveKey={selectedSource?.source_id}>
+                                    {host.speciessource
+                                        .sort((a, b) => a.source.citation.localeCompare(b.source.citation))
+                                        .map((speciessource) => (
+                                            <ListGroup.Item
+                                                key={speciessource.source_id}
+                                                id={speciessource.source_id.toString()}
+                                                action
+                                                onClick={changeDescription}
+                                                variant={speciessource.source_id === selectedSource?.source_id ? 'dark' : ''}
+                                            >
+                                                <Link href={`/source/${speciessource.source?.id}`}>
+                                                    <a>{speciessource.source?.citation}</a>
+                                                </Link>
+                                            </ListGroup.Item>
+                                        ))}
+                                </ListGroup>
+                                <hr />
+                                <Row className="">
+                                    <Col className="align-self-center">
+                                        <strong>See Also:</strong>
+                                    </Col>
+                                    <Col className="align-self-center">
+                                        <a href={iNatUrl(host.name)} target="_blank" rel="noreferrer">
+                                            <img src="/images/inatlogo-small.png" />
+                                        </a>
+                                    </Col>
+                                    <Col className="align-self-center">
+                                        <a href={bugguideUrl(host.name)} target="_blank" rel="noreferrer">
+                                            <img src="/images/bugguide-small.png" />
+                                        </a>
+                                    </Col>
+                                    <Col className="align-self-center">
+                                        <a href={gScholarUrl(host.name)} target="_blank" rel="noreferrer">
+                                            <img src="/images/gscholar-small.png" />
+                                        </a>
+                                    </Col>
+                                </Row>
+                            </Col>
                         </Row>
                     </Container>
                 </Media.Body>
@@ -74,42 +125,19 @@ export const getStaticProps: GetStaticProps = async (context) => {
         throw new Error(`Expected single id but got an array of ids ${context.params.id}.`);
     }
 
-    const host = await db.species.findFirst({
-        include: {
-            abundance: true,
-            family: true,
-            host_galls: {
-                include: {
-                    gallspecies: true,
-                },
-            },
-        },
-        where: {
-            id: { equals: parseInt(context.params.id) },
-        },
-    });
     return {
         props: {
-            host: host,
+            host: await hostById(context.params.id),
         },
         revalidate: 1,
     };
 };
 
 export const getStaticPaths: GetStaticPaths = async () => {
-    const hosts = await db.species.findMany({
-        include: {
-            family: {},
-        },
-        where: {
-            family: {
-                description: { equals: 'Plant' },
-            },
-        },
-    });
+    const hosts = await allHostIds();
 
     const paths = hosts.map((host) => ({
-        params: { id: host.id?.toString() },
+        params: { id: host },
     }));
 
     return { paths, fallback: false };

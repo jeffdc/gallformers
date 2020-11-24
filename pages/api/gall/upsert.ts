@@ -1,7 +1,23 @@
+import {
+    galllocationCreateWithoutGallInput,
+    galltextureCreateWithoutGallInput,
+    hostCreateWithoutGallspeciesInput,
+} from '@prisma/client';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from 'next-auth/client';
 import { GallUpsertFields } from '../../../libs/apitypes';
 import db from '../../../libs/db/db';
+
+type InsertFieldName = 'hostspecies' | 'location' | 'texture';
+type ConnectTypes = hostCreateWithoutGallspeciesInput | galllocationCreateWithoutGallInput | galltextureCreateWithoutGallInput;
+
+function connectWithIds<T extends ConnectTypes>(fieldName: InsertFieldName, ids: number[]): T[] {
+    const key = fieldName as keyof T;
+    return ids.map((l) => {
+        // ugly casting due to what seems to be a TS bug. See: https://github.com/Microsoft/TypeScript/issues/13948
+        return ({ [key]: { connect: { id: l } } } as unknown) as T;
+    });
+}
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     const gall = req.body as GallUpsertFields;
@@ -17,12 +33,6 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             } else {
                 return {};
             }
-        };
-
-        const createFromIds = (fieldName: string, ids: number[]) => {
-            return ids.map((l) => {
-                return { [fieldName]: { connect: { id: l } } };
-            });
         };
 
         const sp = await db.species.upsert({
@@ -44,12 +54,12 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
                         shape: connectIfNotNull('shape', gall.shape),
                         walls: connectIfNotNull('walls', gall.walls),
                         taxontype: { connect: { taxoncode: 'gall' } },
-                        galllocation: { create: createFromIds('location', gall.locations) },
-                        galltexture: { create: createFromIds('texture', gall.textures) },
+                        galllocation: { create: connectWithIds('location', gall.locations) },
+                        galltexture: { create: connectWithIds('texture', gall.textures) },
                     },
                 },
                 hosts: {
-                    create: createFromIds('hostspecies', gall.hosts),
+                    create: connectWithIds('hostspecies', gall.hosts),
                 },
             },
             update: {
@@ -75,18 +85,19 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
                                 // this seems stupid but I can not figure out a way to update these many-to-many
                                 // like is provided with the 'set' operation for 1-to-many. :(
                                 deleteMany: { location_id: { notIn: [] } },
-                                create: createFromIds('location', gall.locations),
+                                // create: [{ location: { connect: { id: gall.locations[0] } } }],
+                                create: connectWithIds('location', gall.locations),
                             },
                             galltexture: {
                                 deleteMany: { texture_id: { notIn: [] } },
-                                create: createFromIds('texture', gall.textures),
+                                create: connectWithIds('texture', gall.textures),
                             },
                         },
                     },
                 },
                 hosts: {
                     deleteMany: { host_species_id: { notIn: [] } },
-                    create: createFromIds('hostspecies', gall.hosts),
+                    create: connectWithIds('hostspecies', gall.hosts),
                 },
             },
             where: { name: gall.name },

@@ -3,7 +3,7 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
-import { allFamilies, familyById, speciesByFamily } from '../../../libs/db/family';
+import { allFamilyIds, familyById, speciesByFamily } from '../../../libs/db/family';
 
 type Props = {
     family: family;
@@ -28,13 +28,6 @@ const Family = ({ family, species }: Props): JSX.Element => {
             }}
         >
             <Media>
-                {/* <img
-                width={170}
-                height={128}
-                className="mr-3"
-                src=""
-                alt={host.hostspecies.name}
-            /> */}
                 <Media.Body>
                     <Container className="p-3 border">
                         <Row>
@@ -79,10 +72,10 @@ export const getStaticProps: GetStaticProps = async (context) => {
 };
 
 export const getStaticPaths: GetStaticPaths = async () => {
-    const families = await allFamilies();
+    const familyIds = await allFamilyIds();
 
-    const paths = families.map((f) => ({
-        params: { id: f.id?.toString() },
+    const paths = familyIds.map((f) => ({
+        params: { id: f },
     }));
 
     return { paths, fallback: false };

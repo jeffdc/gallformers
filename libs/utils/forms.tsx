@@ -1,17 +1,22 @@
 export const genOptions = (opts: string[]): JSX.Element => {
-    if (opts == undefined || opts == null) {
+    if (!opts) {
         throw new Error('Must have a valid list of options to render.');
+    } else if (new Set(opts).size !== opts.length) {
+        throw new Error('Passed in set of options contains duplicates and this is not allowed.');
     }
+
     return (
         <>
-            <option value=""></option>
-            {opts.map((o) => {
-                return (
-                    <option key={o} value={o}>
-                        {o}
-                    </option>
-                );
-            })}
+            <option key="none" value=""></option>
+            {opts
+                .filter((o) => o)
+                .map((o) => {
+                    return (
+                        <option key={o} value={o}>
+                            {o}
+                        </option>
+                    );
+                })}
         </>
     );
 };

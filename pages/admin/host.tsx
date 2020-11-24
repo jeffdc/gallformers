@@ -27,7 +27,6 @@ const extractGenus = (n: string): string => {
 const Schema = yup.object().shape({
     name: yup.string().matches(/([A-Z][a-z]+ [a-z]+$)/),
     family: yup.string().required(),
-    description: yup.string().required(),
 });
 
 const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
@@ -103,7 +102,6 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
                                     setAbundance(f.abundance_id);
                                     setValue('commonnames', f.commonnames);
                                     setValue('synonyms', f.synonyms);
-                                    setValue('description', f.description);
                                 }
                             }}
                             onBlur={(e) => {
@@ -163,17 +161,6 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
                     <Col>
                         Synonyms (comma-delimited):
                         <input type="text" placeholder="Synonyms" name="synonyms" className="form-control" ref={register} />
-                    </Col>
-                </Row>
-                <Row className="form-group">
-                    <Col>
-                        <p>Description:</p>
-                        <textarea name="description" className="form-control" ref={register} rows={8} />
-                        {errors.description && (
-                            <span className="text-danger">
-                                You must provide a description. You can add source references separately.
-                            </span>
-                        )}
                     </Col>
                 </Row>
                 <Row className="fromGroup" hidden={!existing}>

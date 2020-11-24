@@ -4,7 +4,6 @@ import React, { MouseEvent, useState } from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
 import { GallApi, GallHost } from '../../../libs/apitypes';
 import { allGallIds, gallById } from '../../../libs/db/gall';
-import { formatCSV } from '../../../libs/db/utils';
 import { linkTextFromGlossary } from '../../../libs/glossary';
 import { deserialize, serialize } from '../../../libs/reactserialize';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
@@ -51,7 +50,7 @@ const Gall = ({ gall }: Props): JSX.Element => {
                         <Row>
                             <Col>
                                 <h2>{gall.species.name}</h2>
-                                {gall.species.commonnames ? `(${formatCSV(gall.species.commonnames)})` : ''}
+                                {gall.species.commonnames ? `(${gall.species.commonnames})` : ''}
                             </Col>
                             <Col className="text-right font-italic">
                                 Family:

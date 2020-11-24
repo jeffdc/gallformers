@@ -30,7 +30,6 @@ export type SpeciesUpsertFields = Deletable & {
     synonyms: string;
     family: string;
     abundance: string;
-    description: string;
 };
 
 export type GallUpsertFields = SpeciesUpsertFields & {
@@ -92,6 +91,31 @@ export type GallApi =
       })
     | null;
 
+export type HostSimple = {
+    id: number;
+    name: string;
+    commonnames: string;
+    synonyms: string;
+};
+
+export type GallSimple = {
+    id: number;
+    name: string;
+};
+
+export type HostGall = host & {
+    gallspecies: GallSimple;
+};
+
+export type HostApi =
+    | (species & {
+          abundance: abundance | null;
+          family: family;
+          speciessource: Source[];
+          host_galls: HostGall[];
+      })
+    | null;
+
 export type SourceUpsertFields = {
     title: string;
     author: string;
@@ -101,8 +125,10 @@ export type SourceUpsertFields = {
 };
 
 export type SpeciesSourceInsertFields = {
-    species: number[];
-    sources: number[];
+    species: number;
+    source: number;
+    description: string;
+    useasdefault: boolean;
 };
 
 export type HostInsertFields = {

@@ -1,4 +1,4 @@
-import { GallDistinctFieldEnum, gallWhereInput, PrismaClient } from '@prisma/client';
+import { GallDistinctFieldEnum, gallWhereInput } from '@prisma/client';
 import db from './db/db';
 import { Gall, SearchQuery } from './types';
 

@@ -24,26 +24,29 @@ const Schema = yup.object().shape({
 
 const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
     const [results, setResults] = useState(new Array<speciessource>());
+    const [isGall, setIsGall] = useState(true);
+
     const { handleSubmit, errors, control, register } = useForm({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
 
-    const onSubmit = async (data: { species: string[]; sources: string[] }) => {
+    const onSubmit = async (data: { species: string; source: string; description: string; useasdefault: boolean }) => {
         try {
+            const sp = species.find((sp) => s === sp.name);
+            const so = sources.find((so) => s === so.title);
+            if (!sp || !so) throw new Error('Somehow either the source or the species selected is invalid.');
+
+            setIsGall(sp.taxoncode === 'gall');
+
             const insertData: SpeciesSourceInsertFields = {
-                species: data.species.map((s) => {
-                    // i hate null... :( these should be safe since the text values came from the same place as the ids
-                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                    return species.find((sp) => s === sp.name)!.id;
-                }),
-                sources: data.sources.map((s) => {
-                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                    return sources.find((so) => s === so.title)!.id;
-                }),
+                species: sp.id,
+                sources: so.id,
+                description: data.description,
+                useasdefault: data.useasdefault,
             };
 
-            const res = await fetch('../api/speciessource/insert', {
+            const res = await fetch('../api/speciessource/upsert', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -73,8 +76,6 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                             name="species"
                             placeholder="Species"
                             options={species.map((h) => h.name)}
-                            multiple
-                            clearButton
                             isInvalid={!!errors.species}
                         />
                         {errors.species && <span className="text-danger">You must provide a least one species to map.</span>}
@@ -93,8 +94,6 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                             name="sources"
                             placeholder="Sources"
                             options={sources.map((h) => h.title)}
-                            multiple
-                            clearButton
                             isInvalid={!!errors.sources}
                         />
                         {errors.sources && <span className="text-danger">You must provide a least one source to map.</span>}
@@ -108,7 +107,13 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        <input type="submit" className="button" />
+                        <input type="checkbox" name="useasdefault" className="form-check-inline" ref={register} />
+                        <label className="form-check-label">Use as Default?</label>
+                    </Col>
+                </Row>
+                <Row className="form-group">
+                    <Col>
+                        <input type="submit" className="btn-primary" />
                     </Col>
                 </Row>
                 {results.length > 0 && (
@@ -123,7 +128,7 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                                             <a>source</a>
                                         </Link>{' '}
                                         to{' '}
-                                        <Link href={`/gall/${r.species_id}`}>
+                                        <Link href={`/${isGall ? 'gall' : 'host'}/${r.species_id}`}>
                                             <a>species</a>
                                         </Link>
                                         .

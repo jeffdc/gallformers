@@ -29,5 +29,6 @@ export function gScholarUrl(species: string): string {
  * @param max
  */
 export function randInt(min: number, max: number): number {
+    if (min >= max) throw new Error(`The min value must be smaller than the max value. ${min} >= ${max}!`);
     return Math.floor(Math.random() * (max - min + 1) + min);
 }

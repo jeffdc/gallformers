@@ -24,7 +24,7 @@ const options = {
         encryption: true,
     },
     events: {},
-    debug: false,
+    debug: true,
 
     // A database is optional, but required to persist accounts in a database
     // database: process.env.DATABASE_URL,
