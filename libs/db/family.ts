@@ -26,5 +26,5 @@ export const allFamilyIds = async (): Promise<string[]> => {
         .findMany({
             select: { id: true },
         })
-        .then((ids) => ids.map((id) => id.toString()));
+        .then((fs) => fs.map((f) => f.id.toString()));
 };

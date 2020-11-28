@@ -11,18 +11,19 @@ import {
 } from '@prisma/client';
 import { GallApi } from '../apitypes';
 import db from './db';
+import { GallTaxon } from './dbinternaltypes';
 
 export const allGallIds = async (): Promise<string[]> => {
     return db.species
         .findMany({
-            where: { taxoncode: { equals: 'gall' } },
+            where: { taxoncode: { equals: GallTaxon } },
         })
         .then((sp) => sp.map((s) => s.id.toString()));
 };
 
 export const allGalls = async (): Promise<species[]> => {
     return db.species.findMany({
-        where: { taxoncode: { equals: 'gall' } },
+        where: { taxoncode: { equals: GallTaxon } },
         orderBy: { name: 'asc' },
     });
 };
@@ -72,7 +73,7 @@ export const allGallGenera = async (): Promise<string[]> => {
                 genus: true,
             },
             distinct: [SpeciesDistinctFieldEnum.genus],
-            where: { taxoncode: { equals: 'gall' } },
+            where: { taxoncode: { equals: GallTaxon } },
             orderBy: { genus: 'asc' },
         })
         .then((g) => g.map((g) => g.genus));

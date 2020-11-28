@@ -1,4 +1,5 @@
 // Welcome to the inevitable utils file!!!
+import R from 'ramda';
 
 /**
  * Checks an object, o, for the presence of the prop.
@@ -32,3 +33,6 @@ export function randInt(min: number, max: number): number {
     if (min >= max) throw new Error(`The min value must be smaller than the max value. ${min} >= ${max}!`);
     return Math.floor(Math.random() * (max - min + 1) + min);
 }
+
+// things that we can do to a list of galls in the name of fulfilling search:
+const detachable = R.filter(R.where({ detachable: R.equals(1) }));

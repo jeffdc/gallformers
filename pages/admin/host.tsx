@@ -13,6 +13,8 @@ import { DeleteResults, SpeciesUpsertFields } from '../../libs/apitypes';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import { allHosts } from '../../libs/db/host';
+import Link from 'next/link';
+import { useWithLookup } from '../../hooks/useWithLookups';
 
 type Props = {
     hosts: species[];
@@ -29,6 +31,8 @@ const Schema = yup.object().shape({
     family: yup.string().required(),
 });
 
+type FormFields = 'name' | 'genus' | 'family' | 'abundance' | 'commonnames' | 'synonmys';
+
 const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
     const [existing, setExisting] = useState(false);
     const [deleteResults, setDeleteResults] = useState<DeleteResults>();
@@ -40,14 +44,7 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
 
     const router = useRouter();
 
-    const setFamily = (id: number): void => {
-        const family = families.find((f) => f.id === id);
-        if (family) setValue('family', family.name);
-    };
-    const setAbundance = (id: number | null): void => {
-        const abundance = families.find((f) => f.id === id);
-        if (abundance) setValue('family', abundance.name);
-    };
+    const { setValueForLookup } = useWithLookup<FormFields, family | abundance, string>(setValue);
 
     const onSubmit = async (data: SpeciesUpsertFields) => {
         try {
@@ -87,6 +84,11 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
         <Auth>
             <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                 <h4>Add A Host</h4>
+                <p>
+                    This is for all of the details about a Host. To add a description (which must be referenced to a source) go
+                    add <Link href="/admin/source">Sources</Link>, if they do not already exist, then go{' '}
+                    <Link href="/admin/speciessource">map species to sources with description</Link>.
+                </p>
                 <Row className="form-group">
                     <Col>
                         Name (binomial):
@@ -98,8 +100,8 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
                                 const f = hosts.find((f) => f.name === e[0]);
                                 if (f) {
                                     setExisting(true);
-                                    setFamily(f.family_id);
-                                    setAbundance(f.abundance_id);
+                                    setValueForLookup('family', [f.family_id], families, 'name');
+                                    setValueForLookup('abundance', [f.abundance_id], abundances, 'abundance');
                                     setValue('commonnames', f.commonnames);
                                     setValue('synonyms', f.synonyms);
                                 }

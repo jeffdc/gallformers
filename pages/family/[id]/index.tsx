@@ -3,6 +3,7 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
+import { GallTaxon } from '../../../libs/db/dbinternaltypes';
 import { allFamilyIds, familyById, speciesByFamily } from '../../../libs/db/family';
 
 type Props = {
@@ -11,7 +12,7 @@ type Props = {
 };
 
 function makeSpeciesLink(s: species) {
-    const speciesType = s.taxoncode === 'gall' ? 'gall' : 'host';
+    const speciesType = s.taxoncode === GallTaxon ? 'gall' : 'host';
     return (
         <Link key={s.id} href={`/${speciesType}/${s.id}`}>
             <a>{s.name} </a>

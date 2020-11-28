@@ -1,6 +1,7 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import { abundance, alignment, cells as cs, color, family, location, shape, species, texture, walls as ws } from '@prisma/client';
 import { GetServerSideProps } from 'next';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
 import { Col, Row } from 'react-bootstrap';
@@ -8,15 +9,37 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { DeleteResults, GallRes, GallUpsertFields } from '../../libs/apitypes';
+import { useWithLookup } from '../../hooks/useWithLookups';
+import { DeleteResults, GallRes, GallUpsertFields, HostSimple } from '../../libs/apitypes';
 import { allFamilies } from '../../libs/db/family';
 import { alignments, allGalls, cells, colors, locations, shapes, textures, walls } from '../../libs/db/gall';
-import { allHostsSimple, HostSimple } from '../../libs/db/host';
+import { allHostsSimple } from '../../libs/db/host';
 import { abundances } from '../../libs/db/species';
 import { mightBeNull } from '../../libs/db/utils';
-import { GallFormFields, genOptions } from '../../libs/utils/forms';
+import { genOptions } from '../../libs/utils/forms';
 
 //TODO factor out the species form and allow it to be extended with what is needed for a gall as this code violates DRY a lot!
+
+type SpeciesFormFields = {
+    name: string;
+    commonnames: string;
+    synonyms: string;
+    family: string;
+    abundance: string;
+};
+
+type GallFormFields = SpeciesFormFields & {
+    hosts: string[];
+    locations: string[];
+    color: string;
+    shape: string;
+    textures: string[];
+    alignment: string;
+    walls: string;
+    cells: string;
+    detachable: string;
+    delete?: boolean;
+};
 
 type Props = {
     galls: species[];
@@ -35,7 +58,6 @@ type Props = {
 const Schema = yup.object().shape({
     name: yup.string().matches(/([A-Z][a-z]+ [a-z]+$)/),
     family: yup.string().required(),
-    description: yup.string().required(),
     hosts: yup.array().required(),
 });
 
@@ -58,8 +80,7 @@ type FormFields =
     | 'shape'
     | 'color'
     | 'locations'
-    | 'textures'
-    | 'description';
+    | 'textures';
 
 const Gall = ({
     galls,
@@ -83,30 +104,11 @@ const Gall = ({
     const [existing, setExisting] = useState(false);
     const [deleteResults, setDeleteResults] = useState<DeleteResults>();
 
-    function setValueForLookup(
-        field: FormFields,
-        ids: (number | null | undefined)[] | undefined,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        lookup: any[],
-        valField: string,
-    ) {
-        if (!ids) return;
-
-        const vals = ids.map((id) => {
-            const val = lookup.find((v) => v.id === id);
-            if (val) {
-                return val[valField];
-            } else if (!id) {
-                // was an invalid id so do not care
-                return undefined;
-            } else {
-                throw new Error(`Failed to lookup for ${field}.`);
-            }
-        });
-        if (vals && vals.length > 0 && vals[0]) {
-            setValue(field, vals);
-        }
-    }
+    const { setValueForLookup } = useWithLookup<
+        FormFields,
+        ws | cs | alignment | color | shape | location | texture | HostSimple | family | abundance,
+        string | number
+    >(setValue);
 
     const setGallDetails = async (spid: number): Promise<void> => {
         try {
@@ -177,6 +179,11 @@ const Gall = ({
         <Auth>
             <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                 <h4>Add A Gall</h4>
+                <p>
+                    This is for all of the details about a Gall. To add a description (which must be referenced to a source) go
+                    add <Link href="/admin/source">Sources</Link>, if they do not already exist, then go{' '}
+                    <Link href="/admin/speciessource">map species to sources with description</Link>.
+                </p>
                 <Row className="form-group">
                     <Col>
                         Name (binomial):
@@ -193,7 +200,6 @@ const Gall = ({
                                     setValue('commonnames', f.commonnames);
                                     setValue('synonyms', f.synonyms);
                                     setGallDetails(f.id);
-                                    setValue('description', f.description);
                                 }
                             }}
                             onBlur={(e) => {
@@ -332,17 +338,6 @@ const Gall = ({
                             multiple
                             clearButton
                         />
-                    </Col>
-                </Row>
-                <Row className="form-group">
-                    <Col>
-                        Description:
-                        <textarea name="description" className="form-control" ref={register} rows={8} />
-                        {errors.description && (
-                            <span className="text-danger">
-                                You must provide a description. You can add source references separately.
-                            </span>
-                        )}
                     </Col>
                 </Row>
                 <Row className="fromGroup" hidden={!existing}>

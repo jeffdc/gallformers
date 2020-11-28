@@ -6,6 +6,7 @@ import React from 'react';
 import { Card, CardColumns, ListGroup } from 'react-bootstrap';
 import CardTextCollapse from '../components/cardcollapse';
 import db from '../libs/db/db';
+import { GallTaxon } from '../libs/db/dbinternaltypes';
 import { entriesWithLinkedDefs, EntryLinked } from '../libs/glossary';
 import { deserialize } from '../libs/reactserialize';
 
@@ -21,7 +22,7 @@ type Props = {
 };
 
 const speciesLink = (species: SpeciesProp) => {
-    if (species.taxoncode === 'gall') {
+    if (species.taxoncode === GallTaxon) {
         return (
             <Link href={`gall/${species.id}`}>
                 <a>{species.name}</a>

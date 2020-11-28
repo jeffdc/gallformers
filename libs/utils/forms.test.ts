@@ -24,4 +24,15 @@ describe('The Forms Util genOptions()', () => {
             }),
         );
     });
+
+    it('should not include an empty option when told not to', () => {
+        const opts = render(genOptions(['a'], false));
+        // expect it to be 2, since the body and the div will show as empty text.
+        expect(screen.queryAllByText('').length).toBe(2);
+        opts.unmount();
+
+        // now it should be 4 to account for the empty option: body, empty div (fragment), div, option
+        render(genOptions(['a'], true));
+        expect(screen.queryAllByText('').length).toBe(4);
+    });
 });

@@ -1,11 +1,12 @@
 import { species, SpeciesDistinctFieldEnum } from '@prisma/client';
 import { HostApi, HostSimple } from '../apitypes';
 import db from './db';
+import { HostTaxon } from './dbinternaltypes';
 import { mightBeNull } from './utils';
 
 export const allHosts = async (): Promise<species[]> => {
     return db.species.findMany({
-        where: { taxoncode: { equals: null } },
+        where: { taxoncode: { equals: HostTaxon } },
         orderBy: { name: 'asc' },
     });
 };

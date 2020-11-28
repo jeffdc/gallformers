@@ -7,6 +7,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from 'next-auth/client';
 import { GallUpsertFields } from '../../../libs/apitypes';
 import db from '../../../libs/db/db';
+import { GallTaxon } from '../../../libs/db/dbinternaltypes';
 
 type InsertFieldName = 'hostspecies' | 'location' | 'texture';
 type ConnectTypes = hostCreateWithoutGallspeciesInput | galllocationCreateWithoutGallInput | galltextureCreateWithoutGallInput;
@@ -43,8 +44,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
                 abundance: connectIfNotNull('abundance', gall.abundance),
                 synonyms: gall.synonyms,
                 commonnames: gall.commonnames,
-                description: gall.description,
-                taxontype: { connect: { taxoncode: 'gall' } },
+                taxontype: { connect: { taxoncode: GallTaxon } },
                 gall: {
                     create: {
                         alignment: connectIfNotNull('alignment', gall.alignment),
@@ -53,7 +53,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
                         detachable: gall.detachable ? 1 : 0,
                         shape: connectIfNotNull('shape', gall.shape),
                         walls: connectIfNotNull('walls', gall.walls),
-                        taxontype: { connect: { taxoncode: 'gall' } },
+                        taxontype: { connect: { taxoncode: GallTaxon } },
                         galllocation: { create: connectWithIds('location', gall.locations) },
                         galltexture: { create: connectWithIds('texture', gall.textures) },
                     },
@@ -67,7 +67,6 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
                 abundance: connectIfNotNull('abundance', gall.abundance),
                 synonyms: gall.synonyms,
                 commonnames: gall.commonnames,
-                description: gall.description,
                 gall: {
                     update: {
                         // ugh, have to fake it when the create side of the upsert executes otherwise an error occurs since the

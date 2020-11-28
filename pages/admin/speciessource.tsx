@@ -9,6 +9,7 @@ import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import { SpeciesSourceInsertFields } from '../../libs/apitypes';
+import { GallTaxon } from '../../libs/db/dbinternaltypes';
 import { allSources } from '../../libs/db/source';
 import { allSpecies } from '../../libs/db/species';
 
@@ -22,6 +23,13 @@ const Schema = yup.object().shape({
     sources: yup.array().required(),
 });
 
+type FormFields = {
+    species: string;
+    source: string;
+    description: string;
+    useasdefault: boolean;
+};
+
 const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
     const [results, setResults] = useState(new Array<speciessource>());
     const [isGall, setIsGall] = useState(true);
@@ -31,17 +39,17 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
         resolver: yupResolver(Schema),
     });
 
-    const onSubmit = async (data: { species: string; source: string; description: string; useasdefault: boolean }) => {
+    const onSubmit = async (data: FormFields) => {
         try {
-            const sp = species.find((sp) => s === sp.name);
-            const so = sources.find((so) => s === so.title);
+            const sp = species.find((sp) => data.species === sp.name);
+            const so = sources.find((so) => data.source === so.title);
             if (!sp || !so) throw new Error('Somehow either the source or the species selected is invalid.');
 
-            setIsGall(sp.taxoncode === 'gall');
+            setIsGall(sp.taxoncode === GallTaxon);
 
             const insertData: SpeciesSourceInsertFields = {
                 species: sp.id,
-                sources: so.id,
+                source: so.id,
                 description: data.description,
                 useasdefault: data.useasdefault,
             };
