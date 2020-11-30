@@ -1,14 +1,12 @@
 /**
  * Types for calling the APIs. These are to be used by browser code when it calls the APIs.
  */
-
 import {
     abundance,
     alignment,
     cells,
     color,
     family,
-    gall,
     host,
     location,
     shape,
@@ -18,6 +16,21 @@ import {
     texture,
     walls,
 } from '@prisma/client';
+
+/**
+ *
+ */
+export type SearchQuery = {
+    host: string;
+    detachable?: string;
+    alignment?: string;
+    walls?: string;
+    locations?: string[];
+    textures?: string[];
+    color?: string;
+    shape?: string;
+    cells?: string;
+};
 
 export type Deletable = {
     delete?: boolean;
@@ -44,33 +57,14 @@ export type GallUpsertFields = SpeciesUpsertFields & {
     detachable: string;
 };
 
-export type GallRes = {
-    id: number;
-    species_id: number;
-    taxoncode: string;
-    detachable: number | undefined;
-    alignment_id: number | undefined;
-    walls_id: number | undefined;
-    cells_id: number | undefined;
-    color_id: number | undefined;
-    shape_id: number | undefined;
-    locations: (number | null)[] | undefined;
-    textures: (number | null)[] | undefined;
-    hosts: (number | null)[] | undefined;
-};
-
 export type Source = speciessource & {
     source: source;
 };
-export type GallHost = host & {
-    hostspecies: species | null;
+export type GallHost = {
+    id: number;
+    name: string;
 };
-export type GallSpecies = species & {
-    abundance: abundance | null;
-    family: family;
-    hosts: GallHost[];
-    speciessource: Source[];
-};
+
 export type GallLocation = {
     location: location | null;
 };
@@ -78,18 +72,26 @@ export type GallTexture = {
     texture: texture | null;
 };
 
-export type GallApi =
-    | (gall & {
-          alignment: alignment | null;
-          cells: cells | null;
-          color: color | null;
-          shape: shape | null;
-          walls: walls | null;
-          galltexture: GallTexture[];
-          galllocation: GallLocation[];
-          species: GallSpecies;
-      })
-    | null;
+export type SpeciesApi = species & {
+    abundance: abundance | null;
+    description: string; // to make the caller's life easier we will load the default
+    family: family;
+    speciessource: Source[];
+};
+
+export type GallApi = SpeciesApi & {
+    gall: {
+        alignment: alignment | null;
+        cells: cells | null;
+        color: color | null;
+        detachable: number;
+        shape: shape | null;
+        walls: walls | null;
+        galltexture: GallTexture[];
+        galllocation: GallLocation[];
+    };
+    hosts: GallHost[];
+};
 
 export type HostSimple = {
     id: number;
@@ -134,6 +136,19 @@ export type SpeciesSourceInsertFields = {
 export type HostInsertFields = {
     galls: number[];
     hosts: number[];
+};
+
+export type FamilyApi = family & {
+    species: {
+        id: number;
+        name: string;
+        gall: {
+            species: {
+                id: number;
+                name: string;
+            } | null;
+        } | null;
+    }[];
 };
 
 export type FamilyUpsertFields = {

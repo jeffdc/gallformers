@@ -1,13 +1,13 @@
-import { GallDistinctFieldEnum, gallWhereInput } from '@prisma/client';
-import db from './db/db';
-import { Gall, SearchQuery } from './types';
+import { Prisma } from '@prisma/client';
+import { GallApi, SearchQuery } from './apitypes';
+import { getGalls } from './db/gall';
 
 /**
  * Searches for galls based on the input SearchQuery.
  * @param query the SearchQuery to use
- * @returns a Promise<Gall[]> with found galls, if any.
+ * @returns a Promise<GallApi[]> with found galls, if any.
  */
-export const searchGalls = async (query: SearchQuery): Promise<Gall[]> => {
+export const searchGalls = async (query: SearchQuery): Promise<GallApi[]> => {
     console.log(`Searching for galls with '${JSON.stringify(query, null, '  ')}'`);
 
     // the locations and textures *might* come in as encoded JSON arrays so we need to parse them
@@ -20,7 +20,7 @@ export const searchGalls = async (query: SearchQuery): Promise<Gall[]> => {
     query.textures = parsearrmaybe(query.textures);
 
     // helper to create Where clauses
-    function whereDontCare(field: string | string[] | undefined, o: gallWhereInput) {
+    function whereDontCare(field: string | string[] | undefined, o: Prisma.gallWhereInput) {
         if (field === null || field === undefined || field === '' || (Array.isArray(field) && field.length === 0)) {
             return {};
         } else {
@@ -33,62 +33,27 @@ export const searchGalls = async (query: SearchQuery): Promise<Gall[]> => {
             ? {}
             : { OR: [{ detachable: { equals: null } }, { detachable: { equals: parseInt(query.detachable) } }] };
 
-    const data: Promise<Gall[]> = db.gall
-        .findMany({
-            include: {
-                alignment: {},
-                cells: {},
-                color: {},
-                galllocation: {
-                    include: { location: {} },
-                },
-                shape: {},
-                species: {
-                    include: {
-                        hosts: true,
+    const data: Promise<GallApi[]> = getGalls([
+        detachableWhere,
+        whereDontCare(query.color, { color: { color: { equals: query.color } } }),
+        whereDontCare(query.alignment, { alignment: { alignment: { equals: query.alignment } } }),
+        whereDontCare(query.shape, { shape: { shape: { equals: query.shape } } }),
+        whereDontCare(query.cells, { cells: { cells: { equals: query.cells } } }),
+        whereDontCare(query.walls, { walls: { walls: { equals: query.walls } } }),
+        whereDontCare(query.textures, { galltexture: { some: { texture: { texture: { in: query.textures } } } } }),
+        whereDontCare(query.locations, {
+            galllocation: { some: { location: { location: { in: query.locations } } } },
+        }),
+        {
+            hosts: {
+                some: {
+                    hostspecies: {
+                        name: { equals: query.host },
                     },
                 },
-                galltexture: {
-                    include: { texture: {} },
-                },
-                walls: {},
             },
-            where: {
-                AND: [
-                    detachableWhere,
-                    whereDontCare(query.color, { color: { color: { equals: query.color } } }),
-                    whereDontCare(query.alignment, { alignment: { alignment: { equals: query.alignment } } }),
-                    whereDontCare(query.shape, { shape: { shape: { equals: query.shape } } }),
-                    whereDontCare(query.cells, { cells: { cells: { equals: query.cells } } }),
-                    whereDontCare(query.walls, { walls: { walls: { equals: query.walls } } }),
-                    whereDontCare(query.textures, { galltexture: { some: { texture: { texture: { in: query.textures } } } } }),
-                    whereDontCare(query.locations, {
-                        galllocation: { some: { location: { location: { in: query.locations } } } },
-                    }),
-                    {
-                        species: {
-                            hosts: {
-                                some: {
-                                    hostspecies: {
-                                        name: { equals: query.host },
-                                    },
-                                },
-                            },
-                        },
-                    },
-                ],
-            },
-            distinct: [GallDistinctFieldEnum.species_id],
-        })
-        .then((d) => {
-            // due to a limitation in Prisma it is not possible to sort on a related field, so we have to sort now
-            d.sort((g1, g2) => {
-                if (g1.species.name < g2.species.name) return -1;
-                if (g1.species.name > g2.species.name) return 1;
-                return 0;
-            });
-            return d;
-        });
+        },
+    ]);
 
     return data;
 };

@@ -1,6 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from 'next-auth/client';
+import { SpeciesUpsertFields } from '../../../libs/apitypes';
 import db from '../../../libs/db/db';
+import { HostTaxon } from '../../../libs/db/dbinternaltypes';
+import { upsertHost } from '../../../libs/db/host';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     try {
@@ -9,37 +12,10 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             res.status(401).end();
         }
 
-        const h = req.body;
+        const h = req.body as SpeciesUpsertFields;
+        const spId = await upsertHost(h);
 
-        const abundanceConnect = () => {
-            if (h.abundance) {
-                return { connect: { abundance: h.abundance } };
-            } else {
-                return {};
-            }
-        };
-
-        const sp = await db.species.upsert({
-            where: { name: h.name },
-            update: {
-                family: { connect: { name: h.family } },
-                abundance: { connect: { abundance: h.abundance } },
-                synonyms: h.synonyms,
-                commonnames: h.commonnames,
-                description: h.description,
-            },
-            create: {
-                name: h.name,
-                genus: h.name.split(' ')[0],
-                family: { connect: { name: h.family } },
-                abundance: abundanceConnect(),
-                synonyms: h.synonyms,
-                commonnames: h.commonnames,
-                description: h.description,
-            },
-        });
-
-        res.status(200).redirect(`/host/${sp.id}`).end();
+        res.status(200).redirect(`/host/${spId}`).end();
     } catch (e) {
         res.status(500).json({ error: e.message });
     }

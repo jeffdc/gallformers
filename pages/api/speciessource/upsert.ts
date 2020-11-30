@@ -32,7 +32,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
 
             const results = await db.speciessource.upsert({
                 where: {
-                    id: existing?.id,
+                    id: existing?.id ? existing.id : -1,
                 },
                 create: {
                     source: { connect: { id: sourcespecies.source } },
@@ -48,6 +48,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
 
             res.status(200).send(JSON.stringify(results));
         } catch (e) {
+            console.error(e);
             throw new AggregateError(
                 [e],
                 `Failed to add species-source mapping for species(${sourcespecies.species}) and source(${sourcespecies.source}).`,

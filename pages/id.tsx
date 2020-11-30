@@ -1,4 +1,3 @@
-import { HostDistinctFieldEnum } from '@prisma/client';
 import { Formik, FormikErrors, FormikTouched } from 'formik';
 import { GetStaticProps } from 'next';
 import { useRouter } from 'next/router';
@@ -7,8 +6,8 @@ import { Button, Col, Container, Form } from 'react-bootstrap';
 import * as yup from 'yup';
 import InfoTip from '../components/infotip';
 import SearchFormField, { FieldValueType } from '../components/searchformfield';
-import db from '../libs/db/db';
 import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
+import { allHostNames } from '../libs/db/host';
 
 const schema = yup.object({
     hostName: yup.string().required('You must provide a host name.'),
@@ -40,6 +39,7 @@ type FormProps = {
     errors: FormikErrors<FieldValueType>;
 };
 
+//TODO port away from Formit ro react hook forms
 const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, walls }: Props): JSX.Element => {
     const router = useRouter();
 
@@ -217,23 +217,9 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async () => {
-    const h = await db.host.findMany({
-        include: {
-            hostspecies: {},
-        },
-        distinct: [HostDistinctFieldEnum.host_species_id],
-    });
-    const hosts = h
-        .flatMap((h) => {
-            if (h.hostspecies != null) return [h.hostspecies.name, h.hostspecies.commonnames];
-            else return [];
-        })
-        .filter((h) => h)
-        .sort();
-
     return {
         props: {
-            hosts: hosts,
+            hosts: await allHostNames(),
             locations: await locations(),
             colors: await colors(),
             shapes: await shapes(),

@@ -10,7 +10,7 @@ import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import { useWithLookup } from '../../hooks/useWithLookups';
-import { DeleteResults, GallRes, GallUpsertFields, HostSimple } from '../../libs/apitypes';
+import { DeleteResults, GallApi, GallUpsertFields, HostSimple } from '../../libs/apitypes';
 import { allFamilies } from '../../libs/db/family';
 import { alignments, allGalls, cells, colors, locations, shapes, textures, walls } from '../../libs/db/gall';
 import { allHostsSimple } from '../../libs/db/host';
@@ -113,17 +113,31 @@ const Gall = ({
     const setGallDetails = async (spid: number): Promise<void> => {
         try {
             const res = await fetch(`../api/gall?speciesid=${spid}`);
-            const gall = (await res.json()) as GallRes;
-
-            setValue('detachable', gall.detachable);
-            setValueForLookup('walls', [gall.walls_id], walls, 'walls');
-            setValueForLookup('cells', [gall.cells_id], cells, 'cells');
-            setValueForLookup('alignment', [gall.alignment_id], alignments, 'alignment');
-            setValueForLookup('color', [gall.color_id], colors, 'color');
-            setValueForLookup('shape', [gall.shape_id], shapes, 'shape');
-            setValueForLookup('locations', gall.locations, locations, 'location');
-            setValueForLookup('textures', gall.textures, textures, 'texture');
-            setValueForLookup('hosts', gall.hosts, hosts, 'name');
+            const sp = (await res.json()) as GallApi;
+            setValue('detachable', sp.gall.detachable);
+            setValueForLookup('walls', [sp.gall.walls?.id], walls, 'walls');
+            setValueForLookup('cells', [sp.gall.cells?.id], cells, 'cells');
+            setValueForLookup('alignment', [sp.gall.alignment?.id], alignments, 'alignment');
+            setValueForLookup('color', [sp.gall.color?.id], colors, 'color');
+            setValueForLookup('shape', [sp.gall.shape?.id], shapes, 'shape');
+            setValueForLookup(
+                'locations',
+                sp.gall.galllocation.map((l) => l.location?.id),
+                locations,
+                'location',
+            );
+            setValueForLookup(
+                'textures',
+                sp.gall.galltexture.map((t) => t.texture?.id),
+                textures,
+                'texture',
+            );
+            setValueForLookup(
+                'hosts',
+                sp.hosts.map((h) => h.id),
+                hosts,
+                'name',
+            );
         } catch (e) {
             console.error(e);
         }
@@ -132,12 +146,14 @@ const Gall = ({
     const onSubmit = async (data: GallFormFields) => {
         if (data.delete) {
             const id = galls.find((g) => g.name === data.name)?.id;
+            console.log('FOOO :' + data);
             const res = await fetch(`../api/gall/${id}`, {
                 method: 'DELETE',
             });
 
             if (res.status === 200) {
                 setDeleteResults(await res.json());
+                return;
             } else {
                 throw new Error(await res.text());
             }
@@ -196,7 +212,7 @@ const Gall = ({
                                 if (f) {
                                     setExisting(true);
                                     setValueForLookup('family', [f.family_id], families, 'name');
-                                    setValueForLookup('abundance', [f.abundance_id as number | undefined], abundances, 'name');
+                                    setValueForLookup('abundance', [f.abundance_id], abundances, 'abundance');
                                     setValue('commonnames', f.commonnames);
                                     setValue('synonyms', f.synonyms);
                                     setGallDetails(f.id);

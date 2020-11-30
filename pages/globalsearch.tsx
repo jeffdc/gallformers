@@ -1,27 +1,21 @@
-import { gall, species } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
 import { Card, CardColumns, ListGroup } from 'react-bootstrap';
 import CardTextCollapse from '../components/cardcollapse';
-import db from '../libs/db/db';
+import { SpeciesApi } from '../libs/apitypes';
 import { GallTaxon } from '../libs/db/dbinternaltypes';
+import { getSpecies } from '../libs/db/species';
 import { entriesWithLinkedDefs, EntryLinked } from '../libs/glossary';
 import { deserialize } from '../libs/reactserialize';
 
-type SpeciesProp = species & {
-    gall: gall[];
-    hosts: species[];
-    host_galls: species[];
-};
-
 type Props = {
-    species: SpeciesProp[];
+    species: SpeciesApi[];
     glossary: EntryLinked[];
 };
 
-const speciesLink = (species: SpeciesProp) => {
+const speciesLink = (species: SpeciesApi) => {
     if (species.taxoncode === GallTaxon) {
         return (
             <Link href={`gall/${species.id}`}>
@@ -81,21 +75,15 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     // add wildcards to search phrase
     const q = `%${search}%`;
 
-    const species = await db.species.findMany({
-        include: {
-            host_galls: true,
-            hosts: true,
-            gall: true,
-        },
-        where: {
-            OR: [
-                { name: { contains: q } },
-                { description: { contains: q } },
-                { commonnames: { contains: q } },
-                { synonyms: { contains: q } },
-            ],
-        },
-    });
+    const species = await getSpecies(
+        [
+            { name: { contains: q } },
+            { speciessource: { some: { description: { contains: q } } } },
+            { commonnames: { contains: q } },
+            { synonyms: { contains: q } },
+        ],
+        false,
+    );
 
     const glossary = (await entriesWithLinkedDefs()).filter((e) => {
         return e.word === search || e.definition.includes(search);

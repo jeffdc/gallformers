@@ -8,10 +8,10 @@ import { Col, ListGroup, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import ControlledTypeahead from '../components/controlledtypeahead';
+import { GallApi, GallLocation, GallTexture, SearchQuery } from '../libs/apitypes';
 import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
 import { allHostGenera, allHostNames } from '../libs/db/host';
 import { mightBeNull } from '../libs/db/utils';
-import { Gall, GallLocation, GallTexture, SearchQuery } from '../libs/types';
 
 const dontCare = (o: string | string[] | undefined) => {
     const truthy = !!o;
@@ -30,15 +30,15 @@ const checkTextures = (gallprops: GallTexture[] | null, queryvals: string[] | un
     return gallprops.some((gp) => gp?.texture?.texture && queryvals.includes(gp?.texture?.texture));
 };
 
-const checkGall = (g: Gall, q: SearchQuery): boolean => {
-    const alignment = dontCare(q.alignment) || (!!g.alignment && g.alignment?.alignment === q.alignment);
-    const cells = dontCare(q.cells) || (!!g.cells && g.cells?.cells === q.cells);
-    const color = dontCare(q.color) || (!!g.color && g.color?.color === q.color);
-    const detachable = dontCare(q.detachable) || (!!g.detachable && (g.detachable == 0 ? 'no' : 'yes') === q.detachable);
-    const shape = dontCare(q.shape) || (!!g.shape && g.shape?.shape === q.shape);
-    const walls = dontCare(q.walls) || (!!g.walls && g.walls?.walls === q.walls);
-    const location = dontCare(q.locations) || (!!g.galllocation && checkLocations(g.galllocation, q.locations));
-    const texture = dontCare(q.textures) || (!!g.galltexture && checkTextures(g.galltexture, q.textures));
+const checkGall = (g: GallApi, q: SearchQuery): boolean => {
+    const alignment = dontCare(q.alignment) || (!!g.gall?.alignment && g.gall?.alignment?.alignment === q.alignment);
+    const cells = dontCare(q.cells) || (!!g.gall?.cells && g.gall?.cells?.cells === q.cells);
+    const color = dontCare(q.color) || (!!g.gall?.color && g.gall?.color?.color === q.color);
+    const detachable = dontCare(q.detachable) || (!!g.gall.detachable && (g.gall.detachable == 0 ? 'no' : 'yes') === q.detachable);
+    const shape = dontCare(q.shape) || (!!g.gall?.shape && g.gall?.shape?.shape === q.shape);
+    const walls = dontCare(q.walls) || (!!g.gall?.walls && g.gall?.walls?.walls === q.walls);
+    const location = dontCare(q.locations) || (!!g.gall.galllocation && checkLocations(g.gall.galllocation, q.locations));
+    const texture = dontCare(q.textures) || (!!g.gall.galltexture && checkTextures(g.gall.galltexture, q.textures));
 
     return alignment && cells && color && detachable && shape && walls && location && texture;
 };
@@ -100,7 +100,7 @@ const Search2 = (props: Props): JSX.Element => {
 
     const router = useRouter();
 
-    const [galls, setGalls] = useState(new Array<Gall>());
+    const [galls, setGalls] = useState(new Array<GallApi>());
     const [query, setQuery] = useState(router.query as SearchQuery);
 
     // this is the search form on sepcies or genus
@@ -288,7 +288,7 @@ const Search2 = (props: Props): JSX.Element => {
                                 )
                             ) : (
                                 galls.map((g) => (
-                                    <ListGroup.Item key={g.species_id}>
+                                    <ListGroup.Item key={g.id}>
                                         <Row key={g.id}>
                                             <Col xs={2} className="">
                                                 <img
@@ -299,10 +299,10 @@ const Search2 = (props: Props): JSX.Element => {
                                                 />
                                             </Col>
                                             <Col className="pl-0 pull-right">
-                                                <Link href={`gall/${g.species_id}`}>
-                                                    <a>{g.species?.name}</a>
+                                                <Link href={`gall/${g.id}`}>
+                                                    <a>{g.name}</a>
                                                 </Link>
-                                                - {gallDescription(g)}
+                                                - {gallDescription(g.description)}
                                             </Col>
                                         </Row>
                                     </ListGroup.Item>
@@ -316,15 +316,12 @@ const Search2 = (props: Props): JSX.Element => {
     );
 };
 
-const gallDescription = (g: Gall): string => {
-    if (g.species && g.species.description) {
-        if (g.species.description.length > 400) {
-            return g.species.description.slice(0, 400) + '...';
-        } else {
-            return g.species.description;
-        }
+const gallDescription = (description: string): string => {
+    if (description.length > 400) {
+        return description.slice(0, 400) + '...';
+    } else {
+        return description;
     }
-    return '';
 };
 
 export const getServerSideProps: GetServerSideProps = async () => {

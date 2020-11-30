@@ -12,5 +12,7 @@ import { PrismaClient } from '@prisma/client';
 
 const db = new PrismaClient();
 Object.freeze(db);
+// make sure foreign key support is turned on
+db.$executeRaw('PRAGMA foreign_keys = ON');
 
 export default db;

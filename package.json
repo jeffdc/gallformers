@@ -16,7 +16,7 @@
   "dependencies": {
     "@hookform/error-message": "^0.0.4",
     "@hookform/resolvers": "^1.0.0",
-    "@prisma/client": "^2.9.0",
+    "@prisma/client": "^2.12.1",
     "bootstrap": "^4.5.2",
     "formik": "^2.2.0",
     "natural": "^2.1.5",
@@ -32,7 +32,7 @@
     "yup": "^0.29.3"
   },
   "devDependencies": {
-    "@prisma/cli": "^2.9.0",
+    "@prisma/cli": "^2.12.1",
     "@testing-library/jest-dom": "^5.11.6",
     "@testing-library/react": "^11.2.2",
     "@types/jest": "^26.0.15",

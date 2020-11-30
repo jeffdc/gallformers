@@ -1,6 +1,7 @@
 import { family, species } from '@prisma/client';
-import Id from '../../pages/api/family/[id]';
+import { FamilyApi } from '../apitypes';
 import db from './db';
+import { GallTaxon, HostTaxon } from './dbinternaltypes';
 
 export const familyById = async (id: number): Promise<family | null> => {
     return db.family.findFirst({
@@ -17,6 +18,42 @@ export const speciesByFamily = async (id: number): Promise<species[]> => {
 
 export const allFamilies = async (): Promise<family[]> => {
     return db.family.findMany({
+        orderBy: { name: 'asc' },
+    });
+};
+
+export const getGallMakerFamilies = async (): Promise<FamilyApi[]> => {
+    return db.family.findMany({
+        include: {
+            species: {
+                select: {
+                    id: true,
+                    name: true,
+                    gall: { include: { species: { select: { id: true, name: true } } } },
+                },
+                where: { taxoncode: GallTaxon },
+                orderBy: { name: 'asc' },
+            },
+        },
+        where: { description: { not: 'Plant' } },
+        orderBy: { name: 'asc' },
+    });
+};
+
+export const getHostFamilies = async (): Promise<FamilyApi[]> => {
+    return db.family.findMany({
+        include: {
+            species: {
+                select: {
+                    id: true,
+                    name: true,
+                    gall: { include: { species: { select: { id: true, name: true } } } },
+                },
+                where: { taxoncode: HostTaxon },
+                orderBy: { name: 'asc' },
+            },
+        },
+        where: { description: { equals: 'Plant' } },
         orderBy: { name: 'asc' },
     });
 };

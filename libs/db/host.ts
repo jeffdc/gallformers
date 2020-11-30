@@ -1,5 +1,5 @@
-import { species, SpeciesDistinctFieldEnum } from '@prisma/client';
-import { HostApi, HostSimple } from '../apitypes';
+import { Prisma, species } from '@prisma/client';
+import { HostApi, HostSimple, SpeciesUpsertFields } from '../apitypes';
 import db from './db';
 import { HostTaxon } from './dbinternaltypes';
 import { mightBeNull } from './utils';
@@ -36,8 +36,8 @@ export const allHostGenera = async (): Promise<string[]> => {
             select: {
                 genus: true,
             },
-            distinct: [SpeciesDistinctFieldEnum.genus],
-            where: { taxoncode: { equals: null } },
+            distinct: [Prisma.SpeciesDistinctFieldEnum.genus],
+            where: { taxoncode: { equals: HostTaxon } },
             orderBy: { genus: 'asc' },
         })
         .then((hosts) => hosts.map((host) => host.genus));
@@ -72,4 +72,35 @@ export const hostById = async (id: string): Promise<HostApi | null> => {
             id: { equals: parseInt(id) },
         },
     });
+};
+
+export const upsertHost = async (h: SpeciesUpsertFields): Promise<number> => {
+    const abundanceConnect = () => {
+        if (h.abundance) {
+            return { connect: { abundance: h.abundance } };
+        } else {
+            return {};
+        }
+    };
+
+    const sp = db.species.upsert({
+        where: { name: h.name },
+        update: {
+            family: { connect: { name: h.family } },
+            abundance: { connect: { abundance: h.abundance } },
+            synonyms: h.synonyms,
+            commonnames: h.commonnames,
+        },
+        create: {
+            name: h.name,
+            genus: h.name.split(' ')[0],
+            taxontype: { connect: { taxoncode: HostTaxon } },
+            family: { connect: { name: h.family } },
+            abundance: abundanceConnect(),
+            synonyms: h.synonyms,
+            commonnames: h.commonnames,
+        },
+    });
+
+    return sp.then((s) => s.id);
 };

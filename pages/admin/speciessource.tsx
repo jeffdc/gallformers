@@ -3,12 +3,12 @@ import { source, species, speciessource } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import React, { useState } from 'react';
-import { Col, ListGroup, ListGroupItem, Row } from 'react-bootstrap';
+import { Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { SpeciesSourceInsertFields } from '../../libs/apitypes';
+import { DeleteResults, Source, SpeciesSourceInsertFields } from '../../libs/apitypes';
 import { GallTaxon } from '../../libs/db/dbinternaltypes';
 import { allSources } from '../../libs/db/source';
 import { allSpecies } from '../../libs/db/species';
@@ -20,7 +20,7 @@ type Props = {
 
 const Schema = yup.object().shape({
     species: yup.array().required(),
-    sources: yup.array().required(),
+    source: yup.array().required(),
 });
 
 type FormFields = {
@@ -28,22 +28,70 @@ type FormFields = {
     source: string;
     description: string;
     useasdefault: boolean;
+    delete: boolean;
 };
 
 const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
-    const [results, setResults] = useState(new Array<speciessource>());
+    const [results, setResults] = useState<speciessource>();
     const [isGall, setIsGall] = useState(true);
+    const [existing, setExisting] = useState(false);
+    const [deleteResults, setDeleteResults] = useState<DeleteResults>();
 
-    const { handleSubmit, errors, control, register } = useForm({
+    const { handleSubmit, errors, control, register, reset, setValue, getValues } = useForm({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
 
+    const lookup = (speciesName: string, sourceTitle: string) => {
+        return {
+            sp: species.find((sp) => sp.name.localeCompare(speciesName) === 0),
+            so: sources.find((so) => so.title.localeCompare(sourceTitle) === 0),
+        };
+    };
+
+    const checkAlreadyExists = async () => {
+        try {
+            const species = getValues('species');
+            const source = getValues('source');
+            console.log(`${JSON.stringify(species, null, '  ')}`);
+            console.log(`${JSON.stringify(source, null, '  ')}`);
+            const { sp, so } = lookup(species, source);
+            if (sp != undefined && so != undefined) {
+                const res = await fetch(`../api/speciessource?speciesid=${sp?.id}&sourceid=${so?.id}`);
+
+                setExisting(false);
+                if (res.status === 200) {
+                    const s = (await res.json()) as Source;
+                    if (s) {
+                        setExisting(true);
+                        setValue('description', s.description);
+                        setValue('useasdefault', s.useasdefault > 0);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
     const onSubmit = async (data: FormFields) => {
         try {
-            const sp = species.find((sp) => data.species === sp.name);
-            const so = sources.find((so) => data.source === so.title);
+            const { sp, so } = lookup(data.species[0], data.source[0]);
             if (!sp || !so) throw new Error('Somehow either the source or the species selected is invalid.');
+
+            if (data.delete) {
+                const res = await fetch(`../api/speciessource?speciesid=${sp?.id}&sourceid=${so?.id}`, {
+                    method: 'DELETE',
+                });
+
+                if (res.status === 200) {
+                    reset();
+                    setDeleteResults(await res.json());
+                    return;
+                } else {
+                    throw new Error(await res.text());
+                }
+            }
 
             setIsGall(sp.taxoncode === GallTaxon);
 
@@ -63,12 +111,13 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
             });
 
             if (res.status === 200) {
+                reset();
                 setResults(await res.json());
             } else {
                 throw new Error(await res.text());
             }
         } catch (e) {
-            console.log(e);
+            console.error(e);
         }
     };
 
@@ -85,6 +134,7 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                             placeholder="Species"
                             options={species.map((h) => h.name)}
                             isInvalid={!!errors.species}
+                            onBlur={checkAlreadyExists}
                         />
                         {errors.species && <span className="text-danger">You must provide a least one species to map.</span>}
                     </Col>
@@ -99,10 +149,11 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                         Source:
                         <ControlledTypeahead
                             control={control}
-                            name="sources"
+                            name="source"
                             placeholder="Sources"
                             options={sources.map((h) => h.title)}
                             isInvalid={!!errors.sources}
+                            onBlur={checkAlreadyExists}
                         />
                         {errors.sources && <span className="text-danger">You must provide a least one source to map.</span>}
                     </Col>
@@ -119,31 +170,33 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                         <label className="form-check-label">Use as Default?</label>
                     </Col>
                 </Row>
-                <Row className="form-group">
-                    <Col>
-                        <input type="submit" className="btn-primary" />
+                <Row className="fromGroup" hidden={!existing}>
+                    <Col xs="1">Delete?:</Col>
+                    <Col className="mr-auto">
+                        <input name="delete" type="checkbox" className="form-check-input" ref={register} />
                     </Col>
                 </Row>
-                {results.length > 0 && (
+                <Row className="formGroup">
+                    <Col>
+                        <input type="submit" className="button" />
+                    </Col>
+                </Row>
+                <Row hidden={!deleteResults}>
+                    <Col>{`Deleted ${deleteResults?.name}.`}</Col>
+                </Row>
+                {results && (
                     <>
-                        <span>Wrote {results.length} species-source mappings.</span>
-                        <ListGroup>
-                            {results.map((r) => {
-                                return (
-                                    <ListGroupItem key={r.id}>
-                                        Added{' '}
-                                        <Link href={`/source/${r.source_id}`}>
-                                            <a>source</a>
-                                        </Link>{' '}
-                                        to{' '}
-                                        <Link href={`/${isGall ? 'gall' : 'host'}/${r.species_id}`}>
-                                            <a>species</a>
-                                        </Link>
-                                        .
-                                    </ListGroupItem>
-                                );
-                            })}
-                        </ListGroup>
+                        <span>
+                            Mapped{' '}
+                            <Link href={`/source/${results.source_id}`}>
+                                <a>source</a>
+                            </Link>{' '}
+                            to{' '}
+                            <Link href={`/${isGall ? 'gall' : 'host'}/${results.species_id}`}>
+                                <a>species</a>
+                            </Link>
+                            .
+                        </span>
                     </>
                 )}
             </form>

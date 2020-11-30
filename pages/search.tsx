@@ -4,11 +4,11 @@ import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
 import { Card, CardColumns, Col, Row } from 'react-bootstrap';
 import CardTextCollapse from '../components/cardcollapse';
+import { GallApi, SearchQuery } from '../libs/apitypes';
 import { searchGalls } from '../libs/search';
-import { Gall, SearchQuery } from '../libs/types';
 
 type Props = {
-    data: Gall[];
+    data: GallApi[];
     query: SearchQuery;
 };
 
@@ -24,13 +24,11 @@ const Search = ({ data }: Props): JSX.Element => {
                                     <Card.Img variant="top" width="200px" src="/images/gall.jpg" />
                                     <Card.Body>
                                         <Card.Title>
-                                            <Link href={`gall/${gall.species_id}`}>
-                                                <a>{gall.species?.name}</a>
+                                            <Link href={`gall/${gall.id}`}>
+                                                <a>{gall.name}</a>
                                             </Link>
                                         </Card.Title>
-                                        <CardTextCollapse
-                                            text={gall.species?.description === null ? '' : gall.species?.description}
-                                        />
+                                        <CardTextCollapse text={gall.description} />
                                     </Card.Body>
                                 </Card>
                             ))}

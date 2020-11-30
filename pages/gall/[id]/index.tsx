@@ -9,30 +9,30 @@ import { deserialize, serialize } from '../../../libs/reactserialize';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
-    gall: GallApi;
+    species: GallApi;
 };
 
 function hostAsLink(h: GallHost) {
     return (
-        <Link key={h.host_species_id} href={`/host/${h.host_species_id}`}>
-            <a>{h.hostspecies?.name} </a>
+        <Link key={h.id} href={`/host/${h.id}`}>
+            <a>{h.name} </a>
         </Link>
     );
 }
 
-const Gall = ({ gall }: Props): JSX.Element => {
-    if (!gall) {
-        console.error('Failed to fetch gall from backend.');
-        return <div>Oops</div>;
-    }
+const Gall = ({ species }: Props): JSX.Element => {
+    // if (!gall) {
+    //     console.error('Failed to fetch gall from backend.');
+    //     return <div>Oops</div>;
+    // }
 
-    const source = gall.species.speciessource.find((s) => s.useasdefault !== 0);
+    const source = species.speciessource.find((s) => s.useasdefault !== 0);
     const [selectedSource, setSelectedSource] = useState(source);
 
     const changeDescription = (e: MouseEvent<HTMLButtonElement>) => {
         e.preventDefault();
         const id = e.currentTarget.id;
-        const s = gall.species.speciessource.find((s) => s.source_id.toString() === id);
+        const s = species.speciessource.find((s) => s.source_id.toString() === id);
         setSelectedSource(s);
     };
 
@@ -44,18 +44,18 @@ const Gall = ({ gall }: Props): JSX.Element => {
             }}
         >
             <Media>
-                <img width={170} height={128} className="mr-3" src="/images/gall.jpg" alt={gall.species.name} />
+                <img width={170} height={128} className="mr-3" src="/images/gall.jpg" alt={species.name} />
                 <Media.Body>
                     <Container className="p-3 border">
                         <Row>
                             <Col>
-                                <h2>{gall.species.name}</h2>
-                                {gall.species.commonnames ? `(${gall.species.commonnames})` : ''}
+                                <h2>{species.name}</h2>
+                                {species.commonnames ? `(${species.commonnames})` : ''}
                             </Col>
                             <Col className="text-right font-italic">
                                 Family:
-                                <Link key={gall.species.family.id} href={`/family/${gall.species.family.id}`}>
-                                    <a> {gall.species.family.name}</a>
+                                <Link key={species.family.id} href={`/family/${species.family.id}`}>
+                                    <a> {species.family.name}</a>
                                 </Link>
                             </Col>
                         </Row>
@@ -66,42 +66,42 @@ const Gall = ({ gall }: Props): JSX.Element => {
                         </Row>
                         <Row>
                             <Col>
-                                <strong>Hosts:</strong> {gall.species.hosts.map(hostAsLink)}
+                                <strong>Hosts:</strong> {species.hosts.map(hostAsLink)}
                             </Col>
                         </Row>
                         <Row>
                             <Col>
-                                <strong>Detachable:</strong> {gall.detachable == 1 ? 'yes' : 'no'}
+                                <strong>Detachable:</strong> {species.gall.detachable == 1 ? 'yes' : 'no'}
                             </Col>
                             <Col>
-                                <strong>Texture:</strong> {gall.galltexture.map((t) => t.texture?.texture).join(',')}
+                                <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.texture?.texture).join(',')}
                             </Col>
                             <Col>
-                                <strong>Color:</strong> {gall.color?.color}
+                                <strong>Color:</strong> {species.gall.color?.color}
                             </Col>
                             <Col>
-                                <strong>Alignment:</strong> {gall.alignment?.alignment}
+                                <strong>Alignment:</strong> {species.gall.alignment?.alignment}
                             </Col>
                         </Row>
                         <Row>
                             <Col>
-                                <strong>Location:</strong> {gall.galllocation.map((l) => l.location?.location).join(', ')}
+                                <strong>Location:</strong> {species.gall.galllocation.map((l) => l.location?.location).join(', ')}
                             </Col>
                             <Col>
-                                <strong>Walls:</strong> {gall.walls?.walls}
+                                <strong>Walls:</strong> {species.gall.walls?.walls}
                             </Col>
                             <Col>
-                                <strong>Abdundance:</strong> {gall.species?.abundance?.abundance}
+                                <strong>Abdundance:</strong> {species.abundance?.abundance}
                             </Col>
                             <Col>
-                                <strong>Shape:</strong> {gall.shape?.shape}
+                                <strong>Shape:</strong> {species.gall.shape?.shape}
                             </Col>
                         </Row>
                         <Row>
                             <Col>
                                 <strong>Further Information:</strong>
                                 <ListGroup variant="flush" defaultActiveKey={selectedSource?.source_id}>
-                                    {gall.species.speciessource
+                                    {species.speciessource
                                         .sort((a, b) => a.source.citation.localeCompare(b.source.citation))
                                         .map((speciessource) => (
                                             <ListGroup.Item
@@ -123,17 +123,17 @@ const Gall = ({ gall }: Props): JSX.Element => {
                                         <strong>See Also:</strong>
                                     </Col>
                                     <Col className="align-self-center">
-                                        <a href={iNatUrl(gall.species.name)} target="_blank" rel="noreferrer">
+                                        <a href={iNatUrl(species.name)} target="_blank" rel="noreferrer">
                                             <img src="/images/inatlogo-small.png" />
                                         </a>
                                     </Col>
                                     <Col className="align-self-center">
-                                        <a href={bugguideUrl(gall.species.name)} target="_blank" rel="noreferrer">
+                                        <a href={bugguideUrl(species.name)} target="_blank" rel="noreferrer">
                                             <img src="/images/bugguide-small.png" />
                                         </a>
                                     </Col>
                                     <Col className="align-self-center">
-                                        <a href={gScholarUrl(gall.species.name)} target="_blank" rel="noreferrer">
+                                        <a href={gScholarUrl(species.name)} target="_blank" rel="noreferrer">
                                             <img src="/images/gscholar-small.png" />
                                         </a>
                                     </Col>
@@ -154,18 +154,18 @@ export const getStaticProps: GetStaticProps = async (context) => {
     }
 
     const id = context.params.id as string;
-    const gall: GallApi = await gallById(id);
+    const species = await gallById(id);
 
-    if (gall != null || gall != undefined) {
+    if (species != null || species != undefined) {
         // markup the descriptions with glossary links
-        for (const s of gall.species.speciessource) {
+        for (const s of species.speciessource) {
             s.description = serialize(await linkTextFromGlossary(s.description));
         }
     }
 
     return {
         props: {
-            gall: gall,
+            species: species as GallApi,
         },
         revalidate: 1,
     };

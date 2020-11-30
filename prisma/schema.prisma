@@ -1,6 +1,5 @@
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["transactionApi"]
 }
 
 datasource db {
@@ -93,12 +92,14 @@ model species {
   commonnames                        String?
   genus                              String
   family_id                          Int
-  description                        String?
+  // description                        String?
   abundance_id                       Int?
   abundance                          abundance?      @relation(fields: [abundance_id], references: [id])
   family                             family          @relation(fields: [family_id], references: [id])
   taxontype                          taxontype?      @relation(fields: [taxoncode], references: [taxoncode])
-  gall                               gall[]
+  // gall                               gall[]
+  gallid                             Int?
+  gall                               gall?           @relation(fields: [gallid], references: [id])
   hosts host[]                       @relation("host_gall_species_idTospecies")
   host_galls host[]                  @relation("host_host_species_idTospecies")
   speciessource                      speciessource[]
@@ -118,7 +119,8 @@ model gall {
   cells        cells?         @relation(fields: [cells_id], references: [id])
   color        color?         @relation(fields: [color_id], references: [id])
   shape        shape?         @relation(fields: [shape_id], references: [id])
-  species      species        @relation(fields: [species_id], references: [id])
+  // species      species        @relation(fields: [species_id], references: [id])
+  species      species?
   taxontype    taxontype      @relation(fields: [taxoncode], references: [taxoncode])
   walls        walls?         @relation(fields: [walls_id], references: [id])
   galllocation galllocation[]
