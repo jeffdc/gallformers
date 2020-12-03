@@ -36,6 +36,31 @@ export type Deletable = {
     delete?: boolean;
 };
 
+export type FamilyApi = family & {
+    species: {
+        id: number;
+        name: string;
+        gall: {
+            species: {
+                id: number;
+                name: string;
+            } | null;
+        } | null;
+    }[];
+};
+
+export const EmptyFamily = {
+    id: -1,
+    name: '',
+    description: '',
+    species: [],
+} as FamilyApi;
+
+export type FamilyUpsertFields = {
+    name: string;
+    description: string;
+};
+
 export type SpeciesUpsertFields = Deletable & {
     id?: number;
     name: string;
@@ -109,16 +134,29 @@ export type HostGall = host & {
     gallspecies: GallSimple;
 };
 
-export type HostApi =
-    | (species & {
-          abundance: abundance | null;
-          family: family;
-          speciessource: Source[];
-          host_galls: HostGall[];
-      })
-    | null;
+export type HostApi = species & {
+    abundance: abundance | null;
+    family: family;
+    speciessource: Source[];
+    host_galls: HostGall[];
+};
 
-export type SourceUpsertFields = {
+export const EmptyHostApi = {
+    id: -1,
+    name: '',
+    genus: '',
+    taxoncode: null,
+    synonyms: null,
+    commonnames: null,
+    abundance_id: null,
+    abundance: null,
+    family_id: -1,
+    family: EmptyFamily,
+    speciessource: [],
+    host_galls: [],
+} as HostApi;
+
+export type SourceUpsertFields = Deletable & {
     title: string;
     author: string;
     pubyear: string;
@@ -126,7 +164,7 @@ export type SourceUpsertFields = {
     citation: string;
 };
 
-export type SpeciesSourceInsertFields = {
+export type SpeciesSourceInsertFields = Deletable & {
     species: number;
     source: number;
     description: string;
@@ -136,24 +174,6 @@ export type SpeciesSourceInsertFields = {
 export type HostInsertFields = {
     galls: number[];
     hosts: number[];
-};
-
-export type FamilyApi = family & {
-    species: {
-        id: number;
-        name: string;
-        gall: {
-            species: {
-                id: number;
-                name: string;
-            } | null;
-        } | null;
-    }[];
-};
-
-export type FamilyUpsertFields = {
-    name: string;
-    description: string;
 };
 
 export type DeleteResults = {

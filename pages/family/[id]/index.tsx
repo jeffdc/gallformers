@@ -3,8 +3,10 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
+import Maybe from 'true-myth/maybe';
 import { GallTaxon } from '../../../libs/db/dbinternaltypes';
 import { allFamilyIds, familyById, speciesByFamily } from '../../../libs/db/family';
+import { failIfNone } from '../../../libs/utils/util';
 
 type Props = {
     family: family;
@@ -65,7 +67,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
 
     return {
         props: {
-            family: await familyById(familyId),
+            family: failIfNone(await familyById(familyId)),
             species: await speciesByFamily(familyId),
         },
         revalidate: 1,

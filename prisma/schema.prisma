@@ -92,14 +92,15 @@ model species {
   commonnames                        String?
   genus                              String
   family_id                          Int
-  // description                        String?
   abundance_id                       Int?
   abundance                          abundance?      @relation(fields: [abundance_id], references: [id])
   family                             family          @relation(fields: [family_id], references: [id])
   taxontype                          taxontype?      @relation(fields: [taxoncode], references: [taxoncode])
   // gall                               gall[]
-  gallid                             Int?
-  gall                               gall?           @relation(fields: [gallid], references: [id])
+  // gallid                             Int?
+  // gall                               gall?           @relation(fields: [gallid], references: [id])
+  // @onDelete(CASCADE)
+  gall                               gall?
   hosts host[]                       @relation("host_gall_species_idTospecies")
   host_galls host[]                  @relation("host_host_species_idTospecies")
   speciessource                      speciessource[]
@@ -107,7 +108,7 @@ model species {
 
 model gall {
   id           Int            @id @default(autoincrement())
-  species_id   Int            @unique
+  species_id   Int           @unique
   taxoncode    String
   detachable   Int?
   alignment_id Int?
@@ -119,11 +120,13 @@ model gall {
   cells        cells?         @relation(fields: [cells_id], references: [id])
   color        color?         @relation(fields: [color_id], references: [id])
   shape        shape?         @relation(fields: [shape_id], references: [id])
-  // species      species        @relation(fields: [species_id], references: [id])
-  species      species?
+  species      species        @relation(fields: [species_id], references: [id])
+  // species      species?
   taxontype    taxontype      @relation(fields: [taxoncode], references: [taxoncode])
   walls        walls?         @relation(fields: [walls_id], references: [id])
+  // @onDelete(CASCADE)
   galllocation galllocation[]
+  // @onDelete(CASCADE)
   galltexture  galltexture[]
 }
 
@@ -145,10 +148,11 @@ model galltexture {
 
 model host {
   id                 Int      @id @default(autoincrement())
-  host_species_id    Int
-  gall_species_id    Int
-  gallspecies        species @relation("host_gall_species_idTospecies", fields: [gall_species_id], references: [id])
-  hostspecies        species @relation("host_host_species_idTospecies", fields: [host_species_id], references: [id])
+  // these need to be optional, otherwise they can not be deleted when a gall is deleted. this due defecincies in Prisma
+  host_species_id    Int?
+  gall_species_id    Int?
+  gallspecies        species? @relation("host_gall_species_idTospecies", fields: [gall_species_id], references: [id])
+  hostspecies        species? @relation("host_host_species_idTospecies", fields: [host_species_id], references: [id])
 }
 
 model source {

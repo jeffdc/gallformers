@@ -1,12 +1,22 @@
-import { family, species } from '@prisma/client';
-import { FamilyApi } from '../apitypes';
+import { family, Prisma, species } from '@prisma/client';
+import { FamilyApi, SpeciesApi } from '../apitypes';
+import { Option, fromNullable } from 'fp-ts/lib/Option';
+import * as TE from 'fp-ts/lib/TaskEither';
 import db from './db';
 import { GallTaxon, HostTaxon } from './dbinternaltypes';
+import { gallDeleteSteps, getGalls } from './gall';
+import { getSpecies } from './species';
+import { TaskEither } from 'fp-ts/lib/TaskEither';
+import { flow, pipe } from 'fp-ts/lib/function';
+import { handleError } from '../utils/util';
+import { extractId } from './utils';
 
-export const familyById = async (id: number): Promise<family | null> => {
-    return db.family.findFirst({
-        where: { id: { equals: id } },
-    });
+export const familyById = async (id: number): Promise<Option<family>> => {
+    return db.family
+        .findFirst({
+            where: { id: { equals: id } },
+        })
+        .then((f) => fromNullable(f));
 };
 
 export const speciesByFamily = async (id: number): Promise<species[]> => {
@@ -64,4 +74,34 @@ export const allFamilyIds = async (): Promise<string[]> => {
             select: { id: true },
         })
         .then((fs) => fs.map((f) => f.id.toString()));
+};
+
+export const getAllSpeciesForFamily = (id: number): TaskEither<Error, SpeciesApi[]> => {
+    return getSpecies([{ family_id: id }]);
+};
+
+export const familyDeleteSteps = (familyid: number): Promise<Prisma.BatchPayload>[] => {
+    return [
+        db.family.deleteMany({
+            where: { id: familyid },
+        }),
+    ];
+};
+
+export const deleteFamily = (id: number): TaskEither<Error, Prisma.BatchPayload[]> => {
+    const deleteTx = (speciesids: number[], gallids: number[]) =>
+        TE.tryCatch(() => db.$transaction(gallDeleteSteps(speciesids, gallids).concat(familyDeleteSteps(id))), handleError);
+
+    const galls = (speciesids: number[]) => getGalls([{ id: { in: speciesids } }]);
+
+    // I am sure that there is a way to map the Species and Gall arrays to number arrays before the point of use
+    // but I struggled figuring it out, got lost in "type soup".
+    const foo = pipe(
+        TE.bindTo('speciesids')(getAllSpeciesForFamily(id)),
+        TE.bind('gallids', ({ speciesids }) => galls(speciesids.map(extractId))),
+        TE.map(({ speciesids, gallids }) => deleteTx(speciesids.map(extractId), gallids.map(extractId))),
+        TE.flatten,
+    );
+
+    return foo;
 };

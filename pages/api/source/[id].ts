@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from 'next-auth/client';
-import { deleteFamily } from '../../../libs/db/family';
+import db from '../../../libs/db/db';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     try {
@@ -12,10 +12,11 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
         if (req.method === 'DELETE') {
             const id = Array.isArray(req.query.id) && req.query.id.length > 1 ? req.query.id[0] : (req.query.id as string);
 
-            (await deleteFamily(parseInt(id))).mapOrElse(
-                (err) => res.status(400).json({ error: err }),
-                () => res.status(200).json({ name: 'Family' }),
-            );
+            const results = await db.source.delete({
+                where: { id: parseInt(id) },
+                select: { title: true },
+            });
+            res.status(200).json({ name: results.title });
         } else {
             res.status(405).end();
         }

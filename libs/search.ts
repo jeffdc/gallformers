@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { GallApi, SearchQuery } from './apitypes';
 import { getGalls } from './db/gall';
 
@@ -7,7 +8,7 @@ import { getGalls } from './db/gall';
  * @param query the SearchQuery to use
  * @returns a Promise<GallApi[]> with found galls, if any.
  */
-export const searchGalls = async (query: SearchQuery): Promise<GallApi[]> => {
+export const searchGalls = (query: SearchQuery): TaskEither<Error, GallApi[]> => {
     console.log(`Searching for galls with '${JSON.stringify(query, null, '  ')}'`);
 
     // the locations and textures *might* come in as encoded JSON arrays so we need to parse them
@@ -33,7 +34,7 @@ export const searchGalls = async (query: SearchQuery): Promise<GallApi[]> => {
             ? {}
             : { OR: [{ detachable: { equals: null } }, { detachable: { equals: parseInt(query.detachable) } }] };
 
-    const data: Promise<GallApi[]> = getGalls([
+    const data = getGalls([
         detachableWhere,
         whereDontCare(query.color, { color: { color: { equals: query.color } } }),
         whereDontCare(query.alignment, { alignment: { alignment: { equals: query.alignment } } }),

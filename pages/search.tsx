@@ -1,3 +1,6 @@
+import { flow, pipe } from 'fp-ts/lib/function';
+import { Task } from 'fp-ts/lib/Task';
+import * as TE from 'fp-ts/lib/TaskEither';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
@@ -6,6 +9,7 @@ import { Card, CardColumns, Col, Row } from 'react-bootstrap';
 import CardTextCollapse from '../components/cardcollapse';
 import { GallApi, SearchQuery } from '../libs/apitypes';
 import { searchGalls } from '../libs/search';
+import { handleFailure, mightFail } from '../libs/utils/util';
 
 type Props = {
     data: GallApi[];
@@ -47,7 +51,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
 
     return {
         props: {
-            data: await searchGalls(context.query as SearchQuery),
+            data: await mightFail(searchGalls(context.query as SearchQuery)),
             query: { ...context.query },
         },
     };

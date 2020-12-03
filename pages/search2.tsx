@@ -34,7 +34,8 @@ const checkGall = (g: GallApi, q: SearchQuery): boolean => {
     const alignment = dontCare(q.alignment) || (!!g.gall?.alignment && g.gall?.alignment?.alignment === q.alignment);
     const cells = dontCare(q.cells) || (!!g.gall?.cells && g.gall?.cells?.cells === q.cells);
     const color = dontCare(q.color) || (!!g.gall?.color && g.gall?.color?.color === q.color);
-    const detachable = dontCare(q.detachable) || (!!g.gall.detachable && (g.gall.detachable == 0 ? 'no' : 'yes') === q.detachable);
+    const detachable =
+        dontCare(q.detachable) || (!!g.gall.detachable && (g.gall.detachable == 0 ? 'no' : 'yes') === q.detachable);
     const shape = dontCare(q.shape) || (!!g.gall?.shape && g.gall?.shape?.shape === q.shape);
     const walls = dontCare(q.walls) || (!!g.gall?.walls && g.gall?.walls?.walls === q.walls);
     const location = dontCare(q.locations) || (!!g.gall.galllocation && checkLocations(g.gall.galllocation, q.locations));

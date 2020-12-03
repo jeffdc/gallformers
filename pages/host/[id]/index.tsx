@@ -5,6 +5,7 @@ import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
 import { HostApi, HostGall } from '../../../libs/apitypes';
 import { allHostIds, hostById } from '../../../libs/db/host';
 import { mightBeNull } from '../../../libs/db/utils';
+import { getStaticPathsFromIds, getStaticPropsWithId } from '../../../libs/pages/nextPageHelpers';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
@@ -22,11 +23,6 @@ function gallAsLink(g: HostGall) {
 }
 
 const Host = ({ host }: Props): JSX.Element => {
-    if (!host) {
-        console.error('Failed to fetch host from backend.');
-        return <div>Oops</div>;
-    }
-
     const source = host.speciessource.find((s) => s.useasdefault !== 0);
     const [selectedSource, setSelectedSource] = useState(source);
 
@@ -119,28 +115,16 @@ const Host = ({ host }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    if (context === undefined || context.params === undefined || context.params.id === undefined) {
-        throw new Error(`Host id can not be undefined.`);
-    } else if (Array.isArray(context.params.id)) {
-        throw new Error(`Expected single id but got an array of ids ${context.params.id}.`);
-    }
+    const host = getStaticPropsWithId(context, hostById, 'host');
 
     return {
         props: {
-            host: await hostById(context.params.id),
+            host: await host,
         },
         revalidate: 1,
     };
 };
 
-export const getStaticPaths: GetStaticPaths = async () => {
-    const hosts = await allHostIds();
-
-    const paths = hosts.map((host) => ({
-        params: { id: host },
-    }));
-
-    return { paths, fallback: false };
-};
+export const getStaticPaths: GetStaticPaths = async () => getStaticPathsFromIds(allHostIds);
 
 export default Host;

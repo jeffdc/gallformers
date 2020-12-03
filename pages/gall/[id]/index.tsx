@@ -5,6 +5,7 @@ import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
 import { GallApi, GallHost } from '../../../libs/apitypes';
 import { allGallIds, gallById } from '../../../libs/db/gall';
 import { linkTextFromGlossary } from '../../../libs/glossary';
+import { getStaticPathsFromIds, getStaticPropsWithId } from '../../../libs/pages/nextPageHelpers';
 import { deserialize, serialize } from '../../../libs/reactserialize';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
@@ -21,11 +22,6 @@ function hostAsLink(h: GallHost) {
 }
 
 const Gall = ({ species }: Props): JSX.Element => {
-    // if (!gall) {
-    //     console.error('Failed to fetch gall from backend.');
-    //     return <div>Oops</div>;
-    // }
-
     const source = species.speciessource.find((s) => s.useasdefault !== 0);
     const [selectedSource, setSelectedSource] = useState(source);
 
@@ -149,36 +145,21 @@ const Gall = ({ species }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    if (context === undefined || context.params === undefined || context.params.id === undefined) {
-        throw new Error('An id must be passed to gall/[id]!');
-    }
+    const g = await getStaticPropsWithId(context, gallById, 'gall');
 
-    const id = context.params.id as string;
-    const species = await gallById(id);
-
-    if (species != null || species != undefined) {
-        // markup the descriptions with glossary links
-        for (const s of species.speciessource) {
-            s.description = serialize(await linkTextFromGlossary(s.description));
-        }
+    const gall = g[0];
+    for (const s of gall.speciessource) {
+        s.description = serialize(await linkTextFromGlossary(s.description));
     }
 
     return {
         props: {
-            species: species as GallApi,
+            species: gall,
         },
         revalidate: 1,
     };
 };
 
-export const getStaticPaths: GetStaticPaths = async () => {
-    const galls = await allGallIds();
-
-    const paths = galls.map((id) => ({
-        params: { id: id },
-    }));
-
-    return { paths, fallback: false };
-};
+export const getStaticPaths: GetStaticPaths = async () => getStaticPathsFromIds(allGallIds);
 
 export default Gall;

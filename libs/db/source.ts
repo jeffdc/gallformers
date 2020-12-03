@@ -1,18 +1,14 @@
 import { source } from '@prisma/client';
+import { Maybe } from 'true-myth';
 import db from './db';
 
-export const sourceById = async (id: number): Promise<source | null> => {
-    return db.source.findFirst({
-        where: { id: { equals: id } },
-    });
+export const sourceById = async (id: number): Promise<Maybe<source>> => {
+    return db.source
+        .findFirst({
+            where: { id: { equals: id } },
+        })
+        .then((s) => Maybe.of(s));
 };
-
-// export const speciesByFamily = async (id: number): Promise<species[]> => {
-//     return db.species.findMany({
-//         where: { family_id: { equals: id } },
-//         orderBy: { name: 'asc' },
-//     });
-// };
 
 export const allSources = async (): Promise<source[]> => {
     return db.source.findMany({

@@ -1,5 +1,6 @@
 import * as fc from 'fast-check';
-import { hasProp, randInt } from './util';
+import { Maybe } from 'true-myth';
+import { handleFailure, hasProp, randInt } from './util';
 
 test('randInt should always return a number within the bounds', () => {
     fc.assert(
@@ -37,4 +38,8 @@ test('hasProp should detect props', () => {
             },
         );
     });
+});
+
+test('handleFailure must throw', () => {
+    expect(() => handleFailure(new Error('fail'))).toThrow();
 });

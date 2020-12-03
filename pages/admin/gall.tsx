@@ -95,7 +95,7 @@ const Gall = ({
     abundances,
     families,
 }: Props): JSX.Element => {
-    const { register, handleSubmit, errors, control, setValue } = useForm({
+    const { register, handleSubmit, errors, control, reset, setValue } = useForm({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
@@ -146,12 +146,12 @@ const Gall = ({
     const onSubmit = async (data: GallFormFields) => {
         if (data.delete) {
             const id = galls.find((g) => g.name === data.name)?.id;
-            console.log('FOOO :' + data);
             const res = await fetch(`../api/gall/${id}`, {
                 method: 'DELETE',
             });
 
             if (res.status === 200) {
+                reset();
                 setDeleteResults(await res.json());
                 return;
             } else {

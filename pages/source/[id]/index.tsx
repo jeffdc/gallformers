@@ -4,6 +4,7 @@ import React from 'react';
 import { Col, Row } from 'react-bootstrap';
 import { allSources, sourceById } from '../../../libs/db/source';
 import { mightBeNull } from '../../../libs/db/utils';
+import { failIfNone } from '../../../libs/utils/util';
 
 type Props = {
     source: source;
@@ -49,7 +50,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
 
     return {
         props: {
-            source: await sourceById(parseInt(context.params.id)),
+            source: failIfNone(await sourceById(parseInt(context.params.id))),
         },
         revalidate: 1,
     };

@@ -92,7 +92,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     return {
         props: {
             species: species,
-            glossary: glossary == undefined ? [] : glossary,
+            glossary: glossary,
         },
     };
 };

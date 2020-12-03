@@ -2,13 +2,13 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { source } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
-import React from 'react';
+import React, { useState } from 'react';
 import { Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { SpeciesUpsertFields } from '../../libs/apitypes';
+import { DeleteResults, SourceUpsertFields } from '../../libs/apitypes';
 import { allSources } from '../../libs/db/source';
 
 const Schema = yup.object().shape({
@@ -23,15 +23,34 @@ type Props = {
 };
 
 const Host = ({ sources }: Props): JSX.Element => {
-    const { register, handleSubmit, errors, control, setValue } = useForm({
+    const { register, handleSubmit, errors, control, setValue, reset } = useForm({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
+    const [existing, setExisting] = useState(false);
+    const [deleteResults, setDeleteResults] = useState<DeleteResults>();
 
     const router = useRouter();
 
-    const onSubmit = async (data: SpeciesUpsertFields) => {
+    const onSubmit = async (data: SourceUpsertFields) => {
         try {
+            if (data.delete) {
+                const id = sources.find((s) => s.title === data.title)?.id;
+                if (!id) throw new Error('Selected source was detected as pre-existing but lookup failed.');
+
+                const res = await fetch(`../api/source/${id}`, {
+                    method: 'DELETE',
+                });
+
+                if (res.status === 200) {
+                    reset();
+                    setDeleteResults(await res.json());
+                    return;
+                } else {
+                    throw new Error(await res.text());
+                }
+            }
+
             const res = await fetch('../api/source/upsert', {
                 method: 'POST',
                 headers: {
@@ -61,8 +80,10 @@ const Host = ({ sources }: Props): JSX.Element => {
                             control={control}
                             name="title"
                             onChange={(e) => {
+                                setExisting(false);
                                 const f = sources.find((f) => f.title === e[0]);
                                 if (f) {
+                                    setExisting(true);
                                     setValue('author', f.author);
                                     setValue('pubyear', f.pubyear);
                                     setValue('link', f.link);
@@ -110,7 +131,20 @@ const Host = ({ sources }: Props): JSX.Element => {
                         {errors.citation && <span className="text-danger">You must provide a citation in MLA form.</span>}
                     </Col>
                 </Row>
-                <input type="submit" className="button" />
+                <Row className="fromGroup" hidden={!existing}>
+                    <Col xs="1">Delete?:</Col>
+                    <Col className="mr-auto">
+                        <input name="delete" type="checkbox" className="form-check-input" ref={register} />
+                    </Col>
+                </Row>
+                <Row className="formGroup">
+                    <Col>
+                        <input type="submit" className="button" />
+                    </Col>
+                </Row>
+                <Row hidden={!deleteResults}>
+                    <Col>{`Deleted ${deleteResults?.name}.`}</Col>
+                </Row>
             </form>
         </Auth>
     );

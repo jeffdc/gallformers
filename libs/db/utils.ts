@@ -25,6 +25,7 @@ export type ConnectTypes =
     | Prisma.taxontypeCreateOneWithoutSpeciesInput
     | Prisma.taxontypeUpdateOneWithoutSpeciesInput
     | Prisma.hostCreateManyWithoutGallspeciesInput
+    | Prisma.hostCreateWithoutGallspeciesInput
     | Prisma.galllocationCreateWithoutGallInput
     | Prisma.galltextureCreateWithoutGallInput;
 
@@ -36,7 +37,7 @@ export function connectIfNotNull<T extends ConnectTypes>(fieldName: string, valu
     }
 }
 
-export type InsertFieldName = 'id' | 'location' | 'texture';
+export type InsertFieldName = 'id' | 'location' | 'texture' | 'hostspecies';
 
 export function connectWithIds<T extends ConnectTypes>(fieldName: InsertFieldName, ids: readonly number[]): T[] {
     const key = fieldName as keyof T;
@@ -45,3 +46,21 @@ export function connectWithIds<T extends ConnectTypes>(fieldName: InsertFieldNam
         return ({ [key]: { connect: { id: l } } } as unknown) as T;
     });
 }
+
+export function createWithIds<T extends ConnectTypes>(fieldName: InsertFieldName, ids: readonly number[]): T[] {
+    const key = fieldName as keyof T;
+    return ids.map((l) => {
+        // ugly casting due to what seems to be a TS bug. See: https://github.com/Microsoft/TypeScript/issues/13948
+        return ({ [key]: { create: { id: l } } } as unknown) as T;
+    });
+}
+
+export function mapToIdsForPrisma<T extends ConnectTypes>(ids: number[]): T[] {
+    return ids.map((id) => {
+        return ({
+            id: id,
+        } as unknown) as T;
+    });
+}
+
+export const extractId = <T extends { id: number }>(o: T): number => o.id;

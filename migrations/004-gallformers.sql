@@ -99,6 +99,64 @@ INSERT INTO gall (id, species_id, taxoncode, detachable, alignment_id, walls_id,
     SELECT id, species_id, taxoncode, detachable, alignment_id, walls_id, cells_id, color_id, shape_id 
     FROM _gall_old;
 
+-- same for host, galllocation and galltexture mapping tables
+ALTER TABLE galllocation RENAME TO _galllocation_old;
+CREATE TABLE galllocation (
+    id          INTEGER PRIMARY KEY
+                        NOT NULL,
+    gall_id     INTEGER,
+    location_id INTEGER,
+    FOREIGN KEY (
+        gall_id
+    )
+    REFERENCES gall (id) ON DELETE CASCADE,
+    FOREIGN KEY (
+        location_id
+    )
+    REFERENCES location (id) 
+);
+INSERT INTO galllocation (id, gall_id, location_id)
+    SELECT id, gall_id, location_id
+    FROM _galllocation_old;
+
+ALTER TABLE galltexture RENAME TO _galltexture_old;
+CREATE TABLE galltexture (
+    id         INTEGER PRIMARY KEY
+                       NOT NULL,
+    gall_id    INTEGER,
+    texture_id INTEGER,
+    FOREIGN KEY (
+        gall_id
+    )
+    REFERENCES gall (id) ON DELETE CASCADE,
+    FOREIGN KEY (
+        texture_id
+    )
+    REFERENCES texture (id) 
+);
+INSERT INTO galltexture (id, gall_id, location_id)
+    SELECT id, gall_id, location_id
+    FROM _galltexture_old;
+
+ALTER TABLE host RENAME TO _host_old;
+CREATE TABLE host (
+    id              INTEGER PRIMARY KEY
+                            NOT NULL,
+    host_species_id INTEGER,
+    gall_species_id INTEGER,
+    FOREIGN KEY (
+        host_species_id
+    )
+    REFERENCES species (id) ON DELETE CASCADE,
+    FOREIGN KEY (
+        gall_species_id
+    )
+    REFERENCES species (id) ON DELETE CASCADE
+);
+INSERT INTO host (id, host_species_id, gall_species_id)
+    SELECT id, host_species_id, gall_species_id
+    FROM _host_old;
+
 PRAGMA foreign_keys=ON;
 
 --------------------------------------------------------------
