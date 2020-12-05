@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 import { allGlossaryEntries, Entry } from '../../../libs/db/glossary';
-import { linkTextFromGlossary, testables } from '../../../libs/glossary';
+import { linkTextFromGlossary, testables } from '../../../libs/pages/glossary';
 import { hasProp } from '../../../libs/utils/util';
 import * as T from 'fp-ts/lib/Task';
 import * as TE from 'fp-ts/lib/TaskEither';

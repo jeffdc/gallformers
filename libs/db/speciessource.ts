@@ -4,7 +4,7 @@ import { TaskEither } from 'fp-ts/lib/TaskEither';
 import * as TE from 'fp-ts/lib/TaskEither';
 import * as A from 'fp-ts/lib/Array';
 import * as O from 'fp-ts/lib/Option';
-import { DeleteResult, Source, SpeciesSourceInsertFields } from '../apitypes';
+import { DeleteResult, Source, SpeciesSourceInsertFields } from '../api/apitypes';
 import db from './db';
 import { handleError } from '../utils/util';
 import { extractId } from './utils';

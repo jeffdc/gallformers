@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, HostApi, HostSimple, HostTaxon, SpeciesUpsertFields } from '../apitypes';
+import { DeleteResult, HostApi, HostSimple, HostTaxon, SpeciesUpsertFields } from '../api/apitypes';
 import { ExtractTFromPromise, handleError } from '../utils/util';
 import db from './db';
 import { mightBeNull } from './utils';

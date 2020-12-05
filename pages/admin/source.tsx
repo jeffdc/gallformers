@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { DeleteResult, SourceUpsertFields } from '../../libs/apitypes';
+import { DeleteResult, SourceUpsertFields } from '../../libs/api/apitypes';
 import { allSources } from '../../libs/db/source';
 import { mightFail } from '../../libs/utils/util';
 

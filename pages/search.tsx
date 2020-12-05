@@ -4,8 +4,8 @@ import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
 import { Card, CardColumns, Col, Row } from 'react-bootstrap';
 import CardTextCollapse from '../components/cardcollapse';
-import { GallApi, SearchQuery } from '../libs/apitypes';
-import { searchGalls } from '../libs/search';
+import { GallApi, SearchQuery } from '../libs/api/apitypes';
+import { searchGalls } from '../libs/pages/search';
 import { mightFail } from '../libs/utils/util';
 
 type Props = {

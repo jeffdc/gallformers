@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { DeleteResult } from '../libs/apitypes';
+import { DeleteResult } from '../libs/api/apitypes';
 
 type Params = {
     doDelete: () => DeleteResult;

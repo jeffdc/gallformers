@@ -4,7 +4,7 @@ import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from 'next-auth/client';
-import { DeleteResult } from '../apitypes';
+import { DeleteResult } from './apitypes';
 
 /**
  *

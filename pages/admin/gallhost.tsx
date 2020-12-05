@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { GallHostInsertFields } from '../../libs/apitypes';
+import { GallHostInsertFields } from '../../libs/api/apitypes';
 import { allGalls } from '../../libs/db/gall';
 import { allHosts } from '../../libs/db/host';
 import { mightFail } from '../../libs/utils/util';

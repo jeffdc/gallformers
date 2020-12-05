@@ -3,7 +3,7 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
-import { GallTaxon } from '../../../libs/apitypes';
+import { GallTaxon } from '../../../libs/api/apitypes';
 import { allFamilyIds, familyById, speciesByFamily } from '../../../libs/db/family';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 

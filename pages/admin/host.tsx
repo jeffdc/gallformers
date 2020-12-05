@@ -9,7 +9,7 @@ import { genOptions } from '../../libs/utils/forms';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { useRouter } from 'next/router';
-import { DeleteResult, SpeciesUpsertFields } from '../../libs/apitypes';
+import { DeleteResult, SpeciesUpsertFields } from '../../libs/api/apitypes';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import { allHosts } from '../../libs/db/host';

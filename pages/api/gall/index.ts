@@ -5,7 +5,7 @@ import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { gallById } from '../../../libs/db/gall';
-import { GallApi } from '../../../libs/apitypes';
+import { GallApi } from '../../../libs/api/apitypes';
 
 export const getQueryId = (id: string | string[] | null | undefined): Option<number> => {
     // eslint-disable-next-line prettier/prettier

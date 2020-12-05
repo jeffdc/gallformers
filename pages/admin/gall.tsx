@@ -10,7 +10,7 @@ import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import { useWithLookup } from '../../hooks/useWithLookups';
-import { DeleteResult, GallApi, GallUpsertFields, HostSimple } from '../../libs/apitypes';
+import { DeleteResult, GallApi, GallUpsertFields, HostSimple } from '../../libs/api/apitypes';
 import { allFamilies } from '../../libs/db/family';
 import { alignments, allGalls, cells, colors, locations, shapes, textures, walls } from '../../libs/db/gall';
 import { allHostsSimple } from '../../libs/db/host';

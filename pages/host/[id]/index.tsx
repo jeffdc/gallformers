@@ -2,7 +2,7 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React, { MouseEvent, useState } from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
-import { HostApi, HostGall } from '../../../libs/apitypes';
+import { HostApi, HostGall } from '../../../libs/api/apitypes';
 import { allHostIds, hostById } from '../../../libs/db/host';
 import { mightBeNull } from '../../../libs/db/utils';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';

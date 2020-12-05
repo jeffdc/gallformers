@@ -6,9 +6,9 @@ import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
 import { Card, CardColumns, ListGroup } from 'react-bootstrap';
 import CardTextCollapse from '../components/cardcollapse';
-import { GallTaxon, SpeciesApi } from '../libs/apitypes';
+import { GallTaxon, SpeciesApi } from '../libs/api/apitypes';
 import { getSpecies } from '../libs/db/species';
-import { entriesWithLinkedDefs, EntryLinked } from '../libs/glossary';
+import { entriesWithLinkedDefs, EntryLinked } from '../libs/pages/glossary';
 import { deserialize } from '../libs/utils/reactserialize';
 import { mightFail } from '../libs/utils/util';
 

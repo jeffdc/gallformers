@@ -8,7 +8,7 @@ import { Col, ListGroup, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import ControlledTypeahead from '../components/controlledtypeahead';
-import { GallApi, GallLocation, GallTexture, SearchQuery } from '../libs/apitypes';
+import { GallApi, GallLocation, GallTexture, SearchQuery } from '../libs/api/apitypes';
 import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
 import { allHostGenera, allHostNames } from '../libs/db/host';
 import { mightBeNull } from '../libs/db/utils';

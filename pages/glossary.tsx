@@ -1,7 +1,7 @@
 import { GetStaticProps } from 'next';
 import React from 'react';
 import { ListGroup } from 'react-bootstrap';
-import { entriesWithLinkedDefs, EntryLinked } from '../libs/glossary';
+import { entriesWithLinkedDefs, EntryLinked } from '../libs/pages/glossary';
 import { getStaticPropsWith } from '../libs/pages/nextPageHelpers';
 import { deserialize } from '../libs/utils/reactserialize';
 

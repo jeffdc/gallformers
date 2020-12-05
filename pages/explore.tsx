@@ -1,7 +1,7 @@
 import { GetStaticProps } from 'next';
 import Link from 'next/link';
 import { Accordion, Button, Card, ListGroup, Tab, Tabs } from 'react-bootstrap';
-import { FamilyApi } from '../libs/apitypes';
+import { FamilyApi } from '../libs/api/apitypes';
 import { getGallMakerFamilies, getHostFamilies } from '../libs/db/family';
 import { getStaticPropsWith } from '../libs/pages/nextPageHelpers';
 

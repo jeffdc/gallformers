@@ -2,7 +2,7 @@ import { family, Prisma, species } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, FamilyApi, FamilyUpsertFields, GallTaxon, HostTaxon, SpeciesApi } from '../apitypes';
+import { DeleteResult, FamilyApi, FamilyUpsertFields, GallTaxon, HostTaxon, SpeciesApi } from '../api/apitypes';
 import { handleError } from '../utils/util';
 import db from './db';
 import { gallDeleteSteps, getGalls } from './gall';

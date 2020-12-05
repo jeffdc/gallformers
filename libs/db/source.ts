@@ -5,7 +5,7 @@ import db from './db';
 import { handleError } from '../utils/util';
 import { extractId } from './utils';
 import { pipe } from 'fp-ts/lib/function';
-import { DeleteResult, SourceUpsertFields } from '../apitypes';
+import { DeleteResult, SourceUpsertFields } from '../api/apitypes';
 
 export const sourceById = (id: number): TaskEither<Error, source[]> => {
     const sources = () =>

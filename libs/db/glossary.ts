@@ -2,7 +2,7 @@ import { glossary } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, GlossaryEntryUpsertFields } from '../apitypes';
+import { DeleteResult, GlossaryEntryUpsertFields } from '../api/apitypes';
 import { handleError } from '../utils/util';
 import db from './db';
 

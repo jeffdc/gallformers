@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { GallApi, SearchQuery } from './apitypes';
-import { getGalls } from './db/gall';
+import { GallApi, SearchQuery } from '../api/apitypes';
+import { getGalls } from '../db/gall';
 
 /**
  * Searches for galls based on the input SearchQuery.

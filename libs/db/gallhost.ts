@@ -1,7 +1,7 @@
 import { host } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
-import { GallHostInsertFields } from '../apitypes';
+import { GallHostInsertFields } from '../api/apitypes';
 import { handleError } from '../utils/util';
 import db from './db';
 

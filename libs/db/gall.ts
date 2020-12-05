@@ -3,7 +3,7 @@ import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, GallApi, GallTaxon, GallUpsertFields } from '../apitypes';
+import { DeleteResult, GallApi, GallTaxon, GallUpsertFields } from '../api/apitypes';
 import { ExtractTFromPromise, handleError } from '../utils/util';
 import db from './db';
 import { speciesByName } from './species';

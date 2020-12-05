@@ -2,7 +2,7 @@ import { abundance, Prisma, species } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import * as O from 'fp-ts/lib/Option';
-import { SpeciesApi } from '../apitypes';
+import { SpeciesApi } from '../api/apitypes';
 import { ExtractTFromPromise, handleError } from '../utils/util';
 import db from './db';
 

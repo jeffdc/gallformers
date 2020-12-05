@@ -3,8 +3,8 @@ import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { PorterStemmer, WordTokenizer } from 'natural';
 import React, { ReactNode } from 'react';
-import { allGlossaryEntries, Entry } from './db/glossary';
-import { serialize } from './utils/reactserialize';
+import { allGlossaryEntries, Entry } from '../db/glossary';
+import { serialize } from '../utils/reactserialize';
 
 export type EntryLinked = {
     word: string;
