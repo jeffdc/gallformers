@@ -1,0 +1,15 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install modules
+      run: yarn
+    - name: Gen DB Client
+      run: yarn generate 
+    - name: Run tests
+      run: yarn test
+    - name: Type Coverage
+      run: yarn type-coverage
