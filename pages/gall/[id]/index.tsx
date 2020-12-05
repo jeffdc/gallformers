@@ -9,7 +9,7 @@ import { GallApi, GallHost, Source } from '../../../libs/apitypes';
 import { allGallIds, gallById } from '../../../libs/db/gall';
 import { linkTextFromGlossary } from '../../../libs/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { deserialize, serialize } from '../../../libs/reactserialize';
+import { deserialize, serialize } from '../../../libs/utils/reactserialize';
 import { bugguideUrl, errorThrow, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {

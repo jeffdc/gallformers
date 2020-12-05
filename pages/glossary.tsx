@@ -3,7 +3,7 @@ import React from 'react';
 import { ListGroup } from 'react-bootstrap';
 import { entriesWithLinkedDefs, EntryLinked } from '../libs/glossary';
 import { getStaticPropsWith } from '../libs/pages/nextPageHelpers';
-import { deserialize } from '../libs/reactserialize';
+import { deserialize } from '../libs/utils/reactserialize';
 
 type Props = {
     es: EntryLinked[];

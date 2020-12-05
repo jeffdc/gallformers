@@ -1,5 +1,5 @@
 import * as fc from 'fast-check';
-import { mightBeNull } from './utils';
+import { mightBeNull } from '../../../libs/db/utils';
 
 test('mightBeNull should never return null', () => {
     expect(mightBeNull(null)).toBe('');

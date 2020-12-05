@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { gallsByHostGenus, gallsByHostName } from '../../../libs/db/gall';
+import { mightFail } from '../../../libs/utils/util';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     try {
@@ -9,9 +10,9 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
 
         const query = req.query.host as string;
         if (req.query.host) {
-            res.status(200).json(await gallsByHostGenus(query));
+            res.status(200).json(await mightFail(gallsByHostGenus(query)));
         } else {
-            res.status(200).json(await gallsByHostName(query));
+            res.status(200).json(await mightFail(gallsByHostName(query)));
         }
     } catch (e) {
         res.status(500).json({ error: e.message });

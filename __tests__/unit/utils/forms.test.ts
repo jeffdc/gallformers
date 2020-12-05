@@ -1,6 +1,6 @@
 import * as fc from 'fast-check';
 import { render, screen } from '@testing-library/react';
-import { genOptions } from './forms';
+import { genOptions } from '../../../libs/utils/forms';
 
 describe('The Forms Util genOptions()', () => {
     it('should render valid options with an empty array as input', () => {

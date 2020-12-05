@@ -1,3 +1,8 @@
+/**
+ * Generates a list of <option>s to be used within a form.
+ * @param opts the array of string that represent the options to be rendered.
+ * @param includeEmpty if true then an empty element will be included in the list of options.
+ */
 export const genOptions = (opts: readonly string[], includeEmpty = true): JSX.Element => {
     if (!opts) {
         throw new Error('Must have a valid list of options to render.');

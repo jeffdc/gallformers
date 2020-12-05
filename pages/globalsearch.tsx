@@ -6,11 +6,10 @@ import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
 import { Card, CardColumns, ListGroup } from 'react-bootstrap';
 import CardTextCollapse from '../components/cardcollapse';
-import { SpeciesApi } from '../libs/apitypes';
-import { GallTaxon } from '../libs/db/dbinternaltypes';
+import { GallTaxon, SpeciesApi } from '../libs/apitypes';
 import { getSpecies } from '../libs/db/species';
 import { entriesWithLinkedDefs, EntryLinked } from '../libs/glossary';
-import { deserialize } from '../libs/reactserialize';
+import { deserialize } from '../libs/utils/reactserialize';
 import { mightFail } from '../libs/utils/util';
 
 type Props = {

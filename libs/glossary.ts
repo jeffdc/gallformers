@@ -4,7 +4,7 @@ import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { PorterStemmer, WordTokenizer } from 'natural';
 import React, { ReactNode } from 'react';
 import { allGlossaryEntries, Entry } from './db/glossary';
-import { serialize } from './reactserialize';
+import { serialize } from './utils/reactserialize';
 
 export type EntryLinked = {
     word: string;
@@ -13,14 +13,58 @@ export type EntryLinked = {
     urls: string[];
 };
 
-interface WordStem {
+type WordStem = {
     word: string;
     stem: string;
-}
+};
 
-const makelink = (linkname: string, display: string, samepage: boolean): JSX.Element => {
+const makeLink = (linkname: string, display: string, samepage: boolean): JSX.Element => {
     const href = samepage ? `#${linkname}` : `/glossary/#${linkname}`;
     return React.createElement('a', { href: href }, display);
+};
+
+const stemText = (es: Entry[]): WordStem[] =>
+    es.map((e) => {
+        return {
+            ...e,
+            stem: PorterStemmer.stem(e.word),
+        };
+    });
+
+const linkFromStems = (text: string, samepage: boolean) => (stems: WordStem[]): ReactNode[] => {
+    const els: ReactNode[] = [];
+    let curr = 0;
+    const tokens = new WordTokenizer().tokenize(text);
+    tokens.forEach((t, i) => {
+        const stemmed = PorterStemmer.stem(t);
+        const raw = tokens[i];
+
+        stems.forEach((stem) => {
+            if (stem.stem === stemmed) {
+                const left = text.substring(curr, text.indexOf(raw, curr));
+                curr = curr + left.length + raw.length;
+
+                els.push(left);
+                els.push(makeLink(stem.word, raw, samepage));
+            }
+        });
+    });
+
+    if (curr == 0) {
+        // there were no words that matched so just put the whole text in
+        els.push(text);
+    } else if (curr < text.length) {
+        // there is text leftover that we need to append
+        els.push(text.substring(curr, text.length));
+    }
+    return els;
+};
+
+/** Make the helper functions available for unit testing. */
+export const testables = {
+    makeLink: makeLink,
+    stemText: stemText,
+    linkFromStems: linkFromStems,
 };
 
 /**
@@ -30,88 +74,16 @@ const makelink = (linkname: string, display: string, samepage: boolean): JSX.Ele
  * @param samepage a flag to signify if the links are on the same page.
  */
 export function linkTextFromGlossary(text: string | null | undefined, samepage = false): TaskEither<Error, ReactNode[]> {
-    const toWordStem = (e: Entry): WordStem => {
-        return <WordStem>{
-            ...e,
-            stem: PorterStemmer.stem(e.word),
-        };
-    };
+    if (text == undefined || text == null || (text as string).length < 1) {
+        return TE.right([]);
+    }
 
-    const linkFromStems = (stems: WordStem[]): ReactNode[] => {
-        const els: ReactNode[] = [];
-        if (text != undefined && text !== null && (text as string).length > 0) {
-            let curr = 0;
-            const tokens = new WordTokenizer().tokenize(text);
-            tokens.forEach((t, i) => {
-                const stemmed = PorterStemmer.stem(t);
-                const raw = tokens[i];
-                //  console.log(`t: '${t}' -- i: '${i}' -- stemmed: '${stemmed}' -- raw: '${raw}'`);
-                stems.forEach((stem) => {
-                    if (stem.stem === stemmed) {
-                        const left = text.substring(curr, text.indexOf(raw, curr));
-                        curr = curr + left.length + raw.length;
-                        // console.log(`\t left: '${left}' -- curr: '${curr}' -- raw: ${raw} -- stem: '${JSON.stringify(stem)}'`);
-
-                        els.push(left);
-                        els.push(makelink(stem.word, raw, samepage));
-                    }
-                });
-            });
-
-            if (curr == 0) {
-                // there were no words that matched so just put the whole text in
-                els.push(text);
-            } else if (curr < text.length) {
-                // there is text leftover that we need to append
-                els.push(text.substring(curr, text.length));
-            }
-        }
-        return els;
-    };
-
+    // eslint-disable-next-line prettier/prettier
     return pipe(
         allGlossaryEntries(),
-        TE.map((es) => es.map(toWordStem)),
-        TE.map(linkFromStems),
+        TE.map(stemText),
+        TE.map(linkFromStems(text, samepage)),
     );
-
-    // const els: (string | JSX.Element)[] = [];
-    // const stems = (await allGlossaryEntries()).map((e) => {
-    //     return <WordStem>{
-    //         word: e.word,
-    //         stem: PorterStemmer.stem(e.word),
-    //     };
-    // });
-
-    // if (text != undefined && text !== null && (text as string).length > 0) {
-    //     let curr = 0;
-    //     const tokens = new WordTokenizer().tokenize(text);
-    //     tokens.forEach((t, i) => {
-    //         const stemmed = PorterStemmer.stem(t);
-    //         const raw = tokens[i];
-    //         //  console.log(`t: '${t}' -- i: '${i}' -- stemmed: '${stemmed}' -- raw: '${raw}'`);
-    //         stems.forEach((stem) => {
-    //             if (stem.stem === stemmed) {
-    //                 const left = text.substring(curr, text.indexOf(raw, curr));
-    //                 curr = curr + left.length + raw.length;
-    //                 // console.log(`\t left: '${left}' -- curr: '${curr}' -- raw: ${raw} -- stem: '${JSON.stringify(stem)}'`);
-
-    //                 els.push(left);
-    //                 els.push(makelink(stem.word, raw, samepage));
-    //             }
-    //         });
-    //     });
-
-    //     if (curr == 0) {
-    //         // there were no words that matched so just put the whole text in
-    //         els.push(text);
-    //     } else if (curr < text.length) {
-    //         // there is text leftover that we need to append
-    //         els.push(text.substring(curr, text.length));
-    //     }
-    // }
-
-    // return els;
 }
 
 /**

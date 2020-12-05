@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/ban-types */
 import React, { ReactNode } from 'react';
-import { hasProp } from './utils/util';
+import { hasProp } from './util';
 
 // lifted from: https://github.com/Scimonster/React-Serialize/tree/fragments-custom-components
 // got tired of trying to fight broken babel builds to build this simple thing, so copied... so shoot me.

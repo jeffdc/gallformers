@@ -1,16 +1,13 @@
 import { alignment, cells as cs, color, location, Prisma, shape, texture, walls as ws } from '@prisma/client';
-import { DeleteResult, GallApi, GallUpsertFields } from '../apitypes';
-import db from './db';
-import { GallTaxon } from './dbinternaltypes';
-import { speciesByName } from './species';
-import { connectIfNotNull, connectWithIds, extractId } from './utils';
-import { ExtractTFromPromise, handleError } from '../utils/util';
-import { TaskEither } from 'fp-ts/lib/TaskEither';
-import * as A from 'fp-ts/lib/Array';
-import * as E from 'fp-ts/lib/Either';
+import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
-import { pipe } from 'fp-ts/lib/function';
+import { TaskEither } from 'fp-ts/lib/TaskEither';
+import { DeleteResult, GallApi, GallTaxon, GallUpsertFields } from '../apitypes';
+import { ExtractTFromPromise, handleError } from '../utils/util';
+import db from './db';
+import { speciesByName } from './species';
+import { connectIfNotNull, connectWithIds, extractId } from './utils';
 
 /**
  * A general way to fetch galls. Check this file for pre-defined helpers that are easier to use.

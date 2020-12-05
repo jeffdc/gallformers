@@ -1,8 +1,7 @@
 import * as fc from 'fast-check';
-import * as U from './util';
-import * as E from 'fp-ts/lib/Either';
-import * as TE from 'fp-ts/lib/TaskEither';
 import { pipe } from 'fp-ts/lib/function';
+import * as TE from 'fp-ts/lib/TaskEither';
+import * as U from '../../../libs/utils/util';
 
 test('randInt should always return a number within the bounds', () => {
     fc.assert(
@@ -45,6 +44,9 @@ test('hasProp should detect props', () => {
 const anError = new Error('this is an expected test exception, it does not mean anything went awry!');
 
 test('mightFail should return an empty array on failure', async () => {
+    // since we expect a console error let's not dump it to the test output
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
     // eslint-disable-next-line prettier/prettier
     const r = await pipe(
         TE.left<Error, unknown[]>(anError),
@@ -52,10 +54,17 @@ test('mightFail should return an empty array on failure', async () => {
     );
 
     expect(r.length).toBe(0);
+    expect(console.error).toHaveBeenCalled();
+    spy.mockRestore();
 });
 
 test('errorThrow should always throw', () => {
+    // since we expect a console error let's not dump it to the test output
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => U.errorThrow(anError)).toThrow();
+    expect(console.error).toHaveBeenCalled();
+    spy.mockRestore();
 });
 
 test('handleFailure should convert to an Error', () => {
