@@ -171,13 +171,15 @@ export type SpeciesSourceInsertFields = Deletable & {
     useasdefault: boolean;
 };
 
-export type HostInsertFields = {
+export type GallHostInsertFields = {
     galls: number[];
     hosts: number[];
 };
 
-export type DeleteResults = {
+export type DeleteResult = {
+    type: string;
     name: string;
+    count: number;
 };
 
 export type GlossaryEntryUpsertFields = Deletable & {

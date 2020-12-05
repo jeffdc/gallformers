@@ -1725,6 +1725,13 @@
   resolved "https://registry.yarnpkg.com/@types/prop-types/-/prop-types-15.7.3.tgz#2ab0d5da2e5815f94b0b9d4b95d1e5f243ab2ca7"
   integrity sha512-KfRL3PuHmqQLOG+2tGpRO26Ctg+Cq1E01D2DMriKEATHgWLfeNDmq9e29Q9WIky0dQ3NPkd1mzYH8Lm936Z9qw==
 
+"@types/react-bootstrap-typeahead@^5.1.0":
+  version "5.1.0"
+  resolved "https://registry.yarnpkg.com/@types/react-bootstrap-typeahead/-/react-bootstrap-typeahead-5.1.0.tgz#cc081baf70a1a838b0207f6884c111c00d0dd24e"
+  integrity sha512-LpdrODwFfjD9P7odSJTgNmGEoqYbqFiIbF1V8pEutIiwEkRg+Tdb82znJ4iOvu/flxw0s3YzF24p48q4Ub6qCw==
+  dependencies:
+    "@types/react" "*"
+
 "@types/react-dom@^16":
   version "16.9.9"
   resolved "https://registry.yarnpkg.com/@types/react-dom/-/react-dom-16.9.9.tgz#d2d0a6f720a0206369ccbefff752ba37b9583136"
@@ -5867,6 +5874,11 @@ lodash@^4.17.11, lodash@^4.17.13, lodash@^4.17.14, lodash@^4.17.15, lodash@^4.17
   version "4.17.20"
   resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.20.tgz#b44a9b6297bcb698f1c51a3545a2b3b368d59c52"
   integrity sha512-PlhdFcillOINfeV7Ni6oF1TAEayyZBoZ8bcshTHqOYJYlrqzRK5hagpagky5o4HfCzzd1TRkXPMFq6cKk9rGmA==
+
+logging-ts@^0.3.4:
+  version "0.3.4"
+  resolved "https://registry.yarnpkg.com/logging-ts/-/logging-ts-0.3.4.tgz#0aa61b07970b1d74a829f6b945b4c51977f0c8a3"
+  integrity sha512-TJYaSB88h8N9/ojruoGZgJeQEwpLmDNWpGf03hDgjPNo5QnwO28vkSH/H8/9aMoX8zeShVJUOnKRM6zs5ifR0A==
 
 loose-envify@^1.0.0, loose-envify@^1.1.0, loose-envify@^1.4.0:
   version "1.4.0"

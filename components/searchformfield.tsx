@@ -46,7 +46,8 @@ const SearchFormField = ({
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         isInvalid={!!(form.errors as any)[name]}
                         multiple={multiple}
-                        defaultInputValue={defaultInputValue ? defaultInputValue : ''}
+                        // TODO this broke when new types were introduced. Do we need it?
+                        //                        defaultInputValue={defaultInputValue ? defaultInputValue : ''}
                     />
                 )}
             </Field>

@@ -8,6 +8,7 @@ import InfoTip from '../components/infotip';
 import SearchFormField, { FieldValueType } from '../components/searchformfield';
 import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
 import { allHostNames } from '../libs/db/host';
+import { mightFail } from '../libs/utils/util';
 
 const schema = yup.object({
     hostName: yup.string().required('You must provide a host name.'),
@@ -219,14 +220,14 @@ const Id = ({ hosts, locations, textures, colors, alignments, shapes, cells, wal
 export const getStaticProps: GetStaticProps = async () => {
     return {
         props: {
-            hosts: await allHostNames(),
-            locations: await locations(),
-            colors: await colors(),
-            shapes: await shapes(),
-            textures: await textures(),
-            alignments: await alignments(),
-            walls: await walls(),
-            cells: await cells(),
+            hosts: await mightFail(allHostNames()),
+            locations: await mightFail(locations()),
+            colors: await mightFail(colors()),
+            shapes: await mightFail(shapes()),
+            textures: await mightFail(textures()),
+            alignments: await mightFail(alignments()),
+            walls: await mightFail(walls()),
+            cells: await mightFail(cells()),
         },
         revalidate: 1,
     };

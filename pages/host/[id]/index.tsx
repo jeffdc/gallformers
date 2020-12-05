@@ -5,7 +5,7 @@ import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
 import { HostApi, HostGall } from '../../../libs/apitypes';
 import { allHostIds, hostById } from '../../../libs/db/host';
 import { mightBeNull } from '../../../libs/db/utils';
-import { getStaticPathsFromIds, getStaticPropsWithId } from '../../../libs/pages/nextPageHelpers';
+import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
@@ -115,11 +115,11 @@ const Host = ({ host }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    const host = getStaticPropsWithId(context, hostById, 'host');
+    const host = getStaticPropsWithContext(context, hostById, 'host');
 
     return {
         props: {
-            host: await host,
+            host: (await host)[0],
         },
         revalidate: 1,
     };

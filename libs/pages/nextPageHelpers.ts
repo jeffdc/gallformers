@@ -7,28 +7,14 @@ import { ParsedUrlQuery } from 'querystring';
 import { errorThrow, mightFail } from '../utils/util';
 
 /**
- * Helper that deals with all the rigormole of get a single item from the backend in getStaticProps()
+ * Helper to hadnle the boilerplate for fetching static props for a next.js page.
+ * @param f how to fetch the values
+ * @param dataType a string describing the data type. Used in error messages.
  */
-export async function getStaticPropsWithId<T>(
-    context: GetStaticPropsContext<ParsedUrlQuery>,
-    fId: (id: string) => TaskEither<Error, T[]>,
-    propName: string,
-): Promise<T[]> {
-    if (context === undefined || context.params === undefined || context.params.id === undefined) {
-        throw new Error('An id must be passed!');
-    } else if (Array.isArray(context.params.id)) {
-        throw new Error(`Expected single id but got an array of ids ${context.params.id}.`);
-    }
-
-    // Do all of the error handling here so that the rendering side does not have to deal with it.
-    // Plus this will all get called at build time and will uncover issues then rather than after deployment.
-    const g = (await mightFail(fId(context.params.id))) as T[];
+export async function getStaticPropsWith<T>(f: () => TaskEither<Error, readonly T[]>, dataType: string): Promise<readonly T[]> {
+    const g = (await mightFail(f())) as readonly T[];
     if (g.length < 1) {
-        const msg = `Failed to fetch ${propName} from backend with ${propName} id = '${context.params.id}'.`;
-        console.error(msg);
-        throw new Error(msg);
-    } else if (g.length > 1) {
-        const msg = `Somehow we got more than ${propName} for ${propName} id '${context.params.id}'.`;
+        const msg = `Failed to fetch ${dataType} from backend.`;
         console.error(msg);
         throw new Error(msg);
     }
@@ -36,6 +22,65 @@ export async function getStaticPropsWithId<T>(
     return g;
 }
 
+/**
+ * Helper to handle the boilerplate of fetching data for static next js page generation.
+ * @param id the id to pass to fId
+ * @param fId how to fetch the data for static props.
+ * @param dataType a string describing the data type. Used in error messages.
+ * @param resultsRequired true if at least one result is required
+ * @param many true if more than one result is expected
+ */
+export async function getStaticPropsWithId<T>(
+    id: number,
+    fId: (id: number) => TaskEither<Error, T[]>,
+    dataType: string,
+    resultsRequired = false,
+    many = false,
+): Promise<T[]> {
+    // Do all of the error handling here so that the rendering side does not have to deal with it.
+    // Plus this will all get called at build time and will uncover issues then rather than after deployment.
+    const g = (await mightFail(fId(id))) as T[];
+    if (resultsRequired && g.length < 1) {
+        const msg = `Failed to fetch ${dataType} from backend with ${dataType} id = '${id}'.`;
+        console.error(msg);
+        throw new Error(msg);
+    } else if (!many && g.length > 1) {
+        const msg = `Somehow we got more than one ${dataType} for ${dataType} id '${id}'.`;
+        console.error(msg);
+        throw new Error(msg);
+    }
+
+    return g;
+}
+
+/**
+ * Helper that deals with all the rigormole of get a single item from the backend in getStaticProps()
+ * @param context the next context from which to extrac the id to pass to fId
+ * @param fId how to fetch the data for static props.
+ * @param dataType a string describing the data type. Used in error messages.
+ * @param resultsRequired true if at least one result is required
+ * @param many true if more than one result is expected
+ */
+export async function getStaticPropsWithContext<T>(
+    context: GetStaticPropsContext<ParsedUrlQuery>,
+    fId: (id: number) => TaskEither<Error, T[]>,
+    dataType: string,
+    resultsRequired = false,
+    many = false,
+): Promise<T[]> {
+    if (context === undefined || context.params === undefined || context.params.id === undefined) {
+        throw new Error('An id must be passed!');
+    } else if (Array.isArray(context.params.id)) {
+        throw new Error(`Expected single id but got an array of ids ${context.params.id}.`);
+    }
+
+    return getStaticPropsWithId(parseInt(context.params.id), fId, dataType, resultsRequired, many);
+}
+
+/**
+ * Helper to handle boilerplate for fetching IDs for static path generation.
+ * @param fIds how to fetch the ids.
+ */
 export async function getStaticPathsFromIds(fIds: () => TaskEither<Error, string[]>): Promise<GetStaticPathsResult> {
     const toPath = (ids: string[]) =>
         ids.map((id) => ({

@@ -8,9 +8,10 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { DeleteResults } from '../../libs/apitypes';
+import { DeleteResult } from '../../libs/apitypes';
 import { allFamilies } from '../../libs/db/family';
 import { genOptions } from '../../libs/utils/forms';
+import { mightFail } from '../../libs/utils/util';
 
 const Schema = yup.object().shape({
     name: yup.string().required(),
@@ -30,7 +31,7 @@ const Family = ({ families }: Props): JSX.Element => {
     if (!families) throw new Error(`The input props for families can not be null or undefined.`);
 
     const [existing, setExisting] = useState(false);
-    const [deleteResults, setDeleteResults] = useState<DeleteResults>();
+    const [deleteResults, setDeleteResults] = useState<DeleteResult>();
 
     const { register, handleSubmit, errors, control, setValue, reset } = useForm({
         mode: 'onBlur',
@@ -132,7 +133,7 @@ const Family = ({ families }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
-            families: await allFamilies(),
+            families: await mightFail(allFamilies()),
         },
     };
 };

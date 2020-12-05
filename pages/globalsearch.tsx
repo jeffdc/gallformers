@@ -1,3 +1,5 @@
+import { pipe } from 'fp-ts/lib/function';
+import * as TE from 'fp-ts/lib/TaskEither';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
@@ -9,6 +11,7 @@ import { GallTaxon } from '../libs/db/dbinternaltypes';
 import { getSpecies } from '../libs/db/species';
 import { entriesWithLinkedDefs, EntryLinked } from '../libs/glossary';
 import { deserialize } from '../libs/reactserialize';
+import { mightFail } from '../libs/utils/util';
 
 type Props = {
     species: SpeciesApi[];
@@ -75,23 +78,29 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     // add wildcards to search phrase
     const q = `%${search}%`;
 
-    const species = await getSpecies(
-        [
-            { name: { contains: q } },
-            { speciessource: { some: { description: { contains: q } } } },
-            { commonnames: { contains: q } },
-            { synonyms: { contains: q } },
-        ],
-        false,
-    );
+    const species = () =>
+        getSpecies(
+            [
+                { name: { contains: q } },
+                { speciessource: { some: { description: { contains: q } } } },
+                { commonnames: { contains: q } },
+                { synonyms: { contains: q } },
+            ],
+            false,
+        );
 
-    const glossary = (await entriesWithLinkedDefs()).filter((e) => {
-        return e.word === search || e.definition.includes(search);
-    });
+    const filterDefinitions = (entries: readonly EntryLinked[]): EntryLinked[] =>
+        entries.filter((e) => e.word === search || e.definition.includes(search));
+
+    // eslint-disable-next-line prettier/prettier
+    const glossary = await pipe(
+        entriesWithLinkedDefs(),
+        TE.map(filterDefinitions),
+    )();
 
     return {
         props: {
-            species: species,
+            species: await mightFail(species()),
             glossary: glossary,
         },
     };

@@ -8,9 +8,10 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { HostInsertFields } from '../../libs/apitypes';
+import { GallHostInsertFields } from '../../libs/apitypes';
 import { allGalls } from '../../libs/db/gall';
 import { allHosts } from '../../libs/db/host';
+import { mightFail } from '../../libs/utils/util';
 
 type Props = {
     galls: species[];
@@ -31,7 +32,7 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
 
     const onSubmit = async (data: { galls: string[]; hosts: string[] }) => {
         try {
-            const insertData: HostInsertFields = {
+            const insertData: GallHostInsertFields = {
                 galls: data.galls.map((s) => {
                     // i hate null... :( these should be safe since the text values came from the same place as the ids
                     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -137,8 +138,8 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
-            galls: await allGalls(),
-            hosts: await allHosts(),
+            galls: await mightFail(allGalls()),
+            hosts: await mightFail(allHosts()),
         },
     };
 };

@@ -1,79 +1,95 @@
 import { family, Prisma, species } from '@prisma/client';
-import { FamilyApi, SpeciesApi } from '../apitypes';
-import { Option, fromNullable } from 'fp-ts/lib/Option';
+import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
+import { TaskEither } from 'fp-ts/lib/TaskEither';
+import { DeleteResult, FamilyApi, FamilyUpsertFields, SpeciesApi } from '../apitypes';
+import { handleError } from '../utils/util';
 import db from './db';
 import { GallTaxon, HostTaxon } from './dbinternaltypes';
 import { gallDeleteSteps, getGalls } from './gall';
 import { getSpecies } from './species';
-import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { flow, pipe } from 'fp-ts/lib/function';
-import { handleError } from '../utils/util';
 import { extractId } from './utils';
 
-export const familyById = async (id: number): Promise<Option<family>> => {
-    return db.family
-        .findFirst({
+export const familyById = (id: number): TaskEither<Error, family[]> => {
+    const family = () =>
+        db.family.findMany({
             where: { id: { equals: id } },
-        })
-        .then((f) => fromNullable(f));
+        });
+
+    return TE.tryCatch(family, handleError);
 };
 
-export const speciesByFamily = async (id: number): Promise<species[]> => {
-    return db.species.findMany({
-        where: { family_id: { equals: id } },
-        orderBy: { name: 'asc' },
-    });
+export const speciesByFamily = (id: number): TaskEither<Error, species[]> => {
+    const families = () =>
+        db.species.findMany({
+            where: { family_id: { equals: id } },
+            orderBy: { name: 'asc' },
+        });
+
+    return TE.tryCatch(families, handleError);
 };
 
-export const allFamilies = async (): Promise<family[]> => {
-    return db.family.findMany({
-        orderBy: { name: 'asc' },
-    });
+export const allFamilies = (): TaskEither<Error, family[]> => {
+    const families = () =>
+        db.family.findMany({
+            orderBy: { name: 'asc' },
+        });
+
+    return TE.tryCatch(families, handleError);
 };
 
-export const getGallMakerFamilies = async (): Promise<FamilyApi[]> => {
-    return db.family.findMany({
-        include: {
-            species: {
-                select: {
-                    id: true,
-                    name: true,
-                    gall: { include: { species: { select: { id: true, name: true } } } },
+export const getGallMakerFamilies = (): TaskEither<Error, FamilyApi[]> => {
+    const families = () =>
+        db.family.findMany({
+            include: {
+                species: {
+                    select: {
+                        id: true,
+                        name: true,
+                        gall: { include: { species: { select: { id: true, name: true } } } },
+                    },
+                    where: { taxoncode: GallTaxon },
+                    orderBy: { name: 'asc' },
                 },
-                where: { taxoncode: GallTaxon },
-                orderBy: { name: 'asc' },
             },
-        },
-        where: { description: { not: 'Plant' } },
-        orderBy: { name: 'asc' },
-    });
+            where: { description: { not: 'Plant' } },
+            orderBy: { name: 'asc' },
+        });
+
+    return TE.tryCatch(families, handleError);
 };
 
-export const getHostFamilies = async (): Promise<FamilyApi[]> => {
-    return db.family.findMany({
-        include: {
-            species: {
-                select: {
-                    id: true,
-                    name: true,
-                    gall: { include: { species: { select: { id: true, name: true } } } },
+export const getHostFamilies = (): TaskEither<Error, FamilyApi[]> => {
+    const families = () =>
+        db.family.findMany({
+            include: {
+                species: {
+                    select: {
+                        id: true,
+                        name: true,
+                        gall: { include: { species: { select: { id: true, name: true } } } },
+                    },
+                    where: { taxoncode: HostTaxon },
+                    orderBy: { name: 'asc' },
                 },
-                where: { taxoncode: HostTaxon },
-                orderBy: { name: 'asc' },
             },
-        },
-        where: { description: { equals: 'Plant' } },
-        orderBy: { name: 'asc' },
-    });
+            where: { description: { equals: 'Plant' } },
+            orderBy: { name: 'asc' },
+        });
+
+    return TE.tryCatch(families, handleError);
 };
 
-export const allFamilyIds = async (): Promise<string[]> => {
-    return db.family
-        .findMany({
+export const allFamilyIds = (): TaskEither<Error, string[]> => {
+    const families = () =>
+        db.family.findMany({
             select: { id: true },
-        })
-        .then((fs) => fs.map((f) => f.id.toString()));
+        });
+
+    return pipe(
+        TE.tryCatch(families, handleError),
+        TE.map((x) => x.map(extractId).map((n) => n.toString())),
+    );
 };
 
 export const getAllSpeciesForFamily = (id: number): TaskEither<Error, SpeciesApi[]> => {
@@ -88,20 +104,45 @@ export const familyDeleteSteps = (familyid: number): Promise<Prisma.BatchPayload
     ];
 };
 
-export const deleteFamily = (id: number): TaskEither<Error, Prisma.BatchPayload[]> => {
+export const deleteFamily = (id: number): TaskEither<Error, DeleteResult> => {
     const deleteTx = (speciesids: number[], gallids: number[]) =>
         TE.tryCatch(() => db.$transaction(gallDeleteSteps(speciesids, gallids).concat(familyDeleteSteps(id))), handleError);
 
     const galls = (speciesids: number[]) => getGalls([{ id: { in: speciesids } }]);
 
+    const toDeleteResult = (batch: Prisma.BatchPayload[]): DeleteResult => {
+        return {
+            type: 'family',
+            name: '',
+            count: batch.reduce((acc, v) => acc + v.count, 0),
+        };
+    };
+
     // I am sure that there is a way to map the Species and Gall arrays to number arrays before the point of use
     // but I struggled figuring it out, got lost in "type soup".
-    const foo = pipe(
+    return pipe(
         TE.bindTo('speciesids')(getAllSpeciesForFamily(id)),
         TE.bind('gallids', ({ speciesids }) => galls(speciesids.map(extractId))),
         TE.map(({ speciesids, gallids }) => deleteTx(speciesids.map(extractId), gallids.map(extractId))),
         TE.flatten,
+        TE.map(toDeleteResult),
     );
+};
 
-    return foo;
+export const upsertFamily = (f: FamilyUpsertFields): TaskEither<Error, number> => {
+    const upsert = () =>
+        db.family.upsert({
+            where: { name: f.name },
+            update: {
+                description: f.description,
+            },
+            create: {
+                name: f.name,
+                description: f.description,
+            },
+        });
+    return pipe(
+        TE.tryCatch(upsert, handleError),
+        TE.map((sp) => sp.id),
+    );
 };

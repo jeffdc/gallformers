@@ -8,10 +8,11 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { DeleteResults, Source, SpeciesSourceInsertFields } from '../../libs/apitypes';
+import { DeleteResult, Source, SpeciesSourceInsertFields } from '../../libs/apitypes';
 import { GallTaxon } from '../../libs/db/dbinternaltypes';
 import { allSources } from '../../libs/db/source';
 import { allSpecies } from '../../libs/db/species';
+import { mightFail } from '../../libs/utils/util';
 
 type Props = {
     species: species[];
@@ -35,7 +36,7 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
     const [results, setResults] = useState<speciessource>();
     const [isGall, setIsGall] = useState(true);
     const [existing, setExisting] = useState(false);
-    const [deleteResults, setDeleteResults] = useState<DeleteResults>();
+    const [deleteResults, setDeleteResults] = useState<DeleteResult>();
 
     const { handleSubmit, errors, control, register, reset, setValue, getValues } = useForm({
         mode: 'onBlur',
@@ -207,8 +208,8 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
-            species: await allSpecies(),
-            sources: await allSources(),
+            species: await mightFail(allSpecies()),
+            sources: await mightFail(allSources()),
         },
     };
 };

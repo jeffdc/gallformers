@@ -1,13 +1,16 @@
+import * as A from 'fp-ts/lib/Array';
+import { pipe } from 'fp-ts/lib/function';
+import * as TE from 'fp-ts/lib/TaskEither';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React, { MouseEvent, useState } from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
-import { GallApi, GallHost } from '../../../libs/apitypes';
+import { GallApi, GallHost, Source } from '../../../libs/apitypes';
 import { allGallIds, gallById } from '../../../libs/db/gall';
 import { linkTextFromGlossary } from '../../../libs/glossary';
-import { getStaticPathsFromIds, getStaticPropsWithId } from '../../../libs/pages/nextPageHelpers';
+import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { deserialize, serialize } from '../../../libs/reactserialize';
-import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
+import { bugguideUrl, errorThrow, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
     species: GallApi;
@@ -145,16 +148,31 @@ const Gall = ({ species }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    const g = await getStaticPropsWithId(context, gallById, 'gall');
+    const g = await getStaticPropsWithContext(context, gallById, 'gall');
 
     const gall = g[0];
-    for (const s of gall.speciessource) {
-        s.description = serialize(await linkTextFromGlossary(s.description));
-    }
+
+    const updateSpeciesSource = (d: string, source: Source): Source => {
+        return {
+            ...source,
+            description: d,
+        };
+    };
+
+    // eslint-disable-next-line prettier/prettier
+    const sources = await pipe(
+        gall.speciessource,
+        A.map((s) => linkTextFromGlossary(s.description)),
+        A.map(TE.map(serialize)),
+        TE.sequenceArray,
+        // sequence makes the array readonly, the rest of the fp-ts API does not use readonly, ...sigh.
+        TE.map((d) => A.zipWith(d as string[], gall.speciessource, updateSpeciesSource)),
+        TE.getOrElse(errorThrow),
+    )();
 
     return {
         props: {
-            species: gall,
+            species: { ...gall, speciessource: sources },
         },
         revalidate: 1,
     };

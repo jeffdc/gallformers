@@ -1,5 +1,5 @@
 import { alignment, cells as cs, color, location, Prisma, shape, texture, walls as ws } from '@prisma/client';
-import { GallApi, GallUpsertFields } from '../apitypes';
+import { DeleteResult, GallApi, GallUpsertFields } from '../apitypes';
 import db from './db';
 import { GallTaxon } from './dbinternaltypes';
 import { speciesByName } from './species';
@@ -133,8 +133,8 @@ export const gallsByHostGenus = (hostGenus: string): TaskEither<Error, GallApi[]
  * Fetches the gall with the given id
  * @param id the id of the gall to fetch
  */
-export const gallById = (id: string): TaskEither<Error, GallApi[]> => {
-    return getGalls([{ id: parseInt(id) }]);
+export const gallById = (id: number): TaskEither<Error, GallApi[]> => {
+    return getGalls([{ id: id }]);
 };
 
 /**
@@ -393,16 +393,25 @@ export const gallDeleteSteps = (speciesids: number[], gallids: number[]): Promis
     ];
 };
 
-export const deleteGall = (speciesid: number): TaskEither<Error, Prisma.BatchPayload[]> => {
+export const deleteGall = (speciesid: number): TaskEither<Error, DeleteResult> => {
     const deleteGallTx = (gallid: number) =>
         TE.tryCatch(() => db.$transaction(gallDeleteSteps([speciesid], [gallid])), handleError);
 
     const notAGallErr = () => TE.left(new Error('You can not delete a species that is not a Gall with this API.'));
 
+    const toDeleteResult = (batch: Prisma.BatchPayload[]): DeleteResult => {
+        return {
+            type: 'gall',
+            name: '',
+            count: batch.reduce((acc, v) => acc + v.count, 0),
+        };
+    };
+
     // eslint-disable-next-line prettier/prettier
     return pipe(
         getGallIdFromSpeciesId(speciesid),
         TE.map(O.fold(notAGallErr, deleteGallTx)),
-        TE.flatten
+        TE.flatten,
+        TE.map(toDeleteResult)
     );
 };

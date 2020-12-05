@@ -6,18 +6,24 @@ import { SpeciesApi } from '../apitypes';
 import { ExtractTFromPromise, handleError } from '../utils/util';
 import db from './db';
 
-export const abundances = async (): Promise<abundance[]> => {
-    return db.abundance.findMany({
-        orderBy: {
-            abundance: 'asc',
-        },
-    });
+export const abundances = (): TE.TaskEither<Error, abundance[]> => {
+    const abundances = () =>
+        db.abundance.findMany({
+            orderBy: {
+                abundance: 'asc',
+            },
+        });
+
+    return TE.tryCatch(abundances, handleError);
 };
 
-export const allSpecies = async (): Promise<species[]> => {
-    return db.species.findMany({
-        orderBy: { name: 'asc' },
-    });
+export const allSpecies = (): TE.TaskEither<Error, species[]> => {
+    const species = () =>
+        db.species.findMany({
+            orderBy: { name: 'asc' },
+        });
+
+    return TE.tryCatch(species, handleError);
 };
 
 export const speciesByName = (name: string): TE.TaskEither<Error, O.Option<species>> => {

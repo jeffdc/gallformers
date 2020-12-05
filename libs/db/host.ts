@@ -1,11 +1,8 @@
 import { Prisma } from '@prisma/client';
-import * as A from 'fp-ts/lib/Array';
-import * as E from 'fp-ts/lib/Either';
-import * as O from 'fp-ts/lib/Option';
-import * as TE from 'fp-ts/lib/TaskEither';
 import { pipe } from 'fp-ts/lib/function';
+import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { HostApi, HostSimple, SpeciesUpsertFields } from '../apitypes';
+import { DeleteResult, HostApi, HostSimple, SpeciesUpsertFields } from '../apitypes';
 import { ExtractTFromPromise, handleError } from '../utils/util';
 import db from './db';
 import { HostTaxon } from './dbinternaltypes';
@@ -144,8 +141,8 @@ export const getHosts = (
  * Fetch a host by its ID.
  * @param id
  */
-export const hostById = (id: string): TaskEither<Error, HostApi[]> => {
-    return getHosts([{ id: parseInt(id) }]);
+export const hostById = (id: number): TaskEither<Error, HostApi[]> => {
+    return getHosts([{ id: id }]);
 };
 
 export const upsertHost = (h: SpeciesUpsertFields): TaskEither<Error, number> => {
@@ -192,5 +189,44 @@ export const getIdsFromHostSpeciesIds = (speciesIds: number[]): TaskEither<Error
     return pipe(
         TE.tryCatch(hostIds, handleError),
         TE.map((hostIds) => hostIds.map((h) => h.id)),
+    );
+};
+
+/**
+ * The steps required to delete a Host. This is a hack to fake CASCADE DELETE since Prisma does not support it yet.
+ * See: https://github.com/prisma/prisma/issues/2057
+ * @param speciesids an array of ids of the species (host) to delete
+ */
+export const hostDeleteSteps = (speciesids: number[]): Promise<Prisma.BatchPayload>[] => {
+    return [
+        db.host.deleteMany({
+            where: { gall_species_id: { in: speciesids } },
+        }),
+
+        db.speciessource.deleteMany({
+            where: { species_id: { in: speciesids } },
+        }),
+
+        db.species.deleteMany({
+            where: { id: { in: speciesids } },
+        }),
+    ];
+};
+
+export const deleteHost = (speciesid: number): TaskEither<Error, DeleteResult> => {
+    const deleteHostTx = (speciesid: number) => TE.tryCatch(() => db.$transaction(hostDeleteSteps([speciesid])), handleError);
+
+    const toDeleteResult = (batch: Prisma.BatchPayload[]): DeleteResult => {
+        return {
+            type: 'host',
+            name: '',
+            count: batch.reduce((acc, v) => acc + v.count, 0),
+        };
+    };
+
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        deleteHostTx(speciesid),
+        TE.map(toDeleteResult)
     );
 };

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Accordion, Button, Card, ListGroup, Tab, Tabs } from 'react-bootstrap';
 import { FamilyApi } from '../libs/apitypes';
 import { getGallMakerFamilies, getHostFamilies } from '../libs/db/family';
+import { getStaticPropsWith } from '../libs/pages/nextPageHelpers';
 
 type Props = {
     gallmakers: FamilyApi[];
@@ -66,8 +67,8 @@ const Explore = ({ gallmakers, hosts }: Props): JSX.Element => {
 export const getStaticProps: GetStaticProps = async () => {
     return {
         props: {
-            gallmakers: await getGallMakerFamilies(),
-            hosts: await getHostFamilies(),
+            gallmakers: await getStaticPropsWith(getGallMakerFamilies, 'gall families'),
+            hosts: await getStaticPropsWith(getHostFamilies, 'host familes'),
         },
         revalidate: 1,
     };

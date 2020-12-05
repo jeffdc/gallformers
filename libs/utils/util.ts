@@ -1,11 +1,8 @@
 // Welcome to the inevitable utils file!!!
 
-import { absurd, pipe } from 'fp-ts/lib/function';
-import { Option } from 'fp-ts/lib/Option';
-import { Task } from 'fp-ts/lib/Task';
-import * as O from 'fp-ts/lib/Option';
-import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import * as T from 'fp-ts/lib/Task';
+import * as TE from 'fp-ts/lib/TaskEither';
 
 /**
  * Checks an object, o, for the presence of the prop.
@@ -50,11 +47,12 @@ export type ExtractTFromPromise<T> = T extends Promise<infer S> ? S : never;
  * This is used to bridge the FP world TaskEithers into Promises while consistently handling failures.
  * @param s
  */
-export const mightFail = async <S extends TE.TaskEither<Error, T[]>, T>(s: S): Promise<T[]> => {
+export const mightFail = async <S extends TE.TaskEither<Error, readonly T[]>, T>(s: S): Promise<T[]> => {
     //TODO why is it that when called we lose the T type and end up an unknown[]?
     // It is "fixable" if the caller annotes the function call with both the S and T type, but that is onerus!
     return pipe(
-        s,
+        // it seems that fp-ts is inconsistent with its use of readonly so we have to cast here :(
+        (s as unknown) as TE.TaskEither<Error, T[]>,
         TE.getOrElse((e) => {
             console.error(e);
             return T.of(new Array<T>());

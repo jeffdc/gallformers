@@ -8,8 +8,9 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { DeleteResults, SourceUpsertFields } from '../../libs/apitypes';
+import { DeleteResult, SourceUpsertFields } from '../../libs/apitypes';
 import { allSources } from '../../libs/db/source';
+import { mightFail } from '../../libs/utils/util';
 
 const Schema = yup.object().shape({
     title: yup.string().required(),
@@ -28,7 +29,7 @@ const Host = ({ sources }: Props): JSX.Element => {
         resolver: yupResolver(Schema),
     });
     const [existing, setExisting] = useState(false);
-    const [deleteResults, setDeleteResults] = useState<DeleteResults>();
+    const [deleteResults, setDeleteResults] = useState<DeleteResult>();
 
     const router = useRouter();
 
@@ -153,7 +154,7 @@ const Host = ({ sources }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
-            sources: await allSources(),
+            sources: await mightFail(allSources()),
         },
     };
 };

@@ -9,12 +9,13 @@ import { genOptions } from '../../libs/utils/forms';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { useRouter } from 'next/router';
-import { DeleteResults, SpeciesUpsertFields } from '../../libs/apitypes';
+import { DeleteResult, SpeciesUpsertFields } from '../../libs/apitypes';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import { allHosts } from '../../libs/db/host';
 import Link from 'next/link';
 import { useWithLookup } from '../../hooks/useWithLookups';
+import { mightFail } from '../../libs/utils/util';
 
 type Props = {
     hosts: species[];
@@ -35,7 +36,7 @@ type FormFields = 'name' | 'genus' | 'family' | 'abundance' | 'commonnames' | 's
 
 const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
     const [existing, setExisting] = useState(false);
-    const [deleteResults, setDeleteResults] = useState<DeleteResults>();
+    const [deleteResults, setDeleteResults] = useState<DeleteResult>();
 
     const { register, handleSubmit, setValue, errors, control, reset } = useForm({
         mode: 'onBlur',
@@ -187,9 +188,9 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
-            hosts: await allHosts(),
-            families: await allFamilies(),
-            abundances: await abundances(),
+            hosts: await mightFail(allHosts()),
+            families: await mightFail(allFamilies()),
+            abundances: await mightFail(abundances()),
         },
     };
 };

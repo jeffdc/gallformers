@@ -2,9 +2,9 @@ import { source } from '@prisma/client';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import React from 'react';
 import { Col, Row } from 'react-bootstrap';
-import { allSources, sourceById } from '../../../libs/db/source';
+import { allSourceIds, sourceById } from '../../../libs/db/source';
 import { mightBeNull } from '../../../libs/db/utils';
-import { failIfNone } from '../../../libs/utils/util';
+import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 
 type Props = {
     source: source;
@@ -42,27 +42,16 @@ const Source = ({ source }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    if (context === undefined || context.params === undefined || context.params.id === undefined) {
-        throw new Error(`Source id can not be undefined.`);
-    } else if (Array.isArray(context.params.id)) {
-        throw new Error(`Expected single id but got an array of ids ${context.params.id}.`);
-    }
+    const source = getStaticPropsWithContext(context, sourceById, 'source');
 
     return {
         props: {
-            source: failIfNone(await sourceById(parseInt(context.params.id))),
+            source: (await source)[0],
         },
         revalidate: 1,
     };
 };
 
-export const getStaticPaths: GetStaticPaths = async () => {
-    const sources = await allSources();
-    const paths = sources.map((source) => ({
-        params: { id: source.id?.toString() },
-    }));
-
-    return { paths, fallback: false };
-};
+export const getStaticPaths: GetStaticPaths = async () => getStaticPathsFromIds(allSourceIds);
 
 export default Source;

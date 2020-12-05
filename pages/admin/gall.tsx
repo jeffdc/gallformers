@@ -10,13 +10,14 @@ import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import { useWithLookup } from '../../hooks/useWithLookups';
-import { DeleteResults, GallApi, GallUpsertFields, HostSimple } from '../../libs/apitypes';
+import { DeleteResult, GallApi, GallUpsertFields, HostSimple } from '../../libs/apitypes';
 import { allFamilies } from '../../libs/db/family';
 import { alignments, allGalls, cells, colors, locations, shapes, textures, walls } from '../../libs/db/gall';
 import { allHostsSimple } from '../../libs/db/host';
 import { abundances } from '../../libs/db/species';
 import { mightBeNull } from '../../libs/db/utils';
 import { genOptions } from '../../libs/utils/forms';
+import { mightFail } from '../../libs/utils/util';
 
 //TODO factor out the species form and allow it to be extended with what is needed for a gall as this code violates DRY a lot!
 
@@ -102,7 +103,7 @@ const Gall = ({
     const router = useRouter();
 
     const [existing, setExisting] = useState(false);
-    const [deleteResults, setDeleteResults] = useState<DeleteResults>();
+    const [deleteResults, setDeleteResults] = useState<DeleteResult>();
 
     const { setValueForLookup } = useWithLookup<
         FormFields,
@@ -378,17 +379,17 @@ const Gall = ({
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
-            galls: await allGalls(),
-            hosts: await allHostsSimple(),
-            families: await allFamilies(),
-            locations: await locations(),
-            colors: await colors(),
-            shapes: await shapes(),
-            textures: await textures(),
-            alignments: await alignments(),
-            walls: await walls(),
-            cells: await cells(),
-            abundances: await abundances(),
+            galls: await mightFail(allGalls()),
+            hosts: await mightFail(allHostsSimple()),
+            families: await mightFail(allFamilies()),
+            locations: await mightFail(locations()),
+            colors: await mightFail(colors()),
+            shapes: await mightFail(shapes()),
+            textures: await mightFail(textures()),
+            alignments: await mightFail(alignments()),
+            walls: await mightFail(walls()),
+            cells: await mightFail(cells()),
+            abundances: await mightFail(abundances()),
         },
     };
 };

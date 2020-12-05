@@ -2,6 +2,7 @@ import { GetStaticProps } from 'next';
 import React from 'react';
 import { ListGroup } from 'react-bootstrap';
 import { entriesWithLinkedDefs, EntryLinked } from '../libs/glossary';
+import { getStaticPropsWith } from '../libs/pages/nextPageHelpers';
 import { deserialize } from '../libs/reactserialize';
 
 type Props = {
@@ -51,7 +52,7 @@ const Glossary = ({ es }: Props): JSX.Element => {
 export const getStaticProps: GetStaticProps = async () => {
     return {
         props: {
-            es: await entriesWithLinkedDefs(),
+            es: await getStaticPropsWith(entriesWithLinkedDefs, 'glossary entries'),
         },
         revalidate: 1,
     };

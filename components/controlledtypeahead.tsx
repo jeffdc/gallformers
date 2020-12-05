@@ -20,7 +20,7 @@ export type ControlledTypeaheadProps = {
     name: string;
     placeholder: string;
     control: Control<Record<string, unknown>>;
-    options: (string | null)[];
+    options: string[];
     multiple?: boolean;
     clearButton?: boolean;
     isInvalid?: boolean;
@@ -73,12 +73,12 @@ const ControlledTypeahead = ({
                     onInputChange={(text: string, e: Event) => {
                         if (onInputChange) onInputChange(text, e);
                     }}
-                    onBlur={(e: FocusEvent<HTMLInputElement>) => {
-                        if (onBlur) onBlur(e);
+                    onBlur={(e: Event) => {
+                        if (onBlur) onBlur((e as unknown) as FocusEvent<HTMLInputElement>);
                         data.onBlur();
                     }}
-                    onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
-                        if (onKeyDown) onKeyDown(e);
+                    onKeyDown={(e: Event) => {
+                        if (onKeyDown && e) onKeyDown((e as unknown) as KeyboardEvent<HTMLInputElement>);
                     }}
                     selected={normalizeToArray(data.value)}
                     placeholder={placeholder}
@@ -88,6 +88,9 @@ const ControlledTypeahead = ({
                     clearButton={clearButton}
                     isInvalid={isInvalid}
                     allowNew={allowNew}
+                    // TODO: why when I added the new typings did this break? It functions correctly but types do not line up.
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                    // @ts-ignore
                     newSelectionPrefix={newSelectionPrefix}
                     disabled={disabled}
                 />

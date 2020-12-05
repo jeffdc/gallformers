@@ -7,8 +7,9 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { DeleteResults, GlossaryEntryUpsertFields } from '../../libs/apitypes';
+import { DeleteResult, GlossaryEntryUpsertFields } from '../../libs/apitypes';
 import { allGlossaryEntries, Entry } from '../../libs/db/glossary';
+import { mightFail } from '../../libs/utils/util';
 
 const Schema = yup.object().shape({
     word: yup.string().required(),
@@ -24,7 +25,7 @@ const Glossary = ({ glossary }: Props): JSX.Element => {
     if (!glossary) throw new Error(`The input props for glossary edit can not be null or undefined.`);
 
     const [existing, setExisting] = useState(false);
-    const [deleteResults, setDeleteResults] = useState<DeleteResults>();
+    const [deleteResults, setDeleteResults] = useState<DeleteResult>();
 
     const { register, handleSubmit, errors, control, setValue, reset } = useForm({
         mode: 'onBlur',
@@ -134,7 +135,7 @@ const Glossary = ({ glossary }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
-            glossary: await allGlossaryEntries(),
+            glossary: await mightFail(allGlossaryEntries()),
         },
     };
 };

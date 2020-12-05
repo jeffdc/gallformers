@@ -3,10 +3,9 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
-import Maybe from 'true-myth/maybe';
 import { GallTaxon } from '../../../libs/db/dbinternaltypes';
 import { allFamilyIds, familyById, speciesByFamily } from '../../../libs/db/family';
-import { failIfNone } from '../../../libs/utils/util';
+import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 
 type Props = {
     family: family;
@@ -57,31 +56,18 @@ const Family = ({ family, species }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    if (context === undefined || context.params === undefined || context.params.id === undefined) {
-        throw new Error(`Family id can not be undefined.`);
-    } else if (Array.isArray(context.params.id)) {
-        throw new Error(`Expected single id but got an array of ids ${context.params.id}.`);
-    }
-
-    const familyId = parseInt(context.params.id);
+    const family = getStaticPropsWithContext(context, familyById, 'family');
+    const species = getStaticPropsWithContext(context, speciesByFamily, 'species', false, true);
 
     return {
         props: {
-            family: failIfNone(await familyById(familyId)),
-            species: await speciesByFamily(familyId),
+            family: (await family)[0],
+            species: await species,
         },
         revalidate: 1,
     };
 };
 
-export const getStaticPaths: GetStaticPaths = async () => {
-    const familyIds = await allFamilyIds();
-
-    const paths = familyIds.map((f) => ({
-        params: { id: f },
-    }));
-
-    return { paths, fallback: false };
-};
+export const getStaticPaths: GetStaticPaths = async () => getStaticPathsFromIds(allFamilyIds);
 
 export default Family;
