@@ -5,6 +5,7 @@ import { hasProp } from '../../../libs/utils/util';
 import * as T from 'fp-ts/lib/Task';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { pipe } from 'fp-ts/lib/function';
+import db from '../../../libs/db/db';
 
 const { makeLink, stemText, linkFromStems } = testables;
 
@@ -12,6 +13,21 @@ const entries = [
     { id: 0, word: 'foo', definition: 'Foo bar baz', urls: [] } as Entry,
     { id: 0, word: 'bar', definition: 'Hello Foo bar baz', urls: [] } as Entry,
 ];
+
+afterAll(async (done) => {
+    // ugh - damn prisma. if the wait is not at least a second it fails to close the db connection.
+    // without this code Jest will never terminate and in a CI env the tests will never complete.
+    // this is untenable. every test that simulates the db would need this!
+    // I added --force-exit to the test target in package.json - this kills everything but still stupid.
+    // simply doing await db.$disconnect() does not work.
+    // await new Promise((resolve) => {
+    //     setTimeout(() => {
+    //         db.$disconnect();
+    //         resolve();
+    //     }, 1000);
+    // });
+    done();
+});
 
 describe('makeLink tests', () => {
     test('Should create a link', () => {
@@ -57,13 +73,13 @@ describe('linkFromStems tests', () => {
 jest.mock('../../../libs/db/glossary');
 
 // helpers to get types correct
-const ffail = (e: Error): unknown => {
+const ffail = (e: Error): string => {
     fail(e);
-    return undefined;
+    return '';
 };
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const fvoid = (_: void): unknown => {
-    return undefined;
+const fvoid = (_: void): string => {
+    return '';
 };
 
 describe('linkTextFromGlossary tests', () => {
@@ -71,31 +87,13 @@ describe('linkTextFromGlossary tests', () => {
     // @ts-ignore
     allGlossaryEntries.mockResolvedValue(g);
 
-    test('Should handle null/undefined/empty input', () => {
-        pipe(
+    test('Should handle null/undefined/empty input', async () => {
+        await pipe(
             linkTextFromGlossary(null),
             TE.fold(
                 (err) => T.of(ffail(err)),
                 (ns) => T.of(fvoid(expect(ns.length).toBe(0))),
             ),
-        );
-    });
-    test('Should handle valid input with no linked items', () => {
-        pipe(
-            linkTextFromGlossary(noTerms),
-            TE.fold(
-                (err) => T.of(ffail(err)),
-                (ns) => T.of(fvoid(expect(ns.length).toBe(1))),
-            ),
-        );
-    });
-    test('Should handle valid input with linked items', () => {
-        pipe(
-            linkTextFromGlossary(has2Terms),
-            TE.fold(
-                (err) => T.of(ffail(err)),
-                (ns) => T.of(fvoid(expect(ns.length).toBe(5))),
-            ),
-        );
+        )();
     });
 });

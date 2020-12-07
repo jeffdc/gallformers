@@ -8,41 +8,12 @@ import { Col, ListGroup, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import ControlledTypeahead from '../components/controlledtypeahead';
-import { GallApi, GallLocation, GallTexture, SearchQuery } from '../libs/api/apitypes';
+import { GallApi, SearchQuery } from '../libs/api/apitypes';
 import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
 import { allHostGenera, allHostNames } from '../libs/db/host';
 import { mightBeNull } from '../libs/db/utils';
-
-const dontCare = (o: string | string[] | undefined) => {
-    const truthy = !!o;
-    return !truthy || (truthy && Array.isArray(o) ? o?.length == 0 : false);
-};
-
-const checkLocations = (gallprops: GallLocation[] | null, queryvals: string[] | undefined): boolean => {
-    if (gallprops == null || queryvals == undefined) return false;
-
-    return gallprops.some((gp) => gp?.location?.location && queryvals.includes(gp?.location?.location));
-};
-
-const checkTextures = (gallprops: GallTexture[] | null, queryvals: string[] | undefined): boolean => {
-    if (gallprops == null || queryvals == undefined) return false;
-
-    return gallprops.some((gp) => gp?.texture?.texture && queryvals.includes(gp?.texture?.texture));
-};
-
-const checkGall = (g: GallApi, q: SearchQuery): boolean => {
-    const alignment = dontCare(q.alignment) || (!!g.gall?.alignment && g.gall?.alignment?.alignment === q.alignment);
-    const cells = dontCare(q.cells) || (!!g.gall?.cells && g.gall?.cells?.cells === q.cells);
-    const color = dontCare(q.color) || (!!g.gall?.color && g.gall?.color?.color === q.color);
-    const detachable =
-        dontCare(q.detachable) || (!!g.gall.detachable && (g.gall.detachable == 0 ? 'no' : 'yes') === q.detachable);
-    const shape = dontCare(q.shape) || (!!g.gall?.shape && g.gall?.shape?.shape === q.shape);
-    const walls = dontCare(q.walls) || (!!g.gall?.walls && g.gall?.walls?.walls === q.walls);
-    const location = dontCare(q.locations) || (!!g.gall.galllocation && checkLocations(g.gall.galllocation, q.locations));
-    const texture = dontCare(q.textures) || (!!g.gall.galltexture && checkTextures(g.gall.galltexture, q.textures));
-
-    return alignment && cells && color && detachable && shape && walls && location && texture;
-};
+import { checkGall } from '../libs/utils/gallsearch';
+import { mightFail } from '../libs/utils/util';
 
 type SearchFormHostField = {
     host: string;
@@ -104,8 +75,14 @@ const Search2 = (props: Props): JSX.Element => {
     const [galls, setGalls] = useState(new Array<GallApi>());
     const [query, setQuery] = useState(router.query as SearchQuery);
 
+    const disableFilter = (): boolean => {
+        const host = getValues(['host']);
+        const genus = getValues(['genus']);
+        return (!host || !host.host || !(host.host.length > 0)) && (!genus || !genus.genus || !(genus.genus.length > 0));
+    };
+
     // this is the search form on sepcies or genus
-    const { control, setValue, handleSubmit, errors } = useForm({
+    const { control, getValues, setValue, handleSubmit, errors } = useForm({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
@@ -125,8 +102,7 @@ const Search2 = (props: Props): JSX.Element => {
         try {
             // make sure to clear all of the filters since we are getting a new set of galls
             filterReset();
-
-            const query = host ? `?host=${host}` : `?genus=${genus}`;
+            const query = encodeURI(host ? `?host=${host}` : `?genus=${genus}`);
             const res = await fetch(`../api/search${query}`, {
                 method: 'GET',
             });
@@ -143,6 +119,7 @@ const Search2 = (props: Props): JSX.Element => {
 
     // this is the handler for changing any other field, all work is done locally
     const doSearch = async (field: string, value: string | string[]) => {
+        console.log(`search: ${field} and ${value}`);
         const newq = updateQuery(field, value);
         const filtered = galls.filter((g) => checkGall(g, newq));
         setGalls(filtered);
@@ -168,6 +145,7 @@ const Search2 = (props: Props): JSX.Element => {
                 control={filterControl}
                 name={field}
                 onChange={(selected) => {
+                    console.log(`search with ${field} - ${selected}`);
                     doSearch(field, selected);
                 }}
                 onKeyDown={(e) => {
@@ -178,7 +156,7 @@ const Search2 = (props: Props): JSX.Element => {
                 placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
                 clearButton={field !== 'host'}
                 options={opts}
-                disabled={!(galls.length > 0)}
+                disabled={disableFilter()}
             />
         );
     };
@@ -329,15 +307,15 @@ export const getServerSideProps: GetServerSideProps = async () => {
     // get all of the data for the typeahead boxes
     return {
         props: {
-            hosts: await allHostNames(),
-            genera: await allHostGenera(),
-            locations: await locations(),
-            colors: await colors(),
-            shapes: await shapes(),
-            textures: await textures(),
-            alignments: await alignments(),
-            walls: await walls(),
-            cells: await cells(),
+            hosts: await mightFail(allHostNames()),
+            genera: await mightFail(allHostGenera()),
+            locations: await mightFail(locations()),
+            colors: await mightFail(colors()),
+            shapes: await mightFail(shapes()),
+            textures: await mightFail(textures()),
+            alignments: await mightFail(alignments()),
+            walls: await mightFail(walls()),
+            cells: await mightFail(cells()),
         },
     };
 };

@@ -21,7 +21,6 @@ export const getGalls = (
     const w = operatorAnd
         ? { AND: [...whereClause, { taxoncode: { equals: GallTaxon } }] }
         : { AND: [{ taxoncode: { equals: GallTaxon } }, { OR: whereClause }] };
-
     const galls = () =>
         db.species.findMany({
             include: {

@@ -8,11 +8,10 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             res.status(400).end('No valid query provided.');
         }
 
-        const query = req.query.host as string;
         if (req.query.host) {
-            res.status(200).json(await mightFail(gallsByHostGenus(query)));
+            res.status(200).json(await mightFail(gallsByHostName(decodeURI(req.query.host as string))));
         } else {
-            res.status(200).json(await mightFail(gallsByHostName(query)));
+            res.status(200).json(await mightFail(gallsByHostGenus(decodeURI(req.query.genus as string))));
         }
     } catch (e) {
         res.status(500).json({ error: e.message });
