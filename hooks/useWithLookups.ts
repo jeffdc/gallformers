@@ -1,7 +1,7 @@
 import { hasProp } from '../libs/utils/util';
 
-function makeSetValueForLookup<F, D extends WithID, V>(setValue: (f: F, v: V[]) => void) {
-    return (field: F, ids: (number | null | undefined)[] | undefined, lookup: D[], valField: string) => {
+function makeSetValueForLookup<F, D extends WithID, V>(setValue: (f: keyof F, v: V) => void) {
+    return (field: keyof F, valField: string, ids: number[] | undefined, lookup: D[]) => {
         if (!ids || ids.length < 1 || !ids[0]) return;
 
         const vals = ids.map((id) => {
@@ -13,13 +13,13 @@ function makeSetValueForLookup<F, D extends WithID, V>(setValue: (f: F, v: V[]) 
             }
         });
         if (vals && vals.length > 0 && vals[0]) {
-            setValue(field, vals);
+            setValue(field, vals[0]);
         }
     };
 }
 export type WithID = { id: number };
-export type LookupHook<T, S> = {
-    setValueForLookup: (field: T, ids: (number | null | undefined)[] | undefined, lookup: S[], valField: string) => void;
+export type LookupHook<F, D> = {
+    setValueForLookup: (field: keyof F, valField: string, ids: number[] | undefined, lookup: D[]) => void;
 };
 
 /**
@@ -31,7 +31,7 @@ export type LookupHook<T, S> = {
  * @typeParam V the type of the value that will be extracted and set
  * @returns a function that can be used to set values extracted from a passed in lookup given an ID
  */
-export function useWithLookup<F, D extends WithID, V>(setValue: (f: F, v: V[]) => void): LookupHook<F, D> {
+export function useWithLookup<F, D extends WithID, V>(setValue: (f: keyof F, v: V) => void): LookupHook<F, D> {
     return {
         setValueForLookup: makeSetValueForLookup<F, D, V>(setValue),
     };

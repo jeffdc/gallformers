@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
 import { Col, Row } from 'react-bootstrap';
-import { useForm } from 'react-hook-form';
+import { Control, useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
@@ -20,27 +20,6 @@ import { genOptions } from '../../libs/utils/forms';
 import { mightFail } from '../../libs/utils/util';
 
 //TODO factor out the species form and allow it to be extended with what is needed for a gall as this code violates DRY a lot!
-
-type SpeciesFormFields = {
-    name: string;
-    commonnames: string;
-    synonyms: string;
-    family: string;
-    abundance: string;
-};
-
-type GallFormFields = SpeciesFormFields & {
-    hosts: string[];
-    locations: string[];
-    color: string;
-    shape: string;
-    textures: string[];
-    alignment: string;
-    walls: string;
-    cells: string;
-    detachable: string;
-    delete?: boolean;
-};
 
 type Props = {
     galls: species[];
@@ -66,22 +45,24 @@ const extractGenus = (n: string): string => {
     return n.split(' ')[0];
 };
 
-type FormFields =
-    | 'name'
-    | 'genus'
-    | 'family'
-    | 'abundance'
-    | 'commonnames'
-    | 'synonmys'
-    | 'hosts'
-    | 'detachable'
-    | 'walls'
-    | 'cells'
-    | 'alignment'
-    | 'shape'
-    | 'color'
-    | 'locations'
-    | 'textures';
+type FormFields = {
+    name: string;
+    genus: string;
+    family: string;
+    abundance: string;
+    commonnames: string;
+    synonyms: string;
+    hosts: string[];
+    detachable: string;
+    walls: string;
+    cells: string;
+    alignment: string;
+    shape: string;
+    color: string;
+    locations: string[];
+    textures: string[];
+    delete: boolean;
+};
 
 const Gall = ({
     galls,
@@ -96,7 +77,7 @@ const Gall = ({
     abundances,
     families,
 }: Props): JSX.Element => {
-    const { register, handleSubmit, errors, control, reset, setValue } = useForm({
+    const { register, handleSubmit, errors, control, reset, setValue } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
@@ -108,43 +89,43 @@ const Gall = ({
     const { setValueForLookup } = useWithLookup<
         FormFields,
         ws | cs | alignment | color | shape | location | texture | HostSimple | family | abundance,
-        string | number
+        FormFields[keyof FormFields]
     >(setValue);
 
     const setGallDetails = async (spid: number): Promise<void> => {
         try {
             const res = await fetch(`../api/gall?speciesid=${spid}`);
             const sp = (await res.json()) as GallApi;
-            setValue('detachable', sp.gall.detachable);
-            setValueForLookup('walls', [sp.gall.walls?.id], walls, 'walls');
-            setValueForLookup('cells', [sp.gall.cells?.id], cells, 'cells');
-            setValueForLookup('alignment', [sp.gall.alignment?.id], alignments, 'alignment');
-            setValueForLookup('color', [sp.gall.color?.id], colors, 'color');
-            setValueForLookup('shape', [sp.gall.shape?.id], shapes, 'shape');
+            setValue('detachable', sp.gall.detachable === 0 ? 'no' : 'yes');
+            setValueForLookup('walls', 'walls', sp.gall.walls?.id ? [sp.gall.walls.id] : [], walls);
+            setValueForLookup('cells', 'cells', sp.gall.cells?.id ? [sp.gall.cells.id] : [], cells);
+            setValueForLookup('alignment', 'alignment', sp.gall.alignment?.id ? [sp.gall.alignment.id] : [], alignments);
+            setValueForLookup('color', 'color', sp.gall.color?.id ? [sp.gall.color.id] : [], colors);
+            setValueForLookup('shape', 'shape', sp.gall.shape?.id ? [sp.gall.shape.id] : [], shapes);
             setValueForLookup(
                 'locations',
-                sp.gall.galllocation.map((l) => l.location?.id),
-                locations,
                 'location',
+                sp.gall.galllocation.flatMap((l) => (l.location?.id ? [l.location.id] : [])),
+                locations,
             );
             setValueForLookup(
                 'textures',
-                sp.gall.galltexture.map((t) => t.texture?.id),
-                textures,
                 'texture',
+                sp.gall.galltexture.flatMap((t) => (t.texture?.id ? [t.texture.id] : [])),
+                textures,
             );
             setValueForLookup(
                 'hosts',
+                'name',
                 sp.hosts.map((h) => h.id),
                 hosts,
-                'name',
             );
         } catch (e) {
             console.error(e);
         }
     };
 
-    const onSubmit = async (data: GallFormFields) => {
+    const onSubmit = async (data: FormFields) => {
         if (data.delete) {
             const id = galls.find((g) => g.name === data.name)?.id;
             const res = await fetch(`../api/gall/${id}`, {
@@ -205,17 +186,22 @@ const Gall = ({
                     <Col>
                         Name (binomial):
                         <ControlledTypeahead
-                            control={control}
+                            control={control as Control<Record<string, unknown>>}
                             name="name"
                             onChange={(e) => {
                                 const f = galls.find((f) => f.name === e[0]);
                                 setExisting(false);
                                 if (f) {
                                     setExisting(true);
-                                    setValueForLookup('family', [f.family_id], families, 'name');
-                                    setValueForLookup('abundance', [f.abundance_id], abundances, 'abundance');
-                                    setValue('commonnames', f.commonnames);
-                                    setValue('synonyms', f.synonyms);
+                                    setValueForLookup('family', 'name', [f.family_id], families);
+                                    setValueForLookup(
+                                        'abundance',
+                                        'abundance',
+                                        f.abundance_id ? [f.abundance_id] : [],
+                                        abundances,
+                                    );
+                                    setValue('commonnames', f.commonnames ? f.commonnames : '');
+                                    setValue('synonyms', f.synonyms ? f.synonyms : '');
                                     setGallDetails(f.id);
                                 }
                             }}
@@ -280,7 +266,7 @@ const Gall = ({
                     <Col>
                         Hosts:
                         <ControlledTypeahead
-                            control={control}
+                            control={control as Control<Record<string, unknown>>}
                             name="hosts"
                             placeholder="Hosts"
                             options={hosts.map((h) => h.name)}
@@ -337,7 +323,7 @@ const Gall = ({
                     <Col>
                         Location(s):
                         <ControlledTypeahead
-                            control={control}
+                            control={control as Control<Record<string, unknown>>}
                             name="locations"
                             placeholder="Location(s)"
                             options={locations.map((l) => l.location)}
@@ -348,7 +334,7 @@ const Gall = ({
                     <Col>
                         Texture(s):
                         <ControlledTypeahead
-                            control={control}
+                            control={control as Control<Record<string, unknown>>}
                             name="textures"
                             placeholder="Texture(s)"
                             options={textures.map((t) => t.texture)}

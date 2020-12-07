@@ -4,7 +4,7 @@ import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import React, { useState } from 'react';
 import { Col, ListGroup, ListGroupItem, Row } from 'react-bootstrap';
-import { useForm } from 'react-hook-form';
+import { Control, useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
@@ -23,9 +23,14 @@ const Schema = yup.object().shape({
     hosts: yup.array().required(),
 });
 
+type FormFields = {
+    galls: string[];
+    hosts: string[];
+};
+
 const GallHost = ({ galls, hosts }: Props): JSX.Element => {
     const [results, setResults] = useState(new Array<host>());
-    const { handleSubmit, errors, control } = useForm({
+    const { handleSubmit, errors, control } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
@@ -72,7 +77,7 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
                     <Col>
                         Gall:
                         <ControlledTypeahead
-                            control={control}
+                            control={control as Control<Record<string, unknown>>}
                             name="galls"
                             placeholder="Gall"
                             options={galls.map((h) => h.name)}
@@ -92,7 +97,7 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
                     <Col>
                         Host:
                         <ControlledTypeahead
-                            control={control}
+                            control={control as Control<Record<string, unknown>>}
                             name="hosts"
                             placeholder="Hosts"
                             options={hosts.map((h) => h.name)}

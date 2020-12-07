@@ -26,7 +26,7 @@ const Schema = yup.object().shape({
 type FormFields = {
     species: string;
     source: string;
-    description: string;
+    description: string | null;
     useasdefault: boolean;
     delete: boolean;
 };
@@ -37,7 +37,7 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
     const [existing, setExisting] = useState(false);
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
 
-    const { handleSubmit, errors, control, register, reset, setValue, getValues } = useForm({
+    const { handleSubmit, errors, control, register, reset, setValue, getValues } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
@@ -98,7 +98,7 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
             const insertData: SpeciesSourceInsertFields = {
                 species: sp.id,
                 source: so.id,
-                description: data.description,
+                description: data.description ? data.description : '',
                 useasdefault: data.useasdefault,
             };
 
@@ -152,10 +152,10 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                             name="source"
                             placeholder="Sources"
                             options={sources.map((h) => h.title)}
-                            isInvalid={!!errors.sources}
+                            isInvalid={!!errors.source}
                             onBlur={checkAlreadyExists}
                         />
-                        {errors.sources && <span className="text-danger">You must provide a least one source to map.</span>}
+                        {errors.source && <span className="text-danger">You must provide a least one source to map.</span>}
                     </Col>
                 </Row>
                 <Row className="form-group">

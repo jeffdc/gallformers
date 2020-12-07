@@ -42,7 +42,7 @@ const Header = (): JSX.Element => {
                 <Navbar.Toggle aria-controls="responsive-navbar-nav" />
                 <Navbar.Collapse id="responsive-navbar-nav">
                     <Nav className="ml-auto">
-                        <Nav.Link href="/search2" className="ml-auto">
+                        <Nav.Link href="/id" className="ml-auto">
                             Id
                         </Nav.Link>
                         <Nav.Link href="/explore" className="ml-auto">

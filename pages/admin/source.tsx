@@ -23,8 +23,16 @@ type Props = {
     sources: source[];
 };
 
+type FormFields = {
+    title: string;
+    author: string;
+    pubyear: string;
+    link: string;
+    citation: string;
+};
+
 const Host = ({ sources }: Props): JSX.Element => {
-    const { register, handleSubmit, errors, control, setValue, reset } = useForm({
+    const { register, handleSubmit, errors, control, setValue, reset } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });

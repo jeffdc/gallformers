@@ -33,6 +33,8 @@ export type ControlledTypeaheadProps = {
     onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
 };
 
+const isTypeaheadCustomOption = (e: string[] | TypeaheadCustomOption[]): e is TypeaheadCustomOption[] =>
+    !!e && !!e[0] && typeof e[0] === 'object';
 /**
  * A wrapped version of react-bootstrap-typeahead that plays well with react-hook-form.
  */
@@ -61,25 +63,28 @@ const ControlledTypeahead = ({
                 <Typeahead
                     onChange={(e: string[] | TypeaheadCustomOption[]) => {
                         // deal with the fact that we are allowing new values - I could not divine a better way.
-                        if (e && e[0] && typeof e[0] === 'object') {
+                        if (isTypeaheadCustomOption(e)) {
                             const ee = (e[0] as TypeaheadCustomOption).label;
                             if (onChange) onChange([ee]);
                             data.onChange(ee);
                         } else {
-                            if (onChange) onChange(e as string[]);
-                            data.onChange(e as string[]);
+                            if (onChange) onChange(e);
+                            data.onChange(e);
                         }
                     }}
                     onInputChange={(text: string, e: Event) => {
                         if (onInputChange) onInputChange(text, e);
                     }}
                     onBlur={(e: Event) => {
+                        //TODO how to deal with the fact that th Typeahead type here is only Event?
                         if (onBlur) onBlur((e as unknown) as FocusEvent<HTMLInputElement>);
                         data.onBlur();
                     }}
                     onKeyDown={(e: Event) => {
+                        //TODO how to deal with the fact that th Typeahead type here is only Event?
                         if (onKeyDown && e) onKeyDown((e as unknown) as KeyboardEvent<HTMLInputElement>);
                     }}
+                    //TODO how to type data.value?
                     selected={normalizeToArray(data.value)}
                     placeholder={placeholder}
                     id={name}

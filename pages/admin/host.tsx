@@ -32,20 +32,27 @@ const Schema = yup.object().shape({
     family: yup.string().required(),
 });
 
-type FormFields = 'name' | 'genus' | 'family' | 'abundance' | 'commonnames' | 'synonmys';
+type FormFields = {
+    name: string;
+    genus: string;
+    family: string;
+    abundance: string;
+    commonnames: string;
+    synonyms: string;
+};
 
 const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
     const [existing, setExisting] = useState(false);
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
 
-    const { register, handleSubmit, setValue, errors, control, reset } = useForm({
+    const { register, handleSubmit, setValue, errors, control, reset } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
 
     const router = useRouter();
 
-    const { setValueForLookup } = useWithLookup<FormFields, family | abundance, string>(setValue);
+    const { setValueForLookup } = useWithLookup<FormFields, family | abundance, FormFields[keyof FormFields]>(setValue);
 
     const onSubmit = async (data: SpeciesUpsertFields) => {
         try {
@@ -101,10 +108,15 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
                                 const f = hosts.find((f) => f.name === e[0]);
                                 if (f) {
                                     setExisting(true);
-                                    setValueForLookup('family', [f.family_id], families, 'name');
-                                    setValueForLookup('abundance', [f.abundance_id], abundances, 'abundance');
-                                    setValue('commonnames', f.commonnames);
-                                    setValue('synonyms', f.synonyms);
+                                    setValueForLookup('family', 'name', [f.family_id], families);
+                                    setValueForLookup(
+                                        'abundance',
+                                        'abundance',
+                                        f.abundance_id ? [f.abundance_id] : [],
+                                        abundances,
+                                    );
+                                    setValue('commonnames', f.commonnames ? f.commonnames : '');
+                                    setValue('synonyms', f.synonyms ? f.synonyms : '');
                                 }
                             }}
                             onBlur={(e) => {

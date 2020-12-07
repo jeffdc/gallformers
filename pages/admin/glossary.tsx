@@ -21,13 +21,19 @@ type Props = {
     glossary: Entry[];
 };
 
+type FormFields = {
+    word: string;
+    definition: string;
+    urls: string;
+};
+
 const Glossary = ({ glossary }: Props): JSX.Element => {
     if (!glossary) throw new Error(`The input props for glossary edit can not be null or undefined.`);
 
     const [existing, setExisting] = useState(false);
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
 
-    const { register, handleSubmit, errors, control, setValue, reset } = useForm({
+    const { register, handleSubmit, errors, control, setValue, reset } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
@@ -104,7 +110,7 @@ const Glossary = ({ glossary }: Props): JSX.Element => {
                     <Col>
                         Definition:
                         <textarea name="definition" className="form-control" ref={register} rows={4} />
-                        {errors.defintion && <span className="text-danger">You must provide the defintion.</span>}
+                        {errors.definition && <span className="text-danger">You must provide the defintion.</span>}
                     </Col>
                 </Row>
                 <Row className="form-group">

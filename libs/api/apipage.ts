@@ -28,6 +28,7 @@ export async function apiIdEndpoint(
             res.status(500).json({ error: 'Failed to Delete.' });
         };
         const success = (result: DeleteResult) => res.status(200).json(result);
+        //TODO how to type req.query.id?
         const id = parseInt(Array.isArray(req.query.id) && req.query.id.length > 1 ? req.query.id[0] : (req.query.id as string));
 
         // eslint-disable-next-line prettier/prettier
@@ -45,17 +46,18 @@ export async function apiUpsertEndpoint<T, R>(
     res: NextApiResponse,
     fUpsert: (item: T) => TaskEither<Error, R>,
     onComplete: (res: NextApiResponse, results: R) => void,
-    // redirectpath: string,
 ): Promise<void> {
     const session = await getSession({ req });
     if (!session) {
         res.status(401).end();
     }
+    //TODO how to type req.body?
     const t = req.body as T;
 
     const err = (e: Error): T.Task<R> => {
         console.error(e);
         res.status(500).json({ error: 'Failed to Upsert.' });
+        //TODO hmmm, this invovles any, must be a better way
         return T.of({} as R); // this never gets called as the above line sends a response back -- seems hacky
     };
 

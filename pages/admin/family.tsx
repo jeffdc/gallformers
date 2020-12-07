@@ -27,13 +27,18 @@ type Props = {
     families: family[];
 };
 
+type FormFields = {
+    name: string;
+    description: string;
+};
+
 const Family = ({ families }: Props): JSX.Element => {
     if (!families) throw new Error(`The input props for families can not be null or undefined.`);
 
     const [existing, setExisting] = useState(false);
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
 
-    const { register, handleSubmit, errors, control, setValue, reset } = useForm({
+    const { register, handleSubmit, errors, control, setValue, reset } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
