@@ -8,13 +8,13 @@ const dontCare = (o: string | string[] | undefined): boolean => {
 const checkLocations = (gallprops: GallLocation[] | null, queryvals: string[] | undefined): boolean => {
     if (gallprops == null || queryvals == undefined) return false;
 
-    return gallprops.some((gp) => gp?.location?.location && queryvals.includes(gp?.location?.location));
+    return queryvals.every((q) => gallprops.find((l) => l.location?.location === q));
 };
 
 const checkTextures = (gallprops: GallTexture[] | null, queryvals: string[] | undefined): boolean => {
     if (gallprops == null || queryvals == undefined) return false;
 
-    return gallprops.some((gp) => gp?.texture?.texture && queryvals.includes(gp?.texture?.texture));
+    return queryvals.every((q) => gallprops.find((l) => l.texture?.texture === q));
 };
 
 /** Make the helper functions available for unit testing. */
@@ -32,6 +32,6 @@ export const checkGall = (g: GallApi, q: SearchQuery): boolean => {
     const location = dontCare(q.locations) || (!!g.gall.galllocation && checkLocations(g.gall.galllocation, q.locations));
     const texture = dontCare(q.textures) || (!!g.gall.galltexture && checkTextures(g.gall.galltexture, q.textures));
 
-    console.log(`a:${alignment} ce:${cells} co:${color} d:${detachable} s: ${shape} w:${walls} l:${location} t:${texture}`);
+    // console.log(`a:${alignment} ce:${cells} co:${color} d:${detachable} s: ${shape} w:${walls} l:${location} t:${texture}`);
     return alignment && cells && color && detachable && shape && walls && location && texture;
 };

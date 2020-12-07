@@ -3,7 +3,7 @@ import { alignment, cells as dbcells, color, location, shape, texture, walls as 
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Col, ListGroup, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
@@ -73,6 +73,7 @@ const Search2 = (props: Props): JSX.Element => {
     const router = useRouter();
 
     const [galls, setGalls] = useState(new Array<GallApi>());
+    const [filtered, setFiltered] = useState(new Array<GallApi>());
     const [query, setQuery] = useState(router.query as SearchQuery);
 
     const disableFilter = (): boolean => {
@@ -108,7 +109,9 @@ const Search2 = (props: Props): JSX.Element => {
             });
 
             if (res.status === 200) {
-                setGalls(await res.json());
+                const g = await res.json();
+                setGalls(g);
+                setFiltered(g);
             } else {
                 throw new Error(await res.text());
             }
@@ -119,10 +122,14 @@ const Search2 = (props: Props): JSX.Element => {
 
     // this is the handler for changing any other field, all work is done locally
     const doSearch = async (field: string, value: string | string[]) => {
-        console.log(`search: ${field} and ${value}`);
         const newq = updateQuery(field, value);
-        const filtered = galls.filter((g) => checkGall(g, newq));
-        setGalls(filtered);
+        const f = galls.filter((g) => checkGall(g, newq));
+        console.log(
+            `search: ${JSON.stringify(newq)} got: ${JSON.stringify(f.map((f) => f.name))} from ${JSON.stringify(
+                galls.map((g) => g.name),
+            )}`,
+        );
+        setFiltered(f);
         setQuery(newq);
     };
 
@@ -139,13 +146,12 @@ const Search2 = (props: Props): JSX.Element => {
         | 'shape'
         | 'color';
 
-    const makeFormInput = (field: FilterFieldNames, opts: string[]) => {
+    const makeFormInput = (field: FilterFieldNames, opts: string[], multiple = false) => {
         return (
             <ControlledTypeahead
                 control={filterControl}
                 name={field}
                 onChange={(selected) => {
-                    console.log(`search with ${field} - ${selected}`);
                     doSearch(field, selected);
                 }}
                 onKeyDown={(e) => {
@@ -157,6 +163,7 @@ const Search2 = (props: Props): JSX.Element => {
                 clearButton={field !== 'host'}
                 options={opts}
                 disabled={disableFilter()}
+                multiple={multiple}
             />
         );
     };
@@ -217,6 +224,7 @@ const Search2 = (props: Props): JSX.Element => {
                         {makeFormInput(
                             'locations',
                             props.locations.map((l) => mightBeNull(l.location)),
+                            true,
                         )}
                         <label className="col-form-label">Detachable:</label>
                         {makeFormInput('detachable', ['yes', 'no', 'unsure'])}
@@ -224,6 +232,7 @@ const Search2 = (props: Props): JSX.Element => {
                         {makeFormInput(
                             'textures',
                             props.textures.map((t) => mightBeNull(t.texture)),
+                            true,
                         )}
                         <label className="col-form-label">Aligment:</label>
                         {makeFormInput(
@@ -256,7 +265,7 @@ const Search2 = (props: Props): JSX.Element => {
                     {/* <Row className='border m-2'><p className='text-right'>Pager TODO</p></Row> */}
                     <Row className="m-2">
                         <ListGroup>
-                            {galls.length == 0 ? (
+                            {filtered.length == 0 ? (
                                 query.host == undefined ? (
                                     <h4 className="font-weight-lighter">
                                         To begin with select a Host or a Genus to see matching galls. Then you can use the filters
@@ -266,7 +275,7 @@ const Search2 = (props: Props): JSX.Element => {
                                     <h4 className="font-weight-lighter">There are no galls that match your filter.</h4>
                                 )
                             ) : (
-                                galls.map((g) => (
+                                filtered.map((g) => (
                                     <ListGroup.Item key={g.id}>
                                         <Row key={g.id}>
                                             <Col xs={2} className="">
