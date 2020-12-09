@@ -70,3 +70,12 @@ test('errorThrow should always throw', () => {
 test('handleFailure should convert to an Error', () => {
     expect(U.handleError('foo').message).toBe('foo');
 });
+
+test('truncateAtWord should handle varying input', () => {
+    fc.property(fc.set(fc.unicodeString()), (values) => {
+        const s = values.join(' ');
+        const t = U.truncateAtWord(2)(s);
+        expect(t.length).toBeLessThanOrEqual(s.length);
+        expect(t.split(' ').length).toBeLessThanOrEqual(s.split(' ').length);
+    });
+});

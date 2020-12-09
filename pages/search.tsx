@@ -4,7 +4,7 @@ import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
 import { Card, CardColumns, Col, Row } from 'react-bootstrap';
 import CardTextCollapse from '../components/cardcollapse';
-import { GallApi, SearchQuery } from '../libs/api/apitypes';
+import { GallApi, SearchQuery, toSearchQuery } from '../libs/api/apitypes';
 import { searchGalls } from '../libs/pages/search';
 import { mightFail } from '../libs/utils/util';
 
@@ -48,7 +48,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
 
     return {
         props: {
-            data: await mightFail(searchGalls(context.query as SearchQuery)),
+            data: await mightFail(searchGalls(toSearchQuery(context.query))),
             query: { ...context.query },
         },
     };

@@ -3,7 +3,7 @@ import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, GallApi, GallTaxon, GallUpsertFields } from '../api/apitypes';
+import { AlignmentApi, CellsApi, DeleteResult, GallApi, GallTaxon, GallUpsertFields, ShapeApi, WallsApi } from '../api/apitypes';
 import { ExtractTFromPromise, handleError } from '../utils/util';
 import db from './db';
 import { speciesByName } from './species';
@@ -56,7 +56,7 @@ export const getGalls = (
 
     type DBGall = ExtractTFromPromise<ReturnType<typeof galls>>;
 
-    // we want a stronger non-null contract on what we return then is modelable in the DB
+    // we want a stronger no-null contract on what we return then is modelable in the DB
     const clean = (galls: DBGall): GallApi[] =>
         galls.flatMap((g) => {
             if (g.gall == null) {
@@ -67,20 +67,39 @@ export const getGalls = (
             }
             // set the default description to make the caller's life easier
             const d = g.speciessource.find((s) => s.useasdefault === 1)?.description;
-            const newg = {
+
+            const newg: GallApi = {
                 ...g,
-                description: d ? d : '',
+                taxoncode: g.taxoncode ? g.taxoncode : '',
+                description: O.fromNullable(d),
+                synonyms: O.fromNullable(g.synonyms),
+                commonnames: O.fromNullable(g.commonnames),
+                abundance: O.fromNullable(g.abundance),
+                gall: {
+                    ...g.gall,
+                    alignment: adaptAlignment(g.gall.alignment),
+                    cells: adaptCells(g.gall.cells),
+                    color: O.fromNullable(g.gall.color),
+                    shape: adaptShape(g.gall.shape),
+                    walls: adaptWalls(g.gall.walls),
+                    detachable: O.fromNullable(g.gall.detachable),
+                },
                 // remove the indirection of the many-to-many table for easier usage
                 hosts: g.hosts.map((h) => {
+                    // due to prisma problems we had to make these hostspecies relationships optional, however
+                    // if we are here then there must be a record in the host table so it can not be null :(
+                    if (!h.hostspecies?.id || !h.hostspecies?.name) throw new Error('Invalid state.');
                     return {
-                        // due to prisma problems we had to make these hostspecies relationships optional, however
-                        // if we are here then there must be a record in the host table so it can not be null :(
-                        id: h.hostspecies?.id,
-                        name: h.hostspecies?.name,
+                        id: h.hostspecies.id,
+                        name: h.hostspecies.name,
                     };
                 }),
+                speciessource: g.speciessource.map((s) => ({
+                    ...s,
+                    description: O.fromNullable(s.description),
+                })),
             };
-            return newg as GallApi; // ugh, TS type-checker can not "see" that we eliminated the null.
+            return newg;
         });
 
     return pipe(TE.tryCatch(galls, handleError), TE.map(clean));
@@ -207,6 +226,17 @@ export const colors = (): TaskEither<Error, color[]> => {
     return TE.tryCatch(colors, handleError);
 };
 
+const adaptShape = (a: shape | null): O.Option<ShapeApi> => {
+    const makeApiVersion = (x: shape): ShapeApi => ({
+        ...x,
+        description: O.fromNullable(x.description),
+    });
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        O.fromNullable(a),
+        O.map(makeApiVersion),
+    );
+};
 /**
  * Fetches all gall shapes
  */
@@ -235,6 +265,18 @@ export const textures = (): TaskEither<Error, texture[]> => {
     return TE.tryCatch(textures, handleError);
 };
 
+const adaptAlignment = (a: alignment | null): O.Option<AlignmentApi> => {
+    const makeApiVersion = (x: alignment): AlignmentApi => ({
+        ...x,
+        description: O.fromNullable(x.description),
+    });
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        O.fromNullable(a),
+        O.map(makeApiVersion),
+    );
+};
+
 /**
  * Fetches all gall alignments
  */
@@ -247,6 +289,18 @@ export const alignments = (): TaskEither<Error, alignment[]> => {
         });
 
     return TE.tryCatch(alignments, handleError);
+};
+
+const adaptWalls = (w: ws | null): O.Option<WallsApi> => {
+    const makeApiVersion = (x: ws): WallsApi => ({
+        ...x,
+        description: O.fromNullable(x.description),
+    });
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        O.fromNullable(w),
+        O.map(makeApiVersion),
+    );
 };
 
 /**
@@ -263,6 +317,17 @@ export const walls = (): TaskEither<Error, ws[]> => {
     return TE.tryCatch(walls, handleError);
 };
 
+const adaptCells = (a: cs | null): O.Option<CellsApi> => {
+    const makeApiVersion = (x: cs): CellsApi => ({
+        ...x,
+        description: O.fromNullable(x.description),
+    });
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        O.fromNullable(a),
+        O.map(makeApiVersion),
+    );
+};
 /**
  * Fetches all gall cells
  */

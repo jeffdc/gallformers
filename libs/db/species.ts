@@ -1,7 +1,7 @@
 import { abundance, Prisma, species } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
-import * as TE from 'fp-ts/lib/TaskEither';
 import * as O from 'fp-ts/lib/Option';
+import * as TE from 'fp-ts/lib/TaskEither';
 import { SpeciesApi } from '../api/apitypes';
 import { ExtractTFromPromise, handleError } from '../utils/util';
 import db from './db';
@@ -58,16 +58,24 @@ export const getSpecies = (
 
     type DBSpecies = ExtractTFromPromise<ReturnType<typeof allSpecies>>;
 
-    // we want a stronger non-null contract on what we return then is modelable in the DB
+    // we want a stronger no-null contract on what we return then is modelable in the DB
     const clean = (species: DBSpecies): SpeciesApi[] =>
         species.flatMap((s) => {
             // set the default description to make the caller's life easier
             const d = s.speciessource.find((s) => s.useasdefault === 1)?.description;
-            const newg = {
+            const species: SpeciesApi = {
                 ...s,
-                description: d ? d : '',
+                description: O.fromNullable(d),
+                taxoncode: s.taxoncode ? s.taxoncode : '',
+                synonyms: O.fromNullable(s.synonyms),
+                commonnames: O.fromNullable(s.commonnames),
+                abundance: O.fromNullable(s.abundance),
+                speciessource: s.speciessource.map((source) => ({
+                    ...source,
+                    description: O.fromNullable(source.description),
+                })),
             };
-            return newg;
+            return species;
         });
 
     // eslint-disable-next-line prettier/prettier

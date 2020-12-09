@@ -1,4 +1,6 @@
 import { Prisma } from '@prisma/client';
+import { pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { GallApi, SearchQuery } from '../api/apitypes';
 import { getGalls } from '../db/gall';
@@ -21,28 +23,39 @@ export const searchGalls = (query: SearchQuery): TaskEither<Error, GallApi[]> =>
     query.textures = parsearrmaybe(query.textures);
 
     // helper to create Where clauses
-    function whereDontCare(field: string | string[] | undefined, o: Prisma.gallWhereInput) {
-        if (field === null || field === undefined || field === '' || (Array.isArray(field) && field.length === 0)) {
+    function whereDontCare(field: O.Option<string>, toWhere: (v: string) => Prisma.gallWhereInput) {
+        return pipe(
+            field,
+            O.map(toWhere),
+            O.getOrElse(() => ({} as Prisma.gallWhereInput)),
+        );
+    }
+    function whereDontCareArray(field: string[], o: Prisma.gallWhereInput) {
+        if (field === null || field === undefined || field.length === 0) {
             return {};
         } else {
             return o;
         }
     }
+
     // detachable is odd case since it is Int (boolean)
-    const detachableWhere =
-        query.detachable !== '0' && query.detachable !== '1'
-            ? {}
-            : { OR: [{ detachable: { equals: null } }, { detachable: { equals: parseInt(query.detachable) } }] };
+    const detachableWhere: Prisma.speciesWhereInput = pipe(
+        query.detachable,
+        O.fold(
+            () => ({} as Prisma.speciesWhereInput),
+            (d) => ({ OR: [{ detachable: { equals: null } }, { detachable: { equals: parseInt(d) } }] }),
+        ),
+    );
 
     const data = getGalls([
         detachableWhere,
-        whereDontCare(query.color, { color: { color: { equals: query.color } } }),
-        whereDontCare(query.alignment, { alignment: { alignment: { equals: query.alignment } } }),
-        whereDontCare(query.shape, { shape: { shape: { equals: query.shape } } }),
-        whereDontCare(query.cells, { cells: { cells: { equals: query.cells } } }),
-        whereDontCare(query.walls, { walls: { walls: { equals: query.walls } } }),
-        whereDontCare(query.textures, { galltexture: { some: { texture: { texture: { in: query.textures } } } } }),
-        whereDontCare(query.locations, {
+        whereDontCare(query.color, (s) => ({ color: { color: { equals: s } } })),
+        whereDontCare(query.alignment, (s) => ({ alignment: { alignment: { equals: s } } })),
+        whereDontCare(query.shape, (s) => ({ shape: { shape: { equals: s } } })),
+        whereDontCare(query.cells, (s) => ({ cells: { cells: { equals: s } } })),
+        whereDontCare(query.walls, (s) => ({ walls: { walls: { equals: s } } })),
+        whereDontCareArray(query.textures, { galltexture: { some: { texture: { texture: { in: query.textures } } } } }),
+        whereDontCareArray(query.locations, {
             galllocation: { some: { location: { location: { in: query.locations } } } },
         }),
         {

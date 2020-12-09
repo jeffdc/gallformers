@@ -1,20 +1,32 @@
-import { GallLocation, GallTexture, GallApi, SearchQuery } from '../api/apitypes';
+import { constFalse, constTrue, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
+import {
+    AlignmentApi,
+    CellsApi,
+    ColorApi,
+    GallApi,
+    GallLocation,
+    GallTexture,
+    SearchQuery,
+    ShapeApi,
+    WallsApi,
+} from '../api/apitypes';
 
 const dontCare = (o: string | string[] | undefined): boolean => {
     const truthy = !!o;
     return !truthy || (truthy && Array.isArray(o) ? o.length === 0 : false);
 };
 
-const checkLocations = (gallprops: GallLocation[] | null, queryvals: string[] | undefined): boolean => {
-    if (gallprops == null || queryvals == undefined) return false;
+const checkLocations = (locs: GallLocation[], queryvals: string[] | undefined): boolean => {
+    if (queryvals == undefined) return false;
 
-    return queryvals.every((q) => gallprops.find((l) => l.location?.location === q));
+    return queryvals.every((q) => locs.find((l) => l.location?.location === q));
 };
 
-const checkTextures = (gallprops: GallTexture[] | null, queryvals: string[] | undefined): boolean => {
-    if (gallprops == null || queryvals == undefined) return false;
+const checkTextures = (textures: GallTexture[], queryvals: string[] | undefined): boolean => {
+    if (queryvals == undefined) return false;
 
-    return queryvals.every((q) => gallprops.find((l) => l.texture?.texture === q));
+    return queryvals.every((q) => textures.find((l) => l.texture?.texture === q));
 };
 
 /** Make the helper functions available for unit testing. */
@@ -22,13 +34,24 @@ export const testables = {
     dontCare: dontCare,
 };
 
+const check = <A, B>(a: O.Option<A>, b: O.Option<B>, f: (a: A, b: B) => boolean): boolean =>
+    pipe(
+        a,
+        O.fold(constTrue, (a) =>
+            pipe(
+                b,
+                O.fold(constFalse, (b) => f(a, b)),
+            ),
+        ),
+    );
+
 export const checkGall = (g: GallApi, q: SearchQuery): boolean => {
-    const alignment = dontCare(q.alignment) || (!!g.gall?.alignment && g.gall?.alignment?.alignment === q.alignment);
-    const cells = dontCare(q.cells) || (!!g.gall?.cells && g.gall?.cells?.cells === q.cells);
-    const color = dontCare(q.color) || (!!g.gall?.color && g.gall?.color?.color === q.color);
-    const detachable = dontCare(q.detachable) || (g.gall.detachable === 0 ? 'no' : 'yes') === q.detachable;
-    const shape = dontCare(q.shape) || (!!g.gall?.shape && g.gall?.shape?.shape === q.shape);
-    const walls = dontCare(q.walls) || (!!g.gall?.walls && g.gall?.walls?.walls === q.walls);
+    const alignment = check(q.alignment, g.gall.alignment, (a: string, b: AlignmentApi) => a === b.alignment);
+    const cells = check(q.cells, g.gall.cells, (a: string, b: CellsApi) => a === b.cells);
+    const color = check(q.color, g.gall.color, (a: string, b: ColorApi) => a === b.color);
+    const detachable = check(q.detachable, g.gall.detachable, (a: string, b: number) => a === (b === 0 ? 'no' : 'yes'));
+    const shape = check(q.shape, g.gall.shape, (a: string, b: ShapeApi) => a === b.shape);
+    const walls = check(q.walls, g.gall.walls, (a: string, b: WallsApi) => a === b.walls);
     const location = dontCare(q.locations) || (!!g.gall.galllocation && checkLocations(g.gall.galllocation, q.locations));
     const texture = dontCare(q.textures) || (!!g.gall.galltexture && checkTextures(g.gall.galltexture, q.textures));
 

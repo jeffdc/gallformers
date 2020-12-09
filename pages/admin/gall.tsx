@@ -1,5 +1,7 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import { abundance, alignment, cells as cs, color, family, location, shape, species, texture, walls as ws } from '@prisma/client';
+import { pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -9,13 +11,12 @@ import { Control, useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { useWithLookup } from '../../hooks/useWithLookups';
+import { useWithLookup, WithID } from '../../hooks/useWithLookups';
 import { DeleteResult, GallApi, GallUpsertFields, HostSimple } from '../../libs/api/apitypes';
 import { allFamilies } from '../../libs/db/family';
 import { alignments, allGalls, cells, colors, locations, shapes, textures, walls } from '../../libs/db/gall';
 import { allHostsSimple } from '../../libs/db/host';
 import { abundances } from '../../libs/db/species';
-import { mightBeNull } from '../../libs/db/utils';
 import { genOptions } from '../../libs/utils/forms';
 import { mightFail } from '../../libs/utils/util';
 
@@ -44,6 +45,16 @@ const Schema = yup.object().shape({
 const extractGenus = (n: string): string => {
     return n.split(' ')[0];
 };
+
+function extractId<T extends WithID>(o: O.Option<T>): number[] {
+    return pipe(
+        o,
+        O.fold(
+            () => [],
+            (d) => [d.id],
+        ),
+    );
+}
 
 type FormFields = {
     name: string;
@@ -96,12 +107,21 @@ const Gall = ({
         try {
             const res = await fetch(`../api/gall?speciesid=${spid}`);
             const sp = (await res.json()) as GallApi;
-            setValue('detachable', sp.gall.detachable === 0 ? 'no' : 'yes');
-            setValueForLookup('walls', 'walls', sp.gall.walls?.id ? [sp.gall.walls.id] : [], walls);
-            setValueForLookup('cells', 'cells', sp.gall.cells?.id ? [sp.gall.cells.id] : [], cells);
-            setValueForLookup('alignment', 'alignment', sp.gall.alignment?.id ? [sp.gall.alignment.id] : [], alignments);
-            setValueForLookup('color', 'color', sp.gall.color?.id ? [sp.gall.color.id] : [], colors);
-            setValueForLookup('shape', 'shape', sp.gall.shape?.id ? [sp.gall.shape.id] : [], shapes);
+            setValue(
+                'detachable',
+                pipe(
+                    sp.gall.detachable,
+                    O.fold(
+                        () => 'unsure',
+                        (d) => (d === 0 ? 'no' : 'yes'),
+                    ),
+                ),
+            );
+            setValueForLookup('walls', 'walls', extractId(sp.gall.walls), walls);
+            setValueForLookup('cells', 'cells', extractId(sp.gall.cells), cells);
+            setValueForLookup('alignment', 'alignment', extractId(sp.gall.alignment), alignments);
+            setValueForLookup('color', 'color', extractId(sp.gall.color), colors);
+            setValueForLookup('shape', 'shape', extractId(sp.gall.shape), shapes);
             setValueForLookup(
                 'locations',
                 'location',
@@ -230,7 +250,7 @@ const Gall = ({
                     <Col>
                         Family:
                         <select name="family" className="form-control" ref={register}>
-                            {genOptions(families.map((f) => mightBeNull(f.name)))}
+                            {genOptions(families.map((f) => f.name))}
                         </select>
                         {errors.family && (
                             <span className="text-danger">
@@ -242,7 +262,7 @@ const Gall = ({
                     <Col>
                         Abundance:
                         <select name="abundance" className="form-control" ref={register}>
-                            {genOptions(abundances.map((a) => mightBeNull(a.abundance)))}
+                            {genOptions(abundances.map((a) => a.abundance))}
                         </select>
                     </Col>
                 </Row>
@@ -289,19 +309,19 @@ const Gall = ({
                     <Col>
                         Walls:
                         <select name="walls" className="form-control" ref={register}>
-                            {genOptions(walls.map((w) => mightBeNull(w.walls)))}
+                            {genOptions(walls.map((w) => w.walls))}
                         </select>
                     </Col>
                     <Col>
                         Cells:
                         <select name="cells" className="form-control" ref={register}>
-                            {genOptions(cells.map((c) => mightBeNull(c.cells)))}
+                            {genOptions(cells.map((c) => c.cells))}
                         </select>
                     </Col>
                     <Col>
                         Alignment:
                         <select name="alignment" className="form-control" ref={register}>
-                            {genOptions(alignments.map((a) => mightBeNull(a.alignment)))}
+                            {genOptions(alignments.map((a) => a.alignment))}
                         </select>
                     </Col>
                 </Row>
@@ -309,13 +329,13 @@ const Gall = ({
                     <Col>
                         Color:
                         <select name="color" className="form-control" ref={register}>
-                            {genOptions(colors.map((c) => mightBeNull(c.color)))}
+                            {genOptions(colors.map((c) => c.color))}
                         </select>
                     </Col>
                     <Col>
                         Shape:
                         <select name="shape" className="form-control" ref={register}>
-                            {genOptions(shapes.map((s) => mightBeNull(s.shape)))}
+                            {genOptions(shapes.map((s) => s.shape))}
                         </select>
                     </Col>{' '}
                 </Row>

@@ -1,11 +1,8 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-import { allGlossaryEntries, Entry } from '../../../libs/db/glossary';
-import { linkTextFromGlossary, testables } from '../../../libs/pages/glossary';
-import { hasProp } from '../../../libs/utils/util';
-import * as T from 'fp-ts/lib/Task';
-import * as TE from 'fp-ts/lib/TaskEither';
-import { pipe } from 'fp-ts/lib/function';
-import db from '../../../libs/db/db';
+import db from '../../../../libs/db/db';
+import { Entry } from '../../../../libs/db/glossary';
+import { testables } from '../../../../libs/pages/glossary';
+import { hasProp } from '../../../../libs/utils/util';
 
 const { makeLink, stemText, linkFromStems } = testables;
 
@@ -20,12 +17,12 @@ afterAll(async (done) => {
     // this is untenable. every test that simulates the db would need this!
     // I added --force-exit to the test target in package.json - this kills everything but still stupid.
     // simply doing await db.$disconnect() does not work.
-    // await new Promise((resolve) => {
-    //     setTimeout(() => {
-    //         db.$disconnect();
-    //         resolve();
-    //     }, 1000);
-    // });
+    await new Promise((resolve) => {
+        setTimeout(() => {
+            db.$disconnect();
+            resolve();
+        }, 100);
+    });
     done();
 });
 
@@ -54,7 +51,7 @@ describe('stemText tests', () => {
 });
 
 const noTerms = 'Hello Joe!';
-const has2Terms = 'Hello Joe. Have you seen foo or bar?';
+const has2Terms = 'Hello Joe. Have you seen foo or bar? Tell me.';
 
 describe('linkFromStems tests', () => {
     const stems = stemText(entries);
@@ -65,35 +62,7 @@ describe('linkFromStems tests', () => {
         expect(linkFromStems(noTerms, true)(stems).length).toBe(1);
     });
     test('Should link to glossary items if in text', () => {
-        // expect 5 because : ['Hello Joe. Have you seen ', linkto foo, ' or ', linkto bar, '?']
+        // expect 5 because : ['Hello Joe. Have you seen ', linkto foo, ' or ', linkto bar, '? Tell Me.']
         expect(linkFromStems(has2Terms, true)(stems).length).toBe(5);
-    });
-});
-
-jest.mock('../../../libs/db/glossary');
-
-// helpers to get types correct
-const ffail = (e: Error): string => {
-    fail(e);
-    return '';
-};
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const fvoid = (_: void): string => {
-    return '';
-};
-
-describe('linkTextFromGlossary tests', () => {
-    const g = TE.taskify(() => entries);
-    // @ts-ignore
-    allGlossaryEntries.mockResolvedValue(g);
-
-    test('Should handle null/undefined/empty input', async () => {
-        await pipe(
-            linkTextFromGlossary(null),
-            TE.fold(
-                (err) => T.of(ffail(err)),
-                (ns) => T.of(fvoid(expect(ns.length).toBe(0))),
-            ),
-        )();
     });
 });

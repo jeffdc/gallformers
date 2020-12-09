@@ -1,14 +1,16 @@
 import * as A from 'fp-ts/lib/Array';
-import { pipe } from 'fp-ts/lib/function';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
-import React, { MouseEvent, useState } from 'react';
+import React, { MouseEvent, ReactFragment, ReactNode, useState } from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
-import { GallApi, GallHost, Source } from '../../../libs/api/apitypes';
+import { GallApi, GallHost, SpeciesSourceApi } from '../../../libs/api/apitypes';
 import { allGallIds, gallById } from '../../../libs/db/gall';
 import { linkTextFromGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
+import { renderCommonNames } from '../../../libs/pages/renderhelpers';
 import { deserialize, serialize } from '../../../libs/utils/reactserialize';
 import { bugguideUrl, errorThrow, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
@@ -49,7 +51,7 @@ const Gall = ({ species }: Props): JSX.Element => {
                         <Row>
                             <Col>
                                 <h2>{species.name}</h2>
-                                {species.commonnames ? `(${species.commonnames})` : ''}
+                                {renderCommonNames(species.commonnames)}
                             </Col>
                             <Col className="text-right font-italic">
                                 Family:
@@ -60,7 +62,15 @@ const Gall = ({ species }: Props): JSX.Element => {
                         </Row>
                         <Row>
                             <Col id="description" className="lead p-3">
-                                {deserialize(selectedSource?.description)}
+                                {
+                                    // eslint-disable-next-line prettier/prettier
+                                    pipe(
+                                        O.fromNullable(selectedSource?.description),
+                                        O.flatten,
+                                        O.map(deserialize),
+                                        O.getOrElse(constant((<></>) as ReactNode)),
+                                    )
+                                }
                             </Col>
                         </Row>
                         <Row>
@@ -70,16 +80,28 @@ const Gall = ({ species }: Props): JSX.Element => {
                         </Row>
                         <Row>
                             <Col>
-                                <strong>Detachable:</strong> {species.gall.detachable == 1 ? 'yes' : 'no'}
+                                <strong>Detachable:</strong>{' '}
+                                {pipe(
+                                    species.gall.detachable,
+                                    O.fold(constant('unsure'), (a) => (a === 1 ? 'yes' : 'no')),
+                                )}
                             </Col>
                             <Col>
                                 <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.texture?.texture).join(',')}
                             </Col>
                             <Col>
-                                <strong>Color:</strong> {species.gall.color?.color}
+                                <strong>Color:</strong>{' '}
+                                {pipe(
+                                    species.gall.color,
+                                    O.fold(constant(''), (c) => c.color),
+                                )}
                             </Col>
                             <Col>
-                                <strong>Alignment:</strong> {species.gall.alignment?.alignment}
+                                <strong>Alignment:</strong>{' '}
+                                {pipe(
+                                    species.gall.alignment,
+                                    O.fold(constant(''), (a) => a.alignment),
+                                )}
                             </Col>
                         </Row>
                         <Row>
@@ -87,13 +109,25 @@ const Gall = ({ species }: Props): JSX.Element => {
                                 <strong>Location:</strong> {species.gall.galllocation.map((l) => l.location?.location).join(', ')}
                             </Col>
                             <Col>
-                                <strong>Walls:</strong> {species.gall.walls?.walls}
+                                <strong>Walls:</strong>{' '}
+                                {pipe(
+                                    species.gall.walls,
+                                    O.fold(constant(''), (a) => a.walls),
+                                )}
                             </Col>
                             <Col>
-                                <strong>Abdundance:</strong> {species.abundance?.abundance}
+                                <strong>Abdundance:</strong>{' '}
+                                {pipe(
+                                    species.abundance,
+                                    O.fold(constant(''), (a) => a.abundance),
+                                )}
                             </Col>
                             <Col>
-                                <strong>Shape:</strong> {species.gall.shape?.shape}
+                                <strong>Shape:</strong>{' '}
+                                {pipe(
+                                    species.gall.shape,
+                                    O.fold(constant(''), (a) => a.shape),
+                                )}
                             </Col>
                         </Row>
                         <Row>
@@ -152,10 +186,10 @@ export const getStaticProps: GetStaticProps = async (context) => {
 
     const gall = g[0];
 
-    const updateSpeciesSource = (d: string, source: Source): Source => {
+    const updateSpeciesSource = (d: string, source: SpeciesSourceApi): SpeciesSourceApi => {
         return {
             ...source,
-            description: d,
+            description: O.of(d),
         };
     };
 

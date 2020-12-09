@@ -15,8 +15,8 @@
     "migrate-debug": "node --nolazy --inspect-brk=9229 migrate.js"
   },
   "typeCoverage": {
-    "atLeast": 99.9,
-    "cache": true,
+    "atLeast": 99.5,
+    "cache": false,
     "ignoreCatch": true,
     "ignoreFiles": ["__tests__/**", "pages/_app.tsx"],
     "strict": true

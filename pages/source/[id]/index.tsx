@@ -1,13 +1,12 @@
-import { source } from '@prisma/client';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import React from 'react';
 import { Col, Row } from 'react-bootstrap';
+import { SourceApi } from '../../../libs/api/apitypes';
 import { allSourceIds, sourceById } from '../../../libs/db/source';
-import { mightBeNull } from '../../../libs/db/utils';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 
 type Props = {
-    source: source;
+    source: SourceApi;
 };
 
 const Source = ({ source }: Props): JSX.Element => {
@@ -28,7 +27,7 @@ const Source = ({ source }: Props): JSX.Element => {
             </Row>
             <Row>
                 <Col>
-                    <a href={mightBeNull(source.link)}>{source.link}</a>
+                    <a href={source.link}>{source.link}</a>
                 </Col>
             </Row>
             <Row>

@@ -1,15 +1,21 @@
-import { Prisma, speciessource } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function';
-import { TaskEither } from 'fp-ts/lib/TaskEither';
-import * as TE from 'fp-ts/lib/TaskEither';
+import { Prisma, source, speciessource } from '@prisma/client';
 import * as A from 'fp-ts/lib/Array';
+import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
-import { DeleteResult, Source, SpeciesSourceInsertFields } from '../api/apitypes';
-import db from './db';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { TaskEither } from 'fp-ts/lib/TaskEither';
+import { DeleteResult, SpeciesSourceApi, SpeciesSourceInsertFields } from '../api/apitypes';
 import { handleError } from '../utils/util';
-import { extractId } from './utils';
+import db from './db';
 
-export const speciesSourceByIds = (speciesId: string, sourceId: string): TaskEither<Error, Source[]> => {
+type DBSpeciesSource = speciessource & { source: source };
+const adaptor = (dbs: DBSpeciesSource[]): SpeciesSourceApi[] =>
+    dbs.map((s) => ({
+        ...s,
+        description: O.fromNullable(s.description),
+    }));
+
+export const speciesSourceByIds = (speciesId: string, sourceId: string): TaskEither<Error, SpeciesSourceApi[]> => {
     const source = () =>
         db.speciessource.findMany({
             include: { source: true },
@@ -18,7 +24,11 @@ export const speciesSourceByIds = (speciesId: string, sourceId: string): TaskEit
             },
         });
 
-    return TE.tryCatch(source, handleError);
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        TE.tryCatch(source, handleError),
+        TE.map(adaptor),
+    );
 };
 
 export const deleteSpeciesSourceByIds = (speciesId: string, sourceId: string): TaskEither<Error, DeleteResult> => {
@@ -57,7 +67,7 @@ export const deleteSpeciesSourceByIds = (speciesId: string, sourceId: string): T
     return pipe(
         speciesSourceByIds(speciesId, sourceId),
         TE.map(A.lookup(0)),
-        TE.map((os) => O.map((s: Source) => s.id)(os)),
+        TE.map((os) => O.map((s: SpeciesSourceApi) => s.id)(os)),
         TE.map((oid) => O.fold(TE.taskify(nothingToDelete), deleteSpeciesSource)(oid)),
         TE.flatten,
     );

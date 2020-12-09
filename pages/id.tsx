@@ -1,19 +1,19 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import { alignment, cells as dbcells, color, location, shape, texture, walls as dbwalls } from '@prisma/client';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Col, ListGroup, Row } from 'react-bootstrap';
-import { useForm } from 'react-hook-form';
+import { Control, useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import ControlledTypeahead from '../components/controlledtypeahead';
-import { GallApi, SearchQuery } from '../libs/api/apitypes';
+import { emptySearchQuery, GallApi, SearchQuery } from '../libs/api/apitypes';
 import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
 import { allHostGenera, allHostNames } from '../libs/db/host';
-import { mightBeNull } from '../libs/db/utils';
 import { checkGall } from '../libs/utils/gallsearch';
-import { mightFail } from '../libs/utils/util';
+import { mightFail, truncateAtWord } from '../libs/utils/util';
 
 type SearchFormHostField = {
     host: string;
@@ -26,6 +26,18 @@ type SearchFormGenusField = {
 };
 
 type SearchFormFields = SearchFormHostField | SearchFormGenusField;
+
+// keep TS happy since the allowable field values are bound when we set the defaultValues above in the useForm() call.
+type FilterFormFields = {
+    locations: string[];
+    detachable: string;
+    textures: string[];
+    alignment: string;
+    walls: string;
+    cells: string;
+    shape: string;
+    color: string;
+};
 
 const Schema = yup.object().shape(
     {
@@ -70,11 +82,9 @@ const Search2 = (props: Props): JSX.Element => {
         throw new Error('Invalid props passed to Search.');
     }
 
-    const router = useRouter();
-
     const [galls, setGalls] = useState(new Array<GallApi>());
     const [filtered, setFiltered] = useState(new Array<GallApi>());
-    const [query, setQuery] = useState(router.query as SearchQuery);
+    const [query, setQuery] = useState(emptySearchQuery());
 
     const disableFilter = (): boolean => {
         const host = getValues(['host']);
@@ -89,12 +99,18 @@ const Search2 = (props: Props): JSX.Element => {
     });
 
     // this is the faceted filter form
-    const { control: filterControl, reset: filterReset } = useForm();
+    const { control: filterControl, reset: filterReset } = useForm<FilterFormFields>();
 
-    const updateQuery = (f: string, v: string | string[]): SearchQuery => {
-        const qq = { ...query } as SearchQuery;
-        const value = f !== 'locations' && f !== 'textures' && v.length > 0 ? v[0] : v;
-        (qq as Record<string, string | string[]>)[f] = value;
+    const updateQuery = (f: keyof SearchQuery, v: string | string[]): SearchQuery => {
+        const qq: SearchQuery = { ...query };
+        if (f === 'host') {
+            qq.host = v as string;
+        } else if (f === 'locations' || f === 'textures') {
+            qq[f] = v as string[];
+        } else {
+            const s = v[0];
+            qq[f] = s.length >= 1 ? O.of(s) : O.none;
+        }
         return qq;
     };
 
@@ -124,7 +140,7 @@ const Search2 = (props: Props): JSX.Element => {
     };
 
     // this is the handler for changing any other field, all work is done locally
-    const doSearch = async (field: string, value: string | string[]) => {
+    const doSearch = async (field: keyof FilterFormFields, value: string | string[]) => {
         const newq = updateQuery(field, value);
         const f = galls.filter((g) => checkGall(g, newq));
         console.log(
@@ -136,23 +152,10 @@ const Search2 = (props: Props): JSX.Element => {
         setQuery(newq);
     };
 
-    // keep TS happy since the allowable field values are bound when we set the defaultValues above in the useForm() call.
-    type FilterFieldNames =
-        | 'host'
-        | 'genus'
-        | 'locations'
-        | 'detachable'
-        | 'textures'
-        | 'alignment'
-        | 'walls'
-        | 'cells'
-        | 'shape'
-        | 'color';
-
-    const makeFormInput = (field: FilterFieldNames, opts: string[], multiple = false) => {
+    const makeFormInput = (field: keyof FilterFormFields, opts: string[], multiple = false) => {
         return (
             <ControlledTypeahead
-                control={filterControl}
+                control={filterControl as Control<Record<string, unknown>>}
                 name={field}
                 onChange={(selected) => {
                     doSearch(field, selected);
@@ -163,9 +166,9 @@ const Search2 = (props: Props): JSX.Element => {
                     }
                 }}
                 placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
-                clearButton={field !== 'host'}
                 options={opts}
                 disabled={disableFilter()}
+                clearButton={true}
                 multiple={multiple}
             />
         );
@@ -223,53 +226,56 @@ const Search2 = (props: Props): JSX.Element => {
             <Row>
                 <Col xs={3}>
                     <form className="fixed-left ml-4 form-group">
-                        <label className="col-form-label">Location:</label>
+                        <label className="col-form-label">Location(s):</label>
                         {makeFormInput(
                             'locations',
-                            props.locations.map((l) => mightBeNull(l.location)),
+                            props.locations.map((l) => l.location),
+                            true,
+                        )}
+                        <label className="col-form-label">Texture(s):</label>
+                        {makeFormInput(
+                            'textures',
+                            props.textures.map((t) => t.texture),
                             true,
                         )}
                         <label className="col-form-label">Detachable:</label>
                         {makeFormInput('detachable', ['yes', 'no', 'unsure'])}
-                        <label className="col-form-label">Texture:</label>
-                        {makeFormInput(
-                            'textures',
-                            props.textures.map((t) => mightBeNull(t.texture)),
-                            true,
-                        )}
                         <label className="col-form-label">Aligment:</label>
                         {makeFormInput(
                             'alignment',
-                            props.alignments.map((a) => mightBeNull(a.alignment)),
+                            props.alignments.map((a) => a.alignment),
                         )}
                         <label className="col-form-label">Walls:</label>
                         {makeFormInput(
                             'walls',
-                            props.walls.map((w) => mightBeNull(w.walls)),
+                            props.walls.map((w) => w.walls),
                         )}
                         <label className="col-form-label">Cells:</label>
                         {makeFormInput(
                             'cells',
-                            props.cells.map((c) => mightBeNull(c.cells)),
+                            props.cells.map((c) => c.cells),
                         )}
                         <label className="col-form-label">Shape:</label>
                         {makeFormInput(
                             'shape',
-                            props.shapes.map((s) => mightBeNull(s.shape)),
+                            props.shapes.map((s) => s.shape),
                         )}
                         <label className="col-form-label">Color:</label>
                         {makeFormInput(
                             'color',
-                            props.colors.map((c) => mightBeNull(c.color)),
+                            props.colors.map((c) => c.color),
                         )}
                     </form>
                 </Col>
                 <Col className="mt-2 form-group mr-4">
+                    <Row className="m-2">
+                        Showing {filtered.length} of {galls.length} galls.
+                    </Row>
                     {/* <Row className='border m-2'><p className='text-right'>Pager TODO</p></Row> */}
                     <Row className="m-2">
                         <ListGroup>
                             {filtered.length == 0 ? (
-                                query.host == undefined ? (
+                                query == undefined || query.host == undefined ? (
                                     <h4 className="font-weight-lighter">
                                         To begin with select a Host or a Genus to see matching galls. Then you can use the filters
                                         on the left to narrow down the list.
@@ -307,12 +313,13 @@ const Search2 = (props: Props): JSX.Element => {
     );
 };
 
-const gallDescription = (description: string): string => {
-    if (description.length > 400) {
-        return description.slice(0, 400) + '...';
-    } else {
-        return description;
-    }
+const gallDescription = (description: O.Option<string>): string => {
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        description,
+        O.map(truncateAtWord(40)),
+        O.getOrElse(constant('')),
+    )    
 };
 
 export const getServerSideProps: GetServerSideProps = async () => {

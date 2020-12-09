@@ -1,4 +1,5 @@
-import { pipe } from 'fp-ts/lib/function';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { PorterStemmer, WordTokenizer } from 'natural';
@@ -73,16 +74,19 @@ export const testables = {
  * @param text the text to find and link glossary terms in.
  * @param samepage a flag to signify if the links are on the same page.
  */
-export function linkTextFromGlossary(text: string | null | undefined, samepage = false): TaskEither<Error, ReactNode[]> {
-    if (text == undefined || text == null || (text as string).length < 1) {
-        return TE.right([]);
-    }
-
+export function linkTextFromGlossary(text: O.Option<string>, samepage = false): TaskEither<Error, ReactNode[]> {
     // eslint-disable-next-line prettier/prettier
     return pipe(
         allGlossaryEntries(),
         TE.map(stemText),
-        TE.map(linkFromStems(text, samepage)),
+        TE.map((stems) =>
+            pipe(
+                text,
+                TE.fromOption(constant(new Error('Received invalid text.'))),
+                TE.map((text) => linkFromStems(text, samepage)(stems)),
+            ),
+        ),
+        TE.flatten,
     );
 }
 
@@ -100,13 +104,11 @@ export const entriesWithLinkedDefs = (): TaskEither<Error, readonly EntryLinked[
     const linkEntries = (es: Entry[]): TaskEither<Error, EntryLinked>[] => {
         return es.map((e) => {
             // eslint-disable-next-line prettier/prettier
-            const foo = pipe(
-                linkTextFromGlossary(e.definition, true),
+            return pipe(
+                linkTextFromGlossary(O.fromNullable(e.definition), true),
                 TE.map(serialize),
                 TE.map(linkEntry(e)),
             );
-
-            return foo;
         });
     };
 

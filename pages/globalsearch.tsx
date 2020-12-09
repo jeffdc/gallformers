@@ -63,7 +63,7 @@ const GlobalSearch = ({ species, glossary }: Props): JSX.Element => {
                         <Card.Img variant="top" width="200px" src="/images/gall.jpg" />
                         <Card.Body>
                             <Card.Title>{speciesLink(species)}</Card.Title>
-                            <CardTextCollapse text={species.description === null ? '' : species.description} />
+                            <CardTextCollapse text={species.description} />
                         </Card.Body>
                     </Card>
                 ))}

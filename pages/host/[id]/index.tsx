@@ -1,23 +1,25 @@
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React, { MouseEvent, useState } from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
-import { HostApi, HostGall } from '../../../libs/api/apitypes';
+import { GallSimple, HostApi } from '../../../libs/api/apitypes';
 import { allHostIds, hostById } from '../../../libs/db/host';
-import { mightBeNull } from '../../../libs/db/utils';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
+import { renderCommonNames } from '../../../libs/pages/renderhelpers';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
     host: HostApi;
 };
 
-function gallAsLink(g: HostGall) {
-    if (!g.gallspecies) throw new Error('Recieved invalid gall for host.');
+function gallAsLink(g: GallSimple) {
+    if (!g) throw new Error('Recieved invalid gall for host.');
 
     return (
-        <Link key={g.gallspecies.id} href={`/gall/${g.gallspecies.id}`}>
-            <a>{g.gallspecies.name} </a>
+        <Link key={g.id} href={`/gall/${g.id}`}>
+            <a>{g.name} </a>
         </Link>
     );
 }
@@ -47,7 +49,7 @@ const Host = ({ host }: Props): JSX.Element => {
                         <Row>
                             <Col>
                                 <h2>{host.name}</h2>
-                                {host.commonnames ? `(${host.commonnames})` : ''}
+                                {renderCommonNames(host.commonnames)}
                             </Col>
                             Family:
                             <Link key={host.family.id} href={`/family/${host.family.id}`}>
@@ -55,13 +57,24 @@ const Host = ({ host }: Props): JSX.Element => {
                             </Link>
                         </Row>
                         <Row>
-                            <Col className="lead p-3">{source?.description}</Col>
+                            <Col className="lead p-3">
+                                {selectedSource?.description == undefined
+                                    ? ''
+                                    : pipe(selectedSource.description, O.getOrElse(constant('')))}
+                            </Col>
                         </Row>
                         <Row>
-                            <Col>Galls: {host.host_galls.map(gallAsLink)}</Col>
+                            <Col>Galls: {host.galls.map(gallAsLink)}</Col>
                         </Row>
                         <Row>
-                            <Col>Abdundance: {mightBeNull(host.abundance?.abundance)}</Col>
+                            <Col>
+                                Abdundance:{' '}
+                                {pipe(
+                                    host.abundance,
+                                    O.map((a) => a.abundance),
+                                    O.getOrElse(constant('')),
+                                )}
+                            </Col>
                         </Row>
                         <Row>
                             <Col>

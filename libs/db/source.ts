@@ -1,19 +1,26 @@
 import { Prisma, source } from '@prisma/client';
-import { TaskEither } from 'fp-ts/lib/TaskEither';
-import * as TE from 'fp-ts/lib/TaskEither';
-import db from './db';
-import { handleError } from '../utils/util';
-import { extractId } from './utils';
 import { pipe } from 'fp-ts/lib/function';
-import { DeleteResult, SourceUpsertFields } from '../api/apitypes';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { TaskEither } from 'fp-ts/lib/TaskEither';
+import { DeleteResult, SourceApi, SourceUpsertFields } from '../api/apitypes';
+import { handleError } from '../utils/util';
+import db from './db';
+import { extractId } from './utils';
 
-export const sourceById = (id: number): TaskEither<Error, source[]> => {
+// currently no transformation needed but this is the pattern we are using across the DB api so good to have this here.
+const adaptor = (sources: source[]): SourceApi[] => sources;
+
+export const sourceById = (id: number): TaskEither<Error, SourceApi[]> => {
     const sources = () =>
         db.source.findMany({
             where: { id: { equals: id } },
         });
 
-    return TE.tryCatch(sources, handleError);
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        TE.tryCatch(sources, handleError),
+        TE.map(adaptor),
+    );
 };
 
 export const allSources = (): TaskEither<Error, source[]> => {

@@ -1,30 +1,40 @@
 import { Card, Button, Collapse, Container } from 'react-bootstrap';
 import { useState } from 'react';
+import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
+import { truncateAtWord } from '../libs/utils/util';
 
 //TODO This component is kind of janky and was really just a quick hack. We should make it better.
 type Props = {
-    text: string | undefined;
+    text: O.Option<string>;
 };
 const CardTextCollapse = ({ text }: Props): JSX.Element => {
     const [open, setOpen] = useState(false);
-    const noCollapse = (
+    const noCollapse = (t: string) => (
         <Container>
-            <Card.Text>{text}</Card.Text>
+            <Card.Text>{t}</Card.Text>
         </Container>
     );
-    if (text === null || text === undefined || text.length === 0) {
-        return noCollapse;
-    }
 
-    const truncated = text.split(' ').splice(0, 40).join(' ');
-    const start = text.substring(truncated.length, text.length + 1);
+    // eslint-disable-next-line prettier/prettier
+    const t = pipe(
+        text,
+        O.getOrElse(constant('')),
+    );
 
-    if (text.length - 40 <= truncated.length) {
-        return noCollapse;
+    // if (text === null || text === undefined || text.length === 0) {
+    //     return noCollapse;
+    // }
+
+    const truncated = truncateAtWord(40)(t);
+    const start = t.substring(truncated.length, t.length + 1);
+
+    if (t.length - 40 <= truncated.length) {
+        return noCollapse(t);
     } else {
         return (
             <Container>
-                <Card.Text>{truncated + '...'}</Card.Text>
+                <Card.Text>{truncated}</Card.Text>
                 <Collapse in={open}>
                     <Card.Text>{start}</Card.Text>
                 </Collapse>

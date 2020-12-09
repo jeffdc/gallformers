@@ -1,5 +1,6 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import { source, species, speciessource } from '@prisma/client';
+import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import React, { useState } from 'react';
@@ -8,7 +9,7 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { DeleteResult, GallTaxon, Source, SpeciesSourceInsertFields } from '../../libs/api/apitypes';
+import { DeleteResult, GallTaxon, SpeciesSourceApi, SpeciesSourceInsertFields } from '../../libs/api/apitypes';
 import { allSources } from '../../libs/db/source';
 import { allSpecies } from '../../libs/db/species';
 import { mightFail } from '../../libs/utils/util';
@@ -61,10 +62,10 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
 
                 setExisting(false);
                 if (res.status === 200) {
-                    const s = (await res.json()) as Source;
+                    const s = (await res.json()) as SpeciesSourceApi;
                     if (s) {
                         setExisting(true);
-                        setValue('description', s.description);
+                        setValue('description', O.getOrElse(() => '')(s.description));
                         setValue('useasdefault', s.useasdefault > 0);
                     }
                 }

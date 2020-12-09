@@ -1,45 +1,84 @@
-import { Prisma } from '@prisma/client';
+import { abundance, family, host, Prisma, source, species, speciessource } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { DeleteResult, HostApi, HostSimple, HostTaxon, SpeciesUpsertFields } from '../api/apitypes';
-import { ExtractTFromPromise, handleError } from '../utils/util';
+import { handleError } from '../utils/util';
 import db from './db';
-import { mightBeNull } from './utils';
+
+type DBHost = species & {
+    abundance: abundance | null;
+    family: family;
+    host_galls: (host & {
+        gallspecies: {
+            id: number;
+            name: string;
+        } | null;
+    })[];
+    speciessource: (speciessource & {
+        source: source;
+    })[];
+};
+
+// we want a stronger non-null contract on what we return then is modelable in the DB
+const adaptor = (hosts: DBHost[]): HostApi[] =>
+    hosts.flatMap((h) => {
+        // set the default description to make the caller's life easier
+        const d = h.speciessource.find((s) => s.useasdefault === 1)?.description;
+        const newh: HostApi = {
+            ...h,
+            description: O.fromNullable(d),
+            taxoncode: h.taxoncode ? h.taxoncode : '',
+            synonyms: O.fromNullable(h.synonyms),
+            commonnames: O.fromNullable(h.commonnames),
+            abundance: O.fromNullable(h.abundance),
+            // remove the indirection of the many-to-many table for easier usage
+            galls: h.host_galls.map((h) => {
+                // due to prisma problems we had to make these hostspecies relationships optional, however
+                // if we are here then there must be a record in the host table so it can not be null :(
+                if (!h.gallspecies?.id || !h.gallspecies?.name) throw new Error('Invalid state for hosts.');
+                return {
+                    id: h.gallspecies?.id,
+                    name: h.gallspecies?.name,
+                };
+            }),
+            speciessource: h.speciessource.map((s) => ({
+                ...s,
+                description: O.fromNullable(s.description),
+            })),
+        };
+        return newh;
+    });
+
+const simplify = (hosts: HostApi[]) =>
+    hosts.map((h) => {
+        return {
+            name: h.name,
+            id: h.id,
+            commonnames: h.commonnames,
+            synonyms: h.synonyms,
+        };
+    });
 
 /**
  * Fetches all hosts.
  */
-export const allHosts = (): TaskEither<Error, HostApi[]> => {
-    return getHosts();
-};
+export const allHosts = (): TaskEither<Error, HostApi[]> => getHosts();
 
 /**
  * Fetches all hosts into a HostSimple format.
  */
-export const allHostsSimple = (): TaskEither<Error, HostSimple[]> => {
-    const simplify = (hosts: HostApi[]) =>
-        hosts.map((h) => {
-            return {
-                name: h.name,
-                id: h.id,
-                commonnames: mightBeNull(h?.commonnames),
-                synonyms: mightBeNull(h?.synonyms),
-            };
-        });
-
-    return pipe(allHosts(), TE.map(simplify));
-};
+export const allHostsSimple = (): TaskEither<Error, HostSimple[]> => pipe(allHosts(), TE.map(simplify));
 
 /**
  * Fetches all host names as a string[].
  */
-export const allHostNames = (): TaskEither<Error, string[]> => {
-    return pipe(
+export const allHostNames = (): TaskEither<Error, string[]> =>
+    pipe(
         allHosts(),
         TE.map((hosts) => hosts.map((h) => h.name)),
     );
-};
 
 /**
  * Fetches all of the Genera for the hosts.
@@ -110,30 +149,7 @@ export const getHosts = (
             orderBy: { name: 'asc' },
         });
 
-    type DBHost = ExtractTFromPromise<ReturnType<typeof hosts>>;
-
-    // we want a stronger non-null contract on what we return then is modelable in the DB
-    const clean = (hosts: DBHost): HostApi[] =>
-        hosts.flatMap((h) => {
-            // set the default description to make the caller's life easier
-            const d = h.speciessource.find((s) => s.useasdefault === 1)?.description;
-            const newh = {
-                ...h,
-                description: d ? d : '',
-                // remove the indirection of the many-to-many table for easier usage
-                hosts: h.host_galls.map((h) => {
-                    return {
-                        // due to prisma problems we had to make these hostspecies relationships optional, however
-                        // if we are here then there must be a record in the host table so it can not be null :(
-                        id: h.gallspecies?.id,
-                        name: h.gallspecies?.name,
-                    };
-                }),
-            };
-            return newh as HostApi; // ugh, TS type-checker can not "see" that we eliminated the null.
-        });
-
-    return pipe(TE.tryCatch(hosts, handleError), TE.map(clean));
+    return pipe(TE.tryCatch(hosts, handleError), TE.map(adaptor));
 };
 
 /**

@@ -4,13 +4,6 @@
 
 import { Prisma } from '@prisma/client';
 
-export function mightBeNull<T extends string | string[] | number>(x: T | null | undefined): T {
-    if (x == null || x == undefined) {
-        return '' as T;
-    }
-    return x;
-}
-
 export type ConnectTypes =
     | Prisma.abundanceCreateOneWithoutSpeciesInput
     | Prisma.abundanceUpdateOneWithoutSpeciesInput

@@ -4,9 +4,7 @@
  * @param includeEmpty if true then an empty element will be included in the list of options.
  */
 export const genOptions = (opts: readonly string[], includeEmpty = true): JSX.Element => {
-    if (!opts) {
-        throw new Error('Must have a valid list of options to render.');
-    } else if (new Set(opts).size !== opts.length) {
+    if (new Set(opts).size !== opts.length) {
         throw new Error('Passed in set of options contains duplicates and this is not allowed.');
     }
 

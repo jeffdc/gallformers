@@ -84,3 +84,15 @@ export function handleError(e: unknown): Error {
         return new Error(e as any);
     }
 }
+
+/**
+ * If the given text is longer than the passed in len then truncate the text and add ... and return.
+ * @param words the number of words at which to truncate and add ...
+ */
+export const truncateAtWord = (words: number) => (s: string): string => {
+    if (s.length > words) {
+        return s.split(' ').splice(0, 40).join(' ') + '...';
+    } else {
+        return s;
+    }
+};

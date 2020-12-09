@@ -18,15 +18,14 @@ if (process.env.NODE_ENV === 'production') {
     db = new PrismaClient();
     console.log('Production: Created DB connection.');
 } else {
+    // Ensure the prisma instance is re-used during hot-reloading
+    // Otherwise, a new client will be created on every reload
     // @ts-ignore
-    if (!global.db) {
-        // @ts-ignore
-        global.db = new PrismaClient();
-        console.log('Development: Created DB connection.');
-    }
-
+    globalThis['db'] = globalThis['db'] || new PrismaClient();
     // @ts-ignore
-    db = global.db;
+    db = globalThis['db'];
+    // console.log('Development: Created DB connection.');
+    // console.log(new Error().stack);
 }
 
 // const db = new PrismaClient();
