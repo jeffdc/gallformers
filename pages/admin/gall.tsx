@@ -1,6 +1,8 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { abundance, alignment, cells as cs, color, family, location, shape, species, texture, walls as ws } from '@prisma/client';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
 import { Col, Row } from 'react-bootstrap';
@@ -8,34 +10,44 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { DeleteResults, GallRes, GallUpsertFields } from '../../libs/apitypes';
+import { AdminFormFields, useAPIs } from '../../hooks/useAPIs';
+import * as AT from '../../libs/api/apitypes';
 import { allFamilies } from '../../libs/db/family';
 import { alignments, allGalls, cells, colors, locations, shapes, textures, walls } from '../../libs/db/gall';
-import { allHostsSimple, HostSimple } from '../../libs/db/host';
+import { allHostsSimple } from '../../libs/db/host';
 import { abundances } from '../../libs/db/species';
-import { mightBeNull } from '../../libs/db/utils';
-import { GallFormFields, genOptions } from '../../libs/utils/forms';
+import { mightFailWithArray } from '../../libs/utils/util';
 
 //TODO factor out the species form and allow it to be extended with what is needed for a gall as this code violates DRY a lot!
 
 type Props = {
-    galls: species[];
-    abundances: abundance[];
-    hosts: HostSimple[];
-    locations: location[];
-    colors: color[];
-    shapes: shape[];
-    textures: texture[];
-    alignments: alignment[];
-    walls: ws[];
-    cells: cs[];
-    families: family[];
+    gs: AT.GallApi[];
+    abundances: AT.AbundanceApi[];
+    hosts: AT.HostSimple[];
+    locations: AT.GallLocation[];
+    colors: AT.ColorApi[];
+    shapes: AT.ShapeApi[];
+    textures: AT.GallTexture[];
+    alignments: AT.AlignmentApi[];
+    walls: AT.WallsApi[];
+    cells: AT.CellsApi[];
+    families: AT.FamilyApi[];
 };
 
 const Schema = yup.object().shape({
-    name: yup.string().matches(/([A-Z][a-z]+ [a-z]+$)/),
+    value: yup
+        .array()
+        .of(
+            yup.object({
+                name: yup
+                    .string()
+                    .matches(/([A-Z][a-z]+ [a-z]+$)/)
+                    .required(),
+            }),
+        )
+        .min(1)
+        .max(1),
     family: yup.string().required(),
-    description: yup.string().required(),
     hosts: yup.array().required(),
 });
 
@@ -43,26 +55,25 @@ const extractGenus = (n: string): string => {
     return n.split(' ')[0];
 };
 
-type FormFields =
-    | 'name'
-    | 'genus'
-    | 'family'
-    | 'abundance'
-    | 'commonnames'
-    | 'synonmys'
-    | 'hosts'
-    | 'detachable'
-    | 'walls'
-    | 'cells'
-    | 'alignment'
-    | 'shape'
-    | 'color'
-    | 'locations'
-    | 'textures'
-    | 'description';
+export type FormFields = AdminFormFields<AT.GallApi> & {
+    genus: string;
+    family: AT.FamilyApi;
+    abundance: AT.AbundanceApi;
+    commonnames: string;
+    synonyms: string;
+    hosts: AT.HostSimple[];
+    detachable: string;
+    walls: AT.WallsApi;
+    cells: AT.CellsApi;
+    alignment: AT.AlignmentApi;
+    shape: AT.ShapeApi;
+    color: AT.ColorApi;
+    locations: AT.GallLocation[];
+    textures: AT.GallTexture[];
+};
 
 const Gall = ({
-    galls,
+    gs,
     hosts,
     locations,
     colors,
@@ -74,141 +85,132 @@ const Gall = ({
     abundances,
     families,
 }: Props): JSX.Element => {
-    const { register, handleSubmit, errors, control, setValue } = useForm({
+    const { register, handleSubmit, errors, control, reset, setValue } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
     const router = useRouter();
 
     const [existing, setExisting] = useState(false);
-    const [deleteResults, setDeleteResults] = useState<DeleteResults>();
-
-    function setValueForLookup(
-        field: FormFields,
-        ids: (number | null | undefined)[] | undefined,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        lookup: any[],
-        valField: string,
-    ) {
-        if (!ids) return;
-
-        const vals = ids.map((id) => {
-            const val = lookup.find((v) => v.id === id);
-            if (val) {
-                return val[valField];
-            } else if (!id) {
-                // was an invalid id so do not care
-                return undefined;
-            } else {
-                throw new Error(`Failed to lookup for ${field}.`);
-            }
-        });
-        if (vals && vals.length > 0 && vals[0]) {
-            setValue(field, vals);
-        }
-    }
+    const [deleteResults, setDeleteResults] = useState<AT.DeleteResult>();
+    const [galls, setGalls] = useState(gs);
 
     const setGallDetails = async (spid: number): Promise<void> => {
         try {
             const res = await fetch(`../api/gall?speciesid=${spid}`);
-            const gall = (await res.json()) as GallRes;
-
-            setValue('detachable', gall.detachable);
-            setValueForLookup('walls', [gall.walls_id], walls, 'walls');
-            setValueForLookup('cells', [gall.cells_id], cells, 'cells');
-            setValueForLookup('alignment', [gall.alignment_id], alignments, 'alignment');
-            setValueForLookup('color', [gall.color_id], colors, 'color');
-            setValueForLookup('shape', [gall.shape_id], shapes, 'shape');
-            setValueForLookup('locations', gall.locations, locations, 'location');
-            setValueForLookup('textures', gall.textures, textures, 'texture');
-            setValueForLookup('hosts', gall.hosts, hosts, 'name');
+            const sp = (await res.json()) as AT.GallApi;
+            setValue(
+                'detachable',
+                pipe(
+                    sp.gall.detachable,
+                    O.fold(
+                        () => 'unsure',
+                        (d) => (d === 0 ? 'no' : 'yes'),
+                    ),
+                ),
+            );
+            setValue('walls', pipe(sp.gall.walls, O.getOrElse(constant(AT.EmptyWalls))));
+            setValue('cells', pipe(sp.gall.cells, O.getOrElse(constant(AT.EmptyCells))));
+            setValue('alignment', pipe(sp.gall.alignment, O.getOrElse(constant(AT.EmptyAlignment))));
+            setValue('color', pipe(sp.gall.color, O.getOrElse(constant(AT.EmptyColor))));
+            setValue('shape', pipe(sp.gall.shape, O.getOrElse(constant(AT.EmptyShape))));
+            setValue('locations', sp.gall.galllocation);
+            setValue('textures', sp.gall.galltexture);
+            setValue('hosts', sp.hosts);
         } catch (e) {
             console.error(e);
         }
     };
 
-    const onSubmit = async (data: GallFormFields) => {
-        if (data.delete) {
-            const id = galls.find((g) => g.name === data.name)?.id;
-            const res = await fetch(`../api/gall/${id}`, {
-                method: 'DELETE',
-            });
+    const { doDeleteOrUpsert } = useAPIs<AT.GallApi, AT.GallUpsertFields>('name', '../api/gall/', '../api/gall/upsert');
 
-            if (res.status === 200) {
-                setDeleteResults(await res.json());
-            } else {
-                throw new Error(await res.text());
-            }
-        }
-
-        const species = galls.find((g) => g.name === data.name);
-
-        const submitData: GallUpsertFields = {
-            ...data,
-            // i hate null... :( these should be safe since the text values came from the same place as the ids
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            hosts: data.hosts.map((h) => hosts.find((hh) => hh.name === h)!.id),
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            locations: data.locations.map((l) => locations.find((ll) => ll.location === l)!.id),
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            textures: data.textures.map((t) => textures.find((tt) => tt.texture === t)!.id),
-            id: species ? species.id : undefined,
+    const onSubmit = async (data: FormFields) => {
+        const postDelete = (id: number | string, result: AT.DeleteResult) => {
+            setGalls(galls.filter((s) => s.id !== id));
+            setDeleteResults(result);
         };
-        try {
-            const res = await fetch('../api/gall/upsert', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(submitData),
-            });
 
-            if (res.status === 200) {
-                router.push(res.url);
-            } else {
-                throw new Error(await res.text());
-            }
-        } catch (e) {
-            console.error(e);
-        }
+        const postUpdate = (res: Response) => {
+            router.push(res.url);
+        };
+
+        const convertFormFieldsToUpsert = (fields: FormFields, name: string, id: number): AT.GallUpsertFields => ({
+            abundance: fields.abundance.abundance,
+            alignment: fields.alignment.alignment,
+            cells: fields.cells.cells,
+            color: fields.color.color,
+            commonnames: fields.commonnames,
+            detachable: fields.detachable,
+            family: fields.family.name,
+            hosts: fields.hosts.map((h) => h.id),
+            id: id,
+            locations: fields.locations.map((l) => l.id),
+            name: name,
+            shape: fields.shape.shape,
+            synonyms: fields.synonyms,
+            textures: fields.textures.map((t) => t.id),
+            walls: fields.walls.walls,
+        });
+
+        await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert);
+        reset();
     };
 
     return (
         <Auth>
             <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                 <h4>Add A Gall</h4>
+                <p>
+                    This is for all of the details about a Gall. To add a description (which must be referenced to a source) go
+                    add <Link href="/admin/source">Sources</Link>, if they do not already exist, then go{' '}
+                    <Link href="/admin/speciessource">map species to sources with description</Link>.
+                </p>
                 <Row className="form-group">
                     <Col>
                         Name (binomial):
                         <ControlledTypeahead
                             control={control}
-                            name="name"
-                            onChange={(e) => {
-                                const f = galls.find((f) => f.name === e[0]);
-                                setExisting(false);
-                                if (f) {
-                                    setExisting(true);
-                                    setValueForLookup('family', [f.family_id], families, 'name');
-                                    setValueForLookup('abundance', [f.abundance_id as number | undefined], abundances, 'name');
-                                    setValue('commonnames', f.commonnames);
-                                    setValue('synonyms', f.synonyms);
-                                    setGallDetails(f.id);
-                                    setValue('description', f.description);
+                            name="value"
+                            onChangeWithNew={(e, isNew) => {
+                                setExisting(!isNew);
+                                if (isNew || !e[0]) {
+                                    setValue('genus', extractGenus(e[0] ? e[0].name : ''));
+                                    setValue('family', AT.EmptyFamily);
+                                    setValue('abundance', AT.EmptyAbundance);
+                                    setValue('commonnames', '');
+                                    setValue('synonyms', '');
+                                    setValue('detachable', '');
+                                    setValue('walls', AT.EmptyWalls);
+                                    setValue('cells', AT.EmptyCells);
+                                    setValue('alignment', AT.EmptyAlignment);
+                                    setValue('color', AT.EmptyColor);
+                                    setValue('shape', AT.EmptyShape);
+                                    setValue('locations', []);
+                                    setValue('textures', []);
+                                    setValue('hosts', []);
+                                } else {
+                                    const gall: AT.GallApi = e[0];
+                                    setValue('family', gall.family);
+                                    setValue('abundance', pipe(gall.abundance, O.getOrElse(constant(AT.EmptyAbundance))));
+                                    setValue('commonnames', pipe(gall.commonnames, O.getOrElse(constant(''))));
+                                    setValue('synonyms', pipe(gall.synonyms, O.getOrElse(constant(''))));
+                                    setGallDetails(gall.id);
                                 }
                             }}
-                            onBlur={(e) => {
-                                if (!errors.name) {
+                            onBlurT={(e) => {
+                                if (!errors.value) {
                                     setValue('genus', extractGenus(e.target.value));
                                 }
                             }}
                             placeholder="Name"
-                            options={galls.map((f) => f.name)}
+                            options={galls}
+                            labelKey="name"
                             clearButton
-                            isInvalid={!!errors.name}
+                            isInvalid={!!errors.value}
                             newSelectionPrefix="Add a new Gall: "
                             allowNew={true}
                         />
-                        {errors.name && (
+                        {errors.value && (
                             <span className="text-danger">
                                 Name is required and must be in standard binomial form, e.g., Andricus weldi
                             </span>
@@ -220,9 +222,13 @@ const Gall = ({
                     </Col>
                     <Col>
                         Family:
-                        <select name="family" className="form-control" ref={register}>
-                            {genOptions(families.map((f) => mightBeNull(f.name)))}
-                        </select>
+                        <ControlledTypeahead
+                            control={control}
+                            name="family"
+                            placeholder="Family"
+                            options={families}
+                            labelKey="name"
+                        />
                         {errors.family && (
                             <span className="text-danger">
                                 The Family name is required. If it is not present in the list you will have to go add the family
@@ -232,9 +238,14 @@ const Gall = ({
                     </Col>
                     <Col>
                         Abundance:
-                        <select name="abundance" className="form-control" ref={register}>
-                            {genOptions(abundances.map((a) => mightBeNull(a.abundance)))}
-                        </select>
+                        <ControlledTypeahead
+                            control={control}
+                            name="abundance"
+                            placeholder=""
+                            options={abundances}
+                            labelKey="abundance"
+                            clearButton
+                        />
                     </Col>
                 </Row>
                 <Row className="form-group">
@@ -260,7 +271,8 @@ const Gall = ({
                             control={control}
                             name="hosts"
                             placeholder="Hosts"
-                            options={hosts.map((h) => h.name)}
+                            options={hosts}
+                            labelKey="name"
                             multiple
                             clearButton
                         />
@@ -279,35 +291,60 @@ const Gall = ({
                     </Col>
                     <Col>
                         Walls:
-                        <select name="walls" className="form-control" ref={register}>
-                            {genOptions(walls.map((w) => mightBeNull(w.walls)))}
-                        </select>
+                        <ControlledTypeahead
+                            control={control}
+                            name="walls"
+                            placeholder=""
+                            options={walls}
+                            labelKey="walls"
+                            clearButton
+                        />
                     </Col>
                     <Col>
                         Cells:
-                        <select name="cells" className="form-control" ref={register}>
-                            {genOptions(cells.map((c) => mightBeNull(c.cells)))}
-                        </select>
+                        <ControlledTypeahead
+                            control={control}
+                            name="cells"
+                            placeholder=""
+                            options={cells}
+                            labelKey="cells"
+                            clearButton
+                        />
                     </Col>
                     <Col>
                         Alignment:
-                        <select name="alignment" className="form-control" ref={register}>
-                            {genOptions(alignments.map((a) => mightBeNull(a.alignment)))}
-                        </select>
+                        <ControlledTypeahead
+                            control={control}
+                            name="alignment"
+                            placeholder=""
+                            options={alignments}
+                            labelKey="alignment"
+                            clearButton
+                        />
                     </Col>
                 </Row>
                 <Row className="form-group">
                     <Col>
                         Color:
-                        <select name="color" className="form-control" ref={register}>
-                            {genOptions(colors.map((c) => mightBeNull(c.color)))}
-                        </select>
+                        <ControlledTypeahead
+                            control={control}
+                            name="color"
+                            placeholder=""
+                            options={colors}
+                            labelKey="color"
+                            clearButton
+                        />
                     </Col>
                     <Col>
                         Shape:
-                        <select name="shape" className="form-control" ref={register}>
-                            {genOptions(shapes.map((s) => mightBeNull(s.shape)))}
-                        </select>
+                        <ControlledTypeahead
+                            control={control}
+                            name="shape"
+                            placeholder=""
+                            options={shapes}
+                            labelKey="shape"
+                            clearButton
+                        />
                     </Col>{' '}
                 </Row>
                 <Row className="form-group">
@@ -317,7 +354,8 @@ const Gall = ({
                             control={control}
                             name="locations"
                             placeholder="Location(s)"
-                            options={locations.map((l) => l.location)}
+                            options={locations}
+                            labelKey="loc"
                             multiple
                             clearButton
                         />
@@ -328,21 +366,11 @@ const Gall = ({
                             control={control}
                             name="textures"
                             placeholder="Texture(s)"
-                            options={textures.map((t) => t.texture)}
+                            options={textures}
+                            labelKey="tex"
                             multiple
                             clearButton
                         />
-                    </Col>
-                </Row>
-                <Row className="form-group">
-                    <Col>
-                        Description:
-                        <textarea name="description" className="form-control" ref={register} rows={8} />
-                        {errors.description && (
-                            <span className="text-danger">
-                                You must provide a description. You can add source references separately.
-                            </span>
-                        )}
                     </Col>
                 </Row>
                 <Row className="fromGroup" hidden={!existing}>
@@ -367,17 +395,17 @@ const Gall = ({
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
-            galls: await allGalls(),
-            hosts: await allHostsSimple(),
-            families: await allFamilies(),
-            locations: await locations(),
-            colors: await colors(),
-            shapes: await shapes(),
-            textures: await textures(),
-            alignments: await alignments(),
-            walls: await walls(),
-            cells: await cells(),
-            abundances: await abundances(),
+            gs: await mightFailWithArray<AT.GallApi>()(allGalls()),
+            hosts: await mightFailWithArray<AT.HostSimple>()(allHostsSimple()),
+            families: await mightFailWithArray<AT.FamilyApi>()(allFamilies()),
+            locations: await mightFailWithArray<AT.GallLocation>()(locations()),
+            colors: await mightFailWithArray<AT.ColorApi>()(colors()),
+            shapes: await mightFailWithArray<AT.ShapeApi>()(shapes()),
+            textures: await mightFailWithArray<AT.GallTexture>()(textures()),
+            alignments: await mightFailWithArray<AT.AlignmentApi>()(alignments()),
+            walls: await mightFailWithArray<AT.WallsApi>()(walls()),
+            cells: await mightFailWithArray<AT.CellsApi>()(cells()),
+            abundances: await mightFailWithArray<AT.AbundanceApi>()(abundances()),
         },
     };
 };

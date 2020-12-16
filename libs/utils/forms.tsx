@@ -1,39 +1,25 @@
-export const genOptions = (opts: string[]): JSX.Element => {
-    if (opts == undefined || opts == null) {
-        throw new Error('Must have a valid list of options to render.');
+/**
+ * Generates a list of <option>s to be used within a form.
+ * @param opts the array of string that represent the options to be rendered.
+ * @param includeEmpty if true then an empty element will be included in the list of options.
+ */
+export const genOptions = (opts: readonly string[], includeEmpty = true): JSX.Element => {
+    if (new Set(opts).size !== opts.length) {
+        throw new Error('Passed in set of options contains duplicates and this is not allowed.');
     }
+
     return (
         <>
-            <option value=""></option>
-            {opts.map((o) => {
-                return (
-                    <option key={o} value={o}>
-                        {o}
-                    </option>
-                );
-            })}
+            {includeEmpty ? <option key="none" value=""></option> : undefined}
+            {opts
+                .filter((o) => o)
+                .map((o) => {
+                    return (
+                        <option key={o} value={o}>
+                            {o}
+                        </option>
+                    );
+                })}
         </>
     );
-};
-
-export type SpeciesFormFields = {
-    name: string;
-    commonnames: string;
-    synonyms: string;
-    family: string;
-    abundance: string;
-    description: string;
-};
-
-export type GallFormFields = SpeciesFormFields & {
-    hosts: string[];
-    locations: string[];
-    color: string;
-    shape: string;
-    textures: string[];
-    alignment: string;
-    walls: string;
-    cells: string;
-    detachable: string;
-    delete?: boolean;
 };

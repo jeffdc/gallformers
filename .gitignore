@@ -9,3 +9,5 @@ gallformers.sqlite-shm
 log.log
 yarn-error.log
 gallformers-docker.tar
+.type-coverage
+.coverage

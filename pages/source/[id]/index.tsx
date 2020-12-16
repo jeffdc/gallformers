@@ -1,37 +1,41 @@
-import { source } from '@prisma/client';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import React from 'react';
 import { Col, Row } from 'react-bootstrap';
-import { allSources, sourceById } from '../../../libs/db/source';
-import { mightBeNull } from '../../../libs/db/utils';
+import { SourceApi } from '../../../libs/api/apitypes';
+import { allSourceIds, sourceById } from '../../../libs/db/source';
+import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 
 type Props = {
-    source: source;
+    source: SourceApi;
 };
 
 const Source = ({ source }: Props): JSX.Element => {
     return (
         <div className="p-3 m-3">
-            <Row>
+            <Row className="pb-4">
                 <Col>
                     <h2>{source.title}</h2>
                 </Col>
             </Row>
-            <Row>
+            <Row className="pb-4">
                 <Col>
-                    <h4>{source.author}</h4>
+                    <h5>Authors:</h5>
+                    {source.author}
                 </Col>
-                <Col>
-                    <b>{source.pubyear}</b>
-                </Col>
-            </Row>
-            <Row>
-                <Col>
-                    <a href={mightBeNull(source.link)}>{source.link}</a>
+                <Col xs={3}>
+                    <h5>Publication Year:</h5>
+                    {source.pubyear}
                 </Col>
             </Row>
-            <Row>
+            <Row className="pb-4">
                 <Col>
+                    <h5>Link:</h5>
+                    <a href={source.link}>{source.link}</a>
+                </Col>
+            </Row>
+            <Row className="pb-4">
+                <Col>
+                    <h5>Citation:</h5>
                     <i>{source.citation}</i>
                 </Col>
             </Row>
@@ -41,27 +45,16 @@ const Source = ({ source }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    if (context === undefined || context.params === undefined || context.params.id === undefined) {
-        throw new Error(`Source id can not be undefined.`);
-    } else if (Array.isArray(context.params.id)) {
-        throw new Error(`Expected single id but got an array of ids ${context.params.id}.`);
-    }
+    const source = getStaticPropsWithContext(context, sourceById, 'source');
 
     return {
         props: {
-            source: await sourceById(parseInt(context.params.id)),
+            source: (await source)[0],
         },
         revalidate: 1,
     };
 };
 
-export const getStaticPaths: GetStaticPaths = async () => {
-    const sources = await allSources();
-    const paths = sources.map((source) => ({
-        params: { id: source.id?.toString() },
-    }));
-
-    return { paths, fallback: false };
-};
+export const getStaticPaths: GetStaticPaths = async () => getStaticPathsFromIds(allSourceIds);
 
 export default Source;

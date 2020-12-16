@@ -1,33 +1,28 @@
-import { gallWhereInput } from '@prisma/client';
+import { pipe } from 'fp-ts/lib/function';
+import * as E from 'fp-ts/lib/Either';
+import * as O from 'fp-ts/lib/Option';
+import * as R from 'fp-ts/lib/Record';
+import * as TE from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
-import db from '../../../libs/db/db';
+import { Err, getQueryParam, sendErrResponse, sendSuccResponse, toErr } from '../../../libs/api/apipage';
+import { GallApi } from '../../../libs/api/apitypes';
+import { gallsByHostGenus, gallsByHostName } from '../../../libs/db/gall';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
-    try {
-        if (!req.query.host && !req.query.genus) {
-            res.status(400).end('No valid query provided.');
-        }
+    const noParamsErr = O.of(
+        TE.left<Err, GallApi[]>({ status: 400, msg: 'No valid query params provided.' }),
+    );
 
-        const whereClause: gallWhereInput = req.query.host
-            ? { species: { hosts: { some: { hostspecies: { name: { equals: req.query.host as string } } } } } }
-            : { species: { hosts: { some: { hostspecies: { genus: { equals: req.query.genus as string } } } } } };
-
-        const galls = await db.gall.findMany({
-            include: {
-                alignment: true,
-                cells: true,
-                color: true,
-                galllocation: { include: { location: true } },
-                galltexture: { include: { texture: true } },
-                shape: true,
-                walls: true,
-                species: { include: { hosts: { select: { hostspecies: { select: { id: true } } } } } },
-            },
-            where: whereClause,
-        });
-
-        res.status(200).json(galls.sort((a, b) => a.species.name?.localeCompare(b.species.name)));
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
+    await pipe(
+        { host: 'host', genus: 'genus' },
+        R.map(getQueryParam(req)),
+        R.map(O.map(decodeURI)),
+        R.mapWithIndex((k, o) => (k === 'host' ? O.map(gallsByHostName)(o) : O.map(gallsByHostGenus)(o))),
+        R.map(O.map(TE.mapLeft(toErr))),
+        R.reduce(noParamsErr, (b, a) => (O.isSome(a) ? a : b)),
+        E.fromOption(() => ({ status: 500, msg: 'Failed to run search' })),
+        TE.fromEither,
+        TE.flatten,
+        TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+    )();
 };

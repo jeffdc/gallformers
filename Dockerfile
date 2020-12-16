@@ -6,10 +6,10 @@ RUN apk update && apk upgrade
 # to get yarn caching working to make builds much faster...
 WORKDIR /usr/src/app
 
-# create a layer with all the dependencies so that we can rely on the docker cache unless package.jspn changes
+# create a layer with all the dependencies so that we can rely on the docker cache unless package.json changes
 COPY package.json ./
 COPY yarn.lock ./
-# RUN node --stack-size=6000 $(which npm) --verbose install
+
 RUN yarn install --production=true
 
 # copy all the stuff

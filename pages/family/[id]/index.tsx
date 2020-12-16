@@ -3,7 +3,9 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
-import { allFamilies, familyById, speciesByFamily } from '../../../libs/db/family';
+import { GallTaxon } from '../../../libs/api/apitypes';
+import { allFamilyIds, familyById, speciesByFamily } from '../../../libs/db/family';
+import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 
 type Props = {
     family: family;
@@ -11,7 +13,7 @@ type Props = {
 };
 
 function makeSpeciesLink(s: species) {
-    const speciesType = s.taxoncode === 'gall' ? 'gall' : 'host';
+    const speciesType = s.taxoncode === GallTaxon ? 'gall' : 'host';
     return (
         <Link key={s.id} href={`/${speciesType}/${s.id}`}>
             <a>{s.name} </a>
@@ -28,15 +30,8 @@ const Family = ({ family, species }: Props): JSX.Element => {
             }}
         >
             <Media>
-                {/* <img
-                width={170}
-                height={128}
-                className="mr-3"
-                src=""
-                alt={host.hostspecies.name}
-            /> */}
                 <Media.Body>
-                    <Container className="p-3 border">
+                    <Container className="p-3">
                         <Row>
                             <Col>
                                 <h1>{family.name}</h1>
@@ -61,31 +56,18 @@ const Family = ({ family, species }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    if (context === undefined || context.params === undefined || context.params.id === undefined) {
-        throw new Error(`Family id can not be undefined.`);
-    } else if (Array.isArray(context.params.id)) {
-        throw new Error(`Expected single id but got an array of ids ${context.params.id}.`);
-    }
-
-    const familyId = parseInt(context.params.id);
+    const family = getStaticPropsWithContext(context, familyById, 'family');
+    const species = getStaticPropsWithContext(context, speciesByFamily, 'species', false, true);
 
     return {
         props: {
-            family: await familyById(familyId),
-            species: await speciesByFamily(familyId),
+            family: (await family)[0],
+            species: await species,
         },
         revalidate: 1,
     };
 };
 
-export const getStaticPaths: GetStaticPaths = async () => {
-    const families = await allFamilies();
-
-    const paths = families.map((f) => ({
-        params: { id: f.id?.toString() },
-    }));
-
-    return { paths, fallback: false };
-};
+export const getStaticPaths: GetStaticPaths = async () => getStaticPathsFromIds(allFamilyIds);
 
 export default Family;

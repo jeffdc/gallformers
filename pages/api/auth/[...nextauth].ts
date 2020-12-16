@@ -4,7 +4,7 @@ import { NextApiRequest, NextApiResponse } from 'next-auth/_utils';
 
 if (!process.env.AUTH0_CLIENT_ID || !process.env.AUTH0_SECRET || !process.env.AUTH0_DOMAIN || !process.env.SECRET) {
     const msg = 'The ENV is not configured properly for authentication to work.';
-    console.log(msg);
+    console.error(msg);
     throw new Error(msg);
 }
 
@@ -24,7 +24,7 @@ const options = {
         encryption: true,
     },
     events: {},
-    debug: false,
+    debug: true,
 
     // A database is optional, but required to persist accounts in a database
     // database: process.env.DATABASE_URL,

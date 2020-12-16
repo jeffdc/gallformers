@@ -1,0 +1,4 @@
+// Used by jest only.
+{
+    "presets": ["next/babel"]
+}

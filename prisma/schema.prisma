@@ -1,6 +1,5 @@
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["transactionApi"]
 }
 
 datasource db {
@@ -17,56 +16,56 @@ model migration {
 
 model location {
   id           Int            @id @default(autoincrement())
-  location     String?        @unique
+  location     String        @unique
   description  String?
   galllocation galllocation[]
 }
 
 model texture {
   id          Int           @id @default(autoincrement())
-  texture     String?       @unique
+  texture     String       @unique
   description String?
   galltexture galltexture[]
 }
 
 model color {
   id    Int     @id @default(autoincrement())
-  color String? @unique
+  color String @unique
   gall  gall[]
 }
 
 model walls {
   id          Int     @id @default(autoincrement())
-  walls       String? @unique
+  walls       String @unique
   description String?
   gall        gall[]
 }
 
 model cells {
   id          Int     @id @default(autoincrement())
-  cells       String? @unique 
+  cells       String @unique 
   description String?
   gall        gall[]
 }
 
 model alignment {
   id          Int     @id @default(autoincrement())
-  alignment   String? @unique
+  alignment   String @unique
   description String?
   gall        gall[]
 }
 
 model shape {
   id          Int     @id @default(autoincrement())
-  shape       String? @unique
+  shape       String @unique
   description String?
   gall        gall[]
 }
 
 model abundance {
   id          Int       @id @default(autoincrement())
-  abundance   String?   @unique
-  description String?
+  abundance   String   @unique
+  description String
   reference   String?
   species     species[]
 }
@@ -80,8 +79,8 @@ model taxontype {
 
 model family {
   id          Int       @id @default(autoincrement())
-  name        String?   @unique
-  description String?
+  name        String   @unique
+  description String
   species     species[]
 }
 
@@ -93,12 +92,15 @@ model species {
   commonnames                        String?
   genus                              String
   family_id                          Int
-  description                        String?
   abundance_id                       Int?
   abundance                          abundance?      @relation(fields: [abundance_id], references: [id])
   family                             family          @relation(fields: [family_id], references: [id])
   taxontype                          taxontype?      @relation(fields: [taxoncode], references: [taxoncode])
-  gall                               gall[]
+  // gall                               gall[]
+  // gallid                             Int?
+  // gall                               gall?           @relation(fields: [gallid], references: [id])
+  // @onDelete(CASCADE)
+  gall                               gall?
   hosts host[]                       @relation("host_gall_species_idTospecies")
   host_galls host[]                  @relation("host_host_species_idTospecies")
   speciessource                      speciessource[]
@@ -106,7 +108,7 @@ model species {
 
 model gall {
   id           Int            @id @default(autoincrement())
-  species_id   Int            @unique
+  species_id   Int           @unique
   taxoncode    String
   detachable   Int?
   alignment_id Int?
@@ -119,30 +121,34 @@ model gall {
   color        color?         @relation(fields: [color_id], references: [id])
   shape        shape?         @relation(fields: [shape_id], references: [id])
   species      species        @relation(fields: [species_id], references: [id])
+  // species      species?
   taxontype    taxontype      @relation(fields: [taxoncode], references: [taxoncode])
   walls        walls?         @relation(fields: [walls_id], references: [id])
+  // @onDelete(CASCADE)
   galllocation galllocation[]
+  // @onDelete(CASCADE)
   galltexture  galltexture[]
 }
 
 model galllocation {
   id          Int       @id @default(autoincrement())
-  gall_id     Int?
-  location_id Int?
-  gall        gall?     @relation(fields: [gall_id], references: [id])
-  location    location? @relation(fields: [location_id], references: [id])
+  gall_id     Int
+  location_id Int
+  gall        gall     @relation(fields: [gall_id], references: [id])
+  location    location @relation(fields: [location_id], references: [id])
 }
 
 model galltexture {
   id         Int      @id @default(autoincrement())
-  gall_id    Int?
-  texture_id Int?
-  gall       gall?    @relation(fields: [gall_id], references: [id])
-  texture    texture? @relation(fields: [texture_id], references: [id])
+  gall_id    Int
+  texture_id Int
+  gall       gall    @relation(fields: [gall_id], references: [id])
+  texture    texture @relation(fields: [texture_id], references: [id])
 }
 
 model host {
   id                 Int      @id @default(autoincrement())
+  // these need to be optional, otherwise they can not be deleted when a gall is deleted. this due defecincies in Prisma
   host_species_id    Int?
   gall_species_id    Int?
   gallspecies        species? @relation("host_gall_species_idTospecies", fields: [gall_species_id], references: [id])
@@ -152,20 +158,23 @@ model host {
 model source {
   id            Int             @id @default(autoincrement())
   title         String          @unique
-  author        String?
-  pubyear       String?
-  link          String?
-  citation      String?
+  author        String
+  pubyear       String
+  link          String
+  citation      String
   speciessource speciessource[]
 }
 
 model speciessource {
   id         Int      @id @default(autoincrement())
-  species_id Int?
-  source_id  Int?
-  source     source?  @relation(fields: [source_id], references: [id])
-  species    species? @relation(fields: [species_id], references: [id])
+  species_id Int
+  source_id  Int
+  source     source  @relation(fields: [source_id], references: [id])
+  species    species @relation(fields: [species_id], references: [id])
+  // added in 003-gallformers.sql migration
   description String?
+  // added in 004-gallformers.sql migration
+  useasdefault Int @default(0)
 }
 
 // Added in 003-gallformers.sql migration

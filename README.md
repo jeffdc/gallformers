@@ -59,6 +59,15 @@ Changes to the schema must involve the follwoing steps:
 1. Run `yarn migrate` to execute a migration.
 1. Run `yarn generate` to generate a new Prisma client.
 
+Because [yarn is a PITA](https://github.com/yarnpkg/yarn/issues/3630) you will have to temporarily add the folling to your dev dependencies for migration to work:
+```
+    "better-sqlite3": "^7.1.1",
+    "better-sqlite3-helper": "^3.1.1",
+    "sqlite": "^4.0.15"
+```
+
+If you leave them in you will not be able to build with docker as `better-sqlite3` requires python to build and there is no python in the docker container.
+
 ### Backup Strategy
 TBD. For now manual snapshots of the block volume are all we have. All of the source is on github and the site can easily be re-created from scratch on a new instance from the files there. The only real back up needed is the database.
 

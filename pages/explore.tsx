@@ -1,45 +1,27 @@
-import { family, gall, species } from '@prisma/client';
 import { GetStaticProps } from 'next';
 import Link from 'next/link';
 import { Accordion, Button, Card, ListGroup, Tab, Tabs } from 'react-bootstrap';
-import db from '../libs/db/db';
+import { FamilyWithSpecies } from '../libs/api/apitypes';
+import { getGallMakerFamilies, getHostFamilies } from '../libs/db/family';
+import { getStaticPropsWith } from '../libs/pages/nextPageHelpers';
 
-type Species = species & {
-    gall: gall[];
-};
-type Family = family & {
-    species: Species[];
-};
 type Props = {
-    gallmakers: Family[];
-    hosts: Family[];
+    gallmakers: FamilyWithSpecies[];
+    hosts: FamilyWithSpecies[];
 };
 
-const gallLister = (f: Family) => {
-    return f.species
-        .map((s) =>
-            s.gall.map((g) => (
-                <ListGroup.Item key={g.species_id}>
-                    <Link href={`gall/${g.species_id}`}>
-                        <a>{s.name}</a>
-                    </Link>
-                </ListGroup.Item>
-            )),
-        )
-        .flat();
-};
-
-const hostLister = (f: Family) => {
+const lister = (f: FamilyWithSpecies, gall: boolean) => {
+    const path = gall ? 'gall' : 'host';
     return f.species.map((s) => (
         <ListGroup.Item key={s.id}>
-            <Link href={`host/${s.id}`}>
+            <Link href={`${path}/${s.id}`}>
                 <a>{s.name}</a>
             </Link>
         </ListGroup.Item>
     ));
 };
 
-const renderList = (data: Family[], lister: (f: Family) => JSX.Element[]) => {
+const renderList = (data: FamilyWithSpecies[], gall: boolean) => {
     return data.map((f) => (
         <Card key={f.id}>
             <Card.Header>
@@ -49,7 +31,7 @@ const renderList = (data: Family[], lister: (f: Family) => JSX.Element[]) => {
             </Card.Header>
             <Accordion.Collapse eventKey={f.id.toString()}>
                 <Card.Body>
-                    <ListGroup>{lister(f)}</ListGroup>
+                    <ListGroup>{lister(f, gall)}</ListGroup>
                 </Card.Body>
             </Accordion.Collapse>
         </Card>
@@ -65,14 +47,14 @@ const Explore = ({ gallmakers, hosts }: Props): JSX.Element => {
                         <Card.Body>
                             <Card.Title>Browse Galls</Card.Title>
                             <Card.Text>By Family</Card.Text>
-                            <Accordion>{renderList(gallmakers, gallLister)}</Accordion>
+                            <Accordion>{renderList(gallmakers, true)}</Accordion>
                         </Card.Body>
                     </Tab>
                     <Tab eventKey="hosts" title="Hosts">
                         <Card.Body>
                             <Card.Title>Browse Hosts</Card.Title>
                             <Card.Text>By Family</Card.Text>
-                            <Accordion>{renderList(hosts, hostLister)}</Accordion>
+                            <Accordion>{renderList(hosts, false)}</Accordion>
                         </Card.Body>
                     </Tab>
                 </Tabs>
@@ -83,43 +65,10 @@ const Explore = ({ gallmakers, hosts }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async () => {
-    const gallmakers = await db.family.findMany({
-        include: {
-            species: {
-                select: {
-                    id: true,
-                    name: true,
-                    gall: {
-                        select: {
-                            species_id: true,
-                        },
-                    },
-                },
-                orderBy: { name: 'asc' },
-            },
-        },
-        orderBy: { name: 'asc' },
-        where: { description: { not: 'Plant' } },
-    });
-
-    const hosts = await db.family.findMany({
-        include: {
-            species: {
-                select: {
-                    id: true,
-                    name: true,
-                },
-                orderBy: { name: 'asc' },
-            },
-        },
-        orderBy: { name: 'asc' },
-        where: { description: { equals: 'Plant' } },
-    });
-
     return {
         props: {
-            gallmakers: gallmakers,
-            hosts: hosts,
+            gallmakers: await getStaticPropsWith(getGallMakerFamilies, 'gall families'),
+            hosts: await getStaticPropsWith(getHostFamilies, 'host familes'),
         },
         revalidate: 1,
     };

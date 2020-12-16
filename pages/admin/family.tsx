@@ -1,5 +1,4 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { family } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
@@ -8,69 +7,56 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { DeleteResults } from '../../libs/apitypes';
+import { AdminFormFields, useAPIs } from '../../hooks/useAPIs';
+import { DeleteResult, FamilyApi, FamilyUpsertFields } from '../../libs/api/apitypes';
 import { allFamilies } from '../../libs/db/family';
 import { genOptions } from '../../libs/utils/forms';
+import { mightFailWithArray } from '../../libs/utils/util';
 
 const Schema = yup.object().shape({
-    name: yup.string().required(),
+    value: yup.mixed().required(),
     description: yup.string().required(),
 });
 
-type Family = {
-    id: number;
-    description: string;
-};
-
 type Props = {
-    families: family[];
+    families: FamilyApi[];
 };
 
-const Family = ({ families }: Props): JSX.Element => {
-    if (!families) throw new Error(`The input props for families can not be null or undefined.`);
+type FormFields = AdminFormFields<FamilyApi> & Omit<FamilyApi, 'id' | 'name'>;
+
+const Family = (props: Props): JSX.Element => {
+    if (!props.families) throw new Error(`The input props for families can not be null or undefined.`);
 
     const [existing, setExisting] = useState(false);
-    const [deleteResults, setDeleteResults] = useState<DeleteResults>();
+    const [deleteResults, setDeleteResults] = useState<DeleteResult>();
+    const [families, setFamilies] = useState(props.families);
 
-    const { register, handleSubmit, errors, control, setValue, reset } = useForm({
+    const { register, handleSubmit, errors, control, setValue, reset } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
 
     const router = useRouter();
 
-    const onSubmit = async (data: { name: string; description: string; delete: boolean }) => {
-        try {
-            if (data.delete) {
-                const id = families.find((f) => f.name === data.name)?.id;
-                const res = await fetch(`../api/family/${id}`, {
-                    method: 'DELETE',
-                });
+    const { doDeleteOrUpsert } = useAPIs<FamilyApi, FamilyUpsertFields>('name', '../api/family/', '../api/family/upsert');
 
-                if (res.status === 200) {
-                    setDeleteResults(await res.json());
-                } else {
-                    throw new Error(await res.text());
-                }
-            } else {
-                const res = await fetch('../api/family/upsert', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data),
-                });
+    const onSubmit = async (data: FormFields) => {
+        const postDelete = (id: number | string, result: DeleteResult) => {
+            setFamilies(families.filter((s) => s.id !== id));
+            setDeleteResults(result);
+        };
 
-                if (res.status === 200) {
-                    router.push(res.url);
-                } else {
-                    throw new Error(await res.text());
-                }
-            }
-            reset();
-        } catch (e) {
-            console.log(e);
-        }
+        const postUpdate = (res: Response) => {
+            router.push(res.url);
+        };
+
+        const convertFormFieldsToUpsert = (fields: FormFields, name: string, id: number): FamilyUpsertFields => ({
+            ...fields,
+            name: name,
+        });
+
+        await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert);
+        reset();
     };
 
     return (
@@ -82,23 +68,21 @@ const Family = ({ families }: Props): JSX.Element => {
                         Name:
                         <ControlledTypeahead
                             control={control}
-                            name="name"
-                            onChange={(e) => {
-                                setExisting(false);
-                                const f = families.find((f) => f.name === e[0]);
-                                if (f) {
-                                    setExisting(true);
-                                    setValue('description', f.description);
-                                }
-                            }}
+                            name="value"
                             placeholder="Name"
-                            options={families.map((f) => f.name)}
+                            options={families}
+                            labelKey="name"
                             clearButton
-                            isInvalid={!!errors.name}
+                            isInvalid={!!errors.value}
                             newSelectionPrefix="Add a new Family: "
                             allowNew={true}
+                            onChangeWithNew={(e, isNew) => {
+                                setExisting(!isNew);
+                                const d = isNew || !e[0] ? '' : (e[0] as FamilyApi).description;
+                                setValue('description', d);
+                            }}
                         />
-                        {errors.name && <span className="text-danger">The Name is required.</span>}
+                        {errors.value && <span className="text-danger">The Name is required.</span>}
                     </Col>
                 </Row>
                 <Row className="form-group">
@@ -113,7 +97,7 @@ const Family = ({ families }: Props): JSX.Element => {
                 <Row className="fromGroup" hidden={!existing}>
                     <Col xs="1">Delete?:</Col>
                     <Col className="mr-auto">
-                        <input name="delete" type="checkbox" className="form-check-input" ref={register} />
+                        <input name="del" type="checkbox" className="form-check-input" ref={register} />
                     </Col>
                 </Row>
                 <Row className="form-input">
@@ -132,7 +116,7 @@ const Family = ({ families }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
-            families: await allFamilies(),
+            families: await mightFailWithArray<FamilyApi>()(allFamilies()),
         },
     };
 };
