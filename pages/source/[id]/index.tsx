@@ -12,26 +12,30 @@ type Props = {
 const Source = ({ source }: Props): JSX.Element => {
     return (
         <div className="p-3 m-3">
-            <Row>
+            <Row className="pb-4">
                 <Col>
                     <h2>{source.title}</h2>
                 </Col>
             </Row>
-            <Row>
+            <Row className="pb-4">
                 <Col>
-                    <h4>{source.author}</h4>
+                    <h5>Authors:</h5>
+                    {source.author}
                 </Col>
-                <Col>
-                    <b>{source.pubyear}</b>
+                <Col xs={3}>
+                    <h5>Publication Year:</h5>
+                    {source.pubyear}
                 </Col>
             </Row>
-            <Row>
+            <Row className="pb-4">
                 <Col>
+                    <h5>Link:</h5>
                     <a href={source.link}>{source.link}</a>
                 </Col>
             </Row>
-            <Row>
+            <Row className="pb-4">
                 <Col>
+                    <h5>Citation:</h5>
                     <i>{source.citation}</i>
                 </Col>
             </Row>

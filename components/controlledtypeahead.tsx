@@ -45,13 +45,16 @@ const ControlledTypeahead = <T extends TypeaheadModel>({
                         if (onChangeWithNew) onChangeWithNew(selected, isNew);
                         // make sure to let the Controller know as well
                         data.onChange(selected);
+                        if (taProps.onChange) taProps.onChange(selected);
                     }}
                     onBlur={(e) => {
                         if (onBlurT) onBlurT((e as unknown) as FocusEvent<HTMLInputElement>);
                         data.onBlur();
+                        if (taProps.onBlur) taProps.onBlur(e);
                     }}
                     onKeyDown={(e) => {
                         if (onKeyDownT) onKeyDownT((e as unknown) as KeyboardEvent<HTMLInputElement>);
+                        if (taProps.onKeyDown) taProps.onKeyDown(e);
                     }}
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                     //@ts-ignore -- the typings for the component have a bug! Adding it here so all callers can avoid it.

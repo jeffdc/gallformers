@@ -100,6 +100,18 @@ describe('checkGall tests', () => {
             }),
         ).toBeTruthy();
         expect(
+            checkGall(makeG('detachable', 1), {
+                ...q,
+                detachable: O.of('yes'),
+            }),
+        ).toBeTruthy();
+        expect(
+            checkGall(makeG('detachable', 0), {
+                ...q,
+                detachable: O.of('no'),
+            }),
+        ).toBeTruthy();
+        expect(
             checkGall(makeG('shape', { shape: 'foo', id: 1, description: O.of('') }), {
                 ...q,
                 shape: O.of('foo'),
@@ -121,6 +133,27 @@ describe('checkGall tests', () => {
             checkGall(makeG('galltexture', [{ tex: 'foo', id: 1, description: O.of('') }]), {
                 ...q,
                 textures: ['foo'],
+            }),
+        ).toBeTruthy();
+    });
+
+    test('Should handle sepcial cases for detachable', () => {
+        expect(
+            checkGall(makeG('detachable', 1), {
+                ...q,
+                detachable: O.of('unsure'),
+            }),
+        ).toBeFalsy();
+        expect(
+            checkGall(makeG('detachable', 1), {
+                ...q,
+                detachable: O.none,
+            }),
+        ).toBeTruthy();
+        expect(
+            checkGall(makeG('detachable', 0), {
+                ...q,
+                detachable: O.none,
             }),
         ).toBeTruthy();
     });

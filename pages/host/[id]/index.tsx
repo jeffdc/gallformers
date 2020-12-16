@@ -14,17 +14,24 @@ type Props = {
     host: HostApi;
 };
 
-function gallAsLink(g: GallSimple) {
+// eslint-disable-next-line react/display-name
+const gallAsLink = (len: number) => (g: GallSimple, idx: number) => {
     if (!g) throw new Error('Recieved invalid gall for host.');
 
     return (
         <Link key={g.id} href={`/gall/${g.id}`}>
-            <a>{g.name} </a>
+            <a>
+                {g.name} {idx < len - 1 ? ' / ' : ''}
+            </a>
         </Link>
     );
-}
+};
 
 const Host = ({ host }: Props): JSX.Element => {
+    // the galls will not be sorted, so sort them for display
+    host.galls.sort((a, b) => a.name.localeCompare(b.name));
+    const gallLinker = gallAsLink(host.galls.length);
+
     const source = host.speciessource.find((s) => s.useasdefault !== 0);
     const [selectedSource, setSelectedSource] = useState(source);
 
@@ -64,7 +71,7 @@ const Host = ({ host }: Props): JSX.Element => {
                             </Col>
                         </Row>
                         <Row>
-                            <Col>Galls: {host.galls.map(gallAsLink)}</Col>
+                            <Col>Galls: {host.galls.map(gallLinker)}</Col>
                         </Row>
                         <Row>
                             <Col>

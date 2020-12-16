@@ -37,9 +37,11 @@ export const testables = {
 const check = <A, B>(a: O.Option<A>, b: O.Option<B>, f: (a: A, b: B) => boolean): boolean =>
     pipe(
         a,
+        // if a is None, then that is OK for the search, just means "any" match for that property.
         O.fold(constTrue, (a) =>
             pipe(
                 b,
+                // however, if b is None, then there is no value and it can not match a (a can not be None at this point).
                 O.fold(constFalse, (b) => f(a, b)),
             ),
         ),

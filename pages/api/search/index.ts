@@ -1,4 +1,5 @@
 import { pipe } from 'fp-ts/lib/function';
+import * as E from 'fp-ts/lib/Either';
 import * as O from 'fp-ts/lib/Option';
 import * as R from 'fp-ts/lib/Record';
 import * as TE from 'fp-ts/lib/TaskEither';
@@ -19,7 +20,9 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
         R.mapWithIndex((k, o) => (k === 'host' ? O.map(gallsByHostName)(o) : O.map(gallsByHostGenus)(o))),
         R.map(O.map(TE.mapLeft(toErr))),
         R.reduce(noParamsErr, (b, a) => (O.isSome(a) ? a : b)),
-        O.map(TE.fold(sendErrResponse(res), sendSuccResponse(res))),
-        O.getOrElseW(() => sendErrResponse(res)({ status: 500, msg: 'Failed to run search.' })),
+        E.fromOption(() => ({ status: 500, msg: 'Failed to run search' })),
+        TE.fromEither,
+        TE.flatten,
+        TE.fold(sendErrResponse(res), sendSuccResponse(res)),
     )();
 };

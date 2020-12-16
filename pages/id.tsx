@@ -1,5 +1,4 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { alignment, cells as cs, color, location, shape, texture, walls as ws } from '@prisma/client';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
@@ -69,16 +68,16 @@ const Schema = yup.object().shape(
 type Props = {
     hosts: string[];
     genera: string[];
-    locations: location[];
-    colors: color[];
-    shapes: shape[];
-    textures: texture[];
-    alignments: alignment[];
-    walls: ws[];
-    cells: cs[];
+    locations: GallLocation[];
+    colors: ColorApi[];
+    shapes: ShapeApi[];
+    textures: GallTexture[];
+    alignments: AlignmentApi[];
+    walls: WallsApi[];
+    cells: CellsApi[];
 };
 
-const Search2 = (props: Props): JSX.Element => {
+const IDGall = (props: Props): JSX.Element => {
     if (
         !props.hosts ||
         !props.genera ||
@@ -120,7 +119,7 @@ const Search2 = (props: Props): JSX.Element => {
             qq[f] = Array.isArray(v) ? v : [v];
         } else {
             const s = v[0];
-            qq[f] = s.length >= 1 ? O.of(s) : O.none;
+            qq[f] = s && s.length >= 1 ? O.of(s) : O.none;
         }
         return qq;
     };
@@ -235,17 +234,17 @@ const Search2 = (props: Props): JSX.Element => {
                         <label className="col-form-label">Location(s):</label>
                         {makeFormInput(
                             'locations',
-                            props.locations.map((l) => l.location),
+                            props.locations.map((l) => l.loc),
                             true,
                         )}
                         <label className="col-form-label">Texture(s):</label>
                         {makeFormInput(
                             'textures',
-                            props.textures.map((t) => t.texture),
+                            props.textures.map((t) => t.tex),
                             true,
                         )}
                         <label className="col-form-label">Detachable:</label>
-                        {makeFormInput('detachable', ['yes', 'no', 'unsure'])}
+                        {makeFormInput('detachable', ['yes', 'no'])}
                         <label className="col-form-label">Aligment:</label>
                         {makeFormInput(
                             'alignment',
@@ -345,4 +344,4 @@ export const getServerSideProps: GetServerSideProps = async () => {
     };
 };
 
-export default Search2;
+export default IDGall;

@@ -18,15 +18,22 @@ type Props = {
     species: GallApi;
 };
 
-function hostAsLink(h: GallHost) {
+// eslint-disable-next-line react/display-name
+const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
     return (
         <Link key={h.id} href={`/host/${h.id}`}>
-            <a>{h.name} </a>
+            <a>
+                {h.name} {idx < len - 1 ? ' / ' : ''}
+            </a>
         </Link>
     );
-}
+};
 
 const Gall = ({ species }: Props): JSX.Element => {
+    // the hosts will not be sorted, so sort them for display
+    species.hosts.sort((a, b) => a.name.localeCompare(b.name));
+    const hostLinker = hostAsLink(species.hosts.length);
+
     const source = species.speciessource.find((s) => s.useasdefault !== 0);
     const [selectedSource, setSelectedSource] = useState(source);
 
@@ -75,7 +82,7 @@ const Gall = ({ species }: Props): JSX.Element => {
                         </Row>
                         <Row>
                             <Col>
-                                <strong>Hosts:</strong> {species.hosts.map(hostAsLink)}
+                                <strong>Hosts:</strong> {species.hosts.map(hostLinker)}
                             </Col>
                         </Row>
                         <Row>

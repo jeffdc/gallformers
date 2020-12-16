@@ -36,10 +36,10 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
         await pipe(
             query,
             // eslint-disable-next-line prettier/prettier
-                E.map((q) => pipe(
-                    speciesSourceByIds(q.speciesId, q.sourceId), 
-                    TE.mapLeft(toErr),
-                )),                
+            E.map((q) => pipe(
+                speciesSourceByIds(q.speciesId, q.sourceId), 
+                TE.mapLeft(toErr),
+            )),                
             TE.fromEither,
             TE.flatten,
             TE.map(validate),
@@ -49,10 +49,10 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
         await pipe(
             query,
             // eslint-disable-next-line prettier/prettier
-                E.map((q) => pipe(
-                    deleteSpeciesSourceByIds(q.speciesId, q.sourceId),
-                    TE.mapLeft(toErr),
-                )),
+            E.map((q) => pipe(
+                deleteSpeciesSourceByIds(q.speciesId, q.sourceId),
+                TE.mapLeft(toErr),
+            )),
             TE.fromEither,
             TE.flatten,
             TE.fold(sendErrResponse(res), sendSuccResponse(res)),
