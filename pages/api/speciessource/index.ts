@@ -1,35 +1,61 @@
+import * as E from 'fp-ts/lib/Either';
 import { pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
+import * as R from 'fp-ts/lib/Record';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
+import { Err, getQueryParam, sendErrResponse, sendSuccResponse, toErr } from '../../../libs/api/apipage';
+import { SpeciesSourceApi } from '../../../libs/api/apitypes';
 import { deleteSpeciesSourceByIds, speciesSourceByIds } from '../../../libs/db/speciessource';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
-    try {
-        if (!req.query.speciesid || !req.query.sourceid) {
-            res.status(400).end('No valid query provided. You must provide both a speciesid and a sourceid.');
-        }
-        const speciesid = req.query.speciesid as string;
-        const sourceid = req.query.sourceid as string;
+    type Query = { speciesId: string; sourceId: string };
 
-        const err = (e: Error) => res.status(500).json({ error: e });
-        const succ = <T>(results: T) => res.status(200).json(results);
+    const invalidQueryErr: Err = {
+        status: 400,
+        msg: 'No valid query provided. You must provide both a speciesid and a sourceid.',
+    };
 
-        if (req.method === 'GET') {
-            // eslint-disable-next-line prettier/prettier
-            await pipe(
-                speciesSourceByIds(speciesid, sourceid),
-                TE.fold(TE.taskify(err), TE.taskify(succ))
-            )();
-            res.status(200).json(await speciesSourceByIds(speciesid, sourceid));
-        } else if (req.method === 'DELETE') {
-            // eslint-disable-next-line prettier/prettier
-            await pipe(
-                deleteSpeciesSourceByIds(speciesid, sourceid),
-                TE.fold(TE.taskify(err), TE.taskify(succ)),
-            )();
+    const query = pipe(
+        { speciesId: 'speciesid', sourceId: 'sourceid' },
+        R.map(getQueryParam(req)),
+        R.sequence(O.Applicative),
+        O.fold(() => E.left<Err, Query>(invalidQueryErr), E.right),
+    );
+
+    const validate = (s: SpeciesSourceApi[]) => {
+        if (s.length > 1) {
+            const q = E.getOrElse(() => ({ speciesId: 'failed', sourceId: 'failed' }))(query);
+            console.error(`Got more than one mapping between species ${q.speciesId} and source ${q.sourceId}.`);
+            return [s[0]];
         }
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ error: e.message });
+        return s;
+    };
+
+    if (req.method === 'GET') {
+        await pipe(
+            query,
+            // eslint-disable-next-line prettier/prettier
+                E.map((q) => pipe(
+                    speciesSourceByIds(q.speciesId, q.sourceId), 
+                    TE.mapLeft(toErr),
+                )),                
+            TE.fromEither,
+            TE.flatten,
+            TE.map(validate),
+            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+        )();
+    } else if (req.method === 'DELETE') {
+        await pipe(
+            query,
+            // eslint-disable-next-line prettier/prettier
+                E.map((q) => pipe(
+                    deleteSpeciesSourceByIds(q.speciesId, q.sourceId),
+                    TE.mapLeft(toErr),
+                )),
+            TE.fromEither,
+            TE.flatten,
+            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+        )();
     }
 };

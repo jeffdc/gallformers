@@ -1,10 +1,11 @@
 import { pipe } from 'fp-ts/lib/function';
 import * as T from 'fp-ts/lib/Task';
 import * as TE from 'fp-ts/lib/TaskEither';
+import * as O from 'fp-ts/lib/Option';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { GetStaticPathsResult, GetStaticPropsContext } from 'next';
 import { ParsedUrlQuery } from 'querystring';
-import { errorThrow, mightFail } from '../utils/util';
+import { errorThrow } from '../utils/util';
 
 /**
  * Helper to hadnle the boilerplate for fetching static props for a next.js page.
@@ -12,14 +13,13 @@ import { errorThrow, mightFail } from '../utils/util';
  * @param dataType a string describing the data type. Used in error messages.
  */
 export async function getStaticPropsWith<T>(f: () => TaskEither<Error, readonly T[]>, dataType: string): Promise<readonly T[]> {
-    const g = (await mightFail(f())) as readonly T[];
-    if (g.length < 1) {
-        const msg = `Failed to fetch ${dataType} from backend.`;
-        console.error(msg);
-        throw new Error(msg);
-    }
-
-    return g;
+    return await pipe(
+        f(),
+        TE.getOrElse((e) => {
+            console.error(`Got an error trying to fetch props for ${dataType}.`);
+            throw e;
+        }),
+    )();
 }
 
 /**
@@ -39,7 +39,14 @@ export async function getStaticPropsWithId<T>(
 ): Promise<T[]> {
     // Do all of the error handling here so that the rendering side does not have to deal with it.
     // Plus this will all get called at build time and will uncover issues then rather than after deployment.
-    const g = (await mightFail(fId(id))) as T[];
+    const g = await pipe(
+        fId(id),
+        TE.getOrElse((e) => {
+            console.error(`Failed to fetch ${dataType} from backend with ${dataType} id = '${id}'`);
+            throw e;
+        }),
+    )();
+
     if (resultsRequired && g.length < 1) {
         const msg = `Failed to fetch ${dataType} from backend with ${dataType} id = '${id}'.`;
         console.error(msg);

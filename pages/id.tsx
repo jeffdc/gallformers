@@ -1,19 +1,30 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { alignment, cells as dbcells, color, location, shape, texture, walls as dbwalls } from '@prisma/client';
+import { alignment, cells as cs, color, location, shape, texture, walls as ws } from '@prisma/client';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import React, { useState } from 'react';
 import { Col, ListGroup, Row } from 'react-bootstrap';
-import { Control, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import ControlledTypeahead from '../components/controlledtypeahead';
-import { emptySearchQuery, GallApi, SearchQuery } from '../libs/api/apitypes';
+import {
+    AlignmentApi,
+    CellsApi,
+    ColorApi,
+    emptySearchQuery,
+    GallApi,
+    GallLocation,
+    GallTexture,
+    SearchQuery,
+    ShapeApi,
+    WallsApi,
+} from '../libs/api/apitypes';
 import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
 import { allHostGenera, allHostNames } from '../libs/db/host';
 import { checkGall } from '../libs/utils/gallsearch';
-import { mightFail, truncateAtWord } from '../libs/utils/util';
+import { capitalizeFirstLetter, mightFailWithArray, mightFailWithStringArray, truncateAtWord } from '../libs/utils/util';
 
 type SearchFormHostField = {
     host: string;
@@ -63,8 +74,8 @@ type Props = {
     shapes: shape[];
     textures: texture[];
     alignments: alignment[];
-    walls: dbwalls[];
-    cells: dbcells[];
+    walls: ws[];
+    cells: cs[];
 };
 
 const Search2 = (props: Props): JSX.Element => {
@@ -104,9 +115,9 @@ const Search2 = (props: Props): JSX.Element => {
     const updateQuery = (f: keyof SearchQuery, v: string | string[]): SearchQuery => {
         const qq: SearchQuery = { ...query };
         if (f === 'host') {
-            qq.host = v as string;
+            qq.host = Array.isArray(v) ? v[0] : v;
         } else if (f === 'locations' || f === 'textures') {
-            qq[f] = v as string[];
+            qq[f] = Array.isArray(v) ? v : [v];
         } else {
             const s = v[0];
             qq[f] = s.length >= 1 ? O.of(s) : O.none;
@@ -143,11 +154,6 @@ const Search2 = (props: Props): JSX.Element => {
     const doSearch = async (field: keyof FilterFormFields, value: string | string[]) => {
         const newq = updateQuery(field, value);
         const f = galls.filter((g) => checkGall(g, newq));
-        console.log(
-            `search: ${JSON.stringify(newq)} got: ${JSON.stringify(f.map((f) => f.name))} from ${JSON.stringify(
-                galls.map((g) => g.name),
-            )}`,
-        );
         setFiltered(f);
         setQuery(newq);
     };
@@ -155,17 +161,17 @@ const Search2 = (props: Props): JSX.Element => {
     const makeFormInput = (field: keyof FilterFormFields, opts: string[], multiple = false) => {
         return (
             <ControlledTypeahead
-                control={filterControl as Control<Record<string, unknown>>}
+                control={filterControl}
                 name={field}
                 onChange={(selected) => {
                     doSearch(field, selected);
                 }}
-                onKeyDown={(e) => {
+                onKeyDownT={(e) => {
                     if (e.key === 'Enter') {
                         doSearch(field, e.currentTarget.value);
                     }
                 }}
-                placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
+                placeholder={capitalizeFirstLetter(field)}
                 options={opts}
                 disabled={disableFilter()}
                 clearButton={true}
@@ -326,15 +332,15 @@ export const getServerSideProps: GetServerSideProps = async () => {
     // get all of the data for the typeahead boxes
     return {
         props: {
-            hosts: await mightFail(allHostNames()),
-            genera: await mightFail(allHostGenera()),
-            locations: await mightFail(locations()),
-            colors: await mightFail(colors()),
-            shapes: await mightFail(shapes()),
-            textures: await mightFail(textures()),
-            alignments: await mightFail(alignments()),
-            walls: await mightFail(walls()),
-            cells: await mightFail(cells()),
+            hosts: await mightFailWithStringArray(allHostNames()),
+            genera: await mightFailWithStringArray(allHostGenera()),
+            locations: await mightFailWithArray<GallLocation>()(locations()),
+            colors: await mightFailWithArray<ColorApi>()(colors()),
+            shapes: await mightFailWithArray<ShapeApi>()(shapes()),
+            textures: await mightFailWithArray<GallTexture>()(textures()),
+            alignments: await mightFailWithArray<AlignmentApi>()(alignments()),
+            walls: await mightFailWithArray<WallsApi>()(walls()),
+            cells: await mightFailWithArray<CellsApi>()(cells()),
         },
     };
 };

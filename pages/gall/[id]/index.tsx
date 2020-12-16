@@ -4,7 +4,7 @@ import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
-import React, { MouseEvent, ReactFragment, ReactNode, useState } from 'react';
+import React, { MouseEvent, ReactNode, useState } from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
 import { GallApi, GallHost, SpeciesSourceApi } from '../../../libs/api/apitypes';
 import { allGallIds, gallById } from '../../../libs/db/gall';
@@ -47,7 +47,7 @@ const Gall = ({ species }: Props): JSX.Element => {
             <Media>
                 <img width={170} height={128} className="mr-3" src="/images/gall.jpg" alt={species.name} />
                 <Media.Body>
-                    <Container className="p-3 border">
+                    <Container className="p-3">
                         <Row>
                             <Col>
                                 <h2>{species.name}</h2>
@@ -87,7 +87,7 @@ const Gall = ({ species }: Props): JSX.Element => {
                                 )}
                             </Col>
                             <Col>
-                                <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.texture?.texture).join(',')}
+                                <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.tex).join(',')}
                             </Col>
                             <Col>
                                 <strong>Color:</strong>{' '}
@@ -106,7 +106,7 @@ const Gall = ({ species }: Props): JSX.Element => {
                         </Row>
                         <Row>
                             <Col>
-                                <strong>Location:</strong> {species.gall.galllocation.map((l) => l.location?.location).join(', ')}
+                                <strong>Location:</strong> {species.gall.galllocation.map((l) => l.loc).join(', ')}
                             </Col>
                             <Col>
                                 <strong>Walls:</strong>{' '}

@@ -4,8 +4,9 @@ import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { DeleteResult, HostApi, HostSimple, HostTaxon, SpeciesUpsertFields } from '../api/apitypes';
-import { handleError } from '../utils/util';
+import { handleError, optionalWith } from '../utils/util';
 import db from './db';
+import { adaptAbundance } from './species';
 
 type DBHost = species & {
     abundance: abundance | null;
@@ -32,7 +33,7 @@ const adaptor = (hosts: DBHost[]): HostApi[] =>
             taxoncode: h.taxoncode ? h.taxoncode : '',
             synonyms: O.fromNullable(h.synonyms),
             commonnames: O.fromNullable(h.commonnames),
-            abundance: O.fromNullable(h.abundance),
+            abundance: optionalWith(h.abundance, adaptAbundance),
             // remove the indirection of the many-to-many table for easier usage
             galls: h.host_galls.map((h) => {
                 // due to prisma problems we had to make these hostspecies relationships optional, however

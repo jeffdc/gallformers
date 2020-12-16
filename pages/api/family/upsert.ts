@@ -3,4 +3,4 @@ import { upsertFamily } from '../../../libs/db/family';
 import { apiUpsertEndpoint, onCompleteRedirect } from '../../../libs/api/apipage';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> =>
-    apiUpsertEndpoint(req, res, upsertFamily, onCompleteRedirect('/family/'));
+    apiUpsertEndpoint(req, res, upsertFamily, onCompleteRedirect('family/'));

@@ -11,8 +11,6 @@ import { getGalls } from '../db/gall';
  * @returns a Promise<GallApi[]> with found galls, if any.
  */
 export const searchGalls = (query: SearchQuery): TaskEither<Error, GallApi[]> => {
-    console.log(`Searching for galls with '${JSON.stringify(query, null, '  ')}'`);
-
     // the locations and textures *might* come in as encoded JSON arrays so we need to parse them
     const parsearrmaybe = (maybearr: undefined | string | string[]): string[] => {
         if (maybearr == undefined) return [];

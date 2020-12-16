@@ -7,8 +7,8 @@ import { hasProp } from '../../../../libs/utils/util';
 const { makeLink, stemText, linkFromStems } = testables;
 
 const entries = [
-    { id: 0, word: 'foo', definition: 'Foo bar baz', urls: [] } as Entry,
-    { id: 0, word: 'bar', definition: 'Hello Foo bar baz', urls: [] } as Entry,
+    { id: 0, word: 'foo', definition: 'Foo bar baz', urls: '' } as Entry,
+    { id: 0, word: 'bar', definition: 'Hello Foo bar baz', urls: '' } as Entry,
 ];
 
 afterAll(async (done) => {

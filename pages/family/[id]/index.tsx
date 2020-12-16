@@ -31,7 +31,7 @@ const Family = ({ family, species }: Props): JSX.Element => {
         >
             <Media>
                 <Media.Body>
-                    <Container className="p-3 border">
+                    <Container className="p-3">
                         <Row>
                             <Col>
                                 <h1>{family.name}</h1>

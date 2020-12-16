@@ -45,7 +45,7 @@ const Host = ({ host }: Props): JSX.Element => {
             <Media>
                 <img width={170} height={128} className="mr-3" src="" alt={host.name} />
                 <Media.Body>
-                    <Container className="p-3 border">
+                    <Container className="p-3">
                         <Row>
                             <Col>
                                 <h2>{host.name}</h2>

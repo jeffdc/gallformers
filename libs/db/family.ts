@@ -2,7 +2,15 @@ import { family, Prisma, species } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, FamilyApi, FamilyUpsertFields, GallTaxon, HostTaxon, SpeciesApi } from '../api/apitypes';
+import {
+    DeleteResult,
+    FamilyApi,
+    FamilyUpsertFields,
+    FamilyWithSpecies,
+    GallTaxon,
+    HostTaxon,
+    SpeciesApi,
+} from '../api/apitypes';
 import { handleError } from '../utils/util';
 import db from './db';
 import { gallDeleteSteps, getGalls } from './gall';
@@ -28,16 +36,23 @@ export const speciesByFamily = (id: number): TaskEither<Error, species[]> => {
     return TE.tryCatch(families, handleError);
 };
 
-export const allFamilies = (): TaskEither<Error, family[]> => {
+const adaptFamily = (f: family): FamilyApi => ({
+    ...f,
+});
+
+export const allFamilies = (): TaskEither<Error, FamilyApi[]> => {
     const families = () =>
         db.family.findMany({
             orderBy: { name: 'asc' },
         });
 
-    return TE.tryCatch(families, handleError);
+    return pipe(
+        TE.tryCatch(families, handleError),
+        TE.map((f) => f.map(adaptFamily)),
+    );
 };
 
-export const getGallMakerFamilies = (): TaskEither<Error, FamilyApi[]> => {
+export const getGallMakerFamilies = (): TaskEither<Error, FamilyWithSpecies[]> => {
     const families = () =>
         db.family.findMany({
             include: {
@@ -58,7 +73,7 @@ export const getGallMakerFamilies = (): TaskEither<Error, FamilyApi[]> => {
     return TE.tryCatch(families, handleError);
 };
 
-export const getHostFamilies = (): TaskEither<Error, FamilyApi[]> => {
+export const getHostFamilies = (): TaskEither<Error, FamilyWithSpecies[]> => {
     const families = () =>
         db.family.findMany({
             include: {

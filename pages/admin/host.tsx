@@ -1,24 +1,33 @@
-import { abundance, family, species } from '@prisma/client';
+import { yupResolver } from '@hookform/resolvers/yup';
+import { abundance, family } from '@prisma/client';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
 import React, { useState } from 'react';
 import { Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
-import { allFamilies } from '../../libs/db/family';
-import { abundances } from '../../libs/db/species';
-import { genOptions } from '../../libs/utils/forms';
 import * as yup from 'yup';
-import { yupResolver } from '@hookform/resolvers/yup';
-import { useRouter } from 'next/router';
-import { DeleteResult, SpeciesUpsertFields } from '../../libs/api/apitypes';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
+import { AdminFormFields, useAPIs } from '../../hooks/useAPIs';
+import {
+    AbundanceApi,
+    DeleteResult,
+    EmptyAbundance,
+    EmptyFamily,
+    FamilyApi,
+    SpeciesApi,
+    SpeciesUpsertFields,
+} from '../../libs/api/apitypes';
+import { allFamilies } from '../../libs/db/family';
 import { allHosts } from '../../libs/db/host';
-import Link from 'next/link';
-import { useWithLookup } from '../../hooks/useWithLookups';
-import { mightFail } from '../../libs/utils/util';
+import { abundances } from '../../libs/db/species';
+import { mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
-    hosts: species[];
+    hs: SpeciesApi[];
     families: family[];
     abundances: abundance[];
 };
@@ -28,22 +37,38 @@ const extractGenus = (n: string): string => {
 };
 
 const Schema = yup.object().shape({
-    name: yup.string().matches(/([A-Z][a-z]+ [a-z]+$)/),
+    value: yup
+        .array()
+        .of(
+            yup.object({
+                name: yup
+                    .string()
+                    .matches(/([A-Z][a-z]+ [a-z]+$)/)
+                    .required(),
+            }),
+        )
+        .min(1)
+        .max(1),
     family: yup.string().required(),
 });
 
-type FormFields = {
-    name: string;
+export type FormFields = AdminFormFields<SpeciesApi> & {
     genus: string;
-    family: string;
-    abundance: string;
+    family: FamilyApi;
+    abundance: AbundanceApi;
     commonnames: string;
     synonyms: string;
 };
 
-const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
+export const testables = {
+    extractGenus: extractGenus,
+    Schema: Schema,
+};
+
+const Host = ({ hs, families, abundances }: Props): JSX.Element => {
     const [existing, setExisting] = useState(false);
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
+    const [hosts, setHosts] = useState(hs);
 
     const { register, handleSubmit, setValue, errors, control, reset } = useForm<FormFields>({
         mode: 'onBlur',
@@ -52,40 +77,29 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
 
     const router = useRouter();
 
-    const { setValueForLookup } = useWithLookup<FormFields, family | abundance, FormFields[keyof FormFields]>(setValue);
+    const { doDeleteOrUpsert } = useAPIs<SpeciesApi, SpeciesUpsertFields>('name', '../api/host/', '../api/host/upsert');
 
-    const onSubmit = async (data: SpeciesUpsertFields) => {
-        try {
-            if (data.delete) {
-                const id = hosts.find((h) => h.name === data.name)?.id;
-                const res = await fetch(`../api/host/${id}`, {
-                    method: 'DELETE',
-                });
+    const onSubmit = async (data: FormFields) => {
+        const postDelete = (id: number | string, result: DeleteResult) => {
+            setHosts(hosts.filter((s) => s.id !== id));
+            setDeleteResults(result);
+        };
 
-                if (res.status === 200) {
-                    setDeleteResults(await res.json());
-                } else {
-                    throw new Error(await res.text());
-                }
-            } else {
-                const res = await fetch('../api/host/upsert', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data),
-                });
+        const postUpdate = (res: Response) => {
+            router.push(res.url);
+        };
 
-                if (res.status === 200) {
-                    router.push(res.url);
-                } else {
-                    throw new Error(await res.text());
-                }
-            }
-            reset();
-        } catch (e) {
-            console.error(e);
-        }
+        const convertFormFieldsToUpsert = (fields: FormFields, name: string, id: number): SpeciesUpsertFields => ({
+            abundance: fields.abundance.abundance,
+            commonnames: fields.commonnames,
+            family: fields.family.name,
+            id: id,
+            name: name,
+            synonyms: fields.synonyms,
+        });
+
+        await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert);
+        reset();
     };
 
     return (
@@ -102,38 +116,39 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
                         Name (binomial):
                         <ControlledTypeahead
                             control={control}
-                            name="name"
-                            onChange={(e) => {
-                                setExisting(false);
-                                const f = hosts.find((f) => f.name === e[0]);
-                                if (f) {
-                                    setExisting(true);
-                                    setValueForLookup('family', 'name', [f.family_id], families);
-                                    setValueForLookup(
-                                        'abundance',
-                                        'abundance',
-                                        f.abundance_id ? [f.abundance_id] : [],
-                                        abundances,
-                                    );
-                                    setValue('commonnames', f.commonnames ? f.commonnames : '');
-                                    setValue('synonyms', f.synonyms ? f.synonyms : '');
+                            name="value"
+                            onChangeWithNew={(e, isNew) => {
+                                setExisting(!isNew);
+                                if (isNew || !e[0]) {
+                                    setValue('genus', extractGenus(e[0] ? e[0].name : ''));
+                                    setValue('family', EmptyFamily);
+                                    setValue('abundance', EmptyAbundance);
+                                    setValue('commonnames', '');
+                                    setValue('synonyms', '');
+                                } else {
+                                    const host: SpeciesApi = e[0];
+                                    setValue('family', host.family);
+                                    setValue('abundance', pipe(host.abundance, O.getOrElse(constant(EmptyAbundance))));
+                                    setValue('commonnames', pipe(host.commonnames, O.getOrElse(constant(''))));
+                                    setValue('synonyms', pipe(host.synonyms, O.getOrElse(constant(''))));
                                 }
                             }}
-                            onBlur={(e) => {
-                                if (!errors.name) {
+                            onBlurT={(e) => {
+                                if (!errors.value) {
                                     setValue('genus', extractGenus(e.target.value));
                                 }
                             }}
                             placeholder="Name"
-                            options={hosts.map((f) => f.name)}
+                            options={hosts}
+                            labelKey="name"
                             clearButton
-                            isInvalid={!!errors.name}
+                            isInvalid={!!errors.value}
                             newSelectionPrefix="Add a new Host: "
                             allowNew={true}
                         />
-                        {errors.name && (
+                        {errors.value && (
                             <span className="text-danger">
-                                Name is required and must be in standard binomial form, e.g., Andricus weldi
+                                Name is required and must be in standard binomial form, e.g., Gallus gallus
                             </span>
                         )}
                     </Col>
@@ -143,9 +158,13 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
                     </Col>
                     <Col>
                         Family:
-                        <select name="family" className="form-control" ref={register}>
-                            {genOptions(families.map((f) => (f.name ? f.name : '')))}
-                        </select>
+                        <ControlledTypeahead
+                            control={control}
+                            name="family"
+                            placeholder="Family"
+                            options={families}
+                            labelKey="name"
+                        />
                         {errors.family && (
                             <span className="text-danger">
                                 The Family name is required. If it is not present in the list you will have to go add the family
@@ -155,9 +174,14 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
                     </Col>
                     <Col>
                         Abundance:
-                        <select name="abundance" className="form-control" ref={register}>
-                            {genOptions(abundances.map((a) => (a.abundance ? a.abundance : '')))}
-                        </select>
+                        <ControlledTypeahead
+                            control={control}
+                            name="abundance"
+                            placeholder=""
+                            options={abundances}
+                            labelKey="abundance"
+                            clearButton
+                        />
                     </Col>
                 </Row>
                 <Row className="form-group">
@@ -181,7 +205,7 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
                 <Row className="fromGroup" hidden={!existing}>
                     <Col xs="1">Delete?:</Col>
                     <Col className="mr-auto">
-                        <input name="delete" type="checkbox" className="form-check-input" ref={register} />
+                        <input name="del" type="checkbox" className="form-check-input" ref={register} />
                     </Col>
                 </Row>
                 <Row className="formGroup">
@@ -200,9 +224,9 @@ const Host = ({ hosts, families, abundances }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
-            hosts: await mightFail(allHosts()),
-            families: await mightFail(allFamilies()),
-            abundances: await mightFail(abundances()),
+            hs: await mightFailWithArray<SpeciesApi>()(allHosts()),
+            families: await mightFailWithArray<FamilyApi>()(allFamilies()),
+            abundances: await mightFailWithArray<AbundanceApi>()(abundances()),
         },
     };
 };

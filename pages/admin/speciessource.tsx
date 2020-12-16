@@ -1,5 +1,6 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import { source, species, speciessource } from '@prisma/client';
+import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
@@ -12,7 +13,7 @@ import ControlledTypeahead from '../../components/controlledtypeahead';
 import { DeleteResult, GallTaxon, SpeciesSourceApi, SpeciesSourceInsertFields } from '../../libs/api/apitypes';
 import { allSources } from '../../libs/db/source';
 import { allSpecies } from '../../libs/db/species';
-import { mightFail } from '../../libs/utils/util';
+import { mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
     species: species[];
@@ -54,19 +55,20 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
         try {
             const species = getValues('species');
             const source = getValues('source');
-            console.log(`${JSON.stringify(species, null, '  ')}`);
-            console.log(`${JSON.stringify(source, null, '  ')}`);
+            setValue('description', '');
+            setValue('useasdefault', false);
+
             const { sp, so } = lookup(species, source);
             if (sp != undefined && so != undefined) {
                 const res = await fetch(`../api/speciessource?speciesid=${sp?.id}&sourceid=${so?.id}`);
 
                 setExisting(false);
                 if (res.status === 200) {
-                    const s = (await res.json()) as SpeciesSourceApi;
-                    if (s) {
+                    const s = (await res.json()) as SpeciesSourceApi[];
+                    if (s && s.length > 0) {
                         setExisting(true);
-                        setValue('description', O.getOrElse(() => '')(s.description));
-                        setValue('useasdefault', s.useasdefault > 0);
+                        setValue('description', pipe(s[0].description, O.getOrElse(constant(''))));
+                        setValue('useasdefault', s[0].useasdefault > 0);
                     }
                 }
             }
@@ -126,6 +128,10 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
         <Auth>
             <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                 <h4>Map Species & Sources</h4>
+                <p>
+                    First select both a species and a source. If a mapping already exists then the description will display.Then
+                    you can edit the mapping.
+                </p>
                 <Row className="form-group">
                     <Col>
                         Species:
@@ -136,8 +142,9 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                             options={species.map((h) => h.name)}
                             isInvalid={!!errors.species}
                             onBlur={checkAlreadyExists}
+                            clearButton
                         />
-                        {errors.species && <span className="text-danger">You must provide a least one species to map.</span>}
+                        {errors.species && <span className="text-danger">You must provide a species to map.</span>}
                     </Col>
                 </Row>
                 <Row>
@@ -155,8 +162,9 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                             options={sources.map((h) => h.title)}
                             isInvalid={!!errors.source}
                             onBlur={checkAlreadyExists}
+                            clearButton
                         />
-                        {errors.source && <span className="text-danger">You must provide a least one source to map.</span>}
+                        {errors.source && <span className="text-danger">You must provide a source to map.</span>}
                     </Col>
                 </Row>
                 <Row className="form-group">
@@ -208,8 +216,8 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
-            species: await mightFail(allSpecies()),
-            sources: await mightFail(allSources()),
+            species: await mightFailWithArray<species>()(allSpecies()),
+            sources: await mightFailWithArray<source>()(allSources()),
         },
     };
 };

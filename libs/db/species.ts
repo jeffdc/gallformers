@@ -2,11 +2,16 @@ import { abundance, Prisma, species } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
-import { SpeciesApi } from '../api/apitypes';
-import { ExtractTFromPromise, handleError } from '../utils/util';
+import { AbundanceApi, SpeciesApi } from '../api/apitypes';
+import { ExtractTFromPromise, handleError, optionalWith } from '../utils/util';
 import db from './db';
 
-export const abundances = (): TE.TaskEither<Error, abundance[]> => {
+export const adaptAbundance = (a: abundance): AbundanceApi => ({
+    ...a,
+    reference: O.of(a.abundance),
+});
+
+export const abundances = (): TE.TaskEither<Error, AbundanceApi[]> => {
     const abundances = () =>
         db.abundance.findMany({
             orderBy: {
@@ -14,7 +19,10 @@ export const abundances = (): TE.TaskEither<Error, abundance[]> => {
             },
         });
 
-    return TE.tryCatch(abundances, handleError);
+    return pipe(
+        TE.tryCatch(abundances, handleError),
+        TE.map((a) => a.map(adaptAbundance)),
+    );
 };
 
 export const allSpecies = (): TE.TaskEither<Error, species[]> => {
@@ -69,7 +77,7 @@ export const getSpecies = (
                 taxoncode: s.taxoncode ? s.taxoncode : '',
                 synonyms: O.fromNullable(s.synonyms),
                 commonnames: O.fromNullable(s.commonnames),
-                abundance: O.fromNullable(s.abundance),
+                abundance: optionalWith(s.abundance, adaptAbundance),
                 speciessource: s.speciessource.map((source) => ({
                     ...source,
                     description: O.fromNullable(source.description),

@@ -1,21 +1,20 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { host, species } from '@prisma/client';
+import { host } from '@prisma/client';
 import { GetServerSideProps } from 'next';
-import Link from 'next/link';
 import React, { useState } from 'react';
-import { Col, ListGroup, ListGroupItem, Row } from 'react-bootstrap';
-import { Control, useForm } from 'react-hook-form';
+import { Col, Row } from 'react-bootstrap';
+import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { GallHostInsertFields } from '../../libs/api/apitypes';
+import { GallApi, GallHostUpdateFields, SimpleSpecies } from '../../libs/api/apitypes';
 import { allGalls } from '../../libs/db/gall';
 import { allHosts } from '../../libs/db/host';
-import { mightFail } from '../../libs/utils/util';
+import { mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
-    galls: species[];
-    hosts: species[];
+    galls: GallApi[];
+    hosts: SimpleSpecies[];
 };
 
 const Schema = yup.object().shape({
@@ -24,29 +23,24 @@ const Schema = yup.object().shape({
 });
 
 type FormFields = {
-    galls: string[];
-    hosts: string[];
+    gall: GallApi;
+    hosts: SimpleSpecies[];
 };
 
 const GallHost = ({ galls, hosts }: Props): JSX.Element => {
     const [results, setResults] = useState(new Array<host>());
-    const { handleSubmit, errors, control } = useForm<FormFields>({
+    const [selectedGall, setSelectedGall] = useState<GallApi>();
+
+    const { handleSubmit, errors, control, setValue } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
 
-    const onSubmit = async (data: { galls: string[]; hosts: string[] }) => {
+    const onSubmit = async (data: FormFields) => {
         try {
-            const insertData: GallHostInsertFields = {
-                galls: data.galls.map((s) => {
-                    // i hate null... :( these should be safe since the text values came from the same place as the ids
-                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                    return galls.find((sp) => s === sp.name)!.id;
-                }),
-                hosts: data.hosts.map((s) => {
-                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                    return hosts.find((so) => s === so.name)!.id;
-                }),
+            const insertData: GallHostUpdateFields = {
+                gall: data.gall.id,
+                hosts: data.hosts.map((h) => h.id),
             };
 
             const res = await fetch('../api/gallhost/insert', {
@@ -61,11 +55,28 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
                 setResults(await res.json());
             } else {
                 const text = await res.text();
-                console.log(`Got an error back code: ${res.status} and text: ${text}.`);
+                console.error(`Got an error back code: ${res.status} and text: ${text}.`);
                 throw new Error(text);
             }
         } catch (e) {
-            console.log(e);
+            console.error(e);
+        }
+    };
+
+    const gallChange = async (gs: GallApi[]) => {
+        const gall = gs.length > 0 ? gs[0] : undefined;
+        if (gall != undefined) {
+            const res = await fetch(`../api/gallhost?gall=${gall}`);
+            if (res.status === 200) {
+                const hosts = (await res.json()) as SimpleSpecies[];
+                if (hosts) {
+                    setSelectedGall(gall);
+                    setValue('hosts', hosts);
+                }
+            }
+        } else {
+            setSelectedGall(gall);
+            setValue('hosts', []);
         }
     };
 
@@ -73,19 +84,24 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
         <Auth>
             <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                 <h4>Map Galls & Hosts</h4>
+                <p>
+                    First select a gall. If any mappings to hosts already exist they will show up in the Host field. Then you can
+                    edit these mappings (add or delete).
+                </p>
                 <Row className="form-group">
                     <Col>
                         Gall:
                         <ControlledTypeahead
-                            control={control as Control<Record<string, unknown>>}
-                            name="galls"
+                            control={control}
+                            name="gall"
                             placeholder="Gall"
-                            options={galls.map((h) => h.name)}
-                            multiple
+                            options={galls}
+                            labelKey="name"
                             clearButton
-                            isInvalid={!!errors.galls}
+                            isInvalid={!!errors.gall}
+                            onChange={gallChange}
                         />
-                        {errors.galls && <span className="text-danger">You must provide a least one gall to map.</span>}
+                        {errors.gall && <span className="text-danger">You must provide a least one gall to map.</span>}
                     </Col>
                 </Row>
                 <Row>
@@ -97,13 +113,15 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
                     <Col>
                         Host:
                         <ControlledTypeahead
-                            control={control as Control<Record<string, unknown>>}
+                            control={control}
                             name="hosts"
                             placeholder="Hosts"
-                            options={hosts.map((h) => h.name)}
+                            options={hosts}
+                            labelKey="name"
                             multiple
                             clearButton
                             isInvalid={!!errors.hosts}
+                            disabled={!selectedGall}
                         />
                         {errors.hosts && <span className="text-danger">You must provide a least one host to map.</span>}
                     </Col>
@@ -113,28 +131,7 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
                         <input type="submit" className="button" />
                     </Col>
                 </Row>
-                {results.length > 0 && (
-                    <>
-                        <span>Wrote {results.length} gall-host mappings.</span>
-                        <ListGroup>
-                            {results.map((r) => {
-                                return (
-                                    <ListGroupItem key={r.id}>
-                                        Added{' '}
-                                        <Link href={`/gall/${r.gall_species_id}`}>
-                                            <a>gall</a>
-                                        </Link>{' '}
-                                        to{' '}
-                                        <Link href={`/host/${r.host_species_id}`}>
-                                            <a>host</a>
-                                        </Link>
-                                        .
-                                    </ListGroupItem>
-                                );
-                            })}
-                        </ListGroup>
-                    </>
-                )}
+                {results.length > 0 && <span>Updated gall-host mappings.</span>}
             </form>
         </Auth>
     );
@@ -143,8 +140,8 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
-            galls: await mightFail(allGalls()),
-            hosts: await mightFail(allHosts()),
+            galls: await mightFailWithArray<GallApi>()(allGalls()),
+            hosts: await mightFailWithArray<SimpleSpecies>()(allHosts()),
         },
     };
 };

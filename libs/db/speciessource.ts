@@ -119,13 +119,11 @@ export const upsertSpeciesSource = (sourcespecies: SpeciesSourceInsertFields): T
     // further work, onl that it may have failed. If the map in the 2nd line of the pipe is not run the types will be wrong
     // in the upsert call. This is surely just my ignorance and there has to be a better way to accomplish this.
     // eslint-disable-next-line prettier/prettier
-    const foo = pipe(
+    return pipe(
         TE.tryCatch(setAsNewDefault, handleError),
         TE.map(() => TE.tryCatch(existing, handleError)),
         TE.flatten,
         TE.map((s) => TE.tryCatch(upsert(s), handleError)),
         TE.flatten,
     );
-
-    return foo;
 };

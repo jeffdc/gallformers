@@ -7,12 +7,13 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
+import { AdminFormFields, useAPIs } from '../../hooks/useAPIs';
 import { DeleteResult, GlossaryEntryUpsertFields } from '../../libs/api/apitypes';
 import { allGlossaryEntries, Entry } from '../../libs/db/glossary';
-import { mightFail } from '../../libs/utils/util';
+import { mightFailWithArray } from '../../libs/utils/util';
 
 const Schema = yup.object().shape({
-    word: yup.string().required(),
+    value: yup.mixed().required(),
     definition: yup.string().required(),
     urls: yup.string().required(),
 });
@@ -21,57 +22,41 @@ type Props = {
     glossary: Entry[];
 };
 
-type FormFields = {
-    word: string;
-    definition: string;
-    urls: string;
-};
+type FormFields = AdminFormFields<Entry> & Pick<Entry, 'definition' | 'urls'>;
 
-const Glossary = ({ glossary }: Props): JSX.Element => {
-    if (!glossary) throw new Error(`The input props for glossary edit can not be null or undefined.`);
+const Glossary = (props: Props): JSX.Element => {
+    if (!props.glossary) throw new Error(`The input props for glossary edit can not be null or undefined.`);
 
     const [existing, setExisting] = useState(false);
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
+    const [glossary, setGlossary] = useState(props.glossary);
 
     const { register, handleSubmit, errors, control, setValue, reset } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
 
+    const { doDeleteOrUpsert } = useAPIs<Entry, GlossaryEntryUpsertFields>('word', '../api/glossary/', '../api/glossary/upsert');
+
     const router = useRouter();
 
-    const onSubmit = async (data: GlossaryEntryUpsertFields) => {
-        try {
-            if (data.delete) {
-                const id = glossary.find((e) => e.word === data.word)?.id;
-                const res = await fetch(`../api/glossary/${id}`, {
-                    method: 'DELETE',
-                });
+    const onSubmit = async (data: FormFields) => {
+        const postDelete = (id: number | string, result: DeleteResult) => {
+            setGlossary(glossary.filter((g) => g.id !== id));
+            setDeleteResults(result);
+        };
 
-                if (res.status === 200) {
-                    setDeleteResults(await res.json());
-                } else {
-                    throw new Error(await res.text());
-                }
-            } else {
-                const res = await fetch('../api/glossary/upsert', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data),
-                });
+        const postUpdate = (res: Response) => {
+            router.push(res.url);
+        };
 
-                if (res.status === 200) {
-                    router.push(res.url);
-                } else {
-                    throw new Error(await res.text());
-                }
-            }
-            reset();
-        } catch (e) {
-            console.log(e);
-        }
+        const convertFormFieldsToUpsert = (fields: FormFields, word: string, id: number): GlossaryEntryUpsertFields => ({
+            ...fields,
+            word: word,
+        });
+
+        await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert);
+        reset();
     };
 
     return (
@@ -83,27 +68,27 @@ const Glossary = ({ glossary }: Props): JSX.Element => {
                         Name:
                         <ControlledTypeahead
                             control={control}
-                            name="word"
-                            onChange={(e) => {
-                                setExisting(false);
-                                const f = glossary.find((f) => f.word === e[0]);
-                                if (f) {
-                                    setExisting(true);
-                                    setValue('definition', f.definition);
-                                    setValue('urls', f.urls.join('\n'));
-                                } else {
+                            name="value"
+                            onChangeWithNew={(e, isNew) => {
+                                setExisting(!isNew);
+                                if (isNew || !e[0]) {
                                     setValue('definition', '');
                                     setValue('urls', '');
+                                } else {
+                                    const entry: Entry = e[0];
+                                    setValue('definition', entry.definition);
+                                    setValue('urls', entry.urls);
                                 }
                             }}
                             placeholder="Word"
-                            options={glossary.map((f) => f.word)}
+                            options={glossary}
+                            labelKey={'word'}
                             clearButton
-                            isInvalid={!!errors.word}
+                            isInvalid={!!errors.value}
                             newSelectionPrefix="Add a new Word: "
                             allowNew={true}
                         />
-                        {errors.word && <span className="text-danger">The Word is required.</span>}
+                        {errors.value && <span className="text-danger">The Word is required.</span>}
                     </Col>
                 </Row>
                 <Row className="form-group">
@@ -122,7 +107,7 @@ const Glossary = ({ glossary }: Props): JSX.Element => {
                 <Row className="fromGroup" hidden={!existing}>
                     <Col xs="1">Delete?:</Col>
                     <Col className="mr-auto">
-                        <input name="delete" type="checkbox" className="form-check-input" ref={register} />
+                        <input name="del" type="checkbox" className="form-check-input" ref={register} />
                     </Col>
                 </Row>
                 <Row className="form-input">
@@ -141,7 +126,7 @@ const Glossary = ({ glossary }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
-            glossary: await mightFail(allGlossaryEntries()),
+            glossary: await mightFailWithArray<Entry>()(allGlossaryEntries()),
         },
     };
 };

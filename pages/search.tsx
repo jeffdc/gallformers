@@ -6,7 +6,7 @@ import { Card, CardColumns, Col, Row } from 'react-bootstrap';
 import CardTextCollapse from '../components/cardcollapse';
 import { GallApi, SearchQuery, toSearchQuery } from '../libs/api/apitypes';
 import { searchGalls } from '../libs/pages/search';
-import { mightFail } from '../libs/utils/util';
+import { mightFailWithArray } from '../libs/utils/util';
 
 type Props = {
     data: GallApi[];
@@ -48,7 +48,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
 
     return {
         props: {
-            data: await mightFail(searchGalls(toSearchQuery(context.query))),
+            data: await mightFailWithArray<GallApi>()(searchGalls(toSearchQuery(context.query))),
             query: { ...context.query },
         },
     };

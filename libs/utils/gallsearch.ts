@@ -20,13 +20,13 @@ const dontCare = (o: string | string[] | undefined): boolean => {
 const checkLocations = (locs: GallLocation[], queryvals: string[] | undefined): boolean => {
     if (queryvals == undefined) return false;
 
-    return queryvals.every((q) => locs.find((l) => l.location?.location === q));
+    return queryvals.every((q) => locs.find((l) => l.loc === q));
 };
 
 const checkTextures = (textures: GallTexture[], queryvals: string[] | undefined): boolean => {
     if (queryvals == undefined) return false;
 
-    return queryvals.every((q) => textures.find((l) => l.texture?.texture === q));
+    return queryvals.every((q) => textures.find((l) => l.tex === q));
 };
 
 /** Make the helper functions available for unit testing. */
@@ -55,6 +55,5 @@ export const checkGall = (g: GallApi, q: SearchQuery): boolean => {
     const location = dontCare(q.locations) || (!!g.gall.galllocation && checkLocations(g.gall.galllocation, q.locations));
     const texture = dontCare(q.textures) || (!!g.gall.galltexture && checkTextures(g.gall.galltexture, q.textures));
 
-    // console.log(`a:${alignment} ce:${cells} co:${color} d:${detachable} s: ${shape} w:${walls} l:${location} t:${texture}`);
     return alignment && cells && color && detachable && shape && walls && location && texture;
 };

@@ -1,5 +1,4 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { source } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
@@ -8,74 +7,53 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { DeleteResult, SourceUpsertFields } from '../../libs/api/apitypes';
+import { AdminFormFields, useAPIs } from '../../hooks/useAPIs';
+import { DeleteResult, SourceApi, SourceUpsertFields } from '../../libs/api/apitypes';
 import { allSources } from '../../libs/db/source';
-import { mightFail } from '../../libs/utils/util';
+import { mightFailWithArray } from '../../libs/utils/util';
 
 const Schema = yup.object().shape({
-    title: yup.string().required(),
+    value: yup.mixed().required(),
     author: yup.string().required(),
     pubyear: yup.string().matches(/([12][0-9]{3})/),
     citation: yup.string().required(),
 });
 
 type Props = {
-    sources: source[];
+    sources: SourceApi[];
 };
 
-type FormFields = {
-    title: string;
-    author: string;
-    pubyear: string;
-    link: string;
-    citation: string;
-};
+type FormFields = AdminFormFields<SourceApi> & Omit<SourceApi, 'id' | 'title'>;
 
-const Host = ({ sources }: Props): JSX.Element => {
+const Source = (props: Props): JSX.Element => {
     const { register, handleSubmit, errors, control, setValue, reset } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
     const [existing, setExisting] = useState(false);
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
+    const [sources, setSources] = useState(props.sources);
 
     const router = useRouter();
+    const { doDeleteOrUpsert } = useAPIs<SourceApi, SourceUpsertFields>('title', '../api/source/', '../api/source/upsert');
 
-    const onSubmit = async (data: SourceUpsertFields) => {
-        try {
-            if (data.delete) {
-                const id = sources.find((s) => s.title === data.title)?.id;
-                if (!id) throw new Error('Selected source was detected as pre-existing but lookup failed.');
+    const onSubmit = async (data: FormFields) => {
+        const postDelete = (id: number | string, result: DeleteResult) => {
+            setSources(sources.filter((s) => s.id !== id));
+            setDeleteResults(result);
+        };
 
-                const res = await fetch(`../api/source/${id}`, {
-                    method: 'DELETE',
-                });
+        const postUpdate = (res: Response) => {
+            router.push(res.url);
+        };
 
-                if (res.status === 200) {
-                    reset();
-                    setDeleteResults(await res.json());
-                    return;
-                } else {
-                    throw new Error(await res.text());
-                }
-            }
+        const convertFormFieldsToUpsert = (fields: FormFields, title: string, id: number): SourceUpsertFields => ({
+            ...fields,
+            title: title,
+        });
 
-            const res = await fetch('../api/source/upsert', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data),
-            });
-
-            if (res.status === 200) {
-                router.push(res.url);
-            } else {
-                throw new Error(await res.text());
-            }
-        } catch (e) {
-            console.error(e);
-        }
+        await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert);
+        reset();
     };
 
     return (
@@ -87,26 +65,31 @@ const Host = ({ sources }: Props): JSX.Element => {
                         Title:
                         <ControlledTypeahead
                             control={control}
-                            name="title"
-                            onChange={(e) => {
-                                setExisting(false);
-                                const f = sources.find((f) => f.title === e[0]);
-                                if (f) {
-                                    setExisting(true);
-                                    setValue('author', f.author);
-                                    setValue('pubyear', f.pubyear);
-                                    setValue('link', f.link);
-                                    setValue('citation', f.citation);
+                            name="value"
+                            onChangeWithNew={(e, isNew) => {
+                                setExisting(!isNew);
+                                if (isNew || !e[0]) {
+                                    setValue('author', '');
+                                    setValue('pubyear', '');
+                                    setValue('link', '');
+                                    setValue('citation', '');
+                                } else {
+                                    const source: SourceApi = e[0];
+                                    setValue('author', source.author);
+                                    setValue('pubyear', source.pubyear);
+                                    setValue('link', source.link);
+                                    setValue('citation', source.citation);
                                 }
                             }}
                             placeholder="Title"
-                            options={sources.map((f) => f.title)}
+                            options={sources}
+                            labelKey="title"
                             clearButton
-                            isInvalid={!!errors.title}
+                            isInvalid={!!errors.value}
                             newSelectionPrefix="Add a new Source: "
                             allowNew={true}
                         />
-                        {errors.title && <span className="text-danger">The Title is required.</span>}
+                        {errors.value && <span className="text-danger">The Title is required.</span>}
                     </Col>
                 </Row>
                 <Row className="form-group">
@@ -143,7 +126,7 @@ const Host = ({ sources }: Props): JSX.Element => {
                 <Row className="fromGroup" hidden={!existing}>
                     <Col xs="1">Delete?:</Col>
                     <Col className="mr-auto">
-                        <input name="delete" type="checkbox" className="form-check-input" ref={register} />
+                        <input name="del" type="checkbox" className="form-check-input" ref={register} />
                     </Col>
                 </Row>
                 <Row className="formGroup">
@@ -162,9 +145,9 @@ const Host = ({ sources }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
-            sources: await mightFail(allSources()),
+            sources: await mightFailWithArray<SourceApi>()(allSources()),
         },
     };
 };
 
-export default Host;
+export default Source;

@@ -3,10 +3,22 @@ import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { AlignmentApi, CellsApi, DeleteResult, GallApi, GallTaxon, GallUpsertFields, ShapeApi, WallsApi } from '../api/apitypes';
-import { ExtractTFromPromise, handleError } from '../utils/util';
+import {
+    AlignmentApi,
+    CellsApi,
+    ColorApi,
+    DeleteResult,
+    GallApi,
+    GallLocation,
+    GallTaxon,
+    GallTexture,
+    GallUpsertFields,
+    ShapeApi,
+    WallsApi,
+} from '../api/apitypes';
+import { ExtractTFromPromise, handleError, optionalWith } from '../utils/util';
 import db from './db';
-import { speciesByName } from './species';
+import { adaptAbundance, speciesByName } from './species';
 import { connectIfNotNull, connectWithIds, extractId } from './utils';
 
 /**
@@ -74,15 +86,17 @@ export const getGalls = (
                 description: O.fromNullable(d),
                 synonyms: O.fromNullable(g.synonyms),
                 commonnames: O.fromNullable(g.commonnames),
-                abundance: O.fromNullable(g.abundance),
+                abundance: optionalWith(g.abundance, adaptAbundance),
                 gall: {
                     ...g.gall,
-                    alignment: adaptAlignment(g.gall.alignment),
-                    cells: adaptCells(g.gall.cells),
-                    color: O.fromNullable(g.gall.color),
-                    shape: adaptShape(g.gall.shape),
-                    walls: adaptWalls(g.gall.walls),
+                    alignment: optionalWith(g.gall.alignment, adaptAlignment),
+                    cells: optionalWith(g.gall.cells, adaptCells),
+                    color: optionalWith(g.gall.color, adaptColor),
+                    shape: optionalWith(g.gall.shape, adaptShape),
+                    walls: optionalWith(g.gall.walls, adaptWalls),
                     detachable: O.fromNullable(g.gall.detachable),
+                    galllocation: adaptLocations(g.gall.galllocation.map((l) => l.location)),
+                    galltexture: adaptTextures(g.gall.galltexture.map((t) => t.texture)),
                 },
                 // remove the indirection of the many-to-many table for easier usage
                 hosts: g.hosts.map((h) => {
@@ -198,10 +212,18 @@ export const getGallIdFromSpeciesId = (speciesid: number): TaskEither<Error, O.O
     );
 };
 
+const adaptLocations = (ls: location[]): GallLocation[] => {
+    return ls.map((l) => ({
+        id: l.id,
+        loc: l.location,
+        description: O.fromNullable(l.description),
+    }));
+};
+
 /**
  * Fetches all gall locations
  */
-export const locations = (): TaskEither<Error, location[]> => {
+export const locations = (): TaskEither<Error, GallLocation[]> => {
     const locations = () =>
         db.location.findMany({
             orderBy: {
@@ -209,13 +231,15 @@ export const locations = (): TaskEither<Error, location[]> => {
             },
         });
 
-    return TE.tryCatch(locations, handleError);
+    return pipe(TE.tryCatch(locations, handleError), TE.map(adaptLocations));
 };
+
+const adaptColor = (c: color): ColorApi => c;
 
 /**
  * Fetches all gall colors
  */
-export const colors = (): TaskEither<Error, color[]> => {
+export const colors = (): TaskEither<Error, ColorApi[]> => {
     const colors = () =>
         db.color.findMany({
             orderBy: {
@@ -223,24 +247,21 @@ export const colors = (): TaskEither<Error, color[]> => {
             },
         });
 
-    return TE.tryCatch(colors, handleError);
-};
-
-const adaptShape = (a: shape | null): O.Option<ShapeApi> => {
-    const makeApiVersion = (x: shape): ShapeApi => ({
-        ...x,
-        description: O.fromNullable(x.description),
-    });
-    // eslint-disable-next-line prettier/prettier
     return pipe(
-        O.fromNullable(a),
-        O.map(makeApiVersion),
+        TE.tryCatch(colors, handleError),
+        TE.map((c) => c.map(adaptColor)),
     );
 };
+
+const adaptShape = (s: shape): ShapeApi => ({
+    ...s,
+    description: O.fromNullable(s.description),
+});
+
 /**
  * Fetches all gall shapes
  */
-export const shapes = (): TaskEither<Error, shape[]> => {
+export const shapes = (): TaskEither<Error, ShapeApi[]> => {
     const shapes = () =>
         db.shape.findMany({
             orderBy: {
@@ -248,13 +269,24 @@ export const shapes = (): TaskEither<Error, shape[]> => {
             },
         });
 
-    return TE.tryCatch(shapes, handleError);
+    return pipe(
+        TE.tryCatch(shapes, handleError),
+        TE.map((s) => s.map(adaptShape)),
+    );
+};
+
+const adaptTextures = (ts: texture[]): GallTexture[] => {
+    return ts.map((t) => ({
+        id: t.id,
+        tex: t.texture,
+        description: O.fromNullable(t.description),
+    }));
 };
 
 /**
  * Fetches all gall textures
  */
-export const textures = (): TaskEither<Error, texture[]> => {
+export const textures = (): TaskEither<Error, GallTexture[]> => {
     const textures = () =>
         db.texture.findMany({
             orderBy: {
@@ -262,25 +294,18 @@ export const textures = (): TaskEither<Error, texture[]> => {
             },
         });
 
-    return TE.tryCatch(textures, handleError);
+    return pipe(TE.tryCatch(textures, handleError), TE.map(adaptTextures));
 };
 
-const adaptAlignment = (a: alignment | null): O.Option<AlignmentApi> => {
-    const makeApiVersion = (x: alignment): AlignmentApi => ({
-        ...x,
-        description: O.fromNullable(x.description),
-    });
-    // eslint-disable-next-line prettier/prettier
-    return pipe(
-        O.fromNullable(a),
-        O.map(makeApiVersion),
-    );
-};
+const adaptAlignment = (a: alignment): AlignmentApi => ({
+    ...a,
+    description: O.fromNullable(a.description),
+});
 
 /**
  * Fetches all gall alignments
  */
-export const alignments = (): TaskEither<Error, alignment[]> => {
+export const alignments = (): TaskEither<Error, AlignmentApi[]> => {
     const alignments = () =>
         db.alignment.findMany({
             orderBy: {
@@ -288,25 +313,21 @@ export const alignments = (): TaskEither<Error, alignment[]> => {
             },
         });
 
-    return TE.tryCatch(alignments, handleError);
-};
-
-const adaptWalls = (w: ws | null): O.Option<WallsApi> => {
-    const makeApiVersion = (x: ws): WallsApi => ({
-        ...x,
-        description: O.fromNullable(x.description),
-    });
-    // eslint-disable-next-line prettier/prettier
     return pipe(
-        O.fromNullable(w),
-        O.map(makeApiVersion),
+        TE.tryCatch(alignments, handleError),
+        TE.map((a) => a.map(adaptAlignment)),
     );
 };
+
+const adaptWalls = (w: ws): WallsApi => ({
+    ...w,
+    description: O.fromNullable(w.description),
+});
 
 /**
  * Fetches all gall walls
  */
-export const walls = (): TaskEither<Error, ws[]> => {
+export const walls = (): TaskEither<Error, WallsApi[]> => {
     const walls = () =>
         db.walls.findMany({
             orderBy: {
@@ -314,24 +335,21 @@ export const walls = (): TaskEither<Error, ws[]> => {
             },
         });
 
-    return TE.tryCatch(walls, handleError);
-};
-
-const adaptCells = (a: cs | null): O.Option<CellsApi> => {
-    const makeApiVersion = (x: cs): CellsApi => ({
-        ...x,
-        description: O.fromNullable(x.description),
-    });
-    // eslint-disable-next-line prettier/prettier
     return pipe(
-        O.fromNullable(a),
-        O.map(makeApiVersion),
+        TE.tryCatch(walls, handleError),
+        TE.map((w) => w.map(adaptWalls)),
     );
 };
+
+const adaptCells = (a: cs): CellsApi => ({
+    ...a,
+    description: O.fromNullable(a.description),
+});
+
 /**
  * Fetches all gall cells
  */
-export const cells = (): TaskEither<Error, cs[]> => {
+export const cells = (): TaskEither<Error, CellsApi[]> => {
     const cells = () =>
         db.cells.findMany({
             orderBy: {
@@ -339,7 +357,10 @@ export const cells = (): TaskEither<Error, cs[]> => {
             },
         });
 
-    return TE.tryCatch(cells, handleError);
+    return pipe(
+        TE.tryCatch(cells, handleError),
+        TE.map((c) => c.map(adaptCells)),
+    );
 };
 
 /**
@@ -412,12 +433,18 @@ export const upsertGall = (gall: GallUpsertFields): TaskEither<Error, number> =>
             where: { name: gall.name },
         });
 
-    //TODO how to get rid of the if..else?
-    if (speciesByName(gall.name)) {
-        return pipe(TE.tryCatch(update, handleError), TE.map(extractId));
-    } else {
-        return pipe(TE.tryCatch(create, handleError), TE.map(extractId));
-    }
+    return pipe(
+        speciesByName(gall.name),
+        // eslint-disable-next-line prettier/prettier
+        TE.map(
+            O.fold(
+                () => TE.tryCatch(create, handleError),
+                () => TE.tryCatch(update, handleError),
+            ),
+        ),
+        TE.flatten,
+        TE.map(extractId),
+    );
 };
 
 /**

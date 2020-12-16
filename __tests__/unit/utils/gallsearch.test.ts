@@ -76,8 +76,8 @@ describe('checkGall tests', () => {
         expect(checkGall(makeG('color', { color: '', id: 1, description: O.of('') }), q)).toBeTruthy();
         expect(checkGall(makeG('shape', { shape: '', id: 1, description: O.of('') }), q)).toBeTruthy();
         expect(checkGall(makeG('walls', { walls: '', id: 1, description: O.of('') }), q)).toBeTruthy();
-        expect(checkGall(makeG('galllocation', [{ location: { location: '', id: 1, description: '' } }]), q)).toBeTruthy();
-        expect(checkGall(makeG('galltexture', [{ texture: { texture: '', id: 1, description: '' } }]), q)).toBeTruthy();
+        expect(checkGall(makeG('galllocation', [{ loc: '', id: 1, description: O.of('') }]), q)).toBeTruthy();
+        expect(checkGall(makeG('galltexture', [{ tex: '', id: 1, description: O.of('') }]), q)).toBeTruthy();
     });
 
     test('Should match when provided query has single matches', () => {
@@ -112,13 +112,13 @@ describe('checkGall tests', () => {
             }),
         ).toBeTruthy();
         expect(
-            checkGall(makeG('galllocation', [{ location: { location: 'foo', id: 1, description: '' } }]), {
+            checkGall(makeG('galllocation', [{ loc: 'foo', id: 1, description: O.of('') }]), {
                 ...q,
                 locations: ['foo'],
             }),
         ).toBeTruthy();
         expect(
-            checkGall(makeG('galltexture', [{ texture: { texture: 'foo', id: 1, description: '' } }]), {
+            checkGall(makeG('galltexture', [{ tex: 'foo', id: 1, description: O.of('') }]), {
                 ...q,
                 textures: ['foo'],
             }),
@@ -137,8 +137,8 @@ describe('checkGall tests', () => {
                         cells: O.of({ cells: 'cefoo', id: 1, description: O.none }),
                         shape: O.of({ shape: 'sfoo', id: 1, description: O.none }),
                         walls: O.of({ walls: 'wfoo', id: 1, description: O.none }),
-                        galllocation: [{ location: { location: 'lfoo', id: 1, description: '' } }],
-                        galltexture: [{ texture: { texture: 'tfoo', id: 1, description: '' } }],
+                        galllocation: [{ loc: 'lfoo', id: 1, description: O.none }],
+                        galltexture: [{ tex: 'tfoo', id: 1, description: O.none }],
                     },
                 },
                 {
@@ -161,10 +161,10 @@ describe('checkGall tests', () => {
             gall: {
                 ...g.gall,
                 galllocation: [
-                    { location: { location: 'lfoo1', id: 1, description: '' } },
-                    { location: { location: 'lfoo2', id: 2, description: '' } },
+                    { loc: 'lfoo1', id: 1, description: O.of('') },
+                    { loc: 'lfoo2', id: 2, description: O.of('') },
                 ],
-                galltexture: [{ texture: { texture: 'tfoo', id: 1, description: '' } }],
+                galltexture: [{ tex: 'tfoo', id: 1, description: O.of('') }],
             },
         };
 

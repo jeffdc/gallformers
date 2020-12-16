@@ -22,8 +22,13 @@ if (process.env.NODE_ENV === 'production') {
     // Otherwise, a new client will be created on every reload
     // @ts-ignore
     globalThis['db'] = globalThis['db'] || new PrismaClient();
+    // globalThis['db'] = globalThis['db'] || new PrismaClient({ log: ['query'] });
     // @ts-ignore
     db = globalThis['db'];
+
+    // db.$on('query', (e) => {
+    //     console.log(e);
+    // });
     // console.log('Development: Created DB connection.');
     // console.log(new Error().stack);
 }

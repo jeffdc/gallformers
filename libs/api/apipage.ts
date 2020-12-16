@@ -1,9 +1,12 @@
 import { pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import * as T from 'fp-ts/lib/Task';
+import * as TA from 'fp-ts/lib/Task';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from 'next-auth/client';
+import { ParsedUrlQuery } from 'querystring';
 import { DeleteResult } from './apitypes';
 
 /**
@@ -77,7 +80,7 @@ export async function apiUpsertEndpoint<T, R>(
  * (N.B. no slash so you must provide it or some other separator, e.g. #).
  */
 export const onCompleteRedirect = (path: string) => (res: NextApiResponse, pathEnd: unknown): void => {
-    res.status(200).redirect(`${path}${pathEnd}`).end();
+    res.status(200).redirect(`/${path}${pathEnd}`).end();
 };
 
 /**
@@ -88,3 +91,63 @@ export const onCompleteRedirect = (path: string) => (res: NextApiResponse, pathE
 export const onCompleteSendJson = (res: NextApiResponse, results: unknown): void => {
     res.status(200).send(JSON.stringify(results));
 };
+
+/**
+ * Given a @ParsedUrlQuery try an extract a query param from it that matches the @prop name passed in.
+ * @param q
+ * @param prop
+ * @returns an Option that contains the query value as a string if it was found.
+ */
+export const extractQueryParam = (q: ParsedUrlQuery, prop: string): O.Option<string> => {
+    const p = q[prop];
+    if (!p) return O.none;
+    if (Array.isArray(p)) return O.of(p[0]);
+    return O.of(p);
+};
+
+/**
+ * Given a @NextApiRequest try and extract a query param from it that matches the @prop name passed in.
+ * @param prop
+ * @returns an Option that contains the query value as a string if it was found.
+ */
+export const getQueryParam = (req: NextApiRequest) => (prop: string): O.Option<string> => extractQueryParam(req.query, prop);
+
+/**
+ * Send a 200 success repsonse as JSON.
+ * @param res
+ * @returns we only have a return value to make it easier to compose in pipes. This function sends the requests without delay.
+ */
+export const sendSuccResponse = (res: NextApiResponse) => <T>(t: T): TA.Task<number> => {
+    res.status(200).json(t);
+    return TA.of(0); // make type checker happy
+};
+
+/**
+ * Send a @status error back to the client with @e as the message, plain text.
+ * @param res
+ * @returns we only have a return value to make it easier to compose in pipes. This function sends the requests without delay.
+ */
+export const sendErrResponse = (res: NextApiResponse) => (e: Err): TA.Task<number> => {
+    res.status(e.status).end(e.msg);
+    console.error(e.e ? e.e : e.msg);
+    return TA.of(0); // make type checker happy
+};
+
+/**
+ * Type used for representing Repsonse failures back to the client.
+ */
+export type Err = {
+    status: number;
+    msg: string;
+    e?: Error;
+};
+
+/**
+ * Converts an @Error to an @Err type.
+ * @param e
+ */
+export const toErr = (e: Error): Err => ({
+    status: 500,
+    msg: e.message,
+    e: e,
+});

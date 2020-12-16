@@ -7,11 +7,8 @@ import React, { ReactNode } from 'react';
 import { allGlossaryEntries, Entry } from '../db/glossary';
 import { serialize } from '../utils/reactserialize';
 
-export type EntryLinked = {
-    word: string;
+export type EntryLinked = Entry & {
     linkedDefinition: string | JSX.Element[];
-    definition: string;
-    urls: string[];
 };
 
 type WordStem = {
@@ -113,13 +110,11 @@ export const entriesWithLinkedDefs = (): TaskEither<Error, readonly EntryLinked[
     };
 
     // eslint-disable-next-line prettier/prettier
-    const foo = pipe(
+    return pipe(
         allGlossaryEntries(),
         TE.map(linkEntries),
         // deal with the fact that we have a TE<Error, LinkedEntry>[] but want a TE<Error, LinkedEntry[]>
         TE.map(TE.sequenceArray),
         TE.flatten,
     );
-
-    return foo;
 };

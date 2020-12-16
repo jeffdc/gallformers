@@ -1,16 +1,16 @@
 import { GetStaticProps } from 'next';
 import Link from 'next/link';
 import { Accordion, Button, Card, ListGroup, Tab, Tabs } from 'react-bootstrap';
-import { FamilyApi } from '../libs/api/apitypes';
+import { FamilyWithSpecies } from '../libs/api/apitypes';
 import { getGallMakerFamilies, getHostFamilies } from '../libs/db/family';
 import { getStaticPropsWith } from '../libs/pages/nextPageHelpers';
 
 type Props = {
-    gallmakers: FamilyApi[];
-    hosts: FamilyApi[];
+    gallmakers: FamilyWithSpecies[];
+    hosts: FamilyWithSpecies[];
 };
 
-const lister = (f: FamilyApi, gall: boolean) => {
+const lister = (f: FamilyWithSpecies, gall: boolean) => {
     const path = gall ? 'gall' : 'host';
     return f.species.map((s) => (
         <ListGroup.Item key={s.id}>
@@ -21,7 +21,7 @@ const lister = (f: FamilyApi, gall: boolean) => {
     ));
 };
 
-const renderList = (data: FamilyApi[], gall: boolean) => {
+const renderList = (data: FamilyWithSpecies[], gall: boolean) => {
     return data.map((f) => (
         <Card key={f.id}>
             <Card.Header>

@@ -40,7 +40,7 @@ const Glossary = ({ es }: Props): JSX.Element => {
                         <span id={e.word}>
                             <b>{e.word} - </b>
                             {deserialize(e.linkedDefinition)}
-                            {renderrefs(e.urls)}
+                            {renderrefs(e.urls.split('\n'))}
                         </span>
                     </ListGroup.Item>
                 ))}

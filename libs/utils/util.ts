@@ -1,8 +1,9 @@
 // Welcome to the inevitable utils file!!!
 
-import { pipe } from 'fp-ts/lib/function';
+import { constant, pipe } from 'fp-ts/lib/function';
 import * as T from 'fp-ts/lib/Task';
 import * as TE from 'fp-ts/lib/TaskEither';
+import * as O from 'fp-ts/lib/Option';
 
 /**
  * Checks an object, o, for the presence of the prop.
@@ -43,23 +44,26 @@ export function randInt(min: number, max: number): number {
  */
 export type ExtractTFromPromise<T> = T extends Promise<infer S> ? S : never;
 
+export type Diff<T, U> = T extends U ? never : T;
+export type Filter<T, U> = T extends U ? T : never;
+
 /**
  * This is used to bridge the FP world TaskEithers into Promises while consistently handling failures.
  * @param s
  */
-export const mightFail = async <S extends TE.TaskEither<Error, readonly T[]>, T>(s: S): Promise<T[]> => {
-    //TODO why is it that when called we lose the T type and end up an unknown[]?
-    // It is "fixable" if the caller annotes the function call with both the S and T type, but that is onerus!
+export const mightFail = <T>(defaultT: () => T) => async <S extends TE.TaskEither<Error, T>>(s: S): Promise<T> => {
     return pipe(
-        // it seems that fp-ts is inconsistent with its use of readonly so we have to cast here :(
-        (s as unknown) as TE.TaskEither<Error, T[]>,
+        s,
         TE.getOrElse((e) => {
             console.error(e);
-            return T.of(new Array<T>());
+            return T.of(defaultT());
         }),
     )();
 };
 
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+export const mightFailWithArray = <T>() => mightFail(constant(new Array<T>()));
+export const mightFailWithStringArray = mightFailWithArray<string>();
 /**
  * Cute litte hacky function to handle an error. It always throws. Being a function with a generic return type it allows
  * us to throw from within a pipe (not what one would normally want but if you want to stop the error propagation this
@@ -95,4 +99,16 @@ export const truncateAtWord = (words: number) => (s: string): string => {
     } else {
         return s;
     }
+};
+
+export const capitalizeFirstLetter = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ *
+ * @param t
+ * @param adapt
+ */
+export const optionalWith = <T, S>(t: T | null, adapt: (t: T) => S): O.Option<S> => {
+    if (t == null) return O.none;
+    return O.of(adapt(t));
 };

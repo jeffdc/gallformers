@@ -1,7 +1,6 @@
 /**
  * Types for calling the APIs. These are to be used by browser code when it calls the APIs.
  */
-import { abundance, family, location, source, texture } from '@prisma/client';
 import * as O from 'fp-ts/lib/Option';
 import { Option } from 'fp-ts/lib/Option';
 import { ParsedUrlQuery } from 'querystring';
@@ -60,7 +59,14 @@ export type Deletable = {
     delete?: boolean;
 };
 
-export type FamilyApi = family & {
+export type FamilyApi = {
+    id: number;
+    name: string;
+    description: string;
+};
+export const EmptyFamily: FamilyApi = { id: -1, name: '', description: '' };
+
+export type FamilyWithSpecies = FamilyApi & {
     species: {
         id: number;
         name: string;
@@ -78,8 +84,8 @@ export type FamilyUpsertFields = {
     description: string;
 };
 
-export type SpeciesUpsertFields = Deletable & {
-    id?: number;
+export type SpeciesUpsertFields = {
+    id: number;
     name: string;
     commonnames: string;
     synonyms: string;
@@ -114,7 +120,7 @@ export type SpeciesSourceApi = {
     source_id: number;
     description: Option<string>;
     useasdefault: number;
-    source: source;
+    source: SourceApi;
 };
 
 export type GallHost = {
@@ -123,22 +129,43 @@ export type GallHost = {
 };
 
 export type GallLocation = {
-    location: location | null;
-};
-export type GallTexture = {
-    texture: texture | null;
+    id: number;
+    loc: string;
+    description: Option<string>;
 };
 
-export type SpeciesApi = {
+export type GallTexture = {
+    id: number;
+    tex: string;
+    description: Option<string>;
+};
+
+export type AbundanceApi = {
+    id: number;
+    abundance: string;
+    description: string;
+    reference: Option<string>;
+};
+export const EmptyAbundance: AbundanceApi = {
+    id: -1,
+    abundance: '',
+    description: '',
+    reference: O.none,
+};
+
+export type SimpleSpecies = {
     id: number;
     taxoncode: string;
     name: string;
+    genus: string;
+};
+
+export type SpeciesApi = SimpleSpecies & {
     synonyms: Option<string>;
     commonnames: Option<string>;
-    genus: string;
-    abundance: Option<abundance>;
+    abundance: Option<AbundanceApi>;
     description: Option<string>; // to make the caller's life easier we will load the default if we can
-    family: family;
+    family: FamilyApi;
     speciessource: SpeciesSourceApi[];
 };
 
@@ -147,16 +174,30 @@ export type AlignmentApi = {
     alignment: string;
     description: Option<string>;
 };
+export const EmptyAlignment: AlignmentApi = {
+    id: -1,
+    alignment: '',
+    description: O.none,
+};
 
 export type CellsApi = {
     id: number;
     cells: string;
     description: Option<string>;
 };
+export const EmptyCells: CellsApi = {
+    id: -1,
+    cells: '',
+    description: O.none,
+};
 
 export type ColorApi = {
     id: number;
     color: string;
+};
+export const EmptyColor: ColorApi = {
+    id: -1,
+    color: '',
 };
 
 export type ShapeApi = {
@@ -164,11 +205,21 @@ export type ShapeApi = {
     shape: string;
     description: Option<string>;
 };
+export const EmptyShape: ShapeApi = {
+    id: -1,
+    shape: '',
+    description: O.none,
+};
 
 export type WallsApi = {
     id: number;
     walls: string;
     description: Option<string>;
+};
+export const EmptyWalls: WallsApi = {
+    id: -1,
+    walls: '',
+    description: O.none,
 };
 
 export type GallApi = SpeciesApi & {
@@ -216,8 +267,8 @@ export type SpeciesSourceInsertFields = Deletable & {
     useasdefault: boolean;
 };
 
-export type GallHostInsertFields = {
-    galls: number[];
+export type GallHostUpdateFields = {
+    gall: number;
     hosts: number[];
 };
 

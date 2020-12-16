@@ -1,34 +1,41 @@
-import { host } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
-import { GallHostInsertFields } from '../api/apitypes';
-import { handleError } from '../utils/util';
+import { GallHostUpdateFields, SimpleSpecies } from '../api/apitypes';
+import { ExtractTFromPromise, handleError } from '../utils/util';
 import db from './db';
 
-export const insertGallHosts = (gallhost: GallHostInsertFields): TE.TaskEither<Error, host[]> => {
+export const updateGallHosts = (gallhost: GallHostUpdateFields): TE.TaskEither<Error, number[]> => {
     const insert = () => {
-        const statements = gallhost.galls
-            .map((gall) => {
-                return gallhost.hosts.map((host) => {
-                    try {
-                        return db.host.create({
-                            data: {
-                                gallspecies: { connect: { id: gall } },
-                                hostspecies: { connect: { id: host } },
-                            },
-                        });
-                    } catch (e) {
-                        throw new AggregateError([e], `Failed to add gall-host mapping for gall(${gall}) and host(${host}).`);
-                    }
-                });
-            })
-            .flatMap((x) => x);
+        const deletes = db.$executeRaw(`DELETE FROM host WHERE gall_species_id = ${gallhost.gall};`);
+        const values = gallhost.hosts.map((h) => `(NULL, ${gallhost.gall}, ${h})`).join(',');
+        const inserts = db.$executeRaw(`INSERT INTO host (id, gall_species_id, host_species_id) VALUES ${values};`);
 
-        return db.$transaction(statements);
+        return db.$transaction([deletes, inserts]);
     };
 
     // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(insert, handleError),
+    );
+};
+
+export const hostsByGallName = (gallname: string): TE.TaskEither<Error, SimpleSpecies[]> => {
+    const lookupHosts = () =>
+        db.host.findMany({
+            include: { hostspecies: true },
+            where: { gallspecies: { name: { equals: gallname } } },
+        });
+
+    const toSpeciesApi = (hosts: ExtractTFromPromise<ReturnType<typeof lookupHosts>>): SimpleSpecies[] =>
+        hosts.flatMap((h) =>
+            h.hostspecies != undefined
+                ? { ...h.hostspecies, taxoncode: h.hostspecies.taxoncode ? h.hostspecies.taxoncode : '' }
+                : [],
+        );
+
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        TE.tryCatch(lookupHosts, handleError),
+        TE.map(toSpeciesApi),
     );
 };

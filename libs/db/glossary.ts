@@ -10,21 +10,18 @@ export type Entry = {
     id: number;
     word: string;
     definition: string;
-    urls: string[];
+    urls: string; // \n separated
 };
 
 export const allGlossaryEntries = (): TaskEither<Error, Entry[]> => {
     const glossary = () =>
-        db.glossary.findMany({
-            orderBy: { word: 'asc' },
-        });
+        // prisma does not handle sort order by collate nocase
+        db.$queryRaw<glossary[]>(`
+            SELECT * from glossary
+            ORDER BY word COLLATE NOCASE ASC;
+        `);
 
-    const glossaryToEntry = (e: glossary): Entry => {
-        return {
-            ...e,
-            urls: e.urls.split('\n'),
-        };
-    };
+    const glossaryToEntry = (e: glossary): Entry => e;
 
     return pipe(
         TE.tryCatch(glossary, handleError),

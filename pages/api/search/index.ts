@@ -1,19 +1,25 @@
+import { pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
+import * as R from 'fp-ts/lib/Record';
+import * as TE from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
+import { Err, getQueryParam, sendErrResponse, sendSuccResponse, toErr } from '../../../libs/api/apipage';
+import { GallApi } from '../../../libs/api/apitypes';
 import { gallsByHostGenus, gallsByHostName } from '../../../libs/db/gall';
-import { mightFail } from '../../../libs/utils/util';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
-    try {
-        if (!req.query.host && !req.query.genus) {
-            res.status(400).end('No valid query provided.');
-        }
+    const noParamsErr = O.of(
+        TE.left<Err, GallApi[]>({ status: 400, msg: 'No valid query params provided.' }),
+    );
 
-        if (req.query.host) {
-            res.status(200).json(await mightFail(gallsByHostName(decodeURI(req.query.host as string))));
-        } else {
-            res.status(200).json(await mightFail(gallsByHostGenus(decodeURI(req.query.genus as string))));
-        }
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
+    await pipe(
+        { host: 'host', genus: 'genus' },
+        R.map(getQueryParam(req)),
+        R.map(O.map(decodeURI)),
+        R.mapWithIndex((k, o) => (k === 'host' ? O.map(gallsByHostName)(o) : O.map(gallsByHostGenus)(o))),
+        R.map(O.map(TE.mapLeft(toErr))),
+        R.reduce(noParamsErr, (b, a) => (O.isSome(a) ? a : b)),
+        O.map(TE.fold(sendErrResponse(res), sendSuccResponse(res))),
+        O.getOrElseW(() => sendErrResponse(res)({ status: 500, msg: 'Failed to run search.' })),
+    )();
 };
