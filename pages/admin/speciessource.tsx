@@ -187,7 +187,7 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                 </Row>
                 <Row className="formGroup">
                     <Col>
-                        <input type="submit" className="button" />
+                        <input type="submit" className="button" value="Submit" />
                     </Col>
                 </Row>
                 <Row hidden={!deleteResults}>

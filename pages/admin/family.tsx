@@ -8,7 +8,7 @@ import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import { AdminFormFields, useAPIs } from '../../hooks/useAPIs';
-import { DeleteResult, FamilyApi, FamilyUpsertFields } from '../../libs/api/apitypes';
+import { ALL_FAMILY_TYPES, DeleteResult, FamilyApi, FamilyUpsertFields } from '../../libs/api/apitypes';
 import { allFamilies } from '../../libs/db/family';
 import { genOptions } from '../../libs/utils/forms';
 import { mightFailWithArray } from '../../libs/utils/util';
@@ -50,6 +50,7 @@ const Family = (props: Props): JSX.Element => {
             router.push(res.url);
         };
 
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const convertFormFieldsToUpsert = (fields: FormFields, name: string, id: number): FamilyUpsertFields => ({
             ...fields,
             name: name,
@@ -89,7 +90,7 @@ const Family = (props: Props): JSX.Element => {
                     <Col>
                         Description:
                         <select name="description" className="form-control" ref={register}>
-                            {genOptions(['Beetle', 'Fly', 'Midge', 'Mite', 'Moth', 'Plant', 'Scale', 'Wasp'])}
+                            {genOptions(ALL_FAMILY_TYPES)}
                         </select>
                         {errors.description && <span className="text-danger">You must provide the description.</span>}
                     </Col>
@@ -102,7 +103,7 @@ const Family = (props: Props): JSX.Element => {
                 </Row>
                 <Row className="form-input">
                     <Col>
-                        <input type="submit" className="button" />
+                        <input type="submit" className="button" value="Submit" />
                     </Col>
                 </Row>
                 <Row hidden={!deleteResults}>
