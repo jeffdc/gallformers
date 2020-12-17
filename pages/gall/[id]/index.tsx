@@ -94,7 +94,7 @@ const Gall = ({ species }: Props): JSX.Element => {
                                 )}
                             </Col>
                             <Col>
-                                <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.tex).join(',')}
+                                <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.tex).join(', ')}
                             </Col>
                             <Col>
                                 <strong>Color:</strong>{' '}

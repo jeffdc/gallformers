@@ -47,8 +47,12 @@ const Schema = yup.object().shape({
         )
         .min(1)
         .max(1),
-    family: yup.string().required(),
-    hosts: yup.array().required(),
+    family: yup.array().required(),
+    // only force hosts to be present when adding, not deleting.
+    hosts: yup.array().when('del', {
+        is: false,
+        then: yup.array().required(),
+    }),
 });
 
 const extractGenus = (n: string): string => {
@@ -57,17 +61,17 @@ const extractGenus = (n: string): string => {
 
 export type FormFields = AdminFormFields<AT.GallApi> & {
     genus: string;
-    family: AT.FamilyApi;
-    abundance: AT.AbundanceApi;
+    family: AT.FamilyApi[];
+    abundance: AT.AbundanceApi[];
     commonnames: string;
     synonyms: string;
     hosts: AT.HostSimple[];
     detachable: string;
-    walls: AT.WallsApi;
-    cells: AT.CellsApi;
-    alignment: AT.AlignmentApi;
-    shape: AT.ShapeApi;
-    color: AT.ColorApi;
+    walls: AT.WallsApi[];
+    cells: AT.CellsApi[];
+    alignment: AT.AlignmentApi[];
+    shape: AT.ShapeApi[];
+    color: AT.ColorApi[];
     locations: AT.GallLocation[];
     textures: AT.GallTexture[];
 };
@@ -98,22 +102,23 @@ const Gall = ({
     const setGallDetails = async (spid: number): Promise<void> => {
         try {
             const res = await fetch(`../api/gall?speciesid=${spid}`);
-            const sp = (await res.json()) as AT.GallApi;
+            const s = (await res.json()) as AT.GallApi[];
+            const sp = s[0];
             setValue(
                 'detachable',
                 pipe(
                     sp.gall.detachable,
                     O.fold(
-                        () => 'unsure',
+                        () => '',
                         (d) => (d === 0 ? 'no' : 'yes'),
                     ),
                 ),
             );
-            setValue('walls', pipe(sp.gall.walls, O.getOrElse(constant(AT.EmptyWalls))));
-            setValue('cells', pipe(sp.gall.cells, O.getOrElse(constant(AT.EmptyCells))));
-            setValue('alignment', pipe(sp.gall.alignment, O.getOrElse(constant(AT.EmptyAlignment))));
-            setValue('color', pipe(sp.gall.color, O.getOrElse(constant(AT.EmptyColor))));
-            setValue('shape', pipe(sp.gall.shape, O.getOrElse(constant(AT.EmptyShape))));
+            setValue('walls', [pipe(sp.gall.walls, O.getOrElse(constant(AT.EmptyWalls)))]);
+            setValue('cells', [pipe(sp.gall.cells, O.getOrElse(constant(AT.EmptyCells)))]);
+            setValue('alignment', [pipe(sp.gall.alignment, O.getOrElse(constant(AT.EmptyAlignment)))]);
+            setValue('color', [pipe(sp.gall.color, O.getOrElse(constant(AT.EmptyColor)))]);
+            setValue('shape', [pipe(sp.gall.shape, O.getOrElse(constant(AT.EmptyShape)))]);
             setValue('locations', sp.gall.galllocation);
             setValue('textures', sp.gall.galltexture);
             setValue('hosts', sp.hosts);
@@ -135,21 +140,21 @@ const Gall = ({
         };
 
         const convertFormFieldsToUpsert = (fields: FormFields, name: string, id: number): AT.GallUpsertFields => ({
-            abundance: fields.abundance.abundance,
-            alignment: fields.alignment.alignment,
-            cells: fields.cells.cells,
-            color: fields.color.color,
+            abundance: fields.abundance[0].abundance,
+            alignment: fields.alignment[0].alignment,
+            cells: fields.cells[0].cells,
+            color: fields.color[0].color,
             commonnames: fields.commonnames,
             detachable: fields.detachable,
-            family: fields.family.name,
+            family: fields.family[0].name,
             hosts: fields.hosts.map((h) => h.id),
             id: id,
             locations: fields.locations.map((l) => l.id),
             name: name,
-            shape: fields.shape.shape,
+            shape: fields.shape[0].shape,
             synonyms: fields.synonyms,
             textures: fields.textures.map((t) => t.id),
-            walls: fields.walls.walls,
+            walls: fields.walls[0].walls,
         });
 
         await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert);
@@ -175,23 +180,23 @@ const Gall = ({
                                 setExisting(!isNew);
                                 if (isNew || !e[0]) {
                                     setValue('genus', extractGenus(e[0] ? e[0].name : ''));
-                                    setValue('family', AT.EmptyFamily);
-                                    setValue('abundance', AT.EmptyAbundance);
+                                    setValue('family', [AT.EmptyFamily]);
+                                    setValue('abundance', [AT.EmptyAbundance]);
                                     setValue('commonnames', '');
                                     setValue('synonyms', '');
                                     setValue('detachable', '');
-                                    setValue('walls', AT.EmptyWalls);
-                                    setValue('cells', AT.EmptyCells);
-                                    setValue('alignment', AT.EmptyAlignment);
-                                    setValue('color', AT.EmptyColor);
-                                    setValue('shape', AT.EmptyShape);
+                                    setValue('walls', [AT.EmptyWalls]);
+                                    setValue('cells', [AT.EmptyCells]);
+                                    setValue('alignment', [AT.EmptyAlignment]);
+                                    setValue('color', [AT.EmptyColor]);
+                                    setValue('shape', [AT.EmptyShape]);
                                     setValue('locations', []);
                                     setValue('textures', []);
                                     setValue('hosts', []);
                                 } else {
                                     const gall: AT.GallApi = e[0];
-                                    setValue('family', gall.family);
-                                    setValue('abundance', pipe(gall.abundance, O.getOrElse(constant(AT.EmptyAbundance))));
+                                    setValue('family', [gall.family]);
+                                    setValue('abundance', [pipe(gall.abundance, O.getOrElse(constant(AT.EmptyAbundance)))]);
                                     setValue('commonnames', pipe(gall.commonnames, O.getOrElse(constant(''))));
                                     setValue('synonyms', pipe(gall.synonyms, O.getOrElse(constant(''))));
                                     setGallDetails(gall.id);
@@ -251,17 +256,11 @@ const Gall = ({
                 <Row className="form-group">
                     <Col>
                         Common Names (comma-delimited):
-                        <input
-                            type="text"
-                            placeholder="Common Names"
-                            name="commonnames"
-                            className="form-control"
-                            ref={register}
-                        />
+                        <input type="text" placeholder="" name="commonnames" className="form-control" ref={register} />
                     </Col>
                     <Col>
                         Synonyms (comma-delimited):
-                        <input type="text" placeholder="Synonyms" name="synonyms" className="form-control" ref={register} />
+                        <input type="text" placeholder="" name="synonyms" className="form-control" ref={register} />
                     </Col>
                 </Row>
                 <Row className="form-group">
@@ -276,6 +275,7 @@ const Gall = ({
                             multiple
                             clearButton
                         />
+                        {errors.hosts && <span className="text-danger">You must map this gall to at least one host.</span>}
                     </Col>
                 </Row>
                 <Row className="form-group">
@@ -353,7 +353,7 @@ const Gall = ({
                         <ControlledTypeahead
                             control={control}
                             name="locations"
-                            placeholder="Location(s)"
+                            placeholder=""
                             options={locations}
                             labelKey="loc"
                             multiple
@@ -365,7 +365,7 @@ const Gall = ({
                         <ControlledTypeahead
                             control={control}
                             name="textures"
-                            placeholder="Texture(s)"
+                            placeholder=""
                             options={textures}
                             labelKey="tex"
                             multiple
@@ -376,12 +376,12 @@ const Gall = ({
                 <Row className="fromGroup" hidden={!existing}>
                     <Col xs="1">Delete?:</Col>
                     <Col className="mr-auto">
-                        <input name="delete" type="checkbox" className="form-check-input" ref={register} />
+                        <input name="del" type="checkbox" className="form-check-input" ref={register} />
                     </Col>
                 </Row>
                 <Row className="formGroup">
                     <Col>
-                        <input type="submit" className="button" />
+                        <input type="submit" className="button" value="Submit" />
                     </Col>
                 </Row>
                 <Row hidden={!deleteResults}>
@@ -397,7 +397,7 @@ export const getServerSideProps: GetServerSideProps = async () => {
         props: {
             gs: await mightFailWithArray<AT.GallApi>()(allGalls()),
             hosts: await mightFailWithArray<AT.HostSimple>()(allHostsSimple()),
-            families: await mightFailWithArray<AT.FamilyApi>()(allFamilies()),
+            families: await mightFailWithArray<AT.FamilyApi>()(allFamilies(AT.GALL_FAMILY_TYPES)),
             locations: await mightFailWithArray<AT.GallLocation>()(locations()),
             colors: await mightFailWithArray<AT.ColorApi>()(colors()),
             shapes: await mightFailWithArray<AT.ShapeApi>()(shapes()),

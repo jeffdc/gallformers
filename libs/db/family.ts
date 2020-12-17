@@ -3,8 +3,12 @@ import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import {
+    ALL_FAMILY_TYPES,
     DeleteResult,
     FamilyApi,
+    FamilyGallTypesTuples,
+    FamilyHostTypesTuple,
+    FamilyTypesTuple,
     FamilyUpsertFields,
     FamilyWithSpecies,
     GallTaxon,
@@ -40,10 +44,13 @@ const adaptFamily = (f: family): FamilyApi => ({
     ...f,
 });
 
-export const allFamilies = (): TaskEither<Error, FamilyApi[]> => {
+export const allFamilies = (
+    types: FamilyTypesTuple | FamilyGallTypesTuples | FamilyHostTypesTuple = ALL_FAMILY_TYPES,
+): TaskEither<Error, FamilyApi[]> => {
     const families = () =>
         db.family.findMany({
             orderBy: { name: 'asc' },
+            where: { description: { in: [...types] } },
         });
 
     return pipe(

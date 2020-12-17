@@ -37,6 +37,12 @@ const Admin = (): JSX.Element => {
                         </ListGroup>
                     </Col>
                 </Row>
+                <Row className="pt-5">
+                    <Col>
+                        This stuff hopefully all works. I have tested a bunch but I am sure that there are still bugs. If you see
+                        wonkiness then message me (Jeff) on Slack and I will look into it.
+                    </Col>
+                </Row>
             </div>
         </Auth>
     );

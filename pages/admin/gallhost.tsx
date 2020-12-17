@@ -18,12 +18,12 @@ type Props = {
 };
 
 const Schema = yup.object().shape({
-    galls: yup.array().required(),
-    hosts: yup.array().required(),
+    gall: yup.mixed().required(),
+    hosts: yup.mixed().required(),
 });
 
 type FormFields = {
-    gall: GallApi;
+    gall: GallApi[];
     hosts: SimpleSpecies[];
 };
 
@@ -38,8 +38,9 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
 
     const onSubmit = async (data: FormFields) => {
         try {
+            console.log(JSON.stringify(data));
             const insertData: GallHostUpdateFields = {
-                gall: data.gall.id,
+                gall: data.gall[0].id,
                 hosts: data.hosts.map((h) => h.id),
             };
 
@@ -128,7 +129,7 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        <input type="submit" className="button" />
+                        <input type="submit" className="button" value="Submit" />
                     </Col>
                 </Row>
                 {results.length > 0 && <span>Updated gall-host mappings.</span>}

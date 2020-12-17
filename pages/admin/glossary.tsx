@@ -112,7 +112,7 @@ const Glossary = (props: Props): JSX.Element => {
                 </Row>
                 <Row className="form-input">
                     <Col>
-                        <input type="submit" className="button" />
+                        <input type="submit" className="button" value="Submit" />
                     </Col>
                 </Row>
                 <Row hidden={!deleteResults}>

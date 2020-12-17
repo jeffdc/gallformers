@@ -18,6 +18,7 @@ import {
     EmptyAbundance,
     EmptyFamily,
     FamilyApi,
+    HOST_FAMILY_TYPES,
     SpeciesApi,
     SpeciesUpsertFields,
 } from '../../libs/api/apitypes';
@@ -49,13 +50,13 @@ const Schema = yup.object().shape({
         )
         .min(1)
         .max(1),
-    family: yup.string().required(),
+    family: yup.mixed().required(),
 });
 
 export type FormFields = AdminFormFields<SpeciesApi> & {
     genus: string;
-    family: FamilyApi;
-    abundance: AbundanceApi;
+    family: FamilyApi[];
+    abundance: AbundanceApi[];
     commonnames: string;
     synonyms: string;
 };
@@ -90,9 +91,9 @@ const Host = ({ hs, families, abundances }: Props): JSX.Element => {
         };
 
         const convertFormFieldsToUpsert = (fields: FormFields, name: string, id: number): SpeciesUpsertFields => ({
-            abundance: fields.abundance.abundance,
+            abundance: fields.abundance[0].abundance,
             commonnames: fields.commonnames,
-            family: fields.family.name,
+            family: fields.family[0].name,
             id: id,
             name: name,
             synonyms: fields.synonyms,
@@ -121,14 +122,14 @@ const Host = ({ hs, families, abundances }: Props): JSX.Element => {
                                 setExisting(!isNew);
                                 if (isNew || !e[0]) {
                                     setValue('genus', extractGenus(e[0] ? e[0].name : ''));
-                                    setValue('family', EmptyFamily);
-                                    setValue('abundance', EmptyAbundance);
+                                    setValue('family', [EmptyFamily]);
+                                    setValue('abundance', [EmptyAbundance]);
                                     setValue('commonnames', '');
                                     setValue('synonyms', '');
                                 } else {
                                     const host: SpeciesApi = e[0];
-                                    setValue('family', host.family);
-                                    setValue('abundance', pipe(host.abundance, O.getOrElse(constant(EmptyAbundance))));
+                                    setValue('family', [host.family]);
+                                    setValue('abundance', [pipe(host.abundance, O.getOrElse(constant(EmptyAbundance)))]);
                                     setValue('commonnames', pipe(host.commonnames, O.getOrElse(constant(''))));
                                     setValue('synonyms', pipe(host.synonyms, O.getOrElse(constant(''))));
                                 }
@@ -210,7 +211,7 @@ const Host = ({ hs, families, abundances }: Props): JSX.Element => {
                 </Row>
                 <Row className="formGroup">
                     <Col>
-                        <input type="submit" className="button" />
+                        <input type="submit" className="button" value="Submit" />
                     </Col>
                 </Row>
                 <Row hidden={!deleteResults}>
@@ -225,7 +226,7 @@ export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
             hs: await mightFailWithArray<SpeciesApi>()(allHosts()),
-            families: await mightFailWithArray<FamilyApi>()(allFamilies()),
+            families: await mightFailWithArray<FamilyApi>()(allFamilies(HOST_FAMILY_TYPES)),
             abundances: await mightFailWithArray<AbundanceApi>()(abundances()),
         },
     };
