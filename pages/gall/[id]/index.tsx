@@ -4,6 +4,7 @@ import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import React, { MouseEvent, ReactNode, useState } from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
 import { GallApi, GallHost, SpeciesSourceApi } from '../../../libs/api/apitypes';
@@ -52,7 +53,11 @@ const Gall = ({ species }: Props): JSX.Element => {
             }}
         >
             <Media>
-                <img width={170} height={128} className="mr-3" src="/images/gall.jpg" alt={species.name} />
+                <Link href={`/gall/${species.id}/images`} replace>
+                    <a>
+                        <Image width={170} height={128} className="mr-3" src="/images/gall.jpg" alt={species.name} />
+                    </a>
+                </Link>
                 <Media.Body>
                     <Container className="p-3">
                         <Row>

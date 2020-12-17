@@ -18,7 +18,10 @@
     "atLeast": 99.5,
     "cache": false,
     "ignoreCatch": true,
-    "ignoreFiles": ["__tests__/**", "pages/_app.tsx"],
+    "ignoreFiles": [
+      "__tests__/**",
+      "pages/_app.tsx"
+    ],
     "strict": true
   },
   "dependencies": {
@@ -38,6 +41,7 @@
     "react-bootstrap-typeahead": "^5.1.1",
     "react-dom": "^16.14",
     "react-hook-form": "^6.10.1",
+    "react-modal": "^3.12.1",
     "swr": "^0.3.5",
     "yup": "^0.29.3"
   },

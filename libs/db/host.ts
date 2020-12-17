@@ -169,13 +169,13 @@ export const upsertHost = (h: SpeciesUpsertFields): TaskEither<Error, number> =>
             return {};
         }
     };
-
+    console.log(h);
     const upsert = () =>
         db.species.upsert({
             where: { name: h.name },
             update: {
                 family: { connect: { name: h.family } },
-                abundance: { connect: { abundance: h.abundance } },
+                abundance: abundanceConnect(),
                 synonyms: h.synonyms,
                 commonnames: h.commonnames,
             },
