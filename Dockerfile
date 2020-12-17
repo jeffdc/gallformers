@@ -10,17 +10,15 @@ WORKDIR /usr/src/app
 COPY package.json ./
 COPY yarn.lock ./
 
-RUN yarn install --production=true
-
-# copy all the stuff
 COPY . .
 
-# generate the prisma client, then run the build which will generate the static site and all other assets
 ENV NEXT_TELEMETRY_DISABLED 1
-RUN npx prisma generate && yarn add --dev typescript @types/node && yarn build
-# prune reduces the image some bits more :)
-RUN npm prune --production
-
+# These layers can't be broken up due to npm not working well with docker layers
+RUN yarn install --production=true && \
+	npx prisma generate && \
+	yarn add --dev typescript @types/node && \
+	yarn build && \
+	npm prune --production
 
 ## Shrink final image, copy built nextjs and startup the server
 FROM node:12-alpine
