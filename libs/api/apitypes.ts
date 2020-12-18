@@ -59,9 +59,8 @@ export type Deletable = {
     delete?: boolean;
 };
 
-export const GALL_FAMILY_TYPES = ['Bacteria', 'Beetle', 'Fly', 'Fungus', 'Midge', 'Mite', 'Moth', 'Scale', 'Wasp'] as const;
-export const HOST_FAMILY_TYPES = ['Plant'] as const;
-export const ALL_FAMILY_TYPES = [
+export const GALL_FAMILY_TYPES = [
+    'Aphid',
     'Bacteria',
     'Beetle',
     'Fly',
@@ -69,8 +68,29 @@ export const ALL_FAMILY_TYPES = [
     'Midge',
     'Mite',
     'Moth',
-    'Plant',
+    'Nematode',
+    'Psyllid',
     'Scale',
+    'Thrips',
+    'True Bug',
+    'Wasp',
+] as const;
+export const HOST_FAMILY_TYPES = ['Plant'] as const;
+export const ALL_FAMILY_TYPES = [
+    'Aphid',
+    'Bacteria',
+    'Beetle',
+    'Fly',
+    'Fungus',
+    'Midge',
+    'Mite',
+    'Moth',
+    'Nematode',
+    'Plant',
+    'Psyllid',
+    'Scale',
+    'Thrips',
+    'True Bug',
     'Wasp',
 ] as const;
 export type FamilyTypesTuple = typeof ALL_FAMILY_TYPES;
