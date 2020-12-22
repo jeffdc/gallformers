@@ -7,6 +7,7 @@ import { Col, Row } from 'react-bootstrap';
 import 'react-bootstrap-typeahead/css/Typeahead.css';
 import Footer from '../layouts/footer';
 import Header from '../layouts/header';
+import './style.css';
 
 const layoutStyle: CSSProperties = {
     display: 'flex',

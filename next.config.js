@@ -18,5 +18,8 @@ module.exports = (phase) => {
 
             return config;
         },
+        images: {
+            domains: ['static.gallformers.org'],
+        },
     };
 };
