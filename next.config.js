@@ -2,8 +2,15 @@
 const { PHASE_DEVELOPMENT_SERVER } = require('next/constants');
 
 module.exports = (phase) => {
+    const d = new Date();
+    const buildid = `${d.getUTCFullYear()}${
+        d.getUTCMonth() + 1
+    }${d.getUTCDate()}-${d.getUTCHours()}${d.getUTCMinutes()}.${d.getUTCMilliseconds()}`;
+
     return {
-        env: {},
+        env: {
+            BUILD_ID: buildid,
+        },
         // experimental: {
         //     cpus: PHASE_DEVELOPMENT_SERVER ? true : 1,
         //     profiling: true,
@@ -17,6 +24,10 @@ module.exports = (phase) => {
                 ();
 
             return config;
+        },
+        generateBuildId: async () => {
+            //TODO convert this to the latest git hash
+            return buildid;
         },
     };
 };

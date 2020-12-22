@@ -29,6 +29,11 @@ export default function About(): JSX.Element {
                         </p>
                     </Col>
                 </Row>
+                <Row className="mt-5 pt-5">
+                    <Col className="mt-5 pt-5 text-right">
+                        <pre className="font-weight-light small text-muted">Build: {process.env.BUILD_ID}</pre>
+                    </Col>
+                </Row>
             </Container>
         </div>
     );
