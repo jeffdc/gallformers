@@ -137,7 +137,7 @@ const Gall = ({ species, imagePaths }: Props): JSX.Element => {
                             </Col>
                             <Col xs={4} className="border rounded p-1 mx-auto">
                                 <Images imagePaths={imagePaths} species={species} type="gall" />
-                                <AddImage />
+                                <AddImage id={species.id} />
                             </Col>
                         </Row>
 

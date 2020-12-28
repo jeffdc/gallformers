@@ -184,3 +184,24 @@ model glossary {
   definition  String
   urls        String
 }
+
+// Added in 005-gallformers.sql migration
+model image {
+  id          Int @id @default(autoincrement())
+  path        String @unique
+  creator     String
+  attribution String
+  source      String
+  license     String
+  uploader    String
+}
+
+// Added in 005-gallformers.sql migration
+model speciesimage {
+  id          Int @id @default(autoincrement())
+  species_id  Int
+  image_id    Int
+  default     Boolean @default(false)
+  species     species @relation(fields: [species_id], references: [id])
+  image       image   @relation(fields: [image_id], references: [id])
+}

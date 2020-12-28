@@ -12,7 +12,8 @@
     "test": "jest --forceExit",
     "test:watch": "jest --watchAll",
     "migrate": "node migrate.js",
-    "migrate-debug": "node --nolazy --inspect-brk=9229 migrate.js"
+    "migrate-debug": "node --nolazy --inspect-brk=9229 migrate.js",
+    "foo": "node do503.ts"
   },
   "typeCoverage": {
     "atLeast": 99.5,
@@ -26,9 +27,11 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.0.0",
+    "@aws-sdk/s3-request-presigner": "^3.0.0",
     "@hookform/error-message": "^0.0.4",
     "@hookform/resolvers": "^1.0.0",
-    "@prisma/client": "^2.12.1",
+    "@prisma/client": "^2.13.1",
+    "axios": "^0.21.1",
     "bootstrap": "^4.5.2",
     "formik": "^2.2.0",
     "fp-ts": "^2.9.1",
@@ -48,7 +51,7 @@
     "yup": "^0.29.3"
   },
   "devDependencies": {
-    "@prisma/cli": "^2.12.1",
+    "@prisma/cli": "^2.13.1",
     "@testing-library/jest-dom": "^5.11.6",
     "@testing-library/react": "^11.2.2",
     "@types/jest": "^26.0.15",
@@ -67,6 +70,7 @@
     "eslint-config-prettier": "^6.15.0",
     "eslint-plugin-prettier": "^3.1.4",
     "eslint-plugin-react": "^7.21.5",
+    "eslint-plugin-react-hooks": "^4.2.0",
     "fast-check": "^2.7.0",
     "jest": "^26.6.3",
     "prettier": "^2.1.2",

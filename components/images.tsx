@@ -13,9 +13,9 @@ type Props = {
     type: 'gall' | 'host';
 };
 
-const Images = ({ imagePaths, species, type = 'gall' }: Props): JSX.Element => {
+const Images = ({ imagePaths, species }: Props): JSX.Element => {
     const [showModal, setShowModal] = useState(false);
-    const { width, height } = useWindowDimensions();
+    const { width } = useWindowDimensions();
 
     const pad = 25;
     const hwRatio = 2 / 3;

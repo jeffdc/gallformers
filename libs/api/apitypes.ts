@@ -326,3 +326,13 @@ export type GlossaryEntryUpsertFields = Deletable & {
     definition: string;
     urls: string; // newline separated
 };
+
+export type ImageApi = {
+    attribution: string;
+    creator: string;
+    license: string;
+    path: string;
+    source: string;
+    uploader: string;
+    speciesid: number;
+};
