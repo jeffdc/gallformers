@@ -26,9 +26,9 @@ import { connectIfNotNull, connectWithIds, extractId } from './utils';
  * @param whereClause a where clause by which to filter galls
  */
 export const getGalls = (
-    whereClause: readonly Prisma.speciesWhereInput[] = [],
+    whereClause: Prisma.speciesWhereInput[] = [],
     operatorAnd = true,
-    distinct: Prisma.SpeciesDistinctFieldEnum[] = ['id'],
+    distinct: Prisma.SpeciesScalarFieldEnum[] = ['id'],
 ): TaskEither<Error, GallApi[]> => {
     const w = operatorAnd
         ? { AND: [...whereClause, { taxoncode: { equals: GallTaxon } }] }
@@ -175,7 +175,7 @@ export const allGallGenera = (): TaskEither<Error, string[]> => {
             select: {
                 genus: true,
             },
-            distinct: [Prisma.SpeciesDistinctFieldEnum.genus],
+            distinct: [Prisma.SpeciesScalarFieldEnum.genus],
             where: { taxoncode: { equals: GallTaxon } },
             orderBy: { genus: 'asc' },
         });

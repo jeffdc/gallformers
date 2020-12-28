@@ -1,9 +1,10 @@
-import { ListObjectsCommand, PutObjectCommand, S3Client, S3ClientConfig } from '@aws-sdk/client-s3';
+import { PutObjectCommand, S3Client, S3ClientConfig } from '@aws-sdk/client-s3';
 import { S3RequestPresigner } from '@aws-sdk/s3-request-presigner';
 import { createRequest } from '@aws-sdk/util-create-request';
 import { formatUrl } from '@aws-sdk/util-format-url';
 import { image } from '@prisma/client';
 import Jimp from 'jimp';
+import db from '../db/db';
 import { tryBackoff } from '../utils/network';
 
 const ENDPOINT = 'https://nyc3.digitaloceanspaces.com';
@@ -20,6 +21,7 @@ const config: S3ClientConfig = {
 const EDGE = 'https://static.gallformers.org/';
 const BUCKET = 'gallformers';
 const client = new S3Client(config);
+
 // add a middleware to work around bug. See: https://github.com/aws/aws-sdk-js-v3/issues/1800
 client.middlewareStack.add(
     (next) => async (args) => {
@@ -31,37 +33,26 @@ client.middlewareStack.add(
     { step: 'build' },
 );
 
-const isSlowDown = (t) => t.$metadata.httpStatusCode !== 503;
-
 export type ImagePaths = {
     small: string[];
     medium: string[];
     large: string[];
     original: string[];
-    all: string[];
 };
 
 export const getImagePaths = async (speciesId: number): Promise<ImagePaths> => {
     try {
-        const files = await tryBackoff(
-            3,
-            () => client.send(new ListObjectsCommand({ Bucket: BUCKET, Prefix: `gall/${speciesId}/${speciesId}` })),
-            isSlowDown,
-        );
-        const ps = files.Contents
-            ? files.Contents.sort((a, b) => {
-                  if (a.LastModified == undefined) return 1;
-                  if (b.LastModified == undefined) return -1;
-                  return b.LastModified.getTime() - a.LastModified.getTime();
-              }).map((f) => `${EDGE}${f.Key}`)
-            : [];
+        const images = await db.image.findMany({
+            where: { speciesimage: { every: { species_id: speciesId } } },
+            orderBy: { id: 'asc' },
+        });
+        const ps = images.map((i) => `${EDGE}/${i.path}`);
 
         const paths: ImagePaths = {
-            all: ps,
-            small: ps.filter((p) => p.includes('small')),
-            medium: ps.filter((p) => p.includes('medium')),
-            large: ps.filter((p) => p.includes('large')),
-            original: ps.filter((p) => p.includes('original')),
+            small: ps.map((p) => p.replace('original', 'small')),
+            medium: ps.map((p) => p.replace('original', 'medium')),
+            large: ps.map((p) => p.replace('original', 'large')),
+            original: ps,
         };
 
         return paths;
@@ -74,7 +65,6 @@ export const getImagePaths = async (speciesId: number): Promise<ImagePaths> => {
         medium: [],
         large: [],
         original: [],
-        all: [],
     };
 };
 
@@ -127,7 +117,11 @@ const uploadImage = async (key: string, buffer: Buffer, mime: string) => {
     };
 
     try {
-        await tryBackoff(3, () => client.send(new PutObjectCommand(uploadParams)), isSlowDown);
+        await tryBackoff(
+            3,
+            () => client.send(new PutObjectCommand(uploadParams)),
+            (t) => t.$metadata.httpStatusCode !== 503,
+        );
     } catch (e) {
         console.log('Err in uploadImage: ' + JSON.stringify(e));
     }

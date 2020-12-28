@@ -37,10 +37,10 @@ export const searchGalls = (query: SearchQuery): TaskEither<Error, GallApi[]> =>
     }
 
     // detachable is odd case since it is Int (boolean)
-    const detachableWhere: Prisma.speciesWhereInput = pipe(
+    const detachableWhere: Prisma.gallWhereInput = pipe(
         query.detachable,
         O.fold(
-            () => ({} as Prisma.speciesWhereInput),
+            () => ({} as Prisma.gallWhereInput),
             (d) => ({ OR: [{ detachable: { equals: null } }, { detachable: { equals: parseInt(d) } }] }),
         ),
     );

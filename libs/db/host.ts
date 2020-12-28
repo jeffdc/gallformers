@@ -90,7 +90,7 @@ export const allHostGenera = (): TaskEither<Error, string[]> => {
             select: {
                 genus: true,
             },
-            distinct: [Prisma.SpeciesDistinctFieldEnum.genus],
+            distinct: [Prisma.SpeciesScalarFieldEnum.genus],
             where: { taxoncode: { equals: HostTaxon } },
             orderBy: { genus: 'asc' },
         });
@@ -119,9 +119,9 @@ export const allHostIds = (): TaskEither<Error, string[]> => {
  * @param whereClause a where clause by which to filter galls
  */
 export const getHosts = (
-    whereClause: readonly Prisma.speciesWhereInput[] = [],
+    whereClause: Prisma.speciesWhereInput[] = [],
     operatorAnd = true,
-    distinct: Prisma.SpeciesDistinctFieldEnum[] = ['id'],
+    distinct: Prisma.SpeciesScalarFieldEnum[] = ['id'],
 ): TaskEither<Error, HostApi[]> => {
     const w = operatorAnd
         ? { AND: [...whereClause, { taxoncode: { equals: HostTaxon } }] }

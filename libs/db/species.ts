@@ -48,7 +48,7 @@ export const speciesByName = (name: string): TE.TaskEither<Error, O.Option<speci
 export const getSpecies = (
     whereClause: Prisma.speciesWhereInput[],
     operatorAnd = true,
-    distinct: Prisma.SpeciesDistinctFieldEnum[] = [],
+    distinct: Prisma.SpeciesScalarFieldEnum[] = [],
 ): TE.TaskEither<Error, SpeciesApi[]> => {
     const w: Prisma.speciesWhereInput = operatorAnd ? { AND: whereClause } : { OR: whereClause };
 
