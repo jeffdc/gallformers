@@ -89,12 +89,19 @@ export const createOtherSizes = (images: image[]): image[] => {
     try {
         images.map(async (image) => {
             const path = `${ENDPOINT}/${BUCKET}/${image.path}`;
-            const img = await Jimp.read(path);
+            console.log(`trying to load: ${path}`);
+            const img = await tryBackoff(3, () => Jimp.read(path)).catch((reason) =>
+                console.error(`Failed to load file ${path} with Jimp. Received error: ${reason}.`),
+            );
+            if (!img) return [];
+
             const mime = img.getMIME();
+            console.log(`Read file with mime type: ${mime}.`);
             sizes.forEach(async (value, key) => {
                 img.resize(value, Jimp.AUTO);
                 img.quality(90);
                 const newPath = image.path.replace('original', key);
+                console.log(`Will write ${newPath}`);
                 const buffer = await img.getBufferAsync(mime);
                 await uploadImage(newPath, buffer, mime);
             });
@@ -117,6 +124,7 @@ const uploadImage = async (key: string, buffer: Buffer, mime: string) => {
     };
 
     try {
+        console.log(`Uploading new image ${key}`);
         await tryBackoff(
             3,
             () => client.send(new PutObjectCommand(uploadParams)),

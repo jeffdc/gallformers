@@ -3,13 +3,14 @@
  * or an exception is caught.
  * @param retries number of times to retry work before giving up
  * @param work the work that may fail
- * @param predicate a test to determine pass or failure of @work
+ * @param predicate a test to determine pass or failure of @work if no predicate is passed then it will always be
+ * true and rely on an excpetion being thrown to retry.
  * @param delay the time dealy in ms to start with, default 500
  */
 export const tryBackoff = async <T>(
     retries: number,
     work: () => Promise<T>,
-    predicate: (t: T) => boolean,
+    predicate: (t: T) => boolean = () => true,
     delay = 500,
 ): Promise<T> => {
     const retry = async (e?: Error) => {
