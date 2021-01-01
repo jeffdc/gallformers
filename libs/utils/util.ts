@@ -4,6 +4,7 @@ import { constant, pipe } from 'fp-ts/lib/function';
 import * as T from 'fp-ts/lib/Task';
 import * as TE from 'fp-ts/lib/TaskEither';
 import * as O from 'fp-ts/lib/Option';
+import { logger } from './logger';
 
 /**
  * Checks an object, o, for the presence of the prop.
@@ -39,15 +40,6 @@ export function randInt(min: number, max: number): number {
 }
 
 /**
- * A type that uses conditional typing to extract the type that is inside of a Promise. Helpful when dealing
- * with database types (from Prisma).
- */
-export type ExtractTFromPromise<T> = T extends Promise<infer S> ? S : never;
-
-export type Diff<T, U> = T extends U ? never : T;
-export type Filter<T, U> = T extends U ? T : never;
-
-/**
  * This is used to bridge the FP world TaskEithers into Promises while consistently handling failures.
  * @param s
  */
@@ -55,7 +47,7 @@ export const mightFail = <T>(defaultT: () => T) => async <S extends TE.TaskEithe
     return pipe(
         s,
         TE.getOrElse((e) => {
-            console.error(e);
+            logger.error(e);
             return T.of(defaultT());
         }),
     )();
@@ -71,7 +63,7 @@ export const mightFailWithStringArray = mightFailWithArray<string>();
  * @param e an error
  */
 export const errorThrow = <T>(e: Error): T => {
-    console.error(e);
+    logger.error(e);
     throw e;
 };
 

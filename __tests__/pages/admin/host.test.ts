@@ -5,9 +5,9 @@ const { extractGenus, Schema } = testables;
 
 describe('Schema validation', () => {
     const fields: FormFields = {
-        abundance: '',
+        abundance: [],
         commonnames: '',
-        family: '',
+        family: [],
         genus: '',
         value: [],
         synonyms: '',

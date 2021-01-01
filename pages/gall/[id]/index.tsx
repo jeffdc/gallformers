@@ -6,8 +6,11 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import React, { MouseEvent, ReactNode, useState } from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
-import { GallApi, GallHost, SpeciesSourceApi } from '../../../libs/api/apitypes';
+import AddImage from '../../../components/addimage';
+import Images from '../../../components/images';
+import { GallApi, GallHost, ImagePaths, SpeciesSourceApi } from '../../../libs/api/apitypes';
 import { allGallIds, gallById } from '../../../libs/db/gall';
+import { getImagePaths } from '../../../libs/images/images';
 import { linkTextFromGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { renderCommonNames } from '../../../libs/pages/renderhelpers';
@@ -16,6 +19,7 @@ import { bugguideUrl, errorThrow, gScholarUrl, iNatUrl } from '../../../libs/uti
 
 type Props = {
     species: GallApi;
+    imagePaths: ImagePaths;
 };
 
 // eslint-disable-next-line react/display-name
@@ -29,13 +33,25 @@ const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
     );
 };
 
-const Gall = ({ species }: Props): JSX.Element => {
+const Gall = ({ species, imagePaths }: Props): JSX.Element => {
     // the hosts will not be sorted, so sort them for display
     species.hosts.sort((a, b) => a.name.localeCompare(b.name));
     const hostLinker = hostAsLink(species.hosts.length);
 
     const source = species.speciessource.find((s) => s.useasdefault !== 0);
     const [selectedSource, setSelectedSource] = useState(source);
+    const [images, setImages] = useState(imagePaths);
+
+    const addImages = async (imagePaths: ImagePaths) => {
+        // this seems kludgy but it prevents having to make another call to the server to get the paths
+        imagePaths.small.push(...images.small);
+        imagePaths.medium.push(...images.medium);
+        imagePaths.large.push(...images.large);
+        imagePaths.original.push(...images.original);
+        // add a delay here to hopefully give a chance for the image to be picked up by the CDN
+        await new Promise((r) => setTimeout(r, 2000));
+        setImages(imagePaths);
+    };
 
     const changeDescription = (e: MouseEvent<HTMLButtonElement>) => {
         e.preventDefault();
@@ -52,89 +68,104 @@ const Gall = ({ species }: Props): JSX.Element => {
             }}
         >
             <Media>
-                <img width={170} height={128} className="mr-3" src="/images/gall.jpg" alt={species.name} />
                 <Media.Body>
-                    <Container className="p-3">
+                    <Container className="p-1">
                         <Row>
+                            {/* The details*/}
                             <Col>
-                                <h2>{species.name}</h2>
-                                {renderCommonNames(species.commonnames)}
+                                <Container className="">
+                                    <Row className="">
+                                        <Col>
+                                            <h2>{species.name}</h2>
+                                            {renderCommonNames(species.commonnames)}
+                                            <p className="font-italic">
+                                                Family:
+                                                <Link key={species.family.id} href={`/family/${species.family.id}`}>
+                                                    <a> {species.family.name}</a>
+                                                </Link>
+                                            </p>
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Hosts:</strong> {species.hosts.map(hostLinker)}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Detachable:</strong>{' '}
+                                            {pipe(
+                                                species.gall.detachable,
+                                                O.fold(constant('unsure'), (a) => (a === 1 ? 'yes' : 'no')),
+                                            )}
+                                        </Col>
+                                        <Col>
+                                            <strong>Color:</strong>{' '}
+                                            {pipe(
+                                                species.gall.color,
+                                                O.fold(constant(''), (c) => c.color),
+                                            )}
+                                        </Col>
+                                        <Col>
+                                            <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.tex).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Alignment:</strong>{' '}
+                                            {pipe(
+                                                species.gall.alignment,
+                                                O.fold(constant(''), (a) => a.alignment),
+                                            )}
+                                        </Col>
+                                        <Col>
+                                            <strong>Walls:</strong>{' '}
+                                            {pipe(
+                                                species.gall.walls,
+                                                O.fold(constant(''), (a) => a.walls),
+                                            )}
+                                        </Col>
+                                        <Col>
+                                            <strong>Location:</strong> {species.gall.galllocation.map((l) => l.loc).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Abdundance:</strong>{' '}
+                                            {pipe(
+                                                species.abundance,
+                                                O.fold(constant(''), (a) => a.abundance),
+                                            )}
+                                        </Col>
+                                        <Col>
+                                            <strong>Shape:</strong>{' '}
+                                            {pipe(
+                                                species.gall.shape,
+                                                O.fold(constant(''), (a) => a.shape),
+                                            )}
+                                        </Col>
+                                    </Row>
+                                </Container>
                             </Col>
-                            <Col className="text-right font-italic">
-                                Family:
-                                <Link key={species.family.id} href={`/family/${species.family.id}`}>
-                                    <a> {species.family.name}</a>
-                                </Link>
+                            <Col xs={4} className="border rounded p-1 mx-auto">
+                                <Images imagePaths={images} species={species} type="gall" />
+                                <AddImage id={species.id} onChange={addImages} />
                             </Col>
                         </Row>
+
                         <Row>
                             <Col id="description" className="lead p-3">
-                                {
-                                    // eslint-disable-next-line prettier/prettier
-                                    pipe(
-                                        O.fromNullable(selectedSource?.description),
-                                        O.flatten,
-                                        O.map(deserialize),
-                                        O.getOrElse(constant((<></>) as ReactNode)),
-                                    )
-                                }
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col>
-                                <strong>Hosts:</strong> {species.hosts.map(hostLinker)}
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col>
-                                <strong>Detachable:</strong>{' '}
-                                {pipe(
-                                    species.gall.detachable,
-                                    O.fold(constant('unsure'), (a) => (a === 1 ? 'yes' : 'no')),
-                                )}
-                            </Col>
-                            <Col>
-                                <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.tex).join(', ')}
-                            </Col>
-                            <Col>
-                                <strong>Color:</strong>{' '}
-                                {pipe(
-                                    species.gall.color,
-                                    O.fold(constant(''), (c) => c.color),
-                                )}
-                            </Col>
-                            <Col>
-                                <strong>Alignment:</strong>{' '}
-                                {pipe(
-                                    species.gall.alignment,
-                                    O.fold(constant(''), (a) => a.alignment),
-                                )}
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col>
-                                <strong>Location:</strong> {species.gall.galllocation.map((l) => l.loc).join(', ')}
-                            </Col>
-                            <Col>
-                                <strong>Walls:</strong>{' '}
-                                {pipe(
-                                    species.gall.walls,
-                                    O.fold(constant(''), (a) => a.walls),
-                                )}
-                            </Col>
-                            <Col>
-                                <strong>Abdundance:</strong>{' '}
-                                {pipe(
-                                    species.abundance,
-                                    O.fold(constant(''), (a) => a.abundance),
-                                )}
-                            </Col>
-                            <Col>
-                                <strong>Shape:</strong>{' '}
-                                {pipe(
-                                    species.gall.shape,
-                                    O.fold(constant(''), (a) => a.shape),
-                                )}
+                                <p className="small">
+                                    {
+                                        // eslint-disable-next-line prettier/prettier
+                                        pipe(
+                                            O.fromNullable(selectedSource?.description),
+                                            O.flatten,
+                                            O.map(deserialize),
+                                            O.getOrElse(constant((<></>) as ReactNode)),
+                                        )
+                                    }
+                                </p>
                             </Col>
                         </Row>
                         <Row>
@@ -211,9 +242,13 @@ export const getStaticProps: GetStaticProps = async (context) => {
         TE.getOrElse(errorThrow),
     )();
 
+    // get the image paths, if any
+    const paths = await getImagePaths(gall.id);
+
     return {
         props: {
             species: { ...gall, speciessource: sources },
+            imagePaths: paths,
         },
         revalidate: 1,
     };

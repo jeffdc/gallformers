@@ -19,7 +19,7 @@ module.exports = {
         ecmaVersion: 12,
         sourceType: 'module',
     },
-    plugins: ['react', '@typescript-eslint'],
+    plugins: ['react', '@typescript-eslint', 'react-hooks'],
     settings: {
         react: {
             version: 'detect',
@@ -27,6 +27,8 @@ module.exports = {
     },
     rules: {
         'react/react-in-jsx-scope': 'off',
+        'react-hooks/rules-of-hooks': 'error',
+        'react-hooks/exhaustive-deps': 'warn',
     },
     overrides: [
         {

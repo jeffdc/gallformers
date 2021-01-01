@@ -16,7 +16,9 @@ import {
     ShapeApi,
     WallsApi,
 } from '../api/apitypes';
-import { ExtractTFromPromise, handleError, optionalWith } from '../utils/util';
+import { logger } from '../utils/logger';
+import { ExtractTFromPromise } from '../utils/types';
+import { handleError, optionalWith } from '../utils/util';
 import db from './db';
 import { adaptAbundance, speciesByName } from './species';
 import { connectIfNotNull, connectWithIds, extractId } from './utils';
@@ -26,9 +28,9 @@ import { connectIfNotNull, connectWithIds, extractId } from './utils';
  * @param whereClause a where clause by which to filter galls
  */
 export const getGalls = (
-    whereClause: readonly Prisma.speciesWhereInput[] = [],
+    whereClause: Prisma.speciesWhereInput[] = [],
     operatorAnd = true,
-    distinct: Prisma.SpeciesDistinctFieldEnum[] = ['id'],
+    distinct: Prisma.SpeciesScalarFieldEnum[] = ['id'],
 ): TaskEither<Error, GallApi[]> => {
     const w = operatorAnd
         ? { AND: [...whereClause, { taxoncode: { equals: GallTaxon } }] }
@@ -72,7 +74,7 @@ export const getGalls = (
     const clean = (galls: DBGall): GallApi[] =>
         galls.flatMap((g) => {
             if (g.gall == null) {
-                console.error(
+                logger.error(
                     `Detected a species with id ${g.id} that is supposed to be a gall but does not have a cooresponding gall!`,
                 );
                 return []; // will resolve to nothing since we are in a flatMap
@@ -175,7 +177,7 @@ export const allGallGenera = (): TaskEither<Error, string[]> => {
             select: {
                 genus: true,
             },
-            distinct: [Prisma.SpeciesDistinctFieldEnum.genus],
+            distinct: [Prisma.SpeciesScalarFieldEnum.genus],
             where: { taxoncode: { equals: GallTaxon } },
             orderBy: { genus: 'asc' },
         });

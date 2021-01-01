@@ -7,6 +7,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { Err, getQueryParam, sendErrResponse, sendSuccResponse, toErr } from '../../../libs/api/apipage';
 import { SpeciesSourceApi } from '../../../libs/api/apitypes';
 import { deleteSpeciesSourceByIds, speciesSourceByIds } from '../../../libs/db/speciessource';
+import { logger } from '../../../libs/utils/logger';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     type Query = { speciesId: string; sourceId: string };
@@ -26,7 +27,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
     const validate = (s: SpeciesSourceApi[]) => {
         if (s.length > 1) {
             const q = E.getOrElse(() => ({ speciesId: 'failed', sourceId: 'failed' }))(query);
-            console.error(`Got more than one mapping between species ${q.speciesId} and source ${q.sourceId}.`);
+            logger.error(`Got more than one mapping between species ${q.speciesId} and source ${q.sourceId}.`);
             return [s[0]];
         }
         return s;

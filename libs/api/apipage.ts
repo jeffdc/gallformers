@@ -6,6 +6,7 @@ import * as TE from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from 'next-auth/client';
 import { ParsedUrlQuery } from 'querystring';
+import { logger } from '../utils/logger';
 import { DeleteResult } from './apitypes';
 
 /**
@@ -140,7 +141,7 @@ export const sendSuccResponse = (res: NextApiResponse) => <T>(t: T): TA.Task<nev
  * @returns we only have a return value to make it easier to compose in pipes. This function sends the requests without delay.
  */
 export const sendErrResponse = (res: NextApiResponse) => (e: Err): TA.Task<never> => {
-    console.error(e.e ? e.e : e.msg);
+    logger.error(e);
     res.status(e.status).end(e.msg);
     return TA.never; // make type checker happy
 };

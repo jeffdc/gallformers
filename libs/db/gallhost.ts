@@ -1,7 +1,8 @@
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { GallHostUpdateFields, SimpleSpecies } from '../api/apitypes';
-import { ExtractTFromPromise, handleError } from '../utils/util';
+import { ExtractTFromPromise } from '../utils/types';
+import { handleError } from '../utils/util';
 import db from './db';
 
 export const updateGallHosts = (gallhost: GallHostUpdateFields): TE.TaskEither<Error, number[]> => {

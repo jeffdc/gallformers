@@ -3,7 +3,8 @@ import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { AbundanceApi, SpeciesApi } from '../api/apitypes';
-import { ExtractTFromPromise, handleError, optionalWith } from '../utils/util';
+import { ExtractTFromPromise } from '../utils/types';
+import { handleError, optionalWith } from '../utils/util';
 import db from './db';
 
 export const adaptAbundance = (a: abundance): AbundanceApi => ({
@@ -48,7 +49,7 @@ export const speciesByName = (name: string): TE.TaskEither<Error, O.Option<speci
 export const getSpecies = (
     whereClause: Prisma.speciesWhereInput[],
     operatorAnd = true,
-    distinct: Prisma.SpeciesDistinctFieldEnum[] = [],
+    distinct: Prisma.SpeciesScalarFieldEnum[] = [],
 ): TE.TaskEither<Error, SpeciesApi[]> => {
     const w: Prisma.speciesWhereInput = operatorAnd ? { AND: whereClause } : { OR: whereClause };
 

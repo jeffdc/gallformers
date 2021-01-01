@@ -1,0 +1,18 @@
+
+/* Hacks to deal with terrible bootstrap carousel controls and indicators. */
+.carousel-indicators li {
+    width: 10px;
+    height: 10px;
+    margin-right: 5px;
+    margin-left: 5px;
+    margin-bottom: 5px;
+    border-radius: 50%;
+    border: 0;
+    background-color: transparent;
+    box-shadow: 0 0 0 0.1rem rgba(50, 50, 50, 1);
+}
+
+.carousel-control-next,
+.carousel-control-prev {
+    filter: invert(100%);
+}
