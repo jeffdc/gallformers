@@ -43,10 +43,7 @@ test('hasProp should detect props', () => {
 
 const anError = new Error('this is an expected test exception, it does not mean anything went awry!');
 
-test('mightFail should return an the passed in default on failure', async () => {
-    // since we expect a console error let's not dump it to the test output
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+test('mightFail should return the passed in default on failure', async () => {
     // eslint-disable-next-line prettier/prettier
     const r = await pipe(
         TE.left<Error, unknown[]>(anError),
@@ -54,17 +51,10 @@ test('mightFail should return an the passed in default on failure', async () => 
     );
 
     expect(r.length).toBe(0);
-    expect(console.error).toHaveBeenCalled();
-    spy.mockRestore();
 });
 
 test('errorThrow should always throw', () => {
-    // since we expect a console error let's not dump it to the test output
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => U.errorThrow(anError)).toThrow();
-    expect(console.error).toHaveBeenCalled();
-    spy.mockRestore();
 });
 
 test('handleFailure should convert to an Error', () => {
