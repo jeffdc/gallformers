@@ -336,3 +336,10 @@ export type ImageApi = {
     uploader: string;
     speciesid: number;
 };
+
+export type ImagePaths = {
+    small: string[];
+    medium: string[];
+    large: string[];
+    original: string[];
+};

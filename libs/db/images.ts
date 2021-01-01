@@ -1,13 +1,12 @@
-import { image } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { ImageApi } from '../api/apitypes';
-import { createOtherSizes } from '../images/images';
+import { ImageApi, ImagePaths } from '../api/apitypes';
+import { createOtherSizes, toImagePaths } from '../images/images';
 import { handleError } from '../utils/util';
 import db from './db';
 
-export const addImages = (images: ImageApi[]): TaskEither<Error, image[]> => {
+export const addImages = (images: ImageApi[]): TaskEither<Error, ImagePaths> => {
     const add = () => {
         const creates = images.map((image) =>
             db.image.create({
@@ -25,5 +24,9 @@ export const addImages = (images: ImageApi[]): TaskEither<Error, image[]> => {
         return db.$transaction(creates);
     };
 
-    return pipe(TE.tryCatch(add, handleError), TE.map(createOtherSizes));
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        TE.tryCatch(add, handleError), 
+        TE.map(createOtherSizes),
+        TE.map(toImagePaths));
 };

@@ -6,6 +6,7 @@ import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { GetStaticPathsResult, GetStaticPropsContext } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { errorThrow } from '../utils/util';
+import { logger } from '../utils/logger';
 
 /**
  * Helper to hadnle the boilerplate for fetching static props for a next.js page.
@@ -16,7 +17,7 @@ export async function getStaticPropsWith<T>(f: () => TaskEither<Error, readonly 
     return await pipe(
         f(),
         TE.getOrElse((e) => {
-            console.error(`Got an error trying to fetch props for ${dataType}.`);
+            logger.error(`Got an error trying to fetch props for ${dataType}.`);
             throw e;
         }),
     )();
@@ -42,18 +43,18 @@ export async function getStaticPropsWithId<T>(
     const g = await pipe(
         fId(id),
         TE.getOrElse((e) => {
-            console.error(`Failed to fetch ${dataType} from backend with ${dataType} id = '${id}'`);
+            logger.error(`Failed to fetch ${dataType} from backend with ${dataType} id = '${id}'`);
             throw e;
         }),
     )();
 
     if (resultsRequired && g.length < 1) {
         const msg = `Failed to fetch ${dataType} from backend with ${dataType} id = '${id}'.`;
-        console.error(msg);
+        logger.error(msg);
         throw new Error(msg);
     } else if (!many && g.length > 1) {
         const msg = `Somehow we got more than one ${dataType} for ${dataType} id '${id}'.`;
-        console.error(msg);
+        logger.error(msg);
         throw new Error(msg);
     }
 

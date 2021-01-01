@@ -2,13 +2,14 @@ import { useSession } from 'next-auth/client';
 import React, { ChangeEvent, useState } from 'react';
 import { Col, ProgressBar, Row } from 'react-bootstrap';
 import axios from 'axios';
-import { ImageApi } from '../libs/api/apitypes';
+import { ImageApi, ImagePaths } from '../libs/api/apitypes';
 
 type Props = {
     id: number;
+    onChange: (imagePaths: ImagePaths) => void;
 };
 
-const AddImage = ({ id }: Props): JSX.Element => {
+const AddImage = ({ id, onChange }: Props): JSX.Element => {
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState(0);
 
@@ -40,14 +41,14 @@ const AddImage = ({ id }: Props): JSX.Element => {
             console.log(url);
 
             // upload file
-            const resp = await axios.put(url, file, {
+            const resp = await axios.put<Response>(url, file, {
                 headers: {
                     'Content-Type': file.type,
                     'x-amz-acl': 'public-read',
                 },
                 onUploadProgress: (e) => setProgress(Math.round((100 * e.loaded) / e.total)),
             });
-            console.log('Got response: ' + JSON.stringify(resp));
+
             images.push({
                 attribution: '',
                 creator: '',
@@ -67,23 +68,28 @@ const AddImage = ({ id }: Props): JSX.Element => {
             body: JSON.stringify(images),
         });
 
+        const imagePaths: ImagePaths = await dbres.json();
+
         console.log(JSON.stringify(dbres));
+
+        onChange(imagePaths);
 
         setUploading(false);
     };
 
     return (
         <>
+            {/* eslint-disable-next-line prettier/prettier */}
             {uploading && (
                 <ProgressBar
-                    className="progress-bar-info progress-bar-striped"
-                    aria-valuenow={progress}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    style={{ width: progress + '%' }}
-                >
-                    {progress}%
-                </ProgressBar>
+                    animated
+                    striped
+                    variant="info"
+                    now={progress}
+                    min={0}
+                    max={100}
+                    label={`${progress}%`}
+                />
             )}
             <Row>
                 <Col className="text-center">

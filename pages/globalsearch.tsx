@@ -9,6 +9,7 @@ import { useSortableData } from '../hooks/use-sortabletable';
 import { extractQueryParam } from '../libs/api/apipage';
 import { globalSearch, GlobalSearchResults, TinySource, TinySpecies } from '../libs/db/search';
 import { EntryLinked } from '../libs/pages/glossary';
+import { logger } from '../libs/utils/logger';
 import { capitalizeFirstLetter, mightFail } from '../libs/utils/util';
 
 type SearchResultItem = {
@@ -155,7 +156,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     const search = pipe(
         extractQueryParam(context.query, queryParam),
         O.getOrElse(() => {
-            console.error(`Failed to find the expected query parameter ${queryParam}.`);
+            logger.error(`Failed to find the expected query parameter ${queryParam}.`);
             return '';
         }),
     );

@@ -1,9 +1,11 @@
 import * as C from 'fp-ts/lib/Console';
-import * as D from 'fp-ts/lib/Date';
-import { chain, IO } from 'fp-ts/lib/IO';
-import { pipe } from 'fp-ts/lib/function';
+import { IO } from 'fp-ts/lib/IO';
 import * as L from 'logging-ts/lib/IO';
+import pino from 'pino';
 
+export const logger = pino();
+
+// WIP stuff below here:
 type Level = 'Debug' | 'Info' | 'Warning' | 'Error';
 
 interface Entry {
@@ -22,7 +24,7 @@ function getLoggerEntry(prefix: string): L.LoggerIO<Entry> {
 
 const debugLogger = L.filter(getLoggerEntry('debug.log'), (e) => e.level === 'Debug');
 const productionLogger = L.filter(getLoggerEntry('production.log'), (e) => e.level !== 'Debug');
-export const logger = L.getMonoid<Entry>().concat(debugLogger, productionLogger);
+export const flogger = L.getMonoid<Entry>().concat(debugLogger, productionLogger);
 
-export const info = (message: string) => (time: Date): IO<void> => logger({ message, time, level: 'Info' });
-export const debug = (message: string) => (time: Date): IO<void> => logger({ message, time, level: 'Debug' });
+export const info = (message: string) => (time: Date): IO<void> => flogger({ message, time, level: 'Info' });
+export const debug = (message: string) => (time: Date): IO<void> => flogger({ message, time, level: 'Debug' });

@@ -4,7 +4,9 @@ import { createRequest } from '@aws-sdk/util-create-request';
 import { formatUrl } from '@aws-sdk/util-format-url';
 import { image } from '@prisma/client';
 import Jimp from 'jimp';
+import { ImagePaths } from '../api/apitypes';
 import db from '../db/db';
+import { logger } from '../utils/logger';
 import { tryBackoff } from '../utils/network';
 
 const ENDPOINT = 'https://nyc3.digitaloceanspaces.com';
@@ -33,12 +35,11 @@ client.middlewareStack.add(
     { step: 'build' },
 );
 
-export type ImagePaths = {
-    small: string[];
-    medium: string[];
-    large: string[];
-    original: string[];
-};
+const ORIGINAL = 'original';
+const SMALL = 'small';
+const MEDIUM = 'medium';
+const LARGE = 'large';
+type ImageSize = typeof ORIGINAL | typeof SMALL | typeof MEDIUM | typeof LARGE;
 
 export const getImagePaths = async (speciesId: number): Promise<ImagePaths> => {
     try {
@@ -46,18 +47,10 @@ export const getImagePaths = async (speciesId: number): Promise<ImagePaths> => {
             where: { speciesimage: { every: { species_id: speciesId } } },
             orderBy: { id: 'asc' },
         });
-        const ps = images.map((i) => `${EDGE}/${i.path}`);
 
-        const paths: ImagePaths = {
-            small: ps.map((p) => p.replace('original', 'small')),
-            medium: ps.map((p) => p.replace('original', 'medium')),
-            large: ps.map((p) => p.replace('original', 'large')),
-            original: ps,
-        };
-
-        return paths;
+        return toImagePaths(images);
     } catch (e) {
-        console.error(e);
+        logger.error(e);
     }
 
     return {
@@ -66,6 +59,27 @@ export const getImagePaths = async (speciesId: number): Promise<ImagePaths> => {
         large: [],
         original: [],
     };
+};
+
+export const toImagePaths = (images: image[]): ImagePaths => {
+    const makePath = (path: string, size: ImageSize): string => `${EDGE}/${path.replace(ORIGINAL, size)}`;
+
+    return images.reduce(
+        (paths, image) => {
+            paths.small.push(makePath(image.path, SMALL));
+            paths.medium.push(makePath(image.path, MEDIUM));
+            paths.large.push(makePath(image.path, LARGE));
+            paths.original.push(makePath(image.path, ORIGINAL));
+
+            return paths;
+        },
+        {
+            small: new Array<string>(),
+            medium: new Array<string>(),
+            large: new Array<string>(),
+            original: new Array<string>(),
+        } as ImagePaths,
+    );
 };
 
 const EXPIRE_SECONDS = 60 * 5;
@@ -80,9 +94,9 @@ export const getPresignedUrl = async (path: string): Promise<string> => {
 };
 
 const sizes = new Map([
-    ['small', 300],
-    ['medium', 800],
-    ['large', 1200],
+    [SMALL, 300],
+    [MEDIUM, 800],
+    [LARGE, 1200],
 ]);
 
 export const createOtherSizes = (images: image[]): image[] => {
@@ -90,8 +104,8 @@ export const createOtherSizes = (images: image[]): image[] => {
         images.map(async (image) => {
             const path = `${ENDPOINT}/${BUCKET}/${image.path}`;
             console.log(`trying to load: ${path}`);
-            const img = await tryBackoff(3, () => Jimp.read(path)).catch((reason) =>
-                console.error(`Failed to load file ${path} with Jimp. Received error: ${reason}.`),
+            const img = await tryBackoff(3, () => Jimp.read(path)).catch((reason: Error) =>
+                logger.error(`Failed to load file ${path} with Jimp. Received error: ${reason}.`),
             );
             if (!img) return [];
 
@@ -100,7 +114,7 @@ export const createOtherSizes = (images: image[]): image[] => {
             sizes.forEach(async (value, key) => {
                 img.resize(value, Jimp.AUTO);
                 img.quality(90);
-                const newPath = image.path.replace('original', key);
+                const newPath = image.path.replace(ORIGINAL, key);
                 console.log(`Will write ${newPath}`);
                 const buffer = await img.getBufferAsync(mime);
                 await uploadImage(newPath, buffer, mime);
@@ -109,7 +123,7 @@ export const createOtherSizes = (images: image[]): image[] => {
 
         return images;
     } catch (e) {
-        console.error('Err in createOtherSizes: ' + e);
+        logger.error('Err in createOtherSizes: ' + e);
         return [];
     }
 };

@@ -2,6 +2,7 @@ import { TypeaheadCustomOption } from '../components/controlledtypeahead';
 import { hasProp } from '../libs/utils/util';
 import { WithID } from '../libs/utils/types';
 import { DeleteResult } from '../libs/api/apitypes';
+import { logger } from '../libs/utils/logger';
 
 export type AdminFormFields<T> = {
     value: T[] | TypeaheadCustomOption[];
@@ -92,7 +93,7 @@ export const useAPIs = <T extends WithID, U>(
                 }
             }
         } catch (e) {
-            console.error(e);
+            logger.error(e);
         }
     };
 

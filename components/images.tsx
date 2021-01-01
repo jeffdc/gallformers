@@ -2,8 +2,7 @@ import Image from 'next/image';
 import React, { useState } from 'react';
 import { Carousel, CarouselItem, Modal } from 'react-bootstrap';
 import useWindowDimensions from '../hooks/usewindowdimension';
-import { SpeciesApi } from '../libs/api/apitypes';
-import { ImagePaths } from '../libs/images/images';
+import { ImagePaths, SpeciesApi } from '../libs/api/apitypes';
 
 // Modal.setAppElement('#__next');
 

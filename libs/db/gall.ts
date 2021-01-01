@@ -16,7 +16,9 @@ import {
     ShapeApi,
     WallsApi,
 } from '../api/apitypes';
-import { ExtractTFromPromise, handleError, optionalWith } from '../utils/util';
+import { logger } from '../utils/logger';
+import { ExtractTFromPromise } from '../utils/types';
+import { handleError, optionalWith } from '../utils/util';
 import db from './db';
 import { adaptAbundance, speciesByName } from './species';
 import { connectIfNotNull, connectWithIds, extractId } from './utils';
@@ -72,7 +74,7 @@ export const getGalls = (
     const clean = (galls: DBGall): GallApi[] =>
         galls.flatMap((g) => {
             if (g.gall == null) {
-                console.error(
+                logger.error(
                     `Detected a species with id ${g.id} that is supposed to be a gall but does not have a cooresponding gall!`,
                 );
                 return []; // will resolve to nothing since we are in a flatMap
