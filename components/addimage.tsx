@@ -35,29 +35,32 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
             }${d.getUTCDate()}${d.getUTCHours()}${d.getUTCMinutes()}${d.getUTCMilliseconds()}`;
             const ext = file.name.split('.').pop();
             const path = `gall/${id}/${id}_${t}_original.${ext}`;
-            const res = await fetch(`../api/images/uploadurl?path=${path}`);
+            const res = await fetch(`../api/images/uploadurl?path=${path}&mime=${file.type}`);
             const url = await res.text();
 
-            console.log(url);
+            console.log(`Pre-signed URL: ${url}`);
 
             // upload file
-            const resp = await axios.put<Response>(url, file, {
-                headers: {
-                    'Content-Type': file.type,
-                    'x-amz-acl': 'public-read',
-                },
-                onUploadProgress: (e) => setProgress(Math.round((100 * e.loaded) / e.total)),
-            });
+            const resp = await axios
+                .put<Response>(url, file, {
+                    headers: {
+                        'Content-Type': file.type,
+                    },
+                    onUploadProgress: (e) => setProgress(Math.round((100 * e.loaded) / e.total)),
+                })
+                .catch((e) => console.error(`Image upload failed with error: ${JSON.stringify(e, null, ' ')}`));
 
-            images.push({
-                attribution: '',
-                creator: '',
-                license: '',
-                path: path,
-                source: '',
-                uploader: session.user.name,
-                speciesid: id,
-            });
+            if (resp) {
+                images.push({
+                    attribution: '',
+                    creator: '',
+                    license: '',
+                    path: path,
+                    source: '',
+                    uploader: session.user.name,
+                    speciesid: id,
+                });
+            }
         }
         // update the database with the new image(s)
         const dbres = await fetch('../api/images/', {

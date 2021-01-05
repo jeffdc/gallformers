@@ -1,4 +1,4 @@
-import { PutObjectCommand, S3Client, S3ClientConfig } from '@aws-sdk/client-s3';
+import { PutObjectCommand, S3, S3ClientConfig } from '@aws-sdk/client-s3';
 import { S3RequestPresigner } from '@aws-sdk/s3-request-presigner';
 import { createRequest } from '@aws-sdk/util-create-request';
 import { formatUrl } from '@aws-sdk/util-format-url';
@@ -9,20 +9,27 @@ import db from '../db/db';
 import { logger } from '../utils/logger';
 import { tryBackoff } from '../utils/network';
 
-const ENDPOINT = 'https://nyc3.digitaloceanspaces.com';
+export const ENDPOINT = 'https://gallformers.s3.us-east-2.amazonaws.com';
+
+const checkCred = (cred: string | undefined): string => {
+    if (cred == undefined) throw new Error('AWS credentials are not configured!');
+
+    return cred;
+};
+
 const config: S3ClientConfig = {
     // logger: console,
-    region: 'nyc3',
-    endpoint: ENDPOINT,
+    region: 'us-east-2',
     credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID == undefined ? '' : process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY == undefined ? '' : process.env.AWS_SECRET_ACCESS_KEY,
+        accessKeyId: checkCred(process.env.AWS_ACCESS_KEY_ID),
+        secretAccessKey: checkCred(process.env.AWS_SECRET_ACCESS_KEY),
     },
 };
 
-const EDGE = 'https://static.gallformers.org/';
+// const EDGE = 'https://static.gallformers.org';
+const EDGE = 'https://dhz6u1p7t6okk.cloudfront.net';
 const BUCKET = 'gallformers';
-const client = new S3Client(config);
+const client = new S3(config);
 
 // add a middleware to work around bug. See: https://github.com/aws/aws-sdk-js-v3/issues/1800
 client.middlewareStack.add(
@@ -39,7 +46,7 @@ const ORIGINAL = 'original';
 const SMALL = 'small';
 const MEDIUM = 'medium';
 const LARGE = 'large';
-type ImageSize = typeof ORIGINAL | typeof SMALL | typeof MEDIUM | typeof LARGE;
+export type ImageSize = typeof ORIGINAL | typeof SMALL | typeof MEDIUM | typeof LARGE;
 
 export const getImagePaths = async (speciesId: number): Promise<ImagePaths> => {
     try {
@@ -84,11 +91,18 @@ export const toImagePaths = (images: image[]): ImagePaths => {
 
 const EXPIRE_SECONDS = 60 * 5;
 
-export const getPresignedUrl = async (path: string): Promise<string> => {
-    console.log(`${new Date().toString()}: Spaces API Call PRESIGNED URL GET for ${path}.`);
+export const getPresignedUrl = async (path: string, mime: string): Promise<string> => {
+    console.log(`${new Date().toString()}: AWS S3 API Call PRESIGNED URL GET for ${path} and ${mime}.`);
 
-    const signer = new S3RequestPresigner({ ...client.config });
-    const request = await createRequest(client, new PutObjectCommand({ Key: path, Bucket: BUCKET }));
+    // we will use different credentials for the S3 upload. these credentials can only upload.
+    const signer = new S3RequestPresigner({
+        ...client.config,
+        credentials: {
+            accessKeyId: checkCred(process.env.S3_PUT_AWS_ACCESS_KEY_ID),
+            secretAccessKey: checkCred(process.env.S3_PUT_AWS_SECRET_ACCESS_KEY),
+        },
+    });
+    const request = await createRequest(client, new PutObjectCommand({ Key: path, Bucket: BUCKET, ContentType: mime }));
 
     return formatUrl(await signer.presign(request, { expiresIn: EXPIRE_SECONDS }));
 };
@@ -102,7 +116,7 @@ const sizes = new Map([
 export const createOtherSizes = (images: image[]): image[] => {
     try {
         images.map(async (image) => {
-            const path = `${ENDPOINT}/${BUCKET}/${image.path}`;
+            const path = `${EDGE}/${image.path}`;
             console.log(`trying to load: ${path}`);
             const img = await tryBackoff(3, () => Jimp.read(path)).catch((reason: Error) =>
                 logger.error(`Failed to load file ${path} with Jimp. Received error: ${reason}.`),
@@ -134,7 +148,7 @@ const uploadImage = async (key: string, buffer: Buffer, mime: string) => {
         Key: key,
         Body: buffer,
         ContentType: mime,
-        ACL: 'public-read',
+        // ACL: 'public-read',
     };
 
     try {

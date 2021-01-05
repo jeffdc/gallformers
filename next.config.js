@@ -26,7 +26,7 @@ module.exports = (phase) => {
             return config;
         },
         images: {
-            domains: ['static.gallformers.org'],
+            domains: ['static.gallformers.org', 'dhz6u1p7t6okk.cloudfront.net'],
         },
         generateBuildId: async () => {
             //TODO convert this to the latest git hash
