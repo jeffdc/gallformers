@@ -108,7 +108,6 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                         <input
                             type="file"
                             name="file"
-                            title="foo"
                             className="form-control"
                             multiple
                             accept={'image/jpg, image/jpeg, image/png'}

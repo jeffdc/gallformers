@@ -14,7 +14,7 @@ const lister = (f: FamilyWithSpecies, gall: boolean) => {
     const path = gall ? 'gall' : 'host';
     return f.species.map((s) => (
         <ListGroup.Item key={s.id}>
-            <Link href={`${path}/${s.id}`}>
+            <Link href={`/${path}/${s.id}`}>
                 <a>{s.name}</a>
             </Link>
         </ListGroup.Item>
