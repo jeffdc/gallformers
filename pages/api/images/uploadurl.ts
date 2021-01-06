@@ -5,7 +5,7 @@ import * as TE from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from 'next-auth/client';
 import { Err, extractQueryParam, sendErrResponse, sendSuccResponse, toErr } from '../../../libs/api/apipage';
-import { getPresignedUrl } from '../../../libs/images/images';
+import { ENDPOINT, getPresignedUrl } from '../../../libs/images/images';
 import { handleError } from '../../../libs/utils/util';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
@@ -17,12 +17,20 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
     if (req.method === 'GET') {
         const invalidQueryErr: Err = {
             status: 400,
-            msg: 'You must provide the path (bucket key) to upload to as a query param.',
+            msg: `You must provide the path (bucket key) to upload to and the mime type as query params. The params you passed are: ${req.query}`,
         };
+
+        res.setHeader('Access-Control-Allow-Origin', ENDPOINT);
 
         await pipe(
             extractQueryParam(req.query, 'path'),
-            O.map((path) => TE.tryCatch(() => getPresignedUrl(path), handleError)),
+            O.map((path) =>
+                pipe(
+                    extractQueryParam(req.query, 'mime'),
+                    O.map((mime) => TE.tryCatch(() => getPresignedUrl(path, mime), handleError)),
+                ),
+            ),
+            O.flatten,
             O.map(TE.mapLeft(toErr)),
             // eslint-disable-next-line prettier/prettier
             O.fold(
