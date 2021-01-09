@@ -2,6 +2,7 @@ import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import React, { MouseEvent, useState } from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
 import { GallSimple, HostApi } from '../../../libs/api/apitypes';
@@ -28,12 +29,18 @@ const gallAsLink = (len: number) => (g: GallSimple, idx: number) => {
 };
 
 const Host = ({ host }: Props): JSX.Element => {
+    const source = host ? host.speciessource.find((s) => s.useasdefault !== 0) : undefined;
+    const [selectedSource, setSelectedSource] = useState(source);
+
+    const router = useRouter();
+    // If the page is not yet generated, this will be displayed initially until getStaticProps() finishes running
+    if (router.isFallback) {
+        return <div>Loading...</div>;
+    }
+
     // the galls will not be sorted, so sort them for display
     host.galls.sort((a, b) => a.name.localeCompare(b.name));
     const gallLinker = gallAsLink(host.galls.length);
-
-    const source = host.speciessource.find((s) => s.useasdefault !== 0);
-    const [selectedSource, setSelectedSource] = useState(source);
 
     const changeDescription = (e: MouseEvent<HTMLButtonElement>) => {
         e.preventDefault();

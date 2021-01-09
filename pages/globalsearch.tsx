@@ -26,25 +26,25 @@ const makeLink = (i: SearchResultItem) => {
     switch (i.type) {
         case 'gall':
             return (
-                <Link href={`gall/${i.id}`}>
+                <Link href={`/gall/${i.id}`}>
                     <a>{i.name}</a>
                 </Link>
             );
         case 'plant':
             return (
-                <Link href={`host/${i.id}`}>
+                <Link href={`/host/${i.id}`}>
                     <a>{i.name}</a>
                 </Link>
             );
         case 'entry':
             return (
-                <Link href={`glossary#${i.name}`}>
+                <Link href={`/glossary#${i.name}`}>
                     <a>{i.name}</a>
                 </Link>
             );
         case 'source':
             return (
-                <Link href={`source/${i.id}`}>
+                <Link href={`/source/${i.id}`}>
                     <a>{i.name}</a>
                 </Link>
             );
@@ -69,11 +69,11 @@ const imageForType = (type: string) => {
 };
 
 const GlobalSearch = ({ results }: Props): JSX.Element => {
+    const { items, requestSort, sortConfig } = useSortableData(results, { key: 'name', direction: 'asc' });
+
     if (results.length <= 0) {
         return <h1>No results</h1>;
     }
-
-    const { items, requestSort, sortConfig } = useSortableData(results, { key: 'name', direction: 'asc' });
 
     const getClassNamesFor = (name: keyof SearchResultItem): string => {
         return sortConfig.key === name ? sortConfig.direction : '';

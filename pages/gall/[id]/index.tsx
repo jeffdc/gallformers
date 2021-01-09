@@ -4,6 +4,7 @@ import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import React, { MouseEvent, ReactNode, useState } from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
 import AddImage from '../../../components/addimage';
@@ -34,13 +35,19 @@ const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
 };
 
 const Gall = ({ species, imagePaths }: Props): JSX.Element => {
+    const source = species ? species.speciessource.find((s) => s.useasdefault !== 0) : undefined;
+    const [selectedSource, setSelectedSource] = useState(source);
+    const [images, setImages] = useState(imagePaths);
+
+    const router = useRouter();
+    // If the page is not yet generated, this will be displayed initially until getStaticProps() finishes running
+    if (router.isFallback) {
+        return <div>Loading...</div>;
+    }
+
     // the hosts will not be sorted, so sort them for display
     species.hosts.sort((a, b) => a.name.localeCompare(b.name));
     const hostLinker = hostAsLink(species.hosts.length);
-
-    const source = species.speciessource.find((s) => s.useasdefault !== 0);
-    const [selectedSource, setSelectedSource] = useState(source);
-    const [images, setImages] = useState(imagePaths);
 
     const addImages = async (imagePaths: ImagePaths) => {
         // this seems kludgy but it prevents having to make another call to the server to get the paths

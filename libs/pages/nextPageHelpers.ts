@@ -106,5 +106,5 @@ export async function getStaticPathsFromIds(fIds: () => TaskEither<Error, string
         T.map(toPath),
     )();
 
-    return { paths, fallback: false };
+    return { paths, fallback: true };
 }

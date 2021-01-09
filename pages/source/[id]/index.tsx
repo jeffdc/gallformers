@@ -1,4 +1,5 @@
 import { GetStaticPaths, GetStaticProps } from 'next';
+import { useRouter } from 'next/router';
 import React from 'react';
 import { Col, Row } from 'react-bootstrap';
 import { SourceApi } from '../../../libs/api/apitypes';
@@ -10,6 +11,12 @@ type Props = {
 };
 
 const Source = ({ source }: Props): JSX.Element => {
+    const router = useRouter();
+    // If the page is not yet generated, this will be displayed initially until getStaticProps() finishes running
+    if (router.isFallback) {
+        return <div>Loading...</div>;
+    }
+
     return (
         <div className="p-3 m-3">
             <Row className="pb-4">
