@@ -79,10 +79,6 @@ export const getSpecies = (
                 synonyms: O.fromNullable(s.synonyms),
                 commonnames: O.fromNullable(s.commonnames),
                 abundance: optionalWith(s.abundance, adaptAbundance),
-                speciessource: s.speciessource.map((source) => ({
-                    ...source,
-                    description: O.fromNullable(source.description),
-                })),
             };
             return species;
         });

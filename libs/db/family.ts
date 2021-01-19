@@ -17,7 +17,7 @@ import {
 } from '../api/apitypes';
 import { handleError } from '../utils/util';
 import db from './db';
-import { gallDeleteSteps, getGalls } from './gall';
+import { gallDeleteSteps } from './gall';
 import { getSpecies } from './species';
 import { extractId } from './utils';
 
@@ -128,10 +128,8 @@ export const familyDeleteSteps = (familyid: number): Promise<number>[] => {
 };
 
 export const deleteFamily = (id: number): TaskEither<Error, DeleteResult> => {
-    const deleteTx = (speciesids: number[], gallids: number[]) =>
-        TE.tryCatch(() => db.$transaction(gallDeleteSteps(speciesids, gallids).concat(familyDeleteSteps(id))), handleError);
-
-    const galls = (speciesids: number[]) => getGalls([{ id: { in: speciesids } }]);
+    const deleteTx = (speciesids: number[]) =>
+        TE.tryCatch(() => db.$transaction(gallDeleteSteps(speciesids).concat(familyDeleteSteps(id))), handleError);
 
     const toDeleteResult = (batch: number[]): DeleteResult => {
         return {
@@ -141,12 +139,10 @@ export const deleteFamily = (id: number): TaskEither<Error, DeleteResult> => {
         };
     };
 
-    // I am sure that there is a way to map the Species and Gall arrays to number arrays before the point of use
-    // but I struggled figuring it out, got lost in "type soup".
     return pipe(
-        TE.bindTo('speciesids')(getAllSpeciesForFamily(id)),
-        TE.bind('gallids', ({ speciesids }) => galls(speciesids.map(extractId))),
-        TE.map(({ speciesids, gallids }) => deleteTx(speciesids.map(extractId), gallids.map(extractId))),
+        getAllSpeciesForFamily(id),
+        TE.map((species) => species.map(extractId)),
+        TE.map(deleteTx),
         TE.flatten,
         TE.map(toDeleteResult),
     );

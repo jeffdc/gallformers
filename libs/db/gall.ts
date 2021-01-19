@@ -111,10 +111,6 @@ export const getGalls = (
                         name: h.hostspecies.name,
                     };
                 }),
-                // speciessource: g.speciessource.map((s) => ({
-                //     ...s,
-                //     description: O.fromNullable(s.description),
-                // })),
             };
             return newg;
         });

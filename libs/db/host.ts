@@ -44,10 +44,6 @@ const adaptor = (hosts: DBHost[]): HostApi[] =>
                     name: h.gallspecies?.name,
                 };
             }),
-            speciessource: h.speciessource.map((s) => ({
-                ...s,
-                description: O.fromNullable(s.description),
-            })),
         };
         return newh;
     });
