@@ -100,6 +100,11 @@ const Family = (props: Props): JSX.Element => {
                     <Col className="mr-auto">
                         <input name="del" type="checkbox" className="form-check-input" ref={register} />
                     </Col>
+                    <Col xs="8">
+                        <em className="text-danger">
+                            Caution. If there are any species (galls or hosts) assigned to this Family they too will be deleted.
+                        </em>
+                    </Col>
                 </Row>
                 <Row className="form-input">
                     <Col>

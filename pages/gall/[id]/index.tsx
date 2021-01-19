@@ -5,7 +5,7 @@ import * as TE from 'fp-ts/lib/TaskEither';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import React, { MouseEvent, ReactNode, useState } from 'react';
+import React, { MouseEvent, useState } from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
 import AddImage from '../../../components/addimage';
 import Images from '../../../components/images';
@@ -162,17 +162,14 @@ const Gall = ({ species, imagePaths }: Props): JSX.Element => {
 
                         <Row>
                             <Col id="description" className="lead p-3">
-                                <p className="small">
-                                    {
-                                        // eslint-disable-next-line prettier/prettier
-                                        pipe(
-                                            O.fromNullable(selectedSource?.description),
-                                            O.flatten,
-                                            O.map(deserialize),
-                                            O.getOrElse(constant((<></>) as ReactNode)),
-                                        )
-                                    }
-                                </p>
+                                {selectedSource && selectedSource.description && (
+                                    <span>
+                                        <p className="small">{deserialize(selectedSource.description)}</p>
+                                        <a className="small" href={selectedSource.externallink} target="_blank" rel="noreferrer">
+                                            {selectedSource.externallink}
+                                        </a>
+                                    </span>
+                                )}
                             </Col>
                         </Row>
                         <Row>
@@ -234,14 +231,14 @@ export const getStaticProps: GetStaticProps = async (context) => {
     const updateSpeciesSource = (d: string, source: SpeciesSourceApi): SpeciesSourceApi => {
         return {
             ...source,
-            description: O.of(d),
+            description: d,
         };
     };
 
     // eslint-disable-next-line prettier/prettier
     const sources = await pipe(
         gall.speciessource,
-        A.map((s) => linkTextFromGlossary(s.description)),
+        A.map((s) => linkTextFromGlossary(O.fromNullable(s.description))),
         A.map(TE.map(serialize)),
         TE.sequenceArray,
         // sequence makes the array readonly, the rest of the fp-ts API does not use readonly, ...sigh.

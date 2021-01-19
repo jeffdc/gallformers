@@ -161,8 +161,9 @@ export type SpeciesSourceApi = {
     id: number;
     species_id: number;
     source_id: number;
-    description: Option<string>;
+    description: string;
     useasdefault: number;
+    externallink: string;
     source: SourceApi;
 };
 
@@ -308,6 +309,7 @@ export type SpeciesSourceInsertFields = Deletable & {
     source: number;
     description: string;
     useasdefault: boolean;
+    externallink: string;
 };
 
 export type GallHostUpdateFields = {
@@ -335,6 +337,7 @@ export type ImageApi = {
     source: string;
     uploader: string;
     speciesid: number;
+    default: boolean;
 };
 
 export type ImagePaths = {

@@ -27,11 +27,11 @@ const Images = ({ imagePaths, species }: Props): JSX.Element => {
                 <Modal.Header closeButton />
                 <Modal.Body>
                     <Carousel interval={null} className="border-dark align-self-center p-2">
-                        {console.log(`image paths: ${imagePaths}`)}
                         {imagePaths.large.map((path) => (
                             <CarouselItem key={path}>
                                 <Image
                                     src={path.replaceAll('small', 'large')}
+                                    unoptimized
                                     alt={`photo of ${species.name}`}
                                     width={width - 2 * pad}
                                     height={(width - 2 * pad) * hwRatio}
@@ -48,6 +48,7 @@ const Images = ({ imagePaths, species }: Props): JSX.Element => {
                     <CarouselItem key={image}>
                         <Image
                             src={image}
+                            unoptimized
                             alt={`photo of ${species.name}`}
                             width={'300'}
                             height={'200'}

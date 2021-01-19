@@ -1,4 +1,4 @@
-import { family, Prisma, species } from '@prisma/client';
+import { family, species } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
@@ -117,11 +117,13 @@ export const getAllSpeciesForFamily = (id: number): TaskEither<Error, SpeciesApi
     return getSpecies([{ family_id: id }]);
 };
 
-export const familyDeleteSteps = (familyid: number): Promise<Prisma.BatchPayload>[] => {
+export const familyDeleteSteps = (familyid: number): Promise<number>[] => {
     return [
-        db.family.deleteMany({
-            where: { id: familyid },
-        }),
+        db.family
+            .deleteMany({
+                where: { id: familyid },
+            })
+            .then((batch) => batch.count),
     ];
 };
 
@@ -131,11 +133,11 @@ export const deleteFamily = (id: number): TaskEither<Error, DeleteResult> => {
 
     const galls = (speciesids: number[]) => getGalls([{ id: { in: speciesids } }]);
 
-    const toDeleteResult = (batch: Prisma.BatchPayload[]): DeleteResult => {
+    const toDeleteResult = (batch: number[]): DeleteResult => {
         return {
             type: 'family',
             name: '',
-            count: batch.reduce((acc, v) => acc + v.count, 0),
+            count: batch.reduce((acc, v) => acc + v, 0),
         };
     };
 

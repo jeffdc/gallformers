@@ -172,9 +172,11 @@ model speciessource {
   source     source  @relation(fields: [source_id], references: [id])
   species    species @relation(fields: [species_id], references: [id])
   // added in 003-gallformers.sql migration
-  description String?
+  description String
   // added in 004-gallformers.sql migration
   useasdefault Int @default(0)
+  // added in 006-gallformers.sql migration
+  externallink String
 }
 
 // Added in 003-gallformers.sql migration
@@ -189,19 +191,12 @@ model glossary {
 model image {
   id          Int @id @default(autoincrement())
   path        String @unique
+  default     Boolean @default(false)
   creator     String
   attribution String
   source      String
   license     String
   uploader    String
-}
-
-// Added in 005-gallformers.sql migration
-model speciesimage {
-  id          Int @id @default(autoincrement())
   species_id  Int
-  image_id    Int
-  default     Boolean @default(false)
   species     species @relation(fields: [species_id], references: [id])
-  image       image   @relation(fields: [image_id], references: [id])
 }

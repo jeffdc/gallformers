@@ -16,6 +16,7 @@ import {
     ShapeApi,
     WallsApi,
 } from '../api/apitypes';
+import { deleteImagesBySpeciesId } from '../images/images';
 import { logger } from '../utils/logger';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError, optionalWith } from '../utils/util';
@@ -110,10 +111,10 @@ export const getGalls = (
                         name: h.hostspecies.name,
                     };
                 }),
-                speciessource: g.speciessource.map((s) => ({
-                    ...s,
-                    description: O.fromNullable(s.description),
-                })),
+                // speciessource: g.speciessource.map((s) => ({
+                //     ...s,
+                //     description: O.fromNullable(s.description),
+                // })),
             };
             return newg;
         });
@@ -452,56 +453,30 @@ export const upsertGall = (gall: GallUpsertFields): TaskEither<Error, number> =>
 /**
  * The steps required to delete a Gall. This is a hack to fake CASCADE DELETE since Prisma does not support it yet.
  * See: https://github.com/prisma/prisma/issues/2057
+ *
  * @param speciesids an array of ids of the species (gall) to delete
- * @param gallids an array of ids of the gall to delete
  */
-export const gallDeleteSteps = (speciesids: number[], gallids: number[]): Promise<Prisma.BatchPayload>[] => {
-    return [
-        db.galllocation.deleteMany({
-            where: { gall_id: { in: gallids } },
-        }),
-
-        db.galltexture.deleteMany({
-            where: { gall_id: { in: gallids } },
-        }),
-
-        db.gall.deleteMany({
-            where: { id: { in: gallids } },
-        }),
-
-        db.host.deleteMany({
-            where: { gall_species_id: { in: speciesids } },
-        }),
-
-        db.speciessource.deleteMany({
-            where: { species_id: { in: speciesids } },
-        }),
-
-        db.species.deleteMany({
-            where: { id: { in: speciesids } },
-        }),
-    ];
+export const gallDeleteSteps = (speciesids: number[]): Promise<number>[] => {
+    return [db.$executeRaw(`DELETE FROM species WHERE id IN (${speciesids})`)];
 };
 
 export const deleteGall = (speciesid: number): TaskEither<Error, DeleteResult> => {
-    const deleteGallTx = (gallid: number) =>
-        TE.tryCatch(() => db.$transaction(gallDeleteSteps([speciesid], [gallid])), handleError);
+    const deleteImages = () => TE.tryCatch(() => deleteImagesBySpeciesId(speciesid), handleError);
 
-    const notAGallErr = () => TE.left(new Error('You can not delete a species that is not a Gall with this API.'));
+    const deleteGallTx = () => TE.tryCatch(() => db.$transaction(gallDeleteSteps([speciesid])), handleError);
 
-    const toDeleteResult = (batch: Prisma.BatchPayload[]): DeleteResult => {
+    const toDeleteResult = (batch: number[]): DeleteResult => {
         return {
             type: 'gall',
             name: '',
-            count: batch.reduce((acc, v) => acc + v.count, 0),
+            count: batch.reduce((acc, v) => acc + v, 0),
         };
     };
 
     // eslint-disable-next-line prettier/prettier
     return pipe(
-        getGallIdFromSpeciesId(speciesid),
-        TE.map(O.fold(notAGallErr, deleteGallTx)),
-        TE.flatten,
-        TE.map(toDeleteResult)
+        deleteImages(),
+        TE.chain(deleteGallTx),
+        TE.map(toDeleteResult),
     );
 };

@@ -59,6 +59,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                     source: '',
                     uploader: session.user.name,
                     speciesid: id,
+                    default: false,
                 });
             }
         }

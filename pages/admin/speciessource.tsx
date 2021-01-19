@@ -1,7 +1,5 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import { source, species, speciessource } from '@prisma/client';
-import { constant, pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import React, { useState } from 'react';
@@ -31,6 +29,7 @@ type FormFields = {
     description: string | null;
     useasdefault: boolean;
     delete: boolean;
+    externallink: string;
 };
 
 const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
@@ -57,6 +56,7 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
             const source = getValues('source');
             setValue('description', '');
             setValue('useasdefault', false);
+            setValue('exernallink', '');
 
             const { sp, so } = lookup(species, source);
             if (sp != undefined && so != undefined) {
@@ -67,8 +67,9 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                     const s = (await res.json()) as SpeciesSourceApi[];
                     if (s && s.length > 0) {
                         setExisting(true);
-                        setValue('description', pipe(s[0].description, O.getOrElse(constant(''))));
+                        setValue('description', s[0].description);
                         setValue('useasdefault', s[0].useasdefault > 0);
+                        setValue('externallink', s[0].externallink);
                     }
                 }
             }
@@ -103,6 +104,7 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                 source: so.id,
                 description: data.description ? data.description : '',
                 useasdefault: data.useasdefault,
+                externallink: data.externallink,
             };
 
             const res = await fetch('../api/speciessource/upsert', {
@@ -171,6 +173,12 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                     <Col>
                         Description (this is the relevant info from the selected Source about the selected Species):
                         <textarea name="description" className="form-control" ref={register} rows={8} />
+                    </Col>
+                </Row>
+                <Row className="form-group">
+                    <Col>
+                        External Description Link:
+                        <input type="text" placeholder="" name="externallink" className="form-control" ref={register} />
                     </Col>
                 </Row>
                 <Row className="form-group">

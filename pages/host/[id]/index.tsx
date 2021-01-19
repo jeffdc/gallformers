@@ -9,6 +9,7 @@ import { GallSimple, HostApi } from '../../../libs/api/apitypes';
 import { allHostIds, hostById } from '../../../libs/db/host';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { renderCommonNames } from '../../../libs/pages/renderhelpers';
+import { deserialize } from '../../../libs/utils/reactserialize';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
@@ -72,9 +73,14 @@ const Host = ({ host }: Props): JSX.Element => {
                         </Row>
                         <Row>
                             <Col className="lead p-3">
-                                {selectedSource?.description == undefined
-                                    ? ''
-                                    : pipe(selectedSource.description, O.getOrElse(constant('')))}
+                                {selectedSource && selectedSource.description && (
+                                    <span>
+                                        <p className="small">{deserialize(selectedSource.description)}</p>
+                                        <a className="small" href={selectedSource.externallink} target="_blank" rel="noreferrer">
+                                            {selectedSource.externallink}
+                                        </a>
+                                    </span>
+                                )}
                             </Col>
                         </Row>
                         <Row>

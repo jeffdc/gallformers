@@ -12,7 +12,7 @@ type DBSpeciesSource = speciessource & { source: source };
 const adaptor = (dbs: DBSpeciesSource[]): SpeciesSourceApi[] =>
     dbs.map((s) => ({
         ...s,
-        description: O.fromNullable(s.description),
+        // description: O.fromNullable(s.description),
     }));
 
 export const speciesSourceByIds = (speciesId: string, sourceId: string): TaskEither<Error, SpeciesSourceApi[]> => {
@@ -108,10 +108,12 @@ export const upsertSpeciesSource = (sourcespecies: SpeciesSourceInsertFields): T
                 species: { connect: { id: sourcespecies.species } },
                 description: sourcespecies.description,
                 useasdefault: sourcespecies.useasdefault ? 1 : 0,
+                externallink: sourcespecies.externallink,
             },
             update: {
                 description: sourcespecies.description,
                 useasdefault: sourcespecies.useasdefault ? 1 : 0,
+                externallink: sourcespecies.externallink,
             },
         });
 

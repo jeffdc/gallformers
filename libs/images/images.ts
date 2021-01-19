@@ -1,4 +1,11 @@
-import { PutObjectCommand, S3, S3ClientConfig } from '@aws-sdk/client-s3';
+import {
+    DeleteObjectsCommand,
+    DeleteObjectsRequest,
+    ObjectIdentifier,
+    PutObjectCommand,
+    S3,
+    S3ClientConfig,
+} from '@aws-sdk/client-s3';
 import { S3RequestPresigner } from '@aws-sdk/s3-request-presigner';
 import { createRequest } from '@aws-sdk/util-create-request';
 import { formatUrl } from '@aws-sdk/util-format-url';
@@ -12,9 +19,11 @@ import { tryBackoff } from '../utils/network';
 export const ENDPOINT = 'https://gallformers.s3.us-east-2.amazonaws.com';
 
 const checkCred = (cred: string | undefined): string => {
-    if (cred == undefined) throw new Error('AWS credentials are not configured!');
+    if (process.env.NODE_ENV === 'production') {
+        if (cred == undefined) throw new Error('AWS credentials are not configured!');
+    }
 
-    return cred;
+    return cred == undefined ? '' : cred;
 };
 
 const config: S3ClientConfig = {
@@ -51,7 +60,7 @@ export type ImageSize = typeof ORIGINAL | typeof SMALL | typeof MEDIUM | typeof 
 export const getImagePaths = async (speciesId: number): Promise<ImagePaths> => {
     try {
         const images = await db.image.findMany({
-            where: { speciesimage: { every: { species_id: speciesId } } },
+            where: { species_id: { in: speciesId } },
             orderBy: { id: 'asc' },
         });
 
@@ -129,7 +138,7 @@ export const createOtherSizes = (images: image[]): image[] => {
                 img.resize(value, Jimp.AUTO);
                 img.quality(90);
                 const newPath = image.path.replace(ORIGINAL, key);
-                console.log(`Will write ${newPath}`);
+                logger.info(`Will write ${newPath}`);
                 const buffer = await img.getBufferAsync(mime);
                 await uploadImage(newPath, buffer, mime);
             });
@@ -148,17 +157,45 @@ const uploadImage = async (key: string, buffer: Buffer, mime: string) => {
         Key: key,
         Body: buffer,
         ContentType: mime,
-        // ACL: 'public-read',
     };
 
     try {
-        console.log(`Uploading new image ${key}`);
+        logger.info(`Uploading new image ${key}`);
         await tryBackoff(
             3,
             () => client.send(new PutObjectCommand(uploadParams)),
             (t) => t.$metadata.httpStatusCode !== 503,
         );
     } catch (e) {
-        console.log('Err in uploadImage: ' + JSON.stringify(e));
+        logger.log(`Err in uploadImage: ${JSON.stringify(e)}`);
+    }
+};
+
+/**
+ * Deletes all images from S3 that are stored with the key relating to the passed in Species ID.
+ * @param id
+ */
+export const deleteImagesBySpeciesId = async (id: number): Promise<void> => {
+    const paths = await getImagePaths(id);
+
+    const objects = new Array<ObjectIdentifier>();
+    const pushObjectIdentifier = (p: string) => objects.push({ Key: p.replace(`${EDGE}/`, '') });
+    paths.original.forEach(pushObjectIdentifier);
+    paths.small.forEach(pushObjectIdentifier);
+    paths.medium.forEach(pushObjectIdentifier);
+    paths.large.forEach(pushObjectIdentifier);
+
+    logger.info(`About to delete images: ${objects.map((o) => o.Key)}`);
+
+    const deleteParams: DeleteObjectsRequest = {
+        Bucket: BUCKET,
+        Delete: { Objects: objects },
+    };
+
+    try {
+        const r = await tryBackoff(3, () => client.send(new DeleteObjectsCommand(deleteParams)));
+        console.info(`Received response from delete: ${JSON.stringify(r)}`);
+    } catch (e) {
+        logger.error(`Err in deleteImagesBySpeciesId: ${JSON.stringify(e)}.`);
     }
 };

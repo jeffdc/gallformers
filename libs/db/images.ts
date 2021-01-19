@@ -17,7 +17,8 @@ export const addImages = (images: ImageApi[]): TaskEither<Error, ImagePaths> => 
                     path: image.path,
                     source: image.source,
                     uploader: image.uploader,
-                    speciesimage: { create: { species: { connect: { id: image.speciesid } } } },
+                    default: image.default,
+                    species: { connect: { id: image.speciesid } },
                 },
             }),
         );
