@@ -154,7 +154,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
         props: {
             host: (await host)[0],
         },
-        revalidate: 60,
+        revalidate: 1,
     };
 };
 

@@ -13,3 +13,23 @@ export const renderCommonNames = (commonnames: O.Option<string>): string => {
         O.getOrElse(constant('')),
     );
 };
+
+/**
+ * Renders the given string input with line breaks for any embedded new lines.
+ * @param p
+ */
+export const renderParagraph = (p: string): React.ReactNode => {
+    const [firstLine, ...rest] = p.split('\n');
+
+    return (
+        <p>
+            {firstLine}
+            {rest.map((line) => (
+                <>
+                    <br />
+                    {line}
+                </>
+            ))}
+        </p>
+    );
+};

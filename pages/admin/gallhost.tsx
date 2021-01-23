@@ -9,39 +9,40 @@ import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import { GallApi, GallHostUpdateFields, SimpleSpecies } from '../../libs/api/apitypes';
 import { allGalls } from '../../libs/db/gall';
-import { allHosts } from '../../libs/db/host';
+import { allHostGenera, allHosts } from '../../libs/db/host';
 import { mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
     galls: GallApi[];
+    genera: string[];
     hosts: SimpleSpecies[];
 };
 
 const Schema = yup.object().shape({
     gall: yup.mixed().required(),
-    hosts: yup.mixed().required(),
 });
 
 type FormFields = {
     gall: GallApi[];
+    genus: string;
     hosts: SimpleSpecies[];
 };
 
-const GallHost = ({ galls, hosts }: Props): JSX.Element => {
+const GallHost = ({ galls, genera, hosts }: Props): JSX.Element => {
     const [results, setResults] = useState(new Array<host>());
     const [selectedGall, setSelectedGall] = useState<GallApi>();
 
-    const { handleSubmit, errors, control, setValue } = useForm<FormFields>({
+    const { handleSubmit, errors, control, setValue, reset } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
 
     const onSubmit = async (data: FormFields) => {
         try {
-            console.log(JSON.stringify(data));
             const insertData: GallHostUpdateFields = {
                 gall: data.gall[0].id,
                 hosts: data.hosts.map((h) => h.id),
+                genus: data.genus[0],
             };
 
             const res = await fetch('../api/gallhost/insert', {
@@ -53,6 +54,7 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
             });
 
             if (res.status === 200) {
+                reset();
                 setResults(await res.json());
             } else {
                 const text = await res.text();
@@ -67,7 +69,7 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
     const gallChange = async (gs: GallApi[]) => {
         const gall = gs.length > 0 ? gs[0] : undefined;
         if (gall != undefined) {
-            const res = await fetch(`../api/gallhost?gall=${gall}`);
+            const res = await fetch(`../api/gallhost?gallid=${gall.id}`);
             if (res.status === 200) {
                 const hosts = (await res.json()) as SimpleSpecies[];
                 if (hosts) {
@@ -79,6 +81,7 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
             setSelectedGall(gall);
             setValue('hosts', []);
         }
+        setValue('genus', '');
     };
 
     return (
@@ -102,7 +105,7 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
                             isInvalid={!!errors.gall}
                             onChange={gallChange}
                         />
-                        {errors.gall && <span className="text-danger">You must provide a least one gall to map.</span>}
+                        {errors.gall && <span className="text-danger">You must provide a gall to map.</span>}
                     </Col>
                 </Row>
                 <Row>
@@ -112,7 +115,7 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        Host:
+                        Hosts:
                         <ControlledTypeahead
                             control={control}
                             name="hosts"
@@ -121,10 +124,29 @@ const GallHost = ({ galls, hosts }: Props): JSX.Element => {
                             labelKey="name"
                             multiple
                             clearButton
-                            isInvalid={!!errors.hosts}
                             disabled={!selectedGall}
                         />
-                        {errors.hosts && <span className="text-danger">You must provide a least one host to map.</span>}
+                    </Col>
+                </Row>
+                <Row>
+                    <Col xs={1} className="p-0 m-0 mx-auto">
+                        <h4> -or- </h4>
+                    </Col>
+                </Row>
+                <Row className="form-group">
+                    <Col>
+                        Genus:
+                        <ControlledTypeahead
+                            control={control}
+                            name="genus"
+                            placeholder="Genus"
+                            options={genera}
+                            disabled={!selectedGall}
+                            clearButton
+                        />
+                        (If you select a Genus, then the mapping will be created for ALL species in that Genus. Once the
+                        individual mappings are created you can edit them individually. This will NOT overwrite any existing
+                        mappings for the gall.)
                     </Col>
                 </Row>
                 <Row className="form-group">
@@ -142,6 +164,7 @@ export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
             galls: await mightFailWithArray<GallApi>()(allGalls()),
+            genera: await mightFailWithArray<string>()(allHostGenera()),
             hosts: await mightFailWithArray<SimpleSpecies>()(allHosts()),
         },
     };

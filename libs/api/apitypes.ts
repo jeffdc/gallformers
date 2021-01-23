@@ -315,6 +315,7 @@ export type SpeciesSourceInsertFields = Deletable & {
 export type GallHostUpdateFields = {
     gall: number;
     hosts: number[];
+    genus: string;
 };
 
 export type DeleteResult = {

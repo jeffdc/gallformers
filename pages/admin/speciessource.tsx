@@ -146,7 +146,7 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                             onBlur={checkAlreadyExists}
                             clearButton
                         />
-                        {errors.species && <span className="text-danger">You must provide a species to map.</span>}
+                        {errors.species && <span className="text-danger">You must provide a species or genus to map.</span>}
                     </Col>
                 </Row>
                 <Row>
@@ -160,7 +160,7 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                         <ControlledTypeahead
                             control={control}
                             name="source"
-                            placeholder="Sources"
+                            placeholder="Source"
                             options={sources.map((h) => h.title)}
                             isInvalid={!!errors.source}
                             onBlur={checkAlreadyExists}
