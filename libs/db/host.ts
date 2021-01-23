@@ -153,8 +153,12 @@ export const getHosts = (
  * Fetch a host by its ID.
  * @param id
  */
-export const hostById = (id: number): TaskEither<Error, HostApi[]> => {
-    return getHosts([{ id: id }]);
+export const hostById = (id: number): TaskEither<Error, HostApi[]> => getHosts([{ id: id }]);
+
+export const hostsByGenus = (genus: string): TaskEither<Error, HostApi[]> => {
+    if (!genus || genus.length === 0) return TE.taskEither.of([]);
+
+    return getHosts([{ genus: { equals: genus } }]);
 };
 
 export const upsertHost = (h: SpeciesUpsertFields): TaskEither<Error, number> => {
