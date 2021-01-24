@@ -2,6 +2,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
+import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
@@ -163,231 +164,237 @@ const Gall = ({
 
     return (
         <Auth>
-            <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
-                <h4>Add A Gall</h4>
-                <p>
-                    This is for all of the details about a Gall. To add a description (which must be referenced to a source) go
-                    add <Link href="/admin/source">Sources</Link>, if they do not already exist, then go{' '}
-                    <Link href="/admin/speciessource">map species to sources with description</Link>.
-                </p>
-                <Row className="form-group">
-                    <Col>
-                        Name (binomial):
-                        <ControlledTypeahead
-                            control={control}
-                            name="value"
-                            onChangeWithNew={(e, isNew) => {
-                                setExisting(!isNew);
-                                if (isNew || !e[0]) {
-                                    setValue('genus', extractGenus(e[0] ? e[0].name : ''));
-                                    setValue('family', [AT.EmptyFamily]);
-                                    setValue('abundance', [AT.EmptyAbundance]);
-                                    setValue('commonnames', '');
-                                    setValue('synonyms', '');
-                                    setValue('detachable', '');
-                                    setValue('walls', [AT.EmptyWalls]);
-                                    setValue('cells', [AT.EmptyCells]);
-                                    setValue('alignment', [AT.EmptyAlignment]);
-                                    setValue('color', [AT.EmptyColor]);
-                                    setValue('shape', [AT.EmptyShape]);
-                                    setValue('locations', []);
-                                    setValue('textures', []);
-                                    setValue('hosts', []);
-                                } else {
-                                    const gall: AT.GallApi = e[0];
-                                    setValue('family', [gall.family]);
-                                    setValue('abundance', [pipe(gall.abundance, O.getOrElse(constant(AT.EmptyAbundance)))]);
-                                    setValue('commonnames', pipe(gall.commonnames, O.getOrElse(constant(''))));
-                                    setValue('synonyms', pipe(gall.synonyms, O.getOrElse(constant(''))));
-                                    setGallDetails(gall.id);
-                                }
-                            }}
-                            onBlurT={(e) => {
-                                if (!errors.value) {
-                                    setValue('genus', extractGenus(e.target.value));
-                                }
-                            }}
-                            placeholder="Name"
-                            options={galls}
-                            labelKey="name"
-                            clearButton
-                            isInvalid={!!errors.value}
-                            newSelectionPrefix="Add a new Gall: "
-                            allowNew={true}
-                        />
-                        {errors.value && (
-                            <span className="text-danger">
-                                Name is required and must be in standard binomial form, e.g., Andricus weldi
-                            </span>
-                        )}
-                    </Col>
-                    <Col>
-                        Genus (filled automatically):
-                        <input type="text" name="genus" className="form-control" readOnly tabIndex={-1} ref={register} />
-                    </Col>
-                    <Col>
-                        Family:
-                        <ControlledTypeahead
-                            control={control}
-                            name="family"
-                            placeholder="Family"
-                            options={families}
-                            labelKey="name"
-                        />
-                        {errors.family && (
-                            <span className="text-danger">
-                                The Family name is required. If it is not present in the list you will have to go add the family
-                                first. :(
-                            </span>
-                        )}
-                    </Col>
-                    <Col>
-                        Abundance:
-                        <ControlledTypeahead
-                            control={control}
-                            name="abundance"
-                            placeholder=""
-                            options={abundances}
-                            labelKey="abundance"
-                            clearButton
-                        />
-                    </Col>
-                </Row>
-                <Row className="form-group">
-                    <Col>
-                        Common Names (comma-delimited):
-                        <input type="text" placeholder="" name="commonnames" className="form-control" ref={register} />
-                    </Col>
-                    <Col>
-                        Synonyms (comma-delimited):
-                        <input type="text" placeholder="" name="synonyms" className="form-control" ref={register} />
-                    </Col>
-                </Row>
-                <Row className="form-group">
-                    <Col>
-                        Hosts:
-                        <ControlledTypeahead
-                            control={control}
-                            name="hosts"
-                            placeholder="Hosts"
-                            options={hosts}
-                            labelKey="name"
-                            multiple
-                            clearButton
-                        />
-                        {errors.hosts && <span className="text-danger">You must map this gall to at least one host.</span>}
-                    </Col>
-                </Row>
-                <Row className="form-group">
-                    <Col>
-                        Detachable:
-                        <input
-                            type="checkbox"
-                            placeholder="Detachable"
-                            name="detachable"
-                            className="form-control"
-                            ref={register}
-                        />
-                    </Col>
-                    <Col>
-                        Walls:
-                        <ControlledTypeahead
-                            control={control}
-                            name="walls"
-                            placeholder=""
-                            options={walls}
-                            labelKey="walls"
-                            clearButton
-                        />
-                    </Col>
-                    <Col>
-                        Cells:
-                        <ControlledTypeahead
-                            control={control}
-                            name="cells"
-                            placeholder=""
-                            options={cells}
-                            labelKey="cells"
-                            clearButton
-                        />
-                    </Col>
-                    <Col>
-                        Alignment:
-                        <ControlledTypeahead
-                            control={control}
-                            name="alignment"
-                            placeholder=""
-                            options={alignments}
-                            labelKey="alignment"
-                            clearButton
-                        />
-                    </Col>
-                </Row>
-                <Row className="form-group">
-                    <Col>
-                        Color:
-                        <ControlledTypeahead
-                            control={control}
-                            name="color"
-                            placeholder=""
-                            options={colors}
-                            labelKey="color"
-                            clearButton
-                        />
-                    </Col>
-                    <Col>
-                        Shape:
-                        <ControlledTypeahead
-                            control={control}
-                            name="shape"
-                            placeholder=""
-                            options={shapes}
-                            labelKey="shape"
-                            clearButton
-                        />
-                    </Col>{' '}
-                </Row>
-                <Row className="form-group">
-                    <Col>
-                        Location(s):
-                        <ControlledTypeahead
-                            control={control}
-                            name="locations"
-                            placeholder=""
-                            options={locations}
-                            labelKey="loc"
-                            multiple
-                            clearButton
-                        />
-                    </Col>
-                    <Col>
-                        Texture(s):
-                        <ControlledTypeahead
-                            control={control}
-                            name="textures"
-                            placeholder=""
-                            options={textures}
-                            labelKey="tex"
-                            multiple
-                            clearButton
-                        />
-                    </Col>
-                </Row>
-                <Row className="fromGroup" hidden={!existing}>
-                    <Col xs="1">Delete?:</Col>
-                    <Col className="mr-auto">
-                        <input name="del" type="checkbox" className="form-check-input" ref={register} />
-                    </Col>
-                </Row>
-                <Row className="formGroup">
-                    <Col>
-                        <input type="submit" className="button" value="Submit" />
-                    </Col>
-                </Row>
-                <Row hidden={!deleteResults}>
-                    <Col>{`Deleted ${deleteResults?.name}.`}</Col>
-                </Row>
-            </form>
+            <>
+                <Head>
+                    <title>Add/Edit Gallformers</title>
+                </Head>
+
+                <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
+                    <h4>Add/Edit Gallformers</h4>
+                    <p>
+                        This is for all of the details about a Gall. To add a description (which must be referenced to a source)
+                        go add <Link href="/admin/source">Sources</Link>, if they do not already exist, then go{' '}
+                        <Link href="/admin/speciessource">map species to sources with description</Link>.
+                    </p>
+                    <Row className="form-group">
+                        <Col>
+                            Name (binomial):
+                            <ControlledTypeahead
+                                control={control}
+                                name="value"
+                                onChangeWithNew={(e, isNew) => {
+                                    setExisting(!isNew);
+                                    if (isNew || !e[0]) {
+                                        setValue('genus', extractGenus(e[0] ? e[0].name : ''));
+                                        setValue('family', [AT.EmptyFamily]);
+                                        setValue('abundance', [AT.EmptyAbundance]);
+                                        setValue('commonnames', '');
+                                        setValue('synonyms', '');
+                                        setValue('detachable', '');
+                                        setValue('walls', [AT.EmptyWalls]);
+                                        setValue('cells', [AT.EmptyCells]);
+                                        setValue('alignment', [AT.EmptyAlignment]);
+                                        setValue('color', [AT.EmptyColor]);
+                                        setValue('shape', [AT.EmptyShape]);
+                                        setValue('locations', []);
+                                        setValue('textures', []);
+                                        setValue('hosts', []);
+                                    } else {
+                                        const gall: AT.GallApi = e[0];
+                                        setValue('family', [gall.family]);
+                                        setValue('abundance', [pipe(gall.abundance, O.getOrElse(constant(AT.EmptyAbundance)))]);
+                                        setValue('commonnames', pipe(gall.commonnames, O.getOrElse(constant(''))));
+                                        setValue('synonyms', pipe(gall.synonyms, O.getOrElse(constant(''))));
+                                        setGallDetails(gall.id);
+                                    }
+                                }}
+                                onBlurT={(e) => {
+                                    if (!errors.value) {
+                                        setValue('genus', extractGenus(e.target.value));
+                                    }
+                                }}
+                                placeholder="Name"
+                                options={galls}
+                                labelKey="name"
+                                clearButton
+                                isInvalid={!!errors.value}
+                                newSelectionPrefix="Add a new Gall: "
+                                allowNew={true}
+                            />
+                            {errors.value && (
+                                <span className="text-danger">
+                                    Name is required and must be in standard binomial form, e.g., Andricus weldi
+                                </span>
+                            )}
+                        </Col>
+                        <Col>
+                            Genus (filled automatically):
+                            <input type="text" name="genus" className="form-control" readOnly tabIndex={-1} ref={register} />
+                        </Col>
+                        <Col>
+                            Family:
+                            <ControlledTypeahead
+                                control={control}
+                                name="family"
+                                placeholder="Family"
+                                options={families}
+                                labelKey="name"
+                            />
+                            {errors.family && (
+                                <span className="text-danger">
+                                    The Family name is required. If it is not present in the list you will have to go add the
+                                    family first. :(
+                                </span>
+                            )}
+                        </Col>
+                        <Col>
+                            Abundance:
+                            <ControlledTypeahead
+                                control={control}
+                                name="abundance"
+                                placeholder=""
+                                options={abundances}
+                                labelKey="abundance"
+                                clearButton
+                            />
+                        </Col>
+                    </Row>
+                    <Row className="form-group">
+                        <Col>
+                            Common Names (comma-delimited):
+                            <input type="text" placeholder="" name="commonnames" className="form-control" ref={register} />
+                        </Col>
+                        <Col>
+                            Synonyms (comma-delimited):
+                            <input type="text" placeholder="" name="synonyms" className="form-control" ref={register} />
+                        </Col>
+                    </Row>
+                    <Row className="form-group">
+                        <Col>
+                            Hosts:
+                            <ControlledTypeahead
+                                control={control}
+                                name="hosts"
+                                placeholder="Hosts"
+                                options={hosts}
+                                labelKey="name"
+                                multiple
+                                clearButton
+                            />
+                            {errors.hosts && <span className="text-danger">You must map this gall to at least one host.</span>}
+                        </Col>
+                    </Row>
+                    <Row className="form-group">
+                        <Col>
+                            Detachable:
+                            <input
+                                type="checkbox"
+                                placeholder="Detachable"
+                                name="detachable"
+                                className="form-control"
+                                ref={register}
+                            />
+                        </Col>
+                        <Col>
+                            Walls:
+                            <ControlledTypeahead
+                                control={control}
+                                name="walls"
+                                placeholder=""
+                                options={walls}
+                                labelKey="walls"
+                                clearButton
+                            />
+                        </Col>
+                        <Col>
+                            Cells:
+                            <ControlledTypeahead
+                                control={control}
+                                name="cells"
+                                placeholder=""
+                                options={cells}
+                                labelKey="cells"
+                                clearButton
+                            />
+                        </Col>
+                        <Col>
+                            Alignment:
+                            <ControlledTypeahead
+                                control={control}
+                                name="alignment"
+                                placeholder=""
+                                options={alignments}
+                                labelKey="alignment"
+                                clearButton
+                            />
+                        </Col>
+                    </Row>
+                    <Row className="form-group">
+                        <Col>
+                            Color:
+                            <ControlledTypeahead
+                                control={control}
+                                name="color"
+                                placeholder=""
+                                options={colors}
+                                labelKey="color"
+                                clearButton
+                            />
+                        </Col>
+                        <Col>
+                            Shape:
+                            <ControlledTypeahead
+                                control={control}
+                                name="shape"
+                                placeholder=""
+                                options={shapes}
+                                labelKey="shape"
+                                clearButton
+                            />
+                        </Col>{' '}
+                    </Row>
+                    <Row className="form-group">
+                        <Col>
+                            Location(s):
+                            <ControlledTypeahead
+                                control={control}
+                                name="locations"
+                                placeholder=""
+                                options={locations}
+                                labelKey="loc"
+                                multiple
+                                clearButton
+                            />
+                        </Col>
+                        <Col>
+                            Texture(s):
+                            <ControlledTypeahead
+                                control={control}
+                                name="textures"
+                                placeholder=""
+                                options={textures}
+                                labelKey="tex"
+                                multiple
+                                clearButton
+                            />
+                        </Col>
+                    </Row>
+                    <Row className="fromGroup" hidden={!existing}>
+                        <Col xs="1">Delete?:</Col>
+                        <Col className="mr-auto">
+                            <input name="del" type="checkbox" className="form-check-input" ref={register} />
+                        </Col>
+                    </Row>
+                    <Row className="formGroup">
+                        <Col>
+                            <input type="submit" className="button" value="Submit" />
+                        </Col>
+                    </Row>
+                    <Row hidden={!deleteResults}>
+                        <Col>{`Deleted ${deleteResults?.name}.`}</Col>
+                    </Row>
+                </form>
+            </>
         </Auth>
     );
 };

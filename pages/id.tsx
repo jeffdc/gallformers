@@ -2,6 +2,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
+import Head from 'next/head';
 import Link from 'next/link';
 import React, { useState } from 'react';
 import { Col, ListGroup, Row } from 'react-bootstrap';
@@ -181,6 +182,10 @@ const IDGall = (props: Props): JSX.Element => {
 
     return (
         <>
+            <Head>
+                <title>ID Galls</title>
+            </Head>
+
             <form onSubmit={handleSubmit(onSubmit)} className="fixed-left mt-2 ml-4 mr-2 form-group">
                 <Row>
                     <Col>

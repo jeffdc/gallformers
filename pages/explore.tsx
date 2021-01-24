@@ -1,5 +1,7 @@
 import { GetStaticProps } from 'next';
+import Head from 'next/head';
 import Link from 'next/link';
+import React from 'react';
 import { Accordion, Button, Card, ListGroup, Tab, Tabs } from 'react-bootstrap';
 import { FamilyWithSpecies } from '../libs/api/apitypes';
 import { getGallMakerFamilies, getHostFamilies } from '../libs/db/family';
@@ -40,26 +42,32 @@ const renderList = (data: FamilyWithSpecies[], gall: boolean) => {
 
 const Explore = ({ gallmakers, hosts }: Props): JSX.Element => {
     return (
-        <Card>
-            <Card.Header>
-                <Tabs defaultActiveKey="galls">
-                    <Tab eventKey="galls" title="Galls">
-                        <Card.Body>
-                            <Card.Title>Browse Galls</Card.Title>
-                            <Card.Text>By Family</Card.Text>
-                            <Accordion>{renderList(gallmakers, true)}</Accordion>
-                        </Card.Body>
-                    </Tab>
-                    <Tab eventKey="hosts" title="Hosts">
-                        <Card.Body>
-                            <Card.Title>Browse Hosts</Card.Title>
-                            <Card.Text>By Family</Card.Text>
-                            <Accordion>{renderList(hosts, false)}</Accordion>
-                        </Card.Body>
-                    </Tab>
-                </Tabs>
-            </Card.Header>
-        </Card>
+        <>
+            <Head>
+                <title>Explore Galls</title>
+            </Head>
+
+            <Card>
+                <Card.Header>
+                    <Tabs defaultActiveKey="galls">
+                        <Tab eventKey="galls" title="Galls">
+                            <Card.Body>
+                                <Card.Title>Browse Galls</Card.Title>
+                                <Card.Text>By Family</Card.Text>
+                                <Accordion>{renderList(gallmakers, true)}</Accordion>
+                            </Card.Body>
+                        </Tab>
+                        <Tab eventKey="hosts" title="Hosts">
+                            <Card.Body>
+                                <Card.Title>Browse Hosts</Card.Title>
+                                <Card.Text>By Family</Card.Text>
+                                <Accordion>{renderList(hosts, false)}</Accordion>
+                            </Card.Body>
+                        </Tab>
+                    </Tabs>
+                </Card.Header>
+            </Card>
+        </>
     );
 };
 

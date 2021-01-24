@@ -1,10 +1,15 @@
 import { Container } from 'next/app';
+import Head from 'next/head';
 import React from 'react';
 import { Col, Row } from 'react-bootstrap';
 
 export default function About(): JSX.Element {
     return (
         <div className="p-5">
+            <Head>
+                <title>About Gallformers</title>
+            </Head>
+
             <Container>
                 <Row>
                     <Col>

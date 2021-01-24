@@ -1,5 +1,6 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import { GetServerSideProps } from 'next';
+import Head from 'next/head';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
 import { Col, Row } from 'react-bootstrap';
@@ -61,64 +62,70 @@ const Glossary = (props: Props): JSX.Element => {
 
     return (
         <Auth>
-            <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
-                <h4>Add/Modify Glossary Entries</h4>
-                <Row className="form-group">
-                    <Col>
-                        Name:
-                        <ControlledTypeahead
-                            control={control}
-                            name="value"
-                            onChangeWithNew={(e, isNew) => {
-                                setExisting(!isNew);
-                                if (isNew || !e[0]) {
-                                    setValue('definition', '');
-                                    setValue('urls', '');
-                                } else {
-                                    const entry: Entry = e[0];
-                                    setValue('definition', entry.definition);
-                                    setValue('urls', entry.urls);
-                                }
-                            }}
-                            placeholder="Word"
-                            options={glossary}
-                            labelKey={'word'}
-                            clearButton
-                            isInvalid={!!errors.value}
-                            newSelectionPrefix="Add a new Word: "
-                            allowNew={true}
-                        />
-                        {errors.value && <span className="text-danger">The Word is required.</span>}
-                    </Col>
-                </Row>
-                <Row className="form-group">
-                    <Col>
-                        Definition:
-                        <textarea name="definition" className="form-control" ref={register} rows={4} />
-                        {errors.definition && <span className="text-danger">You must provide the defintion.</span>}
-                    </Col>
-                </Row>
-                <Row className="form-group">
-                    <Col>
-                        URLs (separated by a newline [enter]):
-                        <textarea name="urls" className="form-control" ref={register} rows={3} />
-                    </Col>
-                </Row>
-                <Row className="fromGroup" hidden={!existing}>
-                    <Col xs="1">Delete?:</Col>
-                    <Col className="mr-auto">
-                        <input name="del" type="checkbox" className="form-check-input" ref={register} />
-                    </Col>
-                </Row>
-                <Row className="form-input">
-                    <Col>
-                        <input type="submit" className="button" value="Submit" />
-                    </Col>
-                </Row>
-                <Row hidden={!deleteResults}>
-                    <Col>{`Deleted ${deleteResults?.name}.`}</Col>☹️
-                </Row>
-            </form>
+            <>
+                <Head>
+                    <title>Add/Edit Glossary Entries</title>
+                </Head>
+
+                <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
+                    <h4>Add/Edit Glossary Entries</h4>
+                    <Row className="form-group">
+                        <Col>
+                            Name:
+                            <ControlledTypeahead
+                                control={control}
+                                name="value"
+                                onChangeWithNew={(e, isNew) => {
+                                    setExisting(!isNew);
+                                    if (isNew || !e[0]) {
+                                        setValue('definition', '');
+                                        setValue('urls', '');
+                                    } else {
+                                        const entry: Entry = e[0];
+                                        setValue('definition', entry.definition);
+                                        setValue('urls', entry.urls);
+                                    }
+                                }}
+                                placeholder="Word"
+                                options={glossary}
+                                labelKey={'word'}
+                                clearButton
+                                isInvalid={!!errors.value}
+                                newSelectionPrefix="Add a new Word: "
+                                allowNew={true}
+                            />
+                            {errors.value && <span className="text-danger">The Word is required.</span>}
+                        </Col>
+                    </Row>
+                    <Row className="form-group">
+                        <Col>
+                            Definition:
+                            <textarea name="definition" className="form-control" ref={register} rows={4} />
+                            {errors.definition && <span className="text-danger">You must provide the defintion.</span>}
+                        </Col>
+                    </Row>
+                    <Row className="form-group">
+                        <Col>
+                            URLs (separated by a newline [enter]):
+                            <textarea name="urls" className="form-control" ref={register} rows={3} />
+                        </Col>
+                    </Row>
+                    <Row className="fromGroup" hidden={!existing}>
+                        <Col xs="1">Delete?:</Col>
+                        <Col className="mr-auto">
+                            <input name="del" type="checkbox" className="form-check-input" ref={register} />
+                        </Col>
+                    </Row>
+                    <Row className="form-input">
+                        <Col>
+                            <input type="submit" className="button" value="Submit" />
+                        </Col>
+                    </Row>
+                    <Row hidden={!deleteResults}>
+                        <Col>{`Deleted ${deleteResults?.name}.`}</Col>☹️
+                    </Row>
+                </form>
+            </>
         </Auth>
     );
 };

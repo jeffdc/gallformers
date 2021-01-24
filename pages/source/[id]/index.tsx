@@ -1,4 +1,5 @@
 import { GetStaticPaths, GetStaticProps } from 'next';
+import Head from 'next/head';
 import { useRouter } from 'next/router';
 import React from 'react';
 import { Col, Row } from 'react-bootstrap';
@@ -19,6 +20,10 @@ const Source = ({ source }: Props): JSX.Element => {
 
     return (
         <div className="p-3 m-3">
+            <Head>
+                <title>{source.title}</title>
+            </Head>
+
             <Row className="pb-4">
                 <Col>
                     <h2>{source.title}</h2>

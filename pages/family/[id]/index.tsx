@@ -1,5 +1,6 @@
 import { family, species } from '@prisma/client';
 import { GetStaticPaths, GetStaticProps } from 'next';
+import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React from 'react';
@@ -36,6 +37,10 @@ const Family = ({ family, species }: Props): JSX.Element => {
                 marginRight: '5%',
             }}
         >
+            <Head>
+                <title>{family.name}</title>
+            </Head>
+
             <Media>
                 <Media.Body>
                     <Container className="p-3">

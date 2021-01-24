@@ -1,6 +1,7 @@
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
+import Head from 'next/head';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
@@ -20,6 +21,7 @@ type SearchResultItem = {
 
 type Props = {
     results: SearchResultItem[];
+    search: string;
 };
 
 const makeLink = (i: SearchResultItem) => {
@@ -68,7 +70,7 @@ const imageForType = (type: string) => {
     }
 };
 
-const GlobalSearch = ({ results }: Props): JSX.Element => {
+const GlobalSearch = ({ results, search }: Props): JSX.Element => {
     const { items, requestSort, sortConfig } = useSortableData(results, { key: 'name', direction: 'asc' });
 
     if (results.length <= 0) {
@@ -81,6 +83,10 @@ const GlobalSearch = ({ results }: Props): JSX.Element => {
 
     return (
         <div className="fixed-left mt-2 ml-4 mr-2">
+            <Head>
+                <title>Search Results - {`'${search}'`}</title>
+            </Head>
+
             <Table striped>
                 <thead>
                     <tr>
@@ -178,6 +184,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     return {
         props: {
             results: r,
+            search: search,
         },
     };
 };

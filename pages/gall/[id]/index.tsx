@@ -3,6 +3,7 @@ import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { GetStaticPaths, GetStaticProps } from 'next';
+import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { MouseEvent, useState } from 'react';
@@ -74,6 +75,9 @@ const Gall = ({ species, imagePaths }: Props): JSX.Element => {
                 marginRight: '5%',
             }}
         >
+            <Head>
+                <title>{species.name}</title>
+            </Head>
             <Media>
                 <Media.Body>
                     <Container className="p-1">

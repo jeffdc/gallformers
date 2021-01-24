@@ -1,5 +1,6 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import { GetServerSideProps } from 'next';
+import Head from 'next/head';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
 import { Col, Row } from 'react-bootstrap';
@@ -62,59 +63,66 @@ const Family = (props: Props): JSX.Element => {
 
     return (
         <Auth>
-            <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
-                <h4>Add A Family</h4>
-                <Row className="form-group">
-                    <Col>
-                        Name:
-                        <ControlledTypeahead
-                            control={control}
-                            name="value"
-                            placeholder="Name"
-                            options={families}
-                            labelKey="name"
-                            clearButton
-                            isInvalid={!!errors.value}
-                            newSelectionPrefix="Add a new Family: "
-                            allowNew={true}
-                            onChangeWithNew={(e, isNew) => {
-                                setExisting(!isNew);
-                                const d = isNew || !e[0] ? '' : (e[0] as FamilyApi).description;
-                                setValue('description', d);
-                            }}
-                        />
-                        {errors.value && <span className="text-danger">The Name is required.</span>}
-                    </Col>
-                </Row>
-                <Row className="form-group">
-                    <Col>
-                        Description:
-                        <select name="description" className="form-control" ref={register}>
-                            {genOptions(ALL_FAMILY_TYPES)}
-                        </select>
-                        {errors.description && <span className="text-danger">You must provide the description.</span>}
-                    </Col>
-                </Row>
-                <Row className="fromGroup" hidden={!existing}>
-                    <Col xs="1">Delete?:</Col>
-                    <Col className="mr-auto">
-                        <input name="del" type="checkbox" className="form-check-input" ref={register} />
-                    </Col>
-                    <Col xs="8">
-                        <em className="text-danger">
-                            Caution. If there are any species (galls or hosts) assigned to this Family they too will be deleted.
-                        </em>
-                    </Col>
-                </Row>
-                <Row className="form-input">
-                    <Col>
-                        <input type="submit" className="button" value="Submit" />
-                    </Col>
-                </Row>
-                <Row hidden={!deleteResults}>
-                    <Col>{`Deleted ${deleteResults?.name}.`}</Col>☹️
-                </Row>
-            </form>
+            <>
+                <Head>
+                    <title>Add/Edit Families</title>
+                </Head>
+
+                <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
+                    <h4>Add or Edit a Family</h4>
+                    <Row className="form-group">
+                        <Col>
+                            Name:
+                            <ControlledTypeahead
+                                control={control}
+                                name="value"
+                                placeholder="Name"
+                                options={families}
+                                labelKey="name"
+                                clearButton
+                                isInvalid={!!errors.value}
+                                newSelectionPrefix="Add a new Family: "
+                                allowNew={true}
+                                onChangeWithNew={(e, isNew) => {
+                                    setExisting(!isNew);
+                                    const d = isNew || !e[0] ? '' : (e[0] as FamilyApi).description;
+                                    setValue('description', d);
+                                }}
+                            />
+                            {errors.value && <span className="text-danger">The Name is required.</span>}
+                        </Col>
+                    </Row>
+                    <Row className="form-group">
+                        <Col>
+                            Description:
+                            <select name="description" className="form-control" ref={register}>
+                                {genOptions(ALL_FAMILY_TYPES)}
+                            </select>
+                            {errors.description && <span className="text-danger">You must provide the description.</span>}
+                        </Col>
+                    </Row>
+                    <Row className="fromGroup" hidden={!existing}>
+                        <Col xs="1">Delete?:</Col>
+                        <Col className="mr-auto">
+                            <input name="del" type="checkbox" className="form-check-input" ref={register} />
+                        </Col>
+                        <Col xs="8">
+                            <em className="text-danger">
+                                Caution. If there are any species (galls or hosts) assigned to this Family they too will be
+                                deleted.
+                            </em>
+                        </Col>
+                    </Row>
+                    <Row className="form-input">
+                        <Col>
+                            <input type="submit" className="button" value="Submit" />
+                        </Col>
+                    </Row>
+                    <Row hidden={!deleteResults}>
+                        <Col>{`Deleted ${deleteResults?.name}.`}</Col>☹️
+                    </Row>
+                </form>
+            </>
         </Auth>
     );
 };

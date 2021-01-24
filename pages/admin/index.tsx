@@ -1,3 +1,4 @@
+import Head from 'next/head';
 import Link from 'next/link';
 import React from 'react';
 import { Col, ListGroup, ListGroupItem, Row } from 'react-bootstrap';
@@ -7,6 +8,9 @@ const Admin = (): JSX.Element => {
     return (
         <Auth>
             <div className="p-3 m-3">
+                <Head>
+                    <title>Administration</title>
+                </Head>
                 <Row>
                     <Col>Things that you can do as an Admin:</Col>
                 </Row>

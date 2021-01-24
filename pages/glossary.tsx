@@ -1,4 +1,5 @@
 import { GetStaticProps } from 'next';
+import Head from 'next/head';
 import React from 'react';
 import { ListGroup } from 'react-bootstrap';
 import { entriesWithLinkedDefs, EntryLinked } from '../libs/pages/glossary';
@@ -33,6 +34,9 @@ const Glossary = ({ es }: Props): JSX.Element => {
     }
     return (
         <div>
+            <Head>
+                <title>Glossary</title>
+            </Head>
             <h1 className="ml-3 pt-3">A Glossary of Gall Related Terminology</h1>
             <ListGroup className="m-2 p-2">
                 {es.map((e) => (

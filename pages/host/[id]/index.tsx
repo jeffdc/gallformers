@@ -1,6 +1,7 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetStaticPaths, GetStaticProps } from 'next';
+import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { MouseEvent, useState } from 'react';
@@ -57,6 +58,10 @@ const Host = ({ host }: Props): JSX.Element => {
                 marginRight: '5%',
             }}
         >
+            <Head>
+                <title>{host.name}</title>
+            </Head>
+
             <Media>
                 <img width={170} height={128} className="mr-3" src="" alt={host.name} />
                 <Media.Body>

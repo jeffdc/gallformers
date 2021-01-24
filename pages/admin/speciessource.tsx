@@ -1,6 +1,7 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import { source, species, speciessource } from '@prisma/client';
 import { GetServerSideProps } from 'next';
+import Head from 'next/head';
 import Link from 'next/link';
 import React, { useState } from 'react';
 import { Col, Row } from 'react-bootstrap';
@@ -128,95 +129,102 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
 
     return (
         <Auth>
-            <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
-                <h4>Map Species & Sources</h4>
-                <p>
-                    First select both a species and a source. If a mapping already exists then the description will display.Then
-                    you can edit the mapping.
-                </p>
-                <Row className="form-group">
-                    <Col>
-                        Species:
-                        <ControlledTypeahead
-                            control={control}
-                            name="species"
-                            placeholder="Species"
-                            options={species.map((h) => h.name)}
-                            isInvalid={!!errors.species}
-                            onBlur={checkAlreadyExists}
-                            clearButton
-                        />
-                        {errors.species && <span className="text-danger">You must provide a species or genus to map.</span>}
-                    </Col>
-                </Row>
-                <Row>
-                    <Col xs={1} className="p-0 m-0 mx-auto">
-                        <h2>⇅</h2>
-                    </Col>
-                </Row>
-                <Row className="form-group">
-                    <Col>
-                        Source:
-                        <ControlledTypeahead
-                            control={control}
-                            name="source"
-                            placeholder="Source"
-                            options={sources.map((h) => h.title)}
-                            isInvalid={!!errors.source}
-                            onBlur={checkAlreadyExists}
-                            clearButton
-                        />
-                        {errors.source && <span className="text-danger">You must provide a source to map.</span>}
-                    </Col>
-                </Row>
-                <Row className="form-group">
-                    <Col>
-                        Description (this is the relevant info from the selected Source about the selected Species):
-                        <textarea name="description" className="form-control" ref={register} rows={8} />
-                    </Col>
-                </Row>
-                <Row className="form-group">
-                    <Col>
-                        External Description Link:
-                        <input type="text" placeholder="" name="externallink" className="form-control" ref={register} />
-                    </Col>
-                </Row>
-                <Row className="form-group">
-                    <Col>
-                        <input type="checkbox" name="useasdefault" className="form-check-inline" ref={register} />
-                        <label className="form-check-label">Use as Default?</label>
-                    </Col>
-                </Row>
-                <Row className="fromGroup" hidden={!existing}>
-                    <Col xs="1">Delete?:</Col>
-                    <Col className="mr-auto">
-                        <input name="delete" type="checkbox" className="form-check-input" ref={register} />
-                    </Col>
-                </Row>
-                <Row className="formGroup">
-                    <Col>
-                        <input type="submit" className="button" value="Submit" />
-                    </Col>
-                </Row>
-                <Row hidden={!deleteResults}>
-                    <Col>{`Deleted ${deleteResults?.name}.`}</Col>
-                </Row>
-                {results && (
-                    <>
-                        <span>
-                            Mapped{' '}
-                            <Link href={`/source/${results.source_id}`}>
-                                <a>source</a>
-                            </Link>{' '}
-                            to{' '}
-                            <Link href={`/${isGall ? 'gall' : 'host'}/${results.species_id}`}>
-                                <a>species</a>
-                            </Link>
-                            .
-                        </span>
-                    </>
-                )}
-            </form>
+            <>
+                <Head>
+                    <title>Map Species & Sources</title>
+                </Head>
+
+                <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
+                    <h4>Map Species & Sources</h4>
+                    <p>
+                        First select both a species and a source. If a mapping already exists then the description will
+                        display.Then you can edit the mapping.
+                    </p>
+                    <Row className="form-group">
+                        <Col>
+                            Species:
+                            <ControlledTypeahead
+                                control={control}
+                                name="species"
+                                placeholder="Species"
+                                options={species.map((h) => h.name)}
+                                isInvalid={!!errors.species}
+                                onBlur={checkAlreadyExists}
+                                clearButton
+                            />
+                            {errors.species && <span className="text-danger">You must provide a species or genus to map.</span>}
+                        </Col>
+                    </Row>
+                    <Row>
+                        <Col xs={1} className="p-0 m-0 mx-auto">
+                            <h2>⇅</h2>
+                        </Col>
+                    </Row>
+                    <Row className="form-group">
+                        <Col>
+                            Source:
+                            <ControlledTypeahead
+                                control={control}
+                                name="source"
+                                placeholder="Source"
+                                options={sources.map((h) => h.title)}
+                                isInvalid={!!errors.source}
+                                onBlur={checkAlreadyExists}
+                                clearButton
+                            />
+                            {errors.source && <span className="text-danger">You must provide a source to map.</span>}
+                        </Col>
+                    </Row>
+                    <Row className="form-group">
+                        <Col>
+                            Description (this is the relevant info from the selected Source about the selected Species):
+                            <textarea name="description" className="form-control" ref={register} rows={8} />
+                        </Col>
+                    </Row>
+                    <Row className="form-group">
+                        <Col>
+                            Direct Link to Description Page (if available, eg at BHL or HathiTrust. Do not duplicate main
+                            source-level link or link to a pdf):
+                            <input type="text" placeholder="" name="externallink" className="form-control" ref={register} />
+                        </Col>
+                    </Row>
+                    <Row className="form-group">
+                        <Col>
+                            <input type="checkbox" name="useasdefault" className="form-check-inline" ref={register} />
+                            <label className="form-check-label">Use as Default?</label>
+                        </Col>
+                    </Row>
+                    <Row className="fromGroup" hidden={!existing}>
+                        <Col xs="1">Delete?:</Col>
+                        <Col className="mr-auto">
+                            <input name="delete" type="checkbox" className="form-check-input" ref={register} />
+                        </Col>
+                    </Row>
+                    <Row className="formGroup">
+                        <Col>
+                            <input type="submit" className="button" value="Submit" />
+                        </Col>
+                    </Row>
+                    <Row hidden={!deleteResults}>
+                        <Col>{`Deleted ${deleteResults?.name}.`}</Col>
+                    </Row>
+                    {results && (
+                        <>
+                            <span>
+                                Mapped{' '}
+                                <Link href={`/source/${results.source_id}`}>
+                                    <a>source</a>
+                                </Link>{' '}
+                                to{' '}
+                                <Link href={`/${isGall ? 'gall' : 'host'}/${results.species_id}`}>
+                                    <a>species</a>
+                                </Link>
+                                .
+                            </span>
+                        </>
+                    )}
+                </form>
+            </>
         </Auth>
     );
 };
