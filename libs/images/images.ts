@@ -20,7 +20,7 @@ export const ENDPOINT = 'https://gallformers.s3.us-east-2.amazonaws.com';
 
 const checkCred = (cred: string | undefined): string => {
     if (process.env.NODE_ENV === 'production') {
-        if (cred == undefined) throw new Error('AWS credentials are not configured!');
+        if (cred == undefined) logger.error('AWS credentials are not configured!');
     }
 
     return cred == undefined ? '' : cred;
