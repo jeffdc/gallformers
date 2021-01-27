@@ -7,7 +7,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { MouseEvent, useState } from 'react';
-import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
+import { Button, Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
 import AddImage from '../../../components/addimage';
 import Images from '../../../components/images';
 import { GallApi, GallHost, ImagePaths, SpeciesSourceApi } from '../../../libs/api/apitypes';
@@ -24,6 +24,33 @@ type Props = {
     imagePaths: ImagePaths;
 };
 
+const sourceSortOptions = [
+    {
+        id: 0,
+        text: "Year ▲",
+        order: 1,
+        property: "pubyear"
+    },
+    {
+        id: 1,
+        text: "Year ▼",
+        order: -1,
+        property: "pubyear"
+    },
+    {
+        id: 2,
+        text: "Author ▲",
+        order: 1,
+        property: "citation"
+    },
+    {
+        id: 3,
+        text: "Author ▼",
+        order: -1,
+        property: "citation"
+    }
+];
+
 // eslint-disable-next-line react/display-name
 const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
     return (
@@ -38,6 +65,10 @@ const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
 const Gall = ({ species, imagePaths }: Props): JSX.Element => {
     const source = species ? species.speciessource.find((s) => s.useasdefault !== 0) : undefined;
     const [selectedSource, setSelectedSource] = useState(source);
+
+    // Initially sort the list of sources by most recent year.
+    species.speciessource.sort((a, b) => -a.source.pubyear.localeCompare(b.source.pubyear));
+    const [sourceList, setSourceList] = useState({data: species.speciessource, sort: sourceSortOptions[1]});
     const [images, setImages] = useState(imagePaths);
 
     const router = useRouter();
@@ -66,6 +97,19 @@ const Gall = ({ species, imagePaths }: Props): JSX.Element => {
         const id = e.currentTarget.id;
         const s = species.speciessource.find((s) => s.source_id.toString() === id);
         setSelectedSource(s);
+    };
+
+    const sortSourceList = () => {
+        const newSort = sourceSortOptions[(sourceList.sort.id + 1) % sourceSortOptions.length];
+        const sortOrder = newSort.order;
+        const sortProperty = newSort.property;
+
+        const sortedData = [...sourceList.data];
+        sortedData.sort((a,b) => sortOrder * a.source[sortProperty].localeCompare(b.source[sortProperty]));
+
+        setSourceList({data: sortedData, sort: newSort});
+        console.log(sourceList.data.map(a=>a.source));
+        console.log(sourceList.sort);
     };
 
     return (
@@ -179,9 +223,10 @@ const Gall = ({ species, imagePaths }: Props): JSX.Element => {
                         <Row>
                             <Col>
                                 <strong>Further Information:</strong>
+                                <br/>
+                                <Button variant="outline-secondary" onClick={sortSourceList}>{sourceList.sort.text}</Button>
                                 <ListGroup variant="flush" defaultActiveKey={selectedSource?.source_id}>
-                                    {species.speciessource
-                                        .sort((a, b) => a.source.citation.localeCompare(b.source.citation))
+                                    {sourceList.data
                                         .map((speciessource) => (
                                             <ListGroup.Item
                                                 key={speciessource.source_id}
