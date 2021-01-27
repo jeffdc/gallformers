@@ -51,10 +51,10 @@ client.middlewareStack.add(
     { step: 'build' },
 );
 
-const ORIGINAL = 'original';
-const SMALL = 'small';
-const MEDIUM = 'medium';
-const LARGE = 'large';
+export const ORIGINAL = 'original';
+export const SMALL = 'small';
+export const MEDIUM = 'medium';
+export const LARGE = 'large';
 export type ImageSize = typeof ORIGINAL | typeof SMALL | typeof MEDIUM | typeof LARGE;
 
 export const getImagePaths = async (speciesId: number): Promise<ImagePaths> => {
@@ -77,9 +77,9 @@ export const getImagePaths = async (speciesId: number): Promise<ImagePaths> => {
     };
 };
 
-export const toImagePaths = (images: image[]): ImagePaths => {
-    const makePath = (path: string, size: ImageSize): string => `${EDGE}/${path.replace(ORIGINAL, size)}`;
+export const makePath = (path: string, size: ImageSize): string => `${EDGE}/${path.replace(ORIGINAL, size)}`;
 
+export const toImagePaths = (images: image[]): ImagePaths => {
     return images.reduce(
         (paths, image) => {
             paths.small.push(makePath(image.path, SMALL));

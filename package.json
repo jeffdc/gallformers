@@ -52,6 +52,7 @@
     "yup": "^0.29.3"
   },
   "devDependencies": {
+    "@hookform/devtools": "^2.2.1",
     "@prisma/cli": "^2.13.1",
     "@testing-library/jest-dom": "^5.11.6",
     "@testing-library/react": "^11.2.2",

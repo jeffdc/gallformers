@@ -331,6 +331,7 @@ export type GlossaryEntryUpsertFields = Deletable & {
 };
 
 export type ImageApi = {
+    id: number;
     attribution: string;
     creator: string;
     license: string;
@@ -339,6 +340,10 @@ export type ImageApi = {
     uploader: string;
     speciesid: number;
     default: boolean;
+    small: string;
+    medium: string;
+    large: string;
+    original: string;
 };
 
 export type ImagePaths = {

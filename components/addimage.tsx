@@ -52,6 +52,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
 
             if (resp) {
                 images.push({
+                    id: -1,
                     attribution: '',
                     creator: '',
                     license: '',
@@ -60,11 +61,15 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                     uploader: session.user.name,
                     speciesid: id,
                     default: false,
+                    small: '',
+                    medium: '',
+                    large: '',
+                    original: '',
                 });
             }
         }
         // update the database with the new image(s)
-        const dbres = await fetch('../api/images/', {
+        const dbres = await fetch('../api/images/upsert', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

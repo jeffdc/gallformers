@@ -96,7 +96,7 @@ const Gall = ({
     });
     const router = useRouter();
 
-    const [existing, setExisting] = useState(false);
+    const [existingId, setExistingId] = useState<number | undefined>(undefined);
     const [deleteResults, setDeleteResults] = useState<AT.DeleteResult>();
     const [galls, setGalls] = useState(gs);
 
@@ -183,8 +183,8 @@ const Gall = ({
                                 control={control}
                                 name="value"
                                 onChangeWithNew={(e, isNew) => {
-                                    setExisting(!isNew);
                                     if (isNew || !e[0]) {
+                                        setExistingId(undefined);
                                         setValue('genus', extractGenus(e[0] ? e[0].name : ''));
                                         setValue('family', [AT.EmptyFamily]);
                                         setValue('abundance', [AT.EmptyAbundance]);
@@ -201,6 +201,7 @@ const Gall = ({
                                         setValue('hosts', []);
                                     } else {
                                         const gall: AT.GallApi = e[0];
+                                        setExistingId(gall.id);
                                         setValue('family', [gall.family]);
                                         setValue('abundance', [pipe(gall.abundance, O.getOrElse(constant(AT.EmptyAbundance)))]);
                                         setValue('commonnames', pipe(gall.commonnames, O.getOrElse(constant(''))));
@@ -379,7 +380,7 @@ const Gall = ({
                             />
                         </Col>
                     </Row>
-                    <Row className="fromGroup" hidden={!existing}>
+                    <Row className="fromGroup" hidden={!existingId}>
                         <Col xs="1">Delete?:</Col>
                         <Col className="mr-auto">
                             <input name="del" type="checkbox" className="form-check-input" ref={register} />
@@ -392,6 +393,12 @@ const Gall = ({
                     </Row>
                     <Row hidden={!deleteResults}>
                         <Col>{`Deleted ${deleteResults?.name}.`}</Col>
+                    </Row>
+                    <Row hidden={!existingId}>
+                        <Col>
+                            <br />
+                            <Link href={`./images?speciesid=${existingId}`}>Add/Edit Images for this Gall</Link>
+                        </Col>
                     </Row>
                 </form>
             </>
