@@ -10,7 +10,7 @@ import React, { MouseEvent, useState } from 'react';
 import { Button, Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
 import AddImage from '../../../components/addimage';
 import Images from '../../../components/images';
-import { GallApi, GallHost, ImagePaths, SpeciesSourceApi } from '../../../libs/api/apitypes';
+import { GallApi, GallHost, ImagePaths, SpeciesSourceApi, SourceApi } from '../../../libs/api/apitypes';
 import { allGallIds, gallById } from '../../../libs/db/gall';
 import { getImagePaths } from '../../../libs/images/images';
 import { linkTextFromGlossary } from '../../../libs/pages/glossary';
@@ -24,32 +24,26 @@ type Props = {
     imagePaths: ImagePaths;
 };
 
-const sourceSortOptions = [
+type SortPropertyOption = {
+    property: keyof Pick<SourceApi, 'pubyear' | 'citation'>;
+    propertyText: string;
+};
+
+const sourceSortPropertyOptions: SortPropertyOption[] = [
     {
-        id: 0,
-        text: "Year ▲",
-        order: 1,
-        property: "pubyear"
+        property: 'pubyear',
+        propertyText: 'Year',
     },
     {
-        id: 1,
-        text: "Year ▼",
-        order: -1,
-        property: "pubyear"
+        property: 'citation',
+        propertyText: 'Author',
     },
-    {
-        id: 2,
-        text: "Author ▲",
-        order: 1,
-        property: "citation"
-    },
-    {
-        id: 3,
-        text: "Author ▼",
-        order: -1,
-        property: "citation"
-    }
 ];
+
+type SortOrderOption = 1 | -1;
+
+const ascText = '▲';
+const descText = '▼';
 
 // eslint-disable-next-line react/display-name
 const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
@@ -68,7 +62,7 @@ const Gall = ({ species, imagePaths }: Props): JSX.Element => {
 
     // Initially sort the list of sources by most recent year.
     species.speciessource.sort((a, b) => -a.source.pubyear.localeCompare(b.source.pubyear));
-    const [sourceList, setSourceList] = useState({data: species.speciessource, sort: sourceSortOptions[1]});
+    const [sourceList, setSourceList] = useState({ data: species.speciessource, sortIndex: 0, sortOrder: -1 });
     const [images, setImages] = useState(imagePaths);
 
     const router = useRouter();
@@ -100,16 +94,23 @@ const Gall = ({ species, imagePaths }: Props): JSX.Element => {
     };
 
     const sortSourceList = () => {
-        const newSort = sourceSortOptions[(sourceList.sort.id + 1) % sourceSortOptions.length];
-        const sortOrder = newSort.order;
-        const sortProperty = newSort.property;
+        const newSortIndex = (sourceList.sortIndex + 1) % sourceSortPropertyOptions.length;
+        const sortProperty = sourceSortPropertyOptions[newSortIndex].property;
 
-        const sortedData = [...sourceList.data];
-        sortedData.sort((a,b) => sortOrder * a.source[sortProperty].localeCompare(b.source[sortProperty]));
+        const newData = [...sourceList.data];
+        newData.sort((a, b) => sourceList.sortOrder * a.source[sortProperty].localeCompare(b.source[sortProperty]));
 
-        setSourceList({data: sortedData, sort: newSort});
-        console.log(sourceList.data.map(a=>a.source));
-        console.log(sourceList.sort);
+        setSourceList({ data: newData, sortIndex: newSortIndex, sortOrder: sourceList.sortOrder });
+    };
+
+    const toggleAscDesc = () => {
+        const newSortOrder: SortOrderOption = sourceList.sortOrder == -1 ? 1 : -1; // multiplication does not work on constrained type.
+        const sortProperty = sourceSortPropertyOptions[sourceList.sortIndex].property;
+
+        const newData = [...sourceList.data];
+        newData.sort((a, b) => newSortOrder * a.source[sortProperty].localeCompare(b.source[sortProperty]));
+
+        setSourceList({ data: newData, sortIndex: sourceList.sortIndex, sortOrder: newSortOrder });
     };
 
     return (
@@ -223,23 +224,28 @@ const Gall = ({ species, imagePaths }: Props): JSX.Element => {
                         <Row>
                             <Col>
                                 <strong>Further Information:</strong>
-                                <br/>
-                                <Button variant="outline-secondary" onClick={sortSourceList}>{sourceList.sort.text}</Button>
+                                <div style={{ display: 'flex' }}>
+                                    <Button variant="outline-secondary" onClick={sortSourceList}>
+                                        {sourceSortPropertyOptions[sourceList.sortIndex].propertyText}
+                                    </Button>
+                                    <Button variant="outline-secondary" onClick={toggleAscDesc}>
+                                        {sourceList.sortOrder == -1 ? descText : ascText}
+                                    </Button>
+                                </div>
                                 <ListGroup variant="flush" defaultActiveKey={selectedSource?.source_id}>
-                                    {sourceList.data
-                                        .map((speciessource) => (
-                                            <ListGroup.Item
-                                                key={speciessource.source_id}
-                                                id={speciessource.source_id.toString()}
-                                                action
-                                                onClick={changeDescription}
-                                                variant={speciessource.source_id === selectedSource?.source_id ? 'dark' : ''}
-                                            >
-                                                <Link href={`/source/${speciessource.source?.id}`}>
-                                                    <a>{speciessource.source?.citation}</a>
-                                                </Link>
-                                            </ListGroup.Item>
-                                        ))}
+                                    {sourceList.data.map((speciessource) => (
+                                        <ListGroup.Item
+                                            key={speciessource.source_id}
+                                            id={speciessource.source_id.toString()}
+                                            action
+                                            onClick={changeDescription}
+                                            variant={speciessource.source_id === selectedSource?.source_id ? 'dark' : ''}
+                                        >
+                                            <Link href={`/source/${speciessource.source?.id}`}>
+                                                <a>{speciessource.source?.citation}</a>
+                                            </Link>
+                                        </ListGroup.Item>
+                                    ))}
                                 </ListGroup>
                                 <hr />
                                 <Row className="">
