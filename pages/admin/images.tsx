@@ -124,7 +124,15 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                     <title>Add/Edit Species Images</title>
                 </Head>
 
-                {currentImage && <ImageEdit image={currentImage} onSave={saveImage} show={edit} onClose={handleClose} />}
+                {currentImage && selected && (
+                    <ImageEdit
+                        image={currentImage}
+                        speciesid={selected.id}
+                        onSave={saveImage}
+                        show={edit}
+                        onClose={handleClose}
+                    />
+                )}
 
                 <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                     <h4>Add/Edit Species Images</h4>

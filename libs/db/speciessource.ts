@@ -31,6 +31,20 @@ export const speciesSourceByIds = (speciesId: string, sourceId: string): TaskEit
     );
 };
 
+export const sourcesBySpeciesId = (speciesId: number): TaskEither<Error, SpeciesSourceApi[]> => {
+    const sources = () =>
+        db.speciessource.findMany({
+            include: { source: true },
+            where: { species_id: speciesId },
+        });
+
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        TE.tryCatch(sources, handleError),
+        TE.map(adaptor),
+    );
+};
+
 export const deleteSpeciesSourceByIds = (speciesId: string, sourceId: string): TaskEither<Error, DeleteResult> => {
     const nothingToDelete = (): DeleteResult => {
         return {
