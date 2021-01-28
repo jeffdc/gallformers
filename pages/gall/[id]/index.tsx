@@ -224,14 +224,18 @@ const Gall = ({ species, imagePaths }: Props): JSX.Element => {
                         <Row>
                             <Col>
                                 <strong>Further Information:</strong>
-                                <div style={{ display: 'flex' }}>
-                                    <Button variant="outline-secondary" onClick={sortSourceList}>
-                                        {sourceSortPropertyOptions[sourceList.sortIndex].propertyText}
-                                    </Button>
-                                    <Button variant="outline-secondary" onClick={toggleAscDesc}>
-                                        {sourceList.sortOrder == -1 ? descText : ascText}
-                                    </Button>
-                                </div>
+                            </Col>
+                            <Col xs={2}>
+                                <Button variant="outline-secondary" className="btn-sm" onClick={sortSourceList}>
+                                    {sourceSortPropertyOptions[sourceList.sortIndex].propertyText}
+                                </Button>
+                                <Button variant="outline-secondary" className="btn-sm" onClick={toggleAscDesc}>
+                                    {sourceList.sortOrder == -1 ? descText : ascText}
+                                </Button>
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col>
                                 <ListGroup variant="flush" defaultActiveKey={selectedSource?.source_id}>
                                     {sourceList.data.map((speciessource) => (
                                         <ListGroup.Item
