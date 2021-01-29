@@ -57,7 +57,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                     creator: '',
                     license: '',
                     path: path,
-                    source: '',
+                    sourcelink: '',
                     uploader: session.user.name,
                     speciesid: id,
                     default: false,

@@ -1,4 +1,4 @@
-import { image } from '@prisma/client';
+import { image, Prisma } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
@@ -6,6 +6,7 @@ import { ImageApi, ImagePaths } from '../api/apitypes';
 import { createOtherSizes, LARGE, makePath, MEDIUM, ORIGINAL, SMALL, toImagePaths } from '../images/images';
 import { handleError } from '../utils/util';
 import db from './db';
+import { connectIfNotNull } from './utils';
 
 export const addImages = (images: ImageApi[]): TaskEither<Error, ImagePaths> => {
     const add = () => {
@@ -16,10 +17,11 @@ export const addImages = (images: ImageApi[]): TaskEither<Error, ImagePaths> => 
                     creator: image.creator,
                     license: image.license,
                     path: image.path,
-                    source: image.source,
+                    sourcelink: image.sourcelink,
                     uploader: image.uploader,
                     default: image.default,
                     species: { connect: { id: image.speciesid } },
+                    source: connectIfNotNull<Prisma.sourceCreateOneWithoutImageInput, number>('source', image.sourceid),
                 },
             }),
         );
@@ -34,6 +36,7 @@ export const addImages = (images: ImageApi[]): TaskEither<Error, ImagePaths> => 
 };
 
 export const updateImage = (image: ImageApi): TaskEither<Error, ImageApi> => {
+    console.log(`Updating image: ${JSON.stringify(image, null, ' ')}`);
     const update = () =>
         db.image.update({
             where: { id: image.id },
@@ -41,8 +44,9 @@ export const updateImage = (image: ImageApi): TaskEither<Error, ImageApi> => {
                 attribution: image.attribution,
                 creator: image.creator,
                 license: image.license,
-                source: image.source,
+                sourcelink: image.sourcelink,
                 default: image.default,
+                source: connectIfNotNull<Prisma.sourceCreateOneWithoutImageInput, number>('source', image.sourceid),
             },
         });
 
@@ -60,6 +64,7 @@ const adapt = (img: image): ImageApi => ({
     medium: makePath(img.path, MEDIUM),
     large: makePath(img.path, LARGE),
     original: makePath(img.path, ORIGINAL),
+    sourceid: img.source_id ? img.source_id : undefined,
 });
 
 const adaptMany = (imgs: image[]): ImageApi[] => imgs.map(adapt);

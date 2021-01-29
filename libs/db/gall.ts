@@ -370,18 +370,18 @@ export const cells = (): TaskEither<Error, CellsApi[]> => {
 export const upsertGall = (gall: GallUpsertFields): TaskEither<Error, number> => {
     const spData = {
         family: { connect: { name: gall.family } },
-        abundance: connectIfNotNull<Prisma.abundanceCreateOneWithoutSpeciesInput>('abundance', gall.abundance),
+        abundance: connectIfNotNull<Prisma.abundanceCreateOneWithoutSpeciesInput, string>('abundance', gall.abundance),
         synonyms: gall.synonyms,
         commonnames: gall.commonnames,
     };
 
     const gallData = {
-        alignment: connectIfNotNull<Prisma.alignmentCreateOneWithoutGallInput>('alignment', gall.alignment),
-        cells: connectIfNotNull<Prisma.cellsCreateOneWithoutGallInput>('cells', gall.cells),
-        color: connectIfNotNull<Prisma.colorCreateOneWithoutGallInput>('color', gall.color),
+        alignment: connectIfNotNull<Prisma.alignmentCreateOneWithoutGallInput, string>('alignment', gall.alignment),
+        cells: connectIfNotNull<Prisma.cellsCreateOneWithoutGallInput, string>('cells', gall.cells),
+        color: connectIfNotNull<Prisma.colorCreateOneWithoutGallInput, string>('color', gall.color),
         detachable: gall.detachable ? 1 : 0,
-        shape: connectIfNotNull<Prisma.shapeCreateOneWithoutGallInput>('shape', gall.shape),
-        walls: connectIfNotNull<Prisma.wallsCreateOneWithoutGallInput>('walls', gall.walls),
+        shape: connectIfNotNull<Prisma.shapeCreateOneWithoutGallInput, string>('shape', gall.shape),
+        walls: connectIfNotNull<Prisma.wallsCreateOneWithoutGallInput, string>('walls', gall.walls),
     };
 
     const create = () =>

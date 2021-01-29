@@ -336,7 +336,8 @@ export type ImageApi = {
     creator: string;
     license: string;
     path: string;
-    source: string;
+    sourcelink: string;
+    sourceid?: number;
     uploader: string;
     speciesid: number;
     default: boolean;

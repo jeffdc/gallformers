@@ -6,7 +6,7 @@ import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useState } from 'react';
-import { Button, Col, Modal, Row, Table } from 'react-bootstrap';
+import { Col, Row, Table } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import AddImage from '../../components/addimage';
@@ -183,7 +183,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                                         </td>
                                         <td>{img.creator}</td>
                                         <td>{img.attribution}</td>
-                                        <td>{img.source}</td>
+                                        <td>{img.sourcelink}</td>
                                         <td>{img.license}</td>
                                         <td>{img.uploader}</td>
                                     </tr>

@@ -1,10 +1,8 @@
-import { useSession } from 'next-auth/client';
 import React, { useEffect, useState } from 'react';
 import { Button, Col, Modal, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import { ImageApi, SourceApi, SpeciesSourceApi } from '../libs/api/apitypes';
-import { yupResolver } from '@hookform/resolvers/yup';
 import ControlledTypeahead from './controlledtypeahead';
 import InfoTip from './infotip';
 
@@ -47,9 +45,6 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
             ...img,
         },
     });
-
-    const [session] = useSession();
-    if (!session) return <></>;
 
     useEffect(() => {
         const fetchData = async () => {
@@ -101,7 +96,10 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                             <Row className="form-group">
                                 <Col xs={3}>
                                     Default:
-                                    <InfoTip id="default" text="The default image is always the first one displayed." />
+                                    <InfoTip
+                                        id="default"
+                                        text="The default image is always the first one displayed. Only one image can be the default."
+                                    />
                                 </Col>
                                 <Col>
                                     <input type="checkbox" name="default" className="form-control" ref={register} />
@@ -118,15 +116,29 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                                         name="source"
                                         options={sources}
                                         labelKey={(s) => s.source.title}
+                                        clearButton
                                     />
                                 </Col>
                             </Row>
                             <Row>
-                                <Col className="text-center">- and/or -</Col>
+                                <Col className="">
+                                    <hr />
+                                    Generally you will only want one or the other of the above Source or the below fields.
+                                    <hr />
+                                </Col>
                             </Row>
                             <Row className="form-group">
                                 <Col xs={3}>
-                                    Attribution:
+                                    Source Link:
+                                    <InfoTip id="link" text="A link (URL) to the original image." />
+                                </Col>
+                                <Col>
+                                    <input type="text" name="sourcelink" className="form-control" ref={register} />
+                                </Col>
+                            </Row>
+                            <Row className="form-group">
+                                <Col xs={3}>
+                                    Attribution Notes:
                                     <InfoTip id="attrib" text="Any additional attribution information." />
                                 </Col>
                                 <Col>
@@ -136,19 +148,13 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                             <Row className="form-group">
                                 <Col xs={3}>
                                     Creator:
-                                    <InfoTip id="creator" text="Who created the image." />
+                                    <InfoTip
+                                        id="creator"
+                                        text="Who created the image. Usually a link to the individual. Please no emails!"
+                                    />
                                 </Col>
                                 <Col>
                                     <input type="text" name="creator" className="form-control" ref={register} />
-                                </Col>
-                            </Row>
-                            <Row className="form-group">
-                                <Col xs={3}>
-                                    Source Link:
-                                    <InfoTip id="link" text="A link to the original image." />
-                                </Col>
-                                <Col>
-                                    <input type="text" name="sourcelink" className="form-control" ref={register} />
                                 </Col>
                             </Row>
                             <Row className="form-group">
