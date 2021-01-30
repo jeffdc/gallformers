@@ -1,8 +1,7 @@
 import { abundance, family, host, Prisma, source, species, speciessource } from '@prisma/client';
-import { pipe, tuple } from 'fp-ts/lib/function';
+import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
-import * as TU from 'fp-ts/lib/Tuple';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { DeleteResult, HostApi, HostSimple, HostTaxon, SpeciesUpsertFields } from '../api/apitypes';
 import { handleError, optionalWith } from '../utils/util';

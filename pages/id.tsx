@@ -55,12 +55,12 @@ type FilterFormFields = {
 const Schema = yup.object().shape(
     {
         host: yup.array().when('genus', {
-            is: [],
-            then: yup.string().required('You must provide a search,'),
+            is: '',
+            then: yup.array().required('You must provide a search,'),
             otherwise: yup.array(),
         }),
         genus: yup.string().when('host', {
-            is: '',
+            is: (host) => host.length === 0,
             then: yup.string().required('You must provide a search,'),
             otherwise: yup.string(),
         }),
