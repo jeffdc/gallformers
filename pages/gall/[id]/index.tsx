@@ -15,7 +15,7 @@ import { allGallIds, gallById } from '../../../libs/db/gall';
 import { getImagePaths } from '../../../libs/images/images';
 import { linkTextFromGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { renderCommonNames } from '../../../libs/pages/renderhelpers';
+import { defaultSource, renderCommonNames } from '../../../libs/pages/renderhelpers';
 import { deserialize, serialize } from '../../../libs/utils/reactserialize';
 import { bugguideUrl, errorThrow, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
@@ -36,8 +36,7 @@ const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
 };
 
 const Gall = ({ species, imagePaths }: Props): JSX.Element => {
-    const source = species ? species.speciessource.find((s) => s.useasdefault !== 0) : undefined;
-    const [selectedSource, setSelectedSource] = useState(source);
+    const [selectedSource, setSelectedSource] = useState(defaultSource(species));
     const [images, setImages] = useState(imagePaths);
 
     const router = useRouter();
