@@ -57,7 +57,7 @@ const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
 };
 
 const Gall = ({ species, imagePaths }: Props): JSX.Element => {
-    const source = species ? species.speciessource.find((s) => s.useasdefault !== 0) : undefined;
+    const source = defaultSource(species);
     const [selectedSource, setSelectedSource] = useState(source);
     const [sourceList, setSourceList] = useState({ data: species?.speciessource, sortIndex: 0, sortOrder: -1 });
     const [images, setImages] = useState(imagePaths);
