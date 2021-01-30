@@ -15,7 +15,7 @@ import { allGallIds, gallById } from '../../../libs/db/gall';
 import { getImagePaths } from '../../../libs/images/images';
 import { linkTextFromGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { renderCommonNames } from '../../../libs/pages/renderhelpers';
+import { defaultSource, renderCommonNames } from '../../../libs/pages/renderhelpers';
 import { deserialize, serialize } from '../../../libs/utils/reactserialize';
 import { bugguideUrl, errorThrow, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
@@ -59,10 +59,7 @@ const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
 const Gall = ({ species, imagePaths }: Props): JSX.Element => {
     const source = species ? species.speciessource.find((s) => s.useasdefault !== 0) : undefined;
     const [selectedSource, setSelectedSource] = useState(source);
-
-    // Initially sort the list of sources by most recent year.
-    species.speciessource.sort((a, b) => -a.source.pubyear.localeCompare(b.source.pubyear));
-    const [sourceList, setSourceList] = useState({ data: species.speciessource, sortIndex: 0, sortOrder: -1 });
+    const [sourceList, setSourceList] = useState({ data: species?.speciessource, sortIndex: 0, sortOrder: -1 });
     const [images, setImages] = useState(imagePaths);
 
     const router = useRouter();
@@ -70,6 +67,9 @@ const Gall = ({ species, imagePaths }: Props): JSX.Element => {
     if (router.isFallback) {
         return <div>Loading...</div>;
     }
+
+    // Initially sort the list of sources by most recent year.
+    species.speciessource.sort((a, b) => -a.source.pubyear.localeCompare(b.source.pubyear));
 
     // the hosts will not be sorted, so sort them for display
     species.hosts.sort((a, b) => a.name.localeCompare(b.name));
