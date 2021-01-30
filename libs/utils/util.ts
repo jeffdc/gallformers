@@ -53,9 +53,13 @@ export const mightFail = <T>(defaultT: () => T) => async <S extends TE.TaskEithe
     )();
 };
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export const mightFailWithArray = <T>() => mightFail(constant(new Array<T>()));
+export const mightFailWithArray = <T>(): (<S extends TE.TaskEither<Error, Array<T>>>(s: S) => Promise<Array<T>>) =>
+    mightFail(constant(new Array<T>()));
+
 export const mightFailWithStringArray = mightFailWithArray<string>();
+
+export const mightFailWithMap = <K, V>(): (<S extends TE.TaskEither<Error, Map<K, V>>>(s: S) => Promise<Map<K, V>>) =>
+    mightFail(constant(new Map<K, V>()));
 /**
  * Cute litte hacky function to handle an error. It always throws. Being a function with a generic return type it allows
  * us to throw from within a pipe (not what one would normally want but if you want to stop the error propagation this
