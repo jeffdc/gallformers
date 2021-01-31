@@ -17,6 +17,7 @@ import {
     WallsApi,
 } from '../api/apitypes';
 import { deleteImagesBySpeciesId } from '../images/images';
+import { defaultSource } from '../pages/renderhelpers';
 import { logger } from '../utils/logger';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError, optionalWith } from '../utils/util';
@@ -81,7 +82,7 @@ export const getGalls = (
                 return []; // will resolve to nothing since we are in a flatMap
             }
             // set the default description to make the caller's life easier
-            const d = g.speciessource.find((s) => s.useasdefault === 1)?.description;
+            const d = defaultSource(g.speciessource)?.description;
 
             const newg: GallApi = {
                 ...g,

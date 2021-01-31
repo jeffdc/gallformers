@@ -41,17 +41,16 @@ export const renderParagraph = (p: string): React.ReactNode => {
  * are not sources marked as default, then the source with the oldest publication year will be used.
  * @param species
  */
-export const defaultSource = (species: GallApi): SpeciesSourceApi | undefined => {
-    if (species && species.speciessource.length > 1) {
+export const defaultSource = <T extends { useasdefault: number; source: { pubyear: string } }>(
+    speciessource: T[],
+): T | undefined => {
+    if (speciessource && speciessource.length > 1) {
         // if there is one marked as default, use that
-        const source = species.speciessource.find((s) => s.useasdefault !== 0);
+        const source = speciessource.find((s) => s.useasdefault !== 0);
         if (source) return source;
 
         // otherwise pick the one that has the oldest publication date
-        return species.speciessource.reduce(
-            (acc, v) => (acc && acc.source.pubyear < v.source.pubyear ? acc : v),
-            species.speciessource[0],
-        );
+        return speciessource.reduce((acc, v) => (acc && acc.source.pubyear < v.source.pubyear ? acc : v), speciessource[0]);
     } else {
         return undefined;
     }
