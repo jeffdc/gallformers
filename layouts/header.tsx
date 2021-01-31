@@ -70,8 +70,12 @@ const Header = (): JSX.Element => {
                             </Button>
                         </Form>
                         <OverlayTrigger placement="bottom" overlay={<Tooltip id="glossary">Glossary</Tooltip>}>
-                            <Nav.Link className="ml-auto" href="/glossary">
-                                ?
+                            <Nav.Link
+                                style={{ height: 38, width: 38 }}
+                                className="border border-success rounded m-1 text-center"
+                                href="/glossary"
+                            >
+                                <span className="text-success">?</span>
                             </Nav.Link>
                         </OverlayTrigger>
                     </Nav>
