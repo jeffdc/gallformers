@@ -9,6 +9,7 @@ import { Col, ListGroup, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import ControlledTypeahead from '../components/controlledtypeahead';
+import InfoTip from '../components/infotip';
 import {
     AlignmentApi,
     CellsApi,
@@ -17,17 +18,18 @@ import {
     GallApi,
     GallLocation,
     GallTexture,
+    HostSimple,
     SearchQuery,
     ShapeApi,
     WallsApi,
 } from '../libs/api/apitypes';
 import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
-import { allHostGenera, allHostNames } from '../libs/db/host';
+import { allHostGenera, allHostsSimple } from '../libs/db/host';
 import { checkGall } from '../libs/utils/gallsearch';
 import { capitalizeFirstLetter, mightFailWithArray, mightFailWithStringArray, truncateAtWord } from '../libs/utils/util';
 
 type SearchFormHostField = {
-    host: string;
+    host: HostSimple[];
     genus?: never;
 };
 
@@ -52,13 +54,13 @@ type FilterFormFields = {
 
 const Schema = yup.object().shape(
     {
-        host: yup.string().when('genus', {
+        host: yup.array().when('genus', {
             is: '',
-            then: yup.string().required('You must provide a search,'),
-            otherwise: yup.string(),
+            then: yup.array().required('You must provide a search,'),
+            otherwise: yup.array(),
         }),
         genus: yup.string().when('host', {
-            is: '',
+            is: (host) => host.length === 0,
             then: yup.string().required('You must provide a search,'),
             otherwise: yup.string(),
         }),
@@ -67,7 +69,7 @@ const Schema = yup.object().shape(
 );
 
 type Props = {
-    hosts: string[];
+    hosts: HostSimple[];
     genera: string[];
     locations: GallLocation[];
     colors: ColorApi[];
@@ -130,7 +132,7 @@ const IDGall = (props: Props): JSX.Element => {
         try {
             // make sure to clear all of the filters since we are getting a new set of galls
             filterReset();
-            const query = encodeURI(host ? `?host=${host}` : `?genus=${genus}`);
+            const query = encodeURI(host && host.length > 0 ? `?host=${host[0].name}` : `?genus=${genus}`);
             const res = await fetch(`../api/search${query}`, {
                 method: 'GET',
             });
@@ -199,9 +201,20 @@ const IDGall = (props: Props): JSX.Element => {
                             placeholder="Host"
                             clearButton
                             options={props.hosts}
+                            labelKey={(host: HostSimple) =>
+                                host
+                                    ? pipe(
+                                          host.commonnames,
+                                          O.fold(
+                                              constant(host.name),
+                                              (cns) => `${host.name} ${cns.length > 1 ? `- ${cns.split(',')}` : ''}`,
+                                          ),
+                                      )
+                                    : ''
+                            }
                         />
                     </Col>
-                    <Col xs={1} className="align-self-center">
+                    <Col xs={1} className="align-self-end">
                         - or -
                     </Col>
                     <Col>
@@ -210,7 +223,7 @@ const IDGall = (props: Props): JSX.Element => {
                             control={control}
                             name="genus"
                             onBlur={() => {
-                                setValue('host', '');
+                                setValue('host', []);
                             }}
                             placeholder="Genus"
                             clearButton
@@ -220,7 +233,7 @@ const IDGall = (props: Props): JSX.Element => {
                 </Row>
                 <Row>
                     <Col>
-                        {errors.host && (
+                        {(errors.genus || errors.host) && (
                             <span className="text-danger">
                                 You must provide a search selection, either a Host species or genus.
                             </span>
@@ -233,44 +246,72 @@ const IDGall = (props: Props): JSX.Element => {
                     </Col>
                 </Row>
             </form>
+            <hr />
             <Row>
                 <Col xs={3}>
                     <form className="fixed-left ml-4 form-group">
-                        <label className="col-form-label">Location(s):</label>
+                        <label className="col-form-label">
+                            Location(s):
+                            <InfoTip id="locations" text="Where on the host the gall is found." />
+                        </label>
                         {makeFormInput(
                             'locations',
                             props.locations.map((l) => l.loc),
                             true,
                         )}
-                        <label className="col-form-label">Texture(s):</label>
+                        <hr />
+                        <p className="font-italic small">
+                            Start with Host/Genus & Location. Many galls will not have associated information for all of the below
+                            properties.
+                        </p>
+                        <label className="col-form-label">
+                            Texture(s):
+                            <InfoTip
+                                id="textures"
+                                text="The look and feel of the gall. If you are unsure what any of the terms mean check the glossary (? icon on top right)."
+                            />
+                        </label>
                         {makeFormInput(
                             'textures',
                             props.textures.map((t) => t.tex),
                             true,
                         )}
-                        <label className="col-form-label">Detachable:</label>
+                        <label className="col-form-label">
+                            Detachable: <InfoTip id="detachable" text="Can the gall be removed from the host without cutting?" />
+                        </label>
                         {makeFormInput('detachable', ['yes', 'no'])}
-                        <label className="col-form-label">Aligment:</label>
+                        <label className="col-form-label">
+                            Aligment: <InfoTip id="alignment" text="How the gall is positioned relative to the host substrate." />
+                        </label>
                         {makeFormInput(
                             'alignment',
                             props.alignments.map((a) => a.alignment),
                         )}
-                        <label className="col-form-label">Walls:</label>
+                        <label className="col-form-label">
+                            Walls:{' '}
+                            <InfoTip id="walls" text="What the walls between the outside and the inside of the gall are like." />
+                        </label>
                         {makeFormInput(
                             'walls',
                             props.walls.map((w) => w.walls),
                         )}
-                        <label className="col-form-label">Cells:</label>
+                        <label className="col-form-label">
+                            Cells: <InfoTip id="locations" text="The number of internal chambers that the gall contains." />
+                        </label>
                         {makeFormInput(
                             'cells',
                             props.cells.map((c) => c.cells),
                         )}
-                        <label className="col-form-label">Shape:</label>
+                        <label className="col-form-label">
+                            Shape: <InfoTip id="locations" text="The overall shape of the gall." />
+                        </label>
                         {makeFormInput(
                             'shape',
                             props.shapes.map((s) => s.shape),
                         )}
-                        <label className="col-form-label">Color:</label>
+                        <label className="col-form-label">
+                            Color: <InfoTip id="locations" text="The outside color of the gall." />
+                        </label>
                         {makeFormInput(
                             'color',
                             props.colors.map((c) => c.color),
@@ -336,7 +377,7 @@ export const getServerSideProps: GetServerSideProps = async () => {
     // get all of the data for the typeahead boxes
     return {
         props: {
-            hosts: await mightFailWithStringArray(allHostNames()),
+            hosts: await mightFailWithArray<HostSimple>()(allHostsSimple()),
             genera: await mightFailWithStringArray(allHostGenera()),
             locations: await mightFailWithArray<GallLocation>()(locations()),
             colors: await mightFailWithArray<ColorApi>()(colors()),

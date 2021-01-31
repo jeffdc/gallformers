@@ -40,21 +40,10 @@ const EDGE = 'https://dhz6u1p7t6okk.cloudfront.net';
 const BUCKET = 'gallformers';
 const client = new S3(config);
 
-// add a middleware to work around bug. See: https://github.com/aws/aws-sdk-js-v3/issues/1800
-client.middlewareStack.add(
-    (next) => async (args) => {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        delete args.request.headers['content-type'];
-        return next(args);
-    },
-    { step: 'build' },
-);
-
-export const ORIGINAL = 'original';
-export const SMALL = 'small';
-export const MEDIUM = 'medium';
-export const LARGE = 'large';
+const ORIGINAL = 'original';
+const SMALL = 'small';
+const MEDIUM = 'medium';
+const LARGE = 'large';
 export type ImageSize = typeof ORIGINAL | typeof SMALL | typeof MEDIUM | typeof LARGE;
 
 export const getImagePaths = async (speciesId: number): Promise<ImagePaths> => {
