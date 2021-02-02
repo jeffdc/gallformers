@@ -111,9 +111,9 @@ const Gall = ({
                     sp.gall.detachable,
                     O.fold(
                         () => '',
-                        (d) => (d === 0 ? 'no' : 'yes'),
+                        (d) => (d === 0 ? false : true),
                     ),
-                ),
+                )
             );
             setValue('walls', [pipe(sp.gall.walls, O.getOrElse(constant(AT.EmptyWalls)))]);
             setValue('cells', [pipe(sp.gall.cells, O.getOrElse(constant(AT.EmptyCells)))]);
@@ -146,7 +146,7 @@ const Gall = ({
             cells: fields.cells[0].cells,
             color: fields.color[0].color,
             commonnames: fields.commonnames,
-            detachable: fields.detachable,
+            detachable: fields.detachable ? 1 : 0,
             family: fields.family[0].name,
             hosts: fields.hosts.map((h) => h.id),
             id: id,
