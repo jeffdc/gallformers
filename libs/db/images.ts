@@ -1,5 +1,6 @@
-import { image, Prisma } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function';
+import { image, Prisma, source, speciessource } from '@prisma/client';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { ImageApi, ImagePaths } from '../api/apitypes';
@@ -16,12 +17,17 @@ export const addImages = (images: ImageApi[]): TaskEither<Error, ImagePaths> => 
                     attribution: image.attribution,
                     creator: image.creator,
                     license: image.license,
+                    licenselink: image.licenselink,
                     path: image.path,
                     sourcelink: image.sourcelink,
                     uploader: image.uploader,
+                    lastchangedby: image.lastchangedby,
                     default: image.default,
                     species: { connect: { id: image.speciesid } },
-                    source: connectIfNotNull<Prisma.sourceCreateOneWithoutImageInput, number>('source', image.sourceid),
+                    source: connectIfNotNull<Prisma.sourceCreateOneWithoutImageInput, number>(
+                        'source',
+                        O.getOrElseW(constant(undefined))(image.source)?.id,
+                    ),
                 },
             }),
         );
@@ -37,40 +43,67 @@ export const addImages = (images: ImageApi[]): TaskEither<Error, ImagePaths> => 
 
 export const updateImage = (image: ImageApi): TaskEither<Error, ImageApi> => {
     console.log(`Updating image: ${JSON.stringify(image, null, ' ')}`);
+    const connectSource = pipe(
+        image.source,
+        O.fold(constant({}), (s) => ({ connect: { id: s.id } })),
+    );
+
     const update = () =>
         db.image.update({
             where: { id: image.id },
             data: {
                 attribution: image.attribution,
                 creator: image.creator,
-                license: image.license,
-                sourcelink: image.sourcelink,
                 default: image.default,
-                source: connectIfNotNull<Prisma.sourceCreateOneWithoutImageInput, number>('source', image.sourceid),
+                lastchangedby: image.lastchangedby,
+                license: image.license,
+                licenselink: image.licenselink,
+                sourcelink: image.sourcelink,
+                source: connectSource,
             },
         });
 
     // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(update, handleError),
-        TE.map(adapt),
+        TE.map((img) => ({
+            ...img,
+            speciesid: img.species_id,
+            small: makePath(img.path, SMALL),
+            medium: makePath(img.path, MEDIUM),
+            large: makePath(img.path, LARGE),
+            original: makePath(img.path, ORIGINAL),
+            source: O.none,
+        })),
     );
 };
 
-const adapt = (img: image): ImageApi => ({
+export const adaptImage = <T extends ImageWithSource>(img: T): ImageApi => ({
     ...img,
     speciesid: img.species_id,
     small: makePath(img.path, SMALL),
     medium: makePath(img.path, MEDIUM),
     large: makePath(img.path, LARGE),
     original: makePath(img.path, ORIGINAL),
-    sourceid: img.source_id ? img.source_id : undefined,
+    source: O.fromNullable(img.source),
 });
 
-const adaptMany = (imgs: image[]): ImageApi[] => imgs.map(adapt);
+const adaptMany = <T extends ImageWithSource>(imgs: T[]): ImageApi[] => imgs.map(adaptImage);
+
+type ImageWithSource = image & {
+    source:
+        | (source & {
+              speciessource: speciessource[];
+          })
+        | null;
+};
 
 export const getImages = (speciesid: number): TaskEither<Error, ImageApi[]> => {
-    const get = () => db.image.findMany({ where: { species_id: speciesid } });
+    const get = () =>
+        db.image.findMany({
+            include: { source: { include: { speciessource: true } } },
+            where: { species_id: speciesid },
+        });
 
     // eslint-disable-next-line prettier/prettier
     return pipe(

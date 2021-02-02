@@ -1,6 +1,8 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
-import { GallApi, SpeciesSourceApi } from '../api/apitypes';
+import { ImageApi, SpeciesApi } from '../api/apitypes';
+import { ImageSize } from '../images/images';
+import { truncateAtWord } from '../utils/util';
 
 /**
  * Simple helper to render the commonnames in the UI.
@@ -54,4 +56,25 @@ export const defaultSource = <T extends { useasdefault: number; source: { pubyea
     } else {
         return undefined;
     }
+};
+
+/**
+ * Returns the default image for the species. If there is an image marked as default, that will be returned. If no
+ * image is marked as default then an image will be returned but it is not necessarily determenisitc which one.
+ * @param species
+ */
+export const defaultImage = <T extends SpeciesApi>(species: T): ImageApi | undefined => {
+    let defaultImage = species.images.find((i) => i.default);
+    if (!defaultImage && species.images.length > 0) defaultImage = species.images[0];
+
+    return defaultImage;
+};
+
+export const speciesDescriptionShortened = (description: O.Option<string>, truncateAfterWord = 40): string => {
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        description,
+        O.map(truncateAtWord(truncateAfterWord)),
+        O.getOrElse(constant('')),
+    )    
 };

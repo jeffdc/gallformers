@@ -1,8 +1,9 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import { species } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function';
+import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
+import { useSession } from 'next-auth/client';
 import Head from 'next/head';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useState } from 'react';
@@ -41,13 +42,15 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
     const [edit, setEdit] = useState(false);
     const [currentImage, setCurrentImage] = useState<ImageApi>();
 
-    const { handleSubmit, control, reset } = useForm<FormFields>({
+    const { handleSubmit, control, reset, errors } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
         defaultValues: {
             species: sp?.name,
         },
     });
+
+    const [session] = useSession();
 
     const onSubmit = async (data: FormFields) => {
         reset();
@@ -64,6 +67,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
 
             if (res.status === 200) {
                 const imgs = (await res.json()) as ImageApi[];
+                console.log(`${JSON.stringify(imgs, null, '  ')}`);
                 setImages(imgs);
                 setSelected(sp);
             } else {
@@ -95,6 +99,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
 
     const saveImage = async (image: ImageApi) => {
         try {
+            image.lastchangedby = session ? session.user.name : 'UNKNOWN!';
             const res = await fetch(`../api/images`, {
                 method: 'POST',
                 headers: {
@@ -123,7 +128,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                 <Head>
                     <title>Add/Edit Species Images</title>
                 </Head>
-
+                {/* <AddImage id={species.id} onChange={addImages} /> */}
                 {currentImage && selected && (
                     <ImageEdit
                         image={currentImage}
@@ -162,13 +167,13 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                             <thead>
                                 <tr>
                                     <th className="thead-dark"></th>
-                                    <th>default</th>
                                     <th>image</th>
+                                    <th>default</th>
+                                    <th>uploader</th>
+                                    <th>source</th>
                                     <th>creator</th>
                                     <th>attribution</th>
-                                    <th>source</th>
                                     <th>license</th>
-                                    <th>uploader</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -177,15 +182,20 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                                         <td>
                                             <input type="checkbox" />
                                         </td>
-                                        <td>{img.default ? '✓' : ''}</td>
                                         <td>
                                             <img src={img.small} width="100" />
                                         </td>
+                                        <td>{img.default ? '✓' : ''}</td>
+                                        <td>{img.uploader}</td>
+                                        <td>
+                                            {pipe(
+                                                img.source,
+                                                O.fold(constant(img.sourcelink), (s) => s.title),
+                                            )}
+                                        </td>
                                         <td>{img.creator}</td>
                                         <td>{img.attribution}</td>
-                                        <td>{img.sourcelink}</td>
                                         <td>{img.license}</td>
-                                        <td>{img.uploader}</td>
                                     </tr>
                                 ))}
                             </tbody>

@@ -4,7 +4,7 @@ import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, SpeciesSourceApi, SpeciesSourceInsertFields } from '../api/apitypes';
+import { DeleteResult, SourceWithSpeciesSourceApi, SpeciesSourceApi, SpeciesSourceInsertFields } from '../api/apitypes';
 import { handleError } from '../utils/util';
 import db from './db';
 
@@ -27,20 +27,6 @@ export const speciesSourceByIds = (speciesId: string, sourceId: string): TaskEit
     // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(source, handleError),
-        TE.map(adaptor),
-    );
-};
-
-export const sourcesBySpeciesId = (speciesId: number): TaskEither<Error, SpeciesSourceApi[]> => {
-    const sources = () =>
-        db.speciessource.findMany({
-            include: { source: true },
-            where: { species_id: speciesId },
-        });
-
-    // eslint-disable-next-line prettier/prettier
-    return pipe(
-        TE.tryCatch(sources, handleError),
         TE.map(adaptor),
     );
 };

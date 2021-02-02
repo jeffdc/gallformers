@@ -157,6 +157,10 @@ export type SourceApi = {
     citation: string;
 };
 
+export type SourceWithSpeciesSourceApi = SourceApi & {
+    speciessource: Omit<SpeciesSourceApi, 'source'>[];
+};
+
 export type SpeciesSourceApi = {
     id: number;
     species_id: number;
@@ -211,6 +215,7 @@ export type SpeciesApi = SimpleSpecies & {
     description: Option<string>; // to make the caller's life easier we will load the default if we can
     family: FamilyApi;
     speciessource: SpeciesSourceApi[];
+    images: ImageApi[];
 };
 
 export type AlignmentApi = {
@@ -335,10 +340,12 @@ export type ImageApi = {
     attribution: string;
     creator: string;
     license: string;
+    licenselink: string;
     path: string;
     sourcelink: string;
-    sourceid?: number;
+    source: Option<SourceWithSpeciesSourceApi>;
     uploader: string;
+    lastchangedby: string;
     speciesid: number;
     default: boolean;
     small: string;

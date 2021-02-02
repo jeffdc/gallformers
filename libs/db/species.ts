@@ -6,6 +6,7 @@ import { AbundanceApi, SpeciesApi } from '../api/apitypes';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
+import { adaptImage } from './images';
 
 export const adaptAbundance = (a: abundance): AbundanceApi => ({
     ...a,
@@ -59,6 +60,7 @@ export const getSpecies = (
                 abundance: true,
                 family: true,
                 speciessource: { include: { source: true } },
+                image: { include: { source: { include: { speciessource: true } } } },
             },
             where: w,
             distinct: distinct,
@@ -79,6 +81,7 @@ export const getSpecies = (
                 synonyms: O.fromNullable(s.synonyms),
                 commonnames: O.fromNullable(s.commonnames),
                 abundance: optionalWith(s.abundance, adaptAbundance),
+                images: s.image.map(adaptImage),
             };
             return species;
         });

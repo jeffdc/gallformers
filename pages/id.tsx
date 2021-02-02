@@ -25,6 +25,7 @@ import {
 } from '../libs/api/apitypes';
 import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
 import { allHostGenera, allHostsSimple } from '../libs/db/host';
+import { defaultImage, speciesDescription } from '../libs/pages/renderhelpers';
 import { checkGall } from '../libs/utils/gallsearch';
 import { capitalizeFirstLetter, mightFailWithArray, mightFailWithStringArray, truncateAtWord } from '../libs/utils/util';
 
@@ -340,7 +341,7 @@ const IDGall = (props: Props): JSX.Element => {
                                         <Row key={g.id}>
                                             <Col xs={2} className="">
                                                 <img
-                                                    src="images/gall.jpg"
+                                                    src={defaultImage(g)?.small}
                                                     width="75px"
                                                     height="75px"
                                                     className="img-responsive"
@@ -350,7 +351,7 @@ const IDGall = (props: Props): JSX.Element => {
                                                 <Link href={`gall/${g.id}`}>
                                                     <a>{g.name}</a>
                                                 </Link>
-                                                - {gallDescription(g.description)}
+                                                - {speciesDescription(g.description)}
                                             </Col>
                                         </Row>
                                     </ListGroup.Item>
@@ -362,15 +363,6 @@ const IDGall = (props: Props): JSX.Element => {
             </Row>
         </>
     );
-};
-
-const gallDescription = (description: O.Option<string>): string => {
-    // eslint-disable-next-line prettier/prettier
-    return pipe(
-        description,
-        O.map(truncateAtWord(40)),
-        O.getOrElse(constant('')),
-    )    
 };
 
 export const getServerSideProps: GetServerSideProps = async () => {

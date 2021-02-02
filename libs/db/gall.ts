@@ -22,6 +22,7 @@ import { logger } from '../utils/logger';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
+import { adaptImage } from './images';
 import { adaptAbundance, speciesByName } from './species';
 import { connectIfNotNull, connectWithIds, extractId } from './utils';
 
@@ -64,6 +65,7 @@ export const getGalls = (
                         source: true,
                     },
                 },
+                image: { include: { source: { include: { speciessource: true } } } },
             },
             where: w,
             distinct: distinct,
@@ -112,6 +114,7 @@ export const getGalls = (
                         name: h.hostspecies.name,
                     };
                 }),
+                images: g.image.map(adaptImage),
             };
             return newg;
         });

@@ -197,7 +197,11 @@ model image {
   // renamed from source to sourcelink in 007
   sourcelink  String
   license     String
+  // added in 007
+  licenselink String
   uploader    String
+  // added in 007
+  lastchangedby String
   species_id  Int
   species     species @relation(fields: [species_id], references: [id])
   // added in 007

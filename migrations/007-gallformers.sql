@@ -3,6 +3,7 @@
 PRAGMA foreign_keys=OFF;
 
 -- adding support for image relationships to species-source mappings
+-- adding licenselink and lastchangedby fields
 CREATE TABLE image__ (
     id          INTEGER PRIMARY KEY
                         NOT NULL,
@@ -15,7 +16,9 @@ CREATE TABLE image__ (
     attribution TEXT,
     sourcelink  TEXT,
     license     TEXT,
+    licenselink TEXT,
     uploader    TEXT,
+    lastchangedby TEXT,
     FOREIGN KEY (
         species_id
     )
@@ -26,8 +29,8 @@ CREATE TABLE image__ (
     REFERENCES source (id) ON DELETE CASCADE
 );
 
-INSERT INTO image__ (id, species_id, path, [default], creator, attribution, sourcelink, license, uploader, species_id)
-    SELECT id, species_id, path, [default], creator, attribution, source, license, uploader, species_id 
+INSERT INTO image__ (id, species_id, path, [default], creator, attribution, sourcelink, license, uploader, lastchangedby, species_id)
+    SELECT id, species_id, path, [default], creator, attribution, source, license, uploader, uploader, species_id 
     FROM image;
 DROP TABLE image;
 ALTER TABLE image__ RENAME TO image;

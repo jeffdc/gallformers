@@ -40,10 +40,10 @@ const EDGE = 'https://dhz6u1p7t6okk.cloudfront.net';
 const BUCKET = 'gallformers';
 const client = new S3(config);
 
-const ORIGINAL = 'original';
-const SMALL = 'small';
-const MEDIUM = 'medium';
-const LARGE = 'large';
+export const ORIGINAL = 'original';
+export const SMALL = 'small';
+export const MEDIUM = 'medium';
+export const LARGE = 'large';
 export type ImageSize = typeof ORIGINAL | typeof SMALL | typeof MEDIUM | typeof LARGE;
 
 export const getImagePaths = async (speciesId: number): Promise<ImagePaths> => {
