@@ -1,6 +1,7 @@
 /**
  * Types for calling the APIs. These are to be used by browser code when it calls the APIs.
  */
+import { option } from 'fast-check';
 import * as O from 'fp-ts/lib/Option';
 import { Option } from 'fp-ts/lib/Option';
 import { ParsedUrlQuery } from 'querystring';
@@ -157,6 +158,10 @@ export type SourceApi = {
     citation: string;
 };
 
+export type SourceWithSpeciesSourceApi = SourceApi & {
+    speciessource: Omit<SpeciesSourceApi, 'source'>[];
+};
+
 export type SpeciesSourceApi = {
     id: number;
     species_id: number;
@@ -211,6 +216,7 @@ export type SpeciesApi = SimpleSpecies & {
     description: Option<string>; // to make the caller's life easier we will load the default if we can
     family: FamilyApi;
     speciessource: SpeciesSourceApi[];
+    images: ImageApi[];
 };
 
 export type AlignmentApi = {
@@ -330,15 +336,46 @@ export type GlossaryEntryUpsertFields = Deletable & {
     urls: string; // newline separated
 };
 
+export const NONE = '';
+export const CC0 = 'Public Domain / CC0';
+export const CCBY = 'CC-BY';
+export const ALLRIGHTS = 'All Rights Reserved';
+
+export type LicenseType = typeof NONE | typeof CC0 | typeof CCBY | typeof ALLRIGHTS;
+
+export const asLicenseType = (l: string): LicenseType => {
+    // Seems like there should be a better way to handle this and maintain types.
+    switch (l) {
+        case NONE:
+            return NONE;
+        case CC0:
+            return CC0;
+        case CCBY:
+            return CCBY;
+        case ALLRIGHTS:
+            return ALLRIGHTS;
+        default:
+            throw new Error(`Invalid license type: '${l}'.`);
+    }
+};
+
 export type ImageApi = {
+    id: number;
     attribution: string;
     creator: string;
-    license: string;
+    license: LicenseType;
+    licenselink: string;
     path: string;
-    source: string;
+    sourcelink: string;
+    source: Option<SourceWithSpeciesSourceApi>;
     uploader: string;
+    lastchangedby: string;
     speciesid: number;
     default: boolean;
+    small: string;
+    medium: string;
+    large: string;
+    original: string;
 };
 
 export type ImagePaths = {

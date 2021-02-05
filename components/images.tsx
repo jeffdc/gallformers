@@ -2,24 +2,23 @@ import Image from 'next/image';
 import React, { useState } from 'react';
 import { Carousel, CarouselItem, Modal } from 'react-bootstrap';
 import useWindowDimensions from '../hooks/usewindowdimension';
-import { ImagePaths, SpeciesApi } from '../libs/api/apitypes';
+import { SpeciesApi } from '../libs/api/apitypes';
 
 // Modal.setAppElement('#__next');
 
 type Props = {
-    imagePaths: ImagePaths;
     species: SpeciesApi;
     type: 'gall' | 'host';
 };
 
-const Images = ({ imagePaths, species }: Props): JSX.Element => {
+const Images = ({ species }: Props): JSX.Element => {
     const [showModal, setShowModal] = useState(false);
     const { width } = useWindowDimensions();
 
     const pad = 25;
     const hwRatio = 2 / 3;
 
-    return imagePaths.small.length < 1 ? (
+    return species.images.length < 1 ? (
         <p className="p-2">No images yet...</p>
     ) : (
         <>
@@ -27,10 +26,10 @@ const Images = ({ imagePaths, species }: Props): JSX.Element => {
                 <Modal.Header closeButton />
                 <Modal.Body>
                     <Carousel interval={null} className="border-dark align-self-center p-2">
-                        {imagePaths.large.map((image) => (
-                            <CarouselItem key={image}>
+                        {species.images.map((image) => (
+                            <CarouselItem key={image.id}>
                                 <Image
-                                    src={image}
+                                    src={image.large}
                                     unoptimized
                                     alt={`photo of ${species.name}`}
                                     width={width - 2 * pad}
@@ -44,10 +43,10 @@ const Images = ({ imagePaths, species }: Props): JSX.Element => {
             </Modal>
 
             <Carousel interval={null} className="border-dark align-self-center p-2">
-                {imagePaths.small.map((image) => (
-                    <CarouselItem key={image}>
+                {species.images.map((image) => (
+                    <CarouselItem key={image.id}>
                         <Image
-                            src={image}
+                            src={image.small}
                             unoptimized
                             alt={`photo of ${species.name}`}
                             width={'300'}

@@ -27,6 +27,9 @@ const Admin = (): JSX.Element => {
                                 Create/modify <Link href="./admin/gall">Galls</Link>
                             </ListGroupItem>
                             <ListGroupItem>
+                                Add/Edit <Link href="./admin/images">Images</Link>
+                            </ListGroupItem>
+                            <ListGroupItem>
                                 Create <Link href="./admin/gallhost">Gall-Host Mappings</Link>
                             </ListGroupItem>{' '}
                             <ListGroupItem>

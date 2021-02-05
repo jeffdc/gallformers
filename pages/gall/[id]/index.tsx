@@ -8,11 +8,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { MouseEvent, useState } from 'react';
 import { Button, Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
-import AddImage from '../../../components/addimage';
 import Images from '../../../components/images';
-import { GallApi, GallHost, ImagePaths, SpeciesSourceApi, SourceApi } from '../../../libs/api/apitypes';
+import { GallApi, GallHost, SourceApi, SpeciesSourceApi } from '../../../libs/api/apitypes';
 import { allGallIds, gallById } from '../../../libs/db/gall';
-import { getImagePaths } from '../../../libs/images/images';
 import { linkTextFromGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { defaultSource, renderCommonNames } from '../../../libs/pages/renderhelpers';
@@ -21,7 +19,6 @@ import { bugguideUrl, errorThrow, gScholarUrl, iNatUrl } from '../../../libs/uti
 
 type Props = {
     species: GallApi;
-    imagePaths: ImagePaths;
 };
 
 type SortPropertyOption = {
@@ -56,10 +53,9 @@ const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
     );
 };
 
-const Gall = ({ species, imagePaths }: Props): JSX.Element => {
+const Gall = ({ species }: Props): JSX.Element => {
     const [selectedSource, setSelectedSource] = useState(defaultSource(species?.speciessource));
     const [sourceList, setSourceList] = useState({ data: species?.speciessource, sortIndex: 0, sortOrder: -1 });
-    const [images, setImages] = useState(imagePaths);
 
     const router = useRouter();
     // If the page is not yet generated, this will be displayed initially until getStaticProps() finishes running
@@ -73,17 +69,6 @@ const Gall = ({ species, imagePaths }: Props): JSX.Element => {
     // the hosts will not be sorted, so sort them for display
     species.hosts.sort((a, b) => a.name.localeCompare(b.name));
     const hostLinker = hostAsLink(species.hosts.length);
-
-    const addImages = async (imagePaths: ImagePaths) => {
-        // this seems kludgy but it prevents having to make another call to the server to get the paths
-        imagePaths.small.push(...images.small);
-        imagePaths.medium.push(...images.medium);
-        imagePaths.large.push(...images.large);
-        imagePaths.original.push(...images.original);
-        // add a delay here to hopefully give a chance for the image to be picked up by the CDN
-        await new Promise((r) => setTimeout(r, 2000));
-        setImages(imagePaths);
-    };
 
     const changeDescription = (e: MouseEvent<HTMLButtonElement>) => {
         e.preventDefault();
@@ -203,8 +188,7 @@ const Gall = ({ species, imagePaths }: Props): JSX.Element => {
                                 </Container>
                             </Col>
                             <Col xs={4} className="border rounded p-1 mx-auto">
-                                <Images imagePaths={images} species={species} type="gall" />
-                                <AddImage id={species.id} onChange={addImages} />
+                                <Images species={species} type="gall" />
                             </Col>
                         </Row>
 
@@ -304,13 +288,9 @@ export const getStaticProps: GetStaticProps = async (context) => {
         TE.getOrElse(errorThrow),
     )();
 
-    // get the image paths, if any
-    const paths = await getImagePaths(gall.id);
-
     return {
         props: {
             species: { ...gall, speciessource: sources },
-            imagePaths: paths,
         },
         revalidate: 1,
     };

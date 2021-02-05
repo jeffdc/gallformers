@@ -11,3 +11,12 @@ export type ExtractTFromPromise<T> = T extends Promise<infer S> ? S : never;
 
 export type Diff<T, U> = T extends U ? never : T;
 export type Filter<T, U> = T extends U ? T : never;
+
+/**
+ * A generic type guard that takes in some unknown type that might be a T and a property that is part of T and returns
+ * true if maybeT is of type T and false otherwise. Also includes a type predicate so that the compiler will recognize
+ * this as a legit type guard.
+ * @param maybeT an object that might be a T
+ * @param aTProp a definite property of T
+ */
+export const isOfType = <T>(maybeT: unknown, aTProp: keyof T): maybeT is T => (maybeT as T)[aTProp] !== undefined;
