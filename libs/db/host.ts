@@ -1,4 +1,4 @@
-import { abundance, family, host, Prisma, source, species, speciessource } from '@prisma/client';
+import { abundance, family, host, image, Prisma, source, species, speciessource } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
@@ -6,8 +6,10 @@ import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { DeleteResult, HostApi, HostSimple, HostTaxon, SpeciesUpsertFields } from '../api/apitypes';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
+import { adaptImage } from './images';
 import { adaptAbundance } from './species';
 
+//TODO switch over to model like is beign done in gall.ts with derived type rather than explicit
 type DBHost = species & {
     abundance: abundance | null;
     family: family;
@@ -19,6 +21,13 @@ type DBHost = species & {
     })[];
     speciessource: (speciessource & {
         source: source;
+    })[];
+    image: (image & {
+        source:
+            | (source & {
+                  speciessource: speciessource[];
+              })
+            | null;
     })[];
 };
 
@@ -44,6 +53,7 @@ const adaptor = (hosts: DBHost[]): HostApi[] =>
                     name: h.gallspecies?.name,
                 };
             }),
+            images: h.image.map(adaptImage),
         };
         return newh;
     });
@@ -140,6 +150,7 @@ export const getHosts = (
                         source: true,
                     },
                 },
+                image: { include: { source: { include: { speciessource: true } } } },
             },
             where: w,
             distinct: distinct,
