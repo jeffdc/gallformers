@@ -40,16 +40,17 @@ const EDGE = 'https://dhz6u1p7t6okk.cloudfront.net';
 const BUCKET = 'gallformers';
 const client = new S3(config);
 
-const ORIGINAL = 'original';
-const SMALL = 'small';
-const MEDIUM = 'medium';
-const LARGE = 'large';
+export const ORIGINAL = 'original';
+export const SMALL = 'small';
+export const MEDIUM = 'medium';
+export const LARGE = 'large';
 export type ImageSize = typeof ORIGINAL | typeof SMALL | typeof MEDIUM | typeof LARGE;
 
-export const getImagePaths = async (speciesId: number): Promise<ImagePaths> => {
+export const getImagePaths = async (speciesId: number, imageids: number[] = []): Promise<ImagePaths> => {
     try {
+        const imageidsWhere = imageids.length > 0 ? { id: { in: imageids } } : {};
         const images = await db.image.findMany({
-            where: { species_id: { in: speciesId } },
+            where: { AND: [{ species_id: { in: speciesId } }, imageidsWhere] },
             orderBy: { id: 'asc' },
         });
 
@@ -66,9 +67,9 @@ export const getImagePaths = async (speciesId: number): Promise<ImagePaths> => {
     };
 };
 
-export const toImagePaths = (images: image[]): ImagePaths => {
-    const makePath = (path: string, size: ImageSize): string => `${EDGE}/${path.replace(ORIGINAL, size)}`;
+export const makePath = (path: string, size: ImageSize): string => `${EDGE}/${path.replace(ORIGINAL, size)}`;
 
+export const toImagePaths = (images: image[]): ImagePaths => {
     return images.reduce(
         (paths, image) => {
             paths.small.push(makePath(image.path, SMALL));
@@ -90,8 +91,6 @@ export const toImagePaths = (images: image[]): ImagePaths => {
 const EXPIRE_SECONDS = 60 * 5;
 
 export const getPresignedUrl = async (path: string, mime: string): Promise<string> => {
-    console.log(`${new Date().toString()}: AWS S3 API Call PRESIGNED URL GET for ${path} and ${mime}.`);
-
     // we will use different credentials for the S3 upload. these credentials can only upload.
     const signer = new S3RequestPresigner({
         ...client.config,
@@ -115,14 +114,12 @@ export const createOtherSizes = (images: image[]): image[] => {
     try {
         images.map(async (image) => {
             const path = `${EDGE}/${image.path}`;
-            console.log(`trying to load: ${path}`);
             const img = await tryBackoff(3, () => Jimp.read(path)).catch((reason: Error) =>
                 logger.error(`Failed to load file ${path} with Jimp. Received error: ${reason}.`),
             );
             if (!img) return [];
 
             const mime = img.getMIME();
-            console.log(`Read file with mime type: ${mime}.`);
             sizes.forEach(async (value, key) => {
                 img.resize(value, Jimp.AUTO);
                 img.quality(90);
@@ -164,9 +161,13 @@ const uploadImage = async (key: string, buffer: Buffer, mime: string) => {
  * Deletes all images from S3 that are stored with the key relating to the passed in Species ID.
  * @param id
  */
-export const deleteImagesBySpeciesId = async (id: number): Promise<void> => {
-    const paths = await getImagePaths(id);
+export const deleteImagesBySpeciesId = async (id: number): Promise<void> => deleteImagesByPaths(await getImagePaths(id));
 
+/**
+ * Deletes all images form S3 at the given paths.
+ * @param paths
+ */
+export const deleteImagesByPaths = async (paths: ImagePaths): Promise<void> => {
     const objects = new Array<ObjectIdentifier>();
     const pushObjectIdentifier = (p: string) => objects.push({ Key: p.replace(`${EDGE}/`, '') });
     paths.original.forEach(pushObjectIdentifier);
@@ -182,8 +183,7 @@ export const deleteImagesBySpeciesId = async (id: number): Promise<void> => {
     };
 
     try {
-        const r = await tryBackoff(3, () => client.send(new DeleteObjectsCommand(deleteParams)));
-        console.info(`Received response from delete: ${JSON.stringify(r)}`);
+        await tryBackoff(3, () => client.send(new DeleteObjectsCommand(deleteParams)));
     } catch (e) {
         logger.error(`Err in deleteImagesBySpeciesId: ${JSON.stringify(e)}.`);
     }

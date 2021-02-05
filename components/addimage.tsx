@@ -2,11 +2,12 @@ import { useSession } from 'next-auth/client';
 import React, { ChangeEvent, useState } from 'react';
 import { Col, ProgressBar, Row } from 'react-bootstrap';
 import axios from 'axios';
-import { ImageApi, ImagePaths } from '../libs/api/apitypes';
+import { ImageApi } from '../libs/api/apitypes';
+import * as O from 'fp-ts/lib/Option';
 
 type Props = {
     id: number;
-    onChange: (imagePaths: ImagePaths) => void;
+    onChange: (images: ImageApi[]) => void;
 };
 
 const AddImage = ({ id, onChange }: Props): JSX.Element => {
@@ -38,8 +39,6 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
             const res = await fetch(`../api/images/uploadurl?path=${path}&mime=${file.type}`);
             const url = await res.text();
 
-            console.log(`Pre-signed URL: ${url}`);
-
             // upload file
             const resp = await axios
                 .put<Response>(url, file, {
@@ -52,19 +51,27 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
 
             if (resp) {
                 images.push({
+                    id: -1,
                     attribution: '',
                     creator: '',
                     license: '',
+                    licenselink: '',
                     path: path,
-                    source: '',
+                    sourcelink: '',
+                    source: O.none,
                     uploader: session.user.name,
+                    lastchangedby: session.user.name,
                     speciesid: id,
                     default: false,
+                    small: '',
+                    medium: '',
+                    large: '',
+                    original: '',
                 });
             }
         }
         // update the database with the new image(s)
-        const dbres = await fetch('../api/images/', {
+        const dbres = await fetch('../api/images/upsert', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -72,11 +79,8 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
             body: JSON.stringify(images),
         });
 
-        const imagePaths: ImagePaths = await dbres.json();
-
-        console.log(JSON.stringify(dbres));
-
-        onChange(imagePaths);
+        const newImages: ImageApi[] = await dbres.json();
+        onChange(newImages);
 
         setUploading(false);
     };
@@ -96,13 +100,14 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                 />
             )}
             <Row>
-                <Col className="text-center">
+                <Col className="">
                     <label
-                        className="form-label"
+                        className="form-label bg-light"
                         style={{
                             border: '1px solid #ccc',
+                            borderRadius: '2px',
                             display: 'inline-block',
-                            padding: '2px 8px',
+                            padding: '4px 8px',
                             cursor: 'pointer',
                         }}
                     >
@@ -117,7 +122,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                                 display: 'none',
                             }}
                         />
-                        +
+                        Upload New Image(s)
                     </label>
                 </Col>
             </Row>

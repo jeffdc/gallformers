@@ -69,3 +69,15 @@ test('truncateAtWord should handle varying input', () => {
         expect(t.split(' ').length).toBeLessThanOrEqual(s.split(' ').length);
     });
 });
+
+test('csvAsNumberArr should handle all inputs good and bad', () => {
+    expect(U.csvAsNumberArr('').length).toBe(0);
+    expect(U.csvAsNumberArr(' ').length).toBe(0);
+    expect(U.csvAsNumberArr(' , ').length).toBe(0);
+    expect(U.csvAsNumberArr('1, ').length).toBe(0);
+
+    expect(U.csvAsNumberArr('1').length).toBe(1);
+    expect(U.csvAsNumberArr('1,2').length).toBe(2);
+    expect(U.csvAsNumberArr('1 , 2').length).toBe(2);
+    expect(U.csvAsNumberArr('\t       1 , \n2').length).toBe(2);
+});

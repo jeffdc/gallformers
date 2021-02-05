@@ -22,6 +22,7 @@ import { logger } from '../utils/logger';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
+import { adaptImage } from './images';
 import { adaptAbundance, speciesByName } from './species';
 import { connectIfNotNull, connectWithIds, extractId } from './utils';
 
@@ -64,6 +65,7 @@ export const getGalls = (
                         source: true,
                     },
                 },
+                image: { include: { source: { include: { speciessource: true } } } },
             },
             where: w,
             distinct: distinct,
@@ -112,6 +114,7 @@ export const getGalls = (
                         name: h.hostspecies.name,
                     };
                 }),
+                images: g.image.map(adaptImage),
             };
             return newg;
         });
@@ -371,18 +374,18 @@ export const cells = (): TaskEither<Error, CellsApi[]> => {
 export const upsertGall = (gall: GallUpsertFields): TaskEither<Error, number> => {
     const spData = {
         family: { connect: { name: gall.family } },
-        abundance: connectIfNotNull<Prisma.abundanceCreateOneWithoutSpeciesInput>('abundance', gall.abundance),
+        abundance: connectIfNotNull<Prisma.abundanceCreateOneWithoutSpeciesInput, string>('abundance', gall.abundance),
         synonyms: gall.synonyms,
         commonnames: gall.commonnames,
     };
 
     const gallData = {
-        alignment: connectIfNotNull<Prisma.alignmentCreateOneWithoutGallInput>('alignment', gall.alignment),
-        cells: connectIfNotNull<Prisma.cellsCreateOneWithoutGallInput>('cells', gall.cells),
-        color: connectIfNotNull<Prisma.colorCreateOneWithoutGallInput>('color', gall.color),
+        alignment: connectIfNotNull<Prisma.alignmentCreateOneWithoutGallInput, string>('alignment', gall.alignment),
+        cells: connectIfNotNull<Prisma.cellsCreateOneWithoutGallInput, string>('cells', gall.cells),
+        color: connectIfNotNull<Prisma.colorCreateOneWithoutGallInput, string>('color', gall.color),
         detachable: gall.detachable ? 1 : 0,
-        shape: connectIfNotNull<Prisma.shapeCreateOneWithoutGallInput>('shape', gall.shape),
-        walls: connectIfNotNull<Prisma.wallsCreateOneWithoutGallInput>('walls', gall.walls),
+        shape: connectIfNotNull<Prisma.shapeCreateOneWithoutGallInput, string>('shape', gall.shape),
+        walls: connectIfNotNull<Prisma.wallsCreateOneWithoutGallInput, string>('walls', gall.walls),
     };
 
     const create = () =>

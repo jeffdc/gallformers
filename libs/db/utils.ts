@@ -20,9 +20,11 @@ export type ConnectTypes =
     | Prisma.hostCreateManyWithoutGallspeciesInput
     | Prisma.hostCreateWithoutGallspeciesInput
     | Prisma.galllocationCreateWithoutGallInput
-    | Prisma.galltextureCreateWithoutGallInput;
+    | Prisma.galltextureCreateWithoutGallInput
+    | Prisma.sourceCreateWithoutImageInput
+    | Prisma.sourceCreateOneWithoutImageInput;
 
-export function connectIfNotNull<T extends ConnectTypes>(fieldName: string, value: string | undefined): T {
+export function connectIfNotNull<T extends ConnectTypes, V>(fieldName: string, value: V | undefined): T {
     if (value) {
         return ({ connect: { [fieldName]: value } } as unknown) as T;
     } else {

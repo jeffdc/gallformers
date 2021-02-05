@@ -2,13 +2,23 @@ import { Prisma, source } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, SourceApi, SourceUpsertFields } from '../api/apitypes';
+import { DeleteResult, SourceApi, SourceUpsertFields, SourceWithSpeciesSourceApi } from '../api/apitypes';
+import { isOfType } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
 import { extractId } from './utils';
 
-// currently no transformation needed but this is the pattern we are using across the DB api so good to have this here.
-const adaptor = (sources: source[]): SourceApi[] => sources;
+const adaptor = <T extends source>(source: T): SourceApi | SourceWithSpeciesSourceApi =>
+    isOfType(source, 'speciessource' as keyof SourceWithSpeciesSourceApi)
+        ? {
+              ...source,
+              speciessource: source.speciessource,
+          }
+        : {
+              ...source,
+          };
+
+const adaptMany = <T extends source>(sources: T[]): (SourceApi | SourceWithSpeciesSourceApi)[] => sources.map(adaptor);
 
 export const sourceById = (id: number): TaskEither<Error, SourceApi[]> => {
     const sources = () =>
@@ -19,7 +29,7 @@ export const sourceById = (id: number): TaskEither<Error, SourceApi[]> => {
     // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(sources, handleError),
-        TE.map(adaptor),
+        TE.map(adaptMany),
     );
 };
 
@@ -39,6 +49,21 @@ export const allSourceIds = (): TaskEither<Error, string[]> => {
     return pipe(
         TE.tryCatch(ids, handleError),
         TE.map((i) => i.map(extractId).map((x) => x.toString())),
+    );
+};
+
+export const sourcesWithSpecieSourceBySpeciesId = (speciesId: number): TaskEither<Error, SourceWithSpeciesSourceApi[]> => {
+    const sources = () =>
+        db.source.findMany({
+            include: { speciessource: true },
+            where: { speciessource: { some: { species_id: speciesId } } },
+        });
+
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        TE.tryCatch(sources, handleError),
+        TE.map(adaptMany),
+        TE.map((t) => t as SourceWithSpeciesSourceApi[]), // kludge... :(
     );
 };
 
