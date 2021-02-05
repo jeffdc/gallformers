@@ -5,8 +5,9 @@ import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import { useSession } from 'next-auth/client';
 import Head from 'next/head';
+import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Col, Row, Table } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
@@ -19,12 +20,7 @@ import { ImageApi, ImagePaths } from '../../libs/api/apitypes';
 import { allSpecies } from '../../libs/db/species';
 import { mightFailWithArray } from '../../libs/utils/util';
 
-const Schema = yup.object().shape({
-    value: yup.mixed().required(),
-    author: yup.string().required(),
-    pubyear: yup.string().matches(/([12][0-9]{3})/),
-    citation: yup.string().required(),
-});
+const Schema = yup.object().shape({});
 
 type Props = {
     speciesid: string;
@@ -33,16 +29,17 @@ type Props = {
 
 type FormFields = {
     species: string;
+    delete: any;
 };
 
 const Images = ({ speciesid, species }: Props): JSX.Element => {
     const sp = species.find((s) => s.id === parseInt(speciesid));
-    const [selected, setSelected] = useState(sp);
+    const [selectedId, setSelectedId] = useState(sp ? sp.id : undefined);
     const [images, setImages] = useState<ImageApi[]>();
     const [edit, setEdit] = useState(false);
     const [currentImage, setCurrentImage] = useState<ImageApi>();
 
-    const { handleSubmit, control, reset, errors } = useForm<FormFields>({
+    const { handleSubmit, control, register, errors, reset } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
         defaultValues: {
@@ -52,26 +49,46 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
 
     const [session] = useSession();
 
-    const onSubmit = async (data: FormFields) => {
-        reset();
-    };
+    useEffect(() => {
+        const fetchNewSelection = async (id: number | undefined) => {
+            try {
+                if (!id) return;
 
-    const changeSelected = async (species: species[]) => {
+                const res = await fetch(`../api/images?speciesid=${id}`, {
+                    method: 'GET',
+                });
+
+                if (res.status === 200) {
+                    const imgs = (await res.json()) as ImageApi[];
+                    setImages(imgs);
+                } else {
+                    throw new Error(await res.text());
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        };
+        fetchNewSelection(selectedId);
+    }, [selectedId]);
+
+    // i could not divine the incantation to get the form to track an array of checkboxes and propagate the id
+    const toDelete = new Set<string>();
+
+    const onSubmit = async () => {
         try {
-            const sp = species[0];
-            if (!sp) return;
+            if (toDelete.size > 0) {
+                const res = await fetch(`../api/images?speciesid=${selectedId}&imageids=${[...toDelete.values()]}`, {
+                    method: 'DELETE',
+                });
 
-            const res = await fetch(`../api/images?speciesid=${sp.id}`, {
-                method: 'GET',
-            });
+                if (res.status === 200) {
+                    setImages(images?.filter((i) => !toDelete.has(i.id.toString())));
+                } else {
+                    throw new Error(await res.text());
+                }
 
-            if (res.status === 200) {
-                const imgs = (await res.json()) as ImageApi[];
-                console.log(`${JSON.stringify(imgs, null, '  ')}`);
-                setImages(imgs);
-                setSelected(sp);
-            } else {
-                throw new Error(await res.text());
+                reset({ delete: [], species: sp?.name });
+                toDelete.clear();
             }
         } catch (e) {
             console.error(e);
@@ -100,6 +117,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
     const saveImage = async (image: ImageApi) => {
         try {
             image.lastchangedby = session ? session.user.name : 'UNKNOWN!';
+
             const res = await fetch(`../api/images`, {
                 method: 'POST',
                 headers: {
@@ -129,10 +147,11 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                     <title>Add/Edit Species Images</title>
                 </Head>
                 {/* <AddImage id={species.id} onChange={addImages} /> */}
-                {currentImage && selected && (
-                    <ImageEdit
+                {currentImage && selectedId && (
+                    // eslint-disable-next-line prettier/prettier
+                    <ImageEdit 
                         image={currentImage}
-                        speciesid={selected.id}
+                        speciesid={selectedId}
                         onSave={saveImage}
                         show={edit}
                         onClose={handleClose}
@@ -150,52 +169,95 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                                 options={species}
                                 labelKey="name"
                                 clearButton
-                                onChange={changeSelected}
+                                onChange={(s: species[]) => {
+                                    setSelectedId(s[0].id);
+                                }}
                             />
                         </Col>
                     </Row>
                     <Row className="">
                         <Col>
-                            <input type="button" className="button" value="Delete Selected" />
+                            <input type="submit" className="button" value="Delete Selected" />
                         </Col>
                     </Row>
                     <Row>
-                        <Col>{selected && <AddImage id={selected.id} onChange={addImages} />}</Col>
+                        <Col>{selectedId && <AddImage id={selectedId} onChange={addImages} />}</Col>
                     </Row>
                     <div className="fixed-left mt-2 ml-2 mr-2">
                         <Table striped>
                             <thead>
                                 <tr>
-                                    <th className="thead-dark"></th>
+                                    <th></th>
                                     <th>image</th>
                                     <th>default</th>
-                                    <th>uploader</th>
                                     <th>source</th>
+                                    <th>source link</th>
                                     <th>creator</th>
                                     <th>attribution</th>
                                     <th>license</th>
+                                    <th>license link</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {images?.map((img) => (
                                     <tr key={img.path} id={img.id.toString()} onClick={editRow}>
                                         <td>
-                                            <input type="checkbox" />
+                                            <input
+                                                type="checkbox"
+                                                key={img.id}
+                                                id={img.id.toString()}
+                                                name="delete"
+                                                ref={register}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    e.currentTarget.checked
+                                                        ? toDelete.add(e.currentTarget.id)
+                                                        : toDelete.delete(e.currentTarget.id);
+                                                }}
+                                            />
                                         </td>
                                         <td>
                                             <img src={img.small} width="100" />
                                         </td>
                                         <td>{img.default ? '✓' : ''}</td>
-                                        <td>{img.uploader}</td>
                                         <td>
                                             {pipe(
                                                 img.source,
-                                                O.fold(constant(img.sourcelink), (s) => s.title),
+                                                O.fold(constant(<>{'External'}</>), (s) => (
+                                                    <a
+                                                        href={`/source/${s.id}`}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                    >
+                                                        {s.title}
+                                                    </a>
+                                                )),
                                             )}
+                                        </td>
+                                        <td>
+                                            <a
+                                                href={img.sourcelink}
+                                                onClick={(e) => e.stopPropagation()}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                            >
+                                                {img.sourcelink}
+                                            </a>
                                         </td>
                                         <td>{img.creator}</td>
                                         <td>{img.attribution}</td>
                                         <td>{img.license}</td>
+                                        <td>
+                                            <a
+                                                href={img.licenselink}
+                                                onClick={(e) => e.stopPropagation()}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                            >
+                                                {img.licenselink}
+                                            </a>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>

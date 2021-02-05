@@ -1,13 +1,13 @@
+import { yupResolver } from '@hookform/resolvers/yup';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import React, { useEffect, useState } from 'react';
 import { Button, Col, Modal, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
-import { constant, pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
-import { ImageApi, SourceWithSpeciesSourceApi } from '../libs/api/apitypes';
+import { ALLRIGHTS, CC0, CCBY, ImageApi, LicenseType, SourceWithSpeciesSourceApi } from '../libs/api/apitypes';
 import ControlledTypeahead from './controlledtypeahead';
 import InfoTip from './infotip';
-import { yupResolver } from '@hookform/resolvers/yup';
 
 type Props = {
     image: ImageApi;
@@ -17,21 +17,23 @@ type Props = {
     onClose: () => void;
 };
 
-const NONE = '';
-const CC0 = 'Public Domain / CC0';
-const CCBY = 'CC-BY';
-const ALLRIGHTS = 'All Rights Reserved';
-
-type LicenseType = typeof NONE | typeof CC0 | typeof CCBY | typeof ALLRIGHTS;
-
 const Schema = yup.object().shape({
     source: yup.array(),
-    sourcelink: yup.string().required(),
-    license: yup.string().required(),
-    creator: yup.string().required(),
-    licenselink: yup.string().when('license', {
-        is: (l) => l === CCBY,
-        then: yup.string().required(),
+    sourcelink: yup.string().url().required('You must provide a link to the source.'),
+    license: yup.string().required('You must select one a license.'),
+    creator: yup.string().required('You must provide a reference to the creator.'),
+    licenselink: yup
+        .string()
+        .url()
+        .when('license', {
+            is: (l) => l === CCBY,
+            then: yup.string().url().required('The CC-BY license requires that you provide a link to the license.'),
+        }),
+    attribution: yup.string().when('license', {
+        is: (l) => l === ALLRIGHTS,
+        then: yup
+            .string()
+            .required('You must document proof that we are allowed to use the image when using an All Rights Reserved license.'),
     }),
 });
 
@@ -45,29 +47,33 @@ type FormFields = {
     licenselink: string;
 };
 
+const sourceFromOption = (so: O.Option<SourceWithSpeciesSourceApi>): SourceWithSpeciesSourceApi[] =>
+    pipe(
+        so,
+        O.fold(constant(new Array<SourceWithSpeciesSourceApi>()), (s) => [s]),
+    );
+
+const formFromImage = (img: ImageApi): FormFields => ({
+    ...img,
+    license: img.license as LicenseType,
+    source: sourceFromOption(img.source),
+});
+
 const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Element => {
-    const [img, setImg] = useState(image);
-    const [sources, setSources] = useState<SourceWithSpeciesSourceApi[]>([]);
+    const [sources, setSources] = useState(new Array<SourceWithSpeciesSourceApi>());
 
     const {
         handleSubmit,
         register,
         formState: { isDirty, dirtyFields },
-        reset,
         errors,
         control,
         getValues,
+        setValue,
     } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
-        defaultValues: {
-            ...img,
-            license: img.license as LicenseType,
-            source: pipe(
-                img.source,
-                O.fold(constant(new Array<SourceWithSpeciesSourceApi>()), (s) => [s]),
-            ),
-        },
+        defaultValues: formFromImage(image),
     });
 
     useEffect(() => {
@@ -81,36 +87,43 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                     throw new Error(await res.text());
                 }
                 setSources((await res.json()) as SourceWithSpeciesSourceApi[]);
-                console.log(`The sources:\n${JSON.stringify(sources, null, '  ')}`);
             } catch (e) {
                 console.error(e);
             }
         };
 
         fetchData();
-    }, [speciesid, sources]);
+    }, [speciesid]);
+
+    // I am not clear if this is the React way to deal with this or not.
+    useEffect(() => {
+        setValue('default', image.default);
+        setValue('creator', image.creator);
+        setValue('attribution', image.attribution);
+        setValue('sourcelink', image.sourcelink);
+        setValue('license', image.license as LicenseType);
+        setValue('licenselink', image.licenselink);
+        setValue('source', sourceFromOption(image.source));
+    }, [image, setValue]);
 
     const onSubmit = async (fields: FormFields) => {
+        console.log(`IMAGE: ${JSON.stringify(image, null, '  ')}`);
+        console.log(`FIELDS: ${JSON.stringify(fields, null, '  ')}`);
         const newImg: ImageApi = {
-            ...img,
+            ...image,
             ...fields,
             source: O.fromNullable(fields.source[0]),
         };
         await onSave(newImg);
-        setImg(newImg);
         onHide();
     };
 
     const onHide = () => {
-        // reset(img);
-        console.log(`isdirty = ${isDirty} / dirtyFields = ${JSON.stringify(dirtyFields)} after reset`);
         onClose();
     };
 
     return (
         <Modal show={show} onHide={onHide} size="lg">
-            {`Errors: ${JSON.stringify(errors)}`}
-
             <form onSubmit={handleSubmit(onSubmit)}>
                 <Modal.Header closeButton>
                     <Modal.Title>Edit Image Details</Modal.Title>
@@ -132,7 +145,13 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                                     />
                                 </Col>
                                 <Col>
-                                    <input type="checkbox" name="default" className="form-control" ref={register} />
+                                    <input
+                                        type="checkbox"
+                                        key={image.id}
+                                        name="default"
+                                        className="form-control"
+                                        ref={register}
+                                    />
                                 </Col>
                             </Row>
                             <Row>
@@ -175,6 +194,7 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                                 </Col>
                                 <Col>
                                     <input type="text" name="sourcelink" className="form-control" ref={register} />
+                                    {errors.sourcelink && <span className="text-danger">{errors.sourcelink.message}</span>}
                                 </Col>
                             </Row>
                             <Row className="form-group">
@@ -197,7 +217,7 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                                         <option>{CCBY}</option>
                                         <option>{ALLRIGHTS}</option>
                                     </select>
-                                    {errors.license && <span className="text-danger">You must select a license.</span>}
+                                    {errors.license && <span className="text-danger">{errors.license.message}</span>}
                                 </Col>
                             </Row>
                             <Row className="form-group">
@@ -207,6 +227,7 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                                 </Col>
                                 <Col>
                                     <input type="text" name="licenselink" className="form-control" ref={register} />
+                                    {errors.licenselink && <span className="text-danger">{errors.licenselink.message}</span>}
                                 </Col>
                             </Row>
 
@@ -220,7 +241,7 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                                 </Col>
                                 <Col>
                                     <input type="text" name="creator" className="form-control" ref={register} />
-                                    {errors.creator && <span className="text-danger">You must provide a creator.</span>}
+                                    {errors.creator && <span className="text-danger">{errors.creator.message}</span>}
                                 </Col>
                             </Row>
                             <Row className="form-group">
@@ -230,6 +251,7 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                                 </Col>
                                 <Col>
                                     <textarea name="attribution" className="form-control" ref={register} />
+                                    {errors.attribution && <span className="text-danger">{errors.attribution.message}</span>}
                                 </Col>
                             </Row>
                         </Col>

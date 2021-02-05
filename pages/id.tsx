@@ -25,9 +25,9 @@ import {
 } from '../libs/api/apitypes';
 import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
 import { allHostGenera, allHostsSimple } from '../libs/db/host';
-import { defaultImage, speciesDescription } from '../libs/pages/renderhelpers';
+import { defaultImage, truncateOptionString } from '../libs/pages/renderhelpers';
 import { checkGall } from '../libs/utils/gallsearch';
-import { capitalizeFirstLetter, mightFailWithArray, mightFailWithStringArray, truncateAtWord } from '../libs/utils/util';
+import { capitalizeFirstLetter, mightFailWithArray, mightFailWithStringArray } from '../libs/utils/util';
 
 type SearchFormHostField = {
     host: HostSimple[];
@@ -351,7 +351,7 @@ const IDGall = (props: Props): JSX.Element => {
                                                 <Link href={`gall/${g.id}`}>
                                                     <a>{g.name}</a>
                                                 </Link>
-                                                - {speciesDescription(g.description)}
+                                                - {truncateOptionString(g.description)}
                                             </Col>
                                         </Row>
                                     </ListGroup.Item>

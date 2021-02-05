@@ -1,6 +1,7 @@
 /**
  * Types for calling the APIs. These are to be used by browser code when it calls the APIs.
  */
+import { option } from 'fast-check';
 import * as O from 'fp-ts/lib/Option';
 import { Option } from 'fp-ts/lib/Option';
 import { ParsedUrlQuery } from 'querystring';
@@ -335,11 +336,18 @@ export type GlossaryEntryUpsertFields = Deletable & {
     urls: string; // newline separated
 };
 
+export const NONE = '';
+export const CC0 = 'Public Domain / CC0';
+export const CCBY = 'CC-BY';
+export const ALLRIGHTS = 'All Rights Reserved';
+
+export type LicenseType = typeof NONE | typeof CC0 | typeof CCBY | typeof ALLRIGHTS;
+
 export type ImageApi = {
     id: number;
     attribution: string;
     creator: string;
-    license: string;
+    license: LicenseType;
     licenselink: string;
     path: string;
     sourcelink: string;

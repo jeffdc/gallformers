@@ -70,7 +70,12 @@ export const defaultImage = <T extends SpeciesApi>(species: T): ImageApi | undef
     return defaultImage;
 };
 
-export const speciesDescriptionShortened = (description: O.Option<string>, truncateAfterWord = 40): string => {
+/**
+ * Given an Option<string> return the string truncated at the truncateAfterWord(nth) word if Some. If None an empty string.
+ * @param description
+ * @param truncateAfterWord
+ */
+export const truncateOptionString = (description: O.Option<string>, truncateAfterWord = 40): string => {
     // eslint-disable-next-line prettier/prettier
     return pipe(
         description,

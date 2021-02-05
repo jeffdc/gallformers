@@ -56,7 +56,7 @@ export const sourcesWithSpecieSourceBySpeciesId = (speciesId: number): TaskEithe
     const sources = () =>
         db.source.findMany({
             include: { speciessource: true },
-            where: { speciessource: { every: { species_id: speciesId } } },
+            where: { speciessource: { some: { species_id: speciesId } } },
         });
 
     // eslint-disable-next-line prettier/prettier

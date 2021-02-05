@@ -46,10 +46,11 @@ export const MEDIUM = 'medium';
 export const LARGE = 'large';
 export type ImageSize = typeof ORIGINAL | typeof SMALL | typeof MEDIUM | typeof LARGE;
 
-export const getImagePaths = async (speciesId: number): Promise<ImagePaths> => {
+export const getImagePaths = async (speciesId: number, imageids: number[] = []): Promise<ImagePaths> => {
     try {
+        const imageidsWhere = imageids.length > 0 ? { id: { in: imageids } } : {};
         const images = await db.image.findMany({
-            where: { species_id: { in: speciesId } },
+            where: { AND: [{ species_id: { in: speciesId } }, imageidsWhere] },
             orderBy: { id: 'asc' },
         });
 
@@ -164,9 +165,13 @@ const uploadImage = async (key: string, buffer: Buffer, mime: string) => {
  * Deletes all images from S3 that are stored with the key relating to the passed in Species ID.
  * @param id
  */
-export const deleteImagesBySpeciesId = async (id: number): Promise<void> => {
-    const paths = await getImagePaths(id);
+export const deleteImagesBySpeciesId = async (id: number): Promise<void> => deleteImagesByPaths(await getImagePaths(id));
 
+/**
+ * Deletes all images form S3 at the given paths.
+ * @param paths
+ */
+export const deleteImagesByPaths = async (paths: ImagePaths): Promise<void> => {
     const objects = new Array<ObjectIdentifier>();
     const pushObjectIdentifier = (p: string) => objects.push({ Key: p.replace(`${EDGE}/`, '') });
     paths.original.forEach(pushObjectIdentifier);
