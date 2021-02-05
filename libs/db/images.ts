@@ -1,26 +1,15 @@
 import { image, Prisma, source, speciessource } from '@prisma/client';
 import { constant, pipe } from 'fp-ts/lib/function';
-import * as A from 'fp-ts/lib/Array';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { ImageApi, ImagePaths, LicenseType } from '../api/apitypes';
-import {
-    createOtherSizes,
-    deleteImagesByPaths,
-    getImagePaths,
-    LARGE,
-    makePath,
-    MEDIUM,
-    ORIGINAL,
-    SMALL,
-    toImagePaths,
-} from '../images/images';
+import { asLicenseType, ImageApi } from '../api/apitypes';
+import { createOtherSizes, deleteImagesByPaths, getImagePaths, LARGE, makePath, MEDIUM, ORIGINAL, SMALL } from '../images/images';
 import { handleError } from '../utils/util';
 import db from './db';
 import { connectIfNotNull } from './utils';
 
-export const addImages = (images: ImageApi[]): TaskEither<Error, ImagePaths> => {
+export const addImages = (images: ImageApi[]): TaskEither<Error, ImageApi[]> => {
     const add = () => {
         const creates = images.map((image) =>
             db.image.create({
@@ -45,11 +34,20 @@ export const addImages = (images: ImageApi[]): TaskEither<Error, ImagePaths> => 
         return db.$transaction(creates);
     };
 
+    // The create will not return the related sources so we need to requery to get them
+    const requeryWithSource = (images: image[]) => () =>
+        db.image.findMany({
+            include: { source: { include: { speciessource: { where: { species_id: images[0].species_id } } } } },
+            where: { id: { in: images.map((i) => i.id) } },
+        });
+
     // eslint-disable-next-line prettier/prettier
     return pipe(
-        TE.tryCatch(add, handleError), 
+        TE.tryCatch(add, handleError),
         TE.map(createOtherSizes),
-        TE.map(toImagePaths));
+        TE.chain((images) => TE.tryCatch(requeryWithSource(images), handleError)),
+        TE.map(adaptMany),
+    );
 };
 
 export const updateImage = (image: ImageApi): TaskEither<Error, ImageApi> => {
@@ -100,7 +98,7 @@ export const updateImage = (image: ImageApi): TaskEither<Error, ImageApi> => {
             large: makePath(img.path, LARGE),
             original: makePath(img.path, ORIGINAL),
             source: image.source,
-            license: img.license as LicenseType,
+            license: asLicenseType(img.license),
         })),
     );
 };
@@ -113,7 +111,7 @@ export const adaptImage = <T extends ImageWithSource>(img: T): ImageApi => ({
     large: makePath(img.path, LARGE),
     original: makePath(img.path, ORIGINAL),
     source: O.fromNullable(img.source),
-    license: img.license as LicenseType,
+    license: asLicenseType(img.license),
 });
 
 const adaptMany = <T extends ImageWithSource>(imgs: T[]): ImageApi[] => imgs.map(adaptImage);

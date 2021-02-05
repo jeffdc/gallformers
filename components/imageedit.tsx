@@ -26,11 +26,11 @@ const Schema = yup.object().shape({
         .string()
         .url()
         .when('license', {
-            is: (l) => l === CCBY,
+            is: (l: string) => l === CCBY,
             then: yup.string().url().required('The CC-BY license requires that you provide a link to the license.'),
         }),
     attribution: yup.string().when('license', {
-        is: (l) => l === ALLRIGHTS,
+        is: (l: string) => l === ALLRIGHTS,
         then: yup
             .string()
             .required('You must document proof that we are allowed to use the image when using an All Rights Reserved license.'),
@@ -107,8 +107,6 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
     }, [image, setValue]);
 
     const onSubmit = async (fields: FormFields) => {
-        console.log(`IMAGE: ${JSON.stringify(image, null, '  ')}`);
-        console.log(`FIELDS: ${JSON.stringify(fields, null, '  ')}`);
         const newImg: ImageApi = {
             ...image,
             ...fields,

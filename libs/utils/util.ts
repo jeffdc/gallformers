@@ -108,3 +108,19 @@ export const optionalWith = <T, S>(t: T | null, adapt: (t: T) => S): O.Option<S>
     if (t == null) return O.none;
     return O.of(adapt(t));
 };
+
+/**
+ * Takes a simple CSV of numbers (just commas with no escaping) and returns it as number[].
+ * @param s
+ */
+export const csvAsNumberArr = (s: string): number[] => {
+    const arr = s
+        .split(',')
+        .map((v) => v.trim())
+        .map((n) => parseInt(n));
+
+    // check for NaNs
+    if (arr.filter((n) => n !== n).length > 0) return [];
+
+    return arr;
+};

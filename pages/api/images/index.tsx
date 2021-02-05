@@ -15,6 +15,7 @@ import {
 } from '../../../libs/api/apipage';
 
 import { deleteImages, getImages, updateImage } from '../../../libs/db/images';
+import { csvAsNumberArr } from '../../../libs/utils/util';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     const session = await getSession({ req });
@@ -46,11 +47,12 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             'speciesid',
             getQueryParam(req),
             O.map(parseInt),
+            // eslint-disable-next-line prettier/prettier
             O.map((spid) =>
                 pipe(
                     'imageids',
                     getQueryParam(req),
-                    O.map((s) => s.split(',').map(parseInt)),
+                    O.map(csvAsNumberArr),
                     O.map(deleteImages(spid)),
                 ),
             ),

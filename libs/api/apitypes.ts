@@ -343,6 +343,22 @@ export const ALLRIGHTS = 'All Rights Reserved';
 
 export type LicenseType = typeof NONE | typeof CC0 | typeof CCBY | typeof ALLRIGHTS;
 
+export const asLicenseType = (l: string): LicenseType => {
+    // Seems like there should be a better way to handle this and maintain types.
+    switch (l) {
+        case NONE:
+            return NONE;
+        case CC0:
+            return CC0;
+        case CCBY:
+            return CCBY;
+        case ALLRIGHTS:
+            return ALLRIGHTS;
+        default:
+            throw new Error(`Invalid license type: '${l}'.`);
+    }
+};
+
 export type ImageApi = {
     id: number;
     attribution: string;

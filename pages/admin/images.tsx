@@ -5,7 +5,6 @@ import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import { useSession } from 'next-auth/client';
 import Head from 'next/head';
-import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useEffect, useState } from 'react';
 import { Col, Row, Table } from 'react-bootstrap';
@@ -16,7 +15,7 @@ import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import ImageEdit from '../../components/imageedit';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { ImageApi, ImagePaths } from '../../libs/api/apitypes';
+import { ImageApi } from '../../libs/api/apitypes';
 import { allSpecies } from '../../libs/db/species';
 import { mightFailWithArray } from '../../libs/utils/util';
 
@@ -29,7 +28,7 @@ type Props = {
 
 type FormFields = {
     species: string;
-    delete: any;
+    delete: [];
 };
 
 const Images = ({ speciesid, species }: Props): JSX.Element => {
@@ -39,7 +38,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
     const [edit, setEdit] = useState(false);
     const [currentImage, setCurrentImage] = useState<ImageApi>();
 
-    const { handleSubmit, control, register, errors, reset } = useForm<FormFields>({
+    const { handleSubmit, control, register, reset } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
         defaultValues: {
@@ -95,15 +94,11 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
         }
     };
 
-    const addImages = async (imagePaths: ImagePaths) => {
-        // this seems kludgy but it prevents having to make another call to the server to get the paths
-        // imagePaths.small.push(...images.small);
-        // imagePaths.medium.push(...images.medium);
-        // imagePaths.large.push(...images.large);
-        // imagePaths.original.push(...images.original);
-        // // add a delay here to hopefully give a chance for the image to be picked up by the CDN
-        // await new Promise((r) => setTimeout(r, 2000));
-        // setImages(imagePaths);
+    const addImages = async (newImages: ImageApi[]) => {
+        //hack: add a delay here to hopefully give a chance for the image to be picked up by the CDN
+        await new Promise((r) => setTimeout(r, 2000));
+
+        setImages([...(images !== undefined ? images : []), ...newImages]);
     };
 
     const handleClose = () => setEdit(false);
@@ -161,8 +156,10 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                 <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                     <h4>Add/Edit Species Images</h4>
                     <Row className="form-group" xs={3}>
-                        <Col>
+                        <Col xs={1} style={{ paddingTop: '5px' }}>
                             Species:
+                        </Col>
+                        <Col>
                             <ControlledTypeahead
                                 control={control}
                                 name="species"
@@ -174,14 +171,12 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                                 }}
                             />
                         </Col>
+                        <Col>{selectedId && <AddImage id={selectedId} onChange={addImages} />}</Col>
                     </Row>
                     <Row className="">
                         <Col>
                             <input type="submit" className="button" value="Delete Selected" />
                         </Col>
-                    </Row>
-                    <Row>
-                        <Col>{selectedId && <AddImage id={selectedId} onChange={addImages} />}</Col>
                     </Row>
                     <div className="fixed-left mt-2 ml-2 mr-2">
                         <Table striped>
@@ -301,9 +296,10 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
 
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
     const queryParam = 'speciesid';
+    // eslint-disable-next-line prettier/prettier
     const speciesid = pipe(
         extractQueryParam(context.query, queryParam),
-        O.getOrElse(() => ''),
+        O.getOrElse(constant('')),
     );
 
     return {

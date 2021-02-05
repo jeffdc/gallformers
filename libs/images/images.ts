@@ -91,8 +91,6 @@ export const toImagePaths = (images: image[]): ImagePaths => {
 const EXPIRE_SECONDS = 60 * 5;
 
 export const getPresignedUrl = async (path: string, mime: string): Promise<string> => {
-    console.log(`${new Date().toString()}: AWS S3 API Call PRESIGNED URL GET for ${path} and ${mime}.`);
-
     // we will use different credentials for the S3 upload. these credentials can only upload.
     const signer = new S3RequestPresigner({
         ...client.config,
@@ -116,14 +114,12 @@ export const createOtherSizes = (images: image[]): image[] => {
     try {
         images.map(async (image) => {
             const path = `${EDGE}/${image.path}`;
-            console.log(`trying to load: ${path}`);
             const img = await tryBackoff(3, () => Jimp.read(path)).catch((reason: Error) =>
                 logger.error(`Failed to load file ${path} with Jimp. Received error: ${reason}.`),
             );
             if (!img) return [];
 
             const mime = img.getMIME();
-            console.log(`Read file with mime type: ${mime}.`);
             sizes.forEach(async (value, key) => {
                 img.resize(value, Jimp.AUTO);
                 img.quality(90);
@@ -187,8 +183,7 @@ export const deleteImagesByPaths = async (paths: ImagePaths): Promise<void> => {
     };
 
     try {
-        const r = await tryBackoff(3, () => client.send(new DeleteObjectsCommand(deleteParams)));
-        console.info(`Received response from delete: ${JSON.stringify(r)}`);
+        await tryBackoff(3, () => client.send(new DeleteObjectsCommand(deleteParams)));
     } catch (e) {
         logger.error(`Err in deleteImagesBySpeciesId: ${JSON.stringify(e)}.`);
     }
