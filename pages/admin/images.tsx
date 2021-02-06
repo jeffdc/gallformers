@@ -167,7 +167,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                                 labelKey="name"
                                 clearButton
                                 onChange={(s: species[]) => {
-                                    setSelectedId(s[0].id);
+                                    setSelectedId(s[0]?.id);
                                 }}
                             />
                         </Col>
