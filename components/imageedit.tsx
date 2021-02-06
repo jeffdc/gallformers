@@ -19,7 +19,13 @@ type Props = {
 
 const Schema = yup.object().shape({
     source: yup.array(),
-    sourcelink: yup.string().url().required('You must provide a link to the source.'),
+    sourcelink: yup
+        .string()
+        .url()
+        .when('source', {
+            is: (s: []) => s.length === 0,
+            then: yup.string().required('You must provide a link to the source.'),
+        }),
     license: yup.string().required('You must select one a license.'),
     creator: yup.string().required('You must provide a reference to the creator.'),
     licenselink: yup

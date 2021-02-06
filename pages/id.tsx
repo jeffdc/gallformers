@@ -61,7 +61,7 @@ const Schema = yup.object().shape(
             otherwise: yup.array(),
         }),
         genus: yup.string().when('host', {
-            is: (host) => host.length === 0,
+            is: (host: []) => host.length === 0,
             then: yup.string().required('You must provide a search,'),
             otherwise: yup.string(),
         }),
