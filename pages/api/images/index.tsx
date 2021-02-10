@@ -14,7 +14,7 @@ import {
     toErr,
 } from '../../../libs/api/apipage';
 
-import { deleteImages, getImages, updateImage } from '../../../libs/db/images';
+import { deleteImages, getImages, updateImages } from '../../../libs/db/images';
 import { csvAsNumberArr } from '../../../libs/utils/util';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
@@ -36,7 +36,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             TE.fold(sendErrResponse(res), sendSuccResponse(res)),
         )();
     } else if (req.method === 'POST') {
-        await apiUpsertEndpoint(req, res, updateImage, onCompleteSendJson);
+        await apiUpsertEndpoint(req, res, updateImages, onCompleteSendJson);
     } else if (req.method === 'DELETE') {
         const invalidQueryErr: Err = {
             status: 400,

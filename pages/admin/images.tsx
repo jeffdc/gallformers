@@ -5,15 +5,17 @@ import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import { useSession } from 'next-auth/client';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useEffect, useState } from 'react';
-import { Col, Row, Table } from 'react-bootstrap';
+import { Alert, Button, Col, Modal, Row, Table } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import AddImage from '../../components/addimage';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import ImageEdit from '../../components/imageedit';
+import ImageGrid from '../../components/imagegrid';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { ImageApi } from '../../libs/api/apitypes';
 import { allSpecies } from '../../libs/db/species';
@@ -33,12 +35,17 @@ type FormFields = {
 
 const Images = ({ speciesid, species }: Props): JSX.Element => {
     const sp = species.find((s) => s.id === parseInt(speciesid));
-    const [selectedId, setSelectedId] = useState(sp ? sp.id : undefined);
+    const [selectedId, setSelectedId] = useState(speciesid ? parseInt(speciesid) : undefined);
+    const [selectedImages, setSelectedImages] = useState(new Set<number>());
     const [images, setImages] = useState<ImageApi[]>();
     const [edit, setEdit] = useState(false);
     const [currentImage, setCurrentImage] = useState<ImageApi>();
+    const [showCopy, setShowCopy] = useState(false);
+    const [error, setError] = useState('');
+    const [selectedForCopy, setSelectedForCopy] = useState(new Set<number>());
+    const [copySource, setCopySource] = useState<ImageApi>();
 
-    const { handleSubmit, control, register, reset } = useForm<FormFields>({
+    const { handleSubmit, control, register, reset, setValue } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
         defaultValues: {
@@ -47,6 +54,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
     });
 
     const [session] = useSession();
+    const router = useRouter();
 
     useEffect(() => {
         const fetchNewSelection = async (id: number | undefined) => {
@@ -70,24 +78,30 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
         fetchNewSelection(selectedId);
     }, [selectedId]);
 
-    // i could not divine the incantation to get the form to track an array of checkboxes and propagate the id
-    const toDelete = new Set<string>();
+    const selectAll = (e: React.MouseEvent<HTMLInputElement, MouseEvent>) => {
+        images?.forEach((i) => {
+            setValue(`delete-${i.id}`, e.currentTarget.checked);
+            if (e.currentTarget.checked) selectedImages.add(i.id);
+        });
+        setSelectedImages(selectedImages);
+    };
 
     const onSubmit = async () => {
         try {
-            if (toDelete.size > 0) {
-                const res = await fetch(`../api/images?speciesid=${selectedId}&imageids=${[...toDelete.values()]}`, {
+            if (selectedImages.size > 0) {
+                const res = await fetch(`../api/images?speciesid=${selectedId}&imageids=${[...selectedImages.values()]}`, {
                     method: 'DELETE',
                 });
 
                 if (res.status === 200) {
-                    setImages(images?.filter((i) => !toDelete.has(i.id.toString())));
+                    setImages(images?.filter((i) => !selectedImages.has(i.id)));
                 } else {
                     throw new Error(await res.text());
                 }
 
                 reset({ delete: [], species: sp?.name });
-                toDelete.clear();
+                selectedImages.clear();
+                setSelectedImages(selectedImages);
             }
         } catch (e) {
             console.error(e);
@@ -109,16 +123,31 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
         setEdit(true);
     };
 
-    const saveImage = async (image: ImageApi) => {
+    const startCopy = () => {
+        if (selectedImages.size === 1) {
+            setError('');
+            setCopySource(images?.find((i) => selectedImages.has(i.id)));
+            setShowCopy(true);
+        } else if (images && images.length < 2) {
+            setError('There is only one image so you can not copy yet. Upload another image first.');
+        } else {
+            setError('You need to select one (and only one) image to begin a copy.');
+        }
+    };
+
+    const saveImages = async (imgs: ImageApi[]) => {
         try {
-            image.lastchangedby = session ? session.user.name : 'UNKNOWN!';
+            const updatedImages = imgs.map((i) => {
+                i.lastchangedby = session ? session.user.name : 'UNKNOWN!';
+                return i;
+            });
 
             const res = await fetch(`../api/images`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(image),
+                body: JSON.stringify(updatedImages),
             });
 
             if (res.status !== 200) {
@@ -126,13 +155,38 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
             }
 
             if (images) {
-                setImages([image, ...images.filter((img) => img.id !== image.id)]);
+                const updatedImageIds = new Set(updatedImages.map((i) => i.id));
+                setImages([...updatedImages, ...images.filter((img) => !updatedImageIds.has(img.id))]);
             }
 
-            setCurrentImage(image);
+            setCurrentImage(undefined);
         } catch (e) {
             console.error(e);
         }
+    };
+
+    const doCopy = async () => {
+        if (!copySource || !images) {
+            console.error('Somehow the source and/or the images for the copy are undefined.');
+            return;
+        }
+
+        await saveImages(
+            images
+                .filter((i) => selectedForCopy.has(i.id))
+                .map<ImageApi>((i) => ({
+                    ...i,
+                    lastchangedby: session ? session.user.name : 'UNKNOWN!',
+                    source: copySource.source,
+                    sourcelink: copySource.sourcelink,
+                    license: copySource.license,
+                    licenselink: copySource.licenselink,
+                    creator: copySource.creator,
+                    attribution: copySource.attribution,
+                })),
+        );
+
+        setShowCopy(false);
     };
 
     return (
@@ -141,17 +195,50 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                 <Head>
                     <title>Add/Edit Species Images</title>
                 </Head>
-                {/* <AddImage id={species.id} onChange={addImages} /> */}
+
+                {error.length > 0 && (
+                    <Alert variant="danger" onClose={() => setError('')} dismissible>
+                        <Alert.Heading>Uh-oh</Alert.Heading>
+                        <p>{error}</p>
+                    </Alert>
+                )}
+
                 {currentImage && selectedId && (
                     // eslint-disable-next-line prettier/prettier
                     <ImageEdit 
                         image={currentImage}
                         speciesid={selectedId}
-                        onSave={saveImage}
+                        onSave={(i) => saveImages([i])}
                         show={edit}
                         onClose={handleClose}
                     />
                 )}
+
+                <Modal show={showCopy} onHide={() => setShowCopy(false)} size="lg">
+                    <Modal.Header closeButton>
+                        <Modal.Title>Copy Image Details</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        {/* <p>Copying From:</p> */}
+                        {/* <img src={} width="100" className="img-thumbnail" /> */}
+
+                        <p>Select the other images that you want to copy details to:</p>
+                        {images && (
+                            <ImageGrid
+                                colCount={6}
+                                images={images.filter((img) => !selectedImages.has(img.id))}
+                                selected={selectedForCopy}
+                                setSelected={setSelectedForCopy}
+                            />
+                        )}
+                        <Button variant="primary" className="mt-4" onClick={doCopy}>
+                            Copy
+                        </Button>
+                        <Button variant="secondary" className="mt-4 ml-2" onClick={() => setShowCopy(false)}>
+                            Cancel
+                        </Button>
+                    </Modal.Body>
+                </Modal>
 
                 <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                     <h4>Add/Edit Species Images</h4>
@@ -167,22 +254,31 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                                 labelKey="name"
                                 clearButton
                                 onChange={(s: species[]) => {
-                                    setSelectedId(s[0]?.id);
+                                    const id = s[0]?.id;
+                                    setSelectedId(id);
+                                    router.push(`?speciesid=${id}`, undefined, { shallow: true });
                                 }}
                             />
                         </Col>
                         <Col>{selectedId && <AddImage id={selectedId} onChange={addImages} />}</Col>
                     </Row>
                     <Row className="">
+                        <Col xs={2}>
+                            <input type="submit" className="btn btn-secondary" value="Delete Selected" />
+                        </Col>
                         <Col>
-                            <input type="submit" className="button" value="Delete Selected" />
+                            <Button variant="secondary" onClick={startCopy}>
+                                Copy One to Others
+                            </Button>
                         </Col>
                     </Row>
                     <div className="fixed-left mt-2 ml-2 mr-2">
                         <Table striped>
                             <thead>
                                 <tr>
-                                    <th></th>
+                                    <th>
+                                        <input type="checkbox" key={speciesid} onClick={selectAll} />
+                                    </th>
                                     <th>image</th>
                                     <th>default</th>
                                     <th>source</th>
@@ -195,26 +291,29 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                             </thead>
                             <tbody>
                                 {images?.map((img) => (
-                                    <tr key={img.path} id={img.id.toString()} onClick={editRow}>
+                                    <tr key={img.id} id={img.id.toString()} onClick={editRow}>
                                         <td>
                                             <input
                                                 type="checkbox"
                                                 key={img.id}
                                                 id={img.id.toString()}
-                                                name="delete"
+                                                name={`delete-${img.id}`}
                                                 ref={register}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     e.currentTarget.checked
-                                                        ? toDelete.add(e.currentTarget.id)
-                                                        : toDelete.delete(e.currentTarget.id);
+                                                        ? selectedImages.add(parseInt(e.currentTarget.id))
+                                                        : selectedImages.delete(parseInt(e.currentTarget.id));
+                                                    setSelectedImages(selectedImages);
                                                 }}
                                             />
                                         </td>
                                         <td>
                                             <img src={img.small} width="100" />
                                         </td>
-                                        <td>{img.default ? '✓' : ''}</td>
+                                        <td>
+                                            <span className="d-flex justify-content-center">{img.default ? '✓' : ''}</span>
+                                        </td>
                                         <td>
                                             {pipe(
                                                 img.source,
