@@ -2,6 +2,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { host } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
+import Link from 'next/link';
 import React, { useState } from 'react';
 import { Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
@@ -97,6 +98,13 @@ const GallHost = ({ galls, genera, hosts }: Props): JSX.Element => {
                     <p>
                         First select a gall. If any mappings to hosts already exist they will show up in the Host field. Then you
                         can edit these mappings (add or delete).
+                    </p>
+                    <p>
+                        At least one host species (not just a Genus) must exist before mapping.{' '}
+                        <Link href="./host">
+                            <a>Go add one</a>
+                        </Link>{' '}
+                        now if you need to.
                     </p>
                     <Row className="form-group">
                         <Col>
