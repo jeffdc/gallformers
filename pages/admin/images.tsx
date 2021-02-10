@@ -219,9 +219,6 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                         <Modal.Title>Copy Image Details</Modal.Title>
                     </Modal.Header>
                     <Modal.Body>
-                        {/* <p>Copying From:</p> */}
-                        {/* <img src={} width="100" className="img-thumbnail" /> */}
-
                         <p>Select the other images that you want to copy details to:</p>
                         {images && (
                             <ImageGrid
