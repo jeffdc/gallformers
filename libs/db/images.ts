@@ -1,5 +1,6 @@
 import { image, Prisma, source, speciessource } from '@prisma/client';
 import { constant, pipe } from 'fp-ts/lib/function';
+import * as A from 'fp-ts/lib/Array';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
@@ -8,6 +9,7 @@ import { createOtherSizes, deleteImagesByPaths, getImagePaths, LARGE, makePath, 
 import { handleError } from '../utils/util';
 import db from './db';
 import { connectIfNotNull } from './utils';
+import { ExtractTFromPromise } from '../utils/types';
 
 export const addImages = (images: ImageApi[]): TaskEither<Error, ImageApi[]> => {
     const add = () => {
@@ -50,8 +52,8 @@ export const addImages = (images: ImageApi[]): TaskEither<Error, ImageApi[]> => 
     );
 };
 
-export const updateImage = (image: ImageApi): TaskEither<Error, ImageApi> => {
-    const update = () =>
+export const updateImages = (images: ImageApi[]): TaskEither<Error, readonly ImageApi[]> => {
+    const update = (image: ImageApi) =>
         db.image.update({
             where: { id: image.id },
             data: {
@@ -74,32 +76,41 @@ export const updateImage = (image: ImageApi): TaskEither<Error, ImageApi> => {
     // The intent here is that in teh near future Prisma will fix this and we can get rid of the transaction and
     // the executeRaw call. If it were not on the immediate horizon it would be simpler to just have one raw
     // update call.
-    const sourceid = pipe(
-        image.source,
-        O.fold(constant('NULL'), (s) => s.id.toString()),
-    );
-    const updateSourceRel = () =>
+    const sourceid = (image: ImageApi) =>
+        pipe(
+            image.source,
+            O.fold(constant('NULL'), (s) => s.id.toString()),
+        );
+
+    const updateSourceRel = (image: ImageApi) =>
         db.$executeRaw(
             `UPDATE image 
-             SET source_id = ${sourceid}
+             SET source_id = ${sourceid(image)}
              WHERE image.id = ${image.id}`,
         );
 
-    const doTx = () => db.$transaction([update(), updateSourceRel()]).then((rs) => rs[0]);
+    const doTx = (image: ImageApi) => db.$transaction([update(image), updateSourceRel(image)]).then((rs) => rs[0]);
+    type TxRetType = ExtractTFromPromise<ReturnType<typeof doTx>>;
 
     // eslint-disable-next-line prettier/prettier
     return pipe(
-        TE.tryCatch(doTx, handleError),
-        TE.map((img) => ({
-            ...img,
-            speciesid: img.species_id,
-            small: makePath(img.path, SMALL),
-            medium: makePath(img.path, MEDIUM),
-            large: makePath(img.path, LARGE),
-            original: makePath(img.path, ORIGINAL),
-            source: image.source,
-            license: asLicenseType(img.license),
-        })),
+        images,
+        A.map((img) =>
+            pipe(
+                TE.tryCatch<Error, TxRetType>(() => doTx(img), handleError),
+                TE.map<TxRetType, ImageApi>((i) => ({
+                    ...i,
+                    speciesid: i.species_id,
+                    small: makePath(i.path, SMALL),
+                    medium: makePath(i.path, MEDIUM),
+                    large: makePath(i.path, LARGE),
+                    original: makePath(i.path, ORIGINAL),
+                    source: img.source,
+                    license: asLicenseType(i.license),
+                })),
+            ),
+        ),
+        TE.sequenceArray,
     );
 };
 

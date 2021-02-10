@@ -71,7 +71,7 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
     const {
         handleSubmit,
         register,
-        formState: { isDirty, dirtyFields },
+        formState: { isDirty },
         errors,
         control,
         getValues,
