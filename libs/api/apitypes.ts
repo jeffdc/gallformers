@@ -1,7 +1,6 @@
 /**
  * Types for calling the APIs. These are to be used by browser code when it calls the APIs.
  */
-import { option } from 'fast-check';
 import * as O from 'fp-ts/lib/Option';
 import { Option } from 'fp-ts/lib/Option';
 import { ParsedUrlQuery } from 'querystring';

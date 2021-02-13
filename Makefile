@@ -37,7 +37,7 @@ redeploy-and-run: load-image run
 
 .PHONY: run
 run:
-	docker run -v $(SERVER_SRC):$(DST) --env-file .env.local --env-file .env.production --name $(SERVICE_NAME) -p 3000:3000 -d $(SERVICE_NAME):latest --restart unless-stopped
+	docker run -v $(SERVER_SRC):$(DST) --env-file .env.local --env-file .env.production --name $(SERVICE_NAME) -p 3000:3000 -d $(SERVICE_NAME):latest
 	docker start $(SERVICE_NAME)
 
 .PHONY: restart

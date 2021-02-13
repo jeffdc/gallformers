@@ -1,20 +1,26 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import { host } from '@prisma/client';
+import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
-import React, { useState } from 'react';
-import { Col, Row } from 'react-bootstrap';
+import { ParsedUrlQuery } from 'querystring';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
+import { extractQueryParam } from '../../libs/api/apipage';
 import { GallApi, GallHostUpdateFields, SimpleSpecies } from '../../libs/api/apitypes';
 import { allGalls } from '../../libs/db/gall';
 import { allHostGenera, allHosts } from '../../libs/db/host';
 import { mightFailWithArray } from '../../libs/utils/util';
+import { useRouter } from 'next/router';
 
 type Props = {
+    id: string;
     galls: GallApi[];
     genera: string[];
     hosts: SimpleSpecies[];
@@ -30,14 +36,17 @@ type FormFields = {
     hosts: SimpleSpecies[];
 };
 
-const GallHost = ({ galls, genera, hosts }: Props): JSX.Element => {
+const GallHost = ({ id, galls, genera, hosts }: Props): JSX.Element => {
     const [results, setResults] = useState(new Array<host>());
-    const [selectedGall, setSelectedGall] = useState<GallApi>();
+    const [selectedGall, setSelectedGall] = useState(id ? galls.find((g) => g.id === parseInt(id)) : undefined);
+    const [error, setError] = useState('');
 
     const { handleSubmit, errors, control, setValue, reset } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
+
+    const router = useRouter();
 
     const onSubmit = async (data: FormFields) => {
         try {
@@ -65,6 +74,7 @@ const GallHost = ({ galls, genera, hosts }: Props): JSX.Element => {
             }
         } catch (e) {
             console.error(e);
+            setError(e);
         }
     };
 
@@ -76,15 +86,32 @@ const GallHost = ({ galls, genera, hosts }: Props): JSX.Element => {
                 const hosts = (await res.json()) as SimpleSpecies[];
                 if (hosts) {
                     setSelectedGall(gall);
-                    setValue('hosts', hosts);
                 }
             }
+            router.replace(`?id=${gall.id}`, undefined, { shallow: true });
         } else {
             setSelectedGall(gall);
-            setValue('hosts', []);
+            router.replace(``, undefined, { shallow: true });
         }
-        setValue('genus', '');
     };
+
+    const onGallChange = useCallback(
+        (gall: GallApi | undefined) => {
+            if (gall == undefined) {
+                setValue('gall', []);
+                setValue('hosts', []);
+            } else {
+                setValue('gall', [gall]);
+                setValue('hosts', gall.hosts);
+            }
+            setValue('genus', '');
+        },
+        [setValue],
+    );
+
+    useEffect(() => {
+        onGallChange(selectedGall);
+    }, [selectedGall, onGallChange]);
 
     return (
         <Auth>
@@ -92,6 +119,13 @@ const GallHost = ({ galls, genera, hosts }: Props): JSX.Element => {
                 <Head>
                     <title>Map Galls & Hosts</title>
                 </Head>
+
+                {error.length > 0 && (
+                    <Alert variant="danger" onClose={() => setError('')} dismissible>
+                        <Alert.Heading>Uh-oh</Alert.Heading>
+                        <p>{error}</p>
+                    </Alert>
+                )}
 
                 <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                     <h4>Map Galls & Hosts</h4>
@@ -175,9 +209,16 @@ const GallHost = ({ galls, genera, hosts }: Props): JSX.Element => {
     );
 };
 
-export const getServerSideProps: GetServerSideProps = async () => {
+export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
+    const queryParam = 'id';
+    // eslint-disable-next-line prettier/prettier
+    const id = pipe(
+        extractQueryParam(context.query, queryParam),
+        O.getOrElse(constant('')),
+    );
     return {
         props: {
+            id: id,
             galls: await mightFailWithArray<GallApi>()(allGalls()),
             genera: await mightFailWithArray<string>()(allHostGenera()),
             hosts: await mightFailWithArray<SimpleSpecies>()(allHosts()),

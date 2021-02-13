@@ -1,14 +1,18 @@
 import { yupResolver } from '@hookform/resolvers/yup';
+import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import React, { useState } from 'react';
-import { Col, Row } from 'react-bootstrap';
+import { ParsedUrlQuery } from 'querystring';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import { AdminFormFields, useAPIs } from '../../hooks/useAPIs';
+import { extractQueryParam } from '../../libs/api/apipage';
 import { DeleteResult, SourceApi, SourceUpsertFields } from '../../libs/api/apitypes';
 import { allSources } from '../../libs/db/source';
 import { mightFailWithArray } from '../../libs/utils/util';
@@ -21,6 +25,7 @@ const Schema = yup.object().shape({
 });
 
 type Props = {
+    id: string;
     sources: SourceApi[];
 };
 
@@ -31,12 +36,47 @@ const Source = (props: Props): JSX.Element => {
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
-    const [existing, setExisting] = useState(false);
+    const [existingId, setExistingId] = useState<number | undefined>(
+        props.id && props.id !== '' ? parseInt(props.id) : undefined,
+    );
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
     const [sources, setSources] = useState(props.sources);
+    const [error, setError] = useState('');
 
     const router = useRouter();
     const { doDeleteOrUpsert } = useAPIs<SourceApi, SourceUpsertFields>('title', '../api/source/', '../api/source/upsert');
+
+    const onFamilyChange = useCallback(
+        (id: number | undefined) => {
+            if (id == undefined) {
+                setValue('value', []);
+                setValue('author', '');
+                setValue('pubyear', '');
+                setValue('link', '');
+                setValue('citation', '');
+            } else {
+                try {
+                    const source = sources.find((s) => s.id === id);
+                    if (source == undefined) {
+                        throw new Error(`Somehow we have a source selection that does not exist?! sourceid: ${id}`);
+                    }
+                    setValue('value', [source]);
+                    setValue('author', source.author);
+                    setValue('pubyear', source.pubyear);
+                    setValue('link', source.link);
+                    setValue('citation', source.citation);
+                } catch (e) {
+                    console.error(e);
+                    setError(e);
+                }
+            }
+        },
+        [sources, setValue],
+    );
+
+    useEffect(() => {
+        onFamilyChange(existingId);
+    }, [existingId, onFamilyChange]);
 
     const onSubmit = async (data: FormFields) => {
         const postDelete = (id: number | string, result: DeleteResult) => {
@@ -53,8 +93,9 @@ const Source = (props: Props): JSX.Element => {
             title: title,
         });
 
-        await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert);
-        reset();
+        await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert)
+            .then(() => reset())
+            .catch((e) => setError(`Failed to save changes. ${e}.`));
     };
 
     return (
@@ -63,6 +104,13 @@ const Source = (props: Props): JSX.Element => {
                 <Head>
                     <title>Add/Edit Sources</title>
                 </Head>
+
+                {error.length > 0 && (
+                    <Alert variant="danger" onClose={() => setError('')} dismissible>
+                        <Alert.Heading>Uh-oh</Alert.Heading>
+                        <p>{error}</p>
+                    </Alert>
+                )}
 
                 <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                     <h4>Add/Edit Sources</h4>
@@ -73,18 +121,13 @@ const Source = (props: Props): JSX.Element => {
                                 control={control}
                                 name="value"
                                 onChangeWithNew={(e, isNew) => {
-                                    setExisting(!isNew);
                                     if (isNew || !e[0]) {
-                                        setValue('author', '');
-                                        setValue('pubyear', '');
-                                        setValue('link', '');
-                                        setValue('citation', '');
+                                        setExistingId(undefined);
+                                        router.replace(``, undefined, { shallow: true });
                                     } else {
                                         const source: SourceApi = e[0];
-                                        setValue('author', source.author);
-                                        setValue('pubyear', source.pubyear);
-                                        setValue('link', source.link);
-                                        setValue('citation', source.citation);
+                                        setExistingId(source.id);
+                                        router.replace(`?id=${source.id}`, undefined, { shallow: true });
                                     }
                                 }}
                                 placeholder="Title"
@@ -129,7 +172,7 @@ const Source = (props: Props): JSX.Element => {
                             {errors.citation && <span className="text-danger">You must provide a citation in MLA form.</span>}
                         </Col>
                     </Row>
-                    <Row className="fromGroup" hidden={!existing}>
+                    <Row className="fromGroup" hidden={!existingId}>
                         <Col xs="1">Delete?:</Col>
                         <Col className="mr-auto">
                             <input name="del" type="checkbox" className="form-check-input" ref={register} />
@@ -149,9 +192,16 @@ const Source = (props: Props): JSX.Element => {
     );
 };
 
-export const getServerSideProps: GetServerSideProps = async () => {
+export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
+    const queryParam = 'id';
+    // eslint-disable-next-line prettier/prettier
+    const id = pipe(
+        extractQueryParam(context.query, queryParam),
+        O.getOrElse(constant('')),
+    );
     return {
         props: {
+            id: id,
             sources: await mightFailWithArray<SourceApi>()(allSources()),
         },
     };

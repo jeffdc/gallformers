@@ -169,7 +169,10 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                             <Row className="form-group">
                                 <Col xs={3}>
                                     Source:
-                                    <InfoTip id="source" text="The source that the image came from." />
+                                    <InfoTip
+                                        id="source"
+                                        text="The source that the image came from. This list will only show Sources that have already been mapped to the species."
+                                    />
                                 </Col>
                                 <Col>
                                     <ControlledTypeahead

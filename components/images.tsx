@@ -1,7 +1,9 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
+import { useSession } from 'next-auth/client';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import React, { useState } from 'react';
 import {
     Button,
@@ -31,6 +33,9 @@ const Images = ({ species }: Props): JSX.Element => {
     const [showInfo, setShowInfo] = useState(false);
     const { width } = useWindowDimensions();
 
+    const router = useRouter();
+    const session = useSession();
+
     const pad = 25;
     const hwRatio = 2 / 3;
 
@@ -59,7 +64,9 @@ const Images = ({ species }: Props): JSX.Element => {
             </Modal>
 
             <Modal show={showInfo} onHide={() => setShowInfo(false)} size="xl">
-                <Modal.Header closeButton />
+                <Modal.Header closeButton>
+                    <Modal.Title>Image Details</Modal.Title>
+                </Modal.Header>
                 <Modal.Body>
                     <Row>
                         <Col className="p-0 m-0 border" xs={4}>
@@ -155,7 +162,9 @@ const Images = ({ species }: Props): JSX.Element => {
                         placement="bottom"
                         overlay={
                             <Popover id="copyright-popover">
-                                <Popover.Content>{`${currentImage?.license}`}</Popover.Content>
+                                <Popover.Content>{`${
+                                    currentImage?.license ? currentImage.license : 'No License'
+                                }`}</Popover.Content>
                             </Popover>
                         }
                     >
@@ -166,6 +175,15 @@ const Images = ({ species }: Props): JSX.Element => {
                     <Button variant="secondary" style={{ fontWeight: 'bold' }} onClick={() => setShowInfo(true)}>
                         ⓘ
                     </Button>
+                    {session && (
+                        <Button
+                            variant="secondary"
+                            style={{ fontSize: '1.0em' }}
+                            onClick={() => router.push(`/admin/images?speciesid=${species.id}`)}
+                        >
+                            ✎
+                        </Button>
+                    )}
                 </ButtonGroup>
             </ButtonToolbar>
         </>

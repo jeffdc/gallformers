@@ -4,7 +4,7 @@ import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
 import React, { useState } from 'react';
-import { Col, Row } from 'react-bootstrap';
+import { Alert, Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
@@ -38,6 +38,7 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
     const [isGall, setIsGall] = useState(true);
     const [existing, setExisting] = useState(false);
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
+    const [error, setError] = useState('');
 
     const { handleSubmit, errors, control, register, reset, setValue, getValues } = useForm<FormFields>({
         mode: 'onBlur',
@@ -76,6 +77,7 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
             }
         } catch (e) {
             console.error(e);
+            setError(e);
         }
     };
 
@@ -124,6 +126,7 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
             }
         } catch (e) {
             console.error(e);
+            setError(e);
         }
     };
 
@@ -133,6 +136,13 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                 <Head>
                     <title>Map Species & Sources</title>
                 </Head>
+
+                {error.length > 0 && (
+                    <Alert variant="danger" onClose={() => setError('')} dismissible>
+                        <Alert.Heading>Uh-oh</Alert.Heading>
+                        <p>{error}</p>
+                    </Alert>
+                )}
 
                 <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                     <h4>Map Species & Sources</h4>

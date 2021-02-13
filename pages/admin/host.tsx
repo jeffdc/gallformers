@@ -6,13 +6,15 @@ import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import React, { useState } from 'react';
-import { Col, Row } from 'react-bootstrap';
+import { ParsedUrlQuery } from 'querystring';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import { AdminFormFields, useAPIs } from '../../hooks/useAPIs';
+import { extractQueryParam } from '../../libs/api/apipage';
 import {
     AbundanceApi,
     DeleteResult,
@@ -29,6 +31,7 @@ import { abundances } from '../../libs/db/species';
 import { mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
+    id: string;
     hs: SpeciesApi[];
     families: family[];
     abundances: abundance[];
@@ -67,10 +70,11 @@ export const testables = {
     Schema: Schema,
 };
 
-const Host = ({ hs, families, abundances }: Props): JSX.Element => {
-    const [existing, setExisting] = useState(false);
+const Host = ({ id, hs, families, abundances }: Props): JSX.Element => {
+    const [existingId, setExistingId] = useState<number | undefined>(id && id !== '' ? parseInt(id) : undefined);
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
     const [hosts, setHosts] = useState(hs);
+    const [error, setError] = useState('');
 
     const { register, handleSubmit, setValue, errors, control, reset } = useForm<FormFields>({
         mode: 'onBlur',
@@ -78,6 +82,41 @@ const Host = ({ hs, families, abundances }: Props): JSX.Element => {
     });
 
     const router = useRouter();
+
+    const onHostChange = useCallback(
+        (spid: number | undefined) => {
+            if (spid == undefined) {
+                setValue('value', []);
+                setValue('genus', '');
+                setValue('family', [EmptyFamily]);
+                setValue('abundance', [EmptyAbundance]);
+                setValue('commonnames', '');
+                setValue('synonyms', '');
+            } else {
+                try {
+                    const sp = hosts.find((h) => h.id === spid);
+                    if (sp == undefined) {
+                        throw new Error(`Somehow we have a host selection that does not exist?! hostid: ${spid}`);
+                    }
+
+                    setValue('value', [sp], { shouldValidate: true });
+                    setValue('genus', sp.genus);
+                    setValue('family', [sp.family]);
+                    setValue('abundance', [pipe(sp.abundance, O.getOrElse(constant(EmptyAbundance)))]);
+                    setValue('commonnames', pipe(sp.commonnames, O.getOrElse(constant(''))));
+                    setValue('synonyms', pipe(sp.synonyms, O.getOrElse(constant(''))));
+                } catch (e) {
+                    console.error(e);
+                    setError(e);
+                }
+            }
+        },
+        [hosts, setValue],
+    );
+
+    useEffect(() => {
+        onHostChange(existingId);
+    }, [existingId, onHostChange]);
 
     const { doDeleteOrUpsert } = useAPIs<SpeciesApi, SpeciesUpsertFields>('name', '../api/host/', '../api/host/upsert');
 
@@ -100,8 +139,9 @@ const Host = ({ hs, families, abundances }: Props): JSX.Element => {
             synonyms: fields.synonyms,
         });
 
-        await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert);
-        reset();
+        await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert)
+            .then(() => reset())
+            .catch((e) => setError(`Failed to save changes. ${e}.`));
     };
 
     return (
@@ -110,6 +150,13 @@ const Host = ({ hs, families, abundances }: Props): JSX.Element => {
                 <Head>
                     <title>Add/Edit Hosts</title>
                 </Head>
+
+                {error.length > 0 && (
+                    <Alert variant="danger" onClose={() => setError('')} dismissible>
+                        <Alert.Heading>Uh-oh</Alert.Heading>
+                        <p>{error}</p>
+                    </Alert>
+                )}
 
                 <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                     <h4>Add/Edit Hosts</h4>
@@ -125,19 +172,13 @@ const Host = ({ hs, families, abundances }: Props): JSX.Element => {
                                 control={control}
                                 name="value"
                                 onChangeWithNew={(e, isNew) => {
-                                    setExisting(!isNew);
                                     if (isNew || !e[0]) {
-                                        setValue('genus', extractGenus(e[0] ? e[0].name : ''));
-                                        setValue('family', [EmptyFamily]);
-                                        setValue('abundance', [EmptyAbundance]);
-                                        setValue('commonnames', '');
-                                        setValue('synonyms', '');
+                                        setExistingId(undefined);
+                                        router.replace(``, undefined, { shallow: true });
                                     } else {
                                         const host: SpeciesApi = e[0];
-                                        setValue('family', [host.family]);
-                                        setValue('abundance', [pipe(host.abundance, O.getOrElse(constant(EmptyAbundance)))]);
-                                        setValue('commonnames', pipe(host.commonnames, O.getOrElse(constant(''))));
-                                        setValue('synonyms', pipe(host.synonyms, O.getOrElse(constant(''))));
+                                        setExistingId(host.id);
+                                        router.replace(`?id=${host.id}`, undefined, { shallow: true });
                                     }
                                 }}
                                 onBlurT={(e) => {
@@ -209,7 +250,7 @@ const Host = ({ hs, families, abundances }: Props): JSX.Element => {
                             <input type="text" placeholder="Synonyms" name="synonyms" className="form-control" ref={register} />
                         </Col>
                     </Row>
-                    <Row className="fromGroup" hidden={!existing}>
+                    <Row className="fromGroup" hidden={!existingId}>
                         <Col xs="1">Delete?:</Col>
                         <Col className="mr-auto">
                             <input name="del" type="checkbox" className="form-check-input" ref={register} />
@@ -223,15 +264,29 @@ const Host = ({ hs, families, abundances }: Props): JSX.Element => {
                     <Row hidden={!deleteResults}>
                         <Col>{`Deleted ${deleteResults?.name}.`}</Col>
                     </Row>
+                    <Row hidden={!existingId}>
+                        <Col>
+                            <br />
+                            <Link href={`./images?speciesid=${existingId}`}>Add/Edit Images for this Host</Link>
+                        </Col>
+                    </Row>
                 </form>
             </>
         </Auth>
     );
 };
 
-export const getServerSideProps: GetServerSideProps = async () => {
+export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
+    const queryParam = 'id';
+    // eslint-disable-next-line prettier/prettier
+    const id = pipe(
+        extractQueryParam(context.query, queryParam),
+        O.getOrElse(constant('')),
+    );
+
     return {
         props: {
+            id: id,
             hs: await mightFailWithArray<SpeciesApi>()(allHosts()),
             families: await mightFailWithArray<FamilyApi>()(allFamilies(HOST_FAMILY_TYPES)),
             abundances: await mightFailWithArray<AbundanceApi>()(abundances()),

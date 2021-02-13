@@ -5,7 +5,9 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { MouseEvent, useState } from 'react';
-import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
+import { Col, Container, ListGroup, Row } from 'react-bootstrap';
+import Edit from '../../../components/edit';
+import Images from '../../../components/images';
 import { GallSimple, HostApi } from '../../../libs/api/apitypes';
 import { allHostIds, hostById } from '../../../libs/db/host';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
@@ -52,32 +54,29 @@ const Host = ({ host }: Props): JSX.Element => {
     };
 
     return (
-        <div
-            style={{
-                marginBottom: '5%',
-                marginRight: '5%',
-            }}
-        >
+        <div>
             <Head>
                 <title>{host.name}</title>
             </Head>
 
-            <Media>
-                <img width={170} height={128} className="mr-3" src="" alt={host.name} />
-                <Media.Body>
-                    <Container className="p-3">
+            <Container className="p-1">
+                <Row>
+                    <Col>
                         <Row>
+                            <Edit id={host.id} type="host" />
                             <Col>
                                 <h2>{host.name}</h2>
                                 {renderCommonNames(host.commonnames)}
+                                <p className="font-italic">
+                                    <strong>Family:</strong>
+                                    <Link key={host.family.id} href={`/family/${host.family.id}`}>
+                                        <a> {host.family.name}</a>
+                                    </Link>
+                                </p>
                             </Col>
-                            Family:
-                            <Link key={host.family.id} href={`/family/${host.family.id}`}>
-                                <a> {host.family.name}</a>
-                            </Link>
                         </Row>
                         <Row>
-                            <Col className="lead p-3">
+                            <Col className="">
                                 {selectedSource && selectedSource.description && (
                                     <span>
                                         <p className="small">{deserialize(selectedSource.description)}</p>
@@ -89,11 +88,13 @@ const Host = ({ host }: Props): JSX.Element => {
                             </Col>
                         </Row>
                         <Row>
-                            <Col>Galls: {host.galls.map(gallLinker)}</Col>
+                            <Col>
+                                <strong>Galls:</strong> {host.galls.map(gallLinker)}
+                            </Col>
                         </Row>
                         <Row>
                             <Col>
-                                Abdundance:{' '}
+                                <strong>Abdundance:</strong>{' '}
                                 {pipe(
                                     host.abundance,
                                     O.map((a) => a.abundance),
@@ -101,52 +102,57 @@ const Host = ({ host }: Props): JSX.Element => {
                                 )}
                             </Col>
                         </Row>
-                        <Row>
-                            <Col>
-                                <strong>Further Information:</strong>
-                                <ListGroup variant="flush" defaultActiveKey={selectedSource?.source_id}>
-                                    {host.speciessource
-                                        .sort((a, b) => a.source.citation.localeCompare(b.source.citation))
-                                        .map((speciessource) => (
-                                            <ListGroup.Item
-                                                key={speciessource.source_id}
-                                                id={speciessource.source_id.toString()}
-                                                action
-                                                onClick={changeDescription}
-                                                variant={speciessource.source_id === selectedSource?.source_id ? 'dark' : ''}
-                                            >
-                                                <Link href={`/source/${speciessource.source?.id}`}>
-                                                    <a>{speciessource.source?.citation}</a>
-                                                </Link>
-                                            </ListGroup.Item>
-                                        ))}
-                                </ListGroup>
-                                <hr />
-                                <Row className="">
-                                    <Col className="align-self-center">
-                                        <strong>See Also:</strong>
-                                    </Col>
-                                    <Col className="align-self-center">
-                                        <a href={iNatUrl(host.name)} target="_blank" rel="noreferrer">
-                                            <img src="/images/inatlogo-small.png" />
-                                        </a>
-                                    </Col>
-                                    <Col className="align-self-center">
-                                        <a href={bugguideUrl(host.name)} target="_blank" rel="noreferrer">
-                                            <img src="/images/bugguide-small.png" />
-                                        </a>
-                                    </Col>
-                                    <Col className="align-self-center">
-                                        <a href={gScholarUrl(host.name)} target="_blank" rel="noreferrer">
-                                            <img src="/images/gscholar-small.png" />
-                                        </a>
-                                    </Col>
-                                </Row>
+                    </Col>
+
+                    <Col xs={4} className="border rounded p-1 mx-auto">
+                        <Images species={host} type="host" />
+                    </Col>
+                </Row>
+
+                <Row>
+                    <Col>
+                        <strong>Further Information:</strong>
+                        <ListGroup variant="flush" defaultActiveKey={selectedSource?.source_id}>
+                            {host.speciessource
+                                .sort((a, b) => a.source.citation.localeCompare(b.source.citation))
+                                .map((speciessource) => (
+                                    <ListGroup.Item
+                                        key={speciessource.source_id}
+                                        id={speciessource.source_id.toString()}
+                                        action
+                                        onClick={changeDescription}
+                                        variant={speciessource.source_id === selectedSource?.source_id ? 'dark' : ''}
+                                    >
+                                        <Link href={`/source/${speciessource.source?.id}`}>
+                                            <a>{speciessource.source?.citation}</a>
+                                        </Link>
+                                    </ListGroup.Item>
+                                ))}
+                        </ListGroup>
+                        <hr />
+                        <Row className="">
+                            <Col className="align-self-center">
+                                <strong>See Also:</strong>
+                            </Col>
+                            <Col className="align-self-center">
+                                <a href={iNatUrl(host.name)} target="_blank" rel="noreferrer">
+                                    <img src="/images/inatlogo-small.png" />
+                                </a>
+                            </Col>
+                            <Col className="align-self-center">
+                                <a href={bugguideUrl(host.name)} target="_blank" rel="noreferrer">
+                                    <img src="/images/bugguide-small.png" />
+                                </a>
+                            </Col>
+                            <Col className="align-self-center">
+                                <a href={gScholarUrl(host.name)} target="_blank" rel="noreferrer">
+                                    <img src="/images/gscholar-small.png" />
+                                </a>
                             </Col>
                         </Row>
-                    </Container>
-                </Media.Body>
-            </Media>
+                    </Col>
+                </Row>
+            </Container>
         </div>
     );
 };

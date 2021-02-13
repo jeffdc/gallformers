@@ -2,6 +2,7 @@ import { GetStaticProps } from 'next';
 import Head from 'next/head';
 import React from 'react';
 import { ListGroup } from 'react-bootstrap';
+import Edit from '../components/edit';
 import { entriesWithLinkedDefs, EntryLinked } from '../libs/pages/glossary';
 import { getStaticPropsWith } from '../libs/pages/nextPageHelpers';
 import { deserialize } from '../libs/utils/reactserialize';
@@ -42,6 +43,7 @@ const Glossary = ({ es }: Props): JSX.Element => {
                 {es.map((e) => (
                     <ListGroup.Item key={e.word}>
                         <span id={e.word}>
+                            <Edit id={e.id} type="glossary" />
                             <b>{e.word} - </b>
                             {deserialize(e.linkedDefinition)}
                             {renderrefs(e.urls.split('\n'))}

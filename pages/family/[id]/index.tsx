@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
+import Edit from '../../../components/edit';
 import { GallTaxon } from '../../../libs/api/apitypes';
 import { allFamilyIds, familyById, speciesByFamily } from '../../../libs/db/family';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
@@ -45,6 +46,7 @@ const Family = ({ family, species }: Props): JSX.Element => {
                 <Media.Body>
                     <Container className="p-3">
                         <Row>
+                            <Edit id={family.id} type="family" />
                             <Col>
                                 <h1>{family.name}</h1>
                             </Col>

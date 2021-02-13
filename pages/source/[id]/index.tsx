@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import React from 'react';
 import { Col, Row } from 'react-bootstrap';
+import Edit from '../../../components/edit';
 import { SourceApi } from '../../../libs/api/apitypes';
 import { allSourceIds, sourceById } from '../../../libs/db/source';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
@@ -25,6 +26,7 @@ const Source = ({ source }: Props): JSX.Element => {
             </Head>
 
             <Row className="pb-4">
+                <Edit id={source.id} type="source" />
                 <Col>
                     <h2>{source.title}</h2>
                 </Col>

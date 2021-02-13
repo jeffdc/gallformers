@@ -282,7 +282,8 @@ const IDGall = (props: Props): JSX.Element => {
                         </label>
                         {makeFormInput('detachable', ['yes', 'no'])}
                         <label className="col-form-label">
-                            Aligment: <InfoTip id="alignment" text="How the gall is positioned relative to the host substrate." />
+                            Alignment:{' '}
+                            <InfoTip id="alignment" text="How the gall is positioned relative to the host substrate." />
                         </label>
                         {makeFormInput(
                             'alignment',
