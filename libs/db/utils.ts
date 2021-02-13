@@ -24,8 +24,8 @@ export type ConnectTypes =
     | Prisma.sourceCreateWithoutImageInput
     | Prisma.sourceCreateOneWithoutImageInput;
 
-export function connectIfNotNull<T extends ConnectTypes, V>(fieldName: string, value: V | undefined): T {
-    if (value) {
+export function connectIfNotNull<T extends ConnectTypes, V>(fieldName: string, value: V | undefined | null): T {
+    if (value || (Array.isArray(value) && value.length > 0)) {
         return ({ connect: { [fieldName]: value } } as unknown) as T;
     } else {
         return ({} as unknown) as T;

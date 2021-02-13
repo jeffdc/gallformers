@@ -6,6 +6,7 @@ PRAGMA foreign_keys=OFF;
 INSERT INTO location (id, location, description) VALUES (NULL, 'leaf edge', '');
 INSERT INTO texture (id, texture, description) VALUES (NULL, 'erineum', '');
 INSERT INTO color (id, color) VALUES (NULL, 'green');
+INSERT INTO alignment (id, alignment) VALUES (NULL, 'leaning');
 
 PRAGMA foreign_keys=ON;
 

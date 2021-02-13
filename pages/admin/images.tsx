@@ -73,6 +73,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                 }
             } catch (e) {
                 console.error(e);
+                setError(e);
             }
         };
         fetchNewSelection(selectedId);
@@ -105,6 +106,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
             }
         } catch (e) {
             console.error(e);
+            setError(e);
         }
     };
 
@@ -162,6 +164,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
             setCurrentImage(undefined);
         } catch (e) {
             console.error(e);
+            setError(e);
         }
     };
 
@@ -184,7 +187,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                     creator: copySource.creator,
                     attribution: copySource.attribution,
                 })),
-        );
+        ).catch((e) => setError(`Failed to save changes. ${e}.`));
 
         setShowCopy(false);
     };

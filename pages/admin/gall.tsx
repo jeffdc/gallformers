@@ -1,17 +1,20 @@
 import { yupResolver } from '@hookform/resolvers/yup';
+import { error } from 'console';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import React, { useState } from 'react';
-import { Col, Row } from 'react-bootstrap';
+import { ParsedUrlQuery } from 'querystring';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import { AdminFormFields, useAPIs } from '../../hooks/useAPIs';
+import { extractQueryParam } from '../../libs/api/apipage';
 import * as AT from '../../libs/api/apitypes';
 import { allFamilies } from '../../libs/db/family';
 import { alignments, allGalls, cells, colors, locations, shapes, textures, walls } from '../../libs/db/gall';
@@ -22,6 +25,7 @@ import { mightFailWithArray } from '../../libs/utils/util';
 //TODO factor out the species form and allow it to be extended with what is needed for a gall as this code violates DRY a lot!
 
 type Props = {
+    id: string;
     gs: AT.GallApi[];
     abundances: AT.AbundanceApi[];
     hosts: AT.HostSimple[];
@@ -66,7 +70,7 @@ export type FormFields = AdminFormFields<AT.GallApi> & {
     abundance: AT.AbundanceApi[];
     commonnames: string;
     synonyms: string;
-    hosts: AT.HostSimple[];
+    hosts: AT.GallHost[];
     detachable: string;
     walls: AT.WallsApi[];
     cells: AT.CellsApi[];
@@ -78,6 +82,7 @@ export type FormFields = AdminFormFields<AT.GallApi> & {
 };
 
 const Gall = ({
+    id,
     gs,
     hosts,
     locations,
@@ -90,43 +95,76 @@ const Gall = ({
     abundances,
     families,
 }: Props): JSX.Element => {
+    const [existingId, setExistingId] = useState<number | undefined>(id && id !== '' ? parseInt(id) : undefined);
+    const [deleteResults, setDeleteResults] = useState<AT.DeleteResult>();
+    const [galls, setGalls] = useState(gs);
+    const [error, setError] = useState('');
+
     const { register, handleSubmit, errors, control, reset, setValue } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
+
     const router = useRouter();
 
-    const [existingId, setExistingId] = useState<number | undefined>(undefined);
-    const [deleteResults, setDeleteResults] = useState<AT.DeleteResult>();
-    const [galls, setGalls] = useState(gs);
+    const onGallChange = useCallback(
+        async (spid: number | undefined): Promise<void> => {
+            if (spid == undefined) {
+                setValue('genus', '');
+                setValue('family', [AT.EmptyFamily]);
+                setValue('abundance', [AT.EmptyAbundance]);
+                setValue('commonnames', '');
+                setValue('synonyms', '');
+                setValue('detachable', '');
+                setValue('walls', [AT.EmptyWalls]);
+                setValue('cells', [AT.EmptyCells]);
+                setValue('alignment', [AT.EmptyAlignment]);
+                setValue('color', [AT.EmptyColor]);
+                setValue('shape', [AT.EmptyShape]);
+                setValue('locations', []);
+                setValue('textures', []);
+                setValue('hosts', []);
+            } else {
+                try {
+                    const res = await fetch(`../api/gall?speciesid=${spid}`);
+                    const s = (await res.json()) as AT.GallApi[];
+                    const sp = s[0];
+                    setValue('value', s);
+                    setValue('genus', sp.genus);
+                    setValue('family', [sp.family]);
+                    setValue('abundance', [pipe(sp.abundance, O.getOrElse(constant(AT.EmptyAbundance)))]);
+                    setValue('commonnames', pipe(sp.commonnames, O.getOrElse(constant(''))));
+                    setValue('synonyms', pipe(sp.synonyms, O.getOrElse(constant(''))));
+                    setValue(
+                        'detachable',
+                        pipe(
+                            sp.gall.detachable,
+                            O.fold(
+                                () => '',
+                                (d) => (d === 0 ? 'no' : 'yes'),
+                            ),
+                        ),
+                    );
+                    setValue('walls', [pipe(sp.gall.walls, O.getOrElse(constant(AT.EmptyWalls)))]);
+                    setValue('cells', [pipe(sp.gall.cells, O.getOrElse(constant(AT.EmptyCells)))]);
+                    setValue('alignment', [pipe(sp.gall.alignment, O.getOrElse(constant(AT.EmptyAlignment)))]);
+                    setValue('color', [pipe(sp.gall.color, O.getOrElse(constant(AT.EmptyColor)))]);
+                    setValue('shape', [pipe(sp.gall.shape, O.getOrElse(constant(AT.EmptyShape)))]);
+                    setValue('locations', sp.gall.galllocation);
+                    setValue('textures', sp.gall.galltexture);
+                    setValue('hosts', sp.hosts);
+                } catch (e) {
+                    console.error(e);
+                    setError(e);
+                }
+            }
+        },
+        [setValue],
+    );
 
-    const setGallDetails = async (spid: number): Promise<void> => {
-        try {
-            const res = await fetch(`../api/gall?speciesid=${spid}`);
-            const s = (await res.json()) as AT.GallApi[];
-            const sp = s[0];
-            setValue(
-                'detachable',
-                pipe(
-                    sp.gall.detachable,
-                    O.fold(
-                        () => '',
-                        (d) => (d === 0 ? 'no' : 'yes'),
-                    ),
-                ),
-            );
-            setValue('walls', [pipe(sp.gall.walls, O.getOrElse(constant(AT.EmptyWalls)))]);
-            setValue('cells', [pipe(sp.gall.cells, O.getOrElse(constant(AT.EmptyCells)))]);
-            setValue('alignment', [pipe(sp.gall.alignment, O.getOrElse(constant(AT.EmptyAlignment)))]);
-            setValue('color', [pipe(sp.gall.color, O.getOrElse(constant(AT.EmptyColor)))]);
-            setValue('shape', [pipe(sp.gall.shape, O.getOrElse(constant(AT.EmptyShape)))]);
-            setValue('locations', sp.gall.galllocation);
-            setValue('textures', sp.gall.galltexture);
-            setValue('hosts', sp.hosts);
-        } catch (e) {
-            console.error(e);
-        }
-    };
+    useEffect(() => {
+        onGallChange(existingId);
+    }, [existingId, onGallChange]);
 
     const { doDeleteOrUpsert } = useAPIs<AT.GallApi, AT.GallUpsertFields>('name', '../api/gall/', '../api/gall/upsert');
 
@@ -158,8 +196,9 @@ const Gall = ({
             walls: fields.walls[0].walls,
         });
 
-        await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert);
-        reset();
+        await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert)
+            .then(() => reset())
+            .catch((e) => setError(`Failed to save changes. ${e}.`));
     };
 
     return (
@@ -169,12 +208,24 @@ const Gall = ({
                     <title>Add/Edit Gallformers</title>
                 </Head>
 
+                {error.length > 0 && (
+                    <Alert variant="danger" onClose={() => setError('')} dismissible>
+                        <Alert.Heading>Uh-oh</Alert.Heading>
+                        <p>{error}</p>
+                    </Alert>
+                )}
+
                 <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                     <h4>Add/Edit Gallformers</h4>
                     <p>
                         This is for all of the details about a Gall. To add a description (which must be referenced to a source)
                         go add <Link href="/admin/source">Sources</Link>, if they do not already exist, then go{' '}
-                        <Link href="/admin/speciessource">map species to sources with description</Link>.
+                        <Link href="/admin/speciessource">map species to sources with description</Link>. To associate a gall with
+                        all plants in a genus, add one species here first, then go to{' '}
+                        <Link href="./gallhost">
+                            <a>Gall-Host Mappings</a>
+                        </Link>
+                        .
                     </p>
                     <Row className="form-group">
                         <Col>
@@ -185,28 +236,11 @@ const Gall = ({
                                 onChangeWithNew={(e, isNew) => {
                                     if (isNew || !e[0]) {
                                         setExistingId(undefined);
-                                        setValue('genus', extractGenus(e[0] ? e[0].name : ''));
-                                        setValue('family', [AT.EmptyFamily]);
-                                        setValue('abundance', [AT.EmptyAbundance]);
-                                        setValue('commonnames', '');
-                                        setValue('synonyms', '');
-                                        setValue('detachable', '');
-                                        setValue('walls', [AT.EmptyWalls]);
-                                        setValue('cells', [AT.EmptyCells]);
-                                        setValue('alignment', [AT.EmptyAlignment]);
-                                        setValue('color', [AT.EmptyColor]);
-                                        setValue('shape', [AT.EmptyShape]);
-                                        setValue('locations', []);
-                                        setValue('textures', []);
-                                        setValue('hosts', []);
+                                        router.replace(``, undefined, { shallow: true });
                                     } else {
                                         const gall: AT.GallApi = e[0];
                                         setExistingId(gall.id);
-                                        setValue('family', [gall.family]);
-                                        setValue('abundance', [pipe(gall.abundance, O.getOrElse(constant(AT.EmptyAbundance)))]);
-                                        setValue('commonnames', pipe(gall.commonnames, O.getOrElse(constant(''))));
-                                        setValue('synonyms', pipe(gall.synonyms, O.getOrElse(constant(''))));
-                                        setGallDetails(gall.id);
+                                        router.replace(`?id=${gall.id}`, undefined, { shallow: true });
                                     }
                                 }}
                                 onBlurT={(e) => {
@@ -224,7 +258,7 @@ const Gall = ({
                             />
                             {errors.value && (
                                 <span className="text-danger">
-                                    Name is required and must be in standard binomial form, e.g., Andricus weldi
+                                    Name is required and must be in standard binomial form, e.g., Gallus gallus
                                 </span>
                             )}
                         </Col>
@@ -406,9 +440,17 @@ const Gall = ({
     );
 };
 
-export const getServerSideProps: GetServerSideProps = async () => {
+export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
+    const queryParam = 'id';
+    // eslint-disable-next-line prettier/prettier
+    const id = pipe(
+        extractQueryParam(context.query, queryParam),
+        O.getOrElse(constant('')),
+    );
+
     return {
         props: {
+            id: id,
             gs: await mightFailWithArray<AT.GallApi>()(allGalls()),
             hosts: await mightFailWithArray<AT.HostSimple>()(allHostsSimple()),
             families: await mightFailWithArray<AT.FamilyApi>()(allFamilies(AT.GALL_FAMILY_TYPES)),

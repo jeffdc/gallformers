@@ -9,6 +9,12 @@ import { ParsedUrlQuery } from 'querystring';
 export const GallTaxon = 'gall';
 export const HostTaxon = 'plant';
 
+export type SearchResultItem = {
+    id: string;
+    type: string;
+    name: string;
+};
+
 /**
  *
  * @param q
