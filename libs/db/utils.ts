@@ -7,12 +7,6 @@ import { Prisma } from '@prisma/client';
 export type ConnectTypes =
     | Prisma.abundanceCreateOneWithoutSpeciesInput
     | Prisma.abundanceUpdateOneWithoutSpeciesInput
-    | Prisma.alignmentCreateOneWithoutGallInput
-    | Prisma.alignmentUpdateOneWithoutGallInput
-    | Prisma.cellsCreateOneWithoutGallInput
-    | Prisma.colorCreateOneWithoutGallInput
-    | Prisma.shapeCreateOneWithoutGallInput
-    | Prisma.wallsCreateOneWithoutGallInput
     | Prisma.familyCreateOneWithoutSpeciesInput
     | Prisma.familyUpdateWithoutSpeciesInput
     | Prisma.taxontypeCreateOneWithoutSpeciesInput
@@ -22,7 +16,12 @@ export type ConnectTypes =
     | Prisma.galllocationCreateWithoutGallInput
     | Prisma.galltextureCreateWithoutGallInput
     | Prisma.sourceCreateWithoutImageInput
-    | Prisma.sourceCreateOneWithoutImageInput;
+    | Prisma.sourceCreateOneWithoutImageInput
+    | Prisma.gallalignmentCreateWithoutGallInput
+    | Prisma.gallcolorCreateWithoutGallInput
+    | Prisma.gallcellsCreateWithoutGallInput
+    | Prisma.gallwallsCreateWithoutGallInput
+    | Prisma.gallshapeCreateWithoutGallInput;
 
 export function connectIfNotNull<T extends ConnectTypes, V>(fieldName: string, value: V | undefined | null): T {
     if (value || (Array.isArray(value) && value.length > 0)) {
@@ -32,7 +31,7 @@ export function connectIfNotNull<T extends ConnectTypes, V>(fieldName: string, v
     }
 }
 
-export type InsertFieldName = 'id' | 'location' | 'texture' | 'hostspecies';
+export type InsertFieldName = 'id' | 'location' | 'texture' | 'hostspecies' | 'alignment' | 'color' | 'cells' | 'walls' | 'shape';
 
 export function connectWithIds<T extends ConnectTypes>(fieldName: InsertFieldName, ids: readonly number[]): T[] {
     const key = fieldName as keyof T;

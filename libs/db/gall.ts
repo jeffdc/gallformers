@@ -8,6 +8,8 @@ import {
     CellsApi,
     ColorApi,
     DeleteResult,
+    detachableFromId,
+    detachableFromString,
     GallApi,
     GallLocation,
     GallTaxon,
@@ -45,14 +47,14 @@ export const getGalls = (
                 family: true,
                 gall: {
                     select: {
-                        alignment: true,
-                        cells: true,
-                        color: true,
+                        gallalignment: { include: { alignment: true } },
+                        gallcells: { include: { cells: true } },
+                        gallcolor: { include: { color: true } },
                         detachable: true,
                         galllocation: { include: { location: true } },
                         galltexture: { include: { texture: true } },
-                        shape: true,
-                        walls: true,
+                        gallshape: { include: { shape: true } },
+                        gallwalls: { include: { walls: true } },
                     },
                 },
                 hosts: {
@@ -79,7 +81,7 @@ export const getGalls = (
         galls.flatMap((g) => {
             if (g.gall == null) {
                 logger.error(
-                    `Detected a species with id ${g.id} that is supposed to be a gall but does not have a cooresponding gall!`,
+                    `Detected a species with id ${g.id} that is supposed to be a gall but does not have a corresponding gall!`,
                 );
                 return []; // will resolve to nothing since we are in a flatMap
             }
@@ -95,12 +97,12 @@ export const getGalls = (
                 abundance: optionalWith(g.abundance, adaptAbundance),
                 gall: {
                     ...g.gall,
-                    alignment: optionalWith(g.gall.alignment, adaptAlignment),
-                    cells: optionalWith(g.gall.cells, adaptCells),
-                    color: optionalWith(g.gall.color, adaptColor),
-                    shape: optionalWith(g.gall.shape, adaptShape),
-                    walls: optionalWith(g.gall.walls, adaptWalls),
-                    detachable: O.fromNullable(g.gall.detachable),
+                    gallalignment: adaptAlignments(g.gall.gallalignment.map((a) => a.alignment)),
+                    gallcells: adaptCells(g.gall.gallcells.map((c) => c.cells)),
+                    gallcolor: adaptColors(g.gall.gallcolor.map((c) => c.color)),
+                    gallshape: adaptShapes(g.gall.gallshape.map((s) => s.shape)),
+                    gallwalls: adaptWalls(g.gall.gallwalls.map((w) => w.walls)),
+                    detachable: detachableFromId(g.gall.detachable),
                     galllocation: adaptLocations(g.gall.galllocation.map((l) => l.location)),
                     galltexture: adaptTextures(g.gall.galltexture.map((t) => t.texture)),
                 },
@@ -237,7 +239,7 @@ export const locations = (): TaskEither<Error, GallLocation[]> => {
     return pipe(TE.tryCatch(locations, handleError), TE.map(adaptLocations));
 };
 
-const adaptColor = (c: color): ColorApi => c;
+const adaptColors = (colors: color[]): ColorApi[] => colors.map((c) => c);
 
 /**
  * Fetches all gall colors
@@ -250,16 +252,14 @@ export const colors = (): TaskEither<Error, ColorApi[]> => {
             },
         });
 
-    return pipe(
-        TE.tryCatch(colors, handleError),
-        TE.map((c) => c.map(adaptColor)),
-    );
+    return pipe(TE.tryCatch(colors, handleError), TE.map(adaptColors));
 };
 
-const adaptShape = (s: shape): ShapeApi => ({
-    ...s,
-    description: O.fromNullable(s.description),
-});
+const adaptShapes = (shapes: shape[]): ShapeApi[] =>
+    shapes.map((s) => ({
+        ...s,
+        description: O.fromNullable(s.description),
+    }));
 
 /**
  * Fetches all gall shapes
@@ -272,10 +272,7 @@ export const shapes = (): TaskEither<Error, ShapeApi[]> => {
             },
         });
 
-    return pipe(
-        TE.tryCatch(shapes, handleError),
-        TE.map((s) => s.map(adaptShape)),
-    );
+    return pipe(TE.tryCatch(shapes, handleError), TE.map(adaptShapes));
 };
 
 const adaptTextures = (ts: texture[]): GallTexture[] => {
@@ -300,10 +297,11 @@ export const textures = (): TaskEither<Error, GallTexture[]> => {
     return pipe(TE.tryCatch(textures, handleError), TE.map(adaptTextures));
 };
 
-const adaptAlignment = (a: alignment): AlignmentApi => ({
-    ...a,
-    description: O.fromNullable(a.description),
-});
+const adaptAlignments = (as: alignment[]): AlignmentApi[] =>
+    as.map((a) => ({
+        ...a,
+        description: O.fromNullable(a.description),
+    }));
 
 /**
  * Fetches all gall alignments
@@ -316,16 +314,14 @@ export const alignments = (): TaskEither<Error, AlignmentApi[]> => {
             },
         });
 
-    return pipe(
-        TE.tryCatch(alignments, handleError),
-        TE.map((a) => a.map(adaptAlignment)),
-    );
+    return pipe(TE.tryCatch(alignments, handleError), TE.map(adaptAlignments));
 };
 
-const adaptWalls = (w: ws): WallsApi => ({
-    ...w,
-    description: O.fromNullable(w.description),
-});
+const adaptWalls = (walls: ws[]): WallsApi[] =>
+    walls.map((w) => ({
+        ...w,
+        description: O.fromNullable(w.description),
+    }));
 
 /**
  * Fetches all gall walls
@@ -338,16 +334,14 @@ export const walls = (): TaskEither<Error, WallsApi[]> => {
             },
         });
 
-    return pipe(
-        TE.tryCatch(walls, handleError),
-        TE.map((w) => w.map(adaptWalls)),
-    );
+    return pipe(TE.tryCatch(walls, handleError), TE.map(adaptWalls));
 };
 
-const adaptCells = (a: cs): CellsApi => ({
-    ...a,
-    description: O.fromNullable(a.description),
-});
+const adaptCells = (cells: cs[]): CellsApi[] =>
+    cells.map((c) => ({
+        ...c,
+        description: O.fromNullable(c.description),
+    }));
 
 /**
  * Fetches all gall cells
@@ -360,10 +354,7 @@ export const cells = (): TaskEither<Error, CellsApi[]> => {
             },
         });
 
-    return pipe(
-        TE.tryCatch(cells, handleError),
-        TE.map((c) => c.map(adaptCells)),
-    );
+    return pipe(TE.tryCatch(cells, handleError), TE.map(adaptCells));
 };
 
 /**
@@ -379,15 +370,6 @@ export const upsertGall = (gall: GallUpsertFields): TaskEither<Error, number> =>
         commonnames: gall.commonnames,
     };
 
-    const gallData = {
-        alignment: connectIfNotNull<Prisma.alignmentCreateOneWithoutGallInput, string>('alignment', gall.alignment),
-        cells: connectIfNotNull<Prisma.cellsCreateOneWithoutGallInput, string>('cells', gall.cells),
-        color: connectIfNotNull<Prisma.colorCreateOneWithoutGallInput, string>('color', gall.color),
-        detachable: gall.detachable ? 1 : 0,
-        shape: connectIfNotNull<Prisma.shapeCreateOneWithoutGallInput, string>('shape', gall.shape),
-        walls: connectIfNotNull<Prisma.wallsCreateOneWithoutGallInput, string>('walls', gall.walls),
-    };
-
     const create = () =>
         db.species.create({
             data: {
@@ -400,7 +382,12 @@ export const upsertGall = (gall: GallUpsertFields): TaskEither<Error, number> =>
                 },
                 gall: {
                     create: {
-                        ...gallData,
+                        gallalignment: { create: connectWithIds('alignment', gall.alignments) },
+                        gallcells: { create: connectWithIds('cells', gall.cells) },
+                        gallcolor: { create: connectWithIds('color', gall.colors) },
+                        detachable: detachableFromString(gall.detachable).id,
+                        gallshape: { create: connectWithIds('shape', gall.shapes) },
+                        gallwalls: { create: connectWithIds('walls', gall.walls) },
                         taxontype: { connect: { taxoncode: GallTaxon } },
                         galllocation: { create: connectWithIds('location', gall.locations) },
                         galltexture: { create: connectWithIds('texture', gall.textures) },
@@ -415,10 +402,30 @@ export const upsertGall = (gall: GallUpsertFields): TaskEither<Error, number> =>
                 ...spData,
                 gall: {
                     update: {
-                        ...gallData,
+                        // this seems stupid but I can not figure out a way to update these many-to-many
+                        // like is provided with the 'set' operation for 1-to-many. :(
+                        gallalignment: {
+                            deleteMany: { alignment_id: { notIn: [] } },
+                            create: connectWithIds('alignment', gall.alignments),
+                        },
+                        gallcells: {
+                            deleteMany: { cells_id: { notIn: [] } },
+                            create: connectWithIds('cells', gall.cells),
+                        },
+                        gallcolor: {
+                            deleteMany: { color_id: { notIn: [] } },
+                            create: connectWithIds('color', gall.colors),
+                        },
+                        detachable: detachableFromString(gall.detachable).id,
+                        gallshape: {
+                            deleteMany: { shape_id: { notIn: [] } },
+                            create: connectWithIds('shape', gall.shapes),
+                        },
+                        gallwalls: {
+                            deleteMany: { walls_id: { notIn: [] } },
+                            create: connectWithIds('walls', gall.walls),
+                        },
                         galllocation: {
-                            // this seems stupid but I can not figure out a way to update these many-to-many
-                            // like is provided with the 'set' operation for 1-to-many. :(
                             deleteMany: { location_id: { notIn: [] } },
                             create: connectWithIds('location', gall.locations),
                         },

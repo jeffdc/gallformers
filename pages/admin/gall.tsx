@@ -1,5 +1,4 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { error } from 'console';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
@@ -71,12 +70,12 @@ export type FormFields = AdminFormFields<AT.GallApi> & {
     commonnames: string;
     synonyms: string;
     hosts: AT.GallHost[];
-    detachable: string;
+    detachable: AT.DetachableValues;
     walls: AT.WallsApi[];
     cells: AT.CellsApi[];
-    alignment: AT.AlignmentApi[];
-    shape: AT.ShapeApi[];
-    color: AT.ColorApi[];
+    alignments: AT.AlignmentApi[];
+    shapes: AT.ShapeApi[];
+    colors: AT.ColorApi[];
     locations: AT.GallLocation[];
     textures: AT.GallTexture[];
 };
@@ -115,12 +114,12 @@ const Gall = ({
                 setValue('abundance', [AT.EmptyAbundance]);
                 setValue('commonnames', '');
                 setValue('synonyms', '');
-                setValue('detachable', '');
-                setValue('walls', [AT.EmptyWalls]);
-                setValue('cells', [AT.EmptyCells]);
-                setValue('alignment', [AT.EmptyAlignment]);
-                setValue('color', [AT.EmptyColor]);
-                setValue('shape', [AT.EmptyShape]);
+                setValue('detachable', AT.DetachableNone.value);
+                setValue('walls', []);
+                setValue('cells', []);
+                setValue('alignments', []);
+                setValue('colors', []);
+                setValue('shapes', []);
                 setValue('locations', []);
                 setValue('textures', []);
                 setValue('hosts', []);
@@ -135,21 +134,12 @@ const Gall = ({
                     setValue('abundance', [pipe(sp.abundance, O.getOrElse(constant(AT.EmptyAbundance)))]);
                     setValue('commonnames', pipe(sp.commonnames, O.getOrElse(constant(''))));
                     setValue('synonyms', pipe(sp.synonyms, O.getOrElse(constant(''))));
-                    setValue(
-                        'detachable',
-                        pipe(
-                            sp.gall.detachable,
-                            O.fold(
-                                () => '',
-                                (d) => (d === 0 ? 'no' : 'yes'),
-                            ),
-                        ),
-                    );
-                    setValue('walls', [pipe(sp.gall.walls, O.getOrElse(constant(AT.EmptyWalls)))]);
-                    setValue('cells', [pipe(sp.gall.cells, O.getOrElse(constant(AT.EmptyCells)))]);
-                    setValue('alignment', [pipe(sp.gall.alignment, O.getOrElse(constant(AT.EmptyAlignment)))]);
-                    setValue('color', [pipe(sp.gall.color, O.getOrElse(constant(AT.EmptyColor)))]);
-                    setValue('shape', [pipe(sp.gall.shape, O.getOrElse(constant(AT.EmptyShape)))]);
+                    setValue('detachable', sp.gall.detachable.value);
+                    setValue('walls', sp.gall.gallwalls);
+                    setValue('cells', sp.gall.gallcells);
+                    setValue('alignments', sp.gall.gallalignment);
+                    setValue('colors', sp.gall.gallcolor);
+                    setValue('shapes', sp.gall.gallshape);
                     setValue('locations', sp.gall.galllocation);
                     setValue('textures', sp.gall.galltexture);
                     setValue('hosts', sp.hosts);
@@ -180,9 +170,9 @@ const Gall = ({
 
         const convertFormFieldsToUpsert = (fields: FormFields, name: string, id: number): AT.GallUpsertFields => ({
             abundance: fields.abundance[0].abundance,
-            alignment: fields.alignment[0].alignment,
-            cells: fields.cells[0].cells,
-            color: fields.color[0].color,
+            alignments: fields.alignments.map((a) => a.id),
+            cells: fields.cells.map((c) => c.id),
+            colors: fields.colors.map((c) => c.id),
             commonnames: fields.commonnames,
             detachable: fields.detachable,
             family: fields.family[0].name,
@@ -190,15 +180,15 @@ const Gall = ({
             id: id,
             locations: fields.locations.map((l) => l.id),
             name: name,
-            shape: fields.shape[0].shape,
+            shapes: fields.shapes.map((s) => s.id),
             synonyms: fields.synonyms,
             textures: fields.textures.map((t) => t.id),
-            walls: fields.walls[0].walls,
+            walls: fields.walls.map((w) => w.id),
         });
 
         await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert)
             .then(() => reset())
-            .catch((e) => setError(`Failed to save changes. ${e}.`));
+            .catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
     };
 
     return (
@@ -322,13 +312,11 @@ const Gall = ({
                     <Row className="form-group">
                         <Col>
                             Detachable:
-                            <input
-                                type="checkbox"
-                                placeholder="Detachable"
-                                name="detachable"
-                                className="form-control"
-                                ref={register}
-                            />
+                            <select placeholder="Detachable" name="detachable" className="form-control" ref={register}>
+                                {AT.Detachables.map((d) => (
+                                    <option key={d.id}>{d.value}</option>
+                                ))}
+                            </select>
                         </Col>
                         <Col>
                             Walls:
@@ -338,6 +326,7 @@ const Gall = ({
                                 placeholder=""
                                 options={walls}
                                 labelKey="walls"
+                                multiple
                                 clearButton
                             />
                         </Col>
@@ -349,44 +338,48 @@ const Gall = ({
                                 placeholder=""
                                 options={cells}
                                 labelKey="cells"
+                                multiple
                                 clearButton
                             />
                         </Col>
                         <Col>
-                            Alignment:
+                            Alignment(s):
                             <ControlledTypeahead
                                 control={control}
-                                name="alignment"
+                                name="alignments"
                                 placeholder=""
                                 options={alignments}
                                 labelKey="alignment"
+                                multiple
                                 clearButton
                             />
                         </Col>
                     </Row>
                     <Row className="form-group">
                         <Col>
-                            Color:
+                            Color(s):
                             <ControlledTypeahead
                                 control={control}
-                                name="color"
+                                name="colors"
                                 placeholder=""
                                 options={colors}
                                 labelKey="color"
+                                multiple
                                 clearButton
                             />
                         </Col>
                         <Col>
-                            Shape:
+                            Shape(s):
                             <ControlledTypeahead
                                 control={control}
-                                name="shape"
+                                name="shapes"
                                 placeholder=""
                                 options={shapes}
                                 labelKey="shape"
+                                multiple
                                 clearButton
                             />
-                        </Col>{' '}
+                        </Col>
                     </Row>
                     <Row className="form-group">
                         <Col>

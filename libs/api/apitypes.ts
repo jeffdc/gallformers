@@ -16,28 +16,28 @@ export const toSearchQuery = (q: ParsedUrlQuery): SearchQuery => {
     if (!q.host) throw new Error('Received query without host!');
 
     return {
-        alignment: O.fromNullable(q.alignment?.toString()),
-        cells: O.fromNullable(q.cells?.toString()),
-        color: O.fromNullable(q.color?.toString()),
-        detachable: O.fromNullable(q.detachable?.toString()),
+        alignment: q.alignment == undefined ? [] : [q.alignment].flat(),
+        cells: q.cells == undefined ? [] : [q.cells].flat(),
+        color: q.color == undefined ? [] : [q.color].flat(),
+        detachable: q.detachable == undefined ? DetachableNone : detachableFromString(q.detachable.toString()),
         host: q.host.toString(),
         locations: q.locations == undefined ? [] : [q.locations].flat(),
-        shape: O.fromNullable(q.shape?.toString()),
+        shape: q.shape == undefined ? [] : [q.shape].flat(),
         textures: q.textures == undefined ? [] : [q.textures].flat(),
-        walls: O.fromNullable(q.walls?.toString()),
+        walls: q.walls == undefined ? [] : [q.walls].flat(),
     };
 };
 
 export const emptySearchQuery = (): SearchQuery => ({
     host: '',
-    detachable: O.none,
-    alignment: O.none,
-    walls: O.none,
+    detachable: DetachableNone,
+    alignment: [],
+    walls: [],
     locations: [],
     textures: [],
-    color: O.none,
-    shape: O.none,
-    cells: O.none,
+    color: [],
+    shape: [],
+    cells: [],
 });
 
 /**
@@ -45,14 +45,14 @@ export const emptySearchQuery = (): SearchQuery => ({
  */
 export type SearchQuery = {
     host: string;
-    detachable: Option<string>;
-    alignment: Option<string>;
-    walls: Option<string>;
+    detachable: DetachableApi;
+    alignment: string[];
+    walls: string[];
     locations: string[];
     textures: string[];
-    color: Option<string>;
-    shape: Option<string>;
-    cells: Option<string>;
+    color: string[];
+    shape: string[];
+    cells: string[];
 };
 
 export type Deletable = {
@@ -139,13 +139,13 @@ export type SpeciesUpsertFields = {
 export type GallUpsertFields = SpeciesUpsertFields & {
     hosts: number[];
     locations: number[];
-    color: string;
-    shape: string;
+    colors: number[];
+    shapes: number[];
     textures: number[];
-    alignment: string;
-    walls: string;
-    cells: string;
-    detachable: string;
+    alignments: number[];
+    walls: number[];
+    cells: number[];
+    detachable: DetachableValues;
 };
 
 export type SourceApi = {
@@ -218,6 +218,61 @@ export type SpeciesApi = SimpleSpecies & {
     images: ImageApi[];
 };
 
+export type DetachableApi = {
+    id: number;
+    value: string;
+};
+
+export const DetachableNone: DetachableApi = {
+    id: 0,
+    value: '',
+};
+
+export const DetachableIntegral: DetachableApi = {
+    id: 1,
+    value: 'integral',
+};
+
+export const DetachableDetachable: DetachableApi = {
+    id: 2,
+    value: 'detachable',
+};
+
+export const DetachableBoth: DetachableApi = {
+    id: 3,
+    value: 'both',
+};
+
+export const Detachables = [DetachableNone, DetachableIntegral, DetachableDetachable, DetachableBoth];
+export type DetachableValues = '' | 'Integral' | 'Detachable' | 'Both';
+
+// there has got to be a better way of doing this...
+export const detachableFromString = (s: string): DetachableApi => {
+    switch (s) {
+        case '':
+            return DetachableNone;
+        case 'Integral':
+            return DetachableIntegral;
+        case 'Detachable':
+            return DetachableDetachable;
+        case 'Both':
+            return DetachableBoth;
+        default:
+            console.error(`Received invalid value '${s}' for Detachable.`);
+            return DetachableNone;
+    }
+};
+
+export const detachableFromId = (id: null | undefined | number): DetachableApi => {
+    if (id == undefined || id == null) return DetachableNone;
+
+    const d = Detachables.find((d) => d.id === id);
+    if (d == undefined) {
+        throw new Error(`Received invalid id '${id}' for Detachable.`);
+    }
+    return d;
+};
+
 export type AlignmentApi = {
     id: number;
     alignment: string;
@@ -273,12 +328,12 @@ export const EmptyWalls: WallsApi = {
 
 export type GallApi = SpeciesApi & {
     gall: {
-        alignment: Option<AlignmentApi>;
-        cells: Option<CellsApi>;
-        color: Option<ColorApi>;
-        detachable: Option<number>;
-        shape: Option<ShapeApi>;
-        walls: Option<WallsApi>;
+        gallalignment: AlignmentApi[];
+        gallcells: CellsApi[];
+        gallcolor: ColorApi[];
+        detachable: DetachableApi;
+        gallshape: ShapeApi[];
+        gallwalls: WallsApi[];
         galltexture: GallTexture[];
         galllocation: GallLocation[];
     };

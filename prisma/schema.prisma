@@ -31,35 +31,35 @@ model texture {
 model color {
   id    Int     @id @default(autoincrement())
   color String @unique
-  gall  gall[]
+  gallcolor  gallcolor[]
 }
 
 model walls {
   id          Int     @id @default(autoincrement())
   walls       String @unique
   description String?
-  gall        gall[]
+  gallwalls        gallwalls[]
 }
 
 model cells {
   id          Int     @id @default(autoincrement())
   cells       String @unique 
   description String?
-  gall        gall[]
+  gallcells        gallcells[]
 }
 
 model alignment {
   id          Int     @id @default(autoincrement())
   alignment   String @unique
   description String?
-  gall        gall[]
+  gallalignment        gallalignment[]
 }
 
 model shape {
   id          Int     @id @default(autoincrement())
   shape       String @unique
   description String?
-  gall        gall[]
+  gallshape        gallshape[]
 }
 
 model abundance {
@@ -96,10 +96,6 @@ model species {
   abundance                          abundance?      @relation(fields: [abundance_id], references: [id])
   family                             family          @relation(fields: [family_id], references: [id])
   taxontype                          taxontype?      @relation(fields: [taxoncode], references: [taxoncode])
-  // gall                               gall[]
-  // gallid                             Int?
-  // gall                               gall?           @relation(fields: [gallid], references: [id])
-  // @onDelete(CASCADE)
   gall                               gall?
   hosts host[]                       @relation("host_gall_species_idTospecies")
   host_galls host[]                  @relation("host_host_species_idTospecies")
@@ -111,23 +107,16 @@ model gall {
   species_id   Int           @unique
   taxoncode    String
   detachable   Int?
-  alignment_id Int?
-  walls_id     Int?
-  cells_id     Int?
-  color_id     Int?
-  shape_id     Int?
-  alignment    alignment?     @relation(fields: [alignment_id], references: [id])
-  cells        cells?         @relation(fields: [cells_id], references: [id])
-  color        color?         @relation(fields: [color_id], references: [id])
-  shape        shape?         @relation(fields: [shape_id], references: [id])
   species      species        @relation(fields: [species_id], references: [id])
-  // species      species?
   taxontype    taxontype      @relation(fields: [taxoncode], references: [taxoncode])
-  walls        walls?         @relation(fields: [walls_id], references: [id])
-  // @onDelete(CASCADE)
+  // added in 009 migration
   galllocation galllocation[]
-  // @onDelete(CASCADE)
   galltexture  galltexture[]
+  gallcolor    gallcolor[]
+  gallcells    gallcells[]
+  gallwalls    gallwalls[]
+  gallalignment gallalignment[]
+  gallshape    gallshape[]
 }
 
 model galllocation {
@@ -144,6 +133,51 @@ model galltexture {
   texture_id Int
   gall       gall    @relation(fields: [gall_id], references: [id])
   texture    texture @relation(fields: [texture_id], references: [id])
+}
+
+// added in 009 migration
+model gallcolor {
+  id          Int       @id @default(autoincrement())
+  gall_id     Int
+  color_id Int
+  gall        gall     @relation(fields: [gall_id], references: [id])
+  color    color @relation(fields: [color_id], references: [id])
+}
+
+// added in 009 migration
+model gallshape {
+  id          Int       @id @default(autoincrement())
+  gall_id     Int
+  shape_id Int
+  gall        gall     @relation(fields: [gall_id], references: [id])
+  shape    shape @relation(fields: [shape_id], references: [id])
+}
+
+// added in 009 migration
+model gallcells {
+  id          Int       @id @default(autoincrement())
+  gall_id     Int
+  cells_id Int
+  gall        gall     @relation(fields: [gall_id], references: [id])
+  cells    cells @relation(fields: [cells_id], references: [id])
+}
+
+// added in 009 migration
+model gallwalls {
+  id          Int       @id @default(autoincrement())
+  gall_id     Int
+  walls_id Int
+  gall        gall     @relation(fields: [gall_id], references: [id])
+  walls    walls @relation(fields: [walls_id], references: [id])
+}
+
+// added in 009 migration
+model gallalignment {
+  id          Int       @id @default(autoincrement())
+  gall_id     Int
+  alignment_id Int
+  gall        gall     @relation(fields: [gall_id], references: [id])
+  alignment   alignment @relation(fields: [alignment_id], references: [id])
 }
 
 model host {

@@ -14,6 +14,10 @@ import {
     AlignmentApi,
     CellsApi,
     ColorApi,
+    DetachableDetachable,
+    detachableFromString,
+    DetachableIntegral,
+    DetachableNone,
     emptySearchQuery,
     GallApi,
     GallLocation,
@@ -119,11 +123,11 @@ const IDGall = (props: Props): JSX.Element => {
         const qq: SearchQuery = { ...query };
         if (f === 'host') {
             qq.host = Array.isArray(v) ? v[0] : v;
-        } else if (f === 'locations' || f === 'textures') {
+        } else if (f !== 'detachable') {
             qq[f] = Array.isArray(v) ? v : [v];
         } else {
-            const s = v[0];
-            qq[f] = s && s.length >= 1 ? O.of(s) : O.none;
+            // detachable
+            qq[f] = v[0] === 'yes' ? DetachableDetachable : v[0] === 'no' ? DetachableIntegral : DetachableNone;
         }
         return qq;
     };

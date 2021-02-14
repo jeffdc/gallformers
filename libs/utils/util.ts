@@ -1,6 +1,6 @@
 // Welcome to the inevitable utils file!!!
 
-import { constant, pipe } from 'fp-ts/lib/function';
+import { constant, constFalse, constTrue, pipe } from 'fp-ts/lib/function';
 import * as T from 'fp-ts/lib/Task';
 import * as TE from 'fp-ts/lib/TaskEither';
 import * as O from 'fp-ts/lib/Option';
@@ -108,6 +108,19 @@ export const optionalWith = <T, S>(t: T | null, adapt: (t: T) => S): O.Option<S>
     if (t == null) return O.none;
     return O.of(adapt(t));
 };
+
+export const check = <A, B>(a: O.Option<A>, b: O.Option<B>, f: (a: A, b: B) => boolean): boolean =>
+    pipe(
+        a,
+        // if a is None, then that is OK for the search, just means "any" match for that property.
+        O.fold(constTrue, (a) =>
+            pipe(
+                b,
+                // however, if b is None, then there is no value and it can not match a (a can not be None at this point).
+                O.fold(constFalse, (b) => f(a, b)),
+            ),
+        ),
+    );
 
 /**
  * Takes a simple CSV of numbers (just commas with no escaping) and returns it as number[].

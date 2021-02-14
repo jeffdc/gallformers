@@ -3,7 +3,6 @@ import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { GetStaticPaths, GetStaticProps } from 'next';
-import { useSession } from 'next-auth/client';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -11,7 +10,8 @@ import React, { MouseEvent, useState } from 'react';
 import { Button, Col, Container, ListGroup, Row } from 'react-bootstrap';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
-import { GallApi, GallHost, SourceApi, SpeciesSourceApi } from '../../../libs/api/apitypes';
+import InfoTip from '../../../components/infotip';
+import { DetachableBoth, GallApi, GallHost, SourceApi, SpeciesSourceApi } from '../../../libs/api/apitypes';
 import { allGallIds, gallById } from '../../../libs/db/gall';
 import { linkTextFromGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
@@ -59,7 +59,6 @@ const Gall = ({ species }: Props): JSX.Element => {
     const [selectedSource, setSelectedSource] = useState(defaultSource(species?.speciessource));
     const [sourceList, setSourceList] = useState({ data: species?.speciessource, sortIndex: 0, sortOrder: -1 });
 
-    const session = useSession();
     const router = useRouter();
     // If the page is not yet generated, this will be displayed initially until getStaticProps() finishes running
     if (router.isFallback) {
@@ -134,18 +133,16 @@ const Gall = ({ species }: Props): JSX.Element => {
                         </Row>
                         <Row>
                             <Col>
-                                <strong>Detachable:</strong>{' '}
-                                {pipe(
-                                    species.gall.detachable,
-                                    O.fold(constant('unsure'), (a) => (a === 1 ? 'yes' : 'no')),
+                                <strong>Detachable:</strong> {species.gall.detachable.value}
+                                {species.gall.detachable.value === DetachableBoth.value && (
+                                    <InfoTip
+                                        id="detachable"
+                                        text="This gall can be both detachable and integral depending on what stage of its lifecycle it is in."
+                                    />
                                 )}
                             </Col>
                             <Col>
-                                <strong>Color:</strong>{' '}
-                                {pipe(
-                                    species.gall.color,
-                                    O.fold(constant(''), (c) => c.color),
-                                )}
+                                <strong>Color:</strong> {species.gall.gallcolor.map((c) => c.color).join(', ')}
                             </Col>
                             <Col>
                                 <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.tex).join(', ')}
@@ -153,18 +150,10 @@ const Gall = ({ species }: Props): JSX.Element => {
                         </Row>
                         <Row>
                             <Col>
-                                <strong>Alignment:</strong>{' '}
-                                {pipe(
-                                    species.gall.alignment,
-                                    O.fold(constant(''), (a) => a.alignment),
-                                )}
+                                <strong>Alignment:</strong> {species.gall.gallalignment.map((a) => a.alignment).join(', ')}
                             </Col>
                             <Col>
-                                <strong>Walls:</strong>{' '}
-                                {pipe(
-                                    species.gall.walls,
-                                    O.fold(constant(''), (a) => a.walls),
-                                )}
+                                <strong>Walls:</strong> {species.gall.gallwalls.map((w) => w.walls).join(', ')}
                             </Col>
                             <Col>
                                 <strong>Location:</strong> {species.gall.galllocation.map((l) => l.loc).join(', ')}
@@ -179,11 +168,7 @@ const Gall = ({ species }: Props): JSX.Element => {
                                 )}
                             </Col>
                             <Col>
-                                <strong>Shape:</strong>{' '}
-                                {pipe(
-                                    species.gall.shape,
-                                    O.fold(constant(''), (a) => a.shape),
-                                )}
+                                <strong>Shape:</strong> {species.gall.gallshape.map((s) => s.shape).join(', ')}
                             </Col>
                         </Row>
                     </Col>
