@@ -244,18 +244,18 @@ export const DetachableBoth: DetachableApi = {
 };
 
 export const Detachables = [DetachableNone, DetachableIntegral, DetachableDetachable, DetachableBoth];
-export type DetachableValues = '' | 'Integral' | 'Detachable' | 'Both';
+export type DetachableValues = '' | 'integral' | 'detachable' | 'both';
 
 // there has got to be a better way of doing this...
 export const detachableFromString = (s: string): DetachableApi => {
     switch (s) {
         case '':
             return DetachableNone;
-        case 'Integral':
+        case 'integral':
             return DetachableIntegral;
-        case 'Detachable':
+        case 'detachable':
             return DetachableDetachable;
-        case 'Both':
+        case 'both':
             return DetachableBoth;
         default:
             console.error(`Received invalid value '${s}' for Detachable.`);
