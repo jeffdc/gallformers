@@ -95,7 +95,7 @@ const Glossary = (props: Props): JSX.Element => {
 
         await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert)
             .then(() => reset())
-            .catch((e) => setError(`Failed to save changes. ${e}.`));
+            .catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
     };
 
     return (

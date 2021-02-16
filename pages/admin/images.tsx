@@ -187,7 +187,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                     creator: copySource.creator,
                     attribution: copySource.attribution,
                 })),
-        ).catch((e) => setError(`Failed to save changes. ${e}.`));
+        ).catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
 
         setShowCopy(false);
     };
