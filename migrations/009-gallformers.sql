@@ -85,6 +85,10 @@ UPDATE gall SET detachable = 1 WHERE gall.detachable is 0;
 UPDATE gall SET detachable = 0 WHERE gall.detachable is NULL;
 -- there was no notion of 'Both' in the old meaning so we will not set any to 'Both' which is 3
 
+-- specific updates of data that was bogus
+UPDATE gall SET detachable = 2 WHERE gall.id IN (53,43,48,39,40,42,71,47,52,45,62,44,73,68,70,50,49,51,55,60);
+UPDATE gall SET detachable = 3 WHERE gall.id IN (54,30,41);
+
 PRAGMA foreign_keys=ON;
 
 --------------------------------------------------------------
