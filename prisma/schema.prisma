@@ -77,29 +77,67 @@ model taxontype {
   gall        gall[]
 }
 
-model family {
-  id          Int       @id @default(autoincrement())
-  name        String   @unique
-  description String
-  species     species[]
-}
-
 model species {
   id                                 Int             @id @default(autoincrement())
   taxoncode                          String?
   name                               String          @unique
-  synonyms                           String?
-  commonnames                        String?
-  genus                              String
-  family_id                          Int
+  datacomplete    Boolean
   abundance_id                       Int?
   abundance                          abundance?      @relation(fields: [abundance_id], references: [id])
-  family                             family          @relation(fields: [family_id], references: [id])
   taxontype                          taxontype?      @relation(fields: [taxoncode], references: [taxoncode])
   gall                               gall?
   hosts host[]                       @relation("host_gall_species_idTospecies")
   host_galls host[]                  @relation("host_host_species_idTospecies")
   speciessource                      speciessource[]
+}
+
+model alias {
+  id           Int     @id @default(autoincrement())
+  name         String
+  type         String
+  description  String
+}
+
+model aliasspecies {
+  id           Int     @id @default(autoincrement())
+  species_id   Int
+  alias_id     Int
+  species      species @relation(fields: [species_id], references: [id])
+  alias        alias @relation(fields: [alias_id], references: [id])  
+}
+
+model taxonomy {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String
+  type        String
+  parent_id   Int?      
+  parent      taxonomy?  @relation(name: "parent", fields: [parent_id], references: [id])
+  children    taxonomy[] @relation(name: "parent")
+}
+
+// model taxonomytaxonomy {
+//   id         Int @id @default(autoincrement())
+//   parent_id  Int
+//   parent     taxonomy @relation(name: "parent", fields: [parent_id], references: [id])
+//   child_id   Int
+//   children   taxonomy @relation(name: "children", fields: [child_id], references: [id])
+// }
+
+model taxonomyalias {
+  id           Int @id @default(autoincrement())
+  taxonomy_id  Int
+  taxonomy     taxonomy @relation(fields: [taxonomy_id], references: [id])
+  alias_id     Int
+  alias        alias @relation(fields: [alias_id], references: [id])
+}
+
+model speciestaxonomy {
+  id           Int @id @default(autoincrement())
+  taxonomy_id  Int
+  taxonomy     taxonomy @relation(fields: [taxonomy_id], references: [id])
+  species_id     Int
+  species        species @relation(fields: [species_id], references: [id])
 }
 
 model gall {
@@ -211,6 +249,8 @@ model speciessource {
   useasdefault Int @default(0)
   // added in 006-gallformers.sql migration
   externallink String
+  alias_id     Int? 
+  alias        alias? @relation(fields: [alias_id], references: [id])
 }
 
 // Added in 003-gallformers.sql migration
