@@ -15,6 +15,7 @@ import {
     GallTaxon,
     GallTexture,
     GallUpsertFields,
+    GENUS,
     ShapeApi,
     WallsApi,
 } from '../api/apitypes';
@@ -35,16 +36,32 @@ import { connectIfNotNull, connectWithIds, extractId } from './utils';
 export const getGalls = (
     whereClause: Prisma.speciesWhereInput[] = [],
     operatorAnd = true,
-    distinct: Prisma.SpeciesScalarFieldEnum[] = ['id'],
+    distinct: Prisma.GallspeciesScalarFieldEnum[] = ['id'],
 ): TaskEither<Error, GallApi[]> => {
     const w = operatorAnd
         ? { AND: [...whereClause, { taxoncode: { equals: GallTaxon } }] }
         : { AND: [{ taxoncode: { equals: GallTaxon } }, { OR: whereClause }] };
     const galls = () =>
-        db.species.findMany({
+        db.gallspecies.findMany({
             include: {
-                abundance: true,
-                family: true,
+                // family: true,
+                species: {
+                    select: {
+                        abundance: true,
+                        hosts: {
+                            include: {
+                                hostspecies: { select: { id: true, name: true } },
+                            },
+                        },
+                        speciessource: {
+                            include: {
+                                source: true,
+                            },
+                        },
+                        image: { include: { source: { include: { speciessource: true } } } },
+                        taxonomy: { include: { taxonomy: true } },
+                    },
+                },
                 gall: {
                     select: {
                         gallalignment: { include: { alignment: true } },
@@ -57,21 +74,10 @@ export const getGalls = (
                         gallwalls: { include: { walls: true } },
                     },
                 },
-                hosts: {
-                    include: {
-                        hostspecies: { select: { id: true, name: true } },
-                    },
-                },
-                speciessource: {
-                    include: {
-                        source: true,
-                    },
-                },
-                image: { include: { source: { include: { speciessource: true } } } },
             },
             where: w,
             distinct: distinct,
-            orderBy: { name: 'asc' },
+            // orderBy: { name: 'asc' },
         });
 
     type DBGall = ExtractTFromPromise<ReturnType<typeof galls>>;
@@ -160,7 +166,7 @@ export const gallsByHostName = (hostName: string): TaskEither<Error, GallApi[]> 
  * @param hostGenus the host genus to filter by
  */
 export const gallsByHostGenus = (hostGenus: string): TaskEither<Error, GallApi[]> => {
-    return getGalls([{ hosts: { some: { hostspecies: { genus: { equals: hostGenus } } } } }]);
+    return getGalls([{ hosts: { some: { hostspecies: { taxonomy: { every: { taxonomy: { name: hostGenus } } } } } } }]);
 };
 
 /**
@@ -176,18 +182,22 @@ export const gallById = (id: number): TaskEither<Error, GallApi[]> => {
  */
 export const allGallGenera = (): TaskEither<Error, string[]> => {
     const genera = () =>
-        db.species.findMany({
-            select: {
-                genus: true,
-            },
-            distinct: [Prisma.SpeciesScalarFieldEnum.genus],
-            where: { taxoncode: { equals: GallTaxon } },
-            orderBy: { genus: 'asc' },
+        db.taxonomy.findMany({
+            distinct: [Prisma.AliasScalarFieldEnum.type],
+            where: { AND: [{ type: GENUS }, { speciestaxonomy: { every: { species: { taxoncode: GallTaxon } } } }] },
         });
+    // db.species.findMany({
+    //     select: {
+    //         genus: true,
+    //     },
+    //     distinct: [Prisma.SpeciesScalarFieldEnum.genus],
+    //     where: { taxoncode: { equals: GallTaxon } },
+    //     orderBy: { genus: 'asc' },
+    // });
 
     return pipe(
         TE.tryCatch(genera, handleError),
-        TE.map((gs) => gs.map((g) => g.genus)),
+        TE.map((gs) => gs.map((g) => g.name)),
     );
 };
 
@@ -375,7 +385,7 @@ export const upsertGall = (gall: GallUpsertFields): TaskEither<Error, number> =>
             data: {
                 ...spData,
                 name: gall.name,
-                genus: gall.name.split(' ')[0],
+                // genus: gall.name.split(' ')[0],
                 taxontype: { connect: { taxoncode: GallTaxon } },
                 hosts: {
                     create: connectWithIds('hostspecies', gall.hosts),

@@ -1,4 +1,4 @@
-import { family, species } from '@prisma/client';
+import { taxonomy, species } from '@prisma/client';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -7,11 +7,11 @@ import React from 'react';
 import { Col, Container, ListGroup, Media, Row } from 'react-bootstrap';
 import Edit from '../../../components/edit';
 import { GallTaxon } from '../../../libs/api/apitypes';
-import { allFamilyIds, familyById, speciesByFamily } from '../../../libs/db/family';
+import { allFamilyIds, taxonomyById, speciesByTaxonomy } from '../../../libs/db/family';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 
 type Props = {
-    family: family;
+    family: taxonomy;
     species: species[];
 };
 
@@ -70,8 +70,8 @@ const Family = ({ family, species }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    const family = getStaticPropsWithContext(context, familyById, 'family');
-    const species = getStaticPropsWithContext(context, speciesByFamily, 'species', false, true);
+    const family = getStaticPropsWithContext(context, taxonomyById, 'family');
+    const species = getStaticPropsWithContext(context, speciesByTaxonomy, 'species', false, true);
 
     return {
         props: {

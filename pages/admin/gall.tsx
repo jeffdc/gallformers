@@ -35,7 +35,7 @@ type Props = {
     alignments: AT.AlignmentApi[];
     walls: AT.WallsApi[];
     cells: AT.CellsApi[];
-    families: AT.FamilyApi[];
+    families: AT.TaxonomyApi[];
 };
 
 const Schema = yup.object().shape({
@@ -65,7 +65,7 @@ const extractGenus = (n: string): string => {
 
 export type FormFields = AdminFormFields<AT.GallApi> & {
     genus: string;
-    family: AT.FamilyApi[];
+    family: AT.TaxonomyApi[];
     abundance: AT.AbundanceApi[];
     commonnames: string;
     synonyms: string;
@@ -446,7 +446,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             id: id,
             gs: await mightFailWithArray<AT.GallApi>()(allGalls()),
             hosts: await mightFailWithArray<AT.HostSimple>()(allHostsSimple()),
-            families: await mightFailWithArray<AT.FamilyApi>()(allFamilies(AT.GALL_FAMILY_TYPES)),
+            families: await mightFailWithArray<AT.TaxonomyApi>()(allFamilies(AT.GALL_FAMILY_TYPES)),
             locations: await mightFailWithArray<AT.GallLocation>()(locations()),
             colors: await mightFailWithArray<AT.ColorApi>()(colors()),
             shapes: await mightFailWithArray<AT.ShapeApi>()(shapes()),

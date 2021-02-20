@@ -4,6 +4,8 @@
 import * as O from 'fp-ts/lib/Option';
 import { Option } from 'fp-ts/lib/Option';
 import { ParsedUrlQuery } from 'querystring';
+import * as t from 'io-ts';
+import { gallspecies, species, speciestaxonomy, taxonomy, taxonomyalias, taxonomytaxonomy } from '@prisma/client';
 
 export const GallTaxon = 'gall';
 export const HostTaxon = 'plant';
@@ -102,27 +104,46 @@ export type FamilyGallType = FamilyGallTypesTuples[number];
 export type FamilyHostTypesTuple = typeof HOST_FAMILY_TYPES;
 export type FamilyHostType = FamilyHostTypesTuple[number];
 
-export type FamilyApi = {
+export const TaxonomyTypeT = t.keyof({
+    family: null,
+    section: null,
+    genus: null,
+});
+export type TaxonomyType = t.TypeOf<typeof TaxonomyTypeT>;
+export const FAMILY: TaxonomyType = 'family';
+export const SECTION: TaxonomyType = 'section';
+export const GENUS: TaxonomyType = 'genus';
+export const invalidTaxonomyType = (e: t.Errors): TaxonomyType => {
+    throw new Error(`Got an invalid taxonomy type: '${e}'.`);
+};
+
+export type TaxonomyTaxonomyApi = {
+    id: number;
+    parent_id: number;
+    child_id: number;
+};
+
+export type TaxonomyApi = {
     id: number;
     name: string;
     description: string;
+    type: TaxonomyType;
+    parent?: TaxonomyApi;
+    children: TaxonomyApi[];
 };
-export const EmptyFamily: FamilyApi = { id: -1, name: '', description: '' };
+export const EmptyFamily: TaxonomyApi = { id: -1, name: '', description: '', type: 'family', parent: undefined, children: [] };
 
-export type FamilyWithSpecies = FamilyApi & {
-    species: {
-        id: number;
-        name: string;
-        gall: {
-            species: {
-                id: number;
-                name: string;
-            } | null;
-        } | null;
-    }[];
+export type FamilyGeneraSpecies = taxonomy & {
+    taxonomytaxonomy: (taxonomytaxonomy & {
+        child: taxonomy & {
+            speciestaxonomy: (speciestaxonomy & {
+                species: species;
+            })[];
+        };
+    })[];
 };
 
-export type FamilyUpsertFields = {
+export type TaxonomyUpsertFields = {
     name: string;
     description: string;
 };
@@ -205,15 +226,13 @@ export type SimpleSpecies = {
     id: number;
     taxoncode: string;
     name: string;
-    genus: string;
 };
 
 export type SpeciesApi = SimpleSpecies & {
-    synonyms: Option<string>;
-    commonnames: Option<string>;
+    datacomplete: boolean;
     abundance: Option<AbundanceApi>;
     description: Option<string>; // to make the caller's life easier we will load the default if we can
-    family: FamilyApi;
+    taxonomy: TaxonomyApi[];
     speciessource: SpeciesSourceApi[];
     images: ImageApi[];
 };
@@ -343,8 +362,6 @@ export type GallApi = SpeciesApi & {
 export type HostSimple = {
     id: number;
     name: string;
-    commonnames: Option<string>;
-    synonyms: Option<string>;
 };
 
 export type GallSimple = {

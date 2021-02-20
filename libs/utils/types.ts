@@ -9,6 +9,8 @@ export type WithID = { id: number };
  */
 export type ExtractTFromPromise<T> = T extends Promise<infer S> ? S : never;
 
+export type ExtractTFromPromiseReturn<T extends (args: any) => any> = ExtractTFromPromise<ReturnType<T>>;
+
 export type Diff<T, U> = T extends U ? never : T;
 export type Filter<T, U> = T extends U ? T : never;
 

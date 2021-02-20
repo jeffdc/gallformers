@@ -12,7 +12,7 @@ import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import { AdminFormFields, useAPIs } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { ALL_FAMILY_TYPES, DeleteResult, FamilyApi, FamilyUpsertFields } from '../../libs/api/apitypes';
+import { ALL_FAMILY_TYPES, DeleteResult, TaxonomyApi, TaxonomyUpsertFields } from '../../libs/api/apitypes';
 import { allFamilies } from '../../libs/db/family';
 import { genOptions } from '../../libs/utils/forms';
 import { mightFailWithArray } from '../../libs/utils/util';
@@ -25,10 +25,10 @@ const Schema = yup.object().shape({
 
 type Props = {
     id: string;
-    fs: FamilyApi[];
+    fs: TaxonomyApi[];
 };
 
-type FormFields = AdminFormFields<FamilyApi> & Omit<FamilyApi, 'id' | 'name'>;
+type FormFields = AdminFormFields<TaxonomyApi> & Omit<TaxonomyApi, 'id' | 'name'>;
 
 const Family = ({ id, fs }: Props): JSX.Element => {
     if (!fs) throw new Error(`The input props for families can not be null or undefined.`);
@@ -70,7 +70,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         onFamilyChange(existingId);
     }, [existingId, onFamilyChange]);
 
-    const { doDeleteOrUpsert } = useAPIs<FamilyApi, FamilyUpsertFields>('name', '../api/family/', '../api/family/upsert');
+    const { doDeleteOrUpsert } = useAPIs<TaxonomyApi, TaxonomyUpsertFields>('name', '../api/family/', '../api/family/upsert');
 
     const onSubmit = async (data: FormFields) => {
         const postDelete = (id: number | string, result: DeleteResult) => {
@@ -83,7 +83,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         };
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const convertFormFieldsToUpsert = (fields: FormFields, name: string, id: number): FamilyUpsertFields => ({
+        const convertFormFieldsToUpsert = (fields: FormFields, name: string, id: number): TaxonomyUpsertFields => ({
             ...fields,
             name: name,
         });
@@ -181,7 +181,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     return {
         props: {
             id: id,
-            fs: await mightFailWithArray<FamilyApi>()(allFamilies()),
+            fs: await mightFailWithArray<TaxonomyApi>()(allFamilies()),
         },
     };
 };

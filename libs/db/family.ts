@@ -1,19 +1,21 @@
-import { family, species } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function';
+import { species, taxonomy } from '@prisma/client';
+import * as E from 'fp-ts/lib/Either';
+import { identity, pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import {
     ALL_FAMILY_TYPES,
     DeleteResult,
-    FamilyApi,
+    FAMILY,
     FamilyGallTypesTuples,
     FamilyHostTypesTuple,
     FamilyTypesTuple,
-    FamilyUpsertFields,
-    FamilyWithSpecies,
-    GallTaxon,
-    HostTaxon,
+    invalidTaxonomyType,
     SpeciesApi,
+    TaxonomyApi,
+    TaxonomyTypeT,
+    TaxonomyUpsertFields,
+    FamilyGeneraSpecies,
 } from '../api/apitypes';
 import { handleError } from '../utils/util';
 import db from './db';
@@ -21,90 +23,91 @@ import { gallDeleteSteps } from './gall';
 import { getSpecies } from './species';
 import { extractId } from './utils';
 
-export const familyById = (id: number): TaskEither<Error, family[]> => {
-    const family = () =>
-        db.family.findMany({
+export const adaptTaxonomy = (t: taxonomy): TaxonomyApi => ({
+    ...t,
+    type: pipe(TaxonomyTypeT.decode(t.type), E.fold(invalidTaxonomyType, identity)),
+    children: [],
+});
+
+export const taxonomyById = (id: number): TaskEither<Error, taxonomy[]> => {
+    const tax = () =>
+        db.taxonomy.findMany({
             where: { id: { equals: id } },
         });
 
-    return TE.tryCatch(family, handleError);
+    return TE.tryCatch(tax, handleError);
 };
 
-export const speciesByFamily = (id: number): TaskEither<Error, species[]> => {
-    const families = () =>
-        db.species.findMany({
-            where: { family_id: { equals: id } },
-            orderBy: { name: 'asc' },
-        });
+export const speciesByTaxonomy = (id: number): TaskEither<Error, species[]> => {
+    const sps = () =>
+        db.speciestaxonomy
+            .findMany({
+                include: { species: true },
+                where: { taxonomy_id: { equals: id } },
+            })
+            .then((st) => st.map((s) => s.species));
+    // db.species.findMany({
+    //     where: { family_id: { equals: id } },
+    //     orderBy: { name: 'asc' },
+    // });
 
-    return TE.tryCatch(families, handleError);
+    return TE.tryCatch(sps, handleError);
 };
-
-const adaptFamily = (f: family): FamilyApi => ({
-    ...f,
-});
 
 export const allFamilies = (
     types: FamilyTypesTuple | FamilyGallTypesTuples | FamilyHostTypesTuple = ALL_FAMILY_TYPES,
-): TaskEither<Error, FamilyApi[]> => {
+): TaskEither<Error, TaxonomyApi[]> => {
     const families = () =>
-        db.family.findMany({
+        db.taxonomy.findMany({
             orderBy: { name: 'asc' },
             where: { description: { in: [...types] } },
         });
 
     return pipe(
         TE.tryCatch(families, handleError),
-        TE.map((f) => f.map(adaptFamily)),
+        TE.map((f) => f.map(adaptTaxonomy)),
     );
 };
 
-export const getGallMakerFamilies = (): TaskEither<Error, FamilyWithSpecies[]> => {
-    const families = () =>
-        db.family.findMany({
+export const getFamiliesWithSpecies = (gall: boolean) => (): TaskEither<Error, FamilyGeneraSpecies[]> => {
+    const fams = () => {
+        const where = gall
+            ? [{ type: FAMILY }, { description: { not: 'Plant' } }]
+            : [{ type: FAMILY }, { description: { equals: 'Plant' } }];
+
+        return db.taxonomy.findMany({
             include: {
-                species: {
-                    select: {
-                        id: true,
-                        name: true,
-                        gall: { include: { species: { select: { id: true, name: true } } } },
+                // find the genera in the family
+                taxonomytaxonomy: {
+                    include: {
+                        child: {
+                            include: {
+                                // and the species in the genera
+                                speciestaxonomy: {
+                                    include: {
+                                        species: true,
+                                    },
+                                },
+                            },
+                        },
                     },
-                    where: { taxoncode: GallTaxon },
-                    orderBy: { name: 'asc' },
                 },
             },
-            where: { description: { not: 'Plant' } },
-            orderBy: { name: 'asc' },
-        });
-
-    return TE.tryCatch(families, handleError);
-};
-
-export const getHostFamilies = (): TaskEither<Error, FamilyWithSpecies[]> => {
-    const families = () =>
-        db.family.findMany({
-            include: {
-                species: {
-                    select: {
-                        id: true,
-                        name: true,
-                        gall: { include: { species: { select: { id: true, name: true } } } },
-                    },
-                    where: { taxoncode: HostTaxon },
-                    orderBy: { name: 'asc' },
-                },
+            where: {
+                AND: where,
             },
-            where: { description: { equals: 'Plant' } },
             orderBy: { name: 'asc' },
         });
+    };
 
-    return TE.tryCatch(families, handleError);
+    return TE.tryCatch(fams, handleError);
 };
 
 export const allFamilyIds = (): TaskEither<Error, string[]> => {
     const families = () =>
-        db.family.findMany({
+        db.taxonomy.findMany({
             select: { id: true },
+            where: { type: { equals: 'family' } },
         });
 
     return pipe(
@@ -114,12 +117,12 @@ export const allFamilyIds = (): TaskEither<Error, string[]> => {
 };
 
 export const getAllSpeciesForFamily = (id: number): TaskEither<Error, SpeciesApi[]> => {
-    return getSpecies([{ family_id: id }]);
+    return getSpecies([{ taxonomy: { every: { id: id } } }]);
 };
 
 export const familyDeleteSteps = (familyid: number): Promise<number>[] => {
     return [
-        db.family
+        db.taxonomy
             .deleteMany({
                 where: { id: familyid },
             })
@@ -148,9 +151,9 @@ export const deleteFamily = (id: number): TaskEither<Error, DeleteResult> => {
     );
 };
 
-export const upsertFamily = (f: FamilyUpsertFields): TaskEither<Error, number> => {
+export const upsertFamily = (f: TaxonomyUpsertFields): TaskEither<Error, number> => {
     const upsert = () =>
-        db.family.upsert({
+        db.taxonomy.upsert({
             where: { name: f.name },
             update: {
                 description: f.description,

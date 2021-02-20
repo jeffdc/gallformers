@@ -8,6 +8,7 @@ PRAGMA foreign_keys=OFF;
 --    a) Mapping a species to source by an aliased name
 --    b) undescribed, deprecated, etc.
 -- 3) more complete taxonomy support (sections, genus and family as part of taxonomy)
+-- 4) allowing more than one gall to be associated with a singel species (sexual/asexual generations)
 
 -- new tables for alias support
 CREATE TABLE alias (
@@ -204,12 +205,14 @@ CREATE TABLE taxonomy (
                         NOT NULL,
     name        TEXT    NOT NULL,
     description TEXT DEFAULT '',
-    type        TEXT    NOT NULL CHECK (type = 'family' OR type = 'genus' OR type='section')
+    type        TEXT    NOT NULL CHECK (type = 'family' OR type = 'genus' OR type='section'),
+    parent_id   INTEGER DEFAULT NULL,
+    FOREIGN KEY (parent_id) REFERENCES taxonomy (id)
 );
+-- families have no parent so we will use the default, null, value for the parent
 INSERT INTO taxonomy (id, name, description, type) 
     SELECT id, name, description, 'family' FROM family;
 DROP TABLE family;
-
 
 -- add new tables for taxonomy
 CREATE TABLE taxonomyalias (
@@ -237,24 +240,23 @@ CREATE TABLE speciestaxonomy (
 );
 
 CREATE TABLE taxonomytaxonomy (
-    id           INTEGER PRIMARY KEY
-                         NOT NULL,
-    parent_id  INTEGER NOT NULL,
+    taxonomy_id  INTEGER NOT NULL,
     child_id  INTEGER NOT NULL,
     FOREIGN KEY (
-        parent_id
+        taxonomy_id
     )
     REFERENCES taxonomy (id) ON DELETE CASCADE
     FOREIGN KEY (
         child_id
     )
-    REFERENCES taxonomy (id) ON DELETE CASCADE
+    REFERENCES taxonomy (id) ON DELETE CASCADE,
+    PRIMARY KEY(taxonomy_id, child_id)
 );
 
 -- migrate genus data to new taxonomy: 
 -- 1) insert genus records
-INSERT INTO taxonomy (id, name, type)
-    SELECT DISTINCT NULL, genus, 'genus' FROM species;
+INSERT INTO taxonomy (id, name, type, parent_id)
+    SELECT DISTINCT NULL, genus, 'genus', family_id FROM species;
 -- 2) map to species
 INSERT INTO speciestaxonomy (id, species_id, taxonomy_id)
     SELECT NULL, species.id, taxonomy.id 
@@ -263,20 +265,25 @@ INSERT INTO speciestaxonomy (id, species_id, taxonomy_id)
 
 -- create parent-child relationships for new taxonomy
 -- migrate old family to species relationships to genus-family 
-INSERT INTO taxonomytaxonomy (id, parent_id, child_id)
-    SELECT NULL, family_id, taxonomy.id
+INSERT INTO taxonomytaxonomy (taxonomy_id, child_id)
+    SELECT DISTINCT family_id, taxonomy.id
     FROM species INNER JOIN taxonomy ON species.genus = taxonomy.name;
     
 
 -- for the sake of having some data we will add the Section mappings for Quercus
 -- later an admin UI will be created to maintain these and add new one etc.
-INSERT INTO taxonomy (id, name, type) 
-    VALUES (NULL, 'Quercus', 'section');
+INSERT INTO taxonomy (id, name, type, parent_id) 
+    VALUES (NULL, 'Quercus', 'section', (SELECT id from taxonomy WHERE name = 'Quercus' AND type = 'genus'));
 
 INSERT INTO alias (id, name, type) 
     SELECT id, 'White Oaks', 'common' 
     FROM taxonomy 
     WHERE name = 'Quercus' AND taxonomy.type='section';
+
+INSERT INTO taxonomyalias (id, taxonomy_id, alias_id)
+    SELECT NULL, 
+           (SELECT id from taxonomy WHERE name = 'Quercus' and type='section'),
+           (SELECT id from alias WHERE name = 'White Oaks');
 
 INSERT INTO speciestaxonomy (id, species_id, taxonomy_id) 
     WITH species_list(spid) AS
@@ -287,11 +294,16 @@ INSERT INTO speciestaxonomy (id, species_id, taxonomy_id)
         FROM species_list
         CROSS JOIN (SELECT id as taxid FROM taxonomy WHERE name = 'Quercus' AND type = 'section');
 
-INSERT INTO taxonomy (id, name, type) 
-    VALUES (NULL, 'Lobatae', 'section');
+INSERT INTO taxonomy (id, name, type, parent_id) 
+    VALUES (NULL, 'Lobatae', 'section', (SELECT id from taxonomy WHERE name = 'Quercus' AND type = 'genus'));
 
 INSERT INTO alias (id, name, type) 
     SELECT id, 'Red Oaks', 'common' FROM taxonomy WHERE name = 'Lobatae' AND type ='section';
+
+INSERT INTO taxonomyalias (id, taxonomy_id, alias_id)
+    SELECT NULL, 
+           (SELECT id from taxonomy WHERE name = 'Lobatae' and type='section'),
+           (SELECT id from alias WHERE name = 'Red Oaks');
 
 INSERT INTO speciestaxonomy (id, species_id, taxonomy_id) 
     WITH species_list(spid) AS
@@ -303,11 +315,16 @@ INSERT INTO speciestaxonomy (id, species_id, taxonomy_id)
         CROSS JOIN (SELECT id as taxid FROM taxonomy WHERE name = 'Lobatae' AND type = 'section');
 
 
-INSERT INTO taxonomy (id, name, type) 
-    VALUES (NULL, 'Virentes', 'section');
+INSERT INTO taxonomy (id, name, type, parent_id) 
+    VALUES (NULL, 'Virentes', 'section', (SELECT id from taxonomy WHERE name = 'Quercus' AND type = 'genus'));
 
 INSERT INTO alias (id, name, type) 
     SELECT id, 'Live Oaks', 'common' FROM taxonomy WHERE name = 'Virentes' AND type = 'section';
+
+INSERT INTO taxonomyalias (id, taxonomy_id, alias_id)
+    SELECT NULL, 
+           (SELECT id from taxonomy WHERE name = 'Virentes' and type='section'),
+           (SELECT id from alias WHERE name = 'Live Oaks');
 
 INSERT INTO speciestaxonomy (id, species_id, taxonomy_id) 
     WITH species_list(spid) AS
@@ -316,6 +333,39 @@ INSERT INTO speciestaxonomy (id, species_id, taxonomy_id)
         FROM species_list
         CROSS JOIN (SELECT id as taxid FROM taxonomy WHERE name = 'Virentes' AND type = 'section');
 
+---------------------------------------------------------------------------------------
+-- Changes for many galls to species
+-- new table
+CREATE TABLE gallspecies (
+    id         INTEGER PRIMARY KEY
+                       NOT NULL,
+    species_id INTEGER,
+    gall_id    INTEGER,
+    FOREIGN KEY (species_id) REFERENCES species (id) ON DELETE CASCADE,
+    FOREIGN KEY (gall_id) REFERENCES gall (id) ON DELETE CASCADE
+);
+
+-- migrate exisiting 1-1 species-gall mappings into new structure
+INSERT INTO gallspecies (id, species_id, gall_id)
+    SELECT NULL, species_id, id FROM gall;
+
+-- Now modify old tables:
+-- update gall table to remove species_id
+CREATE TABLE gall__ (
+    id         INTEGER PRIMARY KEY
+                       NOT NULL,
+    taxoncode  TEXT    NOT NULL
+                       CHECK (taxoncode = 'gall'),
+    detachable INTEGER,
+    FOREIGN KEY (
+        taxonCode
+    )
+    REFERENCES taxontype (taxonCode) 
+);
+INSERT INTO gall__ (id, taxoncode, detachable)
+    SELECT id, taxoncode, detachable FROM gall;
+DROP TABLE gall;
+ALTER TABLE gall__ RENAME TO gall;
 
 -------------------------------------------------------------------------------------
 -- update species table to:
@@ -323,16 +373,15 @@ INSERT INTO speciestaxonomy (id, species_id, taxonomy_id)
 -- * add new field for data completeness
 -- * remove genus field
 -- * remove family_id
+-- * remove gallid
 CREATE TABLE species__ (
     id           INTEGER PRIMARY KEY
                          NOT NULL,
     taxoncode    TEXT,
     name         TEXT    UNIQUE
                          NOT NULL,
-    datacomplete BOOLEAN DEFAULT false,
-    description  TEXT,
+    datacomplete BOOLEAN DEFAULT 0,
     abundance_id INTEGER,
-    gallid       INTEGER,
     FOREIGN KEY (
         taxoncode
     )
@@ -342,17 +391,16 @@ CREATE TABLE species__ (
     )
     REFERENCES abundance (id)
 );
-INSERT INTO species__ (id, taxoncode, name, description, abundance_id, gallid)
-    SELECT species id, taxoncode, name, description, abundance_id, gallid) FROM species;
-DROP TABLE speciess;
+INSERT INTO species__ (id, taxoncode, name, abundance_id)
+    SELECT id, taxoncode, name, abundance_id FROM species;
+DROP TABLE species;
 ALTER TABLE species__ RENAME TO species;
 
 
 PRAGMA foreign_keys=ON;
 
---------------------------------------------------------------
+
 -- Down
 PRAGMA foreign_keys=OFF;
-
-
+-- Nothing to do, too complex to roll back 
 PRAGMA foreign_keys=ON;

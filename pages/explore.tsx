@@ -3,27 +3,35 @@ import Head from 'next/head';
 import Link from 'next/link';
 import React from 'react';
 import { Accordion, Button, Card, ListGroup, Tab, Tabs } from 'react-bootstrap';
-import { FamilyWithSpecies } from '../libs/api/apitypes';
-import { getGallMakerFamilies, getHostFamilies } from '../libs/db/family';
+import { FamilyGeneraSpecies } from '../libs/api/apitypes';
+import { getFamiliesWithSpecies } from '../libs/db/family';
 import { getStaticPropsWith } from '../libs/pages/nextPageHelpers';
 
 type Props = {
-    gallmakers: FamilyWithSpecies[];
-    hosts: FamilyWithSpecies[];
+    gallmakers: FamilyGeneraSpecies[];
+    hosts: FamilyGeneraSpecies[];
 };
 
-const lister = (f: FamilyWithSpecies, gall: boolean) => {
+const lister = (f: FamilyGeneraSpecies, gall: boolean) => {
     const path = gall ? 'gall' : 'host';
-    return f.species.map((s) => (
-        <ListGroup.Item key={s.id}>
-            <Link href={`/${path}/${s.id}`}>
-                <a>{s.name}</a>
-            </Link>
-        </ListGroup.Item>
-    ));
+    return f.taxonomytaxonomy
+        .sort((a, b) => a.child.name.localeCompare(b.child.name))
+        .map((s) => (
+            <ListGroup.Item key={s.child.id}>
+                {s.child.name}
+                {' - '}
+                {s.child.speciestaxonomy
+                    .sort((a, b) => a.species.name.localeCompare(b.species.name))
+                    .map((st) => (
+                        <Link key={st.species.id} href={`/${path}/${st.species.id}`}>
+                            <a className="pr-2">{st.species.name}</a>
+                        </Link>
+                    ))}
+            </ListGroup.Item>
+        ));
 };
 
-const renderList = (data: FamilyWithSpecies[], gall: boolean) => {
+const renderList = (data: FamilyGeneraSpecies[], gall: boolean) => {
     return data.map((f) => (
         <Card key={f.id}>
             <Card.Header>
@@ -75,8 +83,8 @@ const Explore = ({ gallmakers, hosts }: Props): JSX.Element => {
 export const getStaticProps: GetStaticProps = async () => {
     return {
         props: {
-            gallmakers: await getStaticPropsWith(getGallMakerFamilies, 'gall families'),
-            hosts: await getStaticPropsWith(getHostFamilies, 'host familes'),
+            gallmakers: await getStaticPropsWith(getFamiliesWithSpecies(true), 'gall families'),
+            hosts: await getStaticPropsWith(getFamiliesWithSpecies(false), 'host familes'),
         },
         revalidate: 1,
     };

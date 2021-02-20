@@ -1,5 +1,5 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { abundance, family } from '@prisma/client';
+import { abundance, taxonomy } from '@prisma/client';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
@@ -20,7 +20,7 @@ import {
     DeleteResult,
     EmptyAbundance,
     EmptyFamily,
-    FamilyApi,
+    TaxonomyApi,
     HOST_FAMILY_TYPES,
     SpeciesApi,
     SpeciesUpsertFields,
@@ -33,7 +33,7 @@ import { mightFailWithArray } from '../../libs/utils/util';
 type Props = {
     id: string;
     hs: SpeciesApi[];
-    families: family[];
+    families: taxonomy[];
     abundances: abundance[];
 };
 
@@ -59,7 +59,7 @@ const Schema = yup.object().shape({
 
 export type FormFields = AdminFormFields<SpeciesApi> & {
     genus: string;
-    family: FamilyApi[];
+    family: TaxonomyApi[];
     abundance: AbundanceApi[];
     commonnames: string;
     synonyms: string;
@@ -288,7 +288,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
         props: {
             id: id,
             hs: await mightFailWithArray<SpeciesApi>()(allHosts()),
-            families: await mightFailWithArray<FamilyApi>()(allFamilies(HOST_FAMILY_TYPES)),
+            families: await mightFailWithArray<TaxonomyApi>()(allFamilies(HOST_FAMILY_TYPES)),
             abundances: await mightFailWithArray<AbundanceApi>()(abundances()),
         },
     };

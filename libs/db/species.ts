@@ -6,6 +6,7 @@ import { AbundanceApi, SpeciesApi } from '../api/apitypes';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
+import { adaptTaxonomy } from './family';
 import { adaptImage } from './images';
 
 export const adaptAbundance = (a: abundance): AbundanceApi => ({
@@ -58,9 +59,9 @@ export const getSpecies = (
         db.species.findMany({
             include: {
                 abundance: true,
-                family: true,
                 speciessource: { include: { source: true } },
                 image: { include: { source: { include: { speciessource: true } } } },
+                taxonomy: { include: { taxonomy: true } },
             },
             where: w,
             distinct: distinct,
@@ -78,10 +79,11 @@ export const getSpecies = (
                 ...s,
                 description: O.fromNullable(d),
                 taxoncode: s.taxoncode ? s.taxoncode : '',
-                synonyms: O.fromNullable(s.synonyms),
-                commonnames: O.fromNullable(s.commonnames),
+                // synonyms: O.fromNullable(s.synonyms),
+                // commonnames: O.fromNullable(s.commonnames),
                 abundance: optionalWith(s.abundance, adaptAbundance),
                 images: s.image.map(adaptImage),
+                taxonomy: s.taxonomy.map((t) => adaptTaxonomy(t.taxonomy)),
             };
             return species;
         });

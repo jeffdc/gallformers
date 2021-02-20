@@ -1,18 +1,18 @@
-import { abundance, family, host, image, Prisma, source, species, speciessource } from '@prisma/client';
+import { abundance, taxonomy, host, image, Prisma, source, species, speciessource, speciestaxonomy } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, HostApi, HostSimple, HostTaxon, SpeciesUpsertFields } from '../api/apitypes';
+import { DeleteResult, GENUS, HostApi, HostSimple, HostTaxon, SpeciesUpsertFields } from '../api/apitypes';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
+import { adaptTaxonomy } from './family';
 import { adaptImage } from './images';
 import { adaptAbundance } from './species';
 
 //TODO switch over to model like is beign done in gall.ts with derived type rather than explicit
 type DBHost = species & {
     abundance: abundance | null;
-    family: family;
     host_galls: (host & {
         gallspecies: {
             id: number;
@@ -29,6 +29,9 @@ type DBHost = species & {
               })
             | null;
     })[];
+    taxonomy: (speciestaxonomy & {
+        taxonomy: taxonomy;
+    })[];
 };
 
 // we want a stronger non-null contract on what we return then is modelable in the DB
@@ -40,8 +43,6 @@ const adaptor = (hosts: DBHost[]): HostApi[] =>
             ...h,
             description: O.fromNullable(d),
             taxoncode: h.taxoncode ? h.taxoncode : '',
-            synonyms: O.fromNullable(h.synonyms),
-            commonnames: O.fromNullable(h.commonnames),
             abundance: optionalWith(h.abundance, adaptAbundance),
             // remove the indirection of the many-to-many table for easier usage
             galls: h.host_galls.map((h) => {
@@ -54,6 +55,7 @@ const adaptor = (hosts: DBHost[]): HostApi[] =>
                 };
             }),
             images: h.image.map(adaptImage),
+            taxonomy: h.taxonomy.map(adaptTaxonomy),
         };
         return newh;
     });
@@ -63,8 +65,6 @@ const simplify = (hosts: HostApi[]) =>
         return {
             name: h.name,
             id: h.id,
-            commonnames: h.commonnames,
-            synonyms: h.synonyms,
         };
     });
 
@@ -92,18 +92,22 @@ export const allHostNames = (): TaskEither<Error, string[]> =>
  */
 export const allHostGenera = (): TaskEither<Error, string[]> => {
     const genera = () =>
-        db.species.findMany({
-            select: {
-                genus: true,
-            },
-            distinct: [Prisma.SpeciesScalarFieldEnum.genus],
-            where: { taxoncode: { equals: HostTaxon } },
-            orderBy: { genus: 'asc' },
+        db.taxonomy.findMany({
+            distinct: [Prisma.AliasScalarFieldEnum.type],
+            where: { AND: [{ type: GENUS }, { speciestaxonomy: { every: { species: { taxoncode: HostTaxon } } } }] },
         });
+    // db.species.findMany({
+    //     select: {
+    //         genus: true,
+    //     },
+    //     distinct: [Prisma.SpeciesScalarFieldEnum.genus],
+    //     where: { taxoncode: { equals: HostTaxon } },
+    //     orderBy: { genus: 'asc' },
+    // });
 
     return pipe(
         TE.tryCatch(genera, handleError),
-        TE.map((hosts) => hosts.map((h) => h.genus)),
+        TE.map((gs) => gs.map((g) => g.name)),
     );
 };
 
@@ -137,7 +141,6 @@ export const getHosts = (
         db.species.findMany({
             include: {
                 abundance: true,
-                family: true,
                 host_galls: {
                     include: {
                         gallspecies: {
@@ -151,6 +154,7 @@ export const getHosts = (
                     },
                 },
                 image: { include: { source: { include: { speciessource: true } } } },
+                taxonomy: { include: { taxonomy: true } },
             },
             where: w,
             distinct: distinct,
@@ -169,7 +173,7 @@ export const hostById = (id: number): TaskEither<Error, HostApi[]> => getHosts([
 export const hostsByGenus = (genus: string): TaskEither<Error, HostApi[]> => {
     if (!genus || genus.length === 0) return TE.taskEither.of([]);
 
-    return getHosts([{ genus: { equals: genus } }]);
+    return getHosts([{ taxonomy: { every: { taxonomy: { type: GENUS } } } }]);
 };
 
 export const upsertHost = (h: SpeciesUpsertFields): TaskEither<Error, number> => {
@@ -185,19 +189,19 @@ export const upsertHost = (h: SpeciesUpsertFields): TaskEither<Error, number> =>
         db.species.upsert({
             where: { name: h.name },
             update: {
-                family: { connect: { name: h.family } },
+                // family: { connect: { name: h.family } },
                 abundance: abundanceConnect(),
-                synonyms: h.synonyms,
-                commonnames: h.commonnames,
+                // synonyms: h.synonyms,
+                // commonnames: h.commonnames,
             },
             create: {
                 name: h.name,
-                genus: h.name.split(' ')[0],
+                // genus: h.name.split(' ')[0],
                 taxontype: { connect: { taxoncode: HostTaxon } },
-                family: { connect: { name: h.family } },
+                // family: { connect: { name: h.family } },
                 abundance: abundanceConnect(),
-                synonyms: h.synonyms,
-                commonnames: h.commonnames,
+                // synonyms: h.synonyms,
+                // commonnames: h.commonnames,
             },
         });
 
