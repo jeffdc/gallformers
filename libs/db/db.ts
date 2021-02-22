@@ -21,8 +21,8 @@ if (process.env.NODE_ENV === 'production') {
     // Ensure the prisma instance is re-used during hot-reloading
     // Otherwise, a new client will be created on every reload
     // @ts-ignore
-    // globalThis['db'] = globalThis['db'] || new PrismaClient();
-    globalThis['db'] = globalThis['db'] || new PrismaClient({ log: ['query'] });
+    globalThis['db'] = globalThis['db'] || new PrismaClient();
+    // globalThis['db'] = globalThis['db'] || new PrismaClient({ log: ['query'] });
     // @ts-ignore
     db = globalThis['db'];
 

@@ -16,6 +16,7 @@ import {
     GallTexture,
     GallUpsertFields,
     GENUS,
+    SECTION,
     ShapeApi,
     WallsApi,
 } from '../api/apitypes';
@@ -34,19 +35,19 @@ import { connectIfNotNull, connectWithIds, extractId } from './utils';
  * @param whereClause a where clause by which to filter galls
  */
 export const getGalls = (
-    whereClause: Prisma.speciesWhereInput[] = [],
+    whereClause: Prisma.gallspeciesWhereInput[] = [],
     operatorAnd = true,
     distinct: Prisma.GallspeciesScalarFieldEnum[] = ['id'],
 ): TaskEither<Error, GallApi[]> => {
     const w = operatorAnd
-        ? { AND: [...whereClause, { taxoncode: { equals: GallTaxon } }] }
-        : { AND: [{ taxoncode: { equals: GallTaxon } }, { OR: whereClause }] };
+        ? { AND: [...whereClause, { species: { taxoncode: GallTaxon } }] }
+        : { AND: [{ species: { taxoncode: GallTaxon } }, { OR: whereClause }] };
     const galls = () =>
         db.gallspecies.findMany({
             include: {
                 // family: true,
                 species: {
-                    select: {
+                    include: {
                         abundance: true,
                         hosts: {
                             include: {
@@ -60,6 +61,7 @@ export const getGalls = (
                         },
                         image: { include: { source: { include: { speciessource: true } } } },
                         taxonomy: { include: { taxonomy: true } },
+                        aliasspecies: { include: { alias: true } },
                     },
                 },
                 gall: {
@@ -92,15 +94,13 @@ export const getGalls = (
                 return []; // will resolve to nothing since we are in a flatMap
             }
             // set the default description to make the caller's life easier
-            const d = defaultSource(g.speciessource)?.description;
+            const d = defaultSource(g.species.speciessource)?.description;
 
             const newg: GallApi = {
-                ...g,
-                taxoncode: g.taxoncode ? g.taxoncode : '',
+                ...g.species,
+                taxoncode: g.species.taxoncode ? g.species.taxoncode : '',
                 description: O.fromNullable(d),
-                synonyms: O.fromNullable(g.synonyms),
-                commonnames: O.fromNullable(g.commonnames),
-                abundance: optionalWith(g.abundance, adaptAbundance),
+                abundance: optionalWith(g.species.abundance, adaptAbundance),
                 gall: {
                     ...g.gall,
                     gallalignment: adaptAlignments(g.gall.gallalignment.map((a) => a.alignment)),
@@ -113,7 +113,7 @@ export const getGalls = (
                     galltexture: adaptTextures(g.gall.galltexture.map((t) => t.texture)),
                 },
                 // remove the indirection of the many-to-many table for easier usage
-                hosts: g.hosts.map((h) => {
+                hosts: g.species.hosts.map((h) => {
                     // due to prisma problems we had to make these hostspecies relationships optional, however
                     // if we are here then there must be a record in the host table so it can not be null :(
                     if (!h.hostspecies?.id || !h.hostspecies?.name) throw new Error('Invalid state.');
@@ -122,7 +122,8 @@ export const getGalls = (
                         name: h.hostspecies.name,
                     };
                 }),
-                images: g.image.map(adaptImage),
+                images: g.species.image.map(adaptImage),
+                aliases: g.species.aliasspecies.map((a) => a.alias),
             };
             return newg;
         });
@@ -158,15 +159,55 @@ export const allGallIds = (): TaskEither<Error, string[]> => {
  * @param hostName the host name to filter by
  */
 export const gallsByHostName = (hostName: string): TaskEither<Error, GallApi[]> => {
-    return getGalls([{ hosts: { some: { hostspecies: { name: { equals: hostName } } } } }]);
+    return getGalls([{ species: { hosts: { some: { hostspecies: { name: { equals: hostName } } } } } }]);
 };
 
 /**
- * Fetch all Galls of the given host
- * @param hostGenus the host genus to filter by
+ * Fetch all Galls of the given host genus or section
+ * @param hostGenus the host genus or section to filter by
  */
 export const gallsByHostGenus = (hostGenus: string): TaskEither<Error, GallApi[]> => {
-    return getGalls([{ hosts: { some: { hostspecies: { taxonomy: { every: { taxonomy: { name: hostGenus } } } } } } }]);
+    return getGalls([
+        {
+            species: {
+                hosts: {
+                    some: {
+                        hostspecies: {
+                            taxonomy: {
+                                some: {
+                                    taxonomy: {
+                                        AND: [{ type: GENUS }, { name: hostGenus }],
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    ]);
+};
+
+export const gallsByHostSection = (hostSection: string): TaskEither<Error, GallApi[]> => {
+    return getGalls([
+        {
+            species: {
+                hosts: {
+                    some: {
+                        hostspecies: {
+                            taxonomy: {
+                                some: {
+                                    taxonomy: {
+                                        AND: [{ type: SECTION }, { name: hostSection }],
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    ]);
 };
 
 /**
@@ -174,7 +215,7 @@ export const gallsByHostGenus = (hostGenus: string): TaskEither<Error, GallApi[]
  * @param id the id of the gall to fetch
  */
 export const gallById = (id: number): TaskEither<Error, GallApi[]> => {
-    return getGalls([{ id: id }]);
+    return getGalls([{ species: { id: id } }]);
 };
 
 /**
@@ -203,27 +244,27 @@ export const allGallGenera = (): TaskEither<Error, string[]> => {
 
 export const getGallIdsFromSpeciesIds = (speciesids: number[]): TaskEither<Error, number[]> => {
     const galls = () =>
-        db.gall.findMany({
-            select: { id: true },
+        db.gallspecies.findMany({
+            select: { gall_id: true },
             where: { species_id: { in: speciesids } },
         });
 
     return pipe(
         TE.tryCatch(galls, handleError),
-        TE.map((gs) => gs.map((g) => g.id)),
+        TE.map((gs) => gs.map((g) => g.gall_id)),
     );
 };
 
 export const getGallIdFromSpeciesId = (speciesid: number): TaskEither<Error, O.Option<number>> => {
     const gall = () =>
-        db.gall.findFirst({
-            select: { id: true },
+        db.gallspecies.findFirst({
+            select: { gall_id: true },
             where: { species_id: { equals: speciesid } },
         });
 
     return pipe(
         TE.tryCatch(gall, handleError),
-        TE.map((g) => O.fromNullable(g?.id)),
+        TE.map((g) => O.fromNullable(g?.gall_id)),
     );
 };
 

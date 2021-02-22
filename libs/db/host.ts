@@ -1,12 +1,20 @@
-import { abundance, taxonomy, host, image, Prisma, source, species, speciessource, speciestaxonomy } from '@prisma/client';
+import { abundance, alias, aliasspecies, host, image, Prisma, source, species, speciessource } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, GENUS, HostApi, HostSimple, HostTaxon, SpeciesUpsertFields } from '../api/apitypes';
+import {
+    DeleteResult,
+    GENUS,
+    HostApi,
+    HostSimple,
+    HostTaxon,
+    SECTION,
+    SpeciesUpsertFields,
+    TaxonomyWithSpecies,
+} from '../api/apitypes';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
-import { adaptTaxonomy } from './family';
 import { adaptImage } from './images';
 import { adaptAbundance } from './species';
 
@@ -22,15 +30,15 @@ type DBHost = species & {
     speciessource: (speciessource & {
         source: source;
     })[];
+    aliasspecies: (aliasspecies & {
+        alias: alias;
+    })[];
     image: (image & {
         source:
             | (source & {
                   speciessource: speciessource[];
               })
             | null;
-    })[];
-    taxonomy: (speciestaxonomy & {
-        taxonomy: taxonomy;
     })[];
 };
 
@@ -40,10 +48,13 @@ const adaptor = (hosts: DBHost[]): HostApi[] =>
         // set the default description to make the caller's life easier
         const d = h.speciessource.find((s) => s.useasdefault === 1)?.description;
         const newh: HostApi = {
-            ...h,
+            id: h.id,
+            name: h.name,
+            datacomplete: h.datacomplete,
             description: O.fromNullable(d),
             taxoncode: h.taxoncode ? h.taxoncode : '',
             abundance: optionalWith(h.abundance, adaptAbundance),
+            speciessource: h.speciessource,
             // remove the indirection of the many-to-many table for easier usage
             galls: h.host_galls.map((h) => {
                 // due to prisma problems we had to make these hostspecies relationships optional, however
@@ -55,7 +66,9 @@ const adaptor = (hosts: DBHost[]): HostApi[] =>
                 };
             }),
             images: h.image.map(adaptImage),
-            taxonomy: h.taxonomy.map(adaptTaxonomy),
+            aliases: h.aliasspecies.map((a) => ({
+                ...a.alias,
+            })),
         };
         return newh;
     });
@@ -65,6 +78,7 @@ const simplify = (hosts: HostApi[]) =>
         return {
             name: h.name,
             id: h.id,
+            aliases: h.aliases,
         };
     });
 
@@ -88,27 +102,36 @@ export const allHostNames = (): TaskEither<Error, string[]> =>
     );
 
 /**
- * Fetches all of the Genera for the hosts.
+ * Fetches all of the Genera and Sections for the hosts.
  */
-export const allHostGenera = (): TaskEither<Error, string[]> => {
+export const allHostGenera = (): TaskEither<Error, TaxonomyWithSpecies[]> => {
     const genera = () =>
         db.taxonomy.findMany({
-            distinct: [Prisma.AliasScalarFieldEnum.type],
-            where: { AND: [{ type: GENUS }, { speciestaxonomy: { every: { species: { taxoncode: HostTaxon } } } }] },
+            include: {
+                parent: true,
+            },
+            where: {
+                OR: [
+                    {
+                        AND: [
+                            { type: GENUS },
+                            {
+                                speciestaxonomy: {
+                                    every: {
+                                        species: {
+                                            taxoncode: HostTaxon,
+                                        },
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                    { type: SECTION },
+                ],
+            },
         });
-    // db.species.findMany({
-    //     select: {
-    //         genus: true,
-    //     },
-    //     distinct: [Prisma.SpeciesScalarFieldEnum.genus],
-    //     where: { taxoncode: { equals: HostTaxon } },
-    //     orderBy: { genus: 'asc' },
-    // });
 
-    return pipe(
-        TE.tryCatch(genera, handleError),
-        TE.map((gs) => gs.map((g) => g.name)),
-    );
+    return pipe(TE.tryCatch(genera, handleError));
 };
 
 export const allHostIds = (): TaskEither<Error, string[]> => {
@@ -154,7 +177,7 @@ export const getHosts = (
                     },
                 },
                 image: { include: { source: { include: { speciessource: true } } } },
-                taxonomy: { include: { taxonomy: true } },
+                aliasspecies: { include: { alias: true } },
             },
             where: w,
             distinct: distinct,

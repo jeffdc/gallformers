@@ -1,6 +1,7 @@
-import { species, taxonomy } from '@prisma/client';
+import { Prisma, speciestaxonomy, taxonomy, taxonomytaxonomy } from '@prisma/client';
 import * as E from 'fp-ts/lib/Either';
 import { identity, pipe } from 'fp-ts/lib/function';
+import { never } from 'fp-ts/lib/Task';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import {
@@ -8,14 +9,17 @@ import {
     DeleteResult,
     FAMILY,
     FamilyGallTypesTuples,
+    FamilyGeneraSpecies,
     FamilyHostTypesTuple,
     FamilyTypesTuple,
+    GENUS,
     invalidTaxonomyType,
     SpeciesApi,
     TaxonomyApi,
+    TaxonomyTree,
     TaxonomyTypeT,
     TaxonomyUpsertFields,
-    FamilyGeneraSpecies,
+    TaxTreeForSpecies,
 } from '../api/apitypes';
 import { handleError } from '../utils/util';
 import db from './db';
@@ -38,18 +42,34 @@ export const taxonomyById = (id: number): TaskEither<Error, taxonomy[]> => {
     return TE.tryCatch(tax, handleError);
 };
 
-export const speciesByTaxonomy = (id: number): TaskEither<Error, species[]> => {
+export const taxonomyForId = (id: number): TaskEither<Error, TaxonomyTree[]> => {
     const sps = () =>
-        db.speciestaxonomy
-            .findMany({
-                include: { species: true },
-                where: { taxonomy_id: { equals: id } },
-            })
-            .then((st) => st.map((s) => s.species));
-    // db.species.findMany({
-    //     where: { family_id: { equals: id } },
-    //     orderBy: { name: 'asc' },
-    // });
+        db.taxonomy.findMany({
+            include: {
+                parent: true,
+                speciestaxonomy: {
+                    include: {
+                        species: true,
+                    },
+                },
+                taxonomy: {
+                    include: {
+                        speciestaxonomy: {
+                            include: {
+                                species: true,
+                            },
+                        },
+                        taxonomy: true,
+                        taxonomyalias: true,
+                        taxonomytaxonomy: true,
+                    },
+                },
+                taxonomyalias: true,
+            },
+            where: {
+                id: id,
+            },
+        });
 
     return TE.tryCatch(sps, handleError);
 };
@@ -66,6 +86,51 @@ export const allFamilies = (
     return pipe(
         TE.tryCatch(families, handleError),
         TE.map((f) => f.map(adaptTaxonomy)),
+    );
+};
+
+export const taxonomyForSpecies = (id: number): TaskEither<Error, TaxTreeForSpecies> => {
+    const tree = (): Prisma.Prisma__speciestaxonomyClient<
+        | (speciestaxonomy & {
+              taxonomy: taxonomy & {
+                  parent: taxonomy | null;
+                  taxonomy: taxonomy[];
+                  taxonomytaxonomy: (taxonomytaxonomy & {
+                      taxonomy: taxonomy;
+                      child: taxonomy;
+                  })[];
+              };
+          })
+        | never
+    > => {
+        const r = db.speciestaxonomy.findFirst({
+            include: {
+                taxonomy: {
+                    include: {
+                        taxonomytaxonomy: {
+                            include: {
+                                taxonomy: true,
+                                child: true,
+                            },
+                        },
+                        parent: true,
+                        taxonomy: true,
+                    },
+                },
+            },
+            where: { AND: [{ species_id: id }, { taxonomy: { type: { equals: GENUS } } }] },
+        });
+
+        if (r == null) {
+            throw new Error(`Failed to find genus for species with id ${id}.`);
+        } else {
+            return r;
+        }
+    };
+
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        TE.tryCatch(tree, handleError),
     );
 };
 
@@ -117,7 +182,27 @@ export const allFamilyIds = (): TaskEither<Error, string[]> => {
 };
 
 export const getAllSpeciesForFamily = (id: number): TaskEither<Error, SpeciesApi[]> => {
-    return getSpecies([{ taxonomy: { every: { id: id } } }]);
+    const extractSpeciesIds = (tt: TaxonomyTree[]): number[] =>
+        tt.reduce((acc, t) => {
+            const more = t.taxonomy.flatMap((s) => s.speciestaxonomy.map((st) => st.species_id));
+            acc.push(...more);
+            return acc;
+        }, new Array<number>());
+
+    const get = (ids: number[]) => {
+        return getSpecies([{ id: { in: ids } }]);
+    };
+
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        taxonomyForId(id),
+        TE.map(extractSpeciesIds),
+        TE.map((x) => {
+            console.log('FOOOOOOO: ' + id + '  -  ' + x);
+            return x;
+        }),
+        TE.chain(get),
+    );
 };
 
 export const familyDeleteSteps = (familyid: number): Promise<number>[] => {
@@ -154,13 +239,15 @@ export const deleteFamily = (id: number): TaskEither<Error, DeleteResult> => {
 export const upsertFamily = (f: TaxonomyUpsertFields): TaskEither<Error, number> => {
     const upsert = () =>
         db.taxonomy.upsert({
-            where: { name: f.name },
+            where: { id: !f.id ? -1 : f.id },
             update: {
+                name: f.name,
                 description: f.description,
             },
             create: {
                 name: f.name,
                 description: f.description,
+                type: f.type,
             },
         });
     return pipe(

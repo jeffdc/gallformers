@@ -25,7 +25,7 @@ import {
     SpeciesApi,
     SpeciesUpsertFields,
 } from '../../libs/api/apitypes';
-import { allFamilies } from '../../libs/db/family';
+import { allFamilies } from '../../libs/db/taxonomy';
 import { allHosts } from '../../libs/db/host';
 import { abundances } from '../../libs/db/species';
 import { mightFailWithArray } from '../../libs/utils/util';

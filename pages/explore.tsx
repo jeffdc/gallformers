@@ -1,58 +1,34 @@
 import { GetStaticProps } from 'next';
 import Head from 'next/head';
-import Link from 'next/link';
+import { useRouter } from 'next/router';
 import React from 'react';
-import { Accordion, Button, Card, ListGroup, Tab, Tabs } from 'react-bootstrap';
-import { FamilyGeneraSpecies } from '../libs/api/apitypes';
-import { getFamiliesWithSpecies } from '../libs/db/family';
+import { Card, Tab, Tabs } from 'react-bootstrap';
+import TreeMenu, { Item, TreeNodeInArray } from 'react-simple-tree-menu';
+import 'react-simple-tree-menu/dist/main.css';
+import { FamilyGeneraSpecies, GallTaxon } from '../libs/api/apitypes';
+import { getFamiliesWithSpecies } from '../libs/db/taxonomy';
 import { getStaticPropsWith } from '../libs/pages/nextPageHelpers';
+import { hasProp } from '../libs/utils/util';
 
 type Props = {
-    gallmakers: FamilyGeneraSpecies[];
-    hosts: FamilyGeneraSpecies[];
-};
-
-const lister = (f: FamilyGeneraSpecies, gall: boolean) => {
-    const path = gall ? 'gall' : 'host';
-    return f.taxonomytaxonomy
-        .sort((a, b) => a.child.name.localeCompare(b.child.name))
-        .map((s) => (
-            <ListGroup.Item key={s.child.id}>
-                {s.child.name}
-                {' - '}
-                {s.child.speciestaxonomy
-                    .sort((a, b) => a.species.name.localeCompare(b.species.name))
-                    .map((st) => (
-                        <Link key={st.species.id} href={`/${path}/${st.species.id}`}>
-                            <a className="pr-2">{st.species.name}</a>
-                        </Link>
-                    ))}
-            </ListGroup.Item>
-        ));
-};
-
-const renderList = (data: FamilyGeneraSpecies[], gall: boolean) => {
-    return data.map((f) => (
-        <Card key={f.id}>
-            <Card.Header>
-                <Accordion.Toggle as={Button} variant="light" eventKey={f.id.toString()}>
-                    <i>{f.name}</i> - {f.description}
-                </Accordion.Toggle>
-            </Card.Header>
-            <Accordion.Collapse eventKey={f.id.toString()}>
-                <Card.Body>
-                    <ListGroup>{lister(f, gall)}</ListGroup>
-                </Card.Body>
-            </Accordion.Collapse>
-        </Card>
-    ));
+    gallmakers: TreeNodeInArray[];
+    hosts: TreeNodeInArray[];
 };
 
 const Explore = ({ gallmakers, hosts }: Props): JSX.Element => {
+    const router = useRouter();
+
+    const handleClick = (item: Item) => {
+        console.log(JSON.stringify(item, null, ' '));
+        if (hasProp(item, 'url')) {
+            router.push(item.url as string);
+        }
+    };
+
     return (
         <>
             <Head>
-                <title>Explore Galls</title>
+                <title>Explore Galls & Hosts</title>
             </Head>
 
             <Card>
@@ -60,16 +36,14 @@ const Explore = ({ gallmakers, hosts }: Props): JSX.Element => {
                     <Tabs defaultActiveKey="galls">
                         <Tab eventKey="galls" title="Galls">
                             <Card.Body>
-                                <Card.Title>Browse Galls</Card.Title>
-                                <Card.Text>By Family</Card.Text>
-                                <Accordion>{renderList(gallmakers, true)}</Accordion>
+                                <Card.Title>Browse Galls - By Family</Card.Title>
+                                <TreeMenu data={gallmakers} onClickItem={handleClick} />
                             </Card.Body>
                         </Tab>
                         <Tab eventKey="hosts" title="Hosts">
                             <Card.Body>
-                                <Card.Title>Browse Hosts</Card.Title>
-                                <Card.Text>By Family</Card.Text>
-                                <Accordion>{renderList(hosts, false)}</Accordion>
+                                <Card.Title>Browse Hosts - By Family</Card.Title>
+                                <TreeMenu data={hosts} onClickItem={handleClick} />
                             </Card.Body>
                         </Tab>
                     </Tabs>
@@ -83,11 +57,30 @@ const Explore = ({ gallmakers, hosts }: Props): JSX.Element => {
 export const getStaticProps: GetStaticProps = async () => {
     return {
         props: {
-            gallmakers: await getStaticPropsWith(getFamiliesWithSpecies(true), 'gall families'),
-            hosts: await getStaticPropsWith(getFamiliesWithSpecies(false), 'host familes'),
+            gallmakers: toTree(await getStaticPropsWith(getFamiliesWithSpecies(true), 'gall families')),
+            hosts: toTree(await getStaticPropsWith(getFamiliesWithSpecies(false), 'host familes')),
         },
         revalidate: 1,
     };
 };
+
+const toTree = (fgs: readonly FamilyGeneraSpecies[]): TreeNodeInArray[] =>
+    fgs.map((f) => ({
+        key: f.id.toString(),
+        label: `${f.name} - ${f.description}`,
+        nodes: f.taxonomytaxonomy
+            .sort((a, b) => a.child.name.localeCompare(b.child.name))
+            .map((tt) => ({
+                key: tt.child.id.toString(),
+                label: tt.child.name,
+                nodes: tt.child.speciestaxonomy
+                    .sort((a, b) => a.species.name.localeCompare(b.species.name))
+                    .map((st) => ({
+                        key: st.species.id.toString(),
+                        label: st.species.name,
+                        url: `/${st.species.taxoncode === GallTaxon ? 'gall' : 'host'}/${st.species.id}`,
+                    })),
+            })),
+    }));
 
 export default Explore;

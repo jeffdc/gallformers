@@ -1,6 +1,4 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { constant, pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -15,7 +13,6 @@ import {
     CellsApi,
     ColorApi,
     DetachableDetachable,
-    detachableFromString,
     DetachableIntegral,
     DetachableNone,
     emptySearchQuery,
@@ -24,14 +21,16 @@ import {
     GallTexture,
     HostSimple,
     SearchQuery,
+    SECTION,
     ShapeApi,
+    TaxonomyWithParent,
     WallsApi,
 } from '../libs/api/apitypes';
 import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
 import { allHostGenera, allHostsSimple } from '../libs/db/host';
 import { defaultImage, truncateOptionString } from '../libs/pages/renderhelpers';
 import { checkGall } from '../libs/utils/gallsearch';
-import { capitalizeFirstLetter, mightFailWithArray, mightFailWithStringArray } from '../libs/utils/util';
+import { capitalizeFirstLetter, mightFailWithArray } from '../libs/utils/util';
 
 type SearchFormHostField = {
     host: HostSimple[];
@@ -40,12 +39,11 @@ type SearchFormHostField = {
 
 type SearchFormGenusField = {
     host?: never;
-    genus: string;
+    genus: TaxonomyWithParent[];
 };
 
 type SearchFormFields = SearchFormHostField | SearchFormGenusField;
 
-// keep TS happy since the allowable field values are bound when we set the defaultValues above in the useForm() call.
 type FilterFormFields = {
     locations: string[];
     detachable: string;
@@ -57,6 +55,10 @@ type FilterFormFields = {
     color: string;
 };
 
+const invalidArraySelection = (arr: unknown[]) => {
+    return arr.length === 0;
+};
+
 const Schema = yup.object().shape(
     {
         host: yup.array().when('genus', {
@@ -64,10 +66,10 @@ const Schema = yup.object().shape(
             then: yup.array().required('You must provide a search,'),
             otherwise: yup.array(),
         }),
-        genus: yup.string().when('host', {
-            is: (host: []) => host.length === 0,
-            then: yup.string().required('You must provide a search,'),
-            otherwise: yup.string(),
+        genus: yup.array().when('host', {
+            is: invalidArraySelection,
+            then: yup.array().required('You must provide a search,'),
+            otherwise: yup.array(),
         }),
     },
     [['host', 'genus']],
@@ -75,7 +77,7 @@ const Schema = yup.object().shape(
 
 type Props = {
     hosts: HostSimple[];
-    genera: string[];
+    genera: TaxonomyWithParent[];
     locations: GallLocation[];
     colors: ColorApi[];
     shapes: ShapeApi[];
@@ -137,7 +139,17 @@ const IDGall = (props: Props): JSX.Element => {
         try {
             // make sure to clear all of the filters since we are getting a new set of galls
             filterReset();
-            const query = encodeURI(host && host.length > 0 ? `?host=${host[0].name}` : `?genus=${genus}`);
+            let query = '';
+            if (host && host.length) {
+                query = encodeURI(`?host=${host[0].name}`);
+            } else if (genus && genus.length > 0) {
+                if (genus[0].type === SECTION) {
+                    query = `?section=${genus[0].name}`;
+                } else {
+                    query = `?genus=${genus[0].name}`;
+                }
+            }
+
             const res = await fetch(`../api/search${query}`, {
                 method: 'GET',
             });
@@ -147,7 +159,7 @@ const IDGall = (props: Props): JSX.Element => {
                 if (!g || !Array.isArray(g)) {
                     throw new Error('Received an invalid search result.');
                 }
-                setGalls(g);
+                setGalls(g.sort((a, b) => a.name.localeCompare(b.name)));
                 setFiltered(g);
             } else {
                 throw new Error(await res.text());
@@ -192,7 +204,7 @@ const IDGall = (props: Props): JSX.Element => {
             <Head>
                 <title>ID Galls</title>
             </Head>
-
+            {JSON.stringify(errors)}
             <form onSubmit={handleSubmit(onSubmit)} className="fixed-left mt-2 ml-4 mr-2 form-group">
                 <Row>
                     <Col>
@@ -201,29 +213,29 @@ const IDGall = (props: Props): JSX.Element => {
                             control={control}
                             name="host"
                             onBlur={() => {
-                                setValue('genus', '');
+                                setValue('genus', []);
                             }}
                             placeholder="Host"
                             clearButton
                             options={props.hosts}
-                            labelKey={(host: HostSimple) =>
-                                host
-                                    ? pipe(
-                                          host.commonnames,
-                                          O.fold(
-                                              constant(host.name),
-                                              (cns) => `${host.name} ${cns.length > 1 ? `- ${cns.split(',')}` : ''}`,
-                                          ),
-                                      )
-                                    : ''
-                            }
+                            labelKey={(host: HostSimple) => {
+                                if (host) {
+                                    const aliases = host.aliases
+                                        .map((a) => a.name)
+                                        .sort()
+                                        .join(', ');
+                                    return aliases.length > 0 ? `${host.name} (${aliases})` : host.name;
+                                } else {
+                                    return '';
+                                }
+                            }}
                         />
                     </Col>
                     <Col xs={1} className="align-self-end">
                         - or -
                     </Col>
                     <Col>
-                        <label className="col-form-label">Genus:</label>
+                        <label className="col-form-label">Genus (Section):</label>
                         <ControlledTypeahead
                             control={control}
                             name="genus"
@@ -233,6 +245,16 @@ const IDGall = (props: Props): JSX.Element => {
                             placeholder="Genus"
                             clearButton
                             options={props.genera}
+                            labelKey={(tax: TaxonomyWithParent) => {
+                                if (tax) {
+                                    if (tax.type === SECTION) {
+                                        return `${tax.parent.name} (${tax.name})`;
+                                    }
+                                    return tax.name;
+                                } else {
+                                    return '';
+                                }
+                            }}
                         />
                     </Col>
                 </Row>
@@ -375,7 +397,7 @@ export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
             hosts: await mightFailWithArray<HostSimple>()(allHostsSimple()),
-            genera: await mightFailWithStringArray(allHostGenera()),
+            genera: await mightFailWithArray<TaxonomyWithParent>()(allHostGenera()),
             locations: await mightFailWithArray<GallLocation>()(locations()),
             colors: await mightFailWithArray<ColorApi>()(colors()),
             shapes: await mightFailWithArray<ShapeApi>()(shapes()),

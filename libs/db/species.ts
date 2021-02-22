@@ -6,7 +6,7 @@ import { AbundanceApi, SpeciesApi } from '../api/apitypes';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
-import { adaptTaxonomy } from './family';
+import { adaptTaxonomy } from './taxonomy';
 import { adaptImage } from './images';
 
 export const adaptAbundance = (a: abundance): AbundanceApi => ({
@@ -51,7 +51,7 @@ export const speciesByName = (name: string): TE.TaskEither<Error, O.Option<speci
 export const getSpecies = (
     whereClause: Prisma.speciesWhereInput[],
     operatorAnd = true,
-    distinct: Prisma.SpeciesScalarFieldEnum[] = [],
+    distinct: Prisma.SpeciesScalarFieldEnum[] | undefined = undefined,
 ): TE.TaskEither<Error, SpeciesApi[]> => {
     const w: Prisma.speciesWhereInput = operatorAnd ? { AND: whereClause } : { OR: whereClause };
 
@@ -90,8 +90,8 @@ export const getSpecies = (
 
     // eslint-disable-next-line prettier/prettier
     const cleaned = pipe(
-        TE.tryCatch(allSpecies, handleError), 
-        TE.map(clean)
+        TE.tryCatch(allSpecies, handleError),
+        TE.map(clean),
     );
 
     return cleaned;

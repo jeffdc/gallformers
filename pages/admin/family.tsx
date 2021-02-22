@@ -13,7 +13,7 @@ import ControlledTypeahead from '../../components/controlledtypeahead';
 import { AdminFormFields, useAPIs } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { ALL_FAMILY_TYPES, DeleteResult, TaxonomyApi, TaxonomyUpsertFields } from '../../libs/api/apitypes';
-import { allFamilies } from '../../libs/db/family';
+import { allFamilies } from '../../libs/db/taxonomy';
 import { genOptions } from '../../libs/utils/forms';
 import { mightFailWithArray } from '../../libs/utils/util';
 import { ParsedUrlQuery } from 'querystring';
@@ -59,6 +59,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
                     setValue('value', [fam]);
                     setValue('description', fam.description);
                 } catch (e) {
+                    setError(e);
                     console.error(e);
                 }
             }
@@ -86,6 +87,8 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         const convertFormFieldsToUpsert = (fields: FormFields, name: string, id: number): TaxonomyUpsertFields => ({
             ...fields,
             name: name,
+            type: 'family',
+            id: typeof fields.value[0].id === 'number' ? fields.value[0].id : parseInt(fields.value[0].id),
         });
 
         await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert)

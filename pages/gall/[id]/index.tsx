@@ -11,16 +11,18 @@ import { Button, Col, Container, ListGroup, Row } from 'react-bootstrap';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import InfoTip from '../../../components/infotip';
-import { DetachableBoth, GallApi, GallHost, SourceApi, SpeciesSourceApi } from '../../../libs/api/apitypes';
+import { DetachableBoth, GallApi, GallHost, SourceApi, SpeciesSourceApi, TaxTreeForSpecies } from '../../../libs/api/apitypes';
 import { allGallIds, gallById } from '../../../libs/db/gall';
+import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkTextFromGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { defaultSource, renderCommonNames } from '../../../libs/pages/renderhelpers';
+import { defaultSource } from '../../../libs/pages/renderhelpers';
 import { deserialize, serialize } from '../../../libs/utils/reactserialize';
 import { bugguideUrl, errorThrow, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
     species: GallApi;
+    taxonomy: TaxTreeForSpecies;
 };
 
 type SortPropertyOption = {
@@ -55,7 +57,7 @@ const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
     );
 };
 
-const Gall = ({ species }: Props): JSX.Element => {
+const Gall = ({ species, taxonomy }: Props): JSX.Element => {
     const [selectedSource, setSelectedSource] = useState(defaultSource(species?.speciessource));
     const [sourceList, setSourceList] = useState({ data: species?.speciessource, sortIndex: 0, sortOrder: -1 });
 
@@ -64,6 +66,8 @@ const Gall = ({ species }: Props): JSX.Element => {
     if (router.isFallback) {
         return <div>Loading...</div>;
     }
+
+    const family = taxonomy.taxonomy.parent != null ? taxonomy.taxonomy.parent : { id: -1, name: '' };
 
     // Initially sort the list of sources by most recent year.
     species.speciessource.sort((a, b) => -a.source.pubyear.localeCompare(b.source.pubyear));
@@ -116,11 +120,11 @@ const Gall = ({ species }: Props): JSX.Element => {
                             <Edit id={species.id} type="gall" />
                             <Col>
                                 <h2>{species.name}</h2>
-                                {renderCommonNames(species.commonnames)}
+                                {species.aliases.map((a) => a.name).join(', ')}
                                 <p className="font-italic">
                                     <strong>Family:</strong>
-                                    <Link key={species.family.id} href={`/family/${species.family.id}`}>
-                                        <a> {species.family.name}</a>
+                                    <Link key={family.id} href={`/family/${family.id}`}>
+                                        <a> {family.name}</a>
                                     </Link>
                                 </p>
                             </Col>
@@ -271,9 +275,12 @@ export const getStaticProps: GetStaticProps = async (context) => {
         TE.getOrElse(errorThrow),
     )();
 
+    const taxonomy = await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy');
+
     return {
         props: {
             species: { ...gall, speciessource: sources },
+            taxonomy: taxonomy,
         },
         revalidate: 1,
     };

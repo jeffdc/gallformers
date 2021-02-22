@@ -49,6 +49,7 @@
     "react-dom": "^16.14",
     "react-hook-form": "^6.10.1",
     "react-modal": "^3.12.1",
+    "react-simple-tree-menu": "^1.1.18",
     "swr": "^0.3.5",
     "yup": "^0.29.3"
   },

@@ -5,7 +5,7 @@ import * as O from 'fp-ts/lib/Option';
 import { Option } from 'fp-ts/lib/Option';
 import { ParsedUrlQuery } from 'querystring';
 import * as t from 'io-ts';
-import { gallspecies, species, speciestaxonomy, taxonomy, taxonomyalias, taxonomytaxonomy } from '@prisma/client';
+import { alias, gallspecies, species, speciestaxonomy, taxonomy, taxonomyalias, taxonomytaxonomy } from '@prisma/client';
 
 export const GallTaxon = 'gall';
 export const HostTaxon = 'plant';
@@ -143,9 +143,42 @@ export type FamilyGeneraSpecies = taxonomy & {
     })[];
 };
 
+export type TaxonomyWithParent = taxonomy & {
+    parent: taxonomy;
+};
+
+export type TaxTreeForSpecies = speciestaxonomy & {
+    taxonomy: taxonomy & {
+        parent: taxonomy | null;
+        taxonomy: taxonomy[];
+        taxonomytaxonomy: (taxonomytaxonomy & {
+            taxonomy: taxonomy;
+            child: taxonomy;
+        })[];
+    };
+};
+
+export type TaxonomyTree = taxonomy & {
+    parent: taxonomy | null;
+    speciestaxonomy: (speciestaxonomy & {
+        species: species;
+    })[];
+    taxonomy: (taxonomy & {
+        speciestaxonomy: (speciestaxonomy & {
+            species: species;
+        })[];
+        taxonomy: taxonomy[];
+        taxonomyalias: taxonomyalias[];
+        taxonomytaxonomy: taxonomytaxonomy[];
+    })[];
+    taxonomyalias: taxonomyalias[];
+};
+
 export type TaxonomyUpsertFields = {
+    id: number;
     name: string;
     description: string;
+    type: TaxonomyType;
 };
 
 export type SpeciesUpsertFields = {
@@ -232,9 +265,16 @@ export type SpeciesApi = SimpleSpecies & {
     datacomplete: boolean;
     abundance: Option<AbundanceApi>;
     description: Option<string>; // to make the caller's life easier we will load the default if we can
-    taxonomy: TaxonomyApi[];
     speciessource: SpeciesSourceApi[];
     images: ImageApi[];
+    aliases: AliasApi[];
+};
+
+export type AliasApi = {
+    id: number;
+    name: string;
+    type: string;
+    description: string;
 };
 
 export type DetachableApi = {
@@ -362,6 +402,7 @@ export type GallApi = SpeciesApi & {
 export type HostSimple = {
     id: number;
     name: string;
+    aliases: alias[];
 };
 
 export type GallSimple = {

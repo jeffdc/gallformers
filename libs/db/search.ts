@@ -41,7 +41,10 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
 
     const mergeSpeciesAndAliases = (s: species[]) => (a: ExtractTFromPromise<ReturnType<typeof aliasSearch>>): species[] => {
         const other = a.map((aa) => aa.aliasspecies.map((as) => as.species)).flat();
-        return [...new Set<species>([...s, ...other])].sort((a, b) => a.name.localeCompare(b.name));
+        other.forEach((o) => {
+            if (!s.find((s) => s.id === o.id)) s.push(o);
+        });
+        return s.sort((a, b) => a.name.localeCompare(b.name));
     };
 
     const sourceSearch = () =>

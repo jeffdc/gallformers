@@ -5,19 +5,6 @@ import { ImageSize } from '../images/images';
 import { truncateAtWord } from '../utils/util';
 
 /**
- * Simple helper to render the commonnames in the UI.
- * @param commonnames
- */
-export const renderCommonNames = (commonnames: O.Option<string>): string => {
-    // eslint-disable-next-line prettier/prettier
-    return pipe(
-        commonnames,
-        O.map((c) => (c.length === 0 ? '' : `(${c})`)),
-        O.getOrElse(constant('')),
-    );
-};
-
-/**
  * Renders the given string input with line breaks for any embedded new lines.
  * @param p
  */
