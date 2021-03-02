@@ -16,3 +16,7 @@
 .carousel-control-prev {
     filter: invert(100%);
 }
+
+.white-space-pre-wrap {
+    white-space: pre-wrap;
+}
