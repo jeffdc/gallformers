@@ -1,9 +1,10 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import * as O from 'fp-ts/lib/Option';
 import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { ParsedUrlQuery } from 'querystring';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
@@ -12,12 +13,11 @@ import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import { AdminFormFields, useAPIs } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { ALL_FAMILY_TYPES, DeleteResult } from '../../libs/api/apitypes';
-import { allFamilies } from '../../libs/db/taxonomy';
-import { genOptions } from '../../libs/utils/forms';
-import { mightFailWithArray } from '../../libs/utils/util';
-import { ParsedUrlQuery } from 'querystring';
+import { DeleteResult, SimpleSpecies } from '../../libs/api/apitypes';
 import { TaxonomyEntry, TaxonomyUpsertFields } from '../../libs/api/taxonomy';
+import { allSpeciesSimple } from '../../libs/db/species';
+import { allSections, getAllSpeciesForSection } from '../../libs/db/taxonomy';
+import { mightFailWithArray } from '../../libs/utils/util';
 
 const Schema = yup.object().shape({
     value: yup.mixed().required(),
@@ -26,14 +26,16 @@ const Schema = yup.object().shape({
 
 type Props = {
     id: string;
-    fs: TaxonomyEntry[];
+    sectSpecies: SimpleSpecies[];
+    sections: TaxonomyEntry[];
+    species: SimpleSpecies[];
 };
 
 type FormFields = AdminFormFields<TaxonomyEntry> & Omit<TaxonomyEntry, 'id' | 'name'>;
 
-const Family = ({ id, fs }: Props): JSX.Element => {
-    if (!fs) throw new Error(`The input props for families can not be null or undefined.`);
-    const [families, setFamilies] = useState(fs);
+const Section = ({ id, sectSpecies, sections, species }: Props): JSX.Element => {
+    if (!sections) throw new Error(`The input props for families can not be null or undefined.`);
+    const [secs, setSecs] = useState(sections);
     const [error, setError] = useState('');
     const [existingId, setExistingId] = useState<number | undefined>(id && id !== '' ? parseInt(id) : undefined);
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
@@ -45,7 +47,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
 
     const router = useRouter();
 
-    const onFamilyChange = useCallback(
+    const onSectionChange = useCallback(
         (id: number | undefined) => {
             if (id == undefined) {
                 reset({
@@ -54,13 +56,14 @@ const Family = ({ id, fs }: Props): JSX.Element => {
                 });
             } else {
                 try {
-                    const fam = families.find((f) => f.id === id);
-                    if (fam == undefined) {
-                        throw new Error(`Somehow we have a family selection that does not exist?! familyid: ${id}`);
+                    const sec = secs.find((f) => f.id === id);
+                    if (sec == undefined) {
+                        throw new Error(`Somehow we have a section selection that does not exist?! sectionid: ${id}`);
                     }
                     reset({
-                        value: [fam],
-                        description: fam.description,
+                        value: [sec],
+                        species: sectSpecies,
+                        description: sec.description,
                     });
                 } catch (e) {
                     setError(e);
@@ -68,18 +71,18 @@ const Family = ({ id, fs }: Props): JSX.Element => {
                 }
             }
         },
-        [families, reset],
+        [secs, reset],
     );
 
     useEffect(() => {
-        onFamilyChange(existingId);
-    }, [existingId, onFamilyChange]);
+        onSectionChange(existingId);
+    }, [existingId, onSectionChange]);
 
-    const { doDeleteOrUpsert } = useAPIs<TaxonomyEntry, TaxonomyUpsertFields>('name', '../api/family/', '../api/family/upsert');
+    const { doDeleteOrUpsert } = useAPIs<TaxonomyEntry, TaxonomyUpsertFields>('name', '../api/section/', '../api/section/upsert');
 
     const onSubmit = async (data: FormFields) => {
         const postDelete = (id: number | string, result: DeleteResult) => {
-            setFamilies(families.filter((s) => s.id !== id));
+            setSecs(secs.filter((s) => s.id !== id));
             setDeleteResults(result);
         };
 
@@ -91,7 +94,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         const convertFormFieldsToUpsert = (fields: FormFields, name: string, id: number): TaxonomyUpsertFields => ({
             ...fields,
             name: name,
-            type: 'family',
+            type: 'section',
             id: typeof fields.value[0].id === 'number' ? fields.value[0].id : parseInt(fields.value[0].id),
         });
 
@@ -104,7 +107,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         <Auth>
             <>
                 <Head>
-                    <title>Add/Edit Families</title>
+                    <title>Add/Edit Sections</title>
                 </Head>
 
                 {error.length > 0 && (
@@ -115,7 +118,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
                 )}
 
                 <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
-                    <h4>Add or Edit a Family</h4>
+                    <h4>Add or Edit a Section</h4>
                     <Row className="form-group">
                         <Col>
                             Name:
@@ -123,11 +126,11 @@ const Family = ({ id, fs }: Props): JSX.Element => {
                                 control={control}
                                 name="value"
                                 placeholder="Name"
-                                options={families}
+                                options={secs}
                                 labelKey="name"
                                 clearButton
                                 isInvalid={!!errors.value}
-                                newSelectionPrefix="Add a new Family: "
+                                newSelectionPrefix="Add a new Section: "
                                 allowNew={true}
                                 onChangeWithNew={(e, isNew) => {
                                     if (isNew || !e[0]) {
@@ -145,22 +148,27 @@ const Family = ({ id, fs }: Props): JSX.Element => {
                     <Row className="form-group">
                         <Col>
                             Description:
-                            <select name="description" className="form-control" ref={register}>
-                                {genOptions(ALL_FAMILY_TYPES)}
-                            </select>
-                            {errors.description && <span className="text-danger">You must provide the description.</span>}
+                            <textarea name="description" className="form-control" ref={register} rows={1} />
+                        </Col>
+                    </Row>
+                    <Row className="form-group">
+                        <Col>
+                            Species:
+                            <ControlledTypeahead
+                                control={control}
+                                name="species"
+                                placeholder="Mapped Species"
+                                options={species}
+                                labelKey="name"
+                                clearButton
+                                multiple
+                            />
                         </Col>
                     </Row>
                     <Row className="fromGroup" hidden={!existingId}>
                         <Col xs="1">Delete?:</Col>
                         <Col className="mr-auto">
                             <input name="del" type="checkbox" className="form-check-input" ref={register} />
-                        </Col>
-                        <Col xs="8">
-                            <em className="text-danger">
-                                Caution. If there are any species (galls or hosts) assigned to this Family they too will be
-                                deleted.
-                            </em>
                         </Col>
                     </Row>
                     <Row className="form-input">
@@ -188,8 +196,10 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     return {
         props: {
             id: id,
-            fs: await mightFailWithArray<TaxonomyEntry>()(allFamilies()),
+            sectSpecies: await mightFailWithArray<SimpleSpecies>()(getAllSpeciesForSection(parseInt(id))),
+            sections: await mightFailWithArray<TaxonomyEntry>()(allSections()),
+            species: await mightFailWithArray<SimpleSpecies>()(allSpeciesSimple()),
         },
     };
 };
-export default Family;
+export default Section;

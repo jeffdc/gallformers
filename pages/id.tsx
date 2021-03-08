@@ -1,4 +1,5 @@
 import { yupResolver } from '@hookform/resolvers/yup';
+import { taxonomy } from '@prisma/client';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -204,7 +205,7 @@ const IDGall = (props: Props): JSX.Element => {
             <Head>
                 <title>ID Galls</title>
             </Head>
-            {JSON.stringify(errors)}
+
             <form onSubmit={handleSubmit(onSubmit)} className="fixed-left mt-2 ml-4 mr-2 form-group">
                 <Row>
                     <Col>
@@ -397,7 +398,7 @@ export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
             hosts: await mightFailWithArray<HostSimple>()(allHostsSimple()),
-            genera: await mightFailWithArray<TaxonomyWithParent>()(allHostGenera()),
+            genera: await mightFailWithArray<taxonomy>()(allHostGenera()),
             locations: await mightFailWithArray<GallLocation>()(locations()),
             colors: await mightFailWithArray<ColorApi>()(colors()),
             shapes: await mightFailWithArray<ShapeApi>()(shapes()),

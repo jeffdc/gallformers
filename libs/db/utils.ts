@@ -19,7 +19,8 @@ export type ConnectTypes =
     | Prisma.gallcolorCreateWithoutGallInput
     | Prisma.gallcellsCreateWithoutGallInput
     | Prisma.gallwallsCreateWithoutGallInput
-    | Prisma.gallshapeCreateWithoutGallInput;
+    | Prisma.gallshapeCreateWithoutGallInput
+    | Prisma.aliasspeciesCreateWithoutSpeciesInput;
 
 export function connectIfNotNull<T extends ConnectTypes, V>(fieldName: string, value: V | undefined | null): T {
     if (value || (Array.isArray(value) && value.length > 0)) {
@@ -29,7 +30,17 @@ export function connectIfNotNull<T extends ConnectTypes, V>(fieldName: string, v
     }
 }
 
-export type InsertFieldName = 'id' | 'location' | 'texture' | 'hostspecies' | 'alignment' | 'color' | 'cells' | 'walls' | 'shape';
+export type InsertFieldName =
+    | 'id'
+    | 'location'
+    | 'texture'
+    | 'hostspecies'
+    | 'alignment'
+    | 'color'
+    | 'cells'
+    | 'walls'
+    | 'shape'
+    | 'alias';
 
 export function connectWithIds<T extends ConnectTypes>(fieldName: InsertFieldName, ids: readonly number[]): T[] {
     const key = fieldName as keyof T;

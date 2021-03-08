@@ -1,11 +1,12 @@
 /**
- * Types for calling the APIs. These are to be used by browser code when it calls the APIs.
+ * Types for calling the APIs. These are to be used by browser code when it calls the APIs so all database stuff
+ * must stay out of here.
  */
+import { alias } from '@prisma/client';
 import * as O from 'fp-ts/lib/Option';
 import { Option } from 'fp-ts/lib/Option';
 import { ParsedUrlQuery } from 'querystring';
-import * as t from 'io-ts';
-import { alias, gallspecies, species, speciestaxonomy, taxonomy, taxonomyalias, taxonomytaxonomy } from '@prisma/client';
+import { FGS, TaxonomyEntry } from './taxonomy';
 
 export const GallTaxon = 'gall';
 export const HostTaxon = 'plant';
@@ -104,90 +105,13 @@ export type FamilyGallType = FamilyGallTypesTuples[number];
 export type FamilyHostTypesTuple = typeof HOST_FAMILY_TYPES;
 export type FamilyHostType = FamilyHostTypesTuple[number];
 
-export const TaxonomyTypeT = t.keyof({
-    family: null,
-    section: null,
-    genus: null,
-});
-export type TaxonomyType = t.TypeOf<typeof TaxonomyTypeT>;
-export const FAMILY: TaxonomyType = 'family';
-export const SECTION: TaxonomyType = 'section';
-export const GENUS: TaxonomyType = 'genus';
-export const invalidTaxonomyType = (e: t.Errors): TaxonomyType => {
-    throw new Error(`Got an invalid taxonomy type: '${e}'.`);
-};
-
-export type TaxonomyTaxonomyApi = {
-    id: number;
-    parent_id: number;
-    child_id: number;
-};
-
-export type TaxonomyApi = {
-    id: number;
-    name: string;
-    description: string;
-    type: TaxonomyType;
-    parent?: TaxonomyApi;
-    children: TaxonomyApi[];
-};
-export const EmptyFamily: TaxonomyApi = { id: -1, name: '', description: '', type: 'family', parent: undefined, children: [] };
-
-export type FamilyGeneraSpecies = taxonomy & {
-    taxonomytaxonomy: (taxonomytaxonomy & {
-        child: taxonomy & {
-            speciestaxonomy: (speciestaxonomy & {
-                species: species;
-            })[];
-        };
-    })[];
-};
-
-export type TaxonomyWithParent = taxonomy & {
-    parent: taxonomy;
-};
-
-export type TaxTreeForSpecies = speciestaxonomy & {
-    taxonomy: taxonomy & {
-        parent: taxonomy | null;
-        taxonomy: taxonomy[];
-        taxonomytaxonomy: (taxonomytaxonomy & {
-            taxonomy: taxonomy;
-            child: taxonomy;
-        })[];
-    };
-};
-
-export type TaxonomyTree = taxonomy & {
-    parent: taxonomy | null;
-    speciestaxonomy: (speciestaxonomy & {
-        species: species;
-    })[];
-    taxonomy: (taxonomy & {
-        speciestaxonomy: (speciestaxonomy & {
-            species: species;
-        })[];
-        taxonomy: taxonomy[];
-        taxonomyalias: taxonomyalias[];
-        taxonomytaxonomy: taxonomytaxonomy[];
-    })[];
-    taxonomyalias: taxonomyalias[];
-};
-
-export type TaxonomyUpsertFields = {
-    id: number;
-    name: string;
-    description: string;
-    type: TaxonomyType;
-};
-
 export type SpeciesUpsertFields = {
     id: number;
     name: string;
-    commonnames: string;
-    synonyms: string;
-    family: string;
+    datacomplete: boolean;
+    aliases: AliasApi[];
     abundance: string;
+    fgs: FGS;
 };
 
 export type GallUpsertFields = SpeciesUpsertFields & {
@@ -275,6 +199,13 @@ export type AliasApi = {
     name: string;
     type: string;
     description: string;
+};
+
+export const EmptyAlias: AliasApi = {
+    id: -1,
+    name: '',
+    type: 'common',
+    description: '',
 };
 
 export type DetachableApi = {
@@ -440,6 +371,13 @@ export type DeleteResult = {
     type: string;
     name: string;
     count: number;
+};
+
+export type UpsertResult = {
+    type: string;
+    name: string;
+    count: number;
+    id: number | undefined;
 };
 
 export type GlossaryEntryUpsertFields = Deletable & {

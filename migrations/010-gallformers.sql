@@ -1,5 +1,5 @@
 -- Up
-
+BEGIN TRANSACTION;
 PRAGMA foreign_keys=OFF;
 
 -- major schema changes to handle the following:
@@ -19,11 +19,12 @@ CREATE TABLE alias (
 );
 
 CREATE TABLE aliasspecies (
-    id          INTEGER PRIMARY KEY NOT NULL,
     species_id  INTEGER,
     alias_id    INTEGER,
     FOREIGN KEY (species_id) REFERENCES species (id) ON DELETE CASCADE,
-    FOREIGN KEY (alias_id) REFERENCES alias (id) ON DELETE CASCADE
+    FOREIGN KEY (alias_id) REFERENCES alias (id) ON DELETE CASCADE,
+    PRIMARY KEY(species_id, alias_id)
+
 );
 
 -- table mods for alias support
@@ -95,7 +96,6 @@ INSERT INTO alias (
 
 -- now add the relationships between the commonnames (now as aliases) and the species
 INSERT INTO aliasspecies (
-                             id,
                              species_id,
                              alias_id
                          )
@@ -118,8 +118,7 @@ INSERT INTO aliasspecies (
                                FROM split
                               WHERE rest <> ''
                          )
-                         SELECT NULL,
-                                species_id,
+                         SELECT species_id,
                                 alias.id as alias_id
                            FROM split
                            INNER JOIN alias ON alias.name = TRIM(split.name)
@@ -163,7 +162,6 @@ INSERT INTO alias (
 
 -- now add the relationships between the synonyms (now as aliases) and the species
 INSERT INTO aliasspecies (
-                             id,
                              species_id,
                              alias_id
                          )
@@ -186,8 +184,7 @@ INSERT INTO aliasspecies (
                                FROM split
                               WHERE rest <> ''
                          )
-                         SELECT NULL,
-                                species_id,
+                         SELECT species_id,
                                 alias.id as alias_id
                            FROM split
                            INNER JOIN alias ON alias.name = TRIM(split.name)
@@ -216,40 +213,26 @@ DROP TABLE family;
 
 -- add new tables for taxonomy
 CREATE TABLE taxonomyalias (
-    id          INTEGER PRIMARY KEY
-                        NOT NULL,
     taxonomy_id  INTEGER,
     alias_id    INTEGER,
     FOREIGN KEY (taxonomy_id) REFERENCES taxonomy (id) ON DELETE CASCADE,
-    FOREIGN KEY (alias_id) REFERENCES alias (id) ON DELETE CASCADE
+    FOREIGN KEY (alias_id) REFERENCES alias (id) ON DELETE CASCADE,
+    PRIMARY KEY(taxonomy_id, alias_id)
 );
 
 CREATE TABLE speciestaxonomy (
-    id           INTEGER PRIMARY KEY
-                         NOT NULL,
     species_id   INTEGER NOT NULL,
     taxonomy_id  INTEGER NOT NULL,
-    FOREIGN KEY (
-        species_id
-    )
-    REFERENCES species (id) ON DELETE CASCADE,
-    FOREIGN KEY (
-        taxonomy_id
-    )
-    REFERENCES taxonomy (id) ON DELETE CASCADE
+    FOREIGN KEY (species_id) REFERENCES species (id) ON DELETE CASCADE,
+    FOREIGN KEY (taxonomy_id) REFERENCES taxonomy (id) ON DELETE CASCADE,
+    PRIMARY KEY(species_id, taxonomy_id)
 );
 
 CREATE TABLE taxonomytaxonomy (
     taxonomy_id  INTEGER NOT NULL,
     child_id  INTEGER NOT NULL,
-    FOREIGN KEY (
-        taxonomy_id
-    )
-    REFERENCES taxonomy (id) ON DELETE CASCADE
-    FOREIGN KEY (
-        child_id
-    )
-    REFERENCES taxonomy (id) ON DELETE CASCADE,
+    FOREIGN KEY (taxonomy_id) REFERENCES taxonomy (id) ON DELETE CASCADE,
+    FOREIGN KEY (child_id) REFERENCES taxonomy (id) ON DELETE CASCADE,
     PRIMARY KEY(taxonomy_id, child_id)
 );
 
@@ -258,8 +241,8 @@ CREATE TABLE taxonomytaxonomy (
 INSERT INTO taxonomy (id, name, type, parent_id)
     SELECT DISTINCT NULL, genus, 'genus', family_id FROM species;
 -- 2) map to species
-INSERT INTO speciestaxonomy (id, species_id, taxonomy_id)
-    SELECT NULL, species.id, taxonomy.id 
+INSERT INTO speciestaxonomy (species_id, taxonomy_id)
+    SELECT species.id, taxonomy.id 
     FROM species 
     INNER JOIN taxonomy ON taxonomy.name = species.genus;
 
@@ -280,17 +263,16 @@ INSERT INTO alias (id, name, type)
     FROM taxonomy 
     WHERE name = 'Quercus' AND taxonomy.type='section';
 
-INSERT INTO taxonomyalias (id, taxonomy_id, alias_id)
-    SELECT NULL, 
-           (SELECT id from taxonomy WHERE name = 'Quercus' and type='section'),
+INSERT INTO taxonomyalias (taxonomy_id, alias_id)
+    SELECT (SELECT id from taxonomy WHERE name = 'Quercus' and type='section'),
            (SELECT id from alias WHERE name = 'White Oaks');
 
-INSERT INTO speciestaxonomy (id, species_id, taxonomy_id) 
+INSERT INTO speciestaxonomy (species_id, taxonomy_id) 
     WITH species_list(spid) AS
         (VALUES (296),(297),(298),(299),(300),(302),(306),(310),(313),(322),(326),
                 (327),(329),(331),(332),(333),(336),(340),(341),(343),(344),(345),
                 (348),(349),(352)
-        ) SELECT NULL, spid, taxid
+        ) SELECT spid, taxid
         FROM species_list
         CROSS JOIN (SELECT id as taxid FROM taxonomy WHERE name = 'Quercus' AND type = 'section');
 
@@ -300,17 +282,16 @@ INSERT INTO taxonomy (id, name, type, parent_id)
 INSERT INTO alias (id, name, type) 
     SELECT id, 'Red Oaks', 'common' FROM taxonomy WHERE name = 'Lobatae' AND type ='section';
 
-INSERT INTO taxonomyalias (id, taxonomy_id, alias_id)
-    SELECT NULL, 
-           (SELECT id from taxonomy WHERE name = 'Lobatae' and type='section'),
+INSERT INTO taxonomyalias (taxonomy_id, alias_id)
+    SELECT (SELECT id from taxonomy WHERE name = 'Lobatae' and type='section'),
            (SELECT id from alias WHERE name = 'Red Oaks');
 
-INSERT INTO speciestaxonomy (id, species_id, taxonomy_id) 
+INSERT INTO speciestaxonomy (species_id, taxonomy_id) 
     WITH species_list(spid) AS
         (VALUES (295),(305),(307),(308),(314),(315),(317),(319),(320),(323),(324),
                 (325),(330),(334),(335),(337),(338),(339),(343),(346),(347),(351),
                 (355),(357)
-        ) SELECT NULL, spid, taxid
+        ) SELECT spid, taxid
         FROM species_list
         CROSS JOIN (SELECT id as taxid FROM taxonomy WHERE name = 'Lobatae' AND type = 'section');
 
@@ -321,15 +302,14 @@ INSERT INTO taxonomy (id, name, type, parent_id)
 INSERT INTO alias (id, name, type) 
     SELECT id, 'Live Oaks', 'common' FROM taxonomy WHERE name = 'Virentes' AND type = 'section';
 
-INSERT INTO taxonomyalias (id, taxonomy_id, alias_id)
-    SELECT NULL, 
-           (SELECT id from taxonomy WHERE name = 'Virentes' and type='section'),
+INSERT INTO taxonomyalias (taxonomy_id, alias_id)
+    SELECT (SELECT id from taxonomy WHERE name = 'Virentes' and type='section'),
            (SELECT id from alias WHERE name = 'Live Oaks');
 
-INSERT INTO speciestaxonomy (id, species_id, taxonomy_id) 
+INSERT INTO speciestaxonomy (species_id, taxonomy_id) 
     WITH species_list(spid) AS
         (VALUES (309),(311),(356))
-        SELECT NULL, spid, taxid
+        SELECT spid, taxid
         FROM species_list
         CROSS JOIN (SELECT id as taxid FROM taxonomy WHERE name = 'Virentes' AND type = 'section');
 
@@ -337,17 +317,16 @@ INSERT INTO speciestaxonomy (id, species_id, taxonomy_id)
 -- Changes for many galls to species
 -- new table
 CREATE TABLE gallspecies (
-    id         INTEGER PRIMARY KEY
-                       NOT NULL,
     species_id INTEGER,
     gall_id    INTEGER,
     FOREIGN KEY (species_id) REFERENCES species (id) ON DELETE CASCADE,
-    FOREIGN KEY (gall_id) REFERENCES gall (id) ON DELETE CASCADE
+    FOREIGN KEY (gall_id) REFERENCES gall (id) ON DELETE CASCADE,
+    PRIMARY KEY(species_id, gall_id)
 );
 
 -- migrate exisiting 1-1 species-gall mappings into new structure
-INSERT INTO gallspecies (id, species_id, gall_id)
-    SELECT NULL, species_id, id FROM gall;
+INSERT INTO gallspecies (species_id, gall_id)
+    SELECT species_id, id FROM gall;
 
 -- Now modify old tables:
 -- update gall table to remove species_id
@@ -398,7 +377,7 @@ ALTER TABLE species__ RENAME TO species;
 
 
 PRAGMA foreign_keys=ON;
-
+COMMIT;
 
 -- Down
 PRAGMA foreign_keys=OFF;

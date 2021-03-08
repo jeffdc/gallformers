@@ -5,7 +5,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { MouseEvent, useState } from 'react';
-import { Col, Container, ListGroup, Row } from 'react-bootstrap';
+import { Button, Col, Container, ListGroup, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import { GallSimple, HostApi, SECTION, TaxTreeForSpecies } from '../../../libs/api/apitypes';
@@ -65,11 +65,32 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
 
             <Container className="p-1">
                 <Row>
+                    {/* The details column */}
                     <Col>
                         <Row>
-                            <Edit id={host.id} type="host" />
-                            <Col>
+                            <Col className="">
                                 <h2>{host.name}</h2>
+                            </Col>
+                            <Col xs={2} className="mr-1">
+                                <span className="p-0 pr-1 my-auto">
+                                    <Edit id={host.id} type="host" />
+                                    <OverlayTrigger
+                                        placement="right"
+                                        overlay={
+                                            <Tooltip id="datacomplete">
+                                                {host.datacomplete
+                                                    ? 'The data for this species is as complete as we can make it.'
+                                                    : 'We are still working on this species so data is missing.'}
+                                            </Tooltip>
+                                        }
+                                    >
+                                        <Button variant="outline-light">{host.datacomplete ? '💯' : '❓'}</Button>
+                                    </OverlayTrigger>
+                                </span>
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col>
                                 {host.aliases.map((a) => a.name).join(', ')}
                                 <p className="font-italic">
                                     <strong>Family:</strong>

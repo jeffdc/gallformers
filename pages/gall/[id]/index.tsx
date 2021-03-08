@@ -7,7 +7,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { MouseEvent, useState } from 'react';
-import { Button, Col, Container, ListGroup, Row } from 'react-bootstrap';
+import { Button, Col, Container, ListGroup, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import InfoTip from '../../../components/infotip';
@@ -115,11 +115,32 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
             </Head>
             <Container className="p-1">
                 <Row>
+                    {/* The Details Column */}
                     <Col>
-                        <Row className="">
-                            <Edit id={species.id} type="gall" />
-                            <Col>
+                        <Row>
+                            <Col className="">
                                 <h2>{species.name}</h2>
+                            </Col>
+                            <Col xs={2}>
+                                <span className="p-0 pr-1 my-auto">
+                                    <Edit id={species.id} type="gall" />
+                                    <OverlayTrigger
+                                        placement="right"
+                                        overlay={
+                                            <Tooltip id="datacomplete">
+                                                {species.datacomplete
+                                                    ? 'The data for this species is as complete as we can make it.'
+                                                    : 'We are still working on this species so data is missing.'}
+                                            </Tooltip>
+                                        }
+                                    >
+                                        <Button variant="outline-light">{species.datacomplete ? '💯' : '❓'}</Button>
+                                    </OverlayTrigger>
+                                </span>
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col>
                                 {species.aliases.map((a) => a.name).join(', ')}
                                 <p className="font-italic">
                                     <strong>Family:</strong>
@@ -129,10 +150,10 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
                                 </p>
                             </Col>
                         </Row>
-                        <Row>
+                        <Row className="">
                             <Col>
-                                <Edit id={species.id} type="gallhost" />
                                 <strong>Hosts:</strong> {species.hosts.map(hostLinker)}
+                                <Edit id={species.id} type="gallhost" />
                             </Col>
                         </Row>
                         <Row>

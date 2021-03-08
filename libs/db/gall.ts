@@ -15,11 +15,10 @@ import {
     GallTaxon,
     GallTexture,
     GallUpsertFields,
-    GENUS,
-    SECTION,
     ShapeApi,
     WallsApi,
 } from '../api/apitypes';
+import { GENUS, SECTION } from '../api/taxonomy';
 import { deleteImagesBySpeciesId } from '../images/images';
 import { defaultSource } from '../pages/renderhelpers';
 import { logger } from '../utils/logger';

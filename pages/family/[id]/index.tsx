@@ -2,18 +2,23 @@ import { taxonomy } from '@prisma/client';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import ErrorPage from 'next/error';
 import React from 'react';
-import { Card, Col, Container, Row } from 'react-bootstrap';
+import { Card } from 'react-bootstrap';
 import TreeMenu, { Item, TreeNodeInArray } from 'react-simple-tree-menu';
 import 'react-simple-tree-menu/dist/main.css';
 import Edit from '../../../components/edit';
 import { GallTaxon } from '../../../libs/api/apitypes';
-import { allFamilyIds, taxonomyById, taxonomyForId } from '../../../libs/db/taxonomy';
+import { TaxonomyEntry, TaxonomyTree } from '../../../libs/api/taxonomy';
+import { allFamilyIds, taxonomyEntryById, taxonomyTreeForId } from '../../../libs/db/taxonomy';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { hasProp } from '../../../libs/utils/util';
+import { handleError, hasProp } from '../../../libs/utils/util';
+import * as O from 'fp-ts/lib/Option';
+import * as T from 'fp-ts/lib/Task';
+import { constant, pipe } from 'fp-ts/lib/function';
 
 type Props = {
-    family: taxonomy;
+    family: O.Option<TaxonomyEntry>;
     tree: TreeNodeInArray[];
 };
 
@@ -23,6 +28,11 @@ const Family = ({ family, tree }: Props): JSX.Element => {
     if (router.isFallback) {
         return <div>Loading...</div>;
     }
+
+    if (O.isNone(family)) {
+        return <ErrorPage statusCode={404} />;
+    }
+    const fam = pipe(family, O.getOrElse(constant({} as TaxonomyEntry)));
 
     const handleClick = (item: Item) => {
         console.log(JSON.stringify(item, null, ' '));
@@ -39,32 +49,29 @@ const Family = ({ family, tree }: Props): JSX.Element => {
             }}
         >
             <Head>
-                <title>{family.name}</title>
+                <title>{fam.name}</title>
             </Head>
 
             <Card className="ml-3">
                 <Card.Header>
-                    <Edit id={family.id} type="family" />
+                    <Edit id={fam.id} type="family" />
                     <h1>
-                        {family.name} - {family.description}
+                        {fam.name} - {fam.description}
                     </h1>
                 </Card.Header>
                 <Card.Body>
-                    <TreeMenu data={tree} onClickItem={handleClick} initialOpenNodes={[family.id.toString()]} />
+                    <TreeMenu data={tree} onClickItem={handleClick} initialOpenNodes={[fam.id.toString()]} />
                 </Card.Body>
             </Card>
         </div>
     );
 };
 
-// Use static so that this stuff can be built once on the server-side and then cached.
-export const getStaticProps: GetStaticProps = async (context) => {
-    const family = getStaticPropsWithContext(context, taxonomyById, 'family');
-    const taxonomy = await getStaticPropsWithContext(context, taxonomyForId, 'species', false, true);
-    const tree: TreeNodeInArray[] = taxonomy.map((t) => ({
-        key: t.id.toString(),
-        label: t.name,
-        nodes: t.taxonomy
+const toTreeNodeInArray = (tree: TaxonomyTree): TreeNodeInArray[] => [
+    {
+        key: tree.id.toString(),
+        label: tree.name,
+        nodes: tree.taxonomy
             .sort((a, b) => a.name.localeCompare(b.name))
             .map((tt) => ({
                 key: tt.id.toString(),
@@ -77,11 +84,20 @@ export const getStaticProps: GetStaticProps = async (context) => {
                         url: `/${st.species.taxoncode === GallTaxon ? 'gall' : 'host'}/${st.species.id}`,
                     })),
             })),
-    }));
+    },
+];
+
+// Use static so that this stuff can be built once on the server-side and then cached.
+export const getStaticProps: GetStaticProps = async (context) => {
+    const family = await getStaticPropsWithContext(context, taxonomyEntryById, 'family');
+    const tree = pipe(
+        await getStaticPropsWithContext(context, taxonomyTreeForId, 'species', false, true),
+        O.fold(constant([]), toTreeNodeInArray),
+    );
 
     return {
         props: {
-            family: (await family)[0],
+            family: family,
             tree: tree,
         },
         revalidate: 1,

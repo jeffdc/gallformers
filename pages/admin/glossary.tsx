@@ -40,7 +40,7 @@ const Glossary = (props: Props): JSX.Element => {
     const [glossary, setGlossary] = useState(props.glossary);
     const [error, setError] = useState('');
 
-    const { register, handleSubmit, errors, control, setValue, reset } = useForm<FormFields>({
+    const { register, handleSubmit, errors, control, reset } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
@@ -52,9 +52,11 @@ const Glossary = (props: Props): JSX.Element => {
     const onGlossaryChange = useCallback(
         (id: number | undefined) => {
             if (id == undefined) {
-                setValue('value', []);
-                setValue('definition', '');
-                setValue('urls', '');
+                reset({
+                    value: [],
+                    definition: '',
+                    urls: '',
+                });
             } else {
                 try {
                     const glos = props.glossary.find((g) => g.id === id);
@@ -62,16 +64,18 @@ const Glossary = (props: Props): JSX.Element => {
                         throw new Error(`Somehow we have a family selection that does not exist?! familyid: ${id}`);
                     }
 
-                    setValue('value', [glos]);
-                    setValue('definition', glos.definition);
-                    setValue('urls', glos.urls);
+                    reset({
+                        value: [glos],
+                        definition: glos.definition,
+                        urls: glos.urls,
+                    });
                 } catch (e) {
                     console.error(e);
                     setError(e);
                 }
             }
         },
-        [props.glossary, setValue],
+        [props.glossary, reset],
     );
 
     useEffect(() => {

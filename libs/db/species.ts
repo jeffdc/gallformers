@@ -2,11 +2,11 @@ import { abundance, Prisma, species } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
-import { AbundanceApi, SpeciesApi } from '../api/apitypes';
+import { AbundanceApi, SimpleSpecies, SpeciesApi } from '../api/apitypes';
+import { adaptTaxonomy } from '../api/taxonomy';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
-import { adaptTaxonomy } from './taxonomy';
 import { adaptImage } from './images';
 
 export const adaptAbundance = (a: abundance): AbundanceApi => ({
@@ -37,6 +37,12 @@ export const allSpecies = (): TE.TaskEither<Error, species[]> => {
     return TE.tryCatch(species, handleError);
 };
 
+export const allSpeciesSimple = (): TE.TaskEither<Error, SimpleSpecies[]> =>
+    pipe(
+        allSpecies(),
+        TE.map((s) => s.map((sp) => ({ ...sp } as SimpleSpecies))),
+    );
+
 export const speciesByName = (name: string): TE.TaskEither<Error, O.Option<species>> => {
     const species = () =>
         db.species.findFirst({
@@ -62,6 +68,7 @@ export const getSpecies = (
                 speciessource: { include: { source: true } },
                 image: { include: { source: { include: { speciessource: true } } } },
                 taxonomy: { include: { taxonomy: true } },
+                aliasspecies: { include: { alias: true } },
             },
             where: w,
             distinct: distinct,
@@ -79,11 +86,10 @@ export const getSpecies = (
                 ...s,
                 description: O.fromNullable(d),
                 taxoncode: s.taxoncode ? s.taxoncode : '',
-                // synonyms: O.fromNullable(s.synonyms),
-                // commonnames: O.fromNullable(s.commonnames),
                 abundance: optionalWith(s.abundance, adaptAbundance),
                 images: s.image.map(adaptImage),
-                taxonomy: s.taxonomy.map((t) => adaptTaxonomy(t.taxonomy)),
+                aliases: s.aliasspecies.map((a) => a.alias),
+                // taxonomy: s.taxonomy.map((t) => adaptTaxonomy(t.taxonomy)),
             };
             return species;
         });

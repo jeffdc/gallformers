@@ -1,5 +1,5 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { abundance, taxonomy } from '@prisma/client';
+import { abundance } from '@prisma/client';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
@@ -7,8 +7,11 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Col, Row } from 'react-bootstrap';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Button, Col, Row } from 'react-bootstrap';
+import BootstrapTable, { ColumnDescription, SelectRowProps } from 'react-bootstrap-table-next';
+import 'react-bootstrap-table-next/dist/react-bootstrap-table2.min.css';
+import cellEditFactory, { CellEditFactoryProps } from 'react-bootstrap-table2-editor';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
@@ -17,23 +20,26 @@ import { AdminFormFields, useAPIs } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
 import {
     AbundanceApi,
+    AliasApi,
     DeleteResult,
     EmptyAbundance,
-    EmptyFamily,
-    TaxonomyApi,
+    EmptyAlias,
     HOST_FAMILY_TYPES,
     SpeciesApi,
     SpeciesUpsertFields,
 } from '../../libs/api/apitypes';
-import { allFamilies } from '../../libs/db/taxonomy';
+import { EMPTY_FGS, FGS, TaxonomyEntry } from '../../libs/api/taxonomy';
 import { allHosts } from '../../libs/db/host';
 import { abundances } from '../../libs/db/species';
-import { mightFailWithArray } from '../../libs/utils/util';
+import { allFamilies, allSections, taxonomyForSpecies } from '../../libs/db/taxonomy';
+import { mightFail, mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
     id: string;
     hs: SpeciesApi[];
-    families: taxonomy[];
+    fgs: FGS;
+    families: TaxonomyEntry[];
+    sections: TaxonomyEntry[];
     abundances: abundance[];
 };
 
@@ -59,10 +65,10 @@ const Schema = yup.object().shape({
 
 export type FormFields = AdminFormFields<SpeciesApi> & {
     genus: string;
-    family: TaxonomyApi[];
+    family: TaxonomyEntry[];
+    section: TaxonomyEntry[];
     abundance: AbundanceApi[];
-    commonnames: string;
-    synonyms: string;
+    datacomplete: boolean;
 };
 
 export const testables = {
@@ -70,11 +76,35 @@ export const testables = {
     Schema: Schema,
 };
 
-const Host = ({ id, hs, families, abundances }: Props): JSX.Element => {
+const aliasColumns: ColumnDescription[] = [
+    { dataField: 'name', text: 'Alias Name' },
+    {
+        dataField: 'type',
+        text: 'Alias Type',
+        editor: {
+            type: 'select',
+            options: [
+                { value: 'common', label: 'common' },
+                { value: 'scientific', label: 'scientific' },
+            ],
+        },
+    },
+    { dataField: 'description', text: 'Alias Description' },
+];
+
+const cellEditProps: CellEditFactoryProps<AliasApi> = {
+    mode: 'click',
+    blurToSave: true,
+};
+
+const Host = ({ id, hs, fgs, families, sections, abundances }: Props): JSX.Element => {
     const [existingId, setExistingId] = useState<number | undefined>(id && id !== '' ? parseInt(id) : undefined);
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
     const [hosts, setHosts] = useState(hs);
+    const [theFGS, setTheFGS] = useState(fgs);
     const [error, setError] = useState('');
+    const [aliasData, setAliasData] = useState<Array<AliasApi>>([]);
+    const [aliasSelected, setAliasSelected] = useState(new Set<number>());
 
     const { register, handleSubmit, setValue, errors, control, reset } = useForm<FormFields>({
         mode: 'onBlur',
@@ -84,14 +114,15 @@ const Host = ({ id, hs, families, abundances }: Props): JSX.Element => {
     const router = useRouter();
 
     const onHostChange = useCallback(
-        (spid: number | undefined) => {
+        async (spid: number | undefined) => {
             if (spid == undefined) {
-                setValue('value', []);
-                setValue('genus', '');
-                setValue('family', [EmptyFamily]);
-                setValue('abundance', [EmptyAbundance]);
-                setValue('commonnames', '');
-                setValue('synonyms', '');
+                reset({
+                    value: [],
+                    genus: '',
+                    family: [],
+                    abundance: [EmptyAbundance],
+                });
+                setAliasData([]);
             } else {
                 try {
                     const sp = hosts.find((h) => h.id === spid);
@@ -99,19 +130,33 @@ const Host = ({ id, hs, families, abundances }: Props): JSX.Element => {
                         throw new Error(`Somehow we have a host selection that does not exist?! hostid: ${spid}`);
                     }
 
-                    setValue('value', [sp], { shouldValidate: true });
-                    setValue('genus', sp.genus);
-                    setValue('family', [sp.family]);
-                    setValue('abundance', [pipe(sp.abundance, O.getOrElse(constant(EmptyAbundance)))]);
-                    setValue('commonnames', pipe(sp.commonnames, O.getOrElse(constant(''))));
-                    setValue('synonyms', pipe(sp.synonyms, O.getOrElse(constant(''))));
+                    // TODO: use a hook and figure out how to deal with state dependencies not causing infinite loop of updates
+                    const res = await fetch(`../api/taxonomy?id=${sp.id}`);
+                    if (res.status === 200) {
+                        setTheFGS(await res.json());
+                    } else {
+                        console.error(await res.text());
+                        setError('Failed to fetch taxonomy for the selected species. Check console.');
+                    }
+                    reset({
+                        value: [sp],
+                        genus: extractGenus(sp.name),
+                        family: theFGS.family != null ? [theFGS.family] : [],
+                        section: pipe(
+                            theFGS.section,
+                            O.fold(constant([]), (s) => [s]),
+                        ),
+                        abundance: [pipe(sp.abundance, O.getOrElse(constant(EmptyAbundance)))],
+                        datacomplete: sp.datacomplete,
+                    });
+                    setAliasData(sp.aliases);
                 } catch (e) {
                     console.error(e);
                     setError(e);
                 }
             }
         },
-        [hosts, setValue],
+        [reset, hosts, theFGS],
     );
 
     useEffect(() => {
@@ -132,16 +177,48 @@ const Host = ({ id, hs, families, abundances }: Props): JSX.Element => {
 
         const convertFormFieldsToUpsert = (fields: FormFields, name: string, id: number): SpeciesUpsertFields => ({
             abundance: fields.abundance[0].abundance,
-            commonnames: fields.commonnames,
-            family: fields.family[0].name,
+            aliases: aliasData,
+            datacomplete: fields.datacomplete,
+            fgs: {
+                // family: fields.family[0],
+                // genus: ,
+                // section: ,
+            },
             id: id,
             name: name,
-            synonyms: fields.synonyms,
         });
 
         await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert)
             .then(() => reset())
             .catch((e) => setError(`Failed to save changes. ${e}.`));
+    };
+
+    const selectRow: SelectRowProps<AliasApi> = {
+        mode: 'checkbox',
+        clickToSelect: false,
+        clickToEdit: true,
+        onSelect: (row) => {
+            const selection = new Set(aliasSelected);
+            selection.has(row.id) ? selection.delete(row.id) : selection.add(row.id);
+            setAliasSelected(selection);
+        },
+        onSelectAll: (isSelect) => {
+            if (isSelect) {
+                setAliasSelected(new Set(aliasData.map((a) => a.id)));
+            } else {
+                setAliasSelected(new Set());
+            }
+        },
+    };
+
+    const addAlias = () => {
+        aliasData.push(EmptyAlias);
+        setAliasData([...aliasData]);
+    };
+
+    const deleteAliases = () => {
+        setAliasData(aliasData.filter((a) => !aliasSelected.has(a.id)));
+        setAliasSelected(new Set());
     };
 
     return (
@@ -163,7 +240,8 @@ const Host = ({ id, hs, families, abundances }: Props): JSX.Element => {
                     <p>
                         This is for all of the details about a Host. To add a description (which must be referenced to a source)
                         go add <Link href="/admin/source">Sources</Link>, if they do not already exist, then go{' '}
-                        <Link href="/admin/speciessource">map species to sources with description</Link>.
+                        <Link href="/admin/speciessource">map species to sources with description</Link>. If you want to assign a
+                        Family or Section then you will need to have created them first if they do not exist.
                     </p>
                     <Row className="form-group">
                         <Col>
@@ -212,6 +290,7 @@ const Host = ({ id, hs, families, abundances }: Props): JSX.Element => {
                                 placeholder="Family"
                                 options={families}
                                 labelKey="name"
+                                clearButton
                             />
                             {errors.family && (
                                 <span className="text-danger">
@@ -219,6 +298,19 @@ const Host = ({ id, hs, families, abundances }: Props): JSX.Element => {
                                     family first. :(
                                 </span>
                             )}
+                        </Col>
+                    </Row>
+                    <Row className="form-group">
+                        <Col>
+                            Section:
+                            <ControlledTypeahead
+                                control={control}
+                                name="section"
+                                placeholder=""
+                                options={sections}
+                                labelKey="name"
+                                clearButton
+                            />
                         </Col>
                         <Col>
                             Abundance:
@@ -234,26 +326,42 @@ const Host = ({ id, hs, families, abundances }: Props): JSX.Element => {
                     </Row>
                     <Row className="form-group">
                         <Col>
-                            Common Names (comma-delimited):
-                            <input
-                                type="text"
-                                placeholder="Common Names"
-                                name="commonnames"
-                                className="form-control"
-                                ref={register}
+                            <BootstrapTable
+                                keyField={'id'}
+                                data={aliasData}
+                                columns={aliasColumns}
+                                bootstrap4
+                                striped
+                                headerClasses="table-header"
+                                cellEdit={cellEditFactory(cellEditProps)}
+                                selectRow={selectRow}
                             />
+                            <Button variant="secondary" className="btn-sm mr-2" onClick={addAlias}>
+                                Add Alias
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                className="btn-sm"
+                                disabled={aliasSelected.size == 0}
+                                onClick={deleteAliases}
+                            >
+                                Delete Selected Alias(es)
+                            </Button>
+                            <p className="font-italic small">
+                                Changes to the aliases will not be saved until you save the whole form by clicking
+                                &lsquo;Submit&rsquo; below.
+                            </p>
                         </Col>
                     </Row>
-                    <Row className="form-group">
-                        <Col>
-                            Synonyms (comma-delimited):
-                            <input type="text" placeholder="Synonyms" name="synonyms" className="form-control" ref={register} />
-                        </Col>
-                    </Row>
-                    <Row className="fromGroup" hidden={!existingId}>
-                        <Col xs="1">Delete?:</Col>
+                    <Row className="formGroup pb-1">
                         <Col className="mr-auto">
-                            <input name="del" type="checkbox" className="form-check-input" ref={register} />
+                            <input name="datacomplete" type="checkbox" className="form-input-checkbox" ref={register} /> Are all
+                            known galls submitted for this host?
+                        </Col>
+                    </Row>
+                    <Row className="fromGroup pb-1" hidden={!existingId}>
+                        <Col className="mr-auto">
+                            <input name="del" type="checkbox" className="form-input-checkbox" ref={register} /> Delete?
                         </Col>
                     </Row>
                     <Row className="formGroup">
@@ -284,11 +392,14 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
         O.getOrElse(constant('')),
     );
 
+    const fgs = id === '' ? EMPTY_FGS : await mightFail(constant(EMPTY_FGS))(taxonomyForSpecies(parseInt(id)));
     return {
         props: {
             id: id,
             hs: await mightFailWithArray<SpeciesApi>()(allHosts()),
-            families: await mightFailWithArray<TaxonomyApi>()(allFamilies(HOST_FAMILY_TYPES)),
+            fgs: fgs,
+            families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(HOST_FAMILY_TYPES)),
+            sections: await mightFailWithArray<TaxonomyEntry>()(allSections()),
             abundances: await mightFailWithArray<AbundanceApi>()(abundances()),
         },
     };

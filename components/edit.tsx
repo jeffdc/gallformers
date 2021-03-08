@@ -8,7 +8,7 @@ type Props = {
 };
 
 const Edit = ({ id, type }: Props): JSX.Element => {
-    const session = useSession();
+    const [session] = useSession();
 
     return (
         <>
