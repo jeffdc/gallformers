@@ -45,7 +45,8 @@ const Schema = yup.object().shape({
             yup.object({
                 name: yup
                     .string()
-                    .matches(/([A-Z][a-z]+ [a-z]+$)/)
+                    // maybe? add this back but allow select punctuation in species name?
+                    // .matches(/([A-Z][a-z]+ [a-z]+$)/)
                     .required(),
             }),
         )
@@ -109,47 +110,53 @@ const Gall = ({
     const onGallChange = useCallback(
         async (spid: number | undefined): Promise<void> => {
             if (spid == undefined) {
-                setValue('genus', '');
-                setValue('family', [AT.EmptyFamily]);
-                setValue('abundance', [AT.EmptyAbundance]);
-                setValue('commonnames', '');
-                setValue('synonyms', '');
-                setValue('detachable', AT.DetachableNone.value);
-                setValue('walls', []);
-                setValue('cells', []);
-                setValue('alignments', []);
-                setValue('colors', []);
-                setValue('shapes', []);
-                setValue('locations', []);
-                setValue('textures', []);
-                setValue('hosts', []);
+                reset({
+                    value: [],
+                    genus: '',
+                    family: [AT.EmptyFamily],
+                    abundance: [AT.EmptyAbundance],
+                    commonnames: '',
+                    synonyms: '',
+                    detachable: AT.DetachableNone.value,
+                    walls: [],
+                    cells: [],
+                    alignments: [],
+                    colors: [],
+                    shapes: [],
+                    locations: [],
+                    textures: [],
+                    hosts: [],
+                });
             } else {
                 try {
                     const res = await fetch(`../api/gall?speciesid=${spid}`);
                     const s = (await res.json()) as AT.GallApi[];
                     const sp = s[0];
-                    setValue('value', s);
-                    setValue('genus', sp.genus);
-                    setValue('family', [sp.family]);
-                    setValue('abundance', [pipe(sp.abundance, O.getOrElse(constant(AT.EmptyAbundance)))]);
-                    setValue('commonnames', pipe(sp.commonnames, O.getOrElse(constant(''))));
-                    setValue('synonyms', pipe(sp.synonyms, O.getOrElse(constant(''))));
-                    setValue('detachable', sp.gall.detachable.value);
-                    setValue('walls', sp.gall.gallwalls);
-                    setValue('cells', sp.gall.gallcells);
-                    setValue('alignments', sp.gall.gallalignment);
-                    setValue('colors', sp.gall.gallcolor);
-                    setValue('shapes', sp.gall.gallshape);
-                    setValue('locations', sp.gall.galllocation);
-                    setValue('textures', sp.gall.galltexture);
-                    setValue('hosts', sp.hosts);
+                    // setValue('value', s);
+                    reset({
+                        value: s,
+                        genus: sp.genus,
+                        family: [sp.family],
+                        abundance: [pipe(sp.abundance, O.getOrElse(constant(AT.EmptyAbundance)))],
+                        commonnames: pipe(sp.commonnames, O.getOrElse(constant(''))),
+                        synonyms: pipe(sp.synonyms, O.getOrElse(constant(''))),
+                        detachable: sp.gall.detachable.value,
+                        walls: sp.gall.gallwalls,
+                        cells: sp.gall.gallcells,
+                        alignments: sp.gall.gallalignment,
+                        colors: sp.gall.gallcolor,
+                        shapes: sp.gall.gallshape,
+                        locations: sp.gall.galllocation,
+                        textures: sp.gall.galltexture,
+                        hosts: sp.hosts,
+                    });
                 } catch (e) {
                     console.error(e);
                     setError(e);
                 }
             }
         },
-        [setValue],
+        [reset],
     );
 
     useEffect(() => {

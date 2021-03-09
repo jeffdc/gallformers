@@ -220,7 +220,7 @@ export type SpeciesApi = SimpleSpecies & {
 
 export type DetachableApi = {
     id: number;
-    value: string;
+    value: DetachableValues;
 };
 
 export const DetachableNone: DetachableApi = {
@@ -429,6 +429,7 @@ export type ImageApi = {
     small: string;
     medium: string;
     large: string;
+    xlarge: string;
     original: string;
 };
 
@@ -436,5 +437,6 @@ export type ImagePaths = {
     small: string[];
     medium: string[];
     large: string[];
+    xlarge: string[];
     original: string[];
 };

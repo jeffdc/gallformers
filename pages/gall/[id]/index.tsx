@@ -191,6 +191,7 @@ const Gall = ({ species }: Props): JSX.Element => {
                 </Row>
                 <Row>
                     <Col>
+                        <Edit id={species.id} type="speciessource" />
                         <strong>Further Information:</strong>
                     </Col>
                     <Col xs={2}>

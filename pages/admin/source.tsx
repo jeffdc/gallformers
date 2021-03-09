@@ -49,29 +49,33 @@ const Source = (props: Props): JSX.Element => {
     const onFamilyChange = useCallback(
         (id: number | undefined) => {
             if (id == undefined) {
-                setValue('value', []);
-                setValue('author', '');
-                setValue('pubyear', '');
-                setValue('link', '');
-                setValue('citation', '');
+                reset({
+                    value: [],
+                    author: '',
+                    pubyear: '',
+                    link: '',
+                    citation: '',
+                });
             } else {
                 try {
                     const source = sources.find((s) => s.id === id);
                     if (source == undefined) {
                         throw new Error(`Somehow we have a source selection that does not exist?! sourceid: ${id}`);
                     }
-                    setValue('value', [source]);
-                    setValue('author', source.author);
-                    setValue('pubyear', source.pubyear);
-                    setValue('link', source.link);
-                    setValue('citation', source.citation);
+                    reset({
+                        value: [source],
+                        author: source.author,
+                        pubyear: source.pubyear,
+                        link: source.link,
+                        citation: source.citation,
+                    });
                 } catch (e) {
                     console.error(e);
                     setError(e);
                 }
             }
         },
-        [sources, setValue],
+        [reset, sources],
     );
 
     useEffect(() => {

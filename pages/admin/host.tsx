@@ -48,7 +48,8 @@ const Schema = yup.object().shape({
             yup.object({
                 name: yup
                     .string()
-                    .matches(/([A-Z][a-z]+ [a-z]+$)/)
+                    // maybe? add this back but allow select punctuation in species name?
+                    // .matches(/([A-Z][a-z]+ [a-z]+$)/)
                     .required(),
             }),
         )
@@ -86,32 +87,35 @@ const Host = ({ id, hs, families, abundances }: Props): JSX.Element => {
     const onHostChange = useCallback(
         (spid: number | undefined) => {
             if (spid == undefined) {
-                setValue('value', []);
-                setValue('genus', '');
-                setValue('family', [EmptyFamily]);
-                setValue('abundance', [EmptyAbundance]);
-                setValue('commonnames', '');
-                setValue('synonyms', '');
+                reset({
+                    value: [],
+                    genus: '',
+                    family: [EmptyFamily],
+                    abundance: [EmptyAbundance],
+                    commonnames: '',
+                    synonyms: '',
+                });
             } else {
                 try {
                     const sp = hosts.find((h) => h.id === spid);
                     if (sp == undefined) {
                         throw new Error(`Somehow we have a host selection that does not exist?! hostid: ${spid}`);
                     }
-
-                    setValue('value', [sp], { shouldValidate: true });
-                    setValue('genus', sp.genus);
-                    setValue('family', [sp.family]);
-                    setValue('abundance', [pipe(sp.abundance, O.getOrElse(constant(EmptyAbundance)))]);
-                    setValue('commonnames', pipe(sp.commonnames, O.getOrElse(constant(''))));
-                    setValue('synonyms', pipe(sp.synonyms, O.getOrElse(constant(''))));
+                    reset({
+                        value: [sp],
+                        genus: sp.genus,
+                        family: [sp.family],
+                        abundance: [pipe(sp.abundance, O.getOrElse(constant(EmptyAbundance)))],
+                        commonnames: pipe(sp.commonnames, O.getOrElse(constant(''))),
+                        synonyms: pipe(sp.synonyms, O.getOrElse(constant(''))),
+                    });
                 } catch (e) {
                     console.error(e);
                     setError(e);
                 }
             }
         },
-        [hosts, setValue],
+        [hosts, reset],
     );
 
     useEffect(() => {

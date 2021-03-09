@@ -44,7 +44,8 @@ export const ORIGINAL = 'original';
 export const SMALL = 'small';
 export const MEDIUM = 'medium';
 export const LARGE = 'large';
-export type ImageSize = typeof ORIGINAL | typeof SMALL | typeof MEDIUM | typeof LARGE;
+export const XLARGE = 'xlarge';
+export type ImageSize = typeof ORIGINAL | typeof SMALL | typeof MEDIUM | typeof LARGE | typeof XLARGE;
 
 export const getImagePaths = async (speciesId: number, imageids: number[] = []): Promise<ImagePaths> => {
     try {
@@ -63,6 +64,7 @@ export const getImagePaths = async (speciesId: number, imageids: number[] = []):
         small: [],
         medium: [],
         large: [],
+        xlarge: [],
         original: [],
     };
 };
@@ -75,6 +77,7 @@ export const toImagePaths = (images: image[]): ImagePaths => {
             paths.small.push(makePath(image.path, SMALL));
             paths.medium.push(makePath(image.path, MEDIUM));
             paths.large.push(makePath(image.path, LARGE));
+            paths.xlarge.push(makePath(image.path, XLARGE));
             paths.original.push(makePath(image.path, ORIGINAL));
 
             return paths;
@@ -83,6 +86,7 @@ export const toImagePaths = (images: image[]): ImagePaths => {
             small: new Array<string>(),
             medium: new Array<string>(),
             large: new Array<string>(),
+            xlarge: new Array<string>(),
             original: new Array<string>(),
         } as ImagePaths,
     );
@@ -108,6 +112,7 @@ const sizes = new Map([
     [SMALL, 300],
     [MEDIUM, 800],
     [LARGE, 1200],
+    [XLARGE, 2000],
 ]);
 
 export const createOtherSizes = (images: image[]): image[] => {
@@ -122,7 +127,7 @@ export const createOtherSizes = (images: image[]): image[] => {
             const mime = img.getMIME();
             sizes.forEach(async (value, key) => {
                 img.resize(value, Jimp.AUTO);
-                img.quality(90);
+                img.quality(100);
                 const newPath = image.path.replace(ORIGINAL, key);
                 logger.info(`Will write ${newPath}`);
                 const buffer = await img.getBufferAsync(mime);
@@ -174,6 +179,7 @@ export const deleteImagesByPaths = async (paths: ImagePaths): Promise<void> => {
     paths.small.forEach(pushObjectIdentifier);
     paths.medium.forEach(pushObjectIdentifier);
     paths.large.forEach(pushObjectIdentifier);
+    paths.xlarge.forEach(pushObjectIdentifier);
 
     logger.info(`About to delete images: ${objects.map((o) => o.Key)}`);
 
