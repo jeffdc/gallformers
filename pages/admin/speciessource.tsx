@@ -1,20 +1,25 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import { source, species, speciessource } from '@prisma/client';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
-import React, { useState } from 'react';
+import { ParsedUrlQuery } from 'querystring';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
+import { extractQueryParam } from '../../libs/api/apipage';
 import { DeleteResult, GallTaxon, SpeciesSourceApi, SpeciesSourceInsertFields } from '../../libs/api/apitypes';
 import { allSources } from '../../libs/db/source';
 import { allSpecies } from '../../libs/db/species';
 import { mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
+    speciesid: string;
     species: species[];
     sources: source[];
 };
@@ -33,7 +38,10 @@ type FormFields = {
     externallink: string;
 };
 
-const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
+const SpeciesSource = ({ speciesid, species, sources }: Props): JSX.Element => {
+    const [existingSpeciesId, setExistingSpeciesId] = useState<number | undefined>(
+        speciesid && speciesid !== '' ? parseInt(speciesid) : undefined,
+    );
     const [results, setResults] = useState<speciessource>();
     const [isGall, setIsGall] = useState(true);
     const [existing, setExisting] = useState(false);
@@ -44,6 +52,45 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
+
+    const onSpeciesChange = useCallback(
+        (spid: number | undefined) => {
+            console.log('checking sp id ' + spid);
+            if (spid == undefined) {
+                reset({
+                    species: '',
+                    source: '',
+                    description: '',
+                    useasdefault: false,
+                    externallink: '',
+                    delete: false,
+                });
+            } else {
+                try {
+                    const sp = species.find((s) => s.id === spid);
+                    if (sp == undefined) {
+                        throw new Error(`Somehow we have a species selection that does not exist?! speciesid: ${spid}`);
+                    }
+                    reset({
+                        species: sp.name,
+                        source: '',
+                        description: '',
+                        useasdefault: false,
+                        externallink: '',
+                        delete: false,
+                    });
+                } catch (e) {
+                    console.error(e);
+                    setError(e);
+                }
+            }
+        },
+        [reset, species],
+    );
+
+    useEffect(() => {
+        onSpeciesChange(existingSpeciesId);
+    }, [existingSpeciesId, onSpeciesChange]);
 
     const lookup = (speciesName: string, sourceTitle: string) => {
         return {
@@ -56,19 +103,18 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
         try {
             const species = getValues('species');
             const source = getValues('source');
-            setValue('description', '');
-            setValue('useasdefault', false);
-            setValue('exernallink', '');
 
             const { sp, so } = lookup(species, source);
             if (sp != undefined && so != undefined) {
                 const res = await fetch(`../api/speciessource?speciesid=${sp?.id}&sourceid=${so?.id}`);
 
                 setExisting(false);
+                setExistingSpeciesId(undefined);
                 if (res.status === 200) {
                     const s = (await res.json()) as SpeciesSourceApi[];
                     if (s && s.length > 0) {
                         setExisting(true);
+                        setExistingSpeciesId(sp.id);
                         setValue('description', s[0].description);
                         setValue('useasdefault', s[0].useasdefault > 0);
                         setValue('externallink', s[0].externallink);
@@ -239,9 +285,17 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
     );
 };
 
-export const getServerSideProps: GetServerSideProps = async () => {
+export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
+    const queryParam = 'id';
+    // eslint-disable-next-line prettier/prettier
+    const id = pipe(
+        extractQueryParam(context.query, queryParam),
+        O.getOrElse(constant('')),
+    );
+
     return {
         props: {
+            speciesid: id,
             species: await mightFailWithArray<species>()(allSpecies()),
             sources: await mightFailWithArray<source>()(allSources()),
         },

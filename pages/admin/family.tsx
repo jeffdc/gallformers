@@ -47,23 +47,26 @@ const Family = ({ id, fs }: Props): JSX.Element => {
     const onFamilyChange = useCallback(
         (id: number | undefined) => {
             if (id == undefined) {
-                setValue('value', []);
-                setValue('description', '');
+                reset({
+                    value: [],
+                    description: '',
+                });
             } else {
                 try {
                     const fam = families.find((f) => f.id === id);
                     if (fam == undefined) {
                         throw new Error(`Somehow we have a family selection that does not exist?! familyid: ${id}`);
                     }
-
-                    setValue('value', [fam]);
-                    setValue('description', fam.description);
+                    reset({
+                        value: [fam],
+                        description: fam.description,
+                    });
                 } catch (e) {
                     console.error(e);
                 }
             }
         },
-        [families, setValue],
+        [families, reset],
     );
 
     useEffect(() => {

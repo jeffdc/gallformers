@@ -50,7 +50,7 @@ const Images = ({ species }: Props): JSX.Element => {
                         {species.images.map((image) => (
                             <CarouselItem key={image.id}>
                                 <Image
-                                    src={image.large}
+                                    src={image.xlarge ? image.xlarge : image.original}
                                     unoptimized
                                     alt={`photo of ${species.name}`}
                                     width={width - 2 * pad}
