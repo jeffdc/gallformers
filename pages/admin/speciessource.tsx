@@ -58,7 +58,6 @@ const SpeciesSource = ({ speciesid, species, sources }: Props): JSX.Element => {
 
     const onSpeciesChange = useCallback(
         (spid: number | undefined) => {
-            console.log('ID: ' + spid);
             if (spid == undefined) {
                 reset({
                     species: '',
@@ -106,7 +105,6 @@ const SpeciesSource = ({ speciesid, species, sources }: Props): JSX.Element => {
         try {
             const species = getValues('species');
             const source = getValues('source');
-            console.log(`Checking with: '${species}' and '${source}'`);
 
             const { sp, so } = lookup(species, source);
             if (sp != undefined) {
