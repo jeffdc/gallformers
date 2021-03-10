@@ -5,6 +5,7 @@ import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Col, Row } from 'react-bootstrap';
@@ -25,8 +26,8 @@ type Props = {
 };
 
 const Schema = yup.object().shape({
-    species: yup.array().required(),
-    source: yup.array().required(),
+    species: yup.string().required(),
+    source: yup.string().required(),
 });
 
 type FormFields = {
@@ -48,14 +49,16 @@ const SpeciesSource = ({ speciesid, species, sources }: Props): JSX.Element => {
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
     const [error, setError] = useState('');
 
-    const { handleSubmit, errors, control, register, reset, setValue, getValues } = useForm<FormFields>({
+    const router = useRouter();
+
+    const { handleSubmit, errors, control, register, reset, getValues } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
 
     const onSpeciesChange = useCallback(
         (spid: number | undefined) => {
-            console.log('checking sp id ' + spid);
+            console.log('ID: ' + spid);
             if (spid == undefined) {
                 reset({
                     species: '',
@@ -103,22 +106,34 @@ const SpeciesSource = ({ speciesid, species, sources }: Props): JSX.Element => {
         try {
             const species = getValues('species');
             const source = getValues('source');
+            console.log(`Checking with: '${species}' and '${source}'`);
 
             const { sp, so } = lookup(species, source);
+            if (sp != undefined) {
+                setExistingSpeciesId(sp.id);
+                router.replace(`?id=${sp.id}`, undefined, { shallow: true });
+            } else {
+                setExistingSpeciesId(undefined);
+                router.replace(``, undefined, { shallow: true });
+            }
+
             if (sp != undefined && so != undefined) {
                 const res = await fetch(`../api/speciessource?speciesid=${sp?.id}&sourceid=${so?.id}`);
 
-                setExisting(false);
-                setExistingSpeciesId(undefined);
                 if (res.status === 200) {
                     const s = (await res.json()) as SpeciesSourceApi[];
                     if (s && s.length > 0) {
                         setExisting(true);
-                        setExistingSpeciesId(sp.id);
-                        setValue('description', s[0].description);
-                        setValue('useasdefault', s[0].useasdefault > 0);
-                        setValue('externallink', s[0].externallink);
+                        reset({
+                            species: sp.name,
+                            source: so.title,
+                            description: s[0].description,
+                            useasdefault: s[0].useasdefault > 0,
+                            externallink: s[0].externallink,
+                        });
                     }
+                } else {
+                    setExisting(false);
                 }
             }
         } catch (e) {
@@ -129,7 +144,7 @@ const SpeciesSource = ({ speciesid, species, sources }: Props): JSX.Element => {
 
     const onSubmit = async (data: FormFields) => {
         try {
-            const { sp, so } = lookup(data.species[0], data.source[0]);
+            const { sp, so } = lookup(data.species, data.source);
             if (!sp || !so) throw new Error('Somehow either the source or the species selected is invalid.');
 
             if (data.delete) {
@@ -138,7 +153,9 @@ const SpeciesSource = ({ speciesid, species, sources }: Props): JSX.Element => {
                 });
 
                 if (res.status === 200) {
-                    reset();
+                    setExisting(false);
+                    setExistingSpeciesId(undefined);
+                    router.replace(``, undefined, { shallow: true });
                     setDeleteResults(await res.json());
                     return;
                 } else {
@@ -165,8 +182,8 @@ const SpeciesSource = ({ speciesid, species, sources }: Props): JSX.Element => {
             });
 
             if (res.status === 200) {
-                reset();
                 setResults(await res.json());
+                setExisting(true);
             } else {
                 throw new Error(await res.text());
             }
@@ -193,8 +210,8 @@ const SpeciesSource = ({ speciesid, species, sources }: Props): JSX.Element => {
                 <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                     <h4>Map Species & Sources</h4>
                     <p>
-                        First select both a species and a source. If a mapping already exists then the description will
-                        display.Then you can edit the mapping.
+                        First select both a species and a source. If a mapping already exists then the description will display.
+                        Then you can edit the mapping.
                     </p>
                     <Row className="form-group">
                         <Col>
