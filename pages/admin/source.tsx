@@ -172,7 +172,7 @@ const Source = (props: Props): JSX.Element => {
                                 </a>
                                 ):
                             </p>
-                            <input type="text" placeholder="Citation" name="citation" className="form-control" ref={register} />
+                            <textarea name="citation" placeholder="Citation" className="form-control" ref={register} rows={8} />
                             {errors.citation && <span className="text-danger">You must provide a citation in MLA form.</span>}
                         </Col>
                     </Row>
