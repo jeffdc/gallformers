@@ -98,15 +98,20 @@ const GallHost = ({ id, galls, genera, hosts }: Props): JSX.Element => {
     const onGallChange = useCallback(
         (gall: GallApi | undefined) => {
             if (gall == undefined) {
-                setValue('gall', []);
-                setValue('hosts', []);
+                reset({
+                    gall: [],
+                    hosts: [],
+                    genus: '',
+                });
             } else {
-                setValue('gall', [gall]);
-                setValue('hosts', gall.hosts);
+                reset({
+                    gall: [gall],
+                    hosts: gall.hosts,
+                    genus: '',
+                });
             }
-            setValue('genus', '');
         },
-        [setValue],
+        [reset],
     );
 
     useEffect(() => {

@@ -109,7 +109,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                             <Col className="">
                                 {selectedSource && selectedSource.description && (
                                     <span>
-                                        <p className="small">{deserialize(selectedSource.description)}</p>
+                                        <p className="small white-space-pre-wrap">{deserialize(selectedSource.description)}</p>
                                         <a className="small" href={selectedSource.externallink} target="_blank" rel="noreferrer">
                                             {selectedSource.externallink}
                                         </a>

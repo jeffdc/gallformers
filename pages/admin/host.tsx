@@ -54,7 +54,8 @@ const Schema = yup.object().shape({
             yup.object({
                 name: yup
                     .string()
-                    .matches(/([A-Z][a-z]+ [a-z]+$)/)
+                    // maybe? add this back but allow select punctuation in species name?
+                    // .matches(/([A-Z][a-z]+ [a-z]+$)/)
                     .required(),
             }),
         )

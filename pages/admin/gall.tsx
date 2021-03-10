@@ -45,7 +45,8 @@ const Schema = yup.object().shape({
             yup.object({
                 name: yup
                     .string()
-                    .matches(/([A-Z][a-z]+ [a-z]+$)/)
+                    // maybe? add this back but allow select punctuation in species name?
+                    // .matches(/([A-Z][a-z]+ [a-z]+$)/)
                     .required(),
             }),
         )
@@ -110,6 +111,7 @@ const Gall = ({
         async (spid: number | undefined): Promise<void> => {
             if (spid == undefined) {
                 reset({
+                    value: [],
                     genus: '',
                     family: [AT.EmptyFamily],
                     abundance: [AT.EmptyAbundance],
@@ -132,7 +134,7 @@ const Gall = ({
                     const sp = s[0];
                     reset({
                         value: s,
-                        genus: extractGenus(sp.name),
+                        genus: sp.genus,
                         family: [sp.family],
                         abundance: [pipe(sp.abundance, O.getOrElse(constant(AT.EmptyAbundance)))],
                         commonnames: pipe(sp.commonnames, O.getOrElse(constant(''))),

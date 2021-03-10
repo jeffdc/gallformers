@@ -5,7 +5,17 @@ import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { asLicenseType, ImageApi } from '../api/apitypes';
-import { createOtherSizes, deleteImagesByPaths, getImagePaths, LARGE, makePath, MEDIUM, ORIGINAL, SMALL } from '../images/images';
+import {
+    createOtherSizes,
+    deleteImagesByPaths,
+    getImagePaths,
+    LARGE,
+    makePath,
+    MEDIUM,
+    ORIGINAL,
+    SMALL,
+    XLARGE,
+} from '../images/images';
 import { handleError } from '../utils/util';
 import db from './db';
 import { connectIfNotNull } from './utils';
@@ -104,6 +114,7 @@ export const updateImages = (images: ImageApi[]): TaskEither<Error, readonly Ima
                     small: makePath(i.path, SMALL),
                     medium: makePath(i.path, MEDIUM),
                     large: makePath(i.path, LARGE),
+                    xlarge: makePath(i.path, XLARGE),
                     original: makePath(i.path, ORIGINAL),
                     source: img.source,
                     license: asLicenseType(i.license),
@@ -120,6 +131,7 @@ export const adaptImage = <T extends ImageWithSource>(img: T): ImageApi => ({
     small: makePath(img.path, SMALL),
     medium: makePath(img.path, MEDIUM),
     large: makePath(img.path, LARGE),
+    xlarge: makePath(img.path, XLARGE),
     original: makePath(img.path, ORIGINAL),
     source: O.fromNullable(img.source),
     license: asLicenseType(img.license),

@@ -1,27 +1,33 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import { source, species, speciessource } from '@prisma/client';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
-import React, { useState } from 'react';
+import { useRouter } from 'next/router';
+import { ParsedUrlQuery } from 'querystring';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Col, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
+import { extractQueryParam } from '../../libs/api/apipage';
 import { DeleteResult, GallTaxon, SpeciesSourceApi, SpeciesSourceInsertFields } from '../../libs/api/apitypes';
 import { allSources } from '../../libs/db/source';
 import { allSpecies } from '../../libs/db/species';
 import { mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
+    speciesid: string;
     species: species[];
     sources: source[];
 };
 
 const Schema = yup.object().shape({
-    species: yup.array().required(),
-    source: yup.array().required(),
+    species: yup.string().required(),
+    source: yup.string().required(),
 });
 
 type FormFields = {
@@ -33,17 +39,60 @@ type FormFields = {
     externallink: string;
 };
 
-const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
+const SpeciesSource = ({ speciesid, species, sources }: Props): JSX.Element => {
+    const [existingSpeciesId, setExistingSpeciesId] = useState<number | undefined>(
+        speciesid && speciesid !== '' ? parseInt(speciesid) : undefined,
+    );
     const [results, setResults] = useState<speciessource>();
     const [isGall, setIsGall] = useState(true);
     const [existing, setExisting] = useState(false);
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
     const [error, setError] = useState('');
 
-    const { handleSubmit, errors, control, register, reset, setValue, getValues } = useForm<FormFields>({
+    const router = useRouter();
+
+    const { handleSubmit, errors, control, register, reset, getValues } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
+
+    const onSpeciesChange = useCallback(
+        (spid: number | undefined) => {
+            if (spid == undefined) {
+                reset({
+                    species: '',
+                    source: '',
+                    description: '',
+                    useasdefault: false,
+                    externallink: '',
+                    delete: false,
+                });
+            } else {
+                try {
+                    const sp = species.find((s) => s.id === spid);
+                    if (sp == undefined) {
+                        throw new Error(`Somehow we have a species selection that does not exist?! speciesid: ${spid}`);
+                    }
+                    reset({
+                        species: sp.name,
+                        source: '',
+                        description: '',
+                        useasdefault: false,
+                        externallink: '',
+                        delete: false,
+                    });
+                } catch (e) {
+                    console.error(e);
+                    setError(e);
+                }
+            }
+        },
+        [reset, species],
+    );
+
+    useEffect(() => {
+        onSpeciesChange(existingSpeciesId);
+    }, [existingSpeciesId, onSpeciesChange]);
 
     const lookup = (speciesName: string, sourceTitle: string) => {
         return {
@@ -56,23 +105,33 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
         try {
             const species = getValues('species');
             const source = getValues('source');
-            setValue('description', '');
-            setValue('useasdefault', false);
-            setValue('exernallink', '');
 
             const { sp, so } = lookup(species, source);
+            if (sp != undefined) {
+                setExistingSpeciesId(sp.id);
+                router.replace(`?id=${sp.id}`, undefined, { shallow: true });
+            } else {
+                setExistingSpeciesId(undefined);
+                router.replace(``, undefined, { shallow: true });
+            }
+
             if (sp != undefined && so != undefined) {
                 const res = await fetch(`../api/speciessource?speciesid=${sp?.id}&sourceid=${so?.id}`);
 
-                setExisting(false);
                 if (res.status === 200) {
                     const s = (await res.json()) as SpeciesSourceApi[];
                     if (s && s.length > 0) {
                         setExisting(true);
-                        setValue('description', s[0].description);
-                        setValue('useasdefault', s[0].useasdefault > 0);
-                        setValue('externallink', s[0].externallink);
+                        reset({
+                            species: sp.name,
+                            source: so.title,
+                            description: s[0].description,
+                            useasdefault: s[0].useasdefault > 0,
+                            externallink: s[0].externallink,
+                        });
                     }
+                } else {
+                    setExisting(false);
                 }
             }
         } catch (e) {
@@ -83,7 +142,7 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
 
     const onSubmit = async (data: FormFields) => {
         try {
-            const { sp, so } = lookup(data.species[0], data.source[0]);
+            const { sp, so } = lookup(data.species, data.source);
             if (!sp || !so) throw new Error('Somehow either the source or the species selected is invalid.');
 
             if (data.delete) {
@@ -92,7 +151,9 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                 });
 
                 if (res.status === 200) {
-                    reset();
+                    setExisting(false);
+                    setExistingSpeciesId(undefined);
+                    router.replace(``, undefined, { shallow: true });
                     setDeleteResults(await res.json());
                     return;
                 } else {
@@ -119,8 +180,8 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
             });
 
             if (res.status === 200) {
-                reset();
                 setResults(await res.json());
+                setExisting(true);
             } else {
                 throw new Error(await res.text());
             }
@@ -147,8 +208,8 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
                 <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                     <h4>Map Species & Sources</h4>
                     <p>
-                        First select both a species and a source. If a mapping already exists then the description will
-                        display.Then you can edit the mapping.
+                        First select both a species and a source. If a mapping already exists then the description will display.
+                        Then you can edit the mapping.
                     </p>
                     <Row className="form-group">
                         <Col>
@@ -239,9 +300,17 @@ const SpeciesSource = ({ species, sources }: Props): JSX.Element => {
     );
 };
 
-export const getServerSideProps: GetServerSideProps = async () => {
+export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
+    const queryParam = 'id';
+    // eslint-disable-next-line prettier/prettier
+    const id = pipe(
+        extractQueryParam(context.query, queryParam),
+        O.getOrElse(constant('')),
+    );
+
     return {
         props: {
+            speciesid: id,
             species: await mightFailWithArray<species>()(allSpecies()),
             sources: await mightFailWithArray<source>()(allSources()),
         },

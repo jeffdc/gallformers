@@ -20,3 +20,7 @@
 .table-header {
     background-color:palegoldenrod;
 }
+
+.white-space-pre-wrap {
+    white-space: pre-wrap;
+}

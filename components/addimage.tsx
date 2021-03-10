@@ -66,6 +66,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                     small: '',
                     medium: '',
                     large: '',
+                    xlarge: '',
                     original: '',
                 });
             }

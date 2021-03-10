@@ -206,7 +206,7 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
                     <Col id="description" className="lead p-3">
                         {selectedSource && selectedSource.description && (
                             <span>
-                                <p className="small">{deserialize(selectedSource.description)}</p>
+                                <p className="small white-space-pre-wrap">{deserialize(selectedSource.description)}</p>
                                 <a className="small" href={selectedSource.externallink} target="_blank" rel="noreferrer">
                                     {selectedSource.externallink}
                                 </a>
@@ -216,6 +216,7 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
                 </Row>
                 <Row>
                     <Col>
+                        <Edit id={species.id} type="speciessource" />
                         <strong>Further Information:</strong>
                     </Col>
                     <Col xs={2}>

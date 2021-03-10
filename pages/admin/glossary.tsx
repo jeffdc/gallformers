@@ -63,7 +63,6 @@ const Glossary = (props: Props): JSX.Element => {
                     if (glos == undefined) {
                         throw new Error(`Somehow we have a family selection that does not exist?! familyid: ${id}`);
                     }
-
                     reset({
                         value: [glos],
                         definition: glos.definition,
