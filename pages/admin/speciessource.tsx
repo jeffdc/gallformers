@@ -101,12 +101,9 @@ const SpeciesSource = ({ speciesid, species, sources }: Props): JSX.Element => {
         };
     };
 
-    const checkAlreadyExists = async () => {
+    const onChangeSpeciesOrSource = async () => {
         try {
-            const species = getValues('species');
-            const source = getValues('source');
-
-            const { sp, so } = lookup(species, source);
+            const { sp, so } = lookup(getValues('species'), getValues('source'));
             if (sp != undefined) {
                 setExistingSpeciesId(sp.id);
                 router.replace(`?id=${sp.id}`, undefined, { shallow: true });
@@ -117,7 +114,6 @@ const SpeciesSource = ({ speciesid, species, sources }: Props): JSX.Element => {
 
             if (sp != undefined && so != undefined) {
                 const res = await fetch(`../api/speciessource?speciesid=${sp?.id}&sourceid=${so?.id}`);
-
                 if (res.status === 200) {
                     const s = (await res.json()) as SpeciesSourceApi[];
                     if (s && s.length > 0) {
@@ -129,9 +125,23 @@ const SpeciesSource = ({ speciesid, species, sources }: Props): JSX.Element => {
                             useasdefault: s[0].useasdefault > 0,
                             externallink: s[0].externallink,
                         });
+                        return;
+                    } else {
+                        // mapping does not exist
+                        setExisting(false);
+                        reset({
+                            species: sp.name,
+                            source: so.title,
+                            description: '',
+                            useasdefault: false,
+                            externallink: '',
+                            delete: false,
+                        });
                     }
                 } else {
-                    setExisting(false);
+                    // non 200 return
+                    console.error(await res.text());
+                    throw new Error(`Failed to check for species-source mapping for species '${sp}' and source '${so}'.`);
                 }
             }
         } catch (e) {
@@ -220,7 +230,7 @@ const SpeciesSource = ({ speciesid, species, sources }: Props): JSX.Element => {
                                 placeholder="Species"
                                 options={species.map((h) => h.name)}
                                 isInvalid={!!errors.species}
-                                onBlur={checkAlreadyExists}
+                                onBlur={onChangeSpeciesOrSource}
                                 clearButton
                             />
                             {errors.species && <span className="text-danger">You must provide a species or genus to map.</span>}
@@ -240,7 +250,7 @@ const SpeciesSource = ({ speciesid, species, sources }: Props): JSX.Element => {
                                 placeholder="Source"
                                 options={sources.map((h) => h.title)}
                                 isInvalid={!!errors.source}
-                                onBlur={checkAlreadyExists}
+                                onBlur={onChangeSpeciesOrSource}
                                 clearButton
                             />
                             {errors.source && <span className="text-danger">You must provide a source to map.</span>}
