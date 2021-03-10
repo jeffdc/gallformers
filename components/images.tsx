@@ -50,9 +50,10 @@ const Images = ({ species }: Props): JSX.Element => {
                         {species.images.map((image) => (
                             <CarouselItem key={image.id}>
                                 <Image
-                                    src={image.xlarge ? image.xlarge : image.original}
+                                    //TODO when all images have XL versions show those here rather than the original
+                                    src={image.original}
                                     unoptimized
-                                    alt={`photo of ${species.name}`}
+                                    alt={`image of ${species.name}`}
                                     width={width - 2 * pad}
                                     height={(width - 2 * pad) * hwRatio}
                                     objectFit={'contain'}
@@ -73,7 +74,7 @@ const Images = ({ species }: Props): JSX.Element => {
                             <Image
                                 src={currentImage ? currentImage.small : ''}
                                 unoptimized
-                                alt={`photo of ${species.name}`}
+                                alt={`image of ${species.name}`}
                                 width={'300'}
                                 height={'200'}
                                 objectFit={'contain'}
@@ -144,7 +145,7 @@ const Images = ({ species }: Props): JSX.Element => {
                         <Image
                             src={image.small}
                             unoptimized
-                            alt={`photo of ${species.name}`}
+                            alt={`image of ${species.name}`}
                             width={'300'}
                             height={'200'}
                             objectFit={'contain'}
