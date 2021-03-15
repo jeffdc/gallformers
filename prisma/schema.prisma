@@ -171,11 +171,11 @@ model gall {
 }
 
 model gallspecies {
-  id         Int     @id @default(autoincrement())
   gall_id    Int
   species_id Int
   gall       gall    @relation(fields: [gall_id], references: [id])
   species    species @relation(fields: [species_id], references: [id])
+  @@id([gall_id, species_id])
 }
 
 model galllocation {

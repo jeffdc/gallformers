@@ -3,7 +3,6 @@ import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { AbundanceApi, SimpleSpecies, SpeciesApi } from '../api/apitypes';
-import { adaptTaxonomy } from '../api/taxonomy';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
@@ -52,6 +51,21 @@ export const speciesByName = (name: string): TE.TaskEither<Error, O.Option<speci
         });
 
     return pipe(TE.tryCatch(species, handleError), TE.map(O.fromNullable));
+};
+
+export const adaptSpecies = (s: species): SpeciesApi => {
+    // set the default description to make the caller's life easier
+    const d = s.speciessource.find((s) => s.useasdefault === 1)?.description;
+    return {
+        ...s,
+        description: O.fromNullable(d),
+        taxoncode: s.taxoncode ? s.taxoncode : '',
+        abundance: optionalWith(s.abundance, adaptAbundance),
+        images: s.image.map(adaptImage),
+        aliases: s.aliasspecies.map((a) => a.alias),
+        speciessource: [],
+        // taxonomy: s.taxonomy.map((t) => adaptTaxonomy(t.taxonomy)),
+    };
 };
 
 export const getSpecies = (

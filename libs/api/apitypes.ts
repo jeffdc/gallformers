@@ -373,13 +373,6 @@ export type DeleteResult = {
     count: number;
 };
 
-export type UpsertResult = {
-    type: string;
-    name: string;
-    count: number;
-    id: number | undefined;
-};
-
 export type GlossaryEntryUpsertFields = Deletable & {
     word: string;
     definition: string;

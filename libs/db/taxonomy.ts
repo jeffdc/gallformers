@@ -1,9 +1,8 @@
-import { constant, pipe, flow } from 'fp-ts/lib/function';
+import { Prisma } from '@prisma/client';
+import { constant, flow, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
-import * as A from 'fp-ts/lib/Array';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import error from 'next/error';
 import {
     ALL_FAMILY_TYPES,
     DeleteResult,
@@ -14,7 +13,6 @@ import {
     SpeciesApi,
 } from '../api/apitypes';
 import {
-    adaptTaxonomy,
     FAMILY,
     FamilyTaxonomy,
     FGS,
@@ -26,13 +24,11 @@ import {
     toTaxonomyEntry,
 } from '../api/taxonomy';
 import { logger } from '../utils/logger';
-import { ExtractTFromPromiseReturn } from '../utils/types';
+import { ExtractTFromPromise } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
-import { gallDeleteSteps } from './gall';
 import { getSpecies } from './species';
 import { extractId } from './utils';
-import { taxonomytaxonomy } from '@prisma/client';
 
 /**
  * Fetch a TaxonomyEntry by taxonomy id.
@@ -107,7 +103,7 @@ export const allFamilies = (
 
     return pipe(
         TE.tryCatch(families, handleError),
-        TE.map((f) => f.map(adaptTaxonomy)),
+        TE.map((f) => f.map(toTaxonomyEntry)),
     );
 };
 
@@ -124,7 +120,7 @@ export const allSections = (): TaskEither<Error, TaxonomyEntry[]> => {
 
     return pipe(
         TE.tryCatch(sections, handleError),
-        TE.map((f) => f.map(adaptTaxonomy)),
+        TE.map((f) => f.map(toTaxonomyEntry)),
     );
 };
 
@@ -164,7 +160,7 @@ export const taxonomyForSpecies = (id: number): TaskEither<Error, FGS> => {
         return r;
     };
 
-    const toFGS = (tax: ExtractTFromPromiseReturn<typeof tree>): FGS => {
+    const toFGS = (tax: ExtractTFromPromise<ReturnType<typeof tree>>): FGS => {
         const genus = tax.taxonomy;
         const family = tax.taxonomy.parent;
         const section = O.fromNullable(tax.taxonomy.taxonomy.find((t) => t.type === SECTION));
@@ -273,13 +269,14 @@ export const getAllSpeciesForSection = (id: number): TaskEither<Error, SimpleSpe
     return pipe(TE.tryCatch(sectionSpecies, handleError));
 };
 
-const taxonomyDeleteSteps = (id: number): Promise<number>[] => {
+const taxonomyDeleteSteps = (id: number) => {
     return [
-        db.taxonomy
-            .deleteMany({
-                where: { id: id },
-            })
-            .then((batch) => batch.count),
+        db.speciestaxonomy.deleteMany({
+            where: { taxonomy_id: id },
+        }),
+        db.taxonomy.deleteMany({
+            where: { id: id },
+        }),
     ];
 };
 
@@ -289,22 +286,16 @@ const taxonomyDeleteSteps = (id: number): Promise<number>[] => {
  * @param id
  */
 export const deleteTaxonomyEntry = (id: number): TaskEither<Error, DeleteResult> => {
-    const deleteTx = (speciesids: number[]) =>
-        TE.tryCatch(() => db.$transaction(gallDeleteSteps(speciesids).concat(taxonomyDeleteSteps(id))), handleError);
-
-    const toDeleteResult = (batch: number[]): DeleteResult => {
+    const toDeleteResult = (batch: Prisma.BatchPayload[]): DeleteResult => {
         return {
             type: 'taxonomy',
-            name: '',
-            count: batch.reduce((acc, v) => acc + v, 0),
+            name: id.toString(),
+            count: batch.reduce((acc, v) => acc + v.count, 0),
         };
     };
 
     return pipe(
-        getAllSpeciesForFamily(id),
-        TE.map((species) => species.map(extractId)),
-        TE.map(deleteTx),
-        TE.flatten,
+        TE.tryCatch(() => db.$transaction(taxonomyDeleteSteps(id)), handleError),
         TE.map(toDeleteResult),
     );
 };
@@ -314,22 +305,33 @@ export const deleteTaxonomyEntry = (id: number): TaskEither<Error, DeleteResult>
  * @param f
  * @returns the count of the number of records added, will be 1 for success and 0 for a failure
  */
-export const upsertTaxonomy = (f: TaxonomyUpsertFields): TaskEither<Error, number> => {
+export const upsertTaxonomy = (f: TaxonomyUpsertFields): TaskEither<Error, TaxonomyEntry> => {
+    const connectSpecies = f.species.map((s) => ({ species: { connect: { id: s } } }));
+
     const upsert = () =>
         db.taxonomy.upsert({
-            where: { id: !f.id ? -1 : f.id },
+            where: { id: f.id },
             update: {
                 name: f.name,
                 description: f.description,
+                speciestaxonomy: {
+                    deleteMany: { taxonomy_id: f.id },
+                    create: connectSpecies,
+                },
             },
             create: {
                 name: f.name,
                 description: f.description,
                 type: f.type,
+                speciestaxonomy: {
+                    create: connectSpecies,
+                },
             },
         });
+
+    // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(upsert, handleError),
-        TE.map((sp) => sp.id),
+        TE.map(toTaxonomyEntry),
     );
 };

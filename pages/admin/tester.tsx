@@ -1,8 +1,7 @@
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import React from 'react';
-import { gallById } from '../../libs/db/gall';
-import { getAllSpeciesForFamily, getAllSpeciesForSection } from '../../libs/db/taxonomy';
+import { allGalls } from '../../libs/db/gall';
 import { mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
@@ -24,7 +23,7 @@ const Tester = ({ data }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async () => {
     return {
         props: {
-            data: await mightFailWithArray()(getAllSpeciesForSection(304)),
+            data: await mightFailWithArray()(allGalls()),
         },
     };
 };

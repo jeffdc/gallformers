@@ -1,25 +1,23 @@
-import { yupResolver } from '@hookform/resolvers/yup';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
-import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Col, Row } from 'react-bootstrap';
-import { useForm } from 'react-hook-form';
+import React, { useState } from 'react';
+import { Button, Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
-import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { AdminFormFields, useAPIs } from '../../hooks/useAPIs';
+import useAdmin from '../../hooks/useadmin';
+import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { DeleteResult, SimpleSpecies } from '../../libs/api/apitypes';
+import { SimpleSpecies } from '../../libs/api/apitypes';
 import { TaxonomyEntry, TaxonomyUpsertFields } from '../../libs/api/taxonomy';
 import { allSpeciesSimple } from '../../libs/db/species';
 import { allSections, getAllSpeciesForSection } from '../../libs/db/taxonomy';
+import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
 
-const Schema = yup.object().shape({
+const schema = yup.object().shape({
     value: yup.mixed().required(),
     description: yup.string().required(),
 });
@@ -28,177 +26,201 @@ type Props = {
     id: string;
     sectSpecies: SimpleSpecies[];
     sections: TaxonomyEntry[];
-    species: SimpleSpecies[];
+    allSpecies: SimpleSpecies[];
 };
 
-type FormFields = AdminFormFields<TaxonomyEntry> & Omit<TaxonomyEntry, 'id' | 'name'>;
+type FormFields = (AdminFormFields<TaxonomyEntry> & Omit<TaxonomyEntry, 'id' | 'name'>) & { species: SimpleSpecies[] };
 
-const Section = ({ id, sectSpecies, sections, species }: Props): JSX.Element => {
-    if (!sections) throw new Error(`The input props for families can not be null or undefined.`);
-    const [secs, setSecs] = useState(sections);
-    const [error, setError] = useState('');
-    const [existingId, setExistingId] = useState<number | undefined>(id && id !== '' ? parseInt(id) : undefined);
-    const [deleteResults, setDeleteResults] = useState<DeleteResult>();
+const updateSection = (s: TaxonomyEntry, newValue: string) => ({
+    ...s,
+    name: newValue,
+});
 
-    const { register, handleSubmit, errors, control, reset } = useForm<FormFields>({
-        mode: 'onBlur',
-        resolver: yupResolver(Schema),
-    });
+const emptyForm = {
+    value: [],
+    description: '',
+};
+
+const convertToFields = (sp: SimpleSpecies[]) => (s: TaxonomyEntry): FormFields => ({
+    ...s,
+    del: false,
+    value: [s],
+    species: sp,
+});
+
+const fetchSectionSpecies = async (sec: TaxonomyEntry): Promise<SimpleSpecies[]> => {
+    const res = await fetch(`../api/taxonomy/section/${sec.id}`);
+    if (res.status === 200) {
+        return (await res.json()) as SimpleSpecies[];
+    } else {
+        console.error(await res.text());
+        throw new Error('Failed to fetch species for the selected section. Check console.');
+    }
+};
+
+const toUpsertFields = (fields: FormFields, name: string, id: number): TaxonomyUpsertFields => {
+    return {
+        ...fields,
+        name: name,
+        type: 'section',
+        id: id,
+        species: fields.species.map((s) => s.id),
+    };
+};
+
+const Section = ({ id, sectSpecies, sections, allSpecies }: Props): JSX.Element => {
+    const [selectedSpecies, setSelectedSpecies] = useState(sectSpecies);
+    const onDataChangeCallback = async (sec: TaxonomyEntry | undefined): Promise<TaxonomyEntry | undefined> => {
+        if (sec != undefined) {
+            const s = await fetchSectionSpecies(sec);
+            setSelectedSpecies(s);
+        }
+        return sec;
+    };
+
+    const {
+        data,
+        selected,
+        setSelected,
+        showRenameModal,
+        setShowRenameModal,
+        error,
+        setError,
+        deleteResults,
+        setDeleteResults,
+        renameWithNewValue,
+        form,
+        formSubmit,
+    } = useAdmin(
+        'Section',
+        id,
+        sections,
+        updateSection,
+        convertToFields(selectedSpecies),
+        toUpsertFields,
+        { keyProp: 'name', delEndpoint: '../api/taxonomy/', upsertEndpoint: '../api/taxonomy/upsert' },
+        schema,
+        emptyForm,
+        onDataChangeCallback,
+    );
 
     const router = useRouter();
 
-    const onSectionChange = useCallback(
-        (id: number | undefined) => {
-            if (id == undefined) {
-                reset({
-                    value: [],
-                    description: '',
-                });
-            } else {
-                try {
-                    const sec = secs.find((f) => f.id === id);
-                    if (sec == undefined) {
-                        throw new Error(`Somehow we have a section selection that does not exist?! sectionid: ${id}`);
-                    }
-                    reset({
-                        value: [sec],
-                        species: sectSpecies,
-                        description: sec.description,
-                    });
-                } catch (e) {
-                    setError(e);
-                    console.error(e);
-                }
-            }
-        },
-        [secs, reset],
-    );
-
-    useEffect(() => {
-        onSectionChange(existingId);
-    }, [existingId, onSectionChange]);
-
-    const { doDeleteOrUpsert } = useAPIs<TaxonomyEntry, TaxonomyUpsertFields>('name', '../api/section/', '../api/section/upsert');
-
-    const onSubmit = async (data: FormFields) => {
-        const postDelete = (id: number | string, result: DeleteResult) => {
-            setSecs(secs.filter((s) => s.id !== id));
-            setDeleteResults(result);
-        };
-
-        const postUpdate = (res: Response) => {
-            router.push(res.url);
-        };
-
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const convertFormFieldsToUpsert = (fields: FormFields, name: string, id: number): TaxonomyUpsertFields => ({
-            ...fields,
-            name: name,
-            type: 'section',
-            id: typeof fields.value[0].id === 'number' ? fields.value[0].id : parseInt(fields.value[0].id),
-        });
-
-        await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert)
-            .then(() => reset())
-            .catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
+    const onSubmit = async (fields: FormFields) => {
+        await formSubmit(fields);
     };
 
     return (
-        <Auth>
-            <>
-                <Head>
-                    <title>Add/Edit Sections</title>
-                </Head>
-
-                {error.length > 0 && (
-                    <Alert variant="danger" onClose={() => setError('')} dismissible>
-                        <Alert.Heading>Uh-oh</Alert.Heading>
-                        <p>{error}</p>
-                    </Alert>
-                )}
-
-                <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
-                    <h4>Add or Edit a Section</h4>
-                    <Row className="form-group">
-                        <Col>
-                            Name:
-                            <ControlledTypeahead
-                                control={control}
-                                name="value"
-                                placeholder="Name"
-                                options={secs}
-                                labelKey="name"
-                                clearButton
-                                isInvalid={!!errors.value}
-                                newSelectionPrefix="Add a new Section: "
-                                allowNew={true}
-                                onChangeWithNew={(e, isNew) => {
-                                    if (isNew || !e[0]) {
-                                        setExistingId(undefined);
-                                        router.replace(``, undefined, { shallow: true });
-                                    } else {
-                                        setExistingId(e[0].id);
-                                        router.replace(`?id=${e[0].id}`, undefined, { shallow: true });
-                                    }
-                                }}
-                            />
-                            {errors.value && <span className="text-danger">The Name is required.</span>}
-                        </Col>
-                    </Row>
-                    <Row className="form-group">
-                        <Col>
-                            Description:
-                            <textarea name="description" className="form-control" ref={register} rows={1} />
-                        </Col>
-                    </Row>
-                    <Row className="form-group">
-                        <Col>
-                            Species:
-                            <ControlledTypeahead
-                                control={control}
-                                name="species"
-                                placeholder="Mapped Species"
-                                options={species}
-                                labelKey="name"
-                                clearButton
-                                multiple
-                            />
-                        </Col>
-                    </Row>
-                    <Row className="fromGroup" hidden={!existingId}>
-                        <Col xs="1">Delete?:</Col>
-                        <Col className="mr-auto">
-                            <input name="del" type="checkbox" className="form-check-input" ref={register} />
-                        </Col>
-                    </Row>
-                    <Row className="form-input">
-                        <Col>
-                            <input type="submit" className="button" value="Submit" />
-                        </Col>
-                    </Row>
-                    <Row hidden={!deleteResults}>
-                        <Col>{`Deleted ${deleteResults?.name}.`}</Col>☹️
-                    </Row>
-                </form>
-            </>
-        </Auth>
+        <Admin
+            type="Section"
+            keyField="name"
+            editName={{ getDefault: () => selected?.name, setNewValue: renameWithNewValue(onSubmit) }}
+            setShowModal={setShowRenameModal}
+            showModal={showRenameModal}
+            setError={setError}
+            error={error}
+            setDeleteResults={setDeleteResults}
+            deleteResults={deleteResults}
+        >
+            <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pr-4">
+                <h4>Add or Edit a Section</h4>
+                <Row className="form-group">
+                    <Col>
+                        <Row>
+                            <Col>Name:</Col>
+                        </Row>
+                        <Row>
+                            <Col>
+                                <ControlledTypeahead
+                                    control={form.control}
+                                    name="value"
+                                    placeholder="Name"
+                                    options={data}
+                                    labelKey="name"
+                                    clearButton
+                                    isInvalid={!!form.errors.value}
+                                    newSelectionPrefix="Add a new Section: "
+                                    allowNew={true}
+                                    onChangeWithNew={(e, isNew) => {
+                                        if (isNew || !e[0]) {
+                                            setSelected(undefined);
+                                            router.replace(``, undefined, { shallow: true });
+                                        } else {
+                                            setSelected(e[0]);
+                                            router.replace(`?id=${e[0].id}`, undefined, { shallow: true });
+                                        }
+                                    }}
+                                />
+                                {form.errors.value && <span className="text-danger">The Name is required.</span>}
+                            </Col>
+                            {selected && (
+                                <Col xs={1}>
+                                    <Button variant="secondary" className="btn-sm" onClick={() => setShowRenameModal(true)}>
+                                        Rename
+                                    </Button>
+                                </Col>
+                            )}
+                        </Row>
+                    </Col>
+                </Row>
+                <Row className="form-group">
+                    <Col>
+                        Description:
+                        <textarea name="description" className="form-control" ref={form.register} rows={1} />
+                    </Col>
+                </Row>
+                <Row className="form-group">
+                    <Col>
+                        Species:
+                        <ControlledTypeahead
+                            control={form.control}
+                            name="species"
+                            placeholder="Mapped Species"
+                            options={allSpecies}
+                            labelKey="name"
+                            clearButton
+                            multiple
+                        />
+                    </Col>
+                </Row>
+                <Row className="form-group" hidden={!selected}>
+                    <Col xs="1">Delete?:</Col>
+                    <Col className="mr-auto">
+                        <input name="del" type="checkbox" className="form-check-input" ref={form.register} />
+                    </Col>
+                </Row>
+                <Row className="form-input">
+                    <Col>
+                        <input type="submit" className="button" value="Submit" />
+                    </Col>
+                </Row>
+            </form>
+        </Admin>
     );
 };
 
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
     const queryParam = 'id';
-    // eslint-disable-next-line prettier/prettier
-    const id = pipe(
+    const { id, sectSpecies } = await pipe(
         extractQueryParam(context.query, queryParam),
-        O.getOrElse(constant('')),
+        O.map(parseInt),
+        O.map((id) => {
+            const species = getAllSpeciesForSection(id);
+            return { id: id, sectSpecies: species };
+        }),
+        O.map(async ({ id, sectSpecies }) => ({
+            id: id.toString(),
+            sectSpecies: await mightFailWithArray<SimpleSpecies>()(sectSpecies),
+        })),
+        O.getOrElse(constant(Promise.resolve({ id: '', sectSpecies: new Array<SimpleSpecies>() }))),
     );
 
     return {
         props: {
             id: id,
-            sectSpecies: await mightFailWithArray<SimpleSpecies>()(getAllSpeciesForSection(parseInt(id))),
+            sectSpecies: sectSpecies,
             sections: await mightFailWithArray<TaxonomyEntry>()(allSections()),
-            species: await mightFailWithArray<SimpleSpecies>()(allSpeciesSimple()),
+            allSpecies: await mightFailWithArray<SimpleSpecies>()(allSpeciesSimple()),
         },
     };
 };

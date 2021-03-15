@@ -15,36 +15,42 @@ import { DeleteResult } from './apitypes';
  * @param res
  * @param fDelete
  */
-export async function apiIdEndpoint(
+export async function apiIdEndpoint<T>(
     req: NextApiRequest,
     res: NextApiResponse,
-    fDelete: (id: number) => TE.TaskEither<Error, DeleteResult>,
+    fDelete: ((id: number) => TE.TaskEither<Error, DeleteResult>) | undefined = undefined,
+    fGet: ((id: number) => TE.TaskEither<Error, T>) | undefined = undefined,
 ): Promise<void> {
     const session = await getSession({ req });
     if (!session) {
         res.status(401).end();
     }
 
-    if (req.method === 'DELETE') {
-        const invalidQueryErr: Err = {
-            status: 400,
-            msg: 'No valid query provided. You must provide an id value to delete.',
-        };
+    const invalidQueryErr: Err = {
+        status: 400,
+        msg: `No valid query provided. You must provide an id value to ${req.method}.`,
+    };
 
-        await pipe(
+    const runRequest = <T>(f: (id: number) => TE.TaskEither<Error, T>): Promise<never> =>
+        pipe(
             extractQueryParam(req.query, 'id'),
             O.map(parseInt),
-            O.map(fDelete),
+            O.map<number, TE.TaskEither<Error, T>>(f),
             O.map(TE.mapLeft(toErr)),
             // eslint-disable-next-line prettier/prettier
             O.fold(
-                () => E.left<Err, TE.TaskEither<Err, DeleteResult>>(invalidQueryErr), 
+                () => E.left<Err, TE.TaskEither<Err, T>>(invalidQueryErr),
                 E.right
             ),
             TE.fromEither,
             TE.flatten,
             TE.fold(sendErrResponse(res), sendSuccResponse(res)),
         )();
+
+    if (req.method === 'GET' && fGet != undefined) {
+        await runRequest(fGet);
+    } else if (req.method === 'DELETE' && fDelete != undefined) {
+        runRequest(fDelete);
     } else {
         res.status(405).end();
     }

@@ -1,23 +1,21 @@
-import { yupResolver } from '@hookform/resolvers/yup';
-import * as O from 'fp-ts/lib/Option';
 import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
-import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Col, Row } from 'react-bootstrap';
-import { useForm } from 'react-hook-form';
+import React from 'react';
+import { Button, Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
-import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { AdminFormFields, useAPIs } from '../../hooks/useAPIs';
+import useAdmin from '../../hooks/useadmin';
+import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { DeleteResult, SourceApi, SourceUpsertFields } from '../../libs/api/apitypes';
+import { SourceApi, SourceUpsertFields } from '../../libs/api/apitypes';
 import { allSources } from '../../libs/db/source';
+import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
 
-const Schema = yup.object().shape({
+const schema = yup.object().shape({
     value: yup.mixed().required(),
     author: yup.string().required(),
     pubyear: yup.string().matches(/([12][0-9]{3})/),
@@ -31,168 +29,163 @@ type Props = {
 
 type FormFields = AdminFormFields<SourceApi> & Omit<SourceApi, 'id' | 'title'>;
 
-const Source = (props: Props): JSX.Element => {
-    const { register, handleSubmit, errors, control, reset } = useForm<FormFields>({
-        mode: 'onBlur',
-        resolver: yupResolver(Schema),
-    });
-    const [existingId, setExistingId] = useState<number | undefined>(
-        props.id && props.id !== '' ? parseInt(props.id) : undefined,
+const updateSource = (s: SourceApi, newValue: string) => ({
+    ...s,
+    title: newValue,
+});
+
+const convertToFields = (s: SourceApi): FormFields => ({
+    ...s,
+    del: false,
+    value: [s],
+});
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const toUpsertFields = (fields: FormFields, name: string, id: number): SourceUpsertFields => {
+    return {
+        ...fields,
+        title: name,
+    };
+};
+
+const emptyForm = {
+    value: [],
+    author: '',
+    pubyear: '',
+    link: '',
+    citation: '',
+};
+
+const Source = ({ id, sources }: Props): JSX.Element => {
+    const {
+        data,
+        selected,
+        setSelected,
+        showRenameModal: showModal,
+        setShowRenameModal: setShowModal,
+        error,
+        setError,
+        deleteResults,
+        setDeleteResults,
+        renameWithNewValue,
+        form,
+        formSubmit,
+    } = useAdmin(
+        'Source',
+        id,
+        sources,
+        updateSource,
+        convertToFields,
+        toUpsertFields,
+        { keyProp: 'title', delEndpoint: '../api/source/', upsertEndpoint: '../api/source/upsert' },
+        schema,
+        emptyForm,
     );
-    const [deleteResults, setDeleteResults] = useState<DeleteResult>();
-    const [sources, setSources] = useState(props.sources);
-    const [error, setError] = useState('');
 
     const router = useRouter();
-    const { doDeleteOrUpsert } = useAPIs<SourceApi, SourceUpsertFields>('title', '../api/source/', '../api/source/upsert');
 
-    const onFamilyChange = useCallback(
-        (id: number | undefined) => {
-            if (id == undefined) {
-                reset({
-                    value: [],
-                    author: '',
-                    pubyear: '',
-                    link: '',
-                    citation: '',
-                });
-            } else {
-                try {
-                    const source = sources.find((s) => s.id === id);
-                    if (source == undefined) {
-                        throw new Error(`Somehow we have a source selection that does not exist?! sourceid: ${id}`);
-                    }
-                    reset({
-                        value: [source],
-                        author: source.author,
-                        pubyear: source.pubyear,
-                        link: source.link,
-                        citation: source.citation,
-                    });
-                } catch (e) {
-                    console.error(e);
-                    setError(e);
-                }
-            }
-        },
-        [sources, reset],
-    );
-
-    useEffect(() => {
-        onFamilyChange(existingId);
-    }, [existingId, onFamilyChange]);
-
-    const onSubmit = async (data: FormFields) => {
-        const postDelete = (id: number | string, result: DeleteResult) => {
-            setSources(sources.filter((s) => s.id !== id));
-            setDeleteResults(result);
-        };
-
-        const postUpdate = (res: Response) => {
-            router.push(res.url);
-        };
-
-        const convertFormFieldsToUpsert = (fields: FormFields, title: string, id: number): SourceUpsertFields => ({
-            ...fields,
-            title: title,
-        });
-
-        await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert)
-            .then(() => reset())
-            .catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
+    const onSubmit = async (fields: FormFields) => {
+        await formSubmit(fields);
     };
 
     return (
-        <Auth>
-            <>
-                <Head>
-                    <title>Add/Edit Sources</title>
-                </Head>
-
-                {error.length > 0 && (
-                    <Alert variant="danger" onClose={() => setError('')} dismissible>
-                        <Alert.Heading>Uh-oh</Alert.Heading>
-                        <p>{error}</p>
-                    </Alert>
-                )}
-
-                <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
-                    <h4>Add/Edit Sources</h4>
-                    <Row className="form-group">
-                        <Col>
-                            Title:
-                            <ControlledTypeahead
-                                control={control}
-                                name="value"
-                                onChangeWithNew={(e, isNew) => {
-                                    if (isNew || !e[0]) {
-                                        setExistingId(undefined);
-                                        router.replace(``, undefined, { shallow: true });
-                                    } else {
-                                        const source: SourceApi = e[0];
-                                        setExistingId(source.id);
-                                        router.replace(`?id=${source.id}`, undefined, { shallow: true });
-                                    }
-                                }}
-                                placeholder="Title"
-                                options={sources}
-                                labelKey="title"
-                                clearButton
-                                isInvalid={!!errors.value}
-                                newSelectionPrefix="Add a new Source: "
-                                allowNew={true}
-                            />
-                            {errors.value && <span className="text-danger">The Title is required.</span>}
-                        </Col>
-                    </Row>
-                    <Row className="form-group">
-                        <Col>
-                            Author:
-                            <input type="text" placeholder="Author(s)" name="author" className="form-control" ref={register} />
-                            {errors.author && <span className="text-danger">You must provide an author.</span>}
-                        </Col>
-                        <Col>
-                            Publication Year:
-                            <input type="text" placeholder="Pub Year" name="pubyear" className="form-control" ref={register} />
-                            {errors.pubyear && <span className="text-danger">You must provide a valid 4 digit year.</span>}
-                        </Col>
-                    </Row>
-                    <Row className="form-group">
-                        <Col>
-                            Reference Link:
-                            <input type="text" placeholder="Link" name="link" className="form-control" ref={register} />
-                        </Col>
-                    </Row>
-                    <Row className="form-group">
-                        <Col>
-                            <p>
-                                Citation (
-                                <a href="https://www.mybib.com/tools/mla-citation-generator" target="_blank" rel="noreferrer">
-                                    MLA Form
-                                </a>
-                                ):
-                            </p>
-                            <textarea name="citation" placeholder="Citation" className="form-control" ref={register} rows={8} />
-                            {errors.citation && <span className="text-danger">You must provide a citation in MLA form.</span>}
-                        </Col>
-                    </Row>
-                    <Row className="fromGroup" hidden={!existingId}>
-                        <Col xs="1">Delete?:</Col>
-                        <Col className="mr-auto">
-                            <input name="del" type="checkbox" className="form-check-input" ref={register} />
-                        </Col>
-                    </Row>
-                    <Row className="formGroup">
-                        <Col>
-                            <input type="submit" className="button" value="Submit" />
-                        </Col>
-                    </Row>
-                    <Row hidden={!deleteResults}>
-                        <Col>{`Deleted ${deleteResults?.name}.`}</Col>
-                    </Row>
-                </form>
-            </>
-        </Auth>
+        <Admin
+            type="Source"
+            keyField="title"
+            editName={{ getDefault: () => selected?.title, setNewValue: renameWithNewValue(onSubmit) }}
+            setShowModal={setShowModal}
+            showModal={showModal}
+            setError={setError}
+            error={error}
+            setDeleteResults={setDeleteResults}
+            deleteResults={deleteResults}
+        >
+            <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pr-4">
+                <h4>Add/Edit Sources</h4>
+                <Row className="form-group">
+                    <Col>
+                        <Row>
+                            <Col>Title:</Col>
+                        </Row>
+                        <Row>
+                            <Col>
+                                <ControlledTypeahead
+                                    control={form.control}
+                                    name="value"
+                                    onChangeWithNew={(e, isNew) => {
+                                        if (isNew || !e[0]) {
+                                            setSelected(undefined);
+                                            router.replace(``, undefined, { shallow: true });
+                                        } else {
+                                            const source: SourceApi = e[0];
+                                            setSelected(source);
+                                            router.replace(`?id=${source.id}`, undefined, { shallow: true });
+                                        }
+                                    }}
+                                    placeholder="Title"
+                                    options={data}
+                                    labelKey="title"
+                                    clearButton
+                                    isInvalid={!!form.errors.value}
+                                    newSelectionPrefix="Add a new Source: "
+                                    allowNew={true}
+                                />
+                                {form.errors.value && <span className="text-danger">The Title is required.</span>}
+                            </Col>
+                            {selected && (
+                                <Col xs={1}>
+                                    <Button variant="secondary" className="btn-sm" onClick={() => setShowModal(true)}>
+                                        Rename
+                                    </Button>
+                                </Col>
+                            )}
+                        </Row>
+                    </Col>
+                </Row>
+                <Row className="form-group">
+                    <Col>
+                        Author:
+                        <input type="text" placeholder="Author(s)" name="author" className="form-control" ref={form.register} />
+                        {form.errors.author && <span className="text-danger">You must provide an author.</span>}
+                    </Col>
+                    <Col>
+                        Publication Year:
+                        <input type="text" placeholder="Pub Year" name="pubyear" className="form-control" ref={form.register} />
+                        {form.errors.pubyear && <span className="text-danger">You must provide a valid 4 digit year.</span>}
+                    </Col>
+                </Row>
+                <Row className="form-group">
+                    <Col>
+                        Reference Link:
+                        <input type="text" placeholder="Link" name="link" className="form-control" ref={form.register} />
+                    </Col>
+                </Row>
+                <Row className="form-group">
+                    <Col>
+                        <p>
+                            Citation (
+                            <a href="https://www.mybib.com/tools/mla-citation-generator" target="_blank" rel="noreferrer">
+                                MLA Form
+                            </a>
+                            ):
+                        </p>
+                        <textarea name="citation" placeholder="Citation" className="form-control" ref={form.register} rows={8} />
+                        {form.errors.citation && <span className="text-danger">You must provide a citation in MLA form.</span>}
+                    </Col>
+                </Row>
+                <Row className="fromGroup" hidden={!selected}>
+                    <Col xs="1">Delete?:</Col>
+                    <Col className="mr-auto">
+                        <input name="del" type="checkbox" className="form-check-input" ref={form.register} />
+                    </Col>
+                </Row>
+                <Row className="formGroup">
+                    <Col>
+                        <input type="submit" className="button" value="Submit" />
+                    </Col>
+                </Row>
+            </form>
+        </Admin>
     );
 };
 

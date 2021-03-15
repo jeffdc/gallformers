@@ -117,10 +117,5 @@ export type TaxonomyUpsertFields = {
     name: string;
     description: string;
     type: TaxonomyType;
+    species: number[];
 };
-
-export const adaptTaxonomy = (t: taxonomy): TaxonomyApi => ({
-    ...t,
-    type: pipe(TaxonomyTypeT.decode(t.type), E.fold(invalidTaxonomyType, identity)),
-    children: [],
-});

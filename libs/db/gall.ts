@@ -36,7 +36,7 @@ import { connectIfNotNull, connectWithIds, extractId } from './utils';
 export const getGalls = (
     whereClause: Prisma.gallspeciesWhereInput[] = [],
     operatorAnd = true,
-    distinct: Prisma.GallspeciesScalarFieldEnum[] = ['id'],
+    // distinct: Prisma.GallspeciesScalarFieldEnum[] = [],
 ): TaskEither<Error, GallApi[]> => {
     const w = operatorAnd
         ? { AND: [...whereClause, { species: { taxoncode: GallTaxon } }] }
@@ -44,7 +44,6 @@ export const getGalls = (
     const galls = () =>
         db.gallspecies.findMany({
             include: {
-                // family: true,
                 species: {
                     include: {
                         abundance: true,
@@ -77,7 +76,7 @@ export const getGalls = (
                 },
             },
             where: w,
-            distinct: distinct,
+            // distinct: distinct,
             // orderBy: { name: 'asc' },
         });
 
@@ -88,7 +87,7 @@ export const getGalls = (
         galls.flatMap((g) => {
             if (g.gall == null) {
                 logger.error(
-                    `Detected a species with id ${g.id} that is supposed to be a gall but does not have a corresponding gall!`,
+                    `Detected a species with id ${g.species.id} that is supposed to be a gall but does not have a corresponding gall!`,
                 );
                 return []; // will resolve to nothing since we are in a flatMap
             }
