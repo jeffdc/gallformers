@@ -66,7 +66,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         setError,
         deleteResults,
         setDeleteResults,
-        renameWithNewValue,
+        renameCallback,
         form,
         formSubmit,
     } = useAdmin(
@@ -91,7 +91,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         <Admin
             type="Family"
             keyField="name"
-            editName={{ getDefault: () => selected?.name, setNewValue: renameWithNewValue(onSubmit) }}
+            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback(onSubmit) }}
             setShowModal={setShowRenameModal}
             showModal={showRenameModal}
             setError={setError}

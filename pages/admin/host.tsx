@@ -11,6 +11,7 @@ import 'react-bootstrap-table-next/dist/react-bootstrap-table2.min.css';
 import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
 import ControlledTypeahead from '../../components/controlledtypeahead';
+import { RenameEvent } from '../../components/editname';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
@@ -141,7 +142,7 @@ const Host = ({ id, hs, fgs, families, sections, abundances }: Props): JSX.Eleme
         setError,
         deleteResults,
         setDeleteResults,
-        renameWithNewValue,
+        renameCallback,
         form,
         formSubmit,
     } = useAdmin(
@@ -159,6 +160,19 @@ const Host = ({ id, hs, fgs, families, sections, abundances }: Props): JSX.Eleme
 
     const router = useRouter();
 
+    const rename = async (fields: FormFields, e: RenameEvent) => {
+        if (e.old == undefined) throw new Error('Trying to add alias for old name but no old name present!');
+
+        aliasData.push({
+            id: -1,
+            name: e.old,
+            type: 'scientific',
+            description: 'Previous name',
+        });
+
+        return onSubmit(fields);
+    };
+
     const onSubmit = async (fields: FormFields) => {
         formSubmit(fields);
     };
@@ -167,7 +181,7 @@ const Host = ({ id, hs, fgs, families, sections, abundances }: Props): JSX.Eleme
         <Admin
             type="Host"
             keyField="name"
-            editName={{ getDefault: () => selected?.name, setNewValue: renameWithNewValue(onSubmit) }}
+            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback(rename) }}
             setShowModal={setShowRenameModal}
             showModal={showRenameModal}
             setError={setError}

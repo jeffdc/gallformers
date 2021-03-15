@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { DeepPartial, UnpackNestedValue, useForm, UseFormMethods } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import * as yup from 'yup';
+import { RenameEvent } from '../components/editname';
 import { DeleteResult } from '../libs/api/apitypes';
 import { WithID } from '../libs/utils/types';
 import { AdminFormFields, useAPIs } from './useAPIs';
@@ -18,7 +19,7 @@ type AdminData<T, FormFields> = {
     setError: (err: string) => void;
     deleteResults?: DeleteResult;
     setDeleteResults: (dr: DeleteResult) => void;
-    renameWithNewValue: (doRename: (s: FormFields) => void) => (newValue: string) => void;
+    renameCallback: (doRename: (s: FormFields, e: RenameEvent) => void) => (e: RenameEvent) => void;
     form: UseFormMethods<FormFields>;
     formSubmit: (fields: FormFields) => Promise<void>;
 };
@@ -26,7 +27,7 @@ type AdminData<T, FormFields> = {
 /**
  *  * A hook to handle universal adminstration data and logic. Works in conjunction with @Admin
 
- * @param type a string represnting the type of data being Adminster.
+ * @param type a string representing the type of data being Adminstered.
  * @param id the initial id that is selected, could be undefined
  * @param ts an array of the data type
  * @param update a function to create a new T from a give T and a new value for its "key"
@@ -94,15 +95,15 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
             .catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
     };
 
-    const renameWithNewValue = (doRename: (s: FormFields) => void) => (newValue: string) => {
+    const renameCallback = (doRename: (s: FormFields, e: RenameEvent) => void) => (e: RenameEvent) => {
         if (selected == undefined) {
             const msg = `You encountered a bug. The current selection is invalid in the middle of a rename operation.`;
             console.error(msg);
             setError(msg);
             return;
         }
-        const updated = update(selected, newValue);
-        doRename(toFormFields(updated));
+        const updated = update(selected, e.new);
+        doRename(toFormFields(updated), e);
         setData(data.map((d) => (d.id === updated.id ? updated : d)));
         setSelected(updated);
     };
@@ -140,7 +141,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         setError: setError,
         deleteResults: deleteResults,
         setDeleteResults: setDeleteResults,
-        renameWithNewValue: renameWithNewValue,
+        renameCallback: renameCallback,
         form: form,
         formSubmit: formSubmit,
     };

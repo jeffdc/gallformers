@@ -63,7 +63,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
         setError,
         deleteResults,
         setDeleteResults,
-        renameWithNewValue,
+        renameCallback,
         form,
         formSubmit,
     } = useAdmin(
@@ -88,7 +88,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
         <Admin
             type="Glossary"
             keyField="word"
-            editName={{ getDefault: () => selected?.word, setNewValue: renameWithNewValue(onSubmit) }}
+            editName={{ getDefault: () => selected?.word, renameCallback: renameCallback(onSubmit) }}
             setShowModal={setShowModal}
             showModal={showModal}
             setError={setError}

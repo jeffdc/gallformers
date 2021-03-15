@@ -67,7 +67,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
         setError,
         deleteResults,
         setDeleteResults,
-        renameWithNewValue,
+        renameCallback,
         form,
         formSubmit,
     } = useAdmin(
@@ -92,7 +92,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
         <Admin
             type="Source"
             keyField="title"
-            editName={{ getDefault: () => selected?.title, setNewValue: renameWithNewValue(onSubmit) }}
+            editName={{ getDefault: () => selected?.title, renameCallback: renameCallback(onSubmit) }}
             setShowModal={setShowModal}
             showModal={showModal}
             setError={setError}

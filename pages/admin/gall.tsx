@@ -9,6 +9,7 @@ import { Button, Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
 import ControlledTypeahead from '../../components/controlledtypeahead';
+import { RenameEvent } from '../../components/editname';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
@@ -199,7 +200,7 @@ const Gall = ({
         setError,
         deleteResults,
         setDeleteResults,
-        renameWithNewValue,
+        renameCallback,
         form,
         formSubmit,
     } = useAdmin(
@@ -217,6 +218,19 @@ const Gall = ({
 
     const router = useRouter();
 
+    const rename = async (fields: FormFields, e: RenameEvent) => {
+        if (e.old == undefined) throw new Error('Trying to add alias for old name but no old name present!');
+
+        aliasData.push({
+            id: -1,
+            name: e.old,
+            type: 'scientific',
+            description: 'Previous name',
+        });
+
+        return onSubmit(fields);
+    };
+
     const onSubmit = async (fields: FormFields) => {
         formSubmit(fields);
     };
@@ -225,7 +239,7 @@ const Gall = ({
         <Admin
             type="Gall"
             keyField="name"
-            editName={{ getDefault: () => selected?.name, setNewValue: renameWithNewValue(onSubmit) }}
+            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback(rename) }}
             setShowModal={setShowRenameModal}
             showModal={showRenameModal}
             setError={setError}

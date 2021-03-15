@@ -9,7 +9,7 @@ import { Button, Col, Container, ListGroup, OverlayTrigger, Row, Tooltip } from 
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import { GallSimple, HostApi } from '../../../libs/api/apitypes';
-import { SECTION, TaxTreeForSpecies } from '../../../libs/api/taxonomy';
+import { FGS } from '../../../libs/api/taxonomy';
 import { allHostIds, hostById } from '../../../libs/db/host';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
@@ -18,7 +18,7 @@ import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
     host: HostApi;
-    taxonomy: TaxTreeForSpecies;
+    taxonomy: FGS;
 };
 
 // eslint-disable-next-line react/display-name
@@ -43,9 +43,6 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
     if (router.isFallback) {
         return <div>Loading...</div>;
     }
-
-    const family = taxonomy.taxonomy.parent != null ? taxonomy.taxonomy.parent : { id: -1, name: '' };
-    const section = taxonomy.taxonomy.taxonomy.find((t) => t.type === SECTION);
 
     // the galls will not be sorted, so sort them for display
     host.galls.sort((a, b) => a.name.localeCompare(b.name));
@@ -81,7 +78,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                             <Tooltip id="datacomplete">
                                                 {host.datacomplete
                                                     ? 'The data for this species is as complete as we can make it.'
-                                                    : 'We are still working on this species so data is missing.'}
+                                                    : 'We are still working on this species so data might be missing.'}
                                             </Tooltip>
                                         }
                                     >
@@ -95,13 +92,19 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                 {host.aliases.map((a) => a.name).join(', ')}
                                 <p className="font-italic">
                                     <strong>Family:</strong>
-                                    <Link key={family.id} href={`/family/${family.id}`}>
-                                        <a> {family.name}</a>
+                                    <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
+                                        <a> {taxonomy.family.name}</a>
                                     </Link>
-                                    {section && (
-                                        <span>
-                                            <strong> Section: </strong> {section.name}
-                                        </span>
+                                    {pipe(
+                                        taxonomy.section,
+                                        O.map((s) => (
+                                            // eslint-disable-next-line react/jsx-key
+                                            <span>
+                                                <strong> Section: </strong> {s.name} ({s.description})
+                                            </span>
+                                        )),
+                                        O.map((s) => s),
+                                        O.getOrElse(constant(<></>)),
                                     )}
                                 </p>
                             </Col>

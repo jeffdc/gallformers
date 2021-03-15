@@ -3,7 +3,7 @@ import React from 'react';
 import { Alert, Col, Row } from 'react-bootstrap';
 import { Toaster } from 'react-hot-toast';
 import Auth from '../../components/auth';
-import EditName from '../../components/editname';
+import EditName, { RenameEvent } from '../../components/editname';
 import { DeleteResult } from '../api/apitypes';
 
 export type AdminProps = {
@@ -12,7 +12,7 @@ export type AdminProps = {
     children: JSX.Element;
     editName?: {
         getDefault: () => string | undefined;
-        setNewValue: (newValue: string) => void;
+        renameCallback: (e: RenameEvent) => void;
     };
     showModal: boolean;
     setShowModal: (show: boolean) => void;
@@ -49,7 +49,7 @@ const Admin = (props: AdminProps): JSX.Element => {
                         defaultValue={props.editName.getDefault()}
                         showModal={props.showModal}
                         setShowModal={props.setShowModal}
-                        setNewValue={props.editName.setNewValue}
+                        renameCallback={props.editName.renameCallback}
                     />
                 )}
 
