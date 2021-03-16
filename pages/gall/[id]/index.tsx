@@ -11,7 +11,8 @@ import { Button, Col, Container, ListGroup, OverlayTrigger, Row, Tooltip } from 
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import InfoTip from '../../../components/infotip';
-import { DetachableBoth, GallApi, GallHost, SourceApi, SpeciesSourceApi, TaxTreeForSpecies } from '../../../libs/api/apitypes';
+import { DetachableBoth, GallApi, GallHost, SourceApi, SpeciesSourceApi } from '../../../libs/api/apitypes';
+import { FGS } from '../../../libs/api/taxonomy';
 import { allGallIds, gallById } from '../../../libs/db/gall';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkTextFromGlossary } from '../../../libs/pages/glossary';
@@ -22,7 +23,7 @@ import { bugguideUrl, errorThrow, gScholarUrl, iNatUrl } from '../../../libs/uti
 
 type Props = {
     species: GallApi;
-    taxonomy: TaxTreeForSpecies;
+    taxonomy: FGS;
 };
 
 type SortPropertyOption = {
@@ -66,8 +67,6 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
     if (router.isFallback) {
         return <div>Loading...</div>;
     }
-
-    const family = taxonomy.taxonomy.parent != null ? taxonomy.taxonomy.parent : { id: -1, name: '' };
 
     // Initially sort the list of sources by most recent year.
     species.speciessource.sort((a, b) => -a.source.pubyear.localeCompare(b.source.pubyear));
@@ -144,8 +143,8 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
                                 {species.aliases.map((a) => a.name).join(', ')}
                                 <p className="font-italic">
                                     <strong>Family:</strong>
-                                    <Link key={family.id} href={`/family/${family.id}`}>
-                                        <a> {family.name}</a>
+                                    <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
+                                        <a> {taxonomy.family.name}</a>
                                     </Link>
                                 </p>
                             </Col>
@@ -297,12 +296,12 @@ export const getStaticProps: GetStaticProps = async (context) => {
         TE.getOrElse(errorThrow),
     )();
 
-    const taxonomy = await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy');
+    const fgs = await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy');
 
     return {
         props: {
             species: { ...gall, speciessource: sources },
-            taxonomy: taxonomy,
+            taxonomy: fgs,
         },
         revalidate: 1,
     };
