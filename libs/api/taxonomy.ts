@@ -1,4 +1,4 @@
-import { Prisma, species, speciestaxonomy, taxonomy, taxonomyalias, taxonomytaxonomy } from '@prisma/client';
+import { species, speciestaxonomy, taxonomy, taxonomyalias, taxonomytaxonomy } from '@prisma/client';
 import * as E from 'fp-ts/lib/Either';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
@@ -14,7 +14,7 @@ export const FAMILY: TaxonomyType = 'family';
 export const SECTION: TaxonomyType = 'section';
 export const GENUS: TaxonomyType = 'genus';
 export const invalidTaxonomyType = (e: t.Errors): TaxonomyType => {
-    throw new Error(`Got an invalid taxonomy type: '${e}'.`);
+    throw new Error(`Got an invalid taxonomy type: '${JSON.stringify(e, null, ' ')}'.`);
 };
 
 export type TaxonomyEntry = {

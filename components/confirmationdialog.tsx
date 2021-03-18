@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Alert, Button } from 'react-bootstrap';
+import { Button, Col, Modal, Row } from 'react-bootstrap';
 
 export type ConfirmationOptions = {
     catchOnCancel?: boolean;
@@ -22,27 +22,35 @@ type ConfirmationDialogProps = ConfirmationOptions & {
 
 export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({ show, title, variant, message, onSubmit, onClose }) => {
     return (
-        <Alert show={show}>
-            <Alert.Heading id="alert-dialog-title">{title}</Alert.Heading>
-            {message}
-            <div className="d-flex justify-content-end">
-                {variant === 'danger' && (
-                    <>
-                        <Button color="primary" onClick={onSubmit}>
-                            Yes
-                        </Button>
-                        <Button color="primary" onClick={onClose} autoFocus>
-                            CANCEL
-                        </Button>
-                    </>
-                )}
+        <Modal show={show}>
+            <Modal.Header id="alert-dialog-title">
+                <Modal.Title>{title}</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>{message}</Modal.Body>
+            <Modal.Footer>
+                <div className="d-flex justify-content-end">
+                    {variant === 'danger' && (
+                        <Row>
+                            <Col xs={4}>
+                                <Button variant="primary" onClick={onSubmit}>
+                                    Yes
+                                </Button>
+                            </Col>
+                            <Col xs={4}>
+                                <Button variant="secondary" onClick={onClose} autoFocus>
+                                    CANCEL
+                                </Button>
+                            </Col>
+                        </Row>
+                    )}
 
-                {variant === 'info' && (
-                    <Button color="primary" onClick={onSubmit}>
-                        OK
-                    </Button>
-                )}
-            </div>
-        </Alert>
+                    {variant === 'info' && (
+                        <Button color="primary" onClick={onSubmit}>
+                            OK
+                        </Button>
+                    )}
+                </div>
+            </Modal.Footer>
+        </Modal>
     );
 };

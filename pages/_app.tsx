@@ -5,6 +5,7 @@ import Head from 'next/head';
 import React, { CSSProperties } from 'react';
 import { Col, Row } from 'react-bootstrap';
 import 'react-bootstrap-typeahead/css/Typeahead.css';
+import { ConfirmationServiceProvider } from '../hooks/useconfirmation';
 import Footer from '../layouts/footer';
 import Header from '../layouts/header';
 import './style.css';
@@ -39,11 +40,13 @@ function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
                         <Header />
                     </Col>
                 </Row>
-                <Row className="pt-4" style={contentStyle}>
-                    <Col>
-                        <Component {...pageProps} />
-                    </Col>
-                </Row>
+                <ConfirmationServiceProvider>
+                    <Row className="pt-4" style={contentStyle}>
+                        <Col>
+                            <Component {...pageProps} />
+                        </Col>
+                    </Row>
+                </ConfirmationServiceProvider>
                 <Footer />
             </div>
         </Provider>

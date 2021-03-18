@@ -18,7 +18,6 @@ export const ConfirmationServiceProvider = ({ children }: Props): JSX.Element =>
     }>();
 
     const openConfirmation = (options: ConfirmationOptions) => {
-        console.log(`opening with ${options}`);
         setConfirmationState(options);
         return new Promise<void>((resolve, reject) => {
             awaitingPromiseRef.current = { resolve, reject };
@@ -26,7 +25,6 @@ export const ConfirmationServiceProvider = ({ children }: Props): JSX.Element =>
     };
 
     const handleClose = () => {
-        console.log('closing');
         if (confirmationState?.catchOnCancel && awaitingPromiseRef.current) {
             awaitingPromiseRef.current.reject();
         }
@@ -35,7 +33,6 @@ export const ConfirmationServiceProvider = ({ children }: Props): JSX.Element =>
     };
 
     const handleSubmit = () => {
-        console.log('submitting');
         if (awaitingPromiseRef.current) {
             awaitingPromiseRef.current.resolve();
         }
@@ -44,16 +41,13 @@ export const ConfirmationServiceProvider = ({ children }: Props): JSX.Element =>
     };
 
     const shouldShow = (): boolean => {
-        console.log(`showing? ${confirmationState !== EmptyOptions} with ${JSON.stringify(confirmationState)}`);
         return confirmationState !== EmptyOptions;
     };
 
-    console.log('creating confirm thing');
     return (
         <>
-            <ConfirmationServiceContext.Provider value={openConfirmation}>{children}</ConfirmationServiceContext.Provider>
-
             <ConfirmationDialog show={shouldShow()} onSubmit={handleSubmit} onClose={handleClose} {...confirmationState} />
+            <ConfirmationServiceContext.Provider value={openConfirmation}>{children}</ConfirmationServiceContext.Provider>
         </>
     );
 };

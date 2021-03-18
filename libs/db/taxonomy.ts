@@ -124,7 +124,7 @@ export const allGenera = (taxon: typeof GallTaxon | typeof HostTaxon): TaskEithe
     const genera = () =>
         db.taxonomy.findMany({
             orderBy: { name: 'asc' },
-            where: { AND: [{ type: GENUS }, { speciestaxonomy: { every: { species: { taxoncode: taxon } } } }] },
+            where: { AND: [{ type: GENUS }, { speciestaxonomy: { some: { species: { taxoncode: taxon } } } }] },
         });
 
     return pipe(
@@ -140,6 +140,7 @@ export const allGenera = (taxon: typeof GallTaxon | typeof HostTaxon): TaskEithe
 export const allSections = (): TaskEither<Error, TaxonomyEntry[]> => {
     const sections = () =>
         db.taxonomy.findMany({
+            include: { parent: true },
             orderBy: { name: 'asc' },
             where: { type: SECTION },
         });

@@ -14,12 +14,21 @@ import ControlledTypeahead from '../../components/controlledtypeahead';
 import { RenameEvent } from '../../components/editname';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
+import { useConfirmation } from '../../hooks/useconfirmation';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { AbundanceApi, AliasApi, EmptyAbundance, HostApi, HOST_FAMILY_TYPES, SpeciesUpsertFields } from '../../libs/api/apitypes';
-import { EMPTY_FGS, FGS, TaxonomyEntry } from '../../libs/api/taxonomy';
+import {
+    AbundanceApi,
+    AliasApi,
+    EmptyAbundance,
+    HostApi,
+    HostTaxon,
+    HOST_FAMILY_TYPES,
+    SpeciesUpsertFields,
+} from '../../libs/api/apitypes';
+import { EMPTY_FGS, FGS, GENUS, TaxonomyEntry } from '../../libs/api/taxonomy';
 import { allHosts } from '../../libs/db/host';
 import { abundances } from '../../libs/db/species';
-import { allFamilies, allSections, taxonomyForSpecies } from '../../libs/db/taxonomy';
+import { allFamilies, allGenera, allSections, taxonomyForSpecies } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
 import { mightFail, mightFailWithArray } from '../../libs/utils/util';
 
@@ -29,6 +38,7 @@ type Props = {
     fgs: FGS;
     families: TaxonomyEntry[];
     sections: TaxonomyEntry[];
+    genera: TaxonomyEntry[];
     abundances: abundance[];
 };
 
@@ -54,7 +64,7 @@ const schema = yup.object().shape({
 });
 
 export type FormFields = AdminFormFields<HostApi> & {
-    genus: string;
+    genus: TaxonomyEntry[];
     family: TaxonomyEntry[];
     section: TaxonomyEntry[];
     abundance: AbundanceApi[];
@@ -73,23 +83,10 @@ const updateHost = (s: HostApi, newValue: string): HostApi => ({
 
 const emptyForm = {
     value: [],
-    genus: '',
+    genus: [],
     family: [],
     abundance: [EmptyAbundance],
 };
-
-const convertToFields = (fgs: FGS) => (s: HostApi): FormFields => ({
-    value: [s],
-    genus: extractGenus(s.name),
-    family: fgs.family != null ? [fgs.family] : [],
-    section: pipe(
-        fgs.section,
-        O.fold(constant([]), (s) => [s]),
-    ),
-    abundance: [pipe(s.abundance, O.getOrElse(constant(EmptyAbundance)))],
-    datacomplete: s.datacomplete,
-    del: false,
-});
 
 const fetchFGS = async (h: HostApi): Promise<FGS> => {
     const res = await fetch(`../api/taxonomy?id=${h.id}`);
@@ -101,9 +98,22 @@ const fetchFGS = async (h: HostApi): Promise<FGS> => {
     }
 };
 
-const Host = ({ id, hs, fgs, families, sections, abundances }: Props): JSX.Element => {
+const Host = ({ id, hs, fgs, genera, families, sections, abundances }: Props): JSX.Element => {
     const [theFGS, setTheFGS] = useState(fgs);
     const [aliasData, setAliasData] = useState<AliasApi[]>([]);
+
+    const convertToFields = (s: HostApi): FormFields => ({
+        value: [s],
+        genus: [theFGS.genus],
+        family: [theFGS.family],
+        section: pipe(
+            theFGS.section,
+            O.fold(constant([]), (s) => [s]),
+        ),
+        abundance: [pipe(s.abundance, O.getOrElse(constant(EmptyAbundance)))],
+        datacomplete: s.datacomplete,
+        del: false,
+    });
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): SpeciesUpsertFields => {
         return {
@@ -120,13 +130,8 @@ const Host = ({ id, hs, fgs, families, sections, abundances }: Props): JSX.Eleme
         if (s == undefined) {
             setAliasData([]);
         } else {
-            if (selected && extractGenus(s.name).localeCompare(extractGenus(selected.name)) != 0) {
-                console.log(`genus change ${s.name} -- ${selected.name}`);
-                // name change as usual
-                // also need to update the taxonomy, possibly adding a new Genus
-                // also need to think about family change
-            }
-            setTheFGS(await fetchFGS(s));
+            const newFGS = await fetchFGS(s);
+            setTheFGS(newFGS);
             setAliasData(s.aliases);
         }
         return s;
@@ -150,7 +155,7 @@ const Host = ({ id, hs, fgs, families, sections, abundances }: Props): JSX.Eleme
         id,
         hs,
         updateHost,
-        convertToFields(theFGS),
+        convertToFields,
         toUpsertFields,
         { keyProp: 'name', delEndpoint: '../api/host/', upsertEndpoint: '../api/host/upsert' },
         schema,
@@ -159,16 +164,44 @@ const Host = ({ id, hs, fgs, families, sections, abundances }: Props): JSX.Eleme
     );
 
     const router = useRouter();
+    const confirm = useConfirmation();
 
     const rename = async (fields: FormFields, e: RenameEvent) => {
-        if (e.old == undefined) throw new Error('Trying to add alias for old name but no old name present!');
+        if (e.old == undefined) throw new Error('Trying to add rename but old name is missing?!');
 
-        aliasData.push({
-            id: -1,
-            name: e.old,
-            type: 'scientific',
-            description: 'Previous name',
-        });
+        if (e.addAlias) {
+            aliasData.push({
+                id: -1,
+                name: e.old,
+                type: 'scientific',
+                description: 'Previous name',
+            });
+        }
+
+        // have to check for genus rename
+        const newGenus = extractGenus(e.new);
+        if (newGenus.localeCompare(extractGenus(e.old)) != 0) {
+            const g = genera.find((g) => g.name.localeCompare(newGenus) == 0);
+            if (g == undefined) {
+                return confirm({
+                    variant: 'danger',
+                    catchOnCancel: true,
+                    title: 'Are you sure want to create a new genus?',
+                    message: `Renaming the genus to ${newGenus} will create a new genus under the current family ${fields.family[0].name}. Do you want to continue?`,
+                }).then(() => {
+                    fields.genus[0] = {
+                        id: -1,
+                        description: '',
+                        name: newGenus,
+                        type: GENUS,
+                        parent: O.of(fields.family[0]),
+                    };
+                    return Promise.bind(onSubmit(fields));
+                });
+            } else {
+                fields.genus[0] = g;
+            }
+        }
 
         return onSubmit(fields);
     };
@@ -202,13 +235,6 @@ const Host = ({ id, hs, fgs, families, sections, abundances }: Props): JSX.Eleme
                     <Col>
                         <Row>
                             <Col xs={8}>Name (binomial):</Col>
-                            {selected && (
-                                <Col xs={1}>
-                                    <Button variant="secondary" className="btn-sm" onClick={() => setShowRenameModal(true)}>
-                                        Rename
-                                    </Button>
-                                </Col>
-                            )}
                         </Row>
                         <Row>
                             <Col>
@@ -230,7 +256,8 @@ const Host = ({ id, hs, fgs, families, sections, abundances }: Props): JSX.Eleme
                                     }}
                                     onBlurT={(e) => {
                                         if (!form.errors.value) {
-                                            form.setValue('genus', extractGenus(e.target.value));
+                                            const h = genera.find((h) => h.name.localeCompare(extractGenus(e.target.value)));
+                                            form.setValue('genus', h ? [h] : []);
                                         }
                                     }}
                                     placeholder="Name"
@@ -247,11 +274,26 @@ const Host = ({ id, hs, fgs, families, sections, abundances }: Props): JSX.Eleme
                                     </span>
                                 )}
                             </Col>
+                            {selected && (
+                                <Col xs={1}>
+                                    <Button variant="secondary" className="btn-sm" onClick={() => setShowRenameModal(true)}>
+                                        Rename
+                                    </Button>
+                                </Col>
+                            )}
                         </Row>
                     </Col>
+                </Row>
+                <Row className="form-group">
                     <Col>
                         Genus (filled automatically):
-                        <input type="text" name="genus" className="form-control" readOnly tabIndex={-1} ref={form.register} />
+                        <ControlledTypeahead
+                            control={form.control}
+                            name="genus"
+                            options={genera}
+                            labelKey="name"
+                            disabled={true}
+                        />
                     </Col>
                     <Col>
                         Family:
@@ -278,7 +320,7 @@ const Host = ({ id, hs, fgs, families, sections, abundances }: Props): JSX.Eleme
                         <ControlledTypeahead
                             control={form.control}
                             name="section"
-                            placeholder=""
+                            placeholder="Section"
                             options={sections}
                             labelKey="name"
                             clearButton
@@ -343,6 +385,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             hs: await mightFailWithArray<HostApi>()(allHosts()),
             fgs: fgs,
             families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(HOST_FAMILY_TYPES)),
+            genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon)),
             sections: await mightFailWithArray<TaxonomyEntry>()(allSections()),
             abundances: await mightFailWithArray<AbundanceApi>()(abundances()),
         },

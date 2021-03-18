@@ -12,6 +12,7 @@ import ControlledTypeahead from '../../components/controlledtypeahead';
 import { RenameEvent } from '../../components/editname';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
+import { useConfirmation } from '../../hooks/useconfirmation';
 import { extractQueryParam } from '../../libs/api/apipage';
 import * as AT from '../../libs/api/apitypes';
 import { EMPTY_FGS, FGS, GENUS, TaxonomyEntry } from '../../libs/api/taxonomy';
@@ -133,7 +134,6 @@ const Gall = ({
     const [aliasData, setAliasData] = useState<Array<AT.AliasApi>>([]);
 
     const convertToFields = (s: AT.GallApi): FormFields => {
-        // console.log(`${JSON.stringify(theFGS, null, '  ')}`);
         return {
             value: [s],
             genus: [theFGS.genus],
@@ -180,11 +180,7 @@ const Gall = ({
             setAliasData([]);
         } else {
             const newFGS = await fetchFGS(s);
-            // if (newFGS == undefined)
-            // console.log(`changing species to ${s.name} fetched new FGS:`);
-            // console.log(`from db: ${JSON.stringify(newFGS, null, '  ')}`);
             setTheFGS(newFGS);
-            // console.log(`afer set: ${JSON.stringify(theFGS, null, '  ')}`);
             setAliasData(s.aliases);
         }
         return s;
@@ -203,7 +199,6 @@ const Gall = ({
         renameCallback,
         form,
         formSubmit,
-        confirm,
     } = useAdmin(
         'Gall',
         id,
@@ -218,6 +213,7 @@ const Gall = ({
     );
 
     const router = useRouter();
+    const confirm = useConfirmation();
 
     const rename = async (fields: FormFields, e: RenameEvent) => {
         if (e.old == undefined) throw new Error('Trying to add rename but old name is missing?!');
@@ -236,24 +232,21 @@ const Gall = ({
         if (newGenus.localeCompare(extractGenus(e.old)) != 0) {
             const g = genera.find((g) => g.name.localeCompare(newGenus) == 0);
             if (g == undefined) {
-                console.log('new genus');
                 return confirm({
                     variant: 'danger',
                     catchOnCancel: true,
                     title: 'Are you sure want to create a new genus?',
                     message: `Renaming the genus to ${newGenus} will create a new genus under the current family ${fields.family[0].name}. Do you want to continue?`,
-                })
-                    .then(() => {
-                        fields.genus[0] = {
-                            id: -1,
-                            description: '',
-                            name: newGenus,
-                            type: GENUS,
-                            parent: O.of(fields.family[0]),
-                        };
-                        return Promise.bind(onSubmit(fields));
-                    })
-                    .catch(() => console.log('ugh'));
+                }).then(() => {
+                    fields.genus[0] = {
+                        id: -1,
+                        description: '',
+                        name: newGenus,
+                        type: GENUS,
+                        parent: O.of(fields.family[0]),
+                    };
+                    return Promise.bind(onSubmit(fields));
+                });
             } else {
                 fields.genus[0] = g;
             }

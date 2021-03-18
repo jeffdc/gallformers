@@ -36,7 +36,7 @@ export type AdminProps = {
 const Admin = (props: AdminProps): JSX.Element => {
     return (
         <Auth>
-            <ConfirmationServiceProvider>
+            <>
                 <Head>
                     <title>{`Add/ Edit ${props.type}s`}</title>
                 </Head>
@@ -66,7 +66,7 @@ const Admin = (props: AdminProps): JSX.Element => {
                 <Row hidden={!props.deleteResults}>
                     <Col>{`Deleted ${props.deleteResults?.name}.`}</Col>
                 </Row>
-            </ConfirmationServiceProvider>
+            </>
         </Auth>
     );
 };

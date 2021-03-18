@@ -93,36 +93,6 @@ export const allHostNames = (): TaskEither<Error, string[]> =>
         TE.map((hosts) => hosts.map((h) => h.name)),
     );
 
-// /**
-//  * Fetch all of the Genera and Sections for the hosts.
-//  */
-// export const allHostGenera = (): TaskEither<Error, TaxonomyEntry[]> => {
-//     const genera = () =>
-//         db.taxonomy.findMany({
-//             where: {
-//                 OR: [
-//                     {
-//                         AND: [
-//                             { type: GENUS },
-//                             {
-//                                 speciestaxonomy: {
-//                                     every: {
-//                                         species: {
-//                                             taxoncode: HostTaxon,
-//                                         },
-//                                     },
-//                                 },
-//                             },
-//                         ],
-//                     },
-//                     { type: SECTION },
-//                 ],
-//             },
-//         });
-
-//     return pipe(TE.tryCatch(genera, handleError), TE.map(toTaxonomyEntry));
-// };
-
 /**
  * Fetch all the ids for the hosts.
  * @returns

@@ -472,7 +472,6 @@ const gallCreateSteps = (gall: GallUpsertFields) => {
 };
 
 const gallUpdateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
-    console.log(`${JSON.stringify(gall, null, '  ')}`);
     return [
         db.species.update({
             where: { id: gall.id },

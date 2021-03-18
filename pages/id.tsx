@@ -243,7 +243,7 @@ const IDGall = (props: Props): JSX.Element => {
                                                 () => 'MISSING GENUS',
                                                 (p) => p.name,
                                             ),
-                                        )} (${tax.name})`;
+                                        )} (${tax.name} - ${tax.description})`;
                                     }
                                     return tax.name;
                                 } else {
@@ -390,7 +390,7 @@ const IDGall = (props: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async () => {
     const genera = await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon));
     const sections = await mightFailWithArray<TaxonomyEntry>()(allSections());
-    const sectionsAndGenera = [...genera, ...sections];
+    const sectionsAndGenera = [...genera, ...sections].sort((a, b) => a.name.localeCompare(b.name));
 
     return {
         props: {
