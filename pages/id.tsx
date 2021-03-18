@@ -1,5 +1,6 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { taxonomy } from '@prisma/client';
+import { pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -21,14 +22,15 @@ import {
     GallLocation,
     GallTexture,
     HostSimple,
+    HostTaxon,
     SearchQuery,
-    SECTION,
     ShapeApi,
-    TaxonomyWithParent,
     WallsApi,
 } from '../libs/api/apitypes';
+import { SECTION, TaxonomyEntry } from '../libs/api/taxonomy';
 import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
-import { allHostGenera, allHostsSimple } from '../libs/db/host';
+import { allHostsSimple } from '../libs/db/host';
+import { allGenera, allSections } from '../libs/db/taxonomy';
 import { defaultImage, truncateOptionString } from '../libs/pages/renderhelpers';
 import { checkGall } from '../libs/utils/gallsearch';
 import { capitalizeFirstLetter, mightFailWithArray } from '../libs/utils/util';
@@ -40,7 +42,7 @@ type SearchFormHostField = {
 
 type SearchFormGenusField = {
     host?: never;
-    genus: TaxonomyWithParent[];
+    genus: TaxonomyEntry[];
 };
 
 type SearchFormFields = SearchFormHostField | SearchFormGenusField;
@@ -78,7 +80,7 @@ const Schema = yup.object().shape(
 
 type Props = {
     hosts: HostSimple[];
-    genera: TaxonomyWithParent[];
+    sectionsAndGenera: TaxonomyEntry[];
     locations: GallLocation[];
     colors: ColorApi[];
     shapes: ShapeApi[];
@@ -89,20 +91,6 @@ type Props = {
 };
 
 const IDGall = (props: Props): JSX.Element => {
-    if (
-        !props.hosts ||
-        !props.genera ||
-        !props.locations ||
-        !props.colors ||
-        !props.shapes ||
-        !props.textures ||
-        !props.alignments ||
-        !props.walls ||
-        !props.cells
-    ) {
-        throw new Error('Invalid props passed to Search.');
-    }
-
     const [galls, setGalls] = useState(new Array<GallApi>());
     const [filtered, setFiltered] = useState(new Array<GallApi>());
     const [query, setQuery] = useState(emptySearchQuery());
@@ -245,11 +233,17 @@ const IDGall = (props: Props): JSX.Element => {
                             }}
                             placeholder="Genus"
                             clearButton
-                            options={props.genera}
-                            labelKey={(tax: TaxonomyWithParent) => {
+                            options={props.sectionsAndGenera}
+                            labelKey={(tax: TaxonomyEntry) => {
                                 if (tax) {
                                     if (tax.type === SECTION) {
-                                        return `${tax.parent.name} (${tax.name})`;
+                                        return `${pipe(
+                                            tax.parent,
+                                            O.fold(
+                                                () => 'MISSING GENUS',
+                                                (p) => p.name,
+                                            ),
+                                        )} (${tax.name})`;
                                     }
                                     return tax.name;
                                 } else {
@@ -394,11 +388,14 @@ const IDGall = (props: Props): JSX.Element => {
 };
 
 export const getServerSideProps: GetServerSideProps = async () => {
-    // get all of the data for the typeahead boxes
+    const genera = await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon));
+    const sections = await mightFailWithArray<TaxonomyEntry>()(allSections());
+    const sectionsAndGenera = [...genera, ...sections];
+
     return {
         props: {
             hosts: await mightFailWithArray<HostSimple>()(allHostsSimple()),
-            genera: await mightFailWithArray<taxonomy>()(allHostGenera()),
+            sectionsAndGenera: sectionsAndGenera,
             locations: await mightFailWithArray<GallLocation>()(locations()),
             colors: await mightFailWithArray<ColorApi>()(colors()),
             shapes: await mightFailWithArray<ShapeApi>()(shapes()),

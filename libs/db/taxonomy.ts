@@ -6,6 +6,8 @@ import { TaskEither } from 'fp-ts/lib/TaskEither';
 import {
     ALL_FAMILY_TYPES,
     DeleteResult,
+    GallTaxon,
+    HostTaxon,
     FamilyGallTypesTuples,
     FamilyHostTypesTuple,
     FamilyTypesTuple,
@@ -43,6 +45,13 @@ export const taxonomyEntryById = (id: number): TaskEither<Error, O.Option<Taxono
     // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(tax, handleError),
+        TE.map((t) => pipe(t, O.fromNullable, O.map(toTaxonomyEntry))),
+    );
+};
+
+export const taxonomyByName = (name: string): TaskEither<Error, O.Option<TaxonomyEntry>> => {
+    return pipe(
+        TE.tryCatch(() => db.taxonomy.findFirst({ where: { name: { equals: name } } }), handleError),
         TE.map((t) => pipe(t, O.fromNullable, O.map(toTaxonomyEntry))),
     );
 };
@@ -104,6 +113,23 @@ export const allFamilies = (
     return pipe(
         TE.tryCatch(families, handleError),
         TE.map((f) => f.map(toTaxonomyEntry)),
+    );
+};
+
+/**
+ * Fetch all genera for the given taxon.
+ * @param taxon
+ */
+export const allGenera = (taxon: typeof GallTaxon | typeof HostTaxon): TaskEither<Error, TaxonomyEntry[]> => {
+    const genera = () =>
+        db.taxonomy.findMany({
+            orderBy: { name: 'asc' },
+            where: { AND: [{ type: GENUS }, { speciestaxonomy: { every: { species: { taxoncode: taxon } } } }] },
+        });
+
+    return pipe(
+        TE.tryCatch(genera, handleError),
+        TE.map((g) => g.map(toTaxonomyEntry)),
     );
 };
 

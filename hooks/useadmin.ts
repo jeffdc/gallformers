@@ -4,10 +4,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { DeepPartial, UnpackNestedValue, useForm, UseFormMethods } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import * as yup from 'yup';
+import { ConfirmationOptions } from '../components/confirmationdialog';
 import { RenameEvent } from '../components/editname';
 import { DeleteResult } from '../libs/api/apitypes';
 import { WithID } from '../libs/utils/types';
 import { AdminFormFields, useAPIs } from './useAPIs';
+import { useConfirmation } from './useconfirmation';
 
 type AdminData<T, FormFields> = {
     data: T[];
@@ -22,6 +24,7 @@ type AdminData<T, FormFields> = {
     renameCallback: (doRename: (s: FormFields, e: RenameEvent) => void) => (e: RenameEvent) => void;
     form: UseFormMethods<FormFields>;
     formSubmit: (fields: FormFields) => Promise<void>;
+    confirm: (options: ConfirmationOptions) => Promise<void>;
 };
 
 /**
@@ -144,6 +147,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         renameCallback: renameCallback,
         form: form,
         formSubmit: formSubmit,
+        confirm: useConfirmation(),
     };
 };
 

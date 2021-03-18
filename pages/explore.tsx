@@ -5,7 +5,8 @@ import React from 'react';
 import { Card, Tab, Tabs } from 'react-bootstrap';
 import TreeMenu, { Item, TreeNodeInArray } from 'react-simple-tree-menu';
 import 'react-simple-tree-menu/dist/main.css';
-import { FamilyGeneraSpecies, GallTaxon } from '../libs/api/apitypes';
+import { GallTaxon } from '../libs/api/apitypes';
+import { FamilyTaxonomy } from '../libs/api/taxonomy';
 import { getFamiliesWithSpecies } from '../libs/db/taxonomy';
 import { getStaticPropsWith } from '../libs/pages/nextPageHelpers';
 import { hasProp } from '../libs/utils/util';
@@ -64,7 +65,7 @@ export const getStaticProps: GetStaticProps = async () => {
     };
 };
 
-const toTree = (fgs: readonly FamilyGeneraSpecies[]): TreeNodeInArray[] =>
+const toTree = (fgs: readonly FamilyTaxonomy[]): TreeNodeInArray[] =>
     fgs.map((f) => ({
         key: f.id.toString(),
         label: `${f.name} - ${f.description}`,

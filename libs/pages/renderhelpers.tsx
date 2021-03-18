@@ -1,7 +1,6 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { ImageApi, SpeciesApi } from '../api/apitypes';
-import { ImageSize } from '../images/images';
 import { truncateAtWord } from '../utils/util';
 
 /**
@@ -33,7 +32,7 @@ export const renderParagraph = (p: string): React.ReactNode => {
 export const defaultSource = <T extends { useasdefault: number; source: { pubyear: string } }>(
     speciessource: T[],
 ): T | undefined => {
-    if (speciessource && speciessource.length > 1) {
+    if (speciessource && speciessource.length > 0) {
         // if there is one marked as default, use that
         const source = speciessource.find((s) => s.useasdefault !== 0);
         if (source) return source;

@@ -4,6 +4,7 @@ import { Alert, Col, Row } from 'react-bootstrap';
 import { Toaster } from 'react-hot-toast';
 import Auth from '../../components/auth';
 import EditName, { RenameEvent } from '../../components/editname';
+import { ConfirmationServiceProvider } from '../../hooks/useconfirmation';
 import { DeleteResult } from '../api/apitypes';
 
 export type AdminProps = {
@@ -35,7 +36,7 @@ export type AdminProps = {
 const Admin = (props: AdminProps): JSX.Element => {
     return (
         <Auth>
-            <>
+            <ConfirmationServiceProvider>
                 <Head>
                     <title>{`Add/ Edit ${props.type}s`}</title>
                 </Head>
@@ -65,7 +66,7 @@ const Admin = (props: AdminProps): JSX.Element => {
                 <Row hidden={!props.deleteResults}>
                     <Col>{`Deleted ${props.deleteResults?.name}.`}</Col>
                 </Row>
-            </>
+            </ConfirmationServiceProvider>
         </Auth>
     );
 };

@@ -1,6 +1,6 @@
-import { species, speciestaxonomy, taxonomy, taxonomyalias, taxonomytaxonomy } from '@prisma/client';
-import { identity, pipe } from 'fp-ts/lib/function';
+import { Prisma, species, speciestaxonomy, taxonomy, taxonomyalias, taxonomytaxonomy } from '@prisma/client';
 import * as E from 'fp-ts/lib/Either';
+import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as t from 'io-ts';
 
@@ -22,18 +22,32 @@ export type TaxonomyEntry = {
     name: string;
     description: string;
     type: TaxonomyType;
+    parent: O.Option<TaxonomyEntry>;
 };
+
 export const EMPTY_TAXONOMYENTRY: TaxonomyEntry = {
     description: '',
     id: -1,
     name: '',
     type: 'family',
+    parent: O.none,
 };
 
-export const toTaxonomyEntry = (t: taxonomy): TaxonomyEntry => ({
-    ...t,
-    type: pipe(TaxonomyTypeT.decode(t.type), E.getOrElse(invalidTaxonomyType)),
-});
+export type DBTaxonomyWithParent =
+    | (taxonomy & {
+          parent?: taxonomy | null;
+      })
+    | null;
+
+export const toTaxonomyEntry = (t: DBTaxonomyWithParent): TaxonomyEntry => {
+    if (t == undefined) return EMPTY_TAXONOMYENTRY;
+
+    return {
+        ...t,
+        type: pipe(TaxonomyTypeT.decode(t.type), E.getOrElse(invalidTaxonomyType)),
+        parent: pipe(t.parent, O.fromNullable, O.map(toTaxonomyEntry)),
+    };
+};
 
 export type FGS = {
     family: TaxonomyEntry;
@@ -60,37 +74,6 @@ export type FamilyTaxonomy = taxonomy & {
             })[];
         };
     })[];
-};
-
-export type TaxonomyWithParent = taxonomy & {
-    parent: taxonomy;
-};
-
-export type TaxTreeForSpecies = speciestaxonomy & {
-    taxonomy: taxonomy & {
-        parent: taxonomy | null;
-        taxonomy: taxonomy[];
-        taxonomytaxonomy: (taxonomytaxonomy & {
-            taxonomy: taxonomy;
-            child: taxonomy;
-        })[];
-    };
-};
-
-export const EmptyTaxTreeForSpecies: TaxTreeForSpecies = {
-    id: -1,
-    species_id: -1,
-    taxonomy_id: -1,
-    taxonomy: {
-        id: -1,
-        description: '',
-        name: '',
-        parent: null,
-        parent_id: null,
-        taxonomy: [],
-        taxonomytaxonomy: [],
-        type: '',
-    },
 };
 
 export type TaxonomyTree = taxonomy & {

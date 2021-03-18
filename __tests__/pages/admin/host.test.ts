@@ -6,12 +6,12 @@ const { extractGenus, Schema } = testables;
 describe('Schema validation', () => {
     const fields: FormFields = {
         abundance: [],
-        commonnames: '',
         family: [],
         genus: '',
         value: [],
-        synonyms: '',
         del: false,
+        datacomplete: false,
+        section: [],
     };
     const fieldsWithFam = {
         ...fields,

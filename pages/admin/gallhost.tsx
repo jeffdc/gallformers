@@ -13,11 +13,13 @@ import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { GallApi, GallHostUpdateFields, SimpleSpecies } from '../../libs/api/apitypes';
+import { GallApi, GallHostUpdateFields, HostTaxon, SimpleSpecies } from '../../libs/api/apitypes';
 import { allGalls } from '../../libs/db/gall';
-import { allHostGenera, allHosts } from '../../libs/db/host';
+import { allHosts } from '../../libs/db/host';
 import { mightFailWithArray } from '../../libs/utils/util';
 import { useRouter } from 'next/router';
+import { allGenera } from '../../libs/db/taxonomy';
+import { TaxonomyEntry } from '../../libs/api/taxonomy';
 
 type Props = {
     id: string;
@@ -221,11 +223,13 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
         extractQueryParam(context.query, queryParam),
         O.getOrElse(constant('')),
     );
+    const genera = (await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon))).map((g) => g.name);
+
     return {
         props: {
             id: id,
             galls: await mightFailWithArray<GallApi>()(allGalls()),
-            genera: await mightFailWithArray<string>()(allHostGenera()),
+            genera: genera,
             hosts: await mightFailWithArray<SimpleSpecies>()(allHosts()),
         },
     };

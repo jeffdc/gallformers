@@ -115,6 +115,7 @@ export type SpeciesUpsertFields = {
 };
 
 export type GallUpsertFields = SpeciesUpsertFields & {
+    gallid: number; // if less than 0 then new
     hosts: number[];
     locations: number[];
     colors: number[];
@@ -318,6 +319,7 @@ export const EmptyWalls: WallsApi = {
 
 export type GallApi = SpeciesApi & {
     gall: {
+        id: number;
         gallalignment: AlignmentApi[];
         gallcells: CellsApi[];
         gallcolor: ColorApi[];

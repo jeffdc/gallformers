@@ -110,7 +110,7 @@ const Host = ({ id, hs, fgs, families, sections, abundances }: Props): JSX.Eleme
             abundance: fields.abundance[0].abundance,
             aliases: aliasData,
             datacomplete: fields.datacomplete,
-            fgs: theFGS,
+            fgs: theFGS.family.id == fields.family[0].id ? theFGS : { ...theFGS, family: fields.family[0] },
             id: id,
             name: name,
         };
@@ -120,8 +120,8 @@ const Host = ({ id, hs, fgs, families, sections, abundances }: Props): JSX.Eleme
         if (s == undefined) {
             setAliasData([]);
         } else {
-            if (selected && extractGenus(s.name) === extractGenus(selected.name)) {
-                console.log('genus change');
+            if (selected && extractGenus(s.name).localeCompare(extractGenus(selected.name)) != 0) {
+                console.log(`genus change ${s.name} -- ${selected.name}`);
                 // name change as usual
                 // also need to update the taxonomy, possibly adding a new Genus
                 // also need to think about family change
@@ -262,6 +262,7 @@ const Host = ({ id, hs, fgs, families, sections, abundances }: Props): JSX.Eleme
                             options={families}
                             labelKey="name"
                             clearButton
+                            disabled={!!selected}
                         />
                         {form.errors.family && (
                             <span className="text-danger">

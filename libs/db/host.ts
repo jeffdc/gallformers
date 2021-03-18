@@ -1,14 +1,14 @@
-import { abundance, alias, aliasspecies, host, image, Prisma, source, species, speciessource, taxonomy } from '@prisma/client';
-import { identity, pipe } from 'fp-ts/lib/function';
+import { abundance, alias, aliasspecies, host, image, Prisma, source, species, speciessource } from '@prisma/client';
+import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, HostApi, HostSimple, HostTaxon, SpeciesApi, SpeciesUpsertFields, UpsertResult } from '../api/apitypes';
-import { GENUS, SECTION } from '../api/taxonomy';
+import { DeleteResult, HostApi, HostSimple, HostTaxon, SpeciesApi, SpeciesUpsertFields } from '../api/apitypes';
+import { GENUS } from '../api/taxonomy';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
 import { adaptImage } from './images';
-import { adaptAbundance } from './species';
+import { adaptAbundance, connectOrCreateGenus } from './species';
 
 //TODO switch over to model like is beign done in gall.ts with derived type rather than explicit
 type DBHost = species & {
@@ -93,38 +93,35 @@ export const allHostNames = (): TaskEither<Error, string[]> =>
         TE.map((hosts) => hosts.map((h) => h.name)),
     );
 
-/**
- * Fetch all of the Genera and Sections for the hosts.
- */
-export const allHostGenera = (): TaskEither<Error, taxonomy[]> => {
-    const genera = () =>
-        db.taxonomy.findMany({
-            include: {
-                parent: true,
-            },
-            where: {
-                OR: [
-                    {
-                        AND: [
-                            { type: GENUS },
-                            {
-                                speciestaxonomy: {
-                                    every: {
-                                        species: {
-                                            taxoncode: HostTaxon,
-                                        },
-                                    },
-                                },
-                            },
-                        ],
-                    },
-                    { type: SECTION },
-                ],
-            },
-        });
+// /**
+//  * Fetch all of the Genera and Sections for the hosts.
+//  */
+// export const allHostGenera = (): TaskEither<Error, TaxonomyEntry[]> => {
+//     const genera = () =>
+//         db.taxonomy.findMany({
+//             where: {
+//                 OR: [
+//                     {
+//                         AND: [
+//                             { type: GENUS },
+//                             {
+//                                 speciestaxonomy: {
+//                                     every: {
+//                                         species: {
+//                                             taxoncode: HostTaxon,
+//                                         },
+//                                     },
+//                                 },
+//                             },
+//                         ],
+//                     },
+//                     { type: SECTION },
+//                 ],
+//             },
+//         });
 
-    return pipe(TE.tryCatch(genera, handleError));
-};
+//     return pipe(TE.tryCatch(genera, handleError), TE.map(toTaxonomyEntry));
+// };
 
 /**
  * Fetch all the ids for the hosts.
@@ -206,120 +203,71 @@ export const hostsByGenus = (genus: string): TaskEither<Error, HostApi[]> => {
     return getHosts([{ taxonomy: { every: { taxonomy: { type: GENUS } } } }]);
 };
 
-const hostUpsertSteps = (host: SpeciesUpsertFields): Promise<unknown>[] => {
-    // delete all aliases that are no longer present in the incoming list of aliases
-    const aliasDeletes = db.$executeRaw(`
-        DELETE FROM alias
-        WHERE alias.id IN (
-            SELECT a.id
-            FROM alias AS a
-                INNER JOIN
-                aliasspecies AS s ON a.id = s.alias_id
-                WHERE s.species_id = ${host.id} AND
-                      a.name NOT IN (${host.aliases.map((a) => `'${a.name}'`).join(',')}));
-    `);
+/////////////////////////////////////////
+const abundanceConnect = (host: SpeciesUpsertFields) => {
+    if (host.abundance) {
+        return { connect: { abundance: host.abundance } };
+    } else {
+        return {};
+    }
+};
 
-    const aliasUpserts = host.aliases.map(
-        (a) =>
-            db.alias.upsert({
-                where: { id: a.id },
-                update: {
-                    name: a.name,
-                    description: a.description,
-                    type: a.type,
-                },
-                create: {
-                    name: a.name,
-                    description: a.description,
-                    type: a.type,
-                    aliasspecies: { create: { species: { connect: { id: host.id } } } },
-                },
-            }),
-        // .then(() => 1),
-    );
-
-    // // have to do this here since Prisma connect only works if we already know the id of the alias which we do not
-    // // until after we create it.
-    // const newAliasSpeciesMappings = () => {
-    //     const newAliases = host.aliases.filter((a) => a.id < 0);
-    //     if (newAliases.length > 0) {
-    //         console.log(`
-    //         INSERT INTO aliasspecies (id, alias_id, species_id)
-    //         VALUES ${host.aliases
-    //             .filter((a) => a.id < 0)
-    //             .map((a) => `(NULL, ${a.id}, ${host.id})`)
-    //             .join(',')};
-    // `);
-    //         return db.$executeRaw(`
-    //             INSERT INTO aliasspecies (id, alias_id, species_id)
-    //             VALUES ${host.aliases
-    //                 .filter((a) => a.id < 0)
-    //                 .map((a) => `(NULL, ${a.id}, ${host.id})`)
-    //                 .join(',')};
-    //     `);
-    //     } else {
-    //         return Promise.resolve(0);
-    //     }
-    // };
-
-    const abundanceConnect = () => {
-        if (host.abundance) {
-            return { connect: { abundance: host.abundance } };
-        } else {
-            return {};
-        }
-    };
-
-    const connectOrCreateGenus = {
-        connectOrCreate: {
-            where: { taxonomy_id_species_id: { species_id: host.id, taxonomy_id: host.fgs.genus.id } },
-            create: {
-                taxonomy: {
-                    connectOrCreate: {
-                        where: { id: host.fgs.genus.id },
-                        create: {
-                            description: host.fgs.genus.description,
-                            name: host.fgs.genus.name,
-                            type: GENUS,
-                        },
-                    },
+const hostUpdateSteps = (host: SpeciesUpsertFields): Promise<unknown>[] => {
+    // eslint-disable-next-line prettier/prettier
+    return [
+        db.species.update({
+            where: { id: host.id },
+            data: {
+                abundance: abundanceConnect(host),
+                datacomplete: host.datacomplete,
+                name: host.name,
+                aliasspecies: {
+                    // typical hack, delete them all and then add
+                    deleteMany: { species_id: host.id },
+                    create: host.aliases.map((a) => ({
+                        alias: { create: { description: a.description, name: a.name, type: a.type } },
+                    })),
                 },
             },
-        },
-    };
+        }),
+        // the genus could have been changed and might be new
+        // TODO I believe that this can lead to orphaned genus records in the taxonomy table.
+        // Also could lead to a genus being assigned to >1 Family
+        db.speciestaxonomy.deleteMany({ where: { AND: [{ species_id: host.id }, { taxonomy: { type: GENUS } }] } }),
+        db.speciestaxonomy.create({
+            data: {
+                species: { connect: { id: host.id } },
+                taxonomy: connectOrCreateGenus(host),
+            },
+        }),
+    ];
+};
 
-    const upsertHost = db.species.upsert({
-        where: { id: host.id },
-        update: {
-            name: host.name,
-            datacomplete: host.datacomplete,
-            abundance: abundanceConnect(),
-            taxonomy: connectOrCreateGenus,
-        },
-        create: {
-            name: host.name,
-            taxontype: { connect: { taxoncode: HostTaxon } },
-            abundance: abundanceConnect(),
-            taxonomy: connectOrCreateGenus,
-        },
-        include: { taxonomy: { include: { taxonomy: true } } },
-    });
-    // .then((h) => {
-    //     // Family must already exist so just need to add a mapping if it is not already present
-    //     const genus = h.taxonomy.find((t) => t.taxonomy.type === GENUS);
-    //     if (genus == undefined) throw new Error('Could not find genus for species');
-
-    //     db.taxonomytaxonomy.upsert({
-    //         where: { taxonomy_id_child_id: { taxonomy_id: host.fgs.family.id, child_id: genus.taxonomy_id } },
-    //         create: { child: genus.taxonomy, taxonomy: host.fgs.family },
-    //         update: {},
-    //     });
-
-    //     // Section must already exist so just need to add mapping if present
-    //     return h.id;
-    // });
-
-    return [upsertHost, aliasDeletes, ...aliasUpserts];
+const hostCreateSteps = (host: SpeciesUpsertFields) => {
+    return [
+        db.species.create({
+            data: {
+                name: host.name,
+                taxontype: { connect: { taxoncode: HostTaxon } },
+                abundance: abundanceConnect(host),
+                taxonomy: {
+                    create: [
+                        // family must already exist
+                        { taxonomy: { connect: { id: host.fgs.family.id } } },
+                        // genus could be new
+                        {
+                            taxonomy: connectOrCreateGenus(host),
+                        },
+                    ],
+                },
+                aliasspecies: {
+                    create: host.aliases.map((a) => ({
+                        alias: { create: { description: a.description, name: a.name, type: a.type } },
+                    })),
+                },
+            },
+        }),
+    ];
 };
 
 /**
@@ -328,14 +276,16 @@ const hostUpsertSteps = (host: SpeciesUpsertFields): Promise<unknown>[] => {
  * @returns
  */
 export const upsertHost = (h: SpeciesUpsertFields): TaskEither<Error, SpeciesApi> => {
-    const upsertHostTx = TE.tryCatch(() => db.$transaction(hostUpsertSteps(h)), handleError);
+    const updateHostTx = TE.tryCatch(() => db.$transaction(hostUpdateSteps(h)), handleError);
+    const createHostTx = TE.tryCatch(() => db.$transaction(hostCreateSteps(h)), handleError);
+
     const getHost = () => {
         return hostByName(h.name);
     };
 
     // eslint-disable-next-line prettier/prettier
     return pipe(
-        upsertHostTx,
+        h.id < 0 ? createHostTx : updateHostTx,
         TE.chain(getHost),
         TE.fold(
             (e) => TE.left(e),

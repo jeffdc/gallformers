@@ -26,8 +26,8 @@ import { ExtractTFromPromise } from '../utils/types';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
 import { adaptImage } from './images';
-import { adaptAbundance, speciesByName } from './species';
-import { connectIfNotNull, connectWithIds, extractId } from './utils';
+import { adaptAbundance } from './species';
+import { connectIfNotNull, connectWithIds } from './utils';
 
 /**
  * A general way to fetch galls. Check this file for pre-defined helpers that are easier to use.
@@ -76,8 +76,6 @@ export const getGalls = (
                 },
             },
             where: w,
-            // distinct: distinct,
-            // orderBy: { name: 'asc' },
         });
 
     type DBGall = ExtractTFromPromise<ReturnType<typeof galls>>;
@@ -101,6 +99,7 @@ export const getGalls = (
                 abundance: optionalWith(g.species.abundance, adaptAbundance),
                 gall: {
                     ...g.gall,
+                    id: g.gall_id,
                     gallalignment: adaptAlignments(g.gall.gallalignment.map((a) => a.alignment)),
                     gallcells: adaptCells(g.gall.gallcells.map((c) => c.cells)),
                     gallcolor: adaptColors(g.gall.gallcolor.map((c) => c.color)),
@@ -114,7 +113,9 @@ export const getGalls = (
                 hosts: g.species.hosts.map((h) => {
                     // due to prisma problems we had to make these hostspecies relationships optional, however
                     // if we are here then there must be a record in the host table so it can not be null :(
-                    if (!h.hostspecies?.id || !h.hostspecies?.name) throw new Error('Invalid state.');
+                    if (!h.hostspecies?.id || !h.hostspecies?.name) {
+                        throw new Error('Invalid state. Hostspecies mappings are not as expected.');
+                    }
                     return {
                         id: h.hostspecies.id,
                         name: h.hostspecies.name,
@@ -126,7 +127,11 @@ export const getGalls = (
             return newg;
         });
 
-    return pipe(TE.tryCatch(galls, handleError), TE.map(clean));
+    return pipe(
+        TE.tryCatch(galls, handleError),
+        TE.map(clean),
+        TE.map((galls) => galls.sort((a, b) => a.name.localeCompare(b.name))),
+    );
 };
 
 /**
@@ -212,9 +217,13 @@ export const gallsByHostSection = (hostSection: string): TaskEither<Error, GallA
  * Fetches the gall with the given id
  * @param id the id of the gall to fetch
  */
-export const gallById = (id: number): TaskEither<Error, GallApi[]> => {
-    return getGalls([{ species: { id: id } }]);
-};
+export const gallById = (id: number): TaskEither<Error, GallApi[]> => getGalls([{ species: { id: id } }]);
+
+/**
+ * Fetch a gall by its name.
+ * @param name
+ */
+export const gallByName = (name: string): TaskEither<Error, GallApi[]> => getGalls([{ species: { name: name } }]);
 
 /**
  * Fetches all of the genera for all of the galls
@@ -406,103 +415,182 @@ export const cells = (): TaskEither<Error, CellsApi[]> => {
     return pipe(TE.tryCatch(cells, handleError), TE.map(adaptCells));
 };
 
-/**
- * Insert or update a gall based on its existence in the DB.
- * @param gall the data to update or insert
- * @returns a Promise when resolved that will containe the id of the species created (a Gall is just a specialization of a species)
- */
-export const upsertGall = (gall: GallUpsertFields): TaskEither<Error, number> => {
-    const spData = {
-        family: { connect: { name: gall.family } },
-        abundance: connectIfNotNull<Prisma.abundanceCreateOneWithoutSpeciesInput, string>('abundance', gall.abundance),
-        synonyms: gall.synonyms,
-        commonnames: gall.commonnames,
-    };
-
-    const create = () =>
+const gallCreateSteps = (gall: GallUpsertFields) => {
+    return [
         db.species.create({
             data: {
-                ...spData,
+                abundance: connectIfNotNull<Prisma.abundanceCreateOneWithoutSpeciesInput, string>('abundance', gall.abundance),
+                datacomplete: gall.datacomplete,
                 name: gall.name,
-                // genus: gall.name.split(' ')[0],
                 taxontype: { connect: { taxoncode: GallTaxon } },
                 hosts: {
                     create: connectWithIds('hostspecies', gall.hosts),
                 },
-                gall: {
+                gallspecies: {
                     create: {
-                        gallalignment: { create: connectWithIds('alignment', gall.alignments) },
-                        gallcells: { create: connectWithIds('cells', gall.cells) },
-                        gallcolor: { create: connectWithIds('color', gall.colors) },
-                        detachable: detachableFromString(gall.detachable).id,
-                        gallshape: { create: connectWithIds('shape', gall.shapes) },
-                        gallwalls: { create: connectWithIds('walls', gall.walls) },
-                        taxontype: { connect: { taxoncode: GallTaxon } },
-                        galllocation: { create: connectWithIds('location', gall.locations) },
-                        galltexture: { create: connectWithIds('texture', gall.textures) },
+                        gall: {
+                            create: {
+                                gallalignment: { create: connectWithIds('alignment', gall.alignments) },
+                                gallcells: { create: connectWithIds('cells', gall.cells) },
+                                gallcolor: { create: connectWithIds('color', gall.colors) },
+                                detachable: detachableFromString(gall.detachable).id,
+                                gallshape: { create: connectWithIds('shape', gall.shapes) },
+                                gallwalls: { create: connectWithIds('walls', gall.walls) },
+                                taxontype: { connect: { taxoncode: GallTaxon } },
+                                galllocation: { create: connectWithIds('location', gall.locations) },
+                                galltexture: { create: connectWithIds('texture', gall.textures) },
+                            },
+                        },
                     },
                 },
+                aliasspecies: {
+                    create: gall.aliases.map((a) => ({
+                        alias: { create: { description: a.description, name: a.name, type: a.type } },
+                    })),
+                },
+                taxonomy: {
+                    create: [
+                        // genus could be new
+                        {
+                            taxonomy: {
+                                connectOrCreate: {
+                                    where: { id: gall.fgs.genus.id },
+                                    create: {
+                                        description: gall.fgs.genus.description,
+                                        name: gall.fgs.genus.name,
+                                        type: GENUS,
+                                        parent: { connect: { id: gall.fgs.family.id } },
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                },
             },
-        });
+        }),
+    ];
+};
 
-    const update = () =>
+const gallUpdateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
+    console.log(`${JSON.stringify(gall, null, '  ')}`);
+    return [
         db.species.update({
+            where: { id: gall.id },
             data: {
-                ...spData,
-                gall: {
+                abundance: connectIfNotNull<Prisma.abundanceCreateOneWithoutSpeciesInput, string>('abundance', gall.abundance),
+                datacomplete: gall.datacomplete,
+                name: gall.name,
+                gallspecies: {
                     update: {
-                        // this seems stupid but I can not figure out a way to update these many-to-many
-                        // like is provided with the 'set' operation for 1-to-many. :(
-                        gallalignment: {
-                            deleteMany: { alignment_id: { notIn: [] } },
-                            create: connectWithIds('alignment', gall.alignments),
-                        },
-                        gallcells: {
-                            deleteMany: { cells_id: { notIn: [] } },
-                            create: connectWithIds('cells', gall.cells),
-                        },
-                        gallcolor: {
-                            deleteMany: { color_id: { notIn: [] } },
-                            create: connectWithIds('color', gall.colors),
-                        },
-                        detachable: detachableFromString(gall.detachable).id,
-                        gallshape: {
-                            deleteMany: { shape_id: { notIn: [] } },
-                            create: connectWithIds('shape', gall.shapes),
-                        },
-                        gallwalls: {
-                            deleteMany: { walls_id: { notIn: [] } },
-                            create: connectWithIds('walls', gall.walls),
-                        },
-                        galllocation: {
-                            deleteMany: { location_id: { notIn: [] } },
-                            create: connectWithIds('location', gall.locations),
-                        },
-                        galltexture: {
-                            deleteMany: { texture_id: { notIn: [] } },
-                            create: connectWithIds('texture', gall.textures),
+                        where: { gall_id_species_id: { gall_id: gall.gallid, species_id: gall.id } },
+                        data: {
+                            gall: {
+                                update: {
+                                    detachable: detachableFromString(gall.detachable).id,
+                                    gallalignment: {
+                                        deleteMany: { alignment_id: { notIn: [] } },
+                                        create: connectWithIds('alignment', gall.alignments),
+                                    },
+                                    gallcells: {
+                                        deleteMany: { cells_id: { notIn: [] } },
+                                        create: connectWithIds('cells', gall.cells),
+                                    },
+                                    gallcolor: {
+                                        deleteMany: { color_id: { notIn: [] } },
+                                        create: connectWithIds('color', gall.colors),
+                                    },
+                                    gallshape: {
+                                        deleteMany: { shape_id: { notIn: [] } },
+                                        create: connectWithIds('shape', gall.shapes),
+                                    },
+                                    gallwalls: {
+                                        deleteMany: { walls_id: { notIn: [] } },
+                                        create: connectWithIds('walls', gall.walls),
+                                    },
+                                    galllocation: {
+                                        deleteMany: { location_id: { notIn: [] } },
+                                        create: connectWithIds('location', gall.locations),
+                                    },
+                                    galltexture: {
+                                        deleteMany: { texture_id: { notIn: [] } },
+                                        create: connectWithIds('texture', gall.textures),
+                                    },
+                                },
+                            },
                         },
                     },
+                },
+                aliasspecies: {
+                    // typical hack, delete them all and then add
+                    deleteMany: { species_id: gall.id },
+                    create: gall.aliases.map((a) => ({
+                        alias: { create: { description: a.description, name: a.name, type: a.type } },
+                    })),
                 },
                 hosts: {
                     deleteMany: { id: { notIn: [] } },
                     create: connectWithIds('hostspecies', gall.hosts),
                 },
             },
-            where: { name: gall.name },
-        });
+        }),
+        // the genus could have been changed and might be new
+        // delete any records that map this species to a genus that are not the same as what is inbound
+        db.speciestaxonomy.deleteMany({
+            where: {
+                AND: [
+                    { species_id: gall.id },
+                    { taxonomy: { type: GENUS } },
+                    { taxonomy: { name: { not: gall.fgs.genus.name } } },
+                ],
+            },
+        }),
+        // now upsert a new species-taxonomy mapping (might be redundant if it already exists) and possibly create
+        // a new Genus Taxonomy record assinging it to the known Family
+        db.speciestaxonomy.upsert({
+            where: { taxonomy_id_species_id: { species_id: gall.id, taxonomy_id: gall.fgs.genus.id } },
+            create: {
+                species: { connect: { id: gall.id } },
+                taxonomy: {
+                    connectOrCreate: {
+                        where: { id: gall.fgs.genus.id },
+                        create: {
+                            description: gall.fgs.genus.description,
+                            name: gall.fgs.genus.name,
+                            type: GENUS,
+                            parent: { connect: { id: gall.fgs.family.id } },
+                        },
+                    },
+                },
+            },
+            update: {
+                species: { connect: { id: gall.id } },
+                taxonomy: { connect: { id: gall.fgs.genus.id } },
+            },
+        }),
+    ];
+};
 
+/**
+ * Insert or update a gall based on its existence in the DB.
+ * @param gall the data to update or insert
+ * @returns a Promise when resolved that will containe the id of the species created (a Gall is just a specialization of a species)
+ */
+export const upsertGall = (gall: GallUpsertFields): TaskEither<Error, GallApi> => {
+    const updateGallTx = TE.tryCatch(() => db.$transaction(gallUpdateSteps(gall)), handleError);
+    const createGallTx = TE.tryCatch(() => db.$transaction(gallCreateSteps(gall)), handleError);
+
+    const getGall = () => {
+        return gallByName(gall.name);
+    };
+
+    // eslint-disable-next-line prettier/prettier
     return pipe(
-        speciesByName(gall.name),
-        // eslint-disable-next-line prettier/prettier
-        TE.map(
-            O.fold(
-                () => TE.tryCatch(create, handleError),
-                () => TE.tryCatch(update, handleError),
-            ),
+        gall.id < 0 ? createGallTx : updateGallTx,
+        TE.chain(getGall),
+        TE.fold(
+            (e) => TE.left(e),
+            (s) => (s.length <= 0 ? TE.left(new Error('Failed to get upserted data.')) : TE.right(s[0])),
         ),
-        TE.flatten,
-        TE.map(extractId),
     );
 };
 
