@@ -128,7 +128,7 @@ INSERT INTO aliasspecies (
 
 
 -- extract the synonyms (scientific) and add them to the new table
-INSERT INTO alias (
+INSERT OR IGNORE INTO alias (
                       id,
                       name,
                       type
@@ -255,17 +255,8 @@ INSERT INTO taxonomytaxonomy (taxonomy_id, child_id)
 
 -- for the sake of having some data we will add the Section mappings for Quercus
 -- later an admin UI will be created to maintain these and add new one etc.
-INSERT INTO taxonomy (id, name, type, parent_id) 
-    VALUES (NULL, 'Quercus', 'section', (SELECT id from taxonomy WHERE name = 'Quercus' AND type = 'genus'));
-
-INSERT INTO alias (id, name, type) 
-    SELECT id, 'White Oaks', 'common' 
-    FROM taxonomy 
-    WHERE name = 'Quercus' AND taxonomy.type='section';
-
-INSERT INTO taxonomyalias (taxonomy_id, alias_id)
-    SELECT (SELECT id from taxonomy WHERE name = 'Quercus' and type='section'),
-           (SELECT id from alias WHERE name = 'White Oaks');
+INSERT INTO taxonomy (id, name, description, type, parent_id) 
+    VALUES (NULL, 'Quercus', 'White Oaks', 'section', (SELECT id from taxonomy WHERE name = 'Quercus' AND type = 'genus'));
 
 INSERT INTO speciestaxonomy (species_id, taxonomy_id) 
     WITH species_list(spid) AS
@@ -276,15 +267,8 @@ INSERT INTO speciestaxonomy (species_id, taxonomy_id)
         FROM species_list
         CROSS JOIN (SELECT id as taxid FROM taxonomy WHERE name = 'Quercus' AND type = 'section');
 
-INSERT INTO taxonomy (id, name, type, parent_id) 
-    VALUES (NULL, 'Lobatae', 'section', (SELECT id from taxonomy WHERE name = 'Quercus' AND type = 'genus'));
-
-INSERT INTO alias (id, name, type) 
-    SELECT id, 'Red Oaks', 'common' FROM taxonomy WHERE name = 'Lobatae' AND type ='section';
-
-INSERT INTO taxonomyalias (taxonomy_id, alias_id)
-    SELECT (SELECT id from taxonomy WHERE name = 'Lobatae' and type='section'),
-           (SELECT id from alias WHERE name = 'Red Oaks');
+INSERT INTO taxonomy (id, name, description, type, parent_id) 
+    VALUES (NULL, 'Lobatae', 'Red Oaks', 'section', (SELECT id from taxonomy WHERE name = 'Quercus' AND type = 'genus'));
 
 INSERT INTO speciestaxonomy (species_id, taxonomy_id) 
     WITH species_list(spid) AS
@@ -296,15 +280,8 @@ INSERT INTO speciestaxonomy (species_id, taxonomy_id)
         CROSS JOIN (SELECT id as taxid FROM taxonomy WHERE name = 'Lobatae' AND type = 'section');
 
 
-INSERT INTO taxonomy (id, name, type, parent_id) 
-    VALUES (NULL, 'Virentes', 'section', (SELECT id from taxonomy WHERE name = 'Quercus' AND type = 'genus'));
-
-INSERT INTO alias (id, name, type) 
-    SELECT id, 'Live Oaks', 'common' FROM taxonomy WHERE name = 'Virentes' AND type = 'section';
-
-INSERT INTO taxonomyalias (taxonomy_id, alias_id)
-    SELECT (SELECT id from taxonomy WHERE name = 'Virentes' and type='section'),
-           (SELECT id from alias WHERE name = 'Live Oaks');
+INSERT INTO taxonomy (id, name, description, type, parent_id) 
+    VALUES (NULL, 'Virentes', 'Live Oaks', 'section', (SELECT id from taxonomy WHERE name = 'Quercus' AND type = 'genus'));
 
 INSERT INTO speciestaxonomy (species_id, taxonomy_id) 
     WITH species_list(spid) AS

@@ -40,7 +40,7 @@ const Tester = ({ data }: Props): JSX.Element => {
 };
 
 export const getServerSideProps: GetServerSideProps = async () => {
-    const data = await mightFail(constant(EMPTY_FGS))(taxonomyForSpecies(299));
+    const data = await mightFail(constant(EMPTY_FGS))(taxonomyForSpecies(690));
 
     return {
         props: {

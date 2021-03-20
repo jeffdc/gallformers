@@ -20,6 +20,7 @@ import {
     FGS,
     GENUS,
     SECTION,
+    SectionUpsertFields,
     TaxonomyEntry,
     TaxonomyTree,
     TaxonomyUpsertFields,
@@ -327,13 +328,22 @@ export const deleteTaxonomyEntry = (id: number): TaskEither<Error, DeleteResult>
     );
 };
 
+const connectSpecies = (f: TaxonomyUpsertFields) => f.species.map((s) => ({ species: { connect: { id: s } } }));
+
 /**
  * Update or insert a Taxonomy entry.
  * @param f
  * @returns the count of the number of records added, will be 1 for success and 0 for a failure
  */
 export const upsertTaxonomy = (f: TaxonomyUpsertFields): TaskEither<Error, TaxonomyEntry> => {
-    const connectSpecies = f.species.map((s) => ({ species: { connect: { id: s } } }));
+    console.log(`${JSON.stringify(f, null, '  ')}`);
+    const connectParentOrNot = pipe(
+        f.parent,
+        O.fold(
+            () => ({}),
+            (p) => ({ connect: { id: p.id } }),
+        ),
+    );
 
     const upsert = () =>
         db.taxonomy.upsert({
@@ -343,16 +353,18 @@ export const upsertTaxonomy = (f: TaxonomyUpsertFields): TaskEither<Error, Taxon
                 description: f.description,
                 speciestaxonomy: {
                     deleteMany: { taxonomy_id: f.id },
-                    create: connectSpecies,
+                    create: connectSpecies(f),
                 },
+                parent: connectParentOrNot,
             },
             create: {
                 name: f.name,
                 description: f.description,
                 type: f.type,
                 speciestaxonomy: {
-                    create: connectSpecies,
+                    create: connectSpecies(f),
                 },
+                parent: connectParentOrNot,
             },
         });
 

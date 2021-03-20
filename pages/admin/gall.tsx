@@ -15,18 +15,17 @@ import { AdminFormFields } from '../../hooks/useAPIs';
 import { useConfirmation } from '../../hooks/useconfirmation';
 import { extractQueryParam } from '../../libs/api/apipage';
 import * as AT from '../../libs/api/apitypes';
-import { EMPTY_FGS, FGS, GENUS, TaxonomyEntry } from '../../libs/api/taxonomy';
+import { FGS, GENUS, TaxonomyEntry } from '../../libs/api/taxonomy';
 import { alignments, allGalls, cells, colors, locations, shapes, textures, walls } from '../../libs/db/gall';
 import { allHostsSimple } from '../../libs/db/host';
 import { abundances } from '../../libs/db/species';
-import { allFamilies, allGenera, taxonomyForSpecies } from '../../libs/db/taxonomy';
+import { allFamilies, allGenera } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
-import { hasProp, mightFail, mightFailWithArray } from '../../libs/utils/util';
+import { extractGenus, hasProp, mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
     id: string;
     gs: AT.GallApi[];
-    fgs: FGS;
     abundances: AT.AbundanceApi[];
     hosts: AT.HostSimple[];
     locations: AT.GallLocation[];
@@ -62,10 +61,6 @@ const schema = yup.object().shape({
     }),
 });
 
-const extractGenus = (n: string): string => {
-    return n.split(' ')[0];
-};
-
 export type FormFields = AdminFormFields<AT.GallApi> & {
     genus: TaxonomyEntry[];
     family: TaxonomyEntry[];
@@ -87,23 +82,6 @@ const updateGall = (s: AT.GallApi, newValue: string): AT.GallApi => ({
     name: newValue,
 });
 
-const emptyForm = {
-    value: [],
-    genus: [],
-    abundance: [AT.EmptyAbundance],
-    commonnames: '',
-    synonyms: '',
-    detachable: AT.DetachableNone.value,
-    walls: [],
-    cells: [],
-    alignments: [],
-    colors: [],
-    shapes: [],
-    locations: [],
-    textures: [],
-    hosts: [],
-};
-
 const fetchFGS = async (h: AT.GallApi): Promise<FGS> => {
     const res = await fetch(`../api/taxonomy?id=${h.id}`);
     if (res.status === 200) {
@@ -117,7 +95,6 @@ const fetchFGS = async (h: AT.GallApi): Promise<FGS> => {
 const Gall = ({
     id,
     gs,
-    fgs,
     hosts,
     locations,
     colors,
@@ -130,28 +107,7 @@ const Gall = ({
     families,
     genera,
 }: Props): JSX.Element => {
-    const [theFGS, setTheFGS] = useState(fgs);
     const [aliasData, setAliasData] = useState<Array<AT.AliasApi>>([]);
-
-    const convertToFields = (s: AT.GallApi): FormFields => {
-        return {
-            value: [s],
-            genus: [theFGS.genus],
-            family: [theFGS.family],
-            abundance: [pipe(s.abundance, O.getOrElse(constant(AT.EmptyAbundance)))],
-            datacomplete: s.datacomplete,
-            alignments: s.gall.gallalignment,
-            cells: s.gall.gallcells,
-            colors: s.gall.gallcolor,
-            detachable: s.gall.detachable.value,
-            hosts: s.hosts,
-            locations: s.gall.galllocation,
-            shapes: s.gall.gallshape,
-            textures: s.gall.galltexture,
-            walls: s.gall.gallwalls,
-            del: false,
-        };
-    };
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): AT.GallUpsertFields => {
         return {
@@ -163,8 +119,7 @@ const Gall = ({
             colors: fields.colors.map((c) => c.id),
             datacomplete: fields.datacomplete,
             detachable: fields.detachable,
-            // the genus could change but family and section will not
-            fgs: { family: theFGS.family, genus: fields.genus[0], section: theFGS.section },
+            fgs: { family: fields.family[0], genus: fields.genus[0], section: O.none },
             hosts: fields.hosts.map((h) => h.id),
             id: id,
             locations: fields.locations.map((l) => l.id),
@@ -175,15 +130,47 @@ const Gall = ({
         };
     };
 
-    const onDataChangeCallback = async (s: AT.GallApi | undefined): Promise<AT.GallApi | undefined> => {
-        if (s == undefined) {
-            setAliasData([]);
-        } else {
+    const updatedFormFields = async (s: AT.GallApi | undefined): Promise<FormFields> => {
+        if (s != undefined) {
+            setAliasData(s?.aliases);
             const newFGS = await fetchFGS(s);
-            setTheFGS(newFGS);
-            setAliasData(s.aliases);
+
+            return {
+                value: [s],
+                genus: [newFGS.genus],
+                family: [newFGS.family],
+                abundance: [pipe(s.abundance, O.getOrElse(constant(AT.EmptyAbundance)))],
+                datacomplete: s.datacomplete,
+                alignments: s.gall.gallalignment,
+                cells: s.gall.gallcells,
+                colors: s.gall.gallcolor,
+                detachable: s.gall.detachable.value,
+                hosts: s.hosts,
+                locations: s.gall.galllocation,
+                shapes: s.gall.gallshape,
+                textures: s.gall.galltexture,
+                walls: s.gall.gallwalls,
+                del: false,
+            };
         }
-        return s;
+
+        return {
+            value: [],
+            genus: [],
+            family: [],
+            abundance: [AT.EmptyAbundance],
+            datacomplete: false,
+            detachable: AT.DetachableNone.value,
+            walls: [],
+            cells: [],
+            alignments: [],
+            colors: [],
+            shapes: [],
+            locations: [],
+            textures: [],
+            hosts: [],
+            del: false,
+        };
     };
 
     const {
@@ -204,12 +191,10 @@ const Gall = ({
         id,
         gs,
         updateGall,
-        convertToFields,
         toUpsertFields,
         { keyProp: 'name', delEndpoint: '../api/gall/', upsertEndpoint: '../api/gall/upsert' },
         schema,
-        emptyForm,
-        onDataChangeCallback,
+        updatedFormFields,
     );
 
     const router = useRouter();
@@ -301,12 +286,6 @@ const Gall = ({
                                             const gall: AT.GallApi = e[0];
                                             setSelected(gall);
                                             router.replace(`?id=${gall.id}`, undefined, { shallow: true });
-                                        }
-                                    }}
-                                    onBlurT={(e) => {
-                                        if (!form.errors.value) {
-                                            const g = genera.find((g) => g.name.localeCompare(extractGenus(e.target.value)));
-                                            form.setValue('genus', g ? [g] : []);
                                         }
                                     }}
                                     placeholder="Name"
@@ -526,13 +505,10 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
         O.getOrElse(constant('')),
     );
 
-    const fgs = id === '' ? EMPTY_FGS : await mightFail(constant(EMPTY_FGS))(taxonomyForSpecies(parseInt(id)));
-
     return {
         props: {
             id: id,
             gs: await mightFailWithArray<AT.GallApi>()(allGalls()),
-            fgs: fgs,
             hosts: await mightFailWithArray<AT.HostSimple>()(allHostsSimple()),
             families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(AT.GALL_FAMILY_TYPES)),
             genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(AT.GallTaxon)),

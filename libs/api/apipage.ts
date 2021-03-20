@@ -50,7 +50,7 @@ export async function apiIdEndpoint<T>(
     if (req.method === 'GET' && fGet != undefined) {
         await runRequest(fGet);
     } else if (req.method === 'DELETE' && fDelete != undefined) {
-        runRequest(fDelete);
+        await runRequest(fDelete);
     } else {
         res.status(405).end();
     }

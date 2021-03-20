@@ -25,25 +25,20 @@ import {
     HOST_FAMILY_TYPES,
     SpeciesUpsertFields,
 } from '../../libs/api/apitypes';
-import { EMPTY_FGS, FGS, GENUS, TaxonomyEntry } from '../../libs/api/taxonomy';
+import { FGS, GENUS, TaxonomyEntry } from '../../libs/api/taxonomy';
 import { allHosts } from '../../libs/db/host';
 import { abundances } from '../../libs/db/species';
-import { allFamilies, allGenera, allSections, taxonomyForSpecies } from '../../libs/db/taxonomy';
+import { allFamilies, allGenera, allSections } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
-import { mightFail, mightFailWithArray } from '../../libs/utils/util';
+import { extractGenus, mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
     id: string;
     hs: HostApi[];
-    fgs: FGS;
     families: TaxonomyEntry[];
     sections: TaxonomyEntry[];
     genera: TaxonomyEntry[];
     abundances: abundance[];
-};
-
-const extractGenus = (n: string): string => {
-    return n.split(' ')[0];
 };
 
 const schema = yup.object().shape({
@@ -72,7 +67,6 @@ export type FormFields = AdminFormFields<HostApi> & {
 };
 
 export const testables = {
-    extractGenus: extractGenus,
     Schema: schema,
 };
 
@@ -80,13 +74,6 @@ const updateHost = (s: HostApi, newValue: string): HostApi => ({
     ...s,
     name: newValue,
 });
-
-const emptyForm = {
-    value: [],
-    genus: [],
-    family: [],
-    abundance: [EmptyAbundance],
-};
 
 const fetchFGS = async (h: HostApi): Promise<FGS> => {
     const res = await fetch(`../api/taxonomy?id=${h.id}`);
@@ -98,43 +85,48 @@ const fetchFGS = async (h: HostApi): Promise<FGS> => {
     }
 };
 
-const Host = ({ id, hs, fgs, genera, families, sections, abundances }: Props): JSX.Element => {
-    const [theFGS, setTheFGS] = useState(fgs);
+const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.Element => {
     const [aliasData, setAliasData] = useState<AliasApi[]>([]);
-
-    const convertToFields = (s: HostApi): FormFields => ({
-        value: [s],
-        genus: [theFGS.genus],
-        family: [theFGS.family],
-        section: pipe(
-            theFGS.section,
-            O.fold(constant([]), (s) => [s]),
-        ),
-        abundance: [pipe(s.abundance, O.getOrElse(constant(EmptyAbundance)))],
-        datacomplete: s.datacomplete,
-        del: false,
-    });
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): SpeciesUpsertFields => {
         return {
             abundance: fields.abundance[0].abundance,
             aliases: aliasData,
             datacomplete: fields.datacomplete,
-            fgs: theFGS.family.id == fields.family[0].id ? theFGS : { ...theFGS, family: fields.family[0] },
+            fgs: { family: fields.family[0], genus: fields.genus[0], section: O.fromNullable(fields.section[0]) },
             id: id,
             name: name,
         };
     };
 
-    const onDataChangeCallback = async (s: HostApi | undefined): Promise<HostApi | undefined> => {
-        if (s == undefined) {
-            setAliasData([]);
-        } else {
+    const updatedFormFields = async (s: HostApi | undefined): Promise<FormFields> => {
+        if (s != undefined) {
+            setAliasData(s?.aliases);
             const newFGS = await fetchFGS(s);
-            setTheFGS(newFGS);
-            setAliasData(s.aliases);
+            return {
+                value: [s],
+                genus: [newFGS.genus],
+                family: [newFGS.family],
+                section: pipe(
+                    newFGS.section,
+                    O.fold(constant([]), (s) => [s]),
+                ),
+                datacomplete: s.datacomplete,
+                abundance: [pipe(s.abundance, O.getOrElse(constant(EmptyAbundance)))],
+                del: false,
+            };
         }
-        return s;
+
+        setAliasData([]);
+        return {
+            value: [],
+            genus: [],
+            family: [],
+            section: [],
+            datacomplete: false,
+            abundance: [EmptyAbundance],
+            del: false,
+        };
     };
 
     const {
@@ -155,12 +147,10 @@ const Host = ({ id, hs, fgs, genera, families, sections, abundances }: Props): J
         id,
         hs,
         updateHost,
-        convertToFields,
         toUpsertFields,
         { keyProp: 'name', delEndpoint: '../api/host/', upsertEndpoint: '../api/host/upsert' },
         schema,
-        emptyForm,
-        onDataChangeCallback,
+        updatedFormFields,
     );
 
     const router = useRouter();
@@ -252,12 +242,6 @@ const Host = ({ id, hs, fgs, genera, families, sections, abundances }: Props): J
                                                 setSelected(host);
                                                 router.replace(`?id=${host.id}`, undefined, { shallow: true });
                                             }
-                                        }
-                                    }}
-                                    onBlurT={(e) => {
-                                        if (!form.errors.value) {
-                                            const h = genera.find((h) => h.name.localeCompare(extractGenus(e.target.value)));
-                                            form.setValue('genus', h ? [h] : []);
                                         }
                                     }}
                                     placeholder="Name"
@@ -378,12 +362,10 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
         O.getOrElse(constant('')),
     );
 
-    const fgs = id === '' ? EMPTY_FGS : await mightFail(constant(EMPTY_FGS))(taxonomyForSpecies(parseInt(id)));
     return {
         props: {
             id: id,
             hs: await mightFailWithArray<HostApi>()(allHosts()),
-            fgs: fgs,
             families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(HOST_FAMILY_TYPES)),
             genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon)),
             sections: await mightFailWithArray<TaxonomyEntry>()(allSections()),

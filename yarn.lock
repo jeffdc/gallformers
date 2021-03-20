@@ -2106,10 +2106,10 @@
   resolved "https://registry.yarnpkg.com/@types/prop-types/-/prop-types-15.7.3.tgz#2ab0d5da2e5815f94b0b9d4b95d1e5f243ab2ca7"
   integrity sha512-KfRL3PuHmqQLOG+2tGpRO26Ctg+Cq1E01D2DMriKEATHgWLfeNDmq9e29Q9WIky0dQ3NPkd1mzYH8Lm936Z9qw==
 
-"@types/react-bootstrap-table-next@^4.0.11":
-  version "4.0.11"
-  resolved "https://registry.yarnpkg.com/@types/react-bootstrap-table-next/-/react-bootstrap-table-next-4.0.11.tgz#d07b02567e1c22e7ca39dd8e0fd5d12d620e04a5"
-  integrity sha512-2NbMDYb9XNw+N4HhLiPd71LMopPtVtcRwSF6r/zck5fRKcL9I29GapCWzX/YI+5nrjKy8592WYEsv5aNWVr+4A==
+"@types/react-bootstrap-table-next@^4.0.12":
+  version "4.0.12"
+  resolved "https://registry.yarnpkg.com/@types/react-bootstrap-table-next/-/react-bootstrap-table-next-4.0.12.tgz#ae68792ba0159895175368c76540093e7158fd57"
+  integrity sha512-NcWKPh41w7FUW6JplHETjBwJ/Q6s46VQdVvsuSLOgUHEDXjtJV3cCCfDBmUVohN361tCNODCLmF5xnvfwvtrsA==
   dependencies:
     "@types/react" "*"
 

@@ -81,3 +81,16 @@ test('csvAsNumberArr should handle all inputs good and bad', () => {
     expect(U.csvAsNumberArr('1 , 2').length).toBe(2);
     expect(U.csvAsNumberArr('\t       1 , \n2').length).toBe(2);
 });
+
+describe('extractGenus tests', () => {
+    test('it must act as the identity if passed in a string whose format is not conformant', () => {
+        fc.property(
+            fc.string().filter((s) => !s.includes(' ')),
+            (s) => expect(U.extractGenus(s)).toBe(s),
+        );
+    });
+
+    test('it must extract the genus when passed a conformant string', () => {
+        expect(U.extractGenus('Foo bar')).toBe('Foo');
+    });
+});

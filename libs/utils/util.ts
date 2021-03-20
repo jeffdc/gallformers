@@ -137,3 +137,11 @@ export const csvAsNumberArr = (s: string): number[] => {
 
     return arr;
 };
+
+/**
+ *
+ * @param n
+ */
+export const extractGenus = (n: string): string => {
+    return n.split(' ')[0];
+};

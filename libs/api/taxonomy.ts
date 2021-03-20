@@ -101,4 +101,5 @@ export type TaxonomyUpsertFields = {
     description: string;
     type: TaxonomyType;
     species: number[];
+    parent: O.Option<TaxonomyEntry>;
 };

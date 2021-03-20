@@ -69,7 +69,7 @@
     "@types/papaparse": "^5.2.4",
     "@types/pino": "^6.3.4",
     "@types/react": "^16",
-    "@types/react-bootstrap-table-next": "^4.0.11",
+    "@types/react-bootstrap-table-next": "^4.0.12",
     "@types/react-bootstrap-typeahead": "^5.1.0",
     "@types/react-dom": "^16",
     "@types/react-modal": "^3.10.6",

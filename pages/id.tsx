@@ -237,13 +237,7 @@ const IDGall = (props: Props): JSX.Element => {
                             labelKey={(tax: TaxonomyEntry) => {
                                 if (tax) {
                                     if (tax.type === SECTION) {
-                                        return `${pipe(
-                                            tax.parent,
-                                            O.fold(
-                                                () => 'MISSING GENUS',
-                                                (p) => p.name,
-                                            ),
-                                        )} (${tax.name} - ${tax.description})`;
+                                        return `${tax.name} - ${tax.description}`;
                                     }
                                     return tax.name;
                                 } else {

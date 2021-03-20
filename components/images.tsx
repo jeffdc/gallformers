@@ -39,6 +39,9 @@ const Images = ({ species }: Props): JSX.Element => {
     const pad = 25;
     const hwRatio = 2 / 3;
 
+    // sort so that the default image always is first
+    species.images.sort((a) => (a.default ? -1 : 1));
+
     return species.images.length < 1 ? (
         <p className="p-2">No images yet...</p>
     ) : (
