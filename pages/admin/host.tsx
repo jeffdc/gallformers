@@ -329,8 +329,10 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col className="mr-auto">
-                        <input name="datacomplete" type="checkbox" className="form-input-checkbox" ref={form.register} /> Are all
-                        known galls submitted for this host?
+                        <input name="datacomplete" type="checkbox" className="form-input-checkbox" ref={form.register} /> All
+                        galls known to occur on this plant have been added to the database, and can be filtered by Location and
+                        Detachable. However, sources and images for galls associated with this host may be incomplete or absent,
+                        and other filters may not have been entered comprehensively or at all.
                     </Col>
                 </Row>
                 <Row className="fromGroup pb-1" hidden={!selected}>

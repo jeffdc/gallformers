@@ -22,6 +22,8 @@ type AdminData<T, FormFields> = {
     renameCallback: (doRename: (s: FormFields, e: RenameEvent) => void) => (e: RenameEvent) => void;
     form: UseFormMethods<FormFields>;
     formSubmit: (fields: FormFields) => Promise<void>;
+    postUpdate: (res: Response) => void;
+    postDelete: (id: number | string, result: DeleteResult) => void;
 };
 
 /**
@@ -127,6 +129,8 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         renameCallback: renameCallback,
         form: form,
         formSubmit: formSubmit,
+        postUpdate: postUpdate,
+        postDelete: postDelete,
     };
 };
 

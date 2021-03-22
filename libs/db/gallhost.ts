@@ -1,9 +1,10 @@
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
-import { GallHostUpdateFields, SimpleSpecies } from '../api/apitypes';
+import { GallApi, GallHostUpdateFields, SimpleSpecies } from '../api/apitypes';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
+import { gallByIdAsO } from './gall';
 import { hostsByGenus } from './host';
 import { extractId } from './utils';
 
@@ -12,7 +13,7 @@ const toValues = (gallid: number, hostids: number[]) => hostids.map((h) => `(NUL
 const toInsertStatement = (gallid: number, hostids: number[]): Promise<number> =>
     db.$executeRaw(`INSERT INTO host (id, gall_species_id, host_species_id) VALUES ${toValues(gallid, hostids)};`);
 
-export const updateGallHosts = (gallhost: GallHostUpdateFields): TE.TaskEither<Error, number[]> => {
+export const updateGallHosts = (gallhost: GallHostUpdateFields): TE.TaskEither<Error, GallApi> => {
     const doTx = (genusHosts: number[]) => () => {
         const deletes = db.$executeRaw(`DELETE FROM host WHERE gall_species_id = ${gallhost.gall};`);
         const hosts = [...new Set([...gallhost.hosts, ...genusHosts])];
@@ -27,6 +28,10 @@ export const updateGallHosts = (gallhost: GallHostUpdateFields): TE.TaskEither<E
         hostsByGenus(gallhost.genus),
         TE.map((hosts) => hosts.map(extractId)),
         TE.chain((genusHosts) => TE.tryCatch(doTx(genusHosts), handleError)),
+        TE.chain(() => gallByIdAsO(gallhost.gall)),
+        TE.map((x) => x),
+        TE.map(TE.fromOption(() => new Error('Failed to retrieve gall after GallHost update.'))),
+        TE.flatten,
     );
 };
 

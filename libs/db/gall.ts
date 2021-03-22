@@ -220,6 +220,17 @@ export const gallsByHostSection = (hostSection: string): TaskEither<Error, GallA
 export const gallById = (id: number): TaskEither<Error, GallApi[]> => getGalls([{ species: { id: id } }]);
 
 /**
+ * Fetches the gall with the given id, returning it wrapped in an Option.
+ * @param id
+ */
+export const gallByIdAsO = (id: number): TaskEither<Error, O.Option<GallApi>> =>
+    pipe(
+        id,
+        gallById,
+        TE.map((g) => O.fromNullable(g[0])),
+    );
+
+/**
  * Fetch a gall by its name.
  * @param name
  */

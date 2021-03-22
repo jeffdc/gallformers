@@ -472,8 +472,9 @@ const Gall = ({
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col className="mr-auto">
-                        <input name="datacomplete" type="checkbox" className="form-input-checkbox" ref={form.register} /> Are all
-                        known sources entered for this gall?
+                        <input name="datacomplete" type="checkbox" className="form-input-checkbox" ref={form.register} /> All
+                        sources containing unique information relevant to this gall have been added and are reflected in its
+                        associated data. However, filter criteria may not be comprehensive in every field.
                     </Col>
                 </Row>
                 <Row className="fromGroup pb-1" hidden={!selected}>

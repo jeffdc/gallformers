@@ -170,7 +170,15 @@ export const hostByName = (name: string): TaskEither<Error, HostApi[]> => getHos
 export const hostsByGenus = (genus: string): TaskEither<Error, HostApi[]> => {
     if (!genus || genus.length === 0) return TE.taskEither.of([]);
 
-    return getHosts([{ taxonomy: { every: { taxonomy: { type: GENUS } } } }]);
+    return getHosts([
+        {
+            taxonomy: {
+                some: {
+                    taxonomy: { AND: [{ name: { equals: genus } }, { type: { equals: GENUS } }] },
+                },
+            },
+        },
+    ]);
 };
 
 /////////////////////////////////////////

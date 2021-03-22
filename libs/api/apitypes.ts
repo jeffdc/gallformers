@@ -356,6 +356,7 @@ export type SourceUpsertFields = Deletable & {
 };
 
 export type SpeciesSourceInsertFields = Deletable & {
+    id: number;
     species: number;
     source: number;
     description: string;

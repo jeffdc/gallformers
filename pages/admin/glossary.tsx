@@ -33,12 +33,6 @@ const updateEntry = (s: Entry, newValue: string): Entry => ({
     word: newValue,
 });
 
-const convertToFields = (s: Entry): FormFields => ({
-    ...s,
-    del: false,
-    value: [s],
-});
-
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const toUpsertFields = (fields: FormFields, word: string, id: number): GlossaryEntryUpsertFields => {
     return {
@@ -47,9 +41,21 @@ const toUpsertFields = (fields: FormFields, word: string, id: number): GlossaryE
     };
 };
 
-const emptyForm = {
-    value: [],
-    defintion: '',
+const updatedFormFields = async (e: Entry | undefined): Promise<FormFields> => {
+    if (e != undefined) {
+        return {
+            ...e,
+            value: [e],
+            del: false,
+        };
+    }
+
+    return {
+        value: [],
+        definition: '',
+        urls: '',
+        del: false,
+    };
 };
 
 const Glossary = ({ id, glossary }: Props): JSX.Element => {
@@ -71,24 +77,19 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
         id,
         glossary,
         updateEntry,
-        convertToFields,
         toUpsertFields,
         { keyProp: 'word', delEndpoint: '../api/glossary/', upsertEndpoint: '../api/glossary/upsert' },
         schema,
-        emptyForm,
+        updatedFormFields,
     );
 
     const router = useRouter();
-
-    const onSubmit = async (fields: FormFields) => {
-        formSubmit(fields);
-    };
 
     return (
         <Admin
             type="Glossary"
             keyField="word"
-            editName={{ getDefault: () => selected?.word, renameCallback: renameCallback(onSubmit) }}
+            editName={{ getDefault: () => selected?.word, renameCallback: renameCallback(formSubmit) }}
             setShowModal={setShowModal}
             showModal={showModal}
             setError={setError}
@@ -96,7 +97,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
             setDeleteResults={setDeleteResults}
             deleteResults={deleteResults}
         >
-            <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pr-4">
+            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
                 <h4>Add/Edit Glossary Entries</h4>
                 <Row className="form-group">
                     <Col>

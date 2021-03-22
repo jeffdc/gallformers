@@ -34,12 +34,6 @@ const updateSource = (s: SourceApi, newValue: string) => ({
     title: newValue,
 });
 
-const convertToFields = (s: SourceApi): FormFields => ({
-    ...s,
-    del: false,
-    value: [s],
-});
-
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const toUpsertFields = (fields: FormFields, name: string, id: number): SourceUpsertFields => {
     return {
@@ -48,12 +42,23 @@ const toUpsertFields = (fields: FormFields, name: string, id: number): SourceUps
     };
 };
 
-const emptyForm = {
-    value: [],
-    author: '',
-    pubyear: '',
-    link: '',
-    citation: '',
+const updatedFormFields = async (s: SourceApi | undefined): Promise<FormFields> => {
+    if (s != undefined) {
+        return {
+            ...s,
+            del: false,
+            value: [s],
+        };
+    }
+
+    return {
+        value: [],
+        author: '',
+        pubyear: '',
+        link: '',
+        citation: '',
+        del: false,
+    };
 };
 
 const Source = ({ id, sources }: Props): JSX.Element => {
@@ -75,24 +80,19 @@ const Source = ({ id, sources }: Props): JSX.Element => {
         id,
         sources,
         updateSource,
-        convertToFields,
         toUpsertFields,
         { keyProp: 'title', delEndpoint: '../api/source/', upsertEndpoint: '../api/source/upsert' },
         schema,
-        emptyForm,
+        updatedFormFields,
     );
 
     const router = useRouter();
-
-    const onSubmit = async (fields: FormFields) => {
-        await formSubmit(fields);
-    };
 
     return (
         <Admin
             type="Source"
             keyField="title"
-            editName={{ getDefault: () => selected?.title, renameCallback: renameCallback(onSubmit) }}
+            editName={{ getDefault: () => selected?.title, renameCallback: renameCallback(formSubmit) }}
             setShowModal={setShowModal}
             showModal={showModal}
             setError={setError}
@@ -100,7 +100,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
             setDeleteResults={setDeleteResults}
             deleteResults={deleteResults}
         >
-            <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pr-4">
+            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
                 <h4>Add/Edit Sources</h4>
                 <Row className="form-group">
                     <Col>

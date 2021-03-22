@@ -4,7 +4,6 @@ import { Alert, Col, Row } from 'react-bootstrap';
 import { Toaster } from 'react-hot-toast';
 import Auth from '../../components/auth';
 import EditName, { RenameEvent } from '../../components/editname';
-import { ConfirmationServiceProvider } from '../../hooks/useconfirmation';
 import { DeleteResult } from '../api/apitypes';
 
 export type AdminProps = {
@@ -15,8 +14,8 @@ export type AdminProps = {
         getDefault: () => string | undefined;
         renameCallback: (e: RenameEvent) => void;
     };
-    showModal: boolean;
-    setShowModal: (show: boolean) => void;
+    showModal?: boolean;
+    setShowModal?: (show: boolean) => void;
     error: string;
     setError: (err: string) => void;
     deleteResults?: DeleteResult;
@@ -43,7 +42,7 @@ const Admin = (props: AdminProps): JSX.Element => {
 
                 <Toaster />
 
-                {props.editName != undefined && (
+                {props.editName != undefined && props.setShowModal != undefined && props.showModal != undefined && (
                     <EditName
                         type={props.type}
                         keyField={props.keyField}

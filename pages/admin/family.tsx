@@ -32,17 +32,6 @@ const updateFamily = (s: TaxonomyEntry, newValue: string) => ({
     name: newValue,
 });
 
-const emptyForm = {
-    value: [],
-    description: '',
-};
-
-const convertToFields = (s: TaxonomyEntry): FormFields => ({
-    ...s,
-    del: false,
-    value: [s],
-});
-
 const toUpsertFields = (fields: FormFields, name: string, id: number): TaxonomyUpsertFields => {
     return {
         ...fields,
@@ -50,10 +39,27 @@ const toUpsertFields = (fields: FormFields, name: string, id: number): TaxonomyU
         type: 'family',
         id: id,
         species: [],
+        parent: O.none,
     };
 };
 
-type FormFields = AdminFormFields<TaxonomyEntry> & Omit<TaxonomyEntry, 'id' | 'name'>;
+type FormFields = AdminFormFields<TaxonomyEntry> & Omit<TaxonomyEntry, 'id' | 'name' | 'type' | 'parent'>;
+
+const updatedFormFields = async (fam: TaxonomyEntry | undefined): Promise<FormFields> => {
+    if (fam != undefined) {
+        return {
+            ...fam,
+            del: false,
+            value: [fam],
+        };
+    }
+
+    return {
+        value: [],
+        description: '',
+        del: false,
+    };
+};
 
 const Family = ({ id, fs }: Props): JSX.Element => {
     const {
@@ -74,24 +80,19 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         id,
         fs,
         updateFamily,
-        convertToFields,
         toUpsertFields,
         { keyProp: 'name', delEndpoint: '../api/family/', upsertEndpoint: '../api/family/upsert' },
         schema,
-        emptyForm,
+        updatedFormFields,
     );
 
     const router = useRouter();
-
-    const onSubmit = async (fields: FormFields) => {
-        await formSubmit(fields);
-    };
 
     return (
         <Admin
             type="Family"
             keyField="name"
-            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback(onSubmit) }}
+            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback(formSubmit) }}
             setShowModal={setShowRenameModal}
             showModal={showRenameModal}
             setError={setError}
@@ -99,7 +100,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
             setDeleteResults={setDeleteResults}
             deleteResults={deleteResults}
         >
-            <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pr-4">
+            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
                 <h4>Add or Edit a Family</h4>
                 <Row className="form-group">
                     <Col>
