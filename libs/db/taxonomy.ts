@@ -20,7 +20,6 @@ import {
     FGS,
     GENUS,
     SECTION,
-    SectionUpsertFields,
     TaxonomyEntry,
     TaxonomyTree,
     TaxonomyUpsertFields,
