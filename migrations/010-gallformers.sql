@@ -128,7 +128,7 @@ INSERT INTO aliasspecies (
 
 
 -- extract the synonyms (scientific) and add them to the new table
-INSERT OR IGNORE INTO alias (
+INSERT INTO alias (
                       id,
                       name,
                       type
