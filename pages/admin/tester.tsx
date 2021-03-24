@@ -3,6 +3,7 @@ import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import React from 'react';
 import { Button } from 'react-bootstrap';
+import Auth from '../../components/auth';
 import { useConfirmation } from '../../hooks/useconfirmation';
 import { GallTaxon, HostTaxon } from '../../libs/api/apitypes';
 import { EMPTY_FGS, TaxonomyEntry } from '../../libs/api/taxonomy';
@@ -30,14 +31,16 @@ const Tester = ({ data }: Props): JSX.Element => {
     };
 
     return (
-        <>
-            <Head>
-                <title>Tester</title>
-            </Head>
-            <Button onClick={foo}>Click me</Button>
-            <p>Count: {data.length}</p>
-            <pre>{JSON.stringify(data, null, '  ')}</pre>
-        </>
+        <Auth>
+            <>
+                <Head>
+                    <title>Tester</title>
+                </Head>
+                <Button onClick={foo}>Click me</Button>
+                <p>Count: {data.length}</p>
+                <pre>{JSON.stringify(data, null, '  ')}</pre>
+            </>
+        </Auth>
     );
 };
 

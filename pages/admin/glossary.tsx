@@ -33,7 +33,6 @@ const updateEntry = (s: Entry, newValue: string): Entry => ({
     word: newValue,
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const toUpsertFields = (fields: FormFields, word: string, id: number): GlossaryEntryUpsertFields => {
     return {
         ...fields,

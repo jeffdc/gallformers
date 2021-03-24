@@ -240,14 +240,6 @@ export const allGallGenera = (): TaskEither<Error, string[]> => {
             distinct: [Prisma.AliasScalarFieldEnum.type],
             where: { AND: [{ type: GENUS }, { speciestaxonomy: { every: { species: { taxoncode: GallTaxon } } } }] },
         });
-    // db.species.findMany({
-    //     select: {
-    //         genus: true,
-    //     },
-    //     distinct: [Prisma.SpeciesScalarFieldEnum.genus],
-    //     where: { taxoncode: { equals: GallTaxon } },
-    //     orderBy: { genus: 'asc' },
-    // });
 
     return pipe(
         TE.tryCatch(genera, handleError),
