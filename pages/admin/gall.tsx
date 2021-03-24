@@ -282,7 +282,7 @@ const Gall = ({
                                     onChangeWithNew={(e, isNew) => {
                                         if (isNew || !e[0]) {
                                             setSelected(undefined);
-                                            const g = genera.find((g) => g.name.localeCompare(e[0].name) == 0);
+                                            const g = genera.find((g) => g.name.localeCompare(e[0]?.name) == 0);
                                             form.setValue(
                                                 'genus',
                                                 g
@@ -290,7 +290,7 @@ const Gall = ({
                                                     : [
                                                           {
                                                               id: -1,
-                                                              name: extractGenus(e[0].name),
+                                                              name: e[0] ? extractGenus(e[0].name) : '',
                                                               description: '',
                                                               type: GENUS,
                                                               parent: O.none,
