@@ -158,6 +158,7 @@ model gall {
   id            Int             @id @default(autoincrement())
   taxoncode     String
   detachable    Int?
+  undescribed   Boolean         @default(false)
   taxontype     taxontype       @relation(fields: [taxoncode], references: [taxoncode])
   gallspecies   gallspecies[]
   // added in 009 migration

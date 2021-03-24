@@ -95,7 +95,7 @@ INSERT INTO alias (
                             name;
 
 -- now add the relationships between the commonnames (now as aliases) and the species
-INSERT INTO aliasspecies (
+INSERT OR IGNORE INTO aliasspecies (
                              species_id,
                              alias_id
                          )
@@ -161,7 +161,7 @@ INSERT INTO alias (
                             name;
 
 -- now add the relationships between the synonyms (now as aliases) and the species
-INSERT INTO aliasspecies (
+INSERT OR IGNORE INTO aliasspecies (
                              species_id,
                              alias_id
                          )
@@ -313,6 +313,7 @@ CREATE TABLE gall__ (
     taxoncode  TEXT    NOT NULL
                        CHECK (taxoncode = 'gall'),
     detachable INTEGER,
+    undescribed BOOLEAN DEFAULT 0,
     FOREIGN KEY (
         taxonCode
     )
