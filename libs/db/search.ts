@@ -2,6 +2,7 @@ import { source, species } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { entriesWithLinkedDefs, EntryLinked } from '../pages/glossary';
+import { sourceToDisplay } from '../pages/renderhelpers';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
@@ -14,7 +15,7 @@ export type TinySpecies = {
 
 export type TinySource = {
     id: number;
-    title: string;
+    source: string;
 };
 
 export type GlobalSearchResults = {
@@ -65,7 +66,7 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
     const winnowSource = (source: source[]): TinySource[] =>
         source.map((s) => ({
             id: s.id,
-            title: s.title,
+            source: sourceToDisplay(s),
         }));
 
     const filterDefinitions = (entries: readonly EntryLinked[]): EntryLinked[] =>
