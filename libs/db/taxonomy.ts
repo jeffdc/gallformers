@@ -335,7 +335,6 @@ const connectSpecies = (f: TaxonomyUpsertFields) => f.species.map((s) => ({ spec
  * @returns the count of the number of records added, will be 1 for success and 0 for a failure
  */
 export const upsertTaxonomy = (f: TaxonomyUpsertFields): TaskEither<Error, TaxonomyEntry> => {
-    console.log(`${JSON.stringify(f, null, '  ')}`);
     const connectParentOrNot = pipe(
         f.parent,
         O.fold(

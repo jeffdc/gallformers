@@ -61,7 +61,14 @@ export default function Home(): JSX.Element {
                                         <a href="https://press.princeton.edu/books/paperback/9780691205762/plant-galls-of-the-western-united-states">
                                             Russo's guide to galls of the Western US
                                         </a>{' '}
-                                        is due from Princeton University Press in March of 2021
+                                        is due from Princeton University Press in <del>March</del> April of 2021
+                                    </li>
+                                    <li>
+                                        Some{' '}
+                                        <a href="https://www.inaturalist.org/posts/47564-tips-for-gall-hunting">
+                                            advice on finding galls
+                                        </a>
+                                        .
                                     </li>
                                 </ul>
                             </Card.Body>

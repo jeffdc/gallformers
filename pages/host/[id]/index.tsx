@@ -13,6 +13,7 @@ import { FGS } from '../../../libs/api/taxonomy';
 import { allHostIds, hostById } from '../../../libs/db/host';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
+import { sourceToDisplay } from '../../../libs/pages/renderhelpers';
 import { deserialize } from '../../../libs/utils/reactserialize';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
@@ -100,6 +101,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                         O.map((s) => (
                                             // eslint-disable-next-line react/jsx-key
                                             <span>
+                                                {' | '}
                                                 <strong> Section: </strong> {s.name} ({s.description})
                                             </span>
                                         )),
@@ -158,7 +160,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                         variant={speciessource.source_id === selectedSource?.source_id ? 'dark' : ''}
                                     >
                                         <Link href={`/source/${speciessource.source?.id}`}>
-                                            <a>{speciessource.source?.citation}</a>
+                                            <a>{sourceToDisplay(speciessource.source)}</a>
                                         </Link>
                                     </ListGroup.Item>
                                 ))}

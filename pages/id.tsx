@@ -197,6 +197,12 @@ const IDGall = (props: Props): JSX.Element => {
             <form onSubmit={handleSubmit(onSubmit)} className="fixed-left mt-2 ml-4 mr-2 form-group">
                 <Row>
                     <Col>
+                        First select either the host species or the genus/section for a host if you are unsure of the species,
+                        then press Search. You can then filter the found galls using the boxes on the left.
+                    </Col>
+                </Row>
+                <Row>
+                    <Col>
                         <label className="col-form-label">Host:</label>
                         <ControlledTypeahead
                             control={control}

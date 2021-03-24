@@ -102,11 +102,12 @@ export const deleteSource = (id: number): TaskEither<Error, DeleteResult> => {
     );
 };
 
-export const upsertSource = (source: SourceUpsertFields): TaskEither<Error, number> => {
+export const upsertSource = (source: SourceUpsertFields): TaskEither<Error, SourceApi> => {
     const upsert = () =>
         db.source.upsert({
-            where: { title: source.title },
+            where: { id: source.id },
             update: {
+                title: source.title,
                 author: source.author,
                 citation: source.citation,
                 link: source.link,
@@ -121,8 +122,9 @@ export const upsertSource = (source: SourceUpsertFields): TaskEither<Error, numb
             },
         });
 
+    // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(upsert, handleError),
-        TE.map((s) => s.id),
+        TE.map(adaptor),
     );
 };

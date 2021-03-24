@@ -40,6 +40,11 @@ export async function getStaticPropsWithId<T>(
 ): Promise<T> {
     // Do all of the error handling here so that the rendering side does not have to deal with it.
     // Plus this will all get called at build time and will uncover issues then rather than after deployment.
+    if (id <= 0) {
+        const msg = `Failed to fetch data ${dataType}. The passed in id is invalid, ${id}.`;
+        logger.error(msg);
+        throw new Error(msg);
+    }
     const g = await pipe(
         fId(id),
         TE.getOrElse((e) => {

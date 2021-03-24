@@ -9,6 +9,21 @@ import { handleError, optionalWith } from '../utils/util';
 import db from './db';
 import { adaptImage } from './images';
 
+export const updateAbundance = (id: number, abundance: string | undefined | null): Promise<number> =>
+    db.$executeRaw(
+        abundance == undefined || abundance == null
+            ? `
+            UPDATE species
+            SET abundance_id = NULL
+            WHERE id = ${id}
+          `
+            : `
+            UPDATE species 
+            SET abundance_id = (SELECT id FROM abundance WHERE abundance = '${abundance}')
+            WHERE id = ${id}
+          `,
+    );
+
 export const adaptAbundance = (a: abundance): AbundanceApi => ({
     ...a,
     reference: O.of(a.abundance),

@@ -110,7 +110,7 @@ export type SpeciesUpsertFields = {
     name: string;
     datacomplete: boolean;
     aliases: AliasApi[];
-    abundance: string;
+    abundance: string | null | undefined;
     fgs: FGS;
 };
 
@@ -348,6 +348,7 @@ export type HostApi = SpeciesApi & {
 };
 
 export type SourceUpsertFields = Deletable & {
+    id: number;
     title: string;
     author: string;
     pubyear: string;
@@ -377,6 +378,7 @@ export type DeleteResult = {
 };
 
 export type GlossaryEntryUpsertFields = Deletable & {
+    id: number;
     word: string;
     definition: string;
     urls: string; // newline separated

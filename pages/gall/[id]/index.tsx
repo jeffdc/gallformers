@@ -7,7 +7,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { MouseEvent, useState } from 'react';
-import { Button, Col, Container, ListGroup, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
+import { Button, ButtonGroup, ButtonToolbar, Col, Container, ListGroup, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import InfoTip from '../../../components/infotip';
@@ -17,7 +17,7 @@ import { allGallIds, gallById } from '../../../libs/db/gall';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkTextFromGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { defaultSource } from '../../../libs/pages/renderhelpers';
+import { defaultSource, sourceToDisplay } from '../../../libs/pages/renderhelpers';
 import { deserialize, serialize } from '../../../libs/utils/reactserialize';
 import { bugguideUrl, errorThrow, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
@@ -219,12 +219,20 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
                         <strong>Further Information:</strong>
                     </Col>
                     <Col xs={2}>
-                        <Button variant="outline-secondary" className="btn-sm" onClick={sortSourceList}>
-                            {sourceSortPropertyOptions[sourceList.sortIndex].propertyText}
-                        </Button>
-                        <Button variant="outline-secondary" className="btn-sm" onClick={toggleAscDesc}>
-                            {sourceList.sortOrder == -1 ? descText : ascText}
-                        </Button>
+                        <ButtonToolbar className="row d-flex justify-content-center mt-2">
+                            <ButtonGroup size="sm">
+                                <Button
+                                    variant="secondary"
+                                    style={{ fontSize: '1.1em', fontWeight: 'lighter' }}
+                                    onClick={sortSourceList}
+                                >
+                                    {sourceSortPropertyOptions[sourceList.sortIndex].propertyText}
+                                </Button>
+                                <Button variant="secondary" style={{ fontWeight: 'bold' }} onClick={toggleAscDesc}>
+                                    {sourceList.sortOrder == -1 ? descText : ascText}
+                                </Button>
+                            </ButtonGroup>
+                        </ButtonToolbar>
                     </Col>
                 </Row>
                 <Row>
@@ -239,7 +247,7 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
                                     variant={speciessource.source_id === selectedSource?.source_id ? 'dark' : ''}
                                 >
                                     <Link href={`/source/${speciessource.source?.id}`}>
-                                        <a>{speciessource.source?.citation}</a>
+                                        <a>{sourceToDisplay(speciessource.source)}</a>
                                     </Link>
                                 </ListGroup.Item>
                             ))}

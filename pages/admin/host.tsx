@@ -90,7 +90,7 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): SpeciesUpsertFields => {
         return {
-            abundance: fields.abundance[0].abundance,
+            abundance: fields.abundance.length > 0 ? fields.abundance[0].abundance : undefined,
             aliases: aliasData,
             datacomplete: fields.datacomplete,
             fgs: { family: fields.family[0], genus: fields.genus[0], section: O.fromNullable(fields.section[0]) },
@@ -234,6 +234,21 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                                     onChangeWithNew={(e, isNew) => {
                                         if (isNew || !e[0]) {
                                             setSelected(undefined);
+                                            const g = genera.find((g) => g.name.localeCompare(e[0].name) == 0);
+                                            form.setValue(
+                                                'genus',
+                                                g
+                                                    ? [g]
+                                                    : [
+                                                          {
+                                                              id: -1,
+                                                              name: extractGenus(e[0].name),
+                                                              description: '',
+                                                              type: GENUS,
+                                                              parent: O.none,
+                                                          },
+                                                      ],
+                                            );
                                             router.replace(``, undefined, { shallow: true });
                                         } else {
                                             const host: HostApi = e[0];
@@ -289,6 +304,14 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                             labelKey="name"
                             clearButton
                             disabled={!!selected}
+                            onChange={(f) => {
+                                // handle the case when a new species is created
+                                const g = form.getValues().genus[0];
+                                if (O.isNone(g.parent)) {
+                                    g.parent = O.some(f[0]);
+                                    form.setValue('genus', [g]);
+                                }
+                            }}
                         />
                         {form.errors.family && (
                             <span className="text-danger">

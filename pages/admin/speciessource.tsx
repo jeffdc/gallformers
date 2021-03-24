@@ -17,6 +17,7 @@ import { SpeciesSourceApi, SpeciesSourceInsertFields } from '../../libs/api/apit
 import { allSources } from '../../libs/db/source';
 import { allSpecies } from '../../libs/db/species';
 import Admin from '../../libs/pages/admin';
+import { sourceToDisplay } from '../../libs/pages/renderhelpers';
 import { mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
@@ -53,8 +54,6 @@ const fetchSources = async (id: number): Promise<SpeciesSourceApi[]> => {
         throw new Error('Failed to fetch sources for the selected species. Check console.');
     }
 };
-
-const sourceToDisplay = (s: DBSource) => `${s.pubyear}: ${s.title} - ${s.author}`;
 
 const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Element => {
     const [sourcesForSpecies, setSourcesForSpecies] = useState(new Array<SpeciesSourceApi>());
@@ -95,14 +94,6 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                 setSelectedSource(firstSource);
 
                 return fieldsFor(sp, firstSource);
-                // return {
-                //     value: [sp],
-                //     description: sources.length > 0 ? firstSource.description : '',
-                //     externallink: sources.length > 0 ? firstSource.externallink : '',
-                //     sources: sources,
-                //     useasdefault: sources.length > 0 ? firstSource.useasdefault != 0 : false,
-                //     del: false,
-                // };
             }
             setSourcesForSpecies([]);
             return {

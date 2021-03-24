@@ -49,9 +49,10 @@ const Images = ({ species }: Props): JSX.Element => {
             <Modal show={showModal} onHide={() => setShowModal(false)} size="xl">
                 <Modal.Header closeButton />
                 <Modal.Body>
-                    <Carousel interval={null} className="border-dark align-self-center p-2">
+                    {/* <Carousel interval={null} className="border-dark align-self-center p-2"> */}
+                    <Carousel interval={null}>
                         {species.images.map((image) => (
-                            <CarouselItem key={image.id}>
+                            <CarouselItem key={image.id} className="">
                                 <Image
                                     //TODO when all images have XL versions show those here rather than the original
                                     src={image.original}
@@ -60,7 +61,15 @@ const Images = ({ species }: Props): JSX.Element => {
                                     width={width - 2 * pad}
                                     height={(width - 2 * pad) * hwRatio}
                                     objectFit={'contain'}
+                                    className="d-block"
                                 />
+                                <Carousel.Caption className="">
+                                    {image.sourcelink != undefined && image.sourcelink !== '' && (
+                                        <a href={image.sourcelink} target="_blank" rel="noreferrer">
+                                            Link to Original
+                                        </a>
+                                    )}
+                                </Carousel.Caption>
                             </CarouselItem>
                         ))}
                     </Carousel>
@@ -156,10 +165,11 @@ const Images = ({ species }: Props): JSX.Element => {
                                 setShowModal(true);
                             }}
                         />
+                        <Carousel.Caption></Carousel.Caption>
                     </CarouselItem>
                 ))}
             </Carousel>
-            <ButtonToolbar className="row d-flex justify-content-center mt-2">
+            <ButtonToolbar className="row d-flex justify-content-center">
                 <ButtonGroup size="sm">
                     <OverlayTrigger
                         trigger="focus"

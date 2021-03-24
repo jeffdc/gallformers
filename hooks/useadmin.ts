@@ -73,13 +73,13 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     const postUpdate = async (res: Response) => {
         const s = (await res.json()) as T;
         setSelected(s);
-        const updated = data;
+        let updated = data;
         if (data.find((d) => d.id === s.id) == undefined) {
             // add new if necessary
             updated.push(s);
         } else {
             // update data in place since name might have changed
-            const updated = data.filter((d) => d.id == s.id);
+            updated = data.filter((d) => d.id !== s.id);
             updated.push(s);
         }
         setData(updated);
@@ -102,13 +102,17 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         }
         const updated = update(selected, e.new);
         doRename(await updatedFormFields(updated), e);
-        setData(data.map((d) => (d.id === updated.id ? updated : d)));
-        setSelected(updated);
+        // const updatedData = data.map((d) => (d.id === updated.id ? updated : d));
+        // setData(updatedData);
+        // setSelected(updated);
     };
 
     const onDataChange = useCallback(async (t: T | undefined) => {
         const ff = await updatedFormFields(t);
         form.reset(ff as UnpackNestedValue<DeepPartial<FormFields>>);
+        // must do this since the value is bound to a control that is controlled (i.e., no ref prop) so it will not get updated
+        // during the reset. see: https://react-hook-form.com/api#reset
+        form.setValue('value', [t as never]);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

@@ -26,7 +26,7 @@ import { ExtractTFromPromise } from '../utils/types';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
 import { adaptImage } from './images';
-import { adaptAbundance } from './species';
+import { adaptAbundance, updateAbundance } from './species';
 import { connectIfNotNull, connectWithIds } from './utils';
 
 /**
@@ -111,14 +111,9 @@ export const getGalls = (
                 },
                 // remove the indirection of the many-to-many table for easier usage
                 hosts: g.species.hosts.map((h) => {
-                    // due to prisma problems we had to make these hostspecies relationships optional, however
-                    // if we are here then there must be a record in the host table so it can not be null :(
-                    if (!h.hostspecies?.id || !h.hostspecies?.name) {
-                        throw new Error('Invalid state. Hostspecies mappings are not as expected.');
-                    }
                     return {
-                        id: h.hostspecies.id,
-                        name: h.hostspecies.name,
+                        id: h.hostspecies?.id ? h.hostspecies.id : -1,
+                        name: h.hostspecies?.name ? h.hostspecies.name : 'MISSING HOST',
                     };
                 }),
                 images: g.species.image.map(adaptImage),
@@ -487,7 +482,16 @@ const gallUpdateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
         db.species.update({
             where: { id: gall.id },
             data: {
-                abundance: connectIfNotNull<Prisma.abundanceCreateOneWithoutSpeciesInput, string>('abundance', gall.abundance),
+                // more Prisma stupidity: disconnecting a record that is not connected throws. :(
+                // so instead of this:
+                // abundance: host.abundance
+                //     ? {
+                //           connect: { abundance: host.abundance },
+                //       }
+                //     : {
+                //           disconnect: true,
+                //       },
+                //   we instead have to have a totally separate step in the transaction to update abundance 😠
                 datacomplete: gall.datacomplete,
                 name: gall.name,
                 gallspecies: {
@@ -543,6 +547,8 @@ const gallUpdateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
                 },
             },
         }),
+        // the abundance update referenced above:
+        updateAbundance(gall.id, gall.abundance),
         // the genus could have been changed and might be new
         // delete any records that map this species to a genus that are not the same as what is inbound
         db.speciestaxonomy.deleteMany({

@@ -5,10 +5,12 @@ import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { DeleteResult, HostApi, HostSimple, HostTaxon, SpeciesApi, SpeciesUpsertFields } from '../api/apitypes';
 import { GENUS } from '../api/taxonomy';
+import { deleteImagesBySpeciesId } from '../images/images';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
 import { adaptImage } from './images';
-import { adaptAbundance, connectOrCreateGenus } from './species';
+import { adaptAbundance, connectOrCreateGenus, updateAbundance } from './species';
+import { connectIfNotNull } from './utils';
 
 //TODO switch over to model like is beign done in gall.ts with derived type rather than explicit
 type DBHost = species & {
@@ -182,21 +184,22 @@ export const hostsByGenus = (genus: string): TaskEither<Error, HostApi[]> => {
 };
 
 /////////////////////////////////////////
-const abundanceConnect = (host: SpeciesUpsertFields) => {
-    if (host.abundance) {
-        return { connect: { abundance: host.abundance } };
-    } else {
-        return {};
-    }
-};
-
 const hostUpdateSteps = (host: SpeciesUpsertFields): Promise<unknown>[] => {
-    // eslint-disable-next-line prettier/prettier
+    console.log(`${JSON.stringify(host, null, '  ')}`);
     return [
         db.species.update({
             where: { id: host.id },
             data: {
-                abundance: abundanceConnect(host),
+                // more Prisma stupidity: disconnecting a record that is not connected throws. :(
+                // so instead of this:
+                // abundance: host.abundance
+                //     ? {
+                //           connect: { abundance: host.abundance },
+                //       }
+                //     : {
+                //           disconnect: true,
+                //       },
+                //   we instead have to have a totally separate step in the transaction to update abundance 😠
                 datacomplete: host.datacomplete,
                 name: host.name,
                 aliasspecies: {
@@ -208,6 +211,8 @@ const hostUpdateSteps = (host: SpeciesUpsertFields): Promise<unknown>[] => {
                 },
             },
         }),
+        // the abundance update referenced above:
+        updateAbundance(host.id, host.abundance),
         // the genus could have been changed and might be new
         // TODO I believe that this can lead to orphaned genus records in the taxonomy table.
         // Also could lead to a genus being assigned to >1 Family
@@ -227,7 +232,7 @@ const hostCreateSteps = (host: SpeciesUpsertFields) => {
             data: {
                 name: host.name,
                 taxontype: { connect: { taxoncode: HostTaxon } },
-                abundance: abundanceConnect(host),
+                abundance: connectIfNotNull<Prisma.abundanceCreateOneWithoutSpeciesInput, string>('abundance', host.abundance),
                 taxonomy: {
                     create: [
                         // family must already exist
@@ -287,6 +292,14 @@ const hostDeleteSteps = (speciesids: number[]): Promise<Prisma.BatchPayload>[] =
             where: { species_id: { in: speciesids } },
         }),
 
+        db.aliasspecies.deleteMany({
+            where: { species_id: { in: speciesids } },
+        }),
+
+        db.speciestaxonomy.deleteMany({
+            where: { species_id: { in: speciesids } },
+        }),
+
         db.species.deleteMany({
             where: { id: { in: speciesids } },
         }),
@@ -299,19 +312,21 @@ const hostDeleteSteps = (speciesids: number[]): Promise<Prisma.BatchPayload>[] =
  * @returns
  */
 export const deleteHost = (speciesid: number): TaskEither<Error, DeleteResult> => {
-    const deleteHostTx = (speciesid: number) => TE.tryCatch(() => db.$transaction(hostDeleteSteps([speciesid])), handleError);
+    const deleteImages = () => TE.tryCatch(() => deleteImagesBySpeciesId(speciesid), handleError);
+    const deleteHostTx = () => TE.tryCatch(() => db.$transaction(hostDeleteSteps([speciesid])), handleError);
 
     const toDeleteResult = (batch: Prisma.BatchPayload[]): DeleteResult => {
         return {
             type: 'host',
-            name: '',
+            name: 'host',
             count: batch.reduce((acc, v) => acc + v.count, 0),
         };
     };
 
     // eslint-disable-next-line prettier/prettier
     return pipe(
-        deleteHostTx(speciesid),
+        deleteImages(),
+        TE.chain(deleteHostTx),
         TE.map(toDeleteResult)
     );
 };

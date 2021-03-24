@@ -154,6 +154,7 @@ const Gall = ({
             };
         }
 
+        setAliasData([]);
         return {
             value: [],
             genus: [],
@@ -281,6 +282,21 @@ const Gall = ({
                                     onChangeWithNew={(e, isNew) => {
                                         if (isNew || !e[0]) {
                                             setSelected(undefined);
+                                            const g = genera.find((g) => g.name.localeCompare(e[0].name) == 0);
+                                            form.setValue(
+                                                'genus',
+                                                g
+                                                    ? [g]
+                                                    : [
+                                                          {
+                                                              id: -1,
+                                                              name: extractGenus(e[0].name),
+                                                              description: '',
+                                                              type: GENUS,
+                                                              parent: O.none,
+                                                          },
+                                                      ],
+                                            );
                                             router.replace(``, undefined, { shallow: true });
                                         } else {
                                             const gall: AT.GallApi = e[0];
@@ -332,6 +348,14 @@ const Gall = ({
                             options={families}
                             labelKey="name"
                             disabled={!!selected}
+                            onChange={(f) => {
+                                // handle the case when a new species is created
+                                const g = form.getValues().genus[0];
+                                if (O.isNone(g.parent)) {
+                                    g.parent = O.some(f[0]);
+                                    form.setValue('genus', [g]);
+                                }
+                            }}
                         />
                         {form.errors.family && (
                             <span className="text-danger">

@@ -37,6 +37,7 @@ const updateEntry = (s: Entry, newValue: string): Entry => ({
 const toUpsertFields = (fields: FormFields, word: string, id: number): GlossaryEntryUpsertFields => {
     return {
         ...fields,
+        id: id,
         word: word,
     };
 };
@@ -44,8 +45,9 @@ const toUpsertFields = (fields: FormFields, word: string, id: number): GlossaryE
 const updatedFormFields = async (e: Entry | undefined): Promise<FormFields> => {
     if (e != undefined) {
         return {
-            ...e,
             value: [e],
+            definition: e.definition,
+            urls: e.urls,
             del: false,
         };
     }
@@ -73,7 +75,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
         form,
         formSubmit,
     } = useAdmin(
-        'Glossary',
+        'Glossary Entry',
         id,
         glossary,
         updateEntry,
@@ -87,7 +89,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
 
     return (
         <Admin
-            type="Glossary"
+            type="Glossary Entry"
             keyField="word"
             editName={{ getDefault: () => selected?.word, renameCallback: renameCallback(formSubmit) }}
             setShowModal={setShowModal}
@@ -149,6 +151,9 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                     <Col>
                         URLs (separated by a newline [enter]):
                         <textarea name="urls" className="form-control" ref={form.register} rows={3} />
+                        {form.errors.urls && (
+                            <span className="text-danger">You must provide a URL for the source of the defintion.</span>
+                        )}
                     </Col>
                 </Row>
                 <Row className="fromGroup" hidden={!selected}>

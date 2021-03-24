@@ -38,6 +38,7 @@ const updateSource = (s: SourceApi, newValue: string) => ({
 const toUpsertFields = (fields: FormFields, name: string, id: number): SourceUpsertFields => {
     return {
         ...fields,
+        id: id,
         title: name,
     };
 };
@@ -45,9 +46,12 @@ const toUpsertFields = (fields: FormFields, name: string, id: number): SourceUps
 const updatedFormFields = async (s: SourceApi | undefined): Promise<FormFields> => {
     if (s != undefined) {
         return {
-            ...s,
-            del: false,
             value: [s],
+            author: s.author,
+            pubyear: s.pubyear,
+            link: s.link,
+            citation: s.citation,
+            del: false,
         };
     }
 
