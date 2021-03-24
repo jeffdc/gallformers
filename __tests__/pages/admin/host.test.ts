@@ -1,4 +1,3 @@
-import fc from 'fast-check';
 import { testables, FormFields } from '../../../pages/admin/host';
 
 const { Schema } = testables;
@@ -7,7 +6,7 @@ describe('Schema validation', () => {
     const fields: FormFields = {
         abundance: [],
         family: [],
-        genus: '',
+        genus: [],
         value: [],
         del: false,
         datacomplete: false,
