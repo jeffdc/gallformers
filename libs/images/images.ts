@@ -181,6 +181,9 @@ export const deleteImagesByPaths = async (paths: ImagePaths): Promise<void> => {
     paths.large.forEach(pushObjectIdentifier);
     paths.xlarge.forEach(pushObjectIdentifier);
 
+    // nothing to do
+    if (objects.length <= 0) return Promise.resolve();
+
     logger.info(`About to delete images: ${objects.map((o) => o.Key)}`);
 
     const deleteParams: DeleteObjectsRequest = {

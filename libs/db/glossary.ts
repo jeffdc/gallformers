@@ -13,6 +13,8 @@ export type Entry = {
     urls: string; // \n separated
 };
 
+const adaptor = (e: glossary): Entry => e;
+
 export const allGlossaryEntries = (): TaskEither<Error, Entry[]> => {
     const glossary = () =>
         // prisma does not handle sort order by collate nocase
@@ -21,11 +23,9 @@ export const allGlossaryEntries = (): TaskEither<Error, Entry[]> => {
             ORDER BY word COLLATE NOCASE ASC;
         `);
 
-    const glossaryToEntry = (e: glossary): Entry => e;
-
     return pipe(
         TE.tryCatch(glossary, handleError),
-        TE.map((e) => e.map(glossaryToEntry)),
+        TE.map((e) => e.map(adaptor)),
     );
 };
 
@@ -50,11 +50,12 @@ export const deleteGlossaryEntry = (id: number): TaskEither<Error, DeleteResult>
     );
 };
 
-export const upsertGlossary = (entry: GlossaryEntryUpsertFields): TaskEither<Error, string> => {
+export const upsertGlossary = (entry: GlossaryEntryUpsertFields): TaskEither<Error, Entry> => {
     const upsert = () =>
         db.glossary.upsert({
-            where: { word: entry.word },
+            where: { id: entry.id },
             update: {
+                word: entry.word,
                 definition: entry.definition,
                 urls: entry.urls,
             },
@@ -65,8 +66,9 @@ export const upsertGlossary = (entry: GlossaryEntryUpsertFields): TaskEither<Err
             },
         });
 
+    // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(upsert, handleError),
-        TE.map((e) => e.word),
+        TE.map(adaptor),
     );
 };

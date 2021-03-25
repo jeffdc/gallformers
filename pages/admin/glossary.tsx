@@ -1,23 +1,21 @@
-import { yupResolver } from '@hookform/resolvers/yup';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
-import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Col, Row } from 'react-bootstrap';
-import { useForm } from 'react-hook-form';
+import React from 'react';
+import { Button, Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
-import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
-import { AdminFormFields, useAPIs } from '../../hooks/useAPIs';
+import useAdmin from '../../hooks/useadmin';
+import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { DeleteResult, GlossaryEntryUpsertFields } from '../../libs/api/apitypes';
+import { GlossaryEntryUpsertFields } from '../../libs/api/apitypes';
 import { allGlossaryEntries, Entry } from '../../libs/db/glossary';
+import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
 
-const Schema = yup.object().shape({
+const schema = yup.object().shape({
     value: yup.mixed().required(),
     definition: yup.string().required(),
     urls: yup.string().required(),
@@ -30,150 +28,146 @@ type Props = {
 
 type FormFields = AdminFormFields<Entry> & Pick<Entry, 'definition' | 'urls'>;
 
-const Glossary = (props: Props): JSX.Element => {
-    if (!props.glossary) throw new Error(`The input props for glossary edit can not be null or undefined.`);
+const updateEntry = (s: Entry, newValue: string): Entry => ({
+    ...s,
+    word: newValue,
+});
 
-    const [existingId, setExistingId] = useState<number | undefined>(
-        props.id && props.id !== '' ? parseInt(props.id) : undefined,
+const toUpsertFields = (fields: FormFields, word: string, id: number): GlossaryEntryUpsertFields => {
+    return {
+        ...fields,
+        id: id,
+        word: word,
+    };
+};
+
+const updatedFormFields = async (e: Entry | undefined): Promise<FormFields> => {
+    if (e != undefined) {
+        return {
+            value: [e],
+            definition: e.definition,
+            urls: e.urls,
+            del: false,
+        };
+    }
+
+    return {
+        value: [],
+        definition: '',
+        urls: '',
+        del: false,
+    };
+};
+
+const Glossary = ({ id, glossary }: Props): JSX.Element => {
+    const {
+        data,
+        selected,
+        setSelected,
+        showRenameModal: showModal,
+        setShowRenameModal: setShowModal,
+        error,
+        setError,
+        deleteResults,
+        setDeleteResults,
+        renameCallback,
+        form,
+        formSubmit,
+    } = useAdmin(
+        'Glossary Entry',
+        id,
+        glossary,
+        updateEntry,
+        toUpsertFields,
+        { keyProp: 'word', delEndpoint: '../api/glossary/', upsertEndpoint: '../api/glossary/upsert' },
+        schema,
+        updatedFormFields,
     );
-    const [deleteResults, setDeleteResults] = useState<DeleteResult>();
-    const [glossary, setGlossary] = useState(props.glossary);
-    const [error, setError] = useState('');
-
-    const { register, handleSubmit, errors, control, reset } = useForm<FormFields>({
-        mode: 'onBlur',
-        resolver: yupResolver(Schema),
-    });
-
-    const { doDeleteOrUpsert } = useAPIs<Entry, GlossaryEntryUpsertFields>('word', '../api/glossary/', '../api/glossary/upsert');
 
     const router = useRouter();
 
-    const onGlossaryChange = useCallback(
-        (id: number | undefined) => {
-            if (id == undefined) {
-                reset({
-                    value: [],
-                    definition: '',
-                    urls: '',
-                });
-            } else {
-                try {
-                    const glos = props.glossary.find((g) => g.id === id);
-                    if (glos == undefined) {
-                        throw new Error(`Somehow we have a family selection that does not exist?! familyid: ${id}`);
-                    }
-                    reset({
-                        value: [glos],
-                        definition: glos.definition,
-                        urls: glos.urls,
-                    });
-                } catch (e) {
-                    console.error(e);
-                    setError(e);
-                }
-            }
-        },
-        [props.glossary, reset],
-    );
-
-    useEffect(() => {
-        onGlossaryChange(existingId);
-    }, [existingId, onGlossaryChange]);
-
-    const onSubmit = async (data: FormFields) => {
-        const postDelete = (id: number | string, result: DeleteResult) => {
-            setGlossary(glossary.filter((g) => g.id !== id));
-            setDeleteResults(result);
-        };
-
-        const postUpdate = (res: Response) => {
-            router.push(res.url);
-        };
-
-        const convertFormFieldsToUpsert = (fields: FormFields, word: string, id: number): GlossaryEntryUpsertFields => ({
-            ...fields,
-            word: word,
-        });
-
-        await doDeleteOrUpsert(data, postDelete, postUpdate, convertFormFieldsToUpsert)
-            .then(() => reset())
-            .catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
-    };
-
     return (
-        <Auth>
-            <>
-                <Head>
-                    <title>Add/Edit Glossary Entries</title>
-                </Head>
-
-                {error.length > 0 && (
-                    <Alert variant="danger" onClose={() => setError('')} dismissible>
-                        <Alert.Heading>Uh-oh</Alert.Heading>
-                        <p>{error}</p>
-                    </Alert>
-                )}
-
-                <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
-                    <h4>Add/Edit Glossary Entries</h4>
-                    <Row className="form-group">
-                        <Col>
-                            Name:
-                            <ControlledTypeahead
-                                control={control}
-                                name="value"
-                                onChangeWithNew={(e, isNew) => {
-                                    if (isNew || !e[0]) {
-                                        setExistingId(undefined);
-                                        router.replace(``, undefined, { shallow: true });
-                                    } else {
-                                        const entry: Entry = e[0];
-                                        setExistingId(entry.id);
-                                        router.replace(`?id=${e[0].id}`, undefined, { shallow: true });
-                                    }
-                                }}
-                                placeholder="Word"
-                                options={glossary}
-                                labelKey={'word'}
-                                clearButton
-                                isInvalid={!!errors.value}
-                                newSelectionPrefix="Add a new Word: "
-                                allowNew={true}
-                            />
-                            {errors.value && <span className="text-danger">The Word is required.</span>}
-                        </Col>
-                    </Row>
-                    <Row className="form-group">
-                        <Col>
-                            Definition:
-                            <textarea name="definition" className="form-control" ref={register} rows={4} />
-                            {errors.definition && <span className="text-danger">You must provide the defintion.</span>}
-                        </Col>
-                    </Row>
-                    <Row className="form-group">
-                        <Col>
-                            URLs (separated by a newline [enter]):
-                            <textarea name="urls" className="form-control" ref={register} rows={3} />
-                        </Col>
-                    </Row>
-                    <Row className="fromGroup" hidden={!existingId}>
-                        <Col xs="1">Delete?:</Col>
-                        <Col className="mr-auto">
-                            <input name="del" type="checkbox" className="form-check-input" ref={register} />
-                        </Col>
-                    </Row>
-                    <Row className="form-input">
-                        <Col>
-                            <input type="submit" className="button" value="Submit" />
-                        </Col>
-                    </Row>
-                    <Row hidden={!deleteResults}>
-                        <Col>{`Deleted ${deleteResults?.name}.`}</Col>☹️
-                    </Row>
-                </form>
-            </>
-        </Auth>
+        <Admin
+            type="Glossary Entry"
+            keyField="word"
+            editName={{ getDefault: () => selected?.word, renameCallback: renameCallback(formSubmit) }}
+            setShowModal={setShowModal}
+            showModal={showModal}
+            setError={setError}
+            error={error}
+            setDeleteResults={setDeleteResults}
+            deleteResults={deleteResults}
+        >
+            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
+                <h4>Add/Edit Glossary Entries</h4>
+                <Row className="form-group">
+                    <Col>
+                        <Row>
+                            <Col>Word:</Col>
+                        </Row>
+                        <Row>
+                            <Col>
+                                <ControlledTypeahead
+                                    control={form.control}
+                                    name="value"
+                                    onChangeWithNew={(e, isNew) => {
+                                        if (isNew || !e[0]) {
+                                            setSelected(undefined);
+                                            router.replace(``, undefined, { shallow: true });
+                                        } else {
+                                            setSelected(e[0]);
+                                            router.replace(`?id=${e[0].id}`, undefined, { shallow: true });
+                                        }
+                                    }}
+                                    placeholder="Word"
+                                    options={data}
+                                    labelKey={'word'}
+                                    clearButton
+                                    isInvalid={!!form.errors.value}
+                                    newSelectionPrefix="Add a new Word: "
+                                    allowNew={true}
+                                />
+                                {form.errors.value && <span className="text-danger">The Word is required.</span>}
+                            </Col>
+                            {selected && (
+                                <Col xs={1}>
+                                    <Button variant="secondary" className="btn-sm" onClick={() => setShowModal(true)}>
+                                        Rename
+                                    </Button>
+                                </Col>
+                            )}
+                        </Row>
+                    </Col>
+                </Row>
+                <Row className="form-group">
+                    <Col>
+                        Definition:
+                        <textarea name="definition" className="form-control" ref={form.register} rows={4} />
+                        {form.errors.definition && <span className="text-danger">You must provide the defintion.</span>}
+                    </Col>
+                </Row>
+                <Row className="form-group">
+                    <Col>
+                        URLs (separated by a newline [enter]):
+                        <textarea name="urls" className="form-control" ref={form.register} rows={3} />
+                        {form.errors.urls && (
+                            <span className="text-danger">You must provide a URL for the source of the defintion.</span>
+                        )}
+                    </Col>
+                </Row>
+                <Row className="fromGroup" hidden={!selected}>
+                    <Col xs="1">Delete?:</Col>
+                    <Col className="mr-auto">
+                        <input name="del" type="checkbox" className="form-check-input" ref={form.register} />
+                    </Col>
+                </Row>
+                <Row className="form-input">
+                    <Col>
+                        <input type="submit" className="button" value="Submit" />
+                    </Col>
+                </Row>
+            </form>
+        </Admin>
     );
 };
 

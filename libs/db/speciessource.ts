@@ -1,10 +1,10 @@
-import { Prisma, source, speciessource } from '@prisma/client';
+import { source, species, speciessource } from '@prisma/client';
 import * as A from 'fp-ts/lib/Array';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, SourceWithSpeciesSourceApi, SpeciesSourceApi, SpeciesSourceInsertFields } from '../api/apitypes';
+import { DeleteResult, SpeciesSourceApi, SpeciesSourceInsertFields } from '../api/apitypes';
 import { handleError } from '../utils/util';
 import db from './db';
 
@@ -28,6 +28,19 @@ export const speciesSourceByIds = (speciesId: string, sourceId: string): TaskEit
     return pipe(
         TE.tryCatch(source, handleError),
         TE.map(adaptor),
+    );
+};
+
+export const sourcesBySpecies = (id: number): TaskEither<Error, SpeciesSourceApi[]> => {
+    const sources = () =>
+        db.speciessource.findMany({
+            where: { species_id: { equals: id } },
+            include: { source: true },
+        });
+
+    return pipe(
+        TE.tryCatch(sources, handleError),
+        TE.map((spso) => spso.sort((a, b) => a.source.citation.localeCompare(b.source.citation))),
     );
 };
 
@@ -73,59 +86,49 @@ export const deleteSpeciesSourceByIds = (speciesId: string, sourceId: string): T
     );
 };
 
-export const upsertSpeciesSource = (sourcespecies: SpeciesSourceInsertFields): TaskEither<Error, speciessource> => {
+export const upsertSpeciesSource = (sourcespecies: SpeciesSourceInsertFields): TaskEither<Error, species> => {
     // if this one is the new default, then make sure all of the other ones are not default
     const setAsNewDefault = () => {
         if (sourcespecies.useasdefault) {
             return db.speciessource.updateMany({
                 data: { useasdefault: 0 },
                 where: {
-                    AND: [{ source_id: { equals: sourcespecies.source } }, { species_id: { equals: sourcespecies.species } }],
+                    species_id: { equals: sourcespecies.species },
                 },
             });
         } else {
             // nothing done but we need to return the correct type
-            return Promise.resolve({ count: 0 } as Prisma.BatchPayload);
+            // return Promise.resolve({ count: 0 } as Prisma.BatchPayload);
+            return db.speciessource.updateMany({
+                where: { id: { equals: -999 } },
+                data: {},
+            });
         }
     };
 
-    // see if this mapping already exists
-    const existing = () =>
-        db.speciessource.findMany({
-            where: {
-                source_id: { equals: sourcespecies.source },
-                species_id: { equals: sourcespecies.species },
-            },
-        });
+    const upsert = db.speciessource.upsert({
+        where: {
+            id: sourcespecies.id,
+        },
+        create: {
+            source: { connect: { id: sourcespecies.source } },
+            species: { connect: { id: sourcespecies.species } },
+            description: sourcespecies.description,
+            useasdefault: sourcespecies.useasdefault ? 1 : 0,
+            externallink: sourcespecies.externallink,
+        },
+        update: {
+            description: sourcespecies.description,
+            useasdefault: sourcespecies.useasdefault ? 1 : 0,
+            externallink: sourcespecies.externallink,
+        },
+        include: { species: true },
+    });
 
-    const upsert = (existingS: speciessource[]) => () =>
-        db.speciessource.upsert({
-            where: {
-                id: existingS.length > 0 ? existingS[0].id : -1,
-            },
-            create: {
-                source: { connect: { id: sourcespecies.source } },
-                species: { connect: { id: sourcespecies.species } },
-                description: sourcespecies.description,
-                useasdefault: sourcespecies.useasdefault ? 1 : 0,
-                externallink: sourcespecies.externallink,
-            },
-            update: {
-                description: sourcespecies.description,
-                useasdefault: sourcespecies.useasdefault ? 1 : 0,
-                externallink: sourcespecies.externallink,
-            },
-        });
-
-    // No sure elegant way to acheive this. We want setAsNewDefault to run, but we do not care about its return value for
-    // further work, onl that it may have failed. If the map in the 2nd line of the pipe is not run the types will be wrong
-    // in the upsert call. This is surely just my ignorance and there has to be a better way to accomplish this.
     // eslint-disable-next-line prettier/prettier
     return pipe(
-        TE.tryCatch(setAsNewDefault, handleError),
-        TE.map(() => TE.tryCatch(existing, handleError)),
-        TE.flatten,
-        TE.map((s) => TE.tryCatch(upsert(s), handleError)),
-        TE.flatten,
+        TE.tryCatch(() => db.$transaction([setAsNewDefault(), upsert]), handleError),
+        TE.map((s) => s[1]),
+        TE.map((s) => s.species),
     );
 };

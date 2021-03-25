@@ -1,17 +1,16 @@
-import fc from 'fast-check';
 import { testables, FormFields } from '../../../pages/admin/host';
 
-const { extractGenus, Schema } = testables;
+const { Schema } = testables;
 
 describe('Schema validation', () => {
     const fields: FormFields = {
         abundance: [],
-        commonnames: '',
         family: [],
-        genus: '',
+        genus: [],
         value: [],
-        synonyms: '',
         del: false,
+        datacomplete: false,
+        section: [],
     };
     const fieldsWithFam = {
         ...fields,
@@ -30,18 +29,5 @@ describe('Schema validation', () => {
 
     test('pass on valid host name', () => {
         expect(Schema.isValidSync({ ...fieldsWithFam, value: [{ name: 'Foo bar' }] })).toBeTruthy();
-    });
-});
-
-describe('extractGenus tests', () => {
-    test('it must act as the identity if passed in a string whose format is not conformant', () => {
-        fc.property(
-            fc.string().filter((s) => !s.includes(' ')),
-            (s) => expect(extractGenus(s)).toBe(s),
-        );
-    });
-
-    test('it must extract the genus when passed a conformant string', () => {
-        expect(extractGenus('Foo bar')).toBe('Foo');
     });
 });

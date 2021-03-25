@@ -33,13 +33,18 @@ export async function getStaticPropsWith<T>(f: () => TaskEither<Error, readonly 
  */
 export async function getStaticPropsWithId<T>(
     id: number,
-    fId: (id: number) => TaskEither<Error, T[]>,
+    fId: (id: number) => TaskEither<Error, T>,
     dataType: string,
     resultsRequired = false,
     many = false,
-): Promise<T[]> {
+): Promise<T> {
     // Do all of the error handling here so that the rendering side does not have to deal with it.
     // Plus this will all get called at build time and will uncover issues then rather than after deployment.
+    if (id <= 0) {
+        const msg = `Failed to fetch data ${dataType}. The passed in id is invalid, ${id}.`;
+        logger.error(msg);
+        throw new Error(msg);
+    }
     const g = await pipe(
         fId(id),
         TE.getOrElse((e) => {
@@ -48,11 +53,11 @@ export async function getStaticPropsWithId<T>(
         }),
     )();
 
-    if (resultsRequired && g.length < 1) {
+    if (resultsRequired && Array.isArray(g) && g.length < 1) {
         const msg = `Failed to fetch ${dataType} from backend with ${dataType} id = '${id}'.`;
         logger.error(msg);
         throw new Error(msg);
-    } else if (!many && g.length > 1) {
+    } else if (!many && Array.isArray(g) && g.length > 1) {
         const msg = `Somehow we got more than one ${dataType} for ${dataType} id '${id}'.`;
         logger.error(msg);
         throw new Error(msg);
@@ -71,11 +76,11 @@ export async function getStaticPropsWithId<T>(
  */
 export async function getStaticPropsWithContext<T>(
     context: GetStaticPropsContext<ParsedUrlQuery>,
-    fId: (id: number) => TaskEither<Error, T[]>,
+    fId: (id: number) => TaskEither<Error, T>,
     dataType: string,
     resultsRequired = false,
     many = false,
-): Promise<T[]> {
+): Promise<T> {
     if (context === undefined || context.params === undefined || context.params.id === undefined) {
         throw new Error('An id must be passed!');
     } else if (Array.isArray(context.params.id)) {

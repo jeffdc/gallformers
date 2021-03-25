@@ -1,18 +1,20 @@
-import { abundance, family, host, image, Prisma, source, species, speciessource } from '@prisma/client';
+import { abundance, alias, aliasspecies, host, image, Prisma, source, species, speciessource } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, HostApi, HostSimple, HostTaxon, SpeciesUpsertFields } from '../api/apitypes';
+import { DeleteResult, HostApi, HostSimple, HostTaxon, SpeciesApi, SpeciesUpsertFields } from '../api/apitypes';
+import { GENUS } from '../api/taxonomy';
+import { deleteImagesBySpeciesId } from '../images/images';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
 import { adaptImage } from './images';
-import { adaptAbundance } from './species';
+import { adaptAbundance, connectOrCreateGenus, updateAbundance } from './species';
+import { connectIfNotNull } from './utils';
 
 //TODO switch over to model like is beign done in gall.ts with derived type rather than explicit
 type DBHost = species & {
     abundance: abundance | null;
-    family: family;
     host_galls: (host & {
         gallspecies: {
             id: number;
@@ -21,6 +23,9 @@ type DBHost = species & {
     })[];
     speciessource: (speciessource & {
         source: source;
+    })[];
+    aliasspecies: (aliasspecies & {
+        alias: alias;
     })[];
     image: (image & {
         source:
@@ -37,12 +42,13 @@ const adaptor = (hosts: DBHost[]): HostApi[] =>
         // set the default description to make the caller's life easier
         const d = h.speciessource.find((s) => s.useasdefault === 1)?.description;
         const newh: HostApi = {
-            ...h,
+            id: h.id,
+            name: h.name,
+            datacomplete: h.datacomplete,
             description: O.fromNullable(d),
             taxoncode: h.taxoncode ? h.taxoncode : '',
-            synonyms: O.fromNullable(h.synonyms),
-            commonnames: O.fromNullable(h.commonnames),
             abundance: optionalWith(h.abundance, adaptAbundance),
+            speciessource: h.speciessource,
             // remove the indirection of the many-to-many table for easier usage
             galls: h.host_galls.map((h) => {
                 // due to prisma problems we had to make these hostspecies relationships optional, however
@@ -54,6 +60,9 @@ const adaptor = (hosts: DBHost[]): HostApi[] =>
                 };
             }),
             images: h.image.map(adaptImage),
+            aliases: h.aliasspecies.map((a) => ({
+                ...a.alias,
+            })),
         };
         return newh;
     });
@@ -63,23 +72,22 @@ const simplify = (hosts: HostApi[]) =>
         return {
             name: h.name,
             id: h.id,
-            commonnames: h.commonnames,
-            synonyms: h.synonyms,
+            aliases: h.aliases,
         };
     });
 
 /**
- * Fetches all hosts.
+ * Fetch all hosts.
  */
 export const allHosts = (): TaskEither<Error, HostApi[]> => getHosts();
 
 /**
- * Fetches all hosts into a HostSimple format.
+ * Fetch all hosts into a HostSimple format.
  */
 export const allHostsSimple = (): TaskEither<Error, HostSimple[]> => pipe(allHosts(), TE.map(simplify));
 
 /**
- * Fetches all host names as a string[].
+ * Fetch all host names as a string[].
  */
 export const allHostNames = (): TaskEither<Error, string[]> =>
     pipe(
@@ -88,25 +96,9 @@ export const allHostNames = (): TaskEither<Error, string[]> =>
     );
 
 /**
- * Fetches all of the Genera for the hosts.
+ * Fetch all the ids for the hosts.
+ * @returns
  */
-export const allHostGenera = (): TaskEither<Error, string[]> => {
-    const genera = () =>
-        db.species.findMany({
-            select: {
-                genus: true,
-            },
-            distinct: [Prisma.SpeciesScalarFieldEnum.genus],
-            where: { taxoncode: { equals: HostTaxon } },
-            orderBy: { genus: 'asc' },
-        });
-
-    return pipe(
-        TE.tryCatch(genera, handleError),
-        TE.map((hosts) => hosts.map((h) => h.genus)),
-    );
-};
-
 export const allHostIds = (): TaskEither<Error, string[]> => {
     const hosts = () =>
         db.species.findMany({
@@ -137,7 +129,6 @@ export const getHosts = (
         db.species.findMany({
             include: {
                 abundance: true,
-                family: true,
                 host_galls: {
                     include: {
                         gallspecies: {
@@ -151,6 +142,7 @@ export const getHosts = (
                     },
                 },
                 image: { include: { source: { include: { speciessource: true } } } },
+                aliasspecies: { include: { alias: true } },
             },
             where: w,
             distinct: distinct,
@@ -166,56 +158,122 @@ export const getHosts = (
  */
 export const hostById = (id: number): TaskEither<Error, HostApi[]> => getHosts([{ id: id }]);
 
+/**
+ * Fetch a host by its name.
+ * @param name
+ */
+export const hostByName = (name: string): TaskEither<Error, HostApi[]> => getHosts([{ name: name }]);
+
+/**
+ * Fetch all hosts for the given genus.
+ * @param genus
+ * @returns
+ */
 export const hostsByGenus = (genus: string): TaskEither<Error, HostApi[]> => {
     if (!genus || genus.length === 0) return TE.taskEither.of([]);
 
-    return getHosts([{ genus: { equals: genus } }]);
+    return getHosts([
+        {
+            taxonomy: {
+                some: {
+                    taxonomy: { AND: [{ name: { equals: genus } }, { type: { equals: GENUS } }] },
+                },
+            },
+        },
+    ]);
 };
 
-export const upsertHost = (h: SpeciesUpsertFields): TaskEither<Error, number> => {
-    const abundanceConnect = () => {
-        if (h.abundance) {
-            return { connect: { abundance: h.abundance } };
-        } else {
-            return {};
-        }
-    };
-    console.log(h);
-    const upsert = () =>
-        db.species.upsert({
-            where: { name: h.name },
-            update: {
-                family: { connect: { name: h.family } },
-                abundance: abundanceConnect(),
-                synonyms: h.synonyms,
-                commonnames: h.commonnames,
+/////////////////////////////////////////
+const hostUpdateSteps = (host: SpeciesUpsertFields): Promise<unknown>[] => {
+    console.log(`${JSON.stringify(host, null, '  ')}`);
+    return [
+        db.species.update({
+            where: { id: host.id },
+            data: {
+                // more Prisma stupidity: disconnecting a record that is not connected throws. :(
+                // so instead of this:
+                // abundance: host.abundance
+                //     ? {
+                //           connect: { abundance: host.abundance },
+                //       }
+                //     : {
+                //           disconnect: true,
+                //       },
+                //   we instead have to have a totally separate step in the transaction to update abundance 😠
+                datacomplete: host.datacomplete,
+                name: host.name,
+                aliasspecies: {
+                    // typical hack, delete them all and then add
+                    deleteMany: { species_id: host.id },
+                    create: host.aliases.map((a) => ({
+                        alias: { create: { description: a.description, name: a.name, type: a.type } },
+                    })),
+                },
             },
-            create: {
-                name: h.name,
-                genus: h.name.split(' ')[0],
+        }),
+        // the abundance update referenced above:
+        updateAbundance(host.id, host.abundance),
+        // the genus could have been changed and might be new
+        // TODO I believe that this can lead to orphaned genus records in the taxonomy table.
+        // Also could lead to a genus being assigned to >1 Family
+        db.speciestaxonomy.deleteMany({ where: { AND: [{ species_id: host.id }, { taxonomy: { type: GENUS } }] } }),
+        db.speciestaxonomy.create({
+            data: {
+                species: { connect: { id: host.id } },
+                taxonomy: connectOrCreateGenus(host),
+            },
+        }),
+    ];
+};
+
+const hostCreateSteps = (host: SpeciesUpsertFields) => {
+    return [
+        db.species.create({
+            data: {
+                name: host.name,
                 taxontype: { connect: { taxoncode: HostTaxon } },
-                family: { connect: { name: h.family } },
-                abundance: abundanceConnect(),
-                synonyms: h.synonyms,
-                commonnames: h.commonnames,
+                abundance: connectIfNotNull<Prisma.abundanceCreateOneWithoutSpeciesInput, string>('abundance', host.abundance),
+                taxonomy: {
+                    create: [
+                        // family must already exist
+                        { taxonomy: { connect: { id: host.fgs.family.id } } },
+                        // genus could be new
+                        {
+                            taxonomy: connectOrCreateGenus(host),
+                        },
+                    ],
+                },
+                aliasspecies: {
+                    create: host.aliases.map((a) => ({
+                        alias: { create: { description: a.description, name: a.name, type: a.type } },
+                    })),
+                },
             },
-        });
-
-    return pipe(
-        TE.tryCatch(upsert, handleError),
-        TE.map((sp) => sp.id),
-    );
+        }),
+    ];
 };
 
-export const getIdsFromHostSpeciesIds = (speciesIds: number[]): TaskEither<Error, number[]> => {
-    const hostIds = () =>
-        db.host.findMany({
-            where: { host_species_id: { in: speciesIds } },
-        });
+/**
+ * Update or insert a host.
+ * @param h
+ * @returns
+ */
+export const upsertHost = (h: SpeciesUpsertFields): TaskEither<Error, SpeciesApi> => {
+    const updateHostTx = TE.tryCatch(() => db.$transaction(hostUpdateSteps(h)), handleError);
+    const createHostTx = TE.tryCatch(() => db.$transaction(hostCreateSteps(h)), handleError);
 
+    const getHost = () => {
+        return hostByName(h.name);
+    };
+
+    // eslint-disable-next-line prettier/prettier
     return pipe(
-        TE.tryCatch(hostIds, handleError),
-        TE.map((hostIds) => hostIds.map((h) => h.id)),
+        h.id < 0 ? createHostTx : updateHostTx,
+        TE.chain(getHost),
+        TE.fold(
+            (e) => TE.left(e),
+            (s) => (s.length <= 0 ? TE.left(new Error('Failed to get upserted data.')) : TE.right(s[0])),
+        ),
     );
 };
 
@@ -224,13 +282,21 @@ export const getIdsFromHostSpeciesIds = (speciesIds: number[]): TaskEither<Error
  * See: https://github.com/prisma/prisma/issues/2057
  * @param speciesids an array of ids of the species (host) to delete
  */
-export const hostDeleteSteps = (speciesids: number[]): Promise<Prisma.BatchPayload>[] => {
+const hostDeleteSteps = (speciesids: number[]): Promise<Prisma.BatchPayload>[] => {
     return [
         db.host.deleteMany({
-            where: { gall_species_id: { in: speciesids } },
+            where: { host_species_id: { in: speciesids } },
         }),
 
         db.speciessource.deleteMany({
+            where: { species_id: { in: speciesids } },
+        }),
+
+        db.aliasspecies.deleteMany({
+            where: { species_id: { in: speciesids } },
+        }),
+
+        db.speciestaxonomy.deleteMany({
             where: { species_id: { in: speciesids } },
         }),
 
@@ -240,20 +306,27 @@ export const hostDeleteSteps = (speciesids: number[]): Promise<Prisma.BatchPaylo
     ];
 };
 
+/**
+ * Delete a host by its id (species id).
+ * @param speciesid
+ * @returns
+ */
 export const deleteHost = (speciesid: number): TaskEither<Error, DeleteResult> => {
-    const deleteHostTx = (speciesid: number) => TE.tryCatch(() => db.$transaction(hostDeleteSteps([speciesid])), handleError);
+    const deleteImages = () => TE.tryCatch(() => deleteImagesBySpeciesId(speciesid), handleError);
+    const deleteHostTx = () => TE.tryCatch(() => db.$transaction(hostDeleteSteps([speciesid])), handleError);
 
     const toDeleteResult = (batch: Prisma.BatchPayload[]): DeleteResult => {
         return {
             type: 'host',
-            name: '',
+            name: 'host',
             count: batch.reduce((acc, v) => acc + v.count, 0),
         };
     };
 
     // eslint-disable-next-line prettier/prettier
     return pipe(
-        deleteHostTx(speciesid),
+        deleteImages(),
+        TE.chain(deleteHostTx),
         TE.map(toDeleteResult)
     );
 };

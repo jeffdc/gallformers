@@ -7,20 +7,23 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { MouseEvent, useState } from 'react';
-import { Button, Col, Container, ListGroup, Row } from 'react-bootstrap';
+import { Button, ButtonGroup, ButtonToolbar, Col, Container, ListGroup, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import InfoTip from '../../../components/infotip';
 import { DetachableBoth, GallApi, GallHost, SourceApi, SpeciesSourceApi } from '../../../libs/api/apitypes';
+import { FGS } from '../../../libs/api/taxonomy';
 import { allGallIds, gallById } from '../../../libs/db/gall';
+import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkTextFromGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { defaultSource, renderCommonNames } from '../../../libs/pages/renderhelpers';
+import { defaultSource, sourceToDisplay } from '../../../libs/pages/renderhelpers';
 import { deserialize, serialize } from '../../../libs/utils/reactserialize';
 import { bugguideUrl, errorThrow, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
     species: GallApi;
+    taxonomy: FGS;
 };
 
 type SortPropertyOption = {
@@ -55,7 +58,7 @@ const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
     );
 };
 
-const Gall = ({ species }: Props): JSX.Element => {
+const Gall = ({ species, taxonomy }: Props): JSX.Element => {
     const [selectedSource, setSelectedSource] = useState(defaultSource(species?.speciessource));
     const [sourceList, setSourceList] = useState({ data: species?.speciessource, sortIndex: 0, sortOrder: -1 });
 
@@ -111,24 +114,45 @@ const Gall = ({ species }: Props): JSX.Element => {
             </Head>
             <Container className="p-1">
                 <Row>
+                    {/* The Details Column */}
                     <Col>
-                        <Row className="">
-                            <Edit id={species.id} type="gall" />
-                            <Col>
+                        <Row>
+                            <Col className="">
                                 <h2>{species.name}</h2>
-                                {renderCommonNames(species.commonnames)}
-                                <p className="font-italic">
-                                    <strong>Family:</strong>
-                                    <Link key={species.family.id} href={`/family/${species.family.id}`}>
-                                        <a> {species.family.name}</a>
-                                    </Link>
-                                </p>
+                            </Col>
+                            <Col xs={2}>
+                                <span className="p-0 pr-1 my-auto">
+                                    <Edit id={species.id} type="gall" />
+                                    <OverlayTrigger
+                                        placement="right"
+                                        overlay={
+                                            <Tooltip id="datacomplete">
+                                                {species.datacomplete
+                                                    ? 'All sources containing unique information relevant to this gall have been added and are reflected in its associated data. However, filter criteria may not be comprehensive in every field.'
+                                                    : 'We are still working on this species so data is missing.'}
+                                            </Tooltip>
+                                        }
+                                    >
+                                        <Button variant="outline-light">{species.datacomplete ? '💯' : '❓'}</Button>
+                                    </OverlayTrigger>
+                                </span>
                             </Col>
                         </Row>
                         <Row>
                             <Col>
-                                <Edit id={species.id} type="gallhost" />
+                                {species.aliases.map((a) => a.name).join(', ')}
+                                <p className="font-italic">
+                                    <strong>Family:</strong>
+                                    <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
+                                        <a> {taxonomy.family.name}</a>
+                                    </Link>
+                                </p>
+                            </Col>
+                        </Row>
+                        <Row className="">
+                            <Col>
                                 <strong>Hosts:</strong> {species.hosts.map(hostLinker)}
+                                <Edit id={species.id} type="gallhost" />
                             </Col>
                         </Row>
                         <Row>
@@ -195,12 +219,20 @@ const Gall = ({ species }: Props): JSX.Element => {
                         <strong>Further Information:</strong>
                     </Col>
                     <Col xs={2}>
-                        <Button variant="outline-secondary" className="btn-sm" onClick={sortSourceList}>
-                            {sourceSortPropertyOptions[sourceList.sortIndex].propertyText}
-                        </Button>
-                        <Button variant="outline-secondary" className="btn-sm" onClick={toggleAscDesc}>
-                            {sourceList.sortOrder == -1 ? descText : ascText}
-                        </Button>
+                        <ButtonToolbar className="row d-flex justify-content-center mt-2">
+                            <ButtonGroup size="sm">
+                                <Button
+                                    variant="secondary"
+                                    style={{ fontSize: '1.1em', fontWeight: 'lighter' }}
+                                    onClick={sortSourceList}
+                                >
+                                    {sourceSortPropertyOptions[sourceList.sortIndex].propertyText}
+                                </Button>
+                                <Button variant="secondary" style={{ fontWeight: 'bold' }} onClick={toggleAscDesc}>
+                                    {sourceList.sortOrder == -1 ? descText : ascText}
+                                </Button>
+                            </ButtonGroup>
+                        </ButtonToolbar>
                     </Col>
                 </Row>
                 <Row>
@@ -215,7 +247,7 @@ const Gall = ({ species }: Props): JSX.Element => {
                                     variant={speciessource.source_id === selectedSource?.source_id ? 'dark' : ''}
                                 >
                                     <Link href={`/source/${speciessource.source?.id}`}>
-                                        <a>{speciessource.source?.citation}</a>
+                                        <a>{sourceToDisplay(speciessource.source)}</a>
                                     </Link>
                                 </ListGroup.Item>
                             ))}
@@ -272,9 +304,12 @@ export const getStaticProps: GetStaticProps = async (context) => {
         TE.getOrElse(errorThrow),
     )();
 
+    const fgs = await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy');
+
     return {
         props: {
             species: { ...gall, speciessource: sources },
+            taxonomy: fgs,
         },
         revalidate: 1,
     };

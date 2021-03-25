@@ -17,7 +17,8 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
-    "noErrorTruncation": true
+    "noErrorTruncation": true,
+    "typeRoots": ["./node_modules/@types", "./@types"]
   },
   "include": [
     "next-env.d.ts",

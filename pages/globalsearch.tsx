@@ -179,7 +179,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     const r: SearchResultItem[] = species
         .map((s) => ({ id: s.id.toString(), type: s.taxoncode, name: s.name }))
         .concat(glossary.map((g) => ({ id: g.word, type: 'entry', name: capitalizeFirstLetter(g.word) })))
-        .concat(sources.map((s) => ({ id: s.id.toString(), type: 'source', name: s.title })));
+        .concat(sources.map((s) => ({ id: s.id.toString(), type: 'source', name: s.source })));
 
     return {
         props: {

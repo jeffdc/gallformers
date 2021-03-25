@@ -1,21 +1,7 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { ImageApi, SpeciesApi } from '../api/apitypes';
-import { ImageSize } from '../images/images';
 import { truncateAtWord } from '../utils/util';
-
-/**
- * Simple helper to render the commonnames in the UI.
- * @param commonnames
- */
-export const renderCommonNames = (commonnames: O.Option<string>): string => {
-    // eslint-disable-next-line prettier/prettier
-    return pipe(
-        commonnames,
-        O.map((c) => (c.length === 0 ? '' : `(${c})`)),
-        O.getOrElse(constant('')),
-    );
-};
 
 /**
  * Renders the given string input with line breaks for any embedded new lines.
@@ -46,7 +32,7 @@ export const renderParagraph = (p: string): React.ReactNode => {
 export const defaultSource = <T extends { useasdefault: number; source: { pubyear: string } }>(
     speciessource: T[],
 ): T | undefined => {
-    if (speciessource && speciessource.length > 1) {
+    if (speciessource && speciessource.length > 0) {
         // if there is one marked as default, use that
         const source = speciessource.find((s) => s.useasdefault !== 0);
         if (source) return source;
@@ -83,3 +69,10 @@ export const truncateOptionString = (description: O.Option<string>, truncateAfte
         O.getOrElse(constant('')),
     )    
 };
+
+/**
+ *
+ * @param s
+ */
+export const sourceToDisplay = (s: { pubyear: string; title: string; author: string }): string =>
+    `${s.author}: (${s.pubyear}) ${s.title}`;

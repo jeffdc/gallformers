@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { upsertFamily } from '../../../libs/db/family';
-import { apiUpsertEndpoint, onCompleteRedirect } from '../../../libs/api/apipage';
+import { apiUpsertEndpoint, onCompleteSendJson } from '../../../libs/api/apipage';
+import { upsertTaxonomy } from '../../../libs/db/taxonomy';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> =>
-    apiUpsertEndpoint(req, res, upsertFamily, onCompleteRedirect('family/'));
+    apiUpsertEndpoint(req, res, upsertTaxonomy, onCompleteSendJson);

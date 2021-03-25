@@ -2,6 +2,8 @@ import { source, species } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { entriesWithLinkedDefs, EntryLinked } from '../pages/glossary';
+import { sourceToDisplay } from '../pages/renderhelpers';
+import { ExtractTFromPromise } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
 
@@ -13,7 +15,7 @@ export type TinySpecies = {
 
 export type TinySource = {
     id: number;
-    title: string;
+    source: string;
 };
 
 export type GlobalSearchResults = {
@@ -28,10 +30,23 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
     const speciesSearch = () =>
         db.species.findMany({
             where: {
-                OR: [{ name: { contains: q } }, { commonnames: { contains: q } }, { synonyms: { contains: q } }],
+                OR: { name: { contains: q } },
             },
-            orderBy: { name: 'asc' },
         });
+
+    const aliasSearch = () =>
+        db.alias.findMany({
+            include: { aliasspecies: { include: { species: true } } },
+            where: { name: { contains: q } },
+        });
+
+    const mergeSpeciesAndAliases = (s: species[]) => (a: ExtractTFromPromise<ReturnType<typeof aliasSearch>>): species[] => {
+        const other = a.map((aa) => aa.aliasspecies.map((as) => as.species)).flat();
+        other.forEach((o) => {
+            if (!s.find((s) => s.id === o.id)) s.push(o);
+        });
+        return s.sort((a, b) => a.name.localeCompare(b.name));
+    };
 
     const sourceSearch = () =>
         db.source.findMany({
@@ -51,7 +66,7 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
     const winnowSource = (source: source[]): TinySource[] =>
         source.map((s) => ({
             id: s.id,
-            title: s.title,
+            source: sourceToDisplay(s),
         }));
 
     const filterDefinitions = (entries: readonly EntryLinked[]): EntryLinked[] =>
@@ -67,6 +82,14 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
 
     return pipe(
         TE.tryCatch(speciesSearch, handleError),
+        // eslint-disable-next-line prettier/prettier
+        TE.map((sp) =>
+            pipe(
+                TE.tryCatch(aliasSearch, handleError),
+                TE.map(mergeSpeciesAndAliases(sp)),
+            )
+        ),
+        TE.flatten,
         TE.map(winnowSpecies),
         // curry the species results into the builder
         TE.map(buildResults),

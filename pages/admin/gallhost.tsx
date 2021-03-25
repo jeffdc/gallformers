@@ -1,23 +1,24 @@
-import { yupResolver } from '@hookform/resolvers/yup';
-import { host } from '@prisma/client';
-import * as O from 'fp-ts/lib/Option';
 import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
-import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Col, Row } from 'react-bootstrap';
-import { useForm } from 'react-hook-form';
+import React from 'react';
+import { Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import ControlledTypeahead from '../../components/controlledtypeahead';
+import useAdmin from '../../hooks/useadmin';
+import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { GallApi, GallHostUpdateFields, SimpleSpecies } from '../../libs/api/apitypes';
+import { GallApi, GallHost, GallHostUpdateFields, HostTaxon, SimpleSpecies } from '../../libs/api/apitypes';
+import { TaxonomyEntry } from '../../libs/api/taxonomy';
 import { allGalls } from '../../libs/db/gall';
-import { allHostGenera, allHosts } from '../../libs/db/host';
-import { mightFailWithArray } from '../../libs/utils/util';
-import { useRouter } from 'next/router';
+import { allHosts } from '../../libs/db/host';
+import { allGenera } from '../../libs/db/taxonomy';
+import Admin from '../../libs/pages/admin';
+import { hasProp, mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
     id: string;
@@ -26,113 +27,99 @@ type Props = {
     hosts: SimpleSpecies[];
 };
 
-const Schema = yup.object().shape({
-    gall: yup.mixed().required(),
+const schema = yup.object().shape({
+    value: yup.array().required('You must provide the gall.'),
 });
 
-type FormFields = {
-    gall: GallApi[];
+type FormFields = AdminFormFields<GallApi> & {
     genus: string;
-    hosts: SimpleSpecies[];
+    hosts: GallHost[];
 };
 
-const GallHost = ({ id, galls, genera, hosts }: Props): JSX.Element => {
-    const [results, setResults] = useState(new Array<host>());
-    const [selectedGall, setSelectedGall] = useState(id ? galls.find((g) => g.id === parseInt(id)) : undefined);
-    const [error, setError] = useState('');
+const update = (s: GallApi, newValue: string) => ({
+    ...s,
+    name: newValue,
+});
 
-    const { handleSubmit, errors, control, setValue, reset } = useForm<FormFields>({
-        mode: 'onBlur',
-        resolver: yupResolver(Schema),
-    });
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const toUpsertFields = (fields: FormFields, name: string, id: number): GallHostUpdateFields => {
+    return {
+        gall: id,
+        hosts: fields.hosts.map((h) => h.id),
+        genus: fields.genus[0],
+    };
+};
+
+const fetchGallHosts = async (id: number | undefined): Promise<GallHost[]> => {
+    if (id == undefined) return [];
+
+    const res = await fetch(`../api/gallhost?gallid=${id}`);
+    if (res.status === 200) {
+        return (await res.json()) as GallHost[];
+    } else {
+        console.error(await res.text());
+        throw new Error('Failed to fetch host for the selected gall. Check console.');
+    }
+};
+
+const GallHostMapper = ({ id, galls, genera, hosts }: Props): JSX.Element => {
+    const updatedFormFields = async (gall: GallApi | undefined): Promise<FormFields> => {
+        if (gall != undefined) {
+            const hosts = await fetchGallHosts(gall.id);
+            return {
+                value: [gall],
+                hosts: hosts,
+                genus: '',
+                del: false,
+            };
+        }
+
+        setSelected(gall);
+        router.replace(``, undefined, { shallow: true });
+
+        return {
+            value: [],
+            hosts: [],
+            genus: '',
+            del: false,
+        };
+    };
+
+    // eslint-disable-next-line prettier/prettier
+    const {
+        data,
+        selected,
+        setSelected,
+        error,
+        setError,
+        deleteResults,
+        setDeleteResults,
+        form,
+        formSubmit,
+    } = useAdmin<GallApi, FormFields, GallHostUpdateFields>(
+        'Gall-Host',
+        id,
+        galls,
+        update,
+        toUpsertFields,
+        { keyProp: 'name', delEndpoint: '../api/gallhost/', upsertEndpoint: '../api/gallhost/insert' },
+        schema,
+        updatedFormFields,
+    );
 
     const router = useRouter();
 
-    const onSubmit = async (data: FormFields) => {
-        try {
-            const insertData: GallHostUpdateFields = {
-                gall: data.gall[0].id,
-                hosts: data.hosts.map((h) => h.id),
-                genus: data.genus[0],
-            };
-
-            const res = await fetch('../api/gallhost/insert', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(insertData),
-            });
-
-            if (res.status === 200) {
-                reset();
-                setResults(await res.json());
-            } else {
-                const text = await res.text();
-                console.error(`Got an error back code: ${res.status} and text: ${text}.`);
-                throw new Error(text);
-            }
-        } catch (e) {
-            console.error(e);
-            setError(e);
-        }
-    };
-
-    const gallChange = async (gs: GallApi[]) => {
-        const gall = gs.length > 0 ? gs[0] : undefined;
-        if (gall != undefined) {
-            const res = await fetch(`../api/gallhost?gallid=${gall.id}`);
-            if (res.status === 200) {
-                const hosts = (await res.json()) as SimpleSpecies[];
-                if (hosts) {
-                    setSelectedGall(gall);
-                }
-            }
-            router.replace(`?id=${gall.id}`, undefined, { shallow: true });
-        } else {
-            setSelectedGall(gall);
-            router.replace(``, undefined, { shallow: true });
-        }
-    };
-
-    const onGallChange = useCallback(
-        (gall: GallApi | undefined) => {
-            if (gall == undefined) {
-                reset({
-                    gall: [],
-                    hosts: [],
-                    genus: '',
-                });
-            } else {
-                reset({
-                    gall: [gall],
-                    hosts: gall.hosts,
-                    genus: '',
-                });
-            }
-        },
-        [reset],
-    );
-
-    useEffect(() => {
-        onGallChange(selectedGall);
-    }, [selectedGall, onGallChange]);
-
     return (
         <Auth>
-            <>
-                <Head>
-                    <title>Map Galls & Hosts</title>
-                </Head>
-
-                {error.length > 0 && (
-                    <Alert variant="danger" onClose={() => setError('')} dismissible>
-                        <Alert.Heading>Uh-oh</Alert.Heading>
-                        <p>{error}</p>
-                    </Alert>
-                )}
-
-                <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
+            <Admin
+                type="Gall & Host Mappings"
+                keyField="name"
+                setError={setError}
+                error={error}
+                setDeleteResults={setDeleteResults}
+                deleteResults={deleteResults}
+            >
+                <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
                     <h4>Map Galls & Hosts</h4>
                     <p>
                         First select a gall. If any mappings to hosts already exist they will show up in the Host field. Then you
@@ -149,16 +136,26 @@ const GallHost = ({ id, galls, genera, hosts }: Props): JSX.Element => {
                         <Col>
                             Gall:
                             <ControlledTypeahead
-                                control={control}
-                                name="gall"
+                                control={form.control}
+                                name="value"
                                 placeholder="Gall"
-                                options={galls}
+                                options={data}
                                 labelKey="name"
                                 clearButton
-                                isInvalid={!!errors.gall}
-                                onChange={gallChange}
+                                isInvalid={!!form.errors.value}
+                                onChange={(s) => {
+                                    if (s.length > 0) {
+                                        setSelected(s[0]);
+                                        router.replace(`?id=${s[0].id}`, undefined, { shallow: true });
+                                    } else {
+                                        setSelected(undefined);
+                                        router.replace(``, undefined, { shallow: true });
+                                    }
+                                }}
                             />
-                            {errors.gall && <span className="text-danger">You must provide a gall to map.</span>}
+                            {form.errors.value && hasProp(form.errors.value, 'message') && (
+                                <span className="text-danger">{form.errors.value.message as string}</span>
+                            )}
                         </Col>
                     </Row>
                     <Row>
@@ -170,14 +167,14 @@ const GallHost = ({ id, galls, genera, hosts }: Props): JSX.Element => {
                         <Col>
                             Hosts:
                             <ControlledTypeahead
-                                control={control}
+                                control={form.control}
                                 name="hosts"
                                 placeholder="Hosts"
                                 options={hosts}
                                 labelKey="name"
                                 multiple
                                 clearButton
-                                disabled={!selectedGall}
+                                disabled={!selected}
                             />
                         </Col>
                     </Row>
@@ -190,11 +187,11 @@ const GallHost = ({ id, galls, genera, hosts }: Props): JSX.Element => {
                         <Col>
                             Genus:
                             <ControlledTypeahead
-                                control={control}
+                                control={form.control}
                                 name="genus"
                                 placeholder="Genus"
                                 options={genera}
-                                disabled={!selectedGall}
+                                disabled={!selected}
                                 clearButton
                             />
                             (If you select a Genus, then the mapping will be created for ALL species in that Genus. Once the
@@ -207,9 +204,8 @@ const GallHost = ({ id, galls, genera, hosts }: Props): JSX.Element => {
                             <input type="submit" className="button" value="Submit" />
                         </Col>
                     </Row>
-                    {results.length > 0 && <span>Updated gall-host mappings.</span>}
                 </form>
-            </>
+            </Admin>
         </Auth>
     );
 };
@@ -221,14 +217,16 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
         extractQueryParam(context.query, queryParam),
         O.getOrElse(constant('')),
     );
+    const genera = (await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon))).map((g) => g.name);
+
     return {
         props: {
             id: id,
             galls: await mightFailWithArray<GallApi>()(allGalls()),
-            genera: await mightFailWithArray<string>()(allHostGenera()),
+            genera: genera,
             hosts: await mightFailWithArray<SimpleSpecies>()(allHosts()),
         },
     };
 };
 
-export default GallHost;
+export default GallHostMapper;

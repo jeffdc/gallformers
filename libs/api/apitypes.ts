@@ -1,9 +1,12 @@
 /**
- * Types for calling the APIs. These are to be used by browser code when it calls the APIs.
+ * Types for calling the APIs. These are to be used by browser code when it calls the APIs so all database stuff
+ * must stay out of here.
  */
+import { alias } from '@prisma/client';
 import * as O from 'fp-ts/lib/Option';
 import { Option } from 'fp-ts/lib/Option';
 import { ParsedUrlQuery } from 'querystring';
+import { FGS, TaxonomyEntry } from './taxonomy';
 
 export const GallTaxon = 'gall';
 export const HostTaxon = 'plant';
@@ -102,41 +105,17 @@ export type FamilyGallType = FamilyGallTypesTuples[number];
 export type FamilyHostTypesTuple = typeof HOST_FAMILY_TYPES;
 export type FamilyHostType = FamilyHostTypesTuple[number];
 
-export type FamilyApi = {
-    id: number;
-    name: string;
-    description: string;
-};
-export const EmptyFamily: FamilyApi = { id: -1, name: '', description: '' };
-
-export type FamilyWithSpecies = FamilyApi & {
-    species: {
-        id: number;
-        name: string;
-        gall: {
-            species: {
-                id: number;
-                name: string;
-            } | null;
-        } | null;
-    }[];
-};
-
-export type FamilyUpsertFields = {
-    name: string;
-    description: string;
-};
-
 export type SpeciesUpsertFields = {
     id: number;
     name: string;
-    commonnames: string;
-    synonyms: string;
-    family: string;
-    abundance: string;
+    datacomplete: boolean;
+    aliases: AliasApi[];
+    abundance: string | null | undefined;
+    fgs: FGS;
 };
 
 export type GallUpsertFields = SpeciesUpsertFields & {
+    gallid: number; // if less than 0 then new
     hosts: number[];
     locations: number[];
     colors: number[];
@@ -205,17 +184,29 @@ export type SimpleSpecies = {
     id: number;
     taxoncode: string;
     name: string;
-    genus: string;
 };
 
 export type SpeciesApi = SimpleSpecies & {
-    synonyms: Option<string>;
-    commonnames: Option<string>;
+    datacomplete: boolean;
     abundance: Option<AbundanceApi>;
     description: Option<string>; // to make the caller's life easier we will load the default if we can
-    family: FamilyApi;
     speciessource: SpeciesSourceApi[];
     images: ImageApi[];
+    aliases: AliasApi[];
+};
+
+export type AliasApi = {
+    id: number;
+    name: string;
+    type: string;
+    description: string;
+};
+
+export const EmptyAlias: AliasApi = {
+    id: -1,
+    name: '',
+    type: 'common',
+    description: '',
 };
 
 export type DetachableApi = {
@@ -328,6 +319,7 @@ export const EmptyWalls: WallsApi = {
 
 export type GallApi = SpeciesApi & {
     gall: {
+        id: number;
         gallalignment: AlignmentApi[];
         gallcells: CellsApi[];
         gallcolor: ColorApi[];
@@ -343,8 +335,7 @@ export type GallApi = SpeciesApi & {
 export type HostSimple = {
     id: number;
     name: string;
-    commonnames: Option<string>;
-    synonyms: Option<string>;
+    aliases: alias[];
 };
 
 export type GallSimple = {
@@ -357,6 +348,7 @@ export type HostApi = SpeciesApi & {
 };
 
 export type SourceUpsertFields = Deletable & {
+    id: number;
     title: string;
     author: string;
     pubyear: string;
@@ -365,6 +357,7 @@ export type SourceUpsertFields = Deletable & {
 };
 
 export type SpeciesSourceInsertFields = Deletable & {
+    id: number;
     species: number;
     source: number;
     description: string;
@@ -385,6 +378,7 @@ export type DeleteResult = {
 };
 
 export type GlossaryEntryUpsertFields = Deletable & {
+    id: number;
     word: string;
     definition: string;
     urls: string; // newline separated

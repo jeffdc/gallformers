@@ -5,18 +5,21 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { MouseEvent, useState } from 'react';
-import { Col, Container, ListGroup, Row } from 'react-bootstrap';
+import { Button, Col, Container, ListGroup, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import { GallSimple, HostApi } from '../../../libs/api/apitypes';
+import { FGS } from '../../../libs/api/taxonomy';
 import { allHostIds, hostById } from '../../../libs/db/host';
+import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { renderCommonNames } from '../../../libs/pages/renderhelpers';
+import { sourceToDisplay } from '../../../libs/pages/renderhelpers';
 import { deserialize } from '../../../libs/utils/reactserialize';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
     host: HostApi;
+    taxonomy: FGS;
 };
 
 // eslint-disable-next-line react/display-name
@@ -32,7 +35,7 @@ const gallAsLink = (len: number) => (g: GallSimple, idx: number) => {
     );
 };
 
-const Host = ({ host }: Props): JSX.Element => {
+const Host = ({ host, taxonomy }: Props): JSX.Element => {
     const source = host ? host.speciessource.find((s) => s.useasdefault !== 0) : undefined;
     const [selectedSource, setSelectedSource] = useState(source);
 
@@ -61,17 +64,50 @@ const Host = ({ host }: Props): JSX.Element => {
 
             <Container className="p-1">
                 <Row>
+                    {/* The details column */}
                     <Col>
                         <Row>
-                            <Edit id={host.id} type="host" />
-                            <Col>
+                            <Col className="">
                                 <h2>{host.name}</h2>
-                                {renderCommonNames(host.commonnames)}
+                            </Col>
+                            <Col xs={2} className="mr-1">
+                                <span className="p-0 pr-1 my-auto">
+                                    <Edit id={host.id} type="host" />
+                                    <OverlayTrigger
+                                        placement="right"
+                                        overlay={
+                                            <Tooltip id="datacomplete">
+                                                {host.datacomplete
+                                                    ? 'All galls known to occur on this plant have been added to the database, and can be filtered by Location and Detachable. However, sources and images for galls associated with this host may be incomplete or absent, and other filters may not have been entered comprehensively or at all.'
+                                                    : 'We are still working on this species so data might be missing.'}
+                                            </Tooltip>
+                                        }
+                                    >
+                                        <Button variant="outline-light">{host.datacomplete ? '💯' : '❓'}</Button>
+                                    </OverlayTrigger>
+                                </span>
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col>
+                                {host.aliases.map((a) => a.name).join(', ')}
                                 <p className="font-italic">
                                     <strong>Family:</strong>
-                                    <Link key={host.family.id} href={`/family/${host.family.id}`}>
-                                        <a> {host.family.name}</a>
+                                    <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
+                                        <a> {taxonomy.family.name}</a>
                                     </Link>
+                                    {pipe(
+                                        taxonomy.section,
+                                        O.map((s) => (
+                                            // eslint-disable-next-line react/jsx-key
+                                            <span>
+                                                {' | '}
+                                                <strong> Section: </strong> {s.name} ({s.description})
+                                            </span>
+                                        )),
+                                        O.map((s) => s),
+                                        O.getOrElse(constant(<></>)),
+                                    )}
                                 </p>
                             </Col>
                         </Row>
@@ -124,7 +160,7 @@ const Host = ({ host }: Props): JSX.Element => {
                                         variant={speciessource.source_id === selectedSource?.source_id ? 'dark' : ''}
                                     >
                                         <Link href={`/source/${speciessource.source?.id}`}>
-                                            <a>{speciessource.source?.citation}</a>
+                                            <a>{sourceToDisplay(speciessource.source)}</a>
                                         </Link>
                                     </ListGroup.Item>
                                 ))}
@@ -160,10 +196,12 @@ const Host = ({ host }: Props): JSX.Element => {
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
     const host = getStaticPropsWithContext(context, hostById, 'host');
+    const taxonomy = getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy');
 
     return {
         props: {
             host: (await host)[0],
+            taxonomy: await taxonomy,
         },
         revalidate: 1,
     };
