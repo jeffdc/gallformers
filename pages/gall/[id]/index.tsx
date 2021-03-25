@@ -128,7 +128,7 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
                                         overlay={
                                             <Tooltip id="datacomplete">
                                                 {species.datacomplete
-                                                    ? 'The data for this species is as complete as we can make it.'
+                                                    ? 'All sources containing unique information relevant to this gall have been added and are reflected in its associated data. However, filter criteria may not be comprehensive in every field.'
                                                     : 'We are still working on this species so data is missing.'}
                                             </Tooltip>
                                         }

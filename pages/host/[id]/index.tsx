@@ -78,7 +78,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                         overlay={
                                             <Tooltip id="datacomplete">
                                                 {host.datacomplete
-                                                    ? 'The data for this species is as complete as we can make it.'
+                                                    ? 'All galls known to occur on this plant have been added to the database, and can be filtered by Location and Detachable. However, sources and images for galls associated with this host may be incomplete or absent, and other filters may not have been entered comprehensively or at all.'
                                                     : 'We are still working on this species so data might be missing.'}
                                             </Tooltip>
                                         }

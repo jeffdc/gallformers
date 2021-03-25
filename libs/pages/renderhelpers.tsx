@@ -75,4 +75,4 @@ export const truncateOptionString = (description: O.Option<string>, truncateAfte
  * @param s
  */
 export const sourceToDisplay = (s: { pubyear: string; title: string; author: string }): string =>
-    `${s.title} (${s.pubyear}) : ${s.author}`;
+    `${s.author}: (${s.pubyear}) ${s.title}`;
