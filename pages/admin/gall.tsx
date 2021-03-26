@@ -10,6 +10,7 @@ import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
 import ControlledTypeahead from '../../components/controlledtypeahead';
 import { RenameEvent } from '../../components/editname';
+import UndescribedFlow from '../../components/UndescribedFlow';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { useConfirmation } from '../../hooks/useconfirmation';
@@ -75,6 +76,7 @@ export type FormFields = AdminFormFields<AT.GallApi> & {
     locations: AT.GallLocation[];
     textures: AT.GallTexture[];
     datacomplete: boolean;
+    undescribed: boolean;
 };
 
 const updateGall = (s: AT.GallApi, newValue: string): AT.GallApi => ({
@@ -108,6 +110,7 @@ const Gall = ({
     genera,
 }: Props): JSX.Element => {
     const [aliasData, setAliasData] = useState<Array<AT.AliasApi>>([]);
+    const [showNewUndescribed, setShowNewUndescribed] = useState(false);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): AT.GallUpsertFields => {
         return {
@@ -126,6 +129,7 @@ const Gall = ({
             name: name,
             shapes: fields.shapes.map((s) => s.id),
             textures: fields.textures.map((t) => t.id),
+            undescribed: fields.undescribed,
             walls: fields.walls.map((w) => w.id),
         };
     };
@@ -150,6 +154,7 @@ const Gall = ({
                 shapes: s.gall.gallshape,
                 textures: s.gall.galltexture,
                 walls: s.gall.gallwalls,
+                undescribed: s.gall.undescribed,
                 del: false,
             };
         }
@@ -162,6 +167,7 @@ const Gall = ({
             abundance: [AT.EmptyAbundance],
             datacomplete: false,
             detachable: AT.DetachableNone.value,
+            undescribed: false,
             walls: [],
             cells: [],
             alignments: [],
@@ -241,6 +247,10 @@ const Gall = ({
         return onSubmit(fields);
     };
 
+    const newUndescribedDone = () => {
+        setShowNewUndescribed(false);
+    };
+
     const onSubmit = async (fields: FormFields) => {
         formSubmit(fields);
     };
@@ -258,6 +268,13 @@ const Gall = ({
             deleteResults={deleteResults}
         >
             <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pr-4">
+                <UndescribedFlow
+                    show={showNewUndescribed}
+                    onClose={newUndescribedDone}
+                    hosts={hosts}
+                    genera={genera}
+                    families={families}
+                />
                 <h4>Add/Edit Gallformers</h4>
                 <p>
                     This is for all of the details about a Gall. To add a description (which must be referenced to a source) go
@@ -501,20 +518,33 @@ const Gall = ({
                         associated data. However, filter criteria may not be comprehensive in every field.
                     </Col>
                 </Row>
+                <Row className="formGroups pb-1">
+                    <Col className="mr-auto">
+                        <input name="undescribed" type="checkbox" className="form-input-checkbox" ref={form.register} />{' '}
+                        Undescribed?
+                    </Col>
+                </Row>
                 <Row className="fromGroup pb-1" hidden={!selected}>
                     <Col className="mr-auto">
                         <input name="del" type="checkbox" className="form-input-checkbox" ref={form.register} /> Delete?
                     </Col>
                 </Row>
-                <Row className="formGroup">
+                <Row className="formGroup pb-1">
                     <Col>
                         <input type="submit" className="button" value="Submit" />
                     </Col>
                 </Row>
-                <Row hidden={!selected}>
+                <Row hidden={!selected} className="formGroup">
                     <Col>
                         <br />
                         <Link href={`./images?speciesid=${selected?.id}`}>Add/Edit Images for this Gall</Link>
+                    </Col>
+                </Row>
+                <Row hidden={!!selected} className="formGroup">
+                    <Col>
+                        <Button className="btn-sm" onClick={() => setShowNewUndescribed(true)}>
+                            Add Undescribed
+                        </Button>
                     </Col>
                 </Row>
             </form>

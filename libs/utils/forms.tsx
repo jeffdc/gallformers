@@ -23,3 +23,25 @@ export const genOptions = (opts: readonly string[], includeEmpty = true): JSX.El
         </>
     );
 };
+
+export const genOptionsWithId = <T extends { id: number | string; name: string }>(
+    opts: T[],
+    includeEmpty = true,
+): JSX.Element => {
+    if (new Set(opts).size !== opts.length) {
+        throw new Error('Passed in set of options contains duplicates and this is not allowed.');
+    }
+
+    return (
+        <>
+            {includeEmpty ? <option key="none" value="" id=""></option> : undefined}
+            {opts.map((o) => {
+                return (
+                    <option key={o.id} value={o.name} id={o.id.toString()}>
+                        {o.name}
+                    </option>
+                );
+            })}
+        </>
+    );
+};

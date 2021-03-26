@@ -124,7 +124,12 @@ export const allGenera = (taxon: typeof GallTaxon | typeof HostTaxon): TaskEithe
     const genera = () =>
         db.taxonomy.findMany({
             orderBy: { name: 'asc' },
-            where: { AND: [{ type: GENUS }, { speciestaxonomy: { some: { species: { taxoncode: taxon } } } }] },
+            where: {
+                OR: [
+                    { AND: [{ type: GENUS }, { speciestaxonomy: { some: { species: { taxoncode: taxon } } } }] },
+                    { AND: [{ type: GENUS }, { name: 'Unknown' }] },
+                ],
+            },
         });
 
     return pipe(

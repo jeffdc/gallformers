@@ -78,6 +78,7 @@ export const GALL_FAMILY_TYPES = [
     'Thrips',
     'True Bug',
     'Wasp',
+    'Unknown',
 ] as const;
 export const HOST_FAMILY_TYPES = ['Plant'] as const;
 export const ALL_FAMILY_TYPES = [
@@ -97,6 +98,7 @@ export const ALL_FAMILY_TYPES = [
     'Thrips',
     'True Bug',
     'Wasp',
+    'Unknown',
 ] as const;
 export type FamilyTypesTuple = typeof ALL_FAMILY_TYPES;
 export type FamilyType = FamilyTypesTuple[number];
@@ -125,6 +127,7 @@ export type GallUpsertFields = SpeciesUpsertFields & {
     walls: number[];
     cells: number[];
     detachable: DetachableValues;
+    undescribed: boolean;
 };
 
 export type SourceApi = {
@@ -328,6 +331,7 @@ export type GallApi = SpeciesApi & {
         gallwalls: WallsApi[];
         galltexture: GallTexture[];
         galllocation: GallLocation[];
+        undescribed: boolean;
     };
     hosts: GallHost[];
 };

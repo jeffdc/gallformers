@@ -72,6 +72,7 @@ export const getGalls = (
                         galltexture: { include: { texture: true } },
                         gallshape: { include: { shape: true } },
                         gallwalls: { include: { walls: true } },
+                        undescribed: true,
                     },
                 },
             },
@@ -108,6 +109,7 @@ export const getGalls = (
                     detachable: detachableFromId(g.gall.detachable),
                     galllocation: adaptLocations(g.gall.galllocation.map((l) => l.location)),
                     galltexture: adaptTextures(g.gall.galltexture.map((t) => t.texture)),
+                    undescribed: g.gall.undescribed,
                 },
                 // remove the indirection of the many-to-many table for easier usage
                 hosts: g.species.hosts.map((h) => {
