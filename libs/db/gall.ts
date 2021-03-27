@@ -430,6 +430,7 @@ const gallCreateSteps = (gall: GallUpsertFields) => {
                     create: {
                         gall: {
                             create: {
+                                undescribed: gall.undescribed,
                                 gallalignment: { create: connectWithIds('alignment', gall.alignments) },
                                 gallcells: { create: connectWithIds('cells', gall.cells) },
                                 gallcolor: { create: connectWithIds('color', gall.colors) },
@@ -494,6 +495,7 @@ const gallUpdateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
                         data: {
                             gall: {
                                 update: {
+                                    undescribed: gall.undescribed,
                                     detachable: detachableFromString(gall.detachable).id,
                                     gallalignment: {
                                         deleteMany: { alignment_id: { notIn: [] } },

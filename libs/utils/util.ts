@@ -97,9 +97,15 @@ export const truncateAtWord = (words: number) => (s: string): string => {
     }
 };
 
-export const capitalizeFirstLetter = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+const doToFirstLetter = (s: string | undefined, capitalize: boolean): string => {
+    if (s == undefined || s.length < 1) return '';
 
-export const lowercaseFirstLetter = (s: string): string => s.charAt(0).toLowerCase() + s.slice(1);
+    return capitalize ? s.charAt(0).toUpperCase() + s.slice(1) : s.charAt(0).toLowerCase() + s.slice(1);
+};
+
+export const capitalizeFirstLetter = (s: string): string => doToFirstLetter(s, true);
+
+export const lowercaseFirstLetter = (s: string): string => doToFirstLetter(s, false);
 
 /**
  *

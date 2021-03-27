@@ -3,6 +3,7 @@ import { constant, flow, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
+import Family from '../../pages/admin/family';
 import {
     ALL_FAMILY_TYPES,
     DeleteResult,
@@ -123,6 +124,7 @@ export const allFamilies = (
 export const allGenera = (taxon: typeof GallTaxon | typeof HostTaxon): TaskEither<Error, TaxonomyEntry[]> => {
     const genera = () =>
         db.taxonomy.findMany({
+            include: { parent: true },
             orderBy: { name: 'asc' },
             where: {
                 OR: [
@@ -221,35 +223,54 @@ export const taxonomyForSpecies = (id: number): TaskEither<Error, FGS> => {
  * Fetches either the gall or host families and all of the children in the taxonomy.
  * @param gall true for gall families, false for host families
  */
-export const getFamiliesWithSpecies = (gall: boolean) => (): TaskEither<Error, FamilyTaxonomy[]> => {
-    const fams = () => {
+export const getFamiliesWithSpecies = (gall: boolean, undescribedOnly = false) => (): TaskEither<Error, FamilyTaxonomy[]> => {
+    const filterOnlyUndescribed = (fs: FamilyTaxonomy[]) => {
+        return fs
+            .map(
+                (family) =>
+                    // filter out all genera that do not have an undescribed species in them
+                    ({
+                        ...family,
+                        taxonomytaxonomy: family.taxonomytaxonomy.filter((genus) => genus.child.speciestaxonomy.length > 0),
+                    } as FamilyTaxonomy),
+                // filter out famlies that have no genera in them after the above filter
+            )
+            .filter((f) => f.taxonomytaxonomy.length > 0);
+    };
+
+    const fams = async () => {
         const where = gall
             ? [{ type: FAMILY }, { description: { not: 'Plant' } }]
             : [{ type: FAMILY }, { description: { equals: 'Plant' } }];
 
-        return db.taxonomy.findMany({
-            include: {
-                // find the genera in the family
-                taxonomytaxonomy: {
-                    include: {
-                        child: {
-                            include: {
-                                // and the species in the genera
-                                speciestaxonomy: {
-                                    include: {
-                                        species: true,
+        return db.taxonomy
+            .findMany({
+                include: {
+                    // find the genera in the family
+                    taxonomytaxonomy: {
+                        include: {
+                            child: {
+                                include: {
+                                    // and the species in the genera
+                                    speciestaxonomy: {
+                                        include: {
+                                            species: true,
+                                        },
+                                        where: !undescribedOnly
+                                            ? {}
+                                            : { species: { gallspecies: { some: { gall: { undescribed: { equals: true } } } } } },
                                     },
                                 },
                             },
                         },
                     },
                 },
-            },
-            where: {
-                AND: where,
-            },
-            orderBy: { name: 'asc' },
-        });
+                where: {
+                    AND: where,
+                },
+                orderBy: { name: 'asc' },
+            })
+            .then((fs) => (!undescribedOnly ? fs : filterOnlyUndescribed(fs)));
     };
 
     return TE.tryCatch(fams, handleError);

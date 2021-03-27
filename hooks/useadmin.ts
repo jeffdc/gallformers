@@ -102,9 +102,6 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         }
         const updated = update(selected, e.new);
         doRename(await updatedFormFields(updated), e);
-        // const updatedData = data.map((d) => (d.id === updated.id ? updated : d));
-        // setData(updatedData);
-        // setSelected(updated);
     };
 
     const onDataChange = useCallback(async (t: T | undefined) => {

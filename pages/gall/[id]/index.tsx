@@ -138,6 +138,11 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
                                 </span>
                             </Col>
                         </Row>
+                        <Row hidden={!species.gall.undescribed}>
+                            <Col>
+                                <span className="text-danger">This is an undescribed species.</span>
+                            </Col>
+                        </Row>
                         <Row>
                             <Col>
                                 {species.aliases.map((a) => a.name).join(', ')}

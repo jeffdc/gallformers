@@ -8,9 +8,9 @@ import React, { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
-import ControlledTypeahead from '../../components/controlledtypeahead';
+import ControlledTypeahead, { TypeaheadCustomOption } from '../../components/controlledtypeahead';
 import { RenameEvent } from '../../components/editname';
-import UndescribedFlow from '../../components/UndescribedFlow';
+import UndescribedFlow, { UndescribedData } from '../../components/UndescribedFlow';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { useConfirmation } from '../../hooks/useconfirmation';
@@ -247,8 +247,16 @@ const Gall = ({
         return onSubmit(fields);
     };
 
-    const newUndescribedDone = () => {
+    const newUndescribedDone = (data: UndescribedData | undefined) => {
         setShowNewUndescribed(false);
+        if (data != undefined) {
+            console.log(`${JSON.stringify(data, null, '  ')}`);
+            form.setValue('value', [{ customOption: true, id: '-1', name: data.name } as TypeaheadCustomOption]);
+            form.setValue('genus', [data.genus]);
+            form.setValue('family', [data.family]);
+            form.setValue('hosts', [data.host]);
+            form.setValue('undescribed', true);
+        }
     };
 
     const onSubmit = async (fields: FormFields) => {
@@ -288,6 +296,13 @@ const Gall = ({
                 </p>
                 <Row className="form-group">
                     <Col>
+                        <Row hidden={!!selected} className="formGroup">
+                            <Col>
+                                <Button className="btn-sm" disabled={!!selected} onClick={() => setShowNewUndescribed(true)}>
+                                    Add Undescribed
+                                </Button>
+                            </Col>
+                        </Row>
                         <Row>
                             <Col xs={8}>Name (binomial):</Col>
                         </Row>
@@ -538,13 +553,6 @@ const Gall = ({
                     <Col>
                         <br />
                         <Link href={`./images?speciesid=${selected?.id}`}>Add/Edit Images for this Gall</Link>
-                    </Col>
-                </Row>
-                <Row hidden={!!selected} className="formGroup">
-                    <Col>
-                        <Button className="btn-sm" onClick={() => setShowNewUndescribed(true)}>
-                            Add Undescribed
-                        </Button>
                     </Col>
                 </Row>
             </form>

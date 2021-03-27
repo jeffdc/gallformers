@@ -5,6 +5,7 @@ import { hasProp } from '../libs/utils/util';
 
 export type TypeaheadCustomOption = {
     customOption: boolean;
+    name: string;
     id: string;
 };
 
