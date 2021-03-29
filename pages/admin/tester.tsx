@@ -5,11 +5,11 @@ import React from 'react';
 import { Button } from 'react-bootstrap';
 import Auth from '../../components/auth';
 import { useConfirmation } from '../../hooks/useconfirmation';
-import { GallTaxon, HostTaxon } from '../../libs/api/apitypes';
+import { GallTaxon, GALL_FAMILY_TYPES, HostTaxon } from '../../libs/api/apitypes';
 import { EMPTY_FGS, TaxonomyEntry } from '../../libs/api/taxonomy';
 import { hostsByGenus } from '../../libs/db/host';
 import { sourcesBySpecies } from '../../libs/db/speciessource';
-import { allGenera, allSections, taxonomyForSpecies } from '../../libs/db/taxonomy';
+import { allFamilies, allGenera, allSections, taxonomyForSpecies } from '../../libs/db/taxonomy';
 import { mightFail, mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
@@ -46,7 +46,7 @@ const Tester = ({ data }: Props): JSX.Element => {
 
 export const getServerSideProps: GetServerSideProps = async () => {
     // const data = await mightFail(constant(EMPTY_FGS))(taxonomyForSpecies(690));
-    const data = await mightFailWithArray()(sourcesBySpecies(587));
+    const data = await mightFailWithArray()(allFamilies(GALL_FAMILY_TYPES));
     return {
         props: {
             data: data,

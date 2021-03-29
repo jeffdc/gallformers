@@ -108,7 +108,7 @@ export const allFamilies = (
     const families = () =>
         db.taxonomy.findMany({
             orderBy: { name: 'asc' },
-            where: { description: { in: [...types] } },
+            where: { AND: [{ description: { in: [...types] } }, { type: { equals: 'family' } }] },
         });
 
     return pipe(

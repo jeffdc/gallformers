@@ -250,7 +250,6 @@ const Gall = ({
     const newUndescribedDone = (data: UndescribedData | undefined) => {
         setShowNewUndescribed(false);
         if (data != undefined) {
-            console.log(`${JSON.stringify(data, null, '  ')}`);
             form.setValue('value', [{ customOption: true, id: '-1', name: data.name } as TypeaheadCustomOption]);
             form.setValue('genus', [data.genus]);
             form.setValue('family', [data.family]);
@@ -260,6 +259,34 @@ const Gall = ({
     };
 
     const onSubmit = async (fields: FormFields) => {
+        // see if a new Unknown Genus is needed - we are hiding this complexity from the user
+        const genus = fields.genus[0];
+        const family = fields.family[0];
+
+        const newGenusNeeded = pipe(
+            genus.parent,
+            O.map((p) => p.id != family.id),
+            O.fold(constant(false), (b) => b && genus.name.localeCompare('Unknown') == 0),
+        );
+
+        if (newGenusNeeded) {
+            fields.genus = [{ id: -1, description: '', name: 'Unknown', type: GENUS, parent: O.of(family) }];
+        }
+
+        // if either genus or family is Unknown and the undescribed box is not checked they are probably messing up
+        if (
+            !fields.undescribed &&
+            (fields.genus[0].name.localeCompare('Unknown') == 0 || fields.family[0].name.localeCompare('Unknown') == 0)
+        ) {
+            return confirm({
+                variant: 'danger',
+                catchOnCancel: true,
+                title: 'Unknown Genus/Family But Not Undescribed!',
+                message: `The gall is assigned to an Unknown genus/family but it is not marked as undescribed. This is almost certainly an error. Do you really want to proceed?`,
+            })
+                .then(() => Promise.bind(formSubmit(fields)))
+                .catch(() => Promise.resolve());
+        }
         formSubmit(fields);
     };
 

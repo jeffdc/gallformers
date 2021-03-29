@@ -52,7 +52,7 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
 
         const { family, genus, host, name } = getValues();
         const f = families.find((f) => f.name.localeCompare(family) == 0);
-        const g = genera.find((g) => g.name.localeCompare(genus) == 0);
+        const g = genera.find((g) => g.name.localeCompare(genusUnknown ? 'Unknown' : genus) == 0);
         const h = hosts.find((h) => h.name.localeCompare(host) == 0);
         if (f == undefined || g == undefined || h == undefined) {
             throw new Error(
@@ -68,6 +68,7 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
     };
 
     const onUnknownGenusChange = (checked: boolean) => {
+        setGenusUnknown(!checked);
         if (!checked) {
             reset({
                 genusKnown: false,
@@ -85,14 +86,14 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
     };
 
     const computeName = (genus: string, host: string, description: string) => {
-        return `${genus} ${lowercaseFirstLetter(host[0])}-${host?.split(' ')[1]}-${description}`;
+        return `${genusUnknown ? 'Unknown' : genus} ${lowercaseFirstLetter(host[0])}-${host?.split(' ')[1]}-${description}`;
     };
 
     const onChange = () => {
         const name = computeName(getValues().genus, getValues().host, getValues().description);
         setValue('name', name);
         setFormComplete(
-            getValues().genus?.length > 0 &&
+            (getValues().genus?.length > 0 || genusUnknown) &&
                 getValues().family?.length > 0 &&
                 getValues().host?.length > 0 &&
                 getValues().name?.length > 0,
@@ -135,15 +136,14 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
                             ref={register}
                             name="genus"
                             onChange={(e) => {
-                                const unknown = e.currentTarget.value?.localeCompare('Unknown') == 0;
-                                setGenusUnknown(unknown);
-                                if (!unknown) {
+                                if (!genusUnknown) {
                                     setValue('family', lookupFamily(e.currentTarget.value));
                                 }
                                 onChange();
                             }}
+                            disabled={genusUnknown}
                         >
-                            {genOptionsWithId(genera)}
+                            {genOptionsWithId(genera.filter((g) => g.name.localeCompare('Unknown')))}
                         </Form.Control>
                         <Form.Label>Family</Form.Label>
                         <Form.Control as="select" disabled={!genusUnknown} ref={register} name="family">
