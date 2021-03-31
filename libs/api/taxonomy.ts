@@ -3,6 +3,7 @@ import * as E from 'fp-ts/lib/Either';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as t from 'io-ts';
+import { AliasApi, SimpleSpecies } from './apitypes';
 
 export const TaxonomyTypeT = t.keyof({
     family: null,
@@ -102,4 +103,12 @@ export type TaxonomyUpsertFields = {
     type: TaxonomyType;
     species: number[];
     parent: O.Option<TaxonomyEntry>;
+};
+
+export type SectionApi = {
+    id: number;
+    name: string;
+    description: string;
+    species: SimpleSpecies[];
+    aliases: AliasApi[];
 };

@@ -118,6 +118,7 @@ const GallHostMapper = ({ id, galls, genera, hosts }: Props): JSX.Element => {
                 error={error}
                 setDeleteResults={setDeleteResults}
                 deleteResults={deleteResults}
+                selected={selected}
             >
                 <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
                     <h4>Map Galls & Hosts</h4>

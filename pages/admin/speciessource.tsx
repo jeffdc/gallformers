@@ -170,10 +170,11 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                 useasdefault: 0,
             };
 
-            setSourcesForSpecies([...sourcesForSpecies, newSpSo]);
+            const newSourcesForSpecies = [...sourcesForSpecies, newSpSo];
+            setSourcesForSpecies(newSourcesForSpecies);
             setSelectedSource(newSpSo);
 
-            form.setValue('source', [so]);
+            form.setValue('sources', [newSpSo], { shouldDirty: true });
             form.setValue('description', '');
             form.setValue('externallink', '');
             form.setValue('useasdefault', false);
@@ -250,6 +251,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                 error={error}
                 setDeleteResults={setDeleteResults}
                 deleteResults={deleteResults}
+                selected={selected}
             >
                 <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pr-4">
                     <h4>Map Species & Sources</h4>

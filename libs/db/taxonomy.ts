@@ -3,15 +3,15 @@ import { constant, flow, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import Family from '../../pages/admin/family';
 import {
+    AliasApi,
     ALL_FAMILY_TYPES,
     DeleteResult,
-    GallTaxon,
-    HostTaxon,
     FamilyGallTypesTuples,
     FamilyHostTypesTuple,
     FamilyTypesTuple,
+    GallTaxon,
+    HostTaxon,
     SimpleSpecies,
     SpeciesApi,
 } from '../api/apitypes';
@@ -21,6 +21,7 @@ import {
     FGS,
     GENUS,
     SECTION,
+    SectionApi,
     TaxonomyEntry,
     TaxonomyTree,
     TaxonomyUpsertFields,
@@ -157,6 +158,12 @@ export const allSections = (): TaskEither<Error, TaxonomyEntry[]> => {
         TE.map((f) => f.map(toTaxonomyEntry)),
     );
 };
+
+export const allSectionIds = (): TaskEither<Error, string[]> =>
+    pipe(
+        allSections(),
+        TE.map((sections) => sections.map((s) => s.id.toString())),
+    );
 
 /**
  * A species level taxonomy will consist of:
@@ -320,6 +327,38 @@ export const getAllSpeciesForSection = (id: number): TaskEither<Error, SimpleSpe
             .then((st) => st.map((s) => ({ ...s.species } as SimpleSpecies)));
 
     return pipe(TE.tryCatch(sectionSpecies, handleError));
+};
+
+export const getSection = (id: number): TaskEither<Error, O.Option<SectionApi>> => {
+    const section = () =>
+        db.taxonomy.findFirst({
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                speciestaxonomy: { include: { species: true } },
+                taxonomyalias: { include: { alias: true } },
+            },
+            where: { id: { equals: id } },
+        });
+
+    return pipe(
+        TE.tryCatch(section, handleError),
+        TE.map((t) =>
+            pipe(
+                t,
+                O.fromNullable,
+                O.map(
+                    (s) =>
+                        ({
+                            ...t,
+                            species: s?.speciestaxonomy.map((sp) => ({ ...sp.species } as SimpleSpecies)),
+                            aliases: s.taxonomyalias.map((a) => ({ ...a.alias } as AliasApi)),
+                        } as SectionApi),
+                ),
+            ),
+        ),
+    );
 };
 
 const taxonomyDeleteSteps = (id: number) => {

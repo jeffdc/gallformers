@@ -211,6 +211,7 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
             error={error}
             setDeleteResults={setDeleteResults}
             deleteResults={deleteResults}
+            selected={selected}
         >
             <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pr-4">
                 <h4>Add/Edit Hosts</h4>

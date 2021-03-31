@@ -301,6 +301,7 @@ const Gall = ({
             error={error}
             setDeleteResults={setDeleteResults}
             deleteResults={deleteResults}
+            selected={selected}
         >
             <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pr-4">
                 <UndescribedFlow
@@ -573,13 +574,18 @@ const Gall = ({
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col>
-                        <input type="submit" className="button" value="Submit" />
+                        <input type="submit" className="button" value="Submit" disabled={selected == undefined} />
                     </Col>
                 </Row>
                 <Row hidden={!selected} className="formGroup">
                     <Col>
                         <br />
-                        <Link href={`./images?speciesid=${selected?.id}`}>Add/Edit Images for this Gall</Link>
+                        <div>
+                            <Link href={`./images?speciesid=${selected?.id}`}>Add/Edit Images for this Gall</Link>
+                        </div>
+                        <div>
+                            <Link href={`./speciessource?id=${selected?.id}`}>Add/Edit Sources for this Gall</Link>
+                        </div>
                     </Col>
                 </Row>
             </form>

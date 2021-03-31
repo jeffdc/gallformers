@@ -5,8 +5,9 @@ import { Toaster } from 'react-hot-toast';
 import Auth from '../../components/auth';
 import EditName, { RenameEvent } from '../../components/editname';
 import { DeleteResult } from '../api/apitypes';
+import { WithID } from '../utils/types';
 
-export type AdminProps = {
+export type AdminProps<T> = {
     type: string;
     keyField: string;
     children: JSX.Element;
@@ -20,7 +21,10 @@ export type AdminProps = {
     setError: (err: string) => void;
     deleteResults?: DeleteResult;
     setDeleteResults: (dr: DeleteResult) => void;
+    selected: T | undefined;
 };
+
+const validLinkableTypes = ['Gall', 'Host', 'Family', 'Section', 'Source'];
 
 /**
  * The Admin component handles the following things that are independent of what data is being manipulated:
@@ -32,7 +36,7 @@ export type AdminProps = {
  * @param props @see AdminProps
  * @returns
  */
-const Admin = (props: AdminProps): JSX.Element => {
+const Admin = <T extends WithID>(props: AdminProps<T>): JSX.Element => {
     return (
         <Auth>
             <>
@@ -65,6 +69,11 @@ const Admin = (props: AdminProps): JSX.Element => {
                 <Row hidden={!props.deleteResults}>
                     <Col>{`Deleted ${props.deleteResults?.name}.`}</Col>
                 </Row>
+                {props.selected != undefined && validLinkableTypes.includes(props.type) && (
+                    <p className="pl-4">
+                        <a href={`/${props.type.toLowerCase()}/${props.selected.id}`}>{`Link to ${props.type}`}</a>
+                    </p>
+                )}
             </>
         </Auth>
     );

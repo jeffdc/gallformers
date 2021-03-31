@@ -99,6 +99,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
             error={error}
             setDeleteResults={setDeleteResults}
             deleteResults={deleteResults}
+            selected={selected}
         >
             <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
                 <h4>Add or Edit a Family</h4>
