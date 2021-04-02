@@ -96,7 +96,10 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                             // eslint-disable-next-line react/jsx-key
                                             <span>
                                                 {' | '}
-                                                <strong> Section: </strong> {s.name} ({s.description})
+                                                <strong> Section: </strong>{' '}
+                                                <Link key={s.id} href={`/section/${s.id}`}>
+                                                    {`${s.name} (${s.description})`}
+                                                </Link>
                                             </span>
                                         )),
                                         O.map((s) => s),

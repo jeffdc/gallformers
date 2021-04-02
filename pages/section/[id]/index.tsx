@@ -65,7 +65,7 @@ const Section = ({ section }: Props): JSX.Element => {
                     <Col>
                         <BootstrapTable
                             keyField={'id'}
-                            data={section.species}
+                            data={section.species.sort((a, b) => a.name.localeCompare(b.name))}
                             columns={columns}
                             bootstrap4
                             striped

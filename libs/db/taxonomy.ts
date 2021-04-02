@@ -175,22 +175,15 @@ export const allSectionIds = (): TaskEither<Error, string[]> =>
 export const taxonomyForSpecies = (id: number): TaskEither<Error, FGS> => {
     const tree = () => {
         const r = db.speciestaxonomy
-            .findFirst({
+            .findMany({
                 include: {
                     taxonomy: {
                         include: {
-                            taxonomytaxonomy: {
-                                include: {
-                                    taxonomy: true,
-                                    child: true,
-                                },
-                            },
                             parent: true,
-                            taxonomy: true,
                         },
                     },
                 },
-                where: { AND: [{ species_id: id }, { taxonomy: { type: { equals: GENUS } } }] },
+                where: { species_id: id },
             })
             .then((r) => {
                 if (r == null) throw new Error(`Failed to find genus for species with id ${id}.`);
@@ -202,9 +195,9 @@ export const taxonomyForSpecies = (id: number): TaskEither<Error, FGS> => {
     };
 
     const toFGS = (tax: ExtractTFromPromise<ReturnType<typeof tree>>): FGS => {
-        const genus = tax.taxonomy;
-        const family = tax.taxonomy.parent;
-        const section = O.fromNullable(tax.taxonomy.taxonomy.find((t) => t.type === SECTION));
+        const genus = tax.find((t) => t.taxonomy.type === GENUS)?.taxonomy;
+        const family = genus?.parent;
+        const section = O.fromNullable(tax.find((t) => t.taxonomy.type === SECTION)?.taxonomy);
 
         if (genus == null || family == null) {
             const msg = `Species with id ${id} is missing its family or genus.`;
@@ -324,7 +317,10 @@ export const getAllSpeciesForSection = (id: number): TaskEither<Error, SimpleSpe
                 where: { taxonomy_id: id },
                 include: { species: true },
             })
-            .then((st) => st.map((s) => ({ ...s.species } as SimpleSpecies)));
+            .then((st) => {
+                console.log(`${JSON.stringify(st, null, '  ')}`);
+                return st.map((s) => ({ ...s.species } as SimpleSpecies)).sort((a, b) => a.name.localeCompare(b.name));
+            });
 
     return pipe(TE.tryCatch(sectionSpecies, handleError));
 };
