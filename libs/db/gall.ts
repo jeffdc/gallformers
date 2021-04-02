@@ -416,6 +416,7 @@ export const cells = (): TaskEither<Error, CellsApi[]> => {
 };
 
 const gallCreateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
+    console.log(`FOO: ${JSON.stringify(gall, null, '  ')}`);
     return [
         db.species.create({
             data: {
@@ -449,28 +450,46 @@ const gallCreateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
                         alias: { create: { description: a.description, name: a.name, type: a.type } },
                     })),
                 },
+                taxonomy: {
+                    // the genus might be new
+                    connectOrCreate: {
+                        where: { taxonomy_id_species_id: { species_id: gall.id, taxonomy_id: gall.fgs.genus.id } },
+                        create: {
+                            taxonomy: {
+                                create: {
+                                    description: gall.fgs.genus.description,
+                                    name: gall.fgs.genus.name,
+                                    type: GENUS,
+                                    parent: { connect: { id: gall.fgs.family.id } },
+                                    //TODO do we need to add this?
+                                    // taxonomytaxonomy: { create: { child: { connect: { id: }}}}
+                                },
+                            },
+                        },
+                    },
+                },
             },
         }),
-        // the taxonomy is incredibly difficult (impossible?) to create correctly via Prisma. I tried.
-        // add new Genus if needed
-        db.$executeRaw(`
-            INSERT INTO taxonomy (id, name, description, type, parent_id)
-                SELECT NULL, '${gall.fgs.genus.name}', '${gall.fgs.genus.description}', 'genus', ${gall.fgs.family.id}
-                WHERE NOT EXISTS (SELECT 1 FROM taxonomy WHERE parent_id = ${gall.fgs.family.id} AND type = 'genus');
-        `),
-        // map species and genus
-        db.$executeRaw(`
-            INSERT INTO speciestaxonomy (species_id, taxonomy_id)
-                SELECT s.id, t.id FROM species as s JOIN taxonomy as t 
-                WHERE s.name = '${gall.name}' AND t.name = 'Unknown' AND t.type = 'genus' AND t.parent_id = ${gall.fgs.family.id};
-        `),
-        // map potentially new genus to the family
-        db.$executeRaw(`
-            INSERT OR IGNORE INTO taxonomytaxonomy (taxonomy_id, child_id) 
-                SELECT parent_id, id
-                FROM taxonomy 
-                WHERE name = 'Unknown' AND type = 'genus' AND parent_id = ${gall.fgs.family.id};
-        `),
+        // // the taxonomy is incredibly difficult (impossible?) to create correctly via Prisma. I tried.
+        // // add new Genus if needed
+        // db.$executeRaw(`
+        //     INSERT INTO taxonomy (id, name, description, type, parent_id)
+        //         SELECT NULL, '${gall.fgs.genus.name}', '${gall.fgs.genus.description}', 'genus', ${gall.fgs.family.id}
+        //         WHERE NOT EXISTS (SELECT 1 FROM taxonomy WHERE parent_id = ${gall.fgs.family.id} AND type = 'genus');
+        // `),
+        // // map species and genus
+        // db.$executeRaw(`
+        //     INSERT INTO speciestaxonomy (species_id, taxonomy_id)
+        //         SELECT s.id, t.id FROM species as s JOIN taxonomy as t
+        //         WHERE s.name = '${gall.name}' AND t.name = 'Unknown' AND t.type = 'genus' AND t.parent_id = ${gall.fgs.family.id};
+        // `),
+        // // map potentially new genus to the family
+        // db.$executeRaw(`
+        //     INSERT OR IGNORE INTO taxonomytaxonomy (taxonomy_id, child_id)
+        //         SELECT parent_id, id
+        //         FROM taxonomy
+        //         WHERE name = 'Unknown' AND type = 'genus' AND parent_id = ${gall.fgs.family.id};
+        // `),
     ];
 };
 
@@ -600,6 +619,10 @@ export const upsertGall = (gall: GallUpsertFields): TaskEither<Error, GallApi> =
     // eslint-disable-next-line prettier/prettier
     return pipe(
         gall.id < 0 ? createGallTx : updateGallTx,
+        TE.map((t) => {
+            console.log(`T AT: ${JSON.stringify(t, null, '  ')}`);
+            return t;
+        }),
         TE.chain(getGall),
         TE.fold(
             (e) => TE.left(e),

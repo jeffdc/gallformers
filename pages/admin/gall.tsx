@@ -574,7 +574,7 @@ const Gall = ({
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col>
-                        <input type="submit" className="button" value="Submit" disabled={selected == undefined} />
+                        <input type="submit" className="button" value="Submit" />
                     </Col>
                 </Row>
                 <Row hidden={!selected} className="formGroup">

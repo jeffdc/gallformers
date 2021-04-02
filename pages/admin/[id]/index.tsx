@@ -3,7 +3,7 @@ import Head from 'next/head';
 import React from 'react';
 import Auth from '../../../components/auth';
 import { SimpleSpecies } from '../../../libs/api/apitypes';
-import { getAllSpeciesForSection } from '../../../libs/db/taxonomy';
+import { getAllSpeciesForSection, taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { mightFailWithArray } from '../../../libs/utils/util';
 
@@ -26,8 +26,8 @@ const Tester = ({ data }: Props): JSX.Element => {
 };
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-    // const data = await getStaticPropsWithContext(context, getAllSpeciesForSection, 'TEST');
-    const data = await mightFailWithArray<SimpleSpecies>()(getAllSpeciesForSection(333));
+    const data = await getStaticPropsWithContext(context, taxonomyForSpecies, 'TEST');
+    // const data = await mightFailWithArray<SimpleSpecies>()(getAllSpeciesForSection(333));
     return {
         props: {
             data: data,

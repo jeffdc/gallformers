@@ -195,6 +195,7 @@ export const taxonomyForSpecies = (id: number): TaskEither<Error, FGS> => {
     };
 
     const toFGS = (tax: ExtractTFromPromise<ReturnType<typeof tree>>): FGS => {
+        console.log(`${JSON.stringify(tax, null, '  ')}`);
         const genus = tax.find((t) => t.taxonomy.type === GENUS)?.taxonomy;
         const family = genus?.parent;
         const section = O.fromNullable(tax.find((t) => t.taxonomy.type === SECTION)?.taxonomy);
