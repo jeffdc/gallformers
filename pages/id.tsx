@@ -3,7 +3,7 @@ import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
 import React, { useState } from 'react';
-import { Col, ListGroup, Row } from 'react-bootstrap';
+import { Alert, Col, ListGroup, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import InfoTip from '../components/infotip';
@@ -200,8 +200,21 @@ const IDGall = (props: Props): JSX.Element => {
             <form onSubmit={handleSubmit(onSubmit)} className="fixed-left mt-2 ml-4 mr-2 form-group">
                 <Row>
                     <Col>
+                        <Alert variant="warning" className="ml-5 mr-5">
+                            Note: our database is a work in progress. Except where indicated otherwise, the ID results
+                            for any given host should not be considered comprehensive, and the traits, host relationships,
+                            and source entries for any gall inducer that does appear in the database may be incomplete.
+                        </Alert>
+                    </Col>
+                </Row>
+                <Row>
+                    <Col>
                         First select either the host species or the genus/section for a host if you are unsure of the species,
                         then press Search. You can then filter the found galls using the boxes on the left.
+                        See the <Link href="/filterguide">Gall Filter Term Guide</Link> if you’re
+                        uncertain about our usage of the terms in the filters. Note that leaving a field blank doesn’t
+                        exclude any galls, whether they have values in that field or not.
+                        Choosing one or more values in a field removes all galls that don’t include at least those values.
                     </Col>
                 </Row>
                 <Row>
@@ -362,29 +375,40 @@ const IDGall = (props: Props): JSX.Element => {
                                         on the left to narrow down the list.
                                     </h4>
                                 ) : (
-                                    <h4 className="font-weight-lighter">There are no galls that match your filter.</h4>
+                                    <h4 className="font-weight-lighter">
+                                        There are no galls that match your filter. It’s possible there are no
+                                        described species that fit this set of traits and your gall is undescribed.
+                                        However, before giving up, try <Link href="/guide#troubleshooting">altering your filter choices.</Link>
+                                    </h4>
                                 )
                             ) : (
-                                filtered.map((g) => (
-                                    <ListGroup.Item key={g.id}>
-                                        <Row key={g.id}>
-                                            <Col xs={2} className="">
-                                                <img
-                                                    src={defaultImage(g)?.small}
-                                                    width="75px"
-                                                    height="75px"
-                                                    className="img-responsive"
-                                                />
-                                            </Col>
-                                            <Col className="pl-0 pull-right">
-                                                <Link href={`gall/${g.id}`}>
-                                                    <a>{g.name}</a>
-                                                </Link>
-                                                - {truncateOptionString(g.description)}
-                                            </Col>
-                                        </Row>
-                                    </ListGroup.Item>
-                                ))
+                                <React.Fragment>
+                                    <Alert variant="info">
+                                        If none of these results match your gall, you may have found an undescribed species. However,
+                                        before concluding that your gall is not in the database,
+                                        try <Link href="/guide#troubleshooting">altering your filter choices.</Link>
+                                    </Alert>
+                                    {filtered.map((g) => (
+                                        <ListGroup.Item key={g.id}>
+                                            <Row key={g.id}>
+                                                <Col xs={2} className="">
+                                                    <img
+                                                        src={defaultImage(g)?.small}
+                                                        width="75px"
+                                                        height="75px"
+                                                        className="img-responsive"
+                                                    />
+                                                </Col>
+                                                <Col className="pl-0 pull-right">
+                                                    <Link href={`gall/${g.id}`}>
+                                                        <a>{g.name}</a>
+                                                    </Link>
+                                                    - {truncateOptionString(g.description)}
+                                                </Col>
+                                            </Row>
+                                        </ListGroup.Item>
+                                    ))}
+                                </React.Fragment>
                             )}
                         </ListGroup>
                     </Row>
