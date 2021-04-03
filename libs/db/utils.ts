@@ -5,16 +5,16 @@
 import { Prisma } from '@prisma/client';
 
 export type ConnectTypes =
-    | Prisma.abundanceCreateOneWithoutSpeciesInput
+    | Prisma.abundanceCreateNestedOneWithoutSpeciesInput
     | Prisma.abundanceUpdateOneWithoutSpeciesInput
-    | Prisma.taxontypeCreateOneWithoutSpeciesInput
+    | Prisma.taxontypeCreateNestedOneWithoutSpeciesInput
     | Prisma.taxontypeUpdateOneWithoutSpeciesInput
     | Prisma.hostCreateManyWithoutGallspeciesInput
     | Prisma.hostCreateWithoutGallspeciesInput
     | Prisma.galllocationCreateWithoutGallInput
     | Prisma.galltextureCreateWithoutGallInput
     | Prisma.sourceCreateWithoutImageInput
-    | Prisma.sourceCreateOneWithoutImageInput
+    | Prisma.sourceCreateNestedOneWithoutImageInput
     | Prisma.gallalignmentCreateWithoutGallInput
     | Prisma.gallcolorCreateWithoutGallInput
     | Prisma.gallcellsCreateWithoutGallInput

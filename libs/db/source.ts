@@ -1,4 +1,4 @@
-import { Prisma, source } from '@prisma/client';
+import { Prisma, PrismaPromise, source } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
@@ -72,7 +72,7 @@ export const sourcesWithSpecieSourceBySpeciesId = (speciesId: number): TaskEithe
  * See: https://github.com/prisma/prisma/issues/2057
  * @param sourceids an array of ids of the species (host) to delete
  */
-export const sourceDeleteSteps = (sourceids: number[]): Promise<Prisma.BatchPayload>[] => {
+export const sourceDeleteSteps = (sourceids: number[]): PrismaPromise<Prisma.BatchPayload>[] => {
     return [
         db.speciessource.deleteMany({
             where: { source_id: { in: sourceids } },

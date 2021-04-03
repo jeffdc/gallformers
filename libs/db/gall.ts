@@ -1,4 +1,4 @@
-import { alignment, cells as cs, color, location, Prisma, shape, texture, walls as ws } from '@prisma/client';
+import { alignment, cells as cs, color, location, Prisma, shape, species, texture, walls as ws } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
@@ -415,12 +415,19 @@ export const cells = (): TaskEither<Error, CellsApi[]> => {
     return pipe(TE.tryCatch(cells, handleError), TE.map(adaptCells));
 };
 
+export const testTx = () => {
+    return db.$transaction([db.species.findMany({ where: { name: { contains: 'alba' } } })]);
+};
+
 const gallCreateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
     console.log(`FOO: ${JSON.stringify(gall, null, '  ')}`);
     return [
         db.species.create({
             data: {
-                abundance: connectIfNotNull<Prisma.abundanceCreateOneWithoutSpeciesInput, string>('abundance', gall.abundance),
+                abundance: connectIfNotNull<Prisma.abundanceCreateNestedOneWithoutSpeciesInput, string>(
+                    'abundance',
+                    gall.abundance,
+                ),
                 datacomplete: gall.datacomplete,
                 name: gall.name,
                 taxontype: { connect: { taxoncode: GallTaxon } },
