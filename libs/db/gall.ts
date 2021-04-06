@@ -1,4 +1,15 @@
-import { alignment, cells as cs, color, location, Prisma, shape, species, texture, walls as ws } from '@prisma/client';
+import {
+    alignment,
+    cells as cs,
+    color,
+    location,
+    Prisma,
+    PrismaPromise,
+    shape,
+    species,
+    texture,
+    walls as ws,
+} from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
@@ -58,7 +69,7 @@ export const getGalls = (
                             },
                         },
                         image: { include: { source: { include: { speciessource: true } } } },
-                        taxonomy: { include: { taxonomy: true } },
+                        speciestaxonomy: { include: { taxonomy: true } },
                         aliasspecies: { include: { alias: true } },
                     },
                 },
@@ -77,6 +88,7 @@ export const getGalls = (
                 },
             },
             where: w,
+            orderBy: { species: { name: 'asc' } },
         });
 
     type DBGall = ExtractTFromPromise<ReturnType<typeof galls>>;
@@ -94,7 +106,10 @@ export const getGalls = (
             const d = defaultSource(g.species.speciessource)?.description;
 
             const newg: GallApi = {
-                ...g.species,
+                id: g.species_id,
+                name: g.species.name,
+                datacomplete: g.species.datacomplete,
+                speciessource: g.species.speciessource,
                 taxoncode: g.species.taxoncode ? g.species.taxoncode : '',
                 description: O.fromNullable(d),
                 abundance: optionalWith(g.species.abundance, adaptAbundance),
@@ -124,10 +139,10 @@ export const getGalls = (
             return newg;
         });
 
+    // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(galls, handleError),
         TE.map(clean),
-        TE.map((galls) => galls.sort((a, b) => a.name.localeCompare(b.name))),
     );
 };
 
@@ -173,7 +188,7 @@ export const gallsByHostGenus = (hostGenus: string): TaskEither<Error, GallApi[]
                 hosts: {
                     some: {
                         hostspecies: {
-                            taxonomy: {
+                            speciestaxonomy: {
                                 some: {
                                     taxonomy: {
                                         AND: [{ type: GENUS }, { name: hostGenus }],
@@ -195,7 +210,7 @@ export const gallsByHostSection = (hostSection: string): TaskEither<Error, GallA
                 hosts: {
                     some: {
                         hostspecies: {
-                            taxonomy: {
+                            speciestaxonomy: {
                                 some: {
                                     taxonomy: {
                                         AND: [{ type: SECTION }, { name: hostSection }],
@@ -415,12 +430,11 @@ export const cells = (): TaskEither<Error, CellsApi[]> => {
     return pipe(TE.tryCatch(cells, handleError), TE.map(adaptCells));
 };
 
-export const testTx = () => {
+export const testTx = (): Promise<[species[]]> => {
     return db.$transaction([db.species.findMany({ where: { name: { contains: 'alba' } } })]);
 };
 
-const gallCreateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
-    console.log(`FOO: ${JSON.stringify(gall, null, '  ')}`);
+const gallCreateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
     return [
         db.species.create({
             data: {
@@ -439,15 +453,15 @@ const gallCreateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
                         gall: {
                             create: {
                                 undescribed: gall.undescribed,
-                                gallalignment: { create: connectWithIds('alignment', gall.alignments) },
-                                gallcells: { create: connectWithIds('cells', gall.cells) },
-                                gallcolor: { create: connectWithIds('color', gall.colors) },
+                                gallalignment: { create: gall.alignments.map((id) => ({ alignment_id: id })) },
+                                gallcells: { create: gall.cells.map((id) => ({ cells_id: id })) },
+                                gallcolor: { create: gall.colors.map((id) => ({ color_id: id })) },
                                 detachable: detachableFromString(gall.detachable).id,
-                                gallshape: { create: connectWithIds('shape', gall.shapes) },
-                                gallwalls: { create: connectWithIds('walls', gall.walls) },
+                                gallshape: { create: gall.shapes.map((id) => ({ shape_id: id })) },
+                                gallwalls: { create: gall.walls.map((id) => ({ walls_id: id })) },
                                 taxontype: { connect: { taxoncode: GallTaxon } },
-                                galllocation: { create: connectWithIds('location', gall.locations) },
-                                galltexture: { create: connectWithIds('texture', gall.textures) },
+                                galllocation: { create: gall.locations.map((id) => ({ location_id: id })) },
+                                galltexture: { create: gall.textures.map((id) => ({ texture_id: id })) },
                             },
                         },
                     },
@@ -457,19 +471,24 @@ const gallCreateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
                         alias: { create: { description: a.description, name: a.name, type: a.type } },
                     })),
                 },
-                taxonomy: {
+                speciestaxonomy: {
                     // the genus might be new
                     connectOrCreate: {
-                        where: { taxonomy_id_species_id: { species_id: gall.id, taxonomy_id: gall.fgs.genus.id } },
+                        where: { species_id_taxonomy_id: { species_id: gall.id, taxonomy_id: gall.fgs.genus.id } },
                         create: {
                             taxonomy: {
                                 create: {
                                     description: gall.fgs.genus.description,
                                     name: gall.fgs.genus.name,
                                     type: GENUS,
-                                    parent: { connect: { id: gall.fgs.family.id } },
-                                    //TODO do we need to add this?
-                                    // taxonomytaxonomy: { create: { child: { connect: { id: }}}}
+                                    parent: {
+                                        connect: {
+                                            id: gall.fgs.family.id,
+                                        },
+                                    },
+                                    children: {
+                                        create: { taxonomy_id: gall.fgs.family.id },
+                                    },
                                 },
                             },
                         },
@@ -477,30 +496,10 @@ const gallCreateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
                 },
             },
         }),
-        // // the taxonomy is incredibly difficult (impossible?) to create correctly via Prisma. I tried.
-        // // add new Genus if needed
-        // db.$executeRaw(`
-        //     INSERT INTO taxonomy (id, name, description, type, parent_id)
-        //         SELECT NULL, '${gall.fgs.genus.name}', '${gall.fgs.genus.description}', 'genus', ${gall.fgs.family.id}
-        //         WHERE NOT EXISTS (SELECT 1 FROM taxonomy WHERE parent_id = ${gall.fgs.family.id} AND type = 'genus');
-        // `),
-        // // map species and genus
-        // db.$executeRaw(`
-        //     INSERT INTO speciestaxonomy (species_id, taxonomy_id)
-        //         SELECT s.id, t.id FROM species as s JOIN taxonomy as t
-        //         WHERE s.name = '${gall.name}' AND t.name = 'Unknown' AND t.type = 'genus' AND t.parent_id = ${gall.fgs.family.id};
-        // `),
-        // // map potentially new genus to the family
-        // db.$executeRaw(`
-        //     INSERT OR IGNORE INTO taxonomytaxonomy (taxonomy_id, child_id)
-        //         SELECT parent_id, id
-        //         FROM taxonomy
-        //         WHERE name = 'Unknown' AND type = 'genus' AND parent_id = ${gall.fgs.family.id};
-        // `),
     ];
 };
 
-const gallUpdateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
+const gallUpdateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
     return [
         db.species.update({
             where: { id: gall.id },
@@ -519,7 +518,7 @@ const gallUpdateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
                 name: gall.name,
                 gallspecies: {
                     update: {
-                        where: { gall_id_species_id: { gall_id: gall.gallid, species_id: gall.id } },
+                        where: { species_id_gall_id: { gall_id: gall.gallid, species_id: gall.id } },
                         data: {
                             gall: {
                                 update: {
@@ -527,31 +526,31 @@ const gallUpdateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
                                     detachable: detachableFromString(gall.detachable).id,
                                     gallalignment: {
                                         deleteMany: { alignment_id: { notIn: [] } },
-                                        create: connectWithIds('alignment', gall.alignments),
+                                        create: gall.alignments.map((a) => ({ alignment_id: a })),
                                     },
                                     gallcells: {
                                         deleteMany: { cells_id: { notIn: [] } },
-                                        create: connectWithIds('cells', gall.cells),
+                                        create: gall.cells.map((c) => ({ cells_id: c })),
                                     },
                                     gallcolor: {
                                         deleteMany: { color_id: { notIn: [] } },
-                                        create: connectWithIds('color', gall.colors),
+                                        create: gall.colors.map((c) => ({ color_id: c })),
                                     },
                                     gallshape: {
                                         deleteMany: { shape_id: { notIn: [] } },
-                                        create: connectWithIds('shape', gall.shapes),
+                                        create: gall.shapes.map((s) => ({ shape_id: s })),
                                     },
                                     gallwalls: {
                                         deleteMany: { walls_id: { notIn: [] } },
-                                        create: connectWithIds('walls', gall.walls),
+                                        create: gall.walls.map((w) => ({ walls_id: w })),
                                     },
                                     galllocation: {
                                         deleteMany: { location_id: { notIn: [] } },
-                                        create: connectWithIds('location', gall.locations),
+                                        create: gall.locations.map((l) => ({ location_id: l })),
                                     },
                                     galltexture: {
                                         deleteMany: { texture_id: { notIn: [] } },
-                                        create: connectWithIds('texture', gall.textures),
+                                        create: gall.textures.map((t) => ({ texture_id: t })),
                                     },
                                 },
                             },
@@ -587,7 +586,7 @@ const gallUpdateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
         // now upsert a new species-taxonomy mapping (might be redundant if it already exists) and possibly create
         // a new Genus Taxonomy record assinging it to the known Family
         db.speciestaxonomy.upsert({
-            where: { taxonomy_id_species_id: { species_id: gall.id, taxonomy_id: gall.fgs.genus.id } },
+            where: { species_id_taxonomy_id: { species_id: gall.id, taxonomy_id: gall.fgs.genus.id } },
             create: {
                 species: { connect: { id: gall.id } },
                 taxonomy: {
@@ -598,6 +597,11 @@ const gallUpdateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
                             name: gall.fgs.genus.name,
                             type: GENUS,
                             parent: { connect: { id: gall.fgs.family.id } },
+                            children: {
+                                connect: {
+                                    taxonomy_id_child_id: { child_id: gall.fgs.genus.id, taxonomy_id: gall.fgs.family.id },
+                                },
+                            },
                         },
                     },
                 },
@@ -618,6 +622,13 @@ const gallUpdateSteps = (gall: GallUpsertFields): Promise<unknown>[] => {
 export const upsertGall = (gall: GallUpsertFields): TaskEither<Error, GallApi> => {
     const updateGallTx = TE.tryCatch(() => db.$transaction(gallUpdateSteps(gall)), handleError);
     const createGallTx = TE.tryCatch(() => db.$transaction(gallCreateSteps(gall)), handleError);
+    // // // map potentially new genus to the family
+    // db.$executeRaw(`
+    //     INSERT OR IGNORE INTO taxonomytaxonomy (taxonomy_id, child_id)
+    //         SELECT parent_id, id
+    //         FROM taxonomy
+    //         WHERE name = 'Unknown' AND type = 'genus' AND parent_id = ${gall.fgs.family.id};
+    // `),
 
     const getGall = () => {
         return gallByName(gall.name);
@@ -626,10 +637,6 @@ export const upsertGall = (gall: GallUpsertFields): TaskEither<Error, GallApi> =
     // eslint-disable-next-line prettier/prettier
     return pipe(
         gall.id < 0 ? createGallTx : updateGallTx,
-        TE.map((t) => {
-            console.log(`T AT: ${JSON.stringify(t, null, '  ')}`);
-            return t;
-        }),
         TE.chain(getGall),
         TE.fold(
             (e) => TE.left(e),
@@ -644,7 +651,7 @@ export const upsertGall = (gall: GallUpsertFields): TaskEither<Error, GallApi> =
  *
  * @param speciesids an array of ids of the species (gall) to delete
  */
-export const gallDeleteSteps = (speciesids: number[]): Promise<number>[] => {
+export const gallDeleteSteps = (speciesids: number[]): PrismaPromise<number>[] => {
     return [db.$executeRaw(`DELETE FROM species WHERE id IN (${speciesids})`)];
 };
 

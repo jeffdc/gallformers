@@ -4,7 +4,7 @@ import * as TE from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Err, getQueryParam, sendErrResponse, sendSuccResponse, toErr } from '../../../libs/api/apipage';
 import { SourceWithSpeciesSourceApi } from '../../../libs/api/apitypes';
-import { sourcesWithSpecieSourceBySpeciesId } from '../../../libs/db/source';
+import { sourcesWithSpeciesSourceBySpeciesId } from '../../../libs/db/source';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     const errMsg = (): TE.TaskEither<Err, SourceWithSpeciesSourceApi[]> => {
@@ -15,7 +15,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
         'speciesid',
         getQueryParam(req),
         O.map(parseInt),
-        O.map(sourcesWithSpecieSourceBySpeciesId),
+        O.map(sourcesWithSpeciesSourceBySpeciesId),
         O.map(TE.mapLeft(toErr)),
         O.getOrElse(errMsg),
         TE.fold(sendErrResponse(res), sendSuccResponse(res)),

@@ -52,7 +52,7 @@ export const allSourceIds = (): TaskEither<Error, string[]> => {
     );
 };
 
-export const sourcesWithSpecieSourceBySpeciesId = (speciesId: number): TaskEither<Error, SourceWithSpeciesSourceApi[]> => {
+export const sourcesWithSpeciesSourceBySpeciesId = (speciesId: number): TaskEither<Error, SourceWithSpeciesSourceApi[]> => {
     const sources = () =>
         db.source.findMany({
             include: { speciessource: true },

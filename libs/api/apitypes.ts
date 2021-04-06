@@ -6,7 +6,7 @@ import { alias } from '@prisma/client';
 import * as O from 'fp-ts/lib/Option';
 import { Option } from 'fp-ts/lib/Option';
 import { ParsedUrlQuery } from 'querystring';
-import { FGS, TaxonomyEntry } from './taxonomy';
+import { FGS } from './taxonomy';
 
 export const GallTaxon = 'gall';
 export const HostTaxon = 'plant';

@@ -32,5 +32,8 @@ module.exports = (phase) => {
             //TODO convert this to the latest git hash
             return buildid;
         },
+        future: {
+            webpack5: true,
+        },
     };
 };

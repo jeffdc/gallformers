@@ -9,7 +9,6 @@ export type ConnectTypes =
     | Prisma.abundanceUpdateOneWithoutSpeciesInput
     | Prisma.taxontypeCreateNestedOneWithoutSpeciesInput
     | Prisma.taxontypeUpdateOneWithoutSpeciesInput
-    | Prisma.hostCreateManyWithoutGallspeciesInput
     | Prisma.hostCreateWithoutGallspeciesInput
     | Prisma.galllocationCreateWithoutGallInput
     | Prisma.galltextureCreateWithoutGallInput
@@ -41,6 +40,16 @@ export type InsertFieldName =
     | 'walls'
     | 'shape'
     | 'alias';
+
+export type MapFieldName = 'alignment_id';
+
+export const mapToIdFieldForPrisma = <T extends ConnectTypes>(idField: MapFieldName, ids: number[]): T[] => {
+    return ids.map((id) => {
+        return ({
+            [idField]: id,
+        } as unknown) as T;
+    });
+};
 
 export function connectWithIds<T extends ConnectTypes>(fieldName: InsertFieldName, ids: readonly number[]): T[] {
     const key = fieldName as keyof T;

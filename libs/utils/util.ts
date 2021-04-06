@@ -5,6 +5,7 @@ import * as T from 'fp-ts/lib/Task';
 import * as TE from 'fp-ts/lib/TaskEither';
 import * as O from 'fp-ts/lib/Option';
 import { logger } from './logger';
+import { Session } from 'next-auth';
 
 /**
  * Checks an object, o, for the presence of the prop.
@@ -153,3 +154,6 @@ export const csvAsNumberArr = (s: string): number[] => {
 export const extractGenus = (n: string): string => {
     return n.split(' ')[0];
 };
+
+export const sessionUserOrUnknown = (session: Session | null | undefined): string =>
+    session && session.user.name ? session.user.name : 'UNKNOWN!';

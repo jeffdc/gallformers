@@ -44,7 +44,9 @@ export const toTaxonomyEntry = (t: DBTaxonomyWithParent): TaxonomyEntry => {
     if (t == undefined) return EMPTY_TAXONOMYENTRY;
 
     return {
-        ...t,
+        id: t.id,
+        description: t.description == null ? '' : t.description,
+        name: t.name,
         type: pipe(TaxonomyTypeT.decode(t.type), E.getOrElse(invalidTaxonomyType)),
         parent: pipe(t.parent, O.fromNullable, O.map(toTaxonomyEntry)),
     };

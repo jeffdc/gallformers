@@ -11,6 +11,7 @@ export type TypeaheadCustomOption = {
 
 export type ControlledTypeaheadProps<T extends TypeaheadModel> = TypeaheadProps<T> & {
     name: string;
+    /* eslint-disable @typescript-eslint/no-explicit-any */
     control: Control<Record<string, any>>;
     newSelectionPrefix?: string;
     onChangeWithNew?: (selected: T[], isNew: boolean) => void;

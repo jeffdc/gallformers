@@ -1,4 +1,4 @@
-import { abundance, Prisma, species } from '@prisma/client';
+import { abundance, Prisma, PrismaPromise, species } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
@@ -9,7 +9,7 @@ import { handleError, optionalWith } from '../utils/util';
 import db from './db';
 import { adaptImage } from './images';
 
-export const updateAbundance = (id: number, abundance: string | undefined | null): Promise<number> =>
+export const updateAbundance = (id: number, abundance: string | undefined | null): PrismaPromise<number> =>
     db.$executeRaw(
         abundance == undefined || abundance == null
             ? `
@@ -25,7 +25,9 @@ export const updateAbundance = (id: number, abundance: string | undefined | null
     );
 
 export const adaptAbundance = (a: abundance): AbundanceApi => ({
-    ...a,
+    id: a.id,
+    abundance: a.abundance,
+    description: a.description == null ? '' : a.description,
     reference: O.of(a.abundance),
 });
 
@@ -82,7 +84,7 @@ export const getSpecies = (
                 abundance: true,
                 speciessource: { include: { source: true } },
                 image: { include: { source: { include: { speciessource: true } } } },
-                taxonomy: { include: { taxonomy: true } },
+                speciestaxonomy: { include: { taxonomy: true } },
                 aliasspecies: { include: { alias: true } },
             },
             where: w,
@@ -118,7 +120,7 @@ export const getSpecies = (
     return cleaned;
 };
 
-export const connectOrCreateGenus = (sp: SpeciesUpsertFields): Prisma.taxonomyCreateOneWithoutTaxonomyInput => ({
+export const connectOrCreateGenus = (sp: SpeciesUpsertFields): Prisma.taxonomyCreateNestedOneWithoutTaxonomyInput => ({
     connectOrCreate: {
         where: { id: sp.fgs.genus.id },
         create: {

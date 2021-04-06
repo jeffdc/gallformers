@@ -21,7 +21,6 @@ const Explore = ({ gallmakers, undescribed, hosts }: Props): JSX.Element => {
     const router = useRouter();
 
     const handleClick = (item: Item) => {
-        console.log(JSON.stringify(item, null, ' '));
         if (hasProp(item, 'url')) {
             router.push(item.url as string);
         }

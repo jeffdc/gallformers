@@ -36,7 +36,7 @@ export const addImages = (images: ImageApi[]): TaskEither<Error, ImageApi[]> => 
                     lastchangedby: image.lastchangedby,
                     default: image.default,
                     species: { connect: { id: image.speciesid } },
-                    source: connectIfNotNull<Prisma.sourceCreateOneWithoutImageInput, number>(
+                    source: connectIfNotNull<Prisma.sourceCreateNestedOneWithoutImageInput, number>(
                         'source',
                         O.getOrElseW(constant(undefined))(image.source)?.id,
                     ),

@@ -19,7 +19,7 @@ import ImageGrid from '../../components/imagegrid';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { ImageApi } from '../../libs/api/apitypes';
 import { allSpecies } from '../../libs/db/species';
-import { mightFailWithArray } from '../../libs/utils/util';
+import { mightFailWithArray, sessionUserOrUnknown } from '../../libs/utils/util';
 
 const Schema = yup.object().shape({});
 
@@ -140,7 +140,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
     const saveImages = async (imgs: ImageApi[]) => {
         try {
             const updatedImages = imgs.map((i) => {
-                i.lastchangedby = session ? session.user.name : 'UNKNOWN!';
+                i.lastchangedby = session && session.user.name ? session.user.name : 'UNKNOWN!';
                 return i;
             });
 
@@ -179,7 +179,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                 .filter((i) => selectedForCopy.has(i.id))
                 .map<ImageApi>((i) => ({
                     ...i,
-                    lastchangedby: session ? session.user.name : 'UNKNOWN!',
+                    lastchangedby: sessionUserOrUnknown(session),
                     source: copySource.source,
                     sourcelink: copySource.sourcelink,
                     license: copySource.license,

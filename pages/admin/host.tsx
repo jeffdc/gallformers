@@ -253,7 +253,6 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                                             router.replace(``, undefined, { shallow: true });
                                         } else {
                                             const host: HostApi = e[0];
-                                            console.log(`selected: ${selected?.id} // host: ${host.id}`);
                                             if (selected?.id !== host.id) {
                                                 setSelected(host);
                                                 router.replace(`?id=${host.id}`, undefined, { shallow: true });

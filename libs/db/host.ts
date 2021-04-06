@@ -1,4 +1,15 @@
-import { abundance, alias, aliasspecies, host, image, Prisma, source, species, speciessource } from '@prisma/client';
+import {
+    abundance,
+    alias,
+    aliasspecies,
+    host,
+    image,
+    Prisma,
+    PrismaPromise,
+    source,
+    species,
+    speciessource,
+} from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
@@ -174,7 +185,7 @@ export const hostsByGenus = (genus: string): TaskEither<Error, HostApi[]> => {
 
     return getHosts([
         {
-            taxonomy: {
+            speciestaxonomy: {
                 some: {
                     taxonomy: { AND: [{ name: { equals: genus } }, { type: { equals: GENUS } }] },
                 },
@@ -184,8 +195,7 @@ export const hostsByGenus = (genus: string): TaskEither<Error, HostApi[]> => {
 };
 
 /////////////////////////////////////////
-const hostUpdateSteps = (host: SpeciesUpsertFields): Promise<unknown>[] => {
-    console.log(`${JSON.stringify(host, null, '  ')}`);
+const hostUpdateSteps = (host: SpeciesUpsertFields): PrismaPromise<unknown>[] => {
     return [
         db.species.update({
             where: { id: host.id },
@@ -232,8 +242,11 @@ const hostCreateSteps = (host: SpeciesUpsertFields) => {
             data: {
                 name: host.name,
                 taxontype: { connect: { taxoncode: HostTaxon } },
-                abundance: connectIfNotNull<Prisma.abundanceCreateOneWithoutSpeciesInput, string>('abundance', host.abundance),
-                taxonomy: {
+                abundance: connectIfNotNull<Prisma.abundanceCreateNestedOneWithoutSpeciesInput, string>(
+                    'abundance',
+                    host.abundance,
+                ),
+                speciestaxonomy: {
                     create: [
                         // family must already exist
                         { taxonomy: { connect: { id: host.fgs.family.id } } },
@@ -282,7 +295,7 @@ export const upsertHost = (h: SpeciesUpsertFields): TaskEither<Error, SpeciesApi
  * See: https://github.com/prisma/prisma/issues/2057
  * @param speciesids an array of ids of the species (host) to delete
  */
-const hostDeleteSteps = (speciesids: number[]): Promise<Prisma.BatchPayload>[] => {
+const hostDeleteSteps = (speciesids: number[]): PrismaPromise<Prisma.BatchPayload>[] => {
     return [
         db.host.deleteMany({
             where: { host_species_id: { in: speciesids } },

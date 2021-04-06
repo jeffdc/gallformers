@@ -312,18 +312,17 @@ export const getAllSpeciesForFamily = (id: number): TaskEither<Error, SpeciesApi
 };
 
 export const getAllSpeciesForSection = (id: number): TaskEither<Error, SimpleSpecies[]> => {
-    const sectionSpecies = (): Promise<SimpleSpecies[]> =>
-        db.speciestaxonomy
-            .findMany({
-                where: { taxonomy_id: id },
-                include: { species: true },
-            })
-            .then((st) => {
-                console.log(`${JSON.stringify(st, null, '  ')}`);
-                return st.map((s) => ({ ...s.species } as SimpleSpecies)).sort((a, b) => a.name.localeCompare(b.name));
-            });
+    const sectionSpecies = () =>
+        db.speciestaxonomy.findMany({
+            where: { taxonomy_id: id },
+            include: { species: true },
+            orderBy: { species: { name: 'asc' } },
+        });
 
-    return pipe(TE.tryCatch(sectionSpecies, handleError));
+    return pipe(
+        TE.tryCatch(sectionSpecies, handleError),
+        TE.map((s) => s.map((sp) => ({ ...sp.species } as SimpleSpecies))),
+    );
 };
 
 export const getSection = (id: number): TaskEither<Error, O.Option<SectionApi>> => {

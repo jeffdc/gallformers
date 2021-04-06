@@ -12,8 +12,7 @@
     "test": "jest --forceExit",
     "test:watch": "jest --watchAll",
     "migrate": "node migrate.js",
-    "migrate-debug": "node --nolazy --inspect-brk=9229 migrate.js",
-    "foo": "node do503.ts"
+    "migrate-debug": "node --nolazy --inspect-brk=9229 migrate.js"
   },
   "typeCoverage": {
     "atLeast": 99.5,

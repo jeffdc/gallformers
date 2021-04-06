@@ -1,7 +1,7 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import router from 'next/router';
 import { useCallback, useEffect, useState } from 'react';
-import { DeepPartial, UnpackNestedValue, useForm, UseFormMethods } from 'react-hook-form';
+import { DeepPartial, FieldName, UnpackNestedValue, useForm, UseFormMethods } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import * as yup from 'yup';
 import { RenameEvent } from '../components/editname';
@@ -66,6 +66,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         setData(data.filter((d) => d.id !== id));
         setDeleteResults(result);
         setSelected(undefined);
+        setError('');
         toast.success(`${type} deleted`);
         router.replace(``, undefined, { shallow: true });
     };
@@ -82,6 +83,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
             updated = data.filter((d) => d.id !== s.id);
             updated.push(s);
         }
+        setError('');
         setData(updated);
         toast.success(`${type} Updated`);
         router.replace(`?id=${s.id}`, undefined, { shallow: true });
@@ -89,7 +91,9 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
 
     const formSubmit = async (fields: FormFields) => {
         await doDeleteOrUpsert(fields, postDelete, postUpdate, toUpsertFields)
-            .then(() => form.reset())
+            .then(() => {
+                form.reset();
+            })
             .catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
     };
 
@@ -109,7 +113,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         form.reset(ff as UnpackNestedValue<DeepPartial<FormFields>>);
         // must do this since the value is bound to a control that is controlled (i.e., no ref prop) so it will not get updated
         // during the reset. see: https://react-hook-form.com/api#reset
-        form.setValue('value', [t as never]);
+        form.setValue('value' as FieldName<FormFields>, [t as never]);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

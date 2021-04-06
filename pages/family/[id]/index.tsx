@@ -1,8 +1,9 @@
-import { taxonomy } from '@prisma/client';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import { GetStaticPaths, GetStaticProps } from 'next';
+import ErrorPage from 'next/error';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import ErrorPage from 'next/error';
 import React from 'react';
 import { Card } from 'react-bootstrap';
 import TreeMenu, { Item, TreeNodeInArray } from 'react-simple-tree-menu';
@@ -12,10 +13,7 @@ import { GallTaxon } from '../../../libs/api/apitypes';
 import { TaxonomyEntry, TaxonomyTree } from '../../../libs/api/taxonomy';
 import { allFamilyIds, taxonomyEntryById, taxonomyTreeForId } from '../../../libs/db/taxonomy';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { handleError, hasProp } from '../../../libs/utils/util';
-import * as O from 'fp-ts/lib/Option';
-import * as T from 'fp-ts/lib/Task';
-import { constant, pipe } from 'fp-ts/lib/function';
+import { hasProp } from '../../../libs/utils/util';
 
 type Props = {
     family: O.Option<TaxonomyEntry>;
@@ -35,7 +33,6 @@ const Family = ({ family, tree }: Props): JSX.Element => {
     const fam = pipe(family, O.getOrElse(constant({} as TaxonomyEntry)));
 
     const handleClick = (item: Item) => {
-        console.log(JSON.stringify(item, null, ' '));
         if (hasProp(item, 'url')) {
             router.push(item.url as string);
         }

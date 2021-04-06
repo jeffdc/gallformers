@@ -1,11 +1,10 @@
+import * as A from 'fp-ts/lib/Array';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
-import * as A from 'fp-ts/lib/Array';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { PorterStemmer, WordTokenizer } from 'natural';
 import React, { ReactNode } from 'react';
-import { SpeciesSourceApi } from '../api/apitypes';
 import { allGlossaryEntries, Entry } from '../db/glossary';
 import { serialize } from '../utils/reactserialize';
 import { errorThrow } from '../utils/util';
