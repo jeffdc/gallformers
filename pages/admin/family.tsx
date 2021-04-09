@@ -1,12 +1,10 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
-import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
-import ControlledTypeahead from '../../components/controlledtypeahead';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
@@ -18,16 +16,21 @@ import { genOptions } from '../../libs/utils/forms';
 import { mightFailWithArray } from '../../libs/utils/util';
 
 const schema = yup.object().shape({
-    value: yup.mixed().required(),
+    mainField: yup.mixed().required(),
     description: yup.string().required(),
 });
 
+// We have to remove the parent property as the Form library can not handle circular references in the data.
+type TaxFamily = Omit<TaxonomyEntry, 'parent'>;
+
+type FormFields = AdminFormFields<TaxFamily> & Omit<TaxFamily, 'id' | 'name' | 'type'>;
+
 type Props = {
     id: string;
-    fs: TaxonomyEntry[];
+    fs: TaxFamily[];
 };
 
-const updateFamily = (s: TaxonomyEntry, newValue: string) => ({
+const updateFamily = (s: TaxFamily, newValue: string) => ({
     ...s,
     name: newValue,
 });
@@ -43,19 +46,17 @@ const toUpsertFields = (fields: FormFields, name: string, id: number): TaxonomyU
     };
 };
 
-type FormFields = AdminFormFields<TaxonomyEntry> & Omit<TaxonomyEntry, 'id' | 'name' | 'type' | 'parent'>;
-
-const updatedFormFields = async (fam: TaxonomyEntry | undefined): Promise<FormFields> => {
+const updatedFormFields = async (fam: TaxFamily | undefined): Promise<FormFields> => {
     if (fam != undefined) {
         return {
-            ...fam,
+            mainField: [fam],
+            description: fam.description,
             del: false,
-            value: [fam],
         };
     }
 
     return {
-        value: [],
+        mainField: [],
         description: '',
         del: false,
     };
@@ -63,9 +64,7 @@ const updatedFormFields = async (fam: TaxonomyEntry | undefined): Promise<FormFi
 
 const Family = ({ id, fs }: Props): JSX.Element => {
     const {
-        data,
         selected,
-        setSelected,
         showRenameModal,
         setShowRenameModal,
         error,
@@ -75,6 +74,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         renameCallback,
         form,
         formSubmit,
+        mainField,
     } = useAdmin(
         'Family',
         id,
@@ -85,8 +85,6 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         schema,
         updatedFormFields,
     );
-
-    const router = useRouter();
 
     return (
         <Admin
@@ -109,29 +107,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
                             <Col>Name:</Col>
                         </Row>
                         <Row>
-                            <Col>
-                                <ControlledTypeahead
-                                    control={form.control}
-                                    name="value"
-                                    placeholder="Name"
-                                    options={data}
-                                    labelKey="name"
-                                    clearButton
-                                    isInvalid={!!form.errors.value}
-                                    newSelectionPrefix="Add a new Family: "
-                                    allowNew={true}
-                                    onChangeWithNew={(e, isNew) => {
-                                        if (isNew || !e[0]) {
-                                            setSelected(undefined);
-                                            router.replace(``, undefined, { shallow: true });
-                                        } else {
-                                            setSelected(e[0]);
-                                            router.replace(`?id=${e[0].id}`, undefined, { shallow: true });
-                                        }
-                                    }}
-                                />
-                                {form.errors.value && <span className="text-danger">The Name is required.</span>}
-                            </Col>
+                            <Col>{mainField('name', 'Family')}</Col>
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowRenameModal(true)}>
@@ -145,16 +121,18 @@ const Family = ({ id, fs }: Props): JSX.Element => {
                 <Row className="form-group">
                     <Col>
                         Description:
-                        <select name="description" className="form-control" ref={form.register}>
+                        <select {...form.register('description')} className="form-control">
                             {genOptions(ALL_FAMILY_TYPES)}
                         </select>
-                        {form.errors.description && <span className="text-danger">You must provide the description.</span>}
+                        {form.formState.errors.description && (
+                            <span className="text-danger">You must provide the description.</span>
+                        )}
                     </Col>
                 </Row>
                 <Row className="fromGroup" hidden={!selected}>
                     <Col xs="1">Delete?:</Col>
                     <Col className="mr-auto">
-                        <input name="del" type="checkbox" className="form-check-input" ref={form.register} />
+                        <input {...form.register('del')} type="checkbox" className="form-check-input" />
                     </Col>
                     <Col xs="8">
                         <em className="text-danger">

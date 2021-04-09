@@ -1,36 +1,44 @@
-# docker pull node:current-alpine3.11
-FROM node:alpine as build
-RUN apk update && apk upgrade
+FROM node:alpine as deps
+# RUN apk -U upgrade
 
-# look at https://gist.github.com/armand1m/b8061bcc9e8e9a5c1303854290c7d61e
-# to get yarn caching working to make builds much faster...
 WORKDIR /usr/src/app
 
 # create a layer with all the dependencies so that we can rely on the docker cache unless package.json changes
-COPY package.json ./
-COPY yarn.lock ./
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile --production=true
 
+FROM node:alpine as build
+WORKDIR /usr/src/app
 COPY . .
+COPY --from=deps /usr/src/app/node_modules ./node_modules
 
 ENV NEXT_TELEMETRY_DISABLED 1
-# These layers can't be broken up due to npm not working well with docker layers
-RUN yarn install --production=true && \
-	npx prisma generate && \
-	yarn add --dev typescript @types/node && \
-	yarn build && \
-	npm prune --production
+# node modules will be r/o which can cause issues with React and the way it renames stuff at build time so...
+RUN mv ./node_modules ./node_modules.tmp \
+	&& mv ./node_modules.tmp ./node_modules \
+	&& yarn generate \
+	&& yarn add --dev typescript @types/node \
+	&& yarn build \
+	&& npm prune --production
+
+# this gets huge and we do not need it for the final build
+RUN rm -rf .next/cache
+# these are dev tools related to Prisma that are large and not needed in prod
+RUN rm node_modules/@prisma/engines/introspection-engine-linux-musl
+RUN rm node_modules/@prisma/engines/migration-engine-linux-musl
+RUN rm node_modules/@prisma/engines/prisma-fmt-linux-musl
 
 ## Shrink final image, copy built nextjs and startup the server
-FROM node:12-alpine
+FROM node:15-alpine
 
 WORKDIR /usr/src/app
+ENV NODE_ENV production
 
 # copy from build image
 COPY --from=build /usr/src/app/package.json /usr/src/app/package.json
 COPY --from=build /usr/src/app/node_modules /usr/src/app/node_modules
 COPY --from=build /usr/src/app/.next /usr/src/app/.next
 COPY --from=build /usr/src/app/public /usr/src/app/public
-
 
 EXPOSE 3000
 CMD ["yarn", "start"]

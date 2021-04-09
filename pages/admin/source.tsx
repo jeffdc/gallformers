@@ -1,12 +1,10 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
-import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
-import ControlledTypeahead from '../../components/controlledtypeahead';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
@@ -16,7 +14,7 @@ import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
 
 const schema = yup.object().shape({
-    value: yup.mixed().required(),
+    mainField: yup.mixed().required(),
     author: yup.string().required(),
     pubyear: yup.string().matches(/([12][0-9]{3})/),
     citation: yup.string().required(),
@@ -34,7 +32,6 @@ const updateSource = (s: SourceApi, newValue: string) => ({
     title: newValue,
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const toUpsertFields = (fields: FormFields, name: string, id: number): SourceUpsertFields => {
     return {
         ...fields,
@@ -46,7 +43,7 @@ const toUpsertFields = (fields: FormFields, name: string, id: number): SourceUps
 const updatedFormFields = async (s: SourceApi | undefined): Promise<FormFields> => {
     if (s != undefined) {
         return {
-            value: [s],
+            mainField: [s],
             author: s.author,
             pubyear: s.pubyear,
             link: s.link,
@@ -56,7 +53,7 @@ const updatedFormFields = async (s: SourceApi | undefined): Promise<FormFields> 
     }
 
     return {
-        value: [],
+        mainField: [],
         author: '',
         pubyear: '',
         link: '',
@@ -67,9 +64,7 @@ const updatedFormFields = async (s: SourceApi | undefined): Promise<FormFields> 
 
 const Source = ({ id, sources }: Props): JSX.Element => {
     const {
-        data,
         selected,
-        setSelected,
         showRenameModal: showModal,
         setShowRenameModal: setShowModal,
         error,
@@ -79,6 +74,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
         renameCallback,
         form,
         formSubmit,
+        mainField,
     } = useAdmin(
         'Source',
         id,
@@ -89,8 +85,6 @@ const Source = ({ id, sources }: Props): JSX.Element => {
         schema,
         updatedFormFields,
     );
-
-    const router = useRouter();
 
     return (
         <Admin
@@ -113,30 +107,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                             <Col>Title:</Col>
                         </Row>
                         <Row>
-                            <Col>
-                                <ControlledTypeahead
-                                    control={form.control}
-                                    name="value"
-                                    onChangeWithNew={(e, isNew) => {
-                                        if (isNew || !e[0]) {
-                                            setSelected(undefined);
-                                            router.replace(``, undefined, { shallow: true });
-                                        } else {
-                                            const source: SourceApi = e[0];
-                                            setSelected(source);
-                                            router.replace(`?id=${source.id}`, undefined, { shallow: true });
-                                        }
-                                    }}
-                                    placeholder="Title"
-                                    options={data}
-                                    labelKey="title"
-                                    clearButton
-                                    isInvalid={!!form.errors.value}
-                                    newSelectionPrefix="Add a new Source: "
-                                    allowNew={true}
-                                />
-                                {form.errors.value && <span className="text-danger">The Title is required.</span>}
-                            </Col>
+                            <Col>{mainField('title', 'Source')}</Col>
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowModal(true)}>
@@ -150,19 +121,21 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                 <Row className="form-group">
                     <Col>
                         Author:
-                        <input type="text" placeholder="Author(s)" name="author" className="form-control" ref={form.register} />
-                        {form.errors.author && <span className="text-danger">You must provide an author.</span>}
+                        <input {...form.register('author')} type="text" placeholder="Author(s)" className="form-control" />
+                        {form.formState.errors.author && <span className="text-danger">You must provide an author.</span>}
                     </Col>
                     <Col>
                         Publication Year:
-                        <input type="text" placeholder="Pub Year" name="pubyear" className="form-control" ref={form.register} />
-                        {form.errors.pubyear && <span className="text-danger">You must provide a valid 4 digit year.</span>}
+                        <input {...form.register('pubyear')} type="text" placeholder="Pub Year" className="form-control" />
+                        {form.formState.errors.pubyear && (
+                            <span className="text-danger">You must provide a valid 4 digit year.</span>
+                        )}
                     </Col>
                 </Row>
                 <Row className="form-group">
                     <Col>
                         Reference Link:
-                        <input type="text" placeholder="Link" name="link" className="form-control" ref={form.register} />
+                        <input {...form.register('link')} type="text" placeholder="Link" className="form-control" />
                     </Col>
                 </Row>
                 <Row className="form-group">
@@ -174,14 +147,16 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                             </a>
                             ):
                         </p>
-                        <textarea name="citation" placeholder="Citation" className="form-control" ref={form.register} rows={8} />
-                        {form.errors.citation && <span className="text-danger">You must provide a citation in MLA form.</span>}
+                        <textarea {...form.register('citation')} placeholder="Citation" className="form-control" rows={8} />
+                        {form.formState.errors.citation && (
+                            <span className="text-danger">You must provide a citation in MLA form.</span>
+                        )}
                     </Col>
                 </Row>
                 <Row className="fromGroup" hidden={!selected}>
                     <Col xs="1">Delete?:</Col>
                     <Col className="mr-auto">
-                        <input name="del" type="checkbox" className="form-check-input" ref={form.register} />
+                        <input {...form.register('del')} type="checkbox" className="form-check-input" />
                     </Col>
                 </Row>
                 <Row className="formGroup">

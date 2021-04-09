@@ -1,6 +1,6 @@
 import React, { FocusEvent, KeyboardEvent } from 'react';
 import { Typeahead, TypeaheadModel, TypeaheadProps } from 'react-bootstrap-typeahead';
-import { Control, Controller } from 'react-hook-form';
+import { ChangeHandler, Control, Controller, Path } from 'react-hook-form';
 import { hasProp } from '../libs/utils/util';
 
 export type TypeaheadCustomOption = {
@@ -9,10 +9,12 @@ export type TypeaheadCustomOption = {
     id: string;
 };
 
-export type ControlledTypeaheadProps<T extends TypeaheadModel> = TypeaheadProps<T> & {
-    name: string;
+export type ControlledTypeaheadProps<T extends TypeaheadModel, FormFields> = TypeaheadProps<T> & {
+    name: Path<FormFields>;
+    onChange: ChangeHandler;
+    onBlur: ChangeHandler;
     /* eslint-disable @typescript-eslint/no-explicit-any */
-    control: Control<Record<string, any>>;
+    control: Control<FormFields>;
     newSelectionPrefix?: string;
     onChangeWithNew?: (selected: T[], isNew: boolean) => void;
     onBlurT?: (e: FocusEvent<HTMLInputElement>) => void;
@@ -22,15 +24,17 @@ export type ControlledTypeaheadProps<T extends TypeaheadModel> = TypeaheadProps<
 /**
  * A wrapped version of react-bootstrap-typeahead that plays well with react-hook-form.
  */
-const ControlledTypeahead = <T extends TypeaheadModel>({
+const ControlledTypeahead = <T extends TypeaheadModel, FormFields>({
     name,
+    onChange,
+    onBlur,
     control,
     newSelectionPrefix,
     onChangeWithNew,
     onBlurT,
     onKeyDownT,
     ...taProps
-}: ControlledTypeaheadProps<T>): JSX.Element => {
+}: ControlledTypeaheadProps<T, FormFields>): JSX.Element => {
     return (
         <Controller
             control={control}
@@ -40,19 +44,19 @@ const ControlledTypeahead = <T extends TypeaheadModel>({
                 <Typeahead
                     {...taProps}
                     defaultSelected={[]}
-                    selected={Array.isArray(data.value) ? data.value : [data.value]}
+                    selected={Array.isArray(data.field.value) ? data.field.value : [data.field.value]}
                     id={taProps.id ? taProps.id : name}
                     onChange={(selected: T[]) => {
                         const isNew = selected.length > 0 && hasProp(selected[0], 'customOption');
                         if (onChangeWithNew) onChangeWithNew(selected, isNew);
                         // make sure to let the Controller know as well
-                        data.onChange(selected);
-                        if (taProps.onChange) taProps.onChange(selected);
+                        onChange(selected);
+                        // if (taProps.onChange) taProps.onChange(selected);
                     }}
                     onBlur={(e) => {
                         if (onBlurT) onBlurT((e as unknown) as FocusEvent<HTMLInputElement>);
-                        data.onBlur();
-                        if (taProps.onBlur) taProps.onBlur(e);
+                        onBlur(e);
+                        // if (taProps.onBlur) taProps.onBlur(e);
                     }}
                     onKeyDown={(e) => {
                         if (onKeyDownT) onKeyDownT((e as unknown) as KeyboardEvent<HTMLInputElement>);

@@ -114,7 +114,7 @@ const Gall = ({
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): AT.GallUpsertFields => {
         return {
-            gallid: hasProp(fields.value[0], 'gall') ? fields.value[0].gall.id : -1,
+            gallid: hasProp(fields.mainField[0], 'gall') ? fields.mainField[0].gall.id : -1,
             abundance: fields.abundance[0].abundance,
             aliases: aliasData,
             alignments: fields.alignments.map((a) => a.id),
@@ -140,7 +140,7 @@ const Gall = ({
             const newFGS = await fetchFGS(s);
 
             return {
-                value: [s],
+                mainField: [s],
                 genus: [newFGS.genus],
                 family: [newFGS.family],
                 abundance: [pipe(s.abundance, O.getOrElse(constant(AT.EmptyAbundance)))],
@@ -161,7 +161,7 @@ const Gall = ({
 
         setAliasData([]);
         return {
-            value: [],
+            mainField: [],
             genus: [],
             family: [],
             abundance: [AT.EmptyAbundance],
@@ -193,6 +193,7 @@ const Gall = ({
         renameCallback,
         form,
         formSubmit,
+        mainField,
     } = useAdmin(
         'Gall',
         id,
@@ -250,7 +251,7 @@ const Gall = ({
     const newUndescribedDone = (data: UndescribedData | undefined) => {
         setShowNewUndescribed(false);
         if (data != undefined) {
-            form.setValue('value', [{ customOption: true, id: '-1', name: data.name } as TypeaheadCustomOption]);
+            form.setValue(mainField, [{ customOption: true, id: '-1', name: data.name } as TypeaheadCustomOption]);
             form.setValue('genus', [data.genus]);
             form.setValue('family', [data.family]);
             form.setValue('hosts', [data.host]);
@@ -368,11 +369,11 @@ const Gall = ({
                                     options={data}
                                     labelKey="name"
                                     clearButton
-                                    isInvalid={!!form.errors.value}
+                                    isInvalid={!!form.formState.errors.mainField}
                                     newSelectionPrefix="Add a new Gall: "
                                     allowNew={true}
                                 />
-                                {form.errors.value && (
+                                {form.formState.errors.mainField && (
                                     <span className="text-danger">
                                         Name is required and must be in standard binomial form, e.g., Gallus gallus
                                     </span>
@@ -417,7 +418,7 @@ const Gall = ({
                                 }
                             }}
                         />
-                        {form.errors.family && (
+                        {form.formState.errors.family && (
                             <span className="text-danger">
                                 The Family name is required. If it is not present in the list you will have to go add the family
                                 first. :(
@@ -448,13 +449,15 @@ const Gall = ({
                             multiple
                             clearButton
                         />
-                        {form.errors.hosts && <span className="text-danger">You must map this gall to at least one host.</span>}
+                        {form.formState.errors.hosts && (
+                            <span className="text-danger">You must map this gall to at least one host.</span>
+                        )}
                     </Col>
                 </Row>
                 <Row className="form-group">
                     <Col>
                         Detachable:
-                        <select placeholder="Detachable" name="detachable" className="form-control" ref={form.register}>
+                        <select {...form.register} placeholder="Detachable" name="detachable" className="form-control">
                             {AT.Detachables.map((d) => (
                                 <option key={d.id}>{d.value}</option>
                             ))}
@@ -556,20 +559,20 @@ const Gall = ({
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col className="mr-auto">
-                        <input name="datacomplete" type="checkbox" className="form-input-checkbox" ref={form.register} /> All
+                        <input {...form.register} name="datacomplete" type="checkbox" className="form-input-checkbox" /> All
                         sources containing unique information relevant to this gall have been added and are reflected in its
                         associated data. However, filter criteria may not be comprehensive in every field.
                     </Col>
                 </Row>
                 <Row className="formGroups pb-1">
                     <Col className="mr-auto">
-                        <input name="undescribed" type="checkbox" className="form-input-checkbox" ref={form.register} />{' '}
+                        <input {...form.register} name="undescribed" type="checkbox" className="form-input-checkbox" />{' '}
                         Undescribed?
                     </Col>
                 </Row>
                 <Row className="fromGroup pb-1" hidden={!selected}>
                     <Col className="mr-auto">
-                        <input name="del" type="checkbox" className="form-input-checkbox" ref={form.register} /> Delete?
+                        <input {...form.register} name="del" type="checkbox" className="form-input-checkbox" /> Delete?
                     </Col>
                 </Row>
                 <Row className="formGroup pb-1">

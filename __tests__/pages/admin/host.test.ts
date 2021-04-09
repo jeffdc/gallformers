@@ -7,7 +7,7 @@ describe('Schema validation', () => {
         abundance: [],
         family: [],
         genus: [],
-        value: [],
+        mainField: [],
         del: false,
         datacomplete: false,
         section: [],

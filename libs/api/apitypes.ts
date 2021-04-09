@@ -196,6 +196,7 @@ export type SpeciesApi = SimpleSpecies & {
     speciessource: SpeciesSourceApi[];
     images: ImageApi[];
     aliases: AliasApi[];
+    fgs: FGS;
 };
 
 export type AliasApi = {

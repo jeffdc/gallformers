@@ -1,17 +1,17 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
-import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
-import React from 'react';
+import React, { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
+import { Path } from 'react-hook-form';
 import * as yup from 'yup';
-import ControlledTypeahead from '../../components/controlledtypeahead';
+import Typeahead from '../../components/Typeahead';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { HostApi, HostTaxon, SimpleSpecies } from '../../libs/api/apitypes';
-import { TaxonomyEntry, TaxonomyUpsertFields } from '../../libs/api/taxonomy';
+import { SECTION, TaxonomyEntry, TaxonomyUpsertFields } from '../../libs/api/taxonomy';
 import { allHosts } from '../../libs/db/host';
 import { allGenera, allSections } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
@@ -24,16 +24,20 @@ const SpeciesSchema = yup.object({
 });
 
 const schema = yup.object().shape({
-    value: yup.array().required('A name is required.'),
+    mainField: yup.array().required('A name is required.'),
     description: yup.string().required('A description is required.'),
     species: yup
         .array()
         .required('At least one species must be selected.')
         .of(SpeciesSchema)
         .test('same genus', 'All species must be of the same genus', (v) => {
-            return new Set(v?.map((s) => extractGenus(s?.name))).size === 1;
+            return new Set(v?.map((s) => (s.name ? extractGenus(s?.name) : undefined))).size === 1;
         }),
 });
+
+type TaxSection = Omit<TaxonomyEntry, 'parent'> & {
+    species: SimpleSpecies[];
+};
 
 type Props = {
     id: string;
@@ -42,26 +46,21 @@ type Props = {
     hosts: HostApi[];
 };
 
-type FormFields = (AdminFormFields<TaxonomyEntry> & Omit<TaxonomyEntry, 'id' | 'name' | 'type' | 'parent'>) & {
-    species: SimpleSpecies[];
-};
+type FormFields = AdminFormFields<TaxSection> & Omit<TaxSection, 'id' | 'name' | 'type'>;
 
-const updateSection = (s: TaxonomyEntry, newValue: string) => ({
+const updateSection = (s: TaxSection, newValue: string) => ({
     ...s,
     name: newValue,
 });
 
-const fetchSectionSpecies = async (sec: TaxonomyEntry): Promise<SimpleSpecies[]> => {
-    const res = await fetch(`../api/taxonomy/section/${sec.id}`);
-    if (res.status === 200) {
-        return (await res.json()) as SimpleSpecies[];
-    } else {
-        console.error(await res.text());
-        throw new Error('Failed to fetch species for the selected section. Check console.');
-    }
-};
+const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): JSX.Element => {
+    const sections: TaxSection[] = unconvertedSections.map((s) => ({
+        ...s,
+        species: [],
+    }));
 
-const Section = ({ id, sections, genera, hosts }: Props): JSX.Element => {
+    const [species, setSpecies] = useState<Array<SimpleSpecies>>([]);
+
     const toUpsertFields = (fields: FormFields, name: string, id: number): TaxonomyUpsertFields => {
         return {
             name: name,
@@ -73,29 +72,51 @@ const Section = ({ id, sections, genera, hosts }: Props): JSX.Element => {
         };
     };
 
-    const updatedFormFields = async (sec: TaxonomyEntry | undefined): Promise<FormFields> => {
+    const fetchSectionSpecies = async (sec: TaxSection): Promise<SimpleSpecies[]> => {
+        if (!sections.find((s) => s.id == sec.id)) {
+            return [];
+        }
+
+        const res = await fetch(`../api/taxonomy/section/${sec.id}`);
+        if (res.status === 200) {
+            return (await res.json()) as SimpleSpecies[];
+        } else {
+            console.error(await res.text());
+            throw new Error('Failed to fetch species for the selected section. Check console.');
+        }
+    };
+
+    const updatedFormFields = async (sec: TaxSection | undefined): Promise<FormFields> => {
         if (sec != undefined) {
             const s = await fetchSectionSpecies(sec);
+            setSpecies(s);
             return {
                 ...sec,
                 del: false,
-                value: [sec],
+                mainField: [sec],
                 species: s,
             };
         }
 
+        setSpecies([]);
         return {
-            value: [],
+            mainField: [],
             description: '',
             del: false,
             species: [],
         };
     };
 
+    const createNewSection = (name: string): TaxSection => ({
+        name: name,
+        description: '',
+        id: -1,
+        species: [],
+        type: SECTION,
+    });
+
     const {
-        data,
         selected,
-        setSelected,
         showRenameModal,
         setShowRenameModal,
         error,
@@ -105,6 +126,7 @@ const Section = ({ id, sections, genera, hosts }: Props): JSX.Element => {
         renameCallback,
         form,
         formSubmit,
+        mainField,
     } = useAdmin(
         'Section',
         id,
@@ -114,9 +136,8 @@ const Section = ({ id, sections, genera, hosts }: Props): JSX.Element => {
         { keyProp: 'name', delEndpoint: '../api/taxonomy/', upsertEndpoint: '../api/taxonomy/upsert' },
         schema,
         updatedFormFields,
+        createNewSection,
     );
-
-    const router = useRouter();
 
     return (
         <Admin
@@ -140,31 +161,7 @@ const Section = ({ id, sections, genera, hosts }: Props): JSX.Element => {
                             <Col xs={8}>Name:</Col>
                         </Row>
                         <Row>
-                            <Col>
-                                <ControlledTypeahead
-                                    control={form.control}
-                                    name="value"
-                                    placeholder="Name"
-                                    options={data}
-                                    labelKey="name"
-                                    clearButton
-                                    isInvalid={!!form.errors.value}
-                                    newSelectionPrefix="Add a new Section: "
-                                    allowNew={true}
-                                    onChangeWithNew={(e, isNew) => {
-                                        if (isNew || !e[0]) {
-                                            setSelected(undefined);
-                                            router.replace(``, undefined, { shallow: true });
-                                        } else {
-                                            setSelected(e[0]);
-                                            router.replace(`?id=${e[0].id}`, undefined, { shallow: true });
-                                        }
-                                    }}
-                                />
-                                {form.errors.value && hasProp(form.errors.value, 'message') && (
-                                    <span className="text-danger">{form.errors.value.message as string}</span>
-                                )}
-                            </Col>
+                            <Col>{mainField('name', 'Section')}</Col>
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowRenameModal(true)}>
@@ -179,29 +176,36 @@ const Section = ({ id, sections, genera, hosts }: Props): JSX.Element => {
                     <Col>
                         Description:
                         <textarea
-                            name="description"
+                            {...form.register('description')}
                             placeholder="A short friendly name/description, e.g., Red Oaks"
                             className="form-control"
-                            ref={form.register}
                             rows={1}
                         />
-                        {form.errors.description && <span className="text-danger">{form.errors.description.message}</span>}
+                        {form.formState.errors.description && (
+                            <span className="text-danger">{form.formState.errors.description.message}</span>
+                        )}
                     </Col>
                 </Row>
                 <Row className="form-group">
                     <Col>
                         Species:
-                        <ControlledTypeahead
-                            control={form.control}
+                        <Typeahead
                             name="species"
-                            placeholder="Mapped Species"
+                            control={form.control}
                             options={hosts}
                             labelKey="name"
+                            placeholder="Mapped Species"
                             clearButton
                             multiple
+                            isInvalid={!!form.formState.errors.species}
+                            selected={species ? species : []}
+                            onChange={(s) => {
+                                setSpecies(s);
+                                form.setValue('species' as Path<FormFields>, s);
+                            }}
                         />
-                        {form.errors.species && hasProp(form.errors.species, 'message') && (
-                            <span className="text-danger">{form.errors.species.message as string}</span>
+                        {form.formState.errors.species && hasProp(form.formState.errors.species, 'message') && (
+                            <span className="text-danger">{form.formState.errors.species.message as string}</span>
                         )}
                         <p>
                             The species that you add should all be from the same genus. If they are not then you will not be able
@@ -213,7 +217,7 @@ const Section = ({ id, sections, genera, hosts }: Props): JSX.Element => {
                 <Row className="form-group" hidden={!selected}>
                     <Col xs="1">Delete?:</Col>
                     <Col className="mr-auto">
-                        <input name="del" type="checkbox" className="form-check-input" ref={form.register} />
+                        <input {...form.register('del')} type="checkbox" className="form-check-input" />
                     </Col>
                 </Row>
                 <Row className="form-input">

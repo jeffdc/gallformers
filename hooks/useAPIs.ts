@@ -5,7 +5,7 @@ import { DeleteResult } from '../libs/api/apitypes';
 import { logger } from '../libs/utils/logger';
 
 export type AdminFormFields<T> = {
-    value: T[] | TypeaheadCustomOption[];
+    mainField: T[] | TypeaheadCustomOption[];
     del: boolean;
 };
 
@@ -32,7 +32,7 @@ export type UseAPIsType<T, U> = {
  * 1) have a type defined that extends AdminFormFields (this must be same type passed to the useForm hook). This type
  * should exclude the id (if present in T).
  * 2) have a "key" field in the form that takes an object type (T). This is the field that is the key for insert vs update.
- * This field *must* be named 'value' when defining the form. Its types is bound when you satisfy prerequisite #1.
+ * This field *must* be named 'mainField' when defining the form. Its types is bound when you satisfy prerequisite #1.
  *
  * @param keyProp the name of the property within T that is contains the actual value that is displaed to the user in the
  *  form. This name is also what gets bound by the Typeahead component to new items which in turn comes from the 'labelKey'
@@ -53,7 +53,7 @@ export const useAPIs = <T extends WithID, U>(
         convertFieldsToUpsert: (fields: FF, keyFieldVal: string, id: number) => U,
     ) => {
         try {
-            const value = data.value[0];
+            const value = data.mainField[0];
             if (data.del && hasProp(value, 'id')) {
                 const res = await fetch(`${delEndpoint}${value.id}`, {
                     method: 'DELETE',

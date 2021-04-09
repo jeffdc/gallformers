@@ -67,7 +67,7 @@ const GallHostMapper = ({ id, galls, genera, hosts }: Props): JSX.Element => {
         if (gall != undefined) {
             const hosts = await fetchGallHosts(gall.id);
             return {
-                value: [gall],
+                mainField: [gall],
                 hosts: hosts,
                 genus: '',
                 del: false,
@@ -78,7 +78,7 @@ const GallHostMapper = ({ id, galls, genera, hosts }: Props): JSX.Element => {
         router.replace(``, undefined, { shallow: true });
 
         return {
-            value: [],
+            mainField: [],
             hosts: [],
             genus: '',
             del: false,

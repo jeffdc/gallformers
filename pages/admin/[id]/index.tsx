@@ -2,6 +2,7 @@ import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import React from 'react';
 import Auth from '../../../components/auth';
+import { allHosts } from '../../../libs/db/host';
 import { getAllSpeciesForSection } from '../../../libs/db/taxonomy';
 import { getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 
@@ -24,7 +25,7 @@ const Tester = ({ data }: Props): JSX.Element => {
 };
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-    const data = await getStaticPropsWithContext(context, getAllSpeciesForSection, 'TEST', true, true);
+    const data = await getStaticPropsWithContext(context, allHosts, 'TEST', true, true);
     // const data = await testTx();
     // const data = await mightFailWithArray()(getAllSpeciesForSection(317));
     return {

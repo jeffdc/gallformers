@@ -67,38 +67,25 @@ export const sourcesWithSpeciesSourceBySpeciesId = (speciesId: number): TaskEith
     );
 };
 
-/**
- * The steps required to delete a Source. This is a hack to fake CASCADE DELETE since Prisma does not support it yet.
- * See: https://github.com/prisma/prisma/issues/2057
- * @param sourceids an array of ids of the species (host) to delete
- */
-export const sourceDeleteSteps = (sourceids: number[]): PrismaPromise<Prisma.BatchPayload>[] => {
-    return [
-        db.speciessource.deleteMany({
-            where: { source_id: { in: sourceids } },
-        }),
-
-        db.source.deleteMany({
-            where: { id: { in: sourceids } },
-        }),
-    ];
-};
-
 export const deleteSource = (id: number): TaskEither<Error, DeleteResult> => {
-    const deleteSourceTx = (sourceid: number) => TE.tryCatch(() => db.$transaction(sourceDeleteSteps([sourceid])), handleError);
+    // have to make raw call since Prisma does not handle cascade delete:  https://github.com/prisma/prisma/issues/2057
+    const doDelete = () =>
+        db.$executeRaw(`
+            DELETE FROM source WHERE id = ${id}
+    `);
 
-    const toDeleteResult = (batch: Prisma.BatchPayload[]): DeleteResult => {
+    const toDeleteResult = (count: number): DeleteResult => {
         return {
             type: 'source',
-            name: '',
-            count: batch.reduce((acc, v) => acc + v.count, 0),
+            name: id.toString(),
+            count: count,
         };
     };
 
     // eslint-disable-next-line prettier/prettier
     return pipe(
-        deleteSourceTx(id),
-        TE.map(toDeleteResult)
+        TE.tryCatch(doDelete, handleError),
+        TE.map(toDeleteResult),
     );
 };
 

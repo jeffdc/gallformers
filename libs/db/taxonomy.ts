@@ -1,4 +1,3 @@
-import { Prisma } from '@prisma/client';
 import { constant, flow, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
@@ -356,33 +355,30 @@ export const getSection = (id: number): TaskEither<Error, O.Option<SectionApi>> 
     );
 };
 
-const taxonomyDeleteSteps = (id: number) => {
-    return [
-        db.speciestaxonomy.deleteMany({
-            where: { taxonomy_id: id },
-        }),
-        db.taxonomy.deleteMany({
-            where: { id: id },
-        }),
-    ];
-};
-
 /**
  * Delete the given taxonomy entry. If the taxoomy entry is a Family, then the delete will cascade to species and
  * delete species that are assigned to that family. So be careful!
  * @param id
  */
 export const deleteTaxonomyEntry = (id: number): TaskEither<Error, DeleteResult> => {
-    const toDeleteResult = (batch: Prisma.BatchPayload[]): DeleteResult => {
+    const doDelete = () => {
+        // have to do a raw call since Prisma does not support cascade deletion.
+        return db.$executeRaw(`
+            DELETE FROM taxonomy WHERE id = ${id}
+        `);
+    };
+
+    const toDeleteResult = (t: number): DeleteResult => {
         return {
             type: 'taxonomy',
             name: id.toString(),
-            count: batch.reduce((acc, v) => acc + v.count, 0),
+            count: t,
         };
     };
 
+    // eslint-disable-next-line prettier/prettier
     return pipe(
-        TE.tryCatch(() => db.$transaction(taxonomyDeleteSteps(id)), handleError),
+        TE.tryCatch(doDelete, handleError),
         TE.map(toDeleteResult),
     );
 };

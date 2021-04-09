@@ -22,7 +22,7 @@ const Footer = (): JSX.Element => {
                 {session && (
                     <img
                         src={session.user.image == null ? undefined : session.user.image}
-                        alt={sessionUserOrUnknown(session)}
+                        alt={sessionUserOrUnknown(session.user.name)}
                         width="25px"
                         height="25px"
                     />

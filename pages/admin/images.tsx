@@ -179,7 +179,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                 .filter((i) => selectedForCopy.has(i.id))
                 .map<ImageApi>((i) => ({
                     ...i,
-                    lastchangedby: sessionUserOrUnknown(session),
+                    lastchangedby: sessionUserOrUnknown(session.user.name),
                     source: copySource.source,
                     sourcelink: copySource.sourcelink,
                     license: copySource.license,

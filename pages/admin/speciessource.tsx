@@ -75,7 +75,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
 
     const fieldsFor = (sp: species, so: SpeciesSourceApi | undefined): FormFields => {
         return {
-            value: [sp],
+            mainField: [sp],
             description: so ? so.description : '',
             externallink: so ? so.externallink : '',
             sources: sourcesForSpecies,
@@ -97,7 +97,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
             }
             setSourcesForSpecies([]);
             return {
-                value: [],
+                mainField: [],
                 description: '',
                 externallink: '',
                 sources: [],
@@ -108,7 +108,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
             console.error(e);
             setError(e);
             return {
-                value: sp ? [sp] : [],
+                mainField: sp ? [sp] : [],
                 description: '',
                 externallink: '',
                 sources: [],
@@ -203,7 +203,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                     setDeleteResults(dr);
                     // kludge: postDelete makes assumptions that are not good for this screen...
                     const sp = selected;
-                    postDelete(fields.value[0].id, dr);
+                    postDelete(fields.mainField[0].id, dr);
                     //... so we save the old species and re-select it after the delete
                     setSelected(sp);
                     router.replace(`?id=${sp.id}`, undefined, { shallow: true });

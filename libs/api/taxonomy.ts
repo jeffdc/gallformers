@@ -26,6 +26,8 @@ export type TaxonomyEntry = {
     parent: O.Option<TaxonomyEntry>;
 };
 
+export type TaxonomyEntryNoParent = Omit<TaxonomyEntry, 'parent'>;
+
 export const EMPTY_TAXONOMYENTRY: TaxonomyEntry = {
     description: '',
     id: -1,
@@ -53,9 +55,9 @@ export const toTaxonomyEntry = (t: DBTaxonomyWithParent): TaxonomyEntry => {
 };
 
 export type FGS = {
-    family: TaxonomyEntry;
-    genus: TaxonomyEntry;
-    section: O.Option<TaxonomyEntry>;
+    family: TaxonomyEntryNoParent;
+    genus: TaxonomyEntryNoParent;
+    section: O.Option<TaxonomyEntryNoParent>;
 };
 export const EMPTY_FGS: FGS = {
     family: EMPTY_TAXONOMYENTRY,

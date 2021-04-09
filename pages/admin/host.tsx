@@ -1,17 +1,16 @@
-import { abundance } from '@prisma/client';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import 'react-bootstrap-table-next/dist/react-bootstrap-table2.min.css';
+import { Path } from 'react-hook-form';
 import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
-import ControlledTypeahead from '../../components/controlledtypeahead';
 import { RenameEvent } from '../../components/editname';
+import Typeahead from '../../components/Typeahead';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { useConfirmation } from '../../hooks/useconfirmation';
@@ -25,12 +24,14 @@ import {
     HOST_FAMILY_TYPES,
     SpeciesUpsertFields,
 } from '../../libs/api/apitypes';
-import { FGS, GENUS, TaxonomyEntry } from '../../libs/api/taxonomy';
+import { FAMILY, FGS, GENUS, TaxonomyEntry } from '../../libs/api/taxonomy';
 import { allHosts } from '../../libs/db/host';
 import { abundances } from '../../libs/db/species';
 import { allFamilies, allGenera, allSections } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
 import { extractGenus, mightFailWithArray } from '../../libs/utils/util';
+
+type TaxNoParent = Omit<TaxonomyEntry, 'parent'>;
 
 type Props = {
     id: string;
@@ -38,11 +39,11 @@ type Props = {
     families: TaxonomyEntry[];
     sections: TaxonomyEntry[];
     genera: TaxonomyEntry[];
-    abundances: abundance[];
+    abundances: AbundanceApi[];
 };
 
 const schema = yup.object().shape({
-    value: yup
+    mainField: yup
         .array()
         .of(
             yup.object({
@@ -59,9 +60,9 @@ const schema = yup.object().shape({
 });
 
 export type FormFields = AdminFormFields<HostApi> & {
-    genus: TaxonomyEntry[];
-    family: TaxonomyEntry[];
-    section: TaxonomyEntry[];
+    genus: TaxNoParent[];
+    family: TaxNoParent[];
+    section: TaxNoParent[];
     abundance: AbundanceApi[];
     datacomplete: boolean;
 };
@@ -75,25 +76,33 @@ const updateHost = (s: HostApi, newValue: string): HostApi => ({
     name: newValue,
 });
 
-const fetchFGS = async (h: HostApi): Promise<FGS> => {
-    const res = await fetch(`../api/taxonomy?id=${h.id}`);
-    if (res.status === 200) {
-        return await res.json();
-    } else {
-        console.error(await res.text());
-        throw new Error('Failed to fetch taxonomy for the selected species. Check console.');
-    }
-};
+// const fetchFGS = async (h: HostData): Promise<FGS> => {
+//     const res = await fetch(`../api/taxonomy?id=${h.id}`);
+//     if (res.status === 200) {
+//         return await res.json();
+//     } else {
+//         console.error(await res.text());
+//         throw new Error('Failed to fetch taxonomy for the selected species. Check console.');
+//     }
+// };
 
 const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.Element => {
     const [aliasData, setAliasData] = useState<AliasApi[]>([]);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): SpeciesUpsertFields => {
+        const family = { ...fields.family[0], parent: O.none };
+        const genus = { ...fields.genus[0], parent: O.of(family) };
+        const section = O.fromNullable({ ...fields.section[0], parent: O.of(genus) });
+
         return {
             abundance: fields.abundance.length > 0 ? fields.abundance[0].abundance : undefined,
             aliases: aliasData,
             datacomplete: fields.datacomplete,
-            fgs: { family: fields.family[0], genus: fields.genus[0], section: O.fromNullable(fields.section[0]) },
+            fgs: {
+                family: family,
+                genus: genus,
+                section: section,
+            },
             id: id,
             name: name,
         };
@@ -102,15 +111,21 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
     const updatedFormFields = async (s: HostApi | undefined): Promise<FormFields> => {
         if (s != undefined) {
             setAliasData(s?.aliases);
-            const newFGS = await fetchFGS(s);
+            // const newFGS = await fetchFGS(s);
             return {
-                value: [s],
-                genus: [newFGS.genus],
-                family: [newFGS.family],
+                mainField: [s],
+                genus: [s.fgs?.genus],
+                family: [s.fgs?.family],
                 section: pipe(
-                    newFGS.section,
-                    O.fold(constant([]), (s) => [s]),
+                    s.fgs?.section,
+                    O.fold(constant([]), (sec) => [sec]),
                 ),
+                // genus: [newFGS.genus],
+                // family: [newFGS.family],
+                // section: pipe(
+                //     newFGS.section,
+                //     O.fold(constant([]), (s) => [s]),
+                // ),
                 datacomplete: s.datacomplete,
                 abundance: [pipe(s.abundance, O.getOrElse(constant(EmptyAbundance)))],
                 del: false,
@@ -119,7 +134,7 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
 
         setAliasData([]);
         return {
-            value: [],
+            mainField: [],
             genus: [],
             family: [],
             section: [],
@@ -129,8 +144,34 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
         };
     };
 
+    const fgsFromName = (name: string): FGS => {
+        const genusName = extractGenus(name);
+        const genus = genera.find((g) => g.name.localeCompare(genusName) == 0);
+        const family = genus?.parent ? pipe(genus.parent, O.getOrElseW(constant(undefined))) : undefined;
+        // if (!family) throw new Error('The selected Genus is missing its Family.');
+
+        return {
+            family: family ? family : { id: -1, description: '', name: '', type: FAMILY },
+            genus: genus ? { ...genus } : { id: -1, description: '', name: genusName, type: GENUS },
+            section: O.none,
+        };
+    };
+
+    const createNewHost = (name: string): HostApi => ({
+        name: name,
+        abundance: O.none,
+        aliases: [],
+        datacomplete: false,
+        description: O.none,
+        fgs: fgsFromName(name),
+        galls: [],
+        id: -1,
+        images: [],
+        speciessource: [],
+        taxoncode: HostTaxon,
+    });
+
     const {
-        data,
         selected,
         setSelected,
         showRenameModal,
@@ -142,6 +183,7 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
         renameCallback,
         form,
         formSubmit,
+        mainField,
     } = useAdmin(
         'Host',
         id,
@@ -151,9 +193,9 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
         { keyProp: 'name', delEndpoint: '../api/host/', upsertEndpoint: '../api/host/upsert' },
         schema,
         updatedFormFields,
+        createNewHost,
     );
 
-    const router = useRouter();
     const confirm = useConfirmation();
 
     const rename = async (fields: FormFields, e: RenameEvent) => {
@@ -184,7 +226,7 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                         description: '',
                         name: newGenus,
                         type: GENUS,
-                        parent: O.of(fields.family[0]),
+                        // parent: O.of(fields.family[0]),
                     };
                     return Promise.bind(onSubmit(fields));
                 });
@@ -228,7 +270,9 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                             <Col xs={8}>Name (binomial):</Col>
                         </Row>
                         <Row>
-                            <Col>
+                            <Col>{mainField('name', 'Host')}</Col>
+
+                            {/* <Col>
                                 <ControlledTypeahead
                                     control={form.control}
                                     name="value"
@@ -272,7 +316,7 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                                         Name is required and must be in standard binomial form, e.g., Gallus gallus
                                     </span>
                                 )}
-                            </Col>
+                            </Col> */}
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowRenameModal(true)}>
@@ -286,34 +330,46 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                 <Row className="form-group">
                     <Col>
                         Genus (filled automatically):
-                        <ControlledTypeahead
-                            control={form.control}
+                        <Typeahead
                             name="genus"
+                            control={form.control}
+                            placeholder="Genus"
                             options={genera}
                             labelKey="name"
+                            selected={selected?.fgs?.genus ? [selected.fgs.genus] : []}
                             disabled={true}
+                            onChange={(g) => {
+                                if (selected) selected.fgs.genus = g[0];
+                                form.setValue('genus' as Path<FormFields>, g);
+                            }}
+                            clearButton
+                            multiple
                         />
                     </Col>
                     <Col>
                         Family:
-                        <ControlledTypeahead
-                            control={form.control}
+                        <Typeahead
                             name="family"
+                            control={form.control}
                             placeholder="Family"
                             options={families}
                             labelKey="name"
-                            clearButton
-                            disabled={!!selected}
+                            selected={selected?.fgs?.family ? [selected.fgs.family] : []}
+                            disabled={selected && selected.id > 0}
                             onChange={(f) => {
-                                // handle the case when a new species is created
-                                const g = form.getValues().genus[0];
-                                if (O.isNone(g.parent)) {
-                                    g.parent = O.some(f[0]);
-                                    form.setValue('genus', [g]);
+                                if (selected) {
+                                    // handle the case when a new species is created
+                                    const g = form.getValues().genus[0];
+                                    const genus = genera.find((gg) => gg.id === g.id);
+                                    if (genus && O.isNone(genus.parent)) {
+                                        genus.parent = O.some({ ...f[0], parent: O.none });
+                                        setSelected({ ...selected, fgs: { ...selected.fgs, genus: genus } });
+                                    }
                                 }
                             }}
+                            clearButton
                         />
-                        {form.errors.family && (
+                        {form.formState.errors.family && (
                             <span className="text-danger">
                                 The Family name is required. If it is not present in the list you will have to go add the family
                                 first. :(
@@ -324,23 +380,53 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                 <Row className="form-group">
                     <Col>
                         Section:
-                        <ControlledTypeahead
-                            control={form.control}
+                        <Typeahead
                             name="section"
+                            control={form.control}
                             placeholder="Section"
                             options={sections}
                             labelKey="name"
+                            selected={
+                                selected?.fgs?.section
+                                    ? pipe(
+                                          selected.fgs.section,
+                                          O.fold(constant([]), (s) => [s]),
+                                      )
+                                    : []
+                            }
+                            onChange={(g) => {
+                                if (selected) {
+                                    selected.fgs.section = O.fromNullable(g[0]);
+                                    setSelected({ ...selected });
+                                }
+                            }}
+                            disabled={!selected}
                             clearButton
                         />
                     </Col>
                     <Col>
                         Abundance:
-                        <ControlledTypeahead
-                            control={form.control}
+                        <Typeahead
                             name="abundance"
+                            control={form.control}
                             placeholder=""
                             options={abundances}
                             labelKey="abundance"
+                            disabled={!selected}
+                            selected={
+                                selected?.abundance
+                                    ? pipe(
+                                          selected.abundance,
+                                          O.fold(constant([]), (a) => [a]),
+                                      )
+                                    : []
+                            }
+                            onChange={(g) => {
+                                if (selected) {
+                                    selected.abundance = O.fromNullable(g[0]);
+                                    setSelected({ ...selected });
+                                }
+                            }}
                             clearButton
                         />
                     </Col>
@@ -352,15 +438,15 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col className="mr-auto">
-                        <input name="datacomplete" type="checkbox" className="form-input-checkbox" ref={form.register} /> All
-                        galls known to occur on this plant have been added to the database, and can be filtered by Location and
+                        <input {...form.register('datacomplete')} type="checkbox" className="form-input-checkbox" /> All galls
+                        known to occur on this plant have been added to the database, and can be filtered by Location and
                         Detachable. However, sources and images for galls associated with this host may be incomplete or absent,
                         and other filters may not have been entered comprehensively or at all.
                     </Col>
                 </Row>
                 <Row className="fromGroup pb-1" hidden={!selected}>
                     <Col className="mr-auto">
-                        <input name="del" type="checkbox" className="form-input-checkbox" ref={form.register} /> Delete?
+                        <input {...form.register('del')} type="checkbox" className="form-input-checkbox" /> Delete?
                     </Col>
                 </Row>
                 <Row className="formGroup">
