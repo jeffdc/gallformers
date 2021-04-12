@@ -2,13 +2,12 @@ import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
-import ControlledTypeahead from '../../components/controlledtypeahead';
+import Typeahead from '../../components/Typeahead';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
@@ -18,7 +17,7 @@ import { allGalls } from '../../libs/db/gall';
 import { allHosts } from '../../libs/db/host';
 import { allGenera } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
-import { hasProp, mightFailWithArray } from '../../libs/utils/util';
+import { mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
     id: string;
@@ -28,7 +27,7 @@ type Props = {
 };
 
 const schema = yup.object().shape({
-    value: yup.array().required('You must provide the gall.'),
+    mainField: yup.array().required('You must provide the gall.'),
 });
 
 type FormFields = AdminFormFields<GallApi> & {
@@ -63,6 +62,8 @@ const fetchGallHosts = async (id: number | undefined): Promise<GallHost[]> => {
 };
 
 const GallHostMapper = ({ id, galls, genera, hosts }: Props): JSX.Element => {
+    const [genus, setGenus] = useState<string>();
+
     const updatedFormFields = async (gall: GallApi | undefined): Promise<FormFields> => {
         if (gall != undefined) {
             const hosts = await fetchGallHosts(gall.id);
@@ -75,7 +76,6 @@ const GallHostMapper = ({ id, galls, genera, hosts }: Props): JSX.Element => {
         }
 
         setSelected(gall);
-        router.replace(``, undefined, { shallow: true });
 
         return {
             mainField: [],
@@ -87,7 +87,6 @@ const GallHostMapper = ({ id, galls, genera, hosts }: Props): JSX.Element => {
 
     // eslint-disable-next-line prettier/prettier
     const {
-        data,
         selected,
         setSelected,
         error,
@@ -96,6 +95,7 @@ const GallHostMapper = ({ id, galls, genera, hosts }: Props): JSX.Element => {
         setDeleteResults,
         form,
         formSubmit,
+        mainField,
     } = useAdmin<GallApi, FormFields, GallHostUpdateFields>(
         'Gall-Host',
         id,
@@ -107,7 +107,9 @@ const GallHostMapper = ({ id, galls, genera, hosts }: Props): JSX.Element => {
         updatedFormFields,
     );
 
-    const router = useRouter();
+    useEffect(() => {
+        setGenus(undefined);
+    }, [selected]);
 
     return (
         <Auth>
@@ -136,27 +138,7 @@ const GallHostMapper = ({ id, galls, genera, hosts }: Props): JSX.Element => {
                     <Row className="form-group">
                         <Col>
                             Gall:
-                            <ControlledTypeahead
-                                control={form.control}
-                                name="value"
-                                placeholder="Gall"
-                                options={data}
-                                labelKey="name"
-                                clearButton
-                                isInvalid={!!form.errors.value}
-                                onChange={(s) => {
-                                    if (s.length > 0) {
-                                        setSelected(s[0]);
-                                        router.replace(`?id=${s[0].id}`, undefined, { shallow: true });
-                                    } else {
-                                        setSelected(undefined);
-                                        router.replace(``, undefined, { shallow: true });
-                                    }
-                                }}
-                            />
-                            {form.errors.value && hasProp(form.errors.value, 'message') && (
-                                <span className="text-danger">{form.errors.value.message as string}</span>
-                            )}
+                            {mainField('name', 'Gall')}
                         </Col>
                     </Row>
                     <Row>
@@ -167,15 +149,22 @@ const GallHostMapper = ({ id, galls, genera, hosts }: Props): JSX.Element => {
                     <Row className="form-group">
                         <Col>
                             Hosts:
-                            <ControlledTypeahead
-                                control={form.control}
+                            <Typeahead
                                 name="hosts"
+                                control={form.control}
                                 placeholder="Hosts"
                                 options={hosts}
                                 labelKey="name"
                                 multiple
                                 clearButton
                                 disabled={!selected}
+                                selected={selected?.hosts ? selected.hosts : []}
+                                onChange={(s) => {
+                                    if (selected) {
+                                        selected.hosts = s;
+                                        setSelected({ ...selected });
+                                    }
+                                }}
                             />
                         </Col>
                     </Row>
@@ -187,13 +176,17 @@ const GallHostMapper = ({ id, galls, genera, hosts }: Props): JSX.Element => {
                     <Row className="form-group">
                         <Col>
                             Genus:
-                            <ControlledTypeahead
-                                control={form.control}
+                            <Typeahead
                                 name="genus"
+                                control={form.control}
                                 placeholder="Genus"
                                 options={genera}
                                 disabled={!selected}
                                 clearButton
+                                selected={genus ? [genus] : []}
+                                onChange={(s) => {
+                                    setGenus(s[0]);
+                                }}
                             />
                             (If you select a Genus, then the mapping will be created for ALL species in that Genus. Once the
                             individual mappings are created you can edit them individually. This will NOT overwrite any existing

@@ -76,16 +76,6 @@ const updateHost = (s: HostApi, newValue: string): HostApi => ({
     name: newValue,
 });
 
-// const fetchFGS = async (h: HostData): Promise<FGS> => {
-//     const res = await fetch(`../api/taxonomy?id=${h.id}`);
-//     if (res.status === 200) {
-//         return await res.json();
-//     } else {
-//         console.error(await res.text());
-//         throw new Error('Failed to fetch taxonomy for the selected species. Check console.');
-//     }
-// };
-
 const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.Element => {
     const [aliasData, setAliasData] = useState<AliasApi[]>([]);
 
@@ -271,52 +261,6 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                         </Row>
                         <Row>
                             <Col>{mainField('name', 'Host')}</Col>
-
-                            {/* <Col>
-                                <ControlledTypeahead
-                                    control={form.control}
-                                    name="value"
-                                    onChangeWithNew={(e, isNew) => {
-                                        if (isNew || !e[0]) {
-                                            setSelected(undefined);
-                                            const g = genera.find((g) => g.name.localeCompare(e[0]?.name) == 0);
-                                            form.setValue(
-                                                'genus',
-                                                g
-                                                    ? [g]
-                                                    : [
-                                                          {
-                                                              id: -1,
-                                                              name: e[0] ? extractGenus(e[0].name) : '',
-                                                              description: '',
-                                                              type: GENUS,
-                                                              parent: O.none,
-                                                          },
-                                                      ],
-                                            );
-                                            router.replace(``, undefined, { shallow: true });
-                                        } else {
-                                            const host: HostApi = e[0];
-                                            if (selected?.id !== host.id) {
-                                                setSelected(host);
-                                                router.replace(`?id=${host.id}`, undefined, { shallow: true });
-                                            }
-                                        }
-                                    }}
-                                    placeholder="Name"
-                                    options={data}
-                                    labelKey="name"
-                                    clearButton
-                                    isInvalid={!!form.errors.value}
-                                    newSelectionPrefix="Add a new Host: "
-                                    allowNew={true}
-                                />
-                                {form.errors.value && (
-                                    <span className="text-danger">
-                                        Name is required and must be in standard binomial form, e.g., Gallus gallus
-                                    </span>
-                                )}
-                            </Col> */}
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowRenameModal(true)}>

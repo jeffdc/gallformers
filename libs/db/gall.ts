@@ -1,16 +1,34 @@
 import {
+    abundance,
+    alias,
+    aliasspecies,
     alignment,
     cells as cs,
     color,
+    gallalignment,
+    gallcells,
+    gallcolor,
+    galllocation,
+    gallshape,
+    gallspecies,
+    galltexture,
+    gallwalls,
+    host,
+    image,
     location,
     Prisma,
     PrismaPromise,
     shape,
+    source,
     species,
+    speciessource,
+    speciestaxonomy,
+    taxonomy,
     texture,
     walls as ws,
 } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function';
+import * as A from 'fp-ts/lib/Array';
+import { flow, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
@@ -29,15 +47,15 @@ import {
     ShapeApi,
     WallsApi,
 } from '../api/apitypes';
-import { GENUS, SECTION } from '../api/taxonomy';
+import { FGS, GENUS, SECTION } from '../api/taxonomy';
 import { deleteImagesBySpeciesId } from '../images/images';
 import { defaultSource } from '../pages/renderhelpers';
 import { logger } from '../utils/logger';
-import { ExtractTFromPromise } from '../utils/types';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
 import { adaptImage } from './images';
 import { adaptAbundance, updateAbundance } from './species';
+import { taxonomyForSpecies } from './taxonomy';
 import { connectIfNotNull, connectWithIds } from './utils';
 
 /**
@@ -91,10 +109,64 @@ export const getGalls = (
             orderBy: { species: { name: 'asc' } },
         });
 
-    type DBGall = ExtractTFromPromise<ReturnType<typeof galls>>;
+    // type DBGall = ExtractTFromPromise<ReturnType<typeof galls>>;
+    // type DBGallWithFGS = Omit<DBGall, 'species'> & DBGall[number]['species'] & { fgs: FGS[] };
+    type DBGallWithFGS = gallspecies & {
+        gall: {
+            gallalignment: (gallalignment & {
+                alignment: alignment;
+            })[];
+            gallcells: (gallcells & {
+                cells: cs;
+            })[];
+            gallcolor: (gallcolor & {
+                color: color;
+            })[];
+            detachable: number | null;
+            galllocation: (galllocation & {
+                location: location;
+            })[];
+            galltexture: (galltexture & {
+                texture: texture;
+            })[];
+            gallshape: (gallshape & {
+                shape: shape;
+            })[];
+            gallwalls: (gallwalls & {
+                walls: ws;
+            })[];
+            undescribed: boolean;
+        };
+        species: species & {
+            abundance: abundance | null;
+            aliasspecies: (aliasspecies & {
+                alias: alias;
+            })[];
+            hosts: (host & {
+                hostspecies: {
+                    id: number;
+                    name: string;
+                } | null;
+            })[];
+            image: (image & {
+                source:
+                    | (source & {
+                          speciessource: speciessource[];
+                      })
+                    | null;
+            })[];
+            speciessource: (speciessource & {
+                source: source;
+            })[];
+            speciestaxonomy: (speciestaxonomy & {
+                taxonomy: taxonomy;
+            })[];
+            fgs: FGS;
+        };
+    };
 
     // we want a stronger no-null contract on what we return then is modelable in the DB
-    const clean = (galls: DBGall): GallApi[] =>
+    const clean = (galls: readonly DBGallWithFGS[]): GallApi[] =>
         galls.flatMap((g) => {
             if (g.gall == null) {
                 logger.error(
@@ -135,6 +207,7 @@ export const getGalls = (
                 }),
                 images: g.species.image.map(adaptImage),
                 aliases: g.species.aliasspecies.map((a) => a.alias),
+                fgs: g.species.fgs,
             };
             return newg;
         });
@@ -142,6 +215,27 @@ export const getGalls = (
     // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(galls, handleError),
+        TE.map(
+            flow(
+                A.map((g) =>
+                    pipe(
+                        taxonomyForSpecies(g.species_id),
+                        TE.map(
+                            (fgs) =>
+                                ({
+                                    ...g,
+                                    species: {
+                                        ...g.species,
+                                        fgs: fgs,
+                                    },
+                                } as DBGallWithFGS),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        TE.map(TE.sequenceArray),
+        TE.flatten,
         TE.map(clean),
     );
 };
@@ -645,33 +739,24 @@ export const upsertGall = (gall: GallUpsertFields): TaskEither<Error, GallApi> =
     );
 };
 
-/**
- * The steps required to delete a Gall. This is a hack to fake CASCADE DELETE since Prisma does not support it yet.
- * See: https://github.com/prisma/prisma/issues/2057
- *
- * @param speciesids an array of ids of the species (gall) to delete
- */
-export const gallDeleteSteps = (speciesids: number[]): PrismaPromise<number>[] => {
-    return [db.$executeRaw(`DELETE FROM species WHERE id IN (${speciesids})`)];
-};
-
 export const deleteGall = (speciesid: number): TaskEither<Error, DeleteResult> => {
     const deleteImages = () => TE.tryCatch(() => deleteImagesBySpeciesId(speciesid), handleError);
 
-    const deleteGallTx = () => TE.tryCatch(() => db.$transaction(gallDeleteSteps([speciesid])), handleError);
+    // Prisma can not do cascade deletes. See: https://github.com/prisma/prisma/issues/2057
+    const gallDelete = () => TE.tryCatch(() => db.$executeRaw(`DELETE FROM species WHERE id = ${speciesid}`), handleError);
 
-    const toDeleteResult = (batch: number[]): DeleteResult => {
+    const toDeleteResult = (count: number): DeleteResult => {
         return {
             type: 'gall',
-            name: '',
-            count: batch.reduce((acc, v) => acc + v, 0),
+            name: speciesid.toString(),
+            count: count,
         };
     };
 
     // eslint-disable-next-line prettier/prettier
     return pipe(
         deleteImages(),
-        TE.chain(deleteGallTx),
+        TE.chain(gallDelete),
         TE.map(toDeleteResult),
     );
 };

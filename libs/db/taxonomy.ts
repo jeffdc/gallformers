@@ -1,4 +1,4 @@
-import { constant, flow, pipe } from 'fp-ts/lib/function';
+import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
@@ -12,7 +12,6 @@ import {
     GallTaxon,
     HostTaxon,
     SimpleSpecies,
-    SpeciesApi,
 } from '../api/apitypes';
 import {
     FAMILY,
@@ -30,7 +29,6 @@ import { logger } from '../utils/logger';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
-import { getSpecies } from './species';
 import { extractId } from './utils';
 
 /**
@@ -291,23 +289,23 @@ export const allFamilyIds = (): TaskEither<Error, string[]> => {
     );
 };
 
-/**
- * Fetches all of the species for a given family.
- * @param id the family to fetch species for
- */
-export const getAllSpeciesForFamily = (id: number): TaskEither<Error, SpeciesApi[]> => {
-    const extractSpeciesIds = (tt: TaxonomyTree): number[] =>
-        tt.taxonomy.flatMap((s) => s.speciestaxonomy.map((st) => st.species_id));
+// /**
+//  * Fetches all of the species for a given family.
+//  * @param id the family to fetch species for
+//  */
+// export const getAllSpeciesForFamily = (id: number): TaskEither<Error, SpeciesApi[]> => {
+//     const extractSpeciesIds = (tt: TaxonomyTree): number[] =>
+//         tt.taxonomy.flatMap((s) => s.speciestaxonomy.map((st) => st.species_id));
 
-    const get = (ids: number[]) => getSpecies([{ id: { in: ids } }]);
+//     const get = (ids: number[]) => getSpecies([{ id: { in: ids } }]);
 
-    // eslint-disable-next-line prettier/prettier
-    return pipe(
-        taxonomyTreeForId(id),
-        TE.map(flow(O.fold(constant([]), extractSpeciesIds))),
-        TE.chain(get),
-    );
-};
+//     // eslint-disable-next-line prettier/prettier
+//     return pipe(
+//         taxonomyTreeForId(id),
+//         TE.map(flow(O.fold(constant([]), extractSpeciesIds))),
+//         TE.chain(get),
+//     );
+// };
 
 export const getAllSpeciesForSection = (id: number): TaskEither<Error, SimpleSpecies[]> => {
     const sectionSpecies = () =>

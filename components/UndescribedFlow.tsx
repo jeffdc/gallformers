@@ -124,17 +124,15 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
                 <Form>
                     <Form.Group>
                         <Form.Check
+                            {...register('genusKnown')}
                             type="checkbox"
                             label="Is this undescribed species part of a known Genus?"
-                            ref={register}
-                            name="genusKnown"
                             onChange={(e) => onUnknownGenusChange(e.currentTarget.checked)}
                         ></Form.Check>
                         <Form.Label>Genus</Form.Label>
                         <Form.Control
+                            {...register('genus')}
                             as="select"
-                            ref={register}
-                            name="genus"
                             onChange={(e) => {
                                 if (!genusUnknown) {
                                     setValue('family', lookupFamily(e.currentTarget.value));
@@ -146,17 +144,17 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
                             {genOptionsWithId(genera.filter((g) => g.name.localeCompare('Unknown')))}
                         </Form.Control>
                         <Form.Label>Family</Form.Label>
-                        <Form.Control as="select" disabled={!genusUnknown} ref={register} name="family">
+                        <Form.Control {...register('family')} as="select" disabled={!genusUnknown}>
                             {genOptionsWithId(families)}
                         </Form.Control>
                         <Form.Label>Type Host</Form.Label>
-                        <Form.Control as="select" ref={register} name="host" onChange={onChange}>
+                        <Form.Control {...register('host')} as="select" onChange={onChange}>
                             {genOptionsWithId(hosts)}
                         </Form.Control>
                         <Form.Label>Description (2 or 3 adjectives separated by dashes, e.g. red-bead-gall)</Form.Label>
-                        <Form.Control ref={register} name="description" onChange={onChange}></Form.Control>
+                        <Form.Control {...register('description')} onChange={onChange}></Form.Control>
                         <Form.Label>Name (you can edit this but it is suggested that you accept the computed value)</Form.Label>
-                        <Form.Control ref={register} name="name"></Form.Control>
+                        <Form.Control {...register('name')}></Form.Control>
                     </Form.Group>
                 </Form>
             </Modal.Body>

@@ -53,7 +53,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     apiConfig: { keyProp: keyof T; delEndpoint: string; upsertEndpoint: string },
     schema: yup.ObjectSchema<ObjectShape, AnyObject, Maybe<TypeOfShape<ObjectShape>>, Maybe<AssertsShape<ObjectShape>>>,
     updatedFormFields: (t: T | undefined) => Promise<FormFields>,
-    createNew: (v: string) => T,
+    createNew?: (v: string) => T,
 ): AdminData<T, FormFields> => {
     const [data, setData] = useState(ts);
     const [selected, setSelected] = useState<T | undefined>(id ? data.find((d) => d.id === parseInt(id)) : undefined);
@@ -72,7 +72,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         return (
             <>
                 <Typeahead
-                    name="mainField"
+                    name={'mainField' as Path<FormFields>}
                     control={form.control}
                     options={data}
                     labelKey={labelKey}
@@ -81,7 +81,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                     clearButton
                     isInvalid={!!form.formState.errors.mainField}
                     newSelectionPrefix={`Add a new ${placeholder}: `}
-                    allowNew
+                    allowNew={!!createNew}
                     onChange={(s) => {
                         console.log(`JDC: mainField.onChange: ${JSON.stringify(s, null, '  ')}`);
                         if (s.length <= 0) {
@@ -89,9 +89,10 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                             router.replace(``, undefined, { shallow: true });
                         } else {
                             if (hasProp(s[0], 'customOption') && hasProp(s[0], 'name')) {
-                                // new
-                                const x = createNew(s[0].name as string);
-                                setSelected(x);
+                                if (createNew) {
+                                    const x = createNew(s[0].name as string);
+                                    setSelected(x);
+                                }
                                 router.replace(``, undefined, { shallow: true });
                             } else {
                                 setSelected(s[0]);

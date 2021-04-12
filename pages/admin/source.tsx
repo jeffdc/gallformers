@@ -62,6 +62,15 @@ const updatedFormFields = async (s: SourceApi | undefined): Promise<FormFields> 
     };
 };
 
+const createNewSource = (title: string): SourceApi => ({
+    title: title,
+    author: '',
+    citation: '',
+    id: -1,
+    link: '',
+    pubyear: '',
+});
+
 const Source = ({ id, sources }: Props): JSX.Element => {
     const {
         selected,
@@ -84,6 +93,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
         { keyProp: 'title', delEndpoint: '../api/source/', upsertEndpoint: '../api/source/upsert' },
         schema,
         updatedFormFields,
+        createNewSource,
     );
 
     return (

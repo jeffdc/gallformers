@@ -8,14 +8,15 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Col, Modal, Row, Table } from 'react-bootstrap';
+import { Alert, Button, Col, Modal, Row } from 'react-bootstrap';
+import BootstrapTable, { ColumnDescription, RowEventHandlerProps, SelectRowProps } from 'react-bootstrap-table-next';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import AddImage from '../../components/addimage';
 import Auth from '../../components/auth';
-import ControlledTypeahead from '../../components/controlledtypeahead';
 import ImageEdit from '../../components/imageedit';
 import ImageGrid from '../../components/imagegrid';
+import Typeahead from '../../components/Typeahead';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { ImageApi } from '../../libs/api/apitypes';
 import { allSpecies } from '../../libs/db/species';
@@ -33,9 +34,79 @@ type FormFields = {
     delete: [];
 };
 
+const externalLinkFormatter = (link: string) => {
+    return (
+        <a href={link} target="_blank" rel="noreferrer">
+            {link}
+        </a>
+    );
+};
+const imageFormatter = (cell: string, row: ImageApi) => {
+    return <img src={row.small} width="100" />;
+};
+
+const sourceFormatter = (cell: string, row: ImageApi) => {
+    return pipe(
+        row.source,
+        O.fold(constant(<span></span>), (s) => (
+            <span>
+                <a href={`/source/${s.id}`}>{s.title}</a>
+            </span>
+        )),
+    );
+};
+
+const columns: ColumnDescription[] = [
+    {
+        dataField: 'small',
+        text: 'image',
+        sort: true,
+        editable: false,
+        formatter: imageFormatter,
+    },
+    {
+        dataField: 'default',
+        text: 'default',
+        sort: true,
+    },
+    {
+        dataField: 'source',
+        text: 'source',
+        sort: true,
+        formatter: sourceFormatter,
+    },
+    {
+        dataField: 'sourcelink',
+        text: 'source link',
+        sort: true,
+        formatter: externalLinkFormatter,
+    },
+    {
+        dataField: 'creator',
+        text: 'creator',
+        sort: true,
+    },
+    {
+        dataField: 'license',
+        text: 'license',
+        sort: true,
+    },
+    {
+        dataField: 'licenselink',
+        text: 'license link',
+        sort: true,
+        formatter: externalLinkFormatter,
+    },
+    {
+        dataField: 'attribution',
+        text: 'attribution',
+        sort: true,
+    },
+];
+
 const Images = ({ speciesid, species }: Props): JSX.Element => {
     const sp = species.find((s) => s.id === parseInt(speciesid));
-    const [selectedId, setSelectedId] = useState(speciesid ? parseInt(speciesid) : undefined);
+    const [selected, setSelected] = useState(species.find((s) => s.id === parseInt(speciesid)));
     const [selectedImages, setSelectedImages] = useState(new Set<number>());
     const [images, setImages] = useState<ImageApi[]>();
     const [edit, setEdit] = useState(false);
@@ -45,7 +116,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
     const [selectedForCopy, setSelectedForCopy] = useState(new Set<number>());
     const [copySource, setCopySource] = useState<ImageApi>();
 
-    const { handleSubmit, control, register, reset, setValue } = useForm<FormFields>({
+    const { handleSubmit, control, reset } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
         defaultValues: {
@@ -76,21 +147,21 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                 setError(e);
             }
         };
-        fetchNewSelection(selectedId);
-    }, [selectedId]);
+        fetchNewSelection(selected?.id);
+    }, [selected?.id]);
 
-    const selectAll = (e: React.MouseEvent<HTMLInputElement, MouseEvent>) => {
-        images?.forEach((i) => {
-            setValue(`delete-${i.id}`, e.currentTarget.checked);
-            if (e.currentTarget.checked) selectedImages.add(i.id);
-        });
-        setSelectedImages(selectedImages);
-    };
+    // const selectAll = (e: React.MouseEvent<HTMLInputElement, MouseEvent>) => {
+    //     images?.forEach((i) => {
+    //         setValue(`delete-${i.id}`, e.currentTarget.checked);
+    //         if (e.currentTarget.checked) selectedImages.add(i.id);
+    //     });
+    //     setSelectedImages(selectedImages);
+    // };
 
     const onSubmit = async () => {
         try {
-            if (selectedImages.size > 0) {
-                const res = await fetch(`../api/images?speciesid=${selectedId}&imageids=${[...selectedImages.values()]}`, {
+            if (selected && selectedImages.size > 0) {
+                const res = await fetch(`../api/images?speciesid=${selected.id}&imageids=${[...selectedImages.values()]}`, {
                     method: 'DELETE',
                 });
 
@@ -119,10 +190,12 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
 
     const handleClose = () => setEdit(false);
 
-    const editRow = (e: React.MouseEvent<HTMLTableRowElement, MouseEvent>): void => {
-        const image = images?.find((i) => i.id == parseInt(e.currentTarget.id));
-        setCurrentImage(image);
-        setEdit(true);
+    const rowEvents: RowEventHandlerProps<ImageApi> = {
+        onClick: (e, row) => {
+            const image = images?.find((i) => i.id === row.id);
+            setCurrentImage(image);
+            setEdit(true);
+        },
     };
 
     const startCopy = () => {
@@ -179,7 +252,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                 .filter((i) => selectedForCopy.has(i.id))
                 .map<ImageApi>((i) => ({
                     ...i,
-                    lastchangedby: sessionUserOrUnknown(session.user.name),
+                    lastchangedby: sessionUserOrUnknown(session?.user.name),
                     source: copySource.source,
                     sourcelink: copySource.sourcelink,
                     license: copySource.license,
@@ -190,6 +263,23 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
         ).catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
 
         setShowCopy(false);
+    };
+
+    const selectRow: SelectRowProps<ImageApi> = {
+        mode: 'checkbox',
+        clickToSelect: false,
+        onSelect: (row) => {
+            const selection = new Set(selectedImages);
+            selection.has(row.id) ? selection.delete(row.id) : selection.add(row.id);
+            setSelectedImages(selection);
+        },
+        onSelectAll: (isSelect) => {
+            if (isSelect) {
+                setSelectedImages(new Set(images?.map((a) => a.id)));
+            } else {
+                setSelectedImages(new Set());
+            }
+        },
     };
 
     return (
@@ -206,11 +296,10 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                     </Alert>
                 )}
 
-                {currentImage && selectedId && (
+                {currentImage && (
                     // eslint-disable-next-line prettier/prettier
                     <ImageEdit 
                         image={currentImage}
-                        speciesid={selectedId}
                         onSave={(i) => saveImages([i])}
                         show={edit}
                         onClose={handleClose}
@@ -247,22 +336,24 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                             Species:
                         </Col>
                         <Col>
-                            <ControlledTypeahead
-                                control={control}
+                            <Typeahead
                                 name="species"
+                                control={control}
                                 options={species}
                                 labelKey="name"
                                 clearButton
+                                selected={selected ? [selected] : []}
                                 onChange={(s: species[]) => {
-                                    const id = s[0]?.id;
-                                    setSelectedId(id);
-                                    router.push(`?speciesid=${id}`, undefined, { shallow: true });
+                                    if (selected) {
+                                        setSelected(s[0]);
+                                        router.push(`?speciesid=${selected?.id}`, undefined, { shallow: true });
+                                    }
                                 }}
                             />
                         </Col>
-                        <Col>{selectedId && <AddImage id={selectedId} onChange={addImages} />}</Col>
+                        <Col>{selected?.id && <AddImage id={selected.id} onChange={addImages} />}</Col>
                     </Row>
-                    <Row className="">
+                    <Row className="form-group">
                         <Col xs={2}>
                             <input type="submit" className="btn btn-secondary" value="Delete Selected" />
                         </Col>
@@ -272,7 +363,28 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                             </Button>
                         </Col>
                     </Row>
-                    <div className="fixed-left mt-2 ml-2 mr-2">
+                    <Row className="form-group">
+                        <Col>
+                            <BootstrapTable
+                                keyField={'id'}
+                                data={images ? images : []}
+                                columns={columns}
+                                bootstrap4
+                                striped
+                                headerClasses="table-header"
+                                rowEvents={rowEvents}
+                                // cellEdit={cellEditFactory(cellEditProps)}
+                                selectRow={selectRow}
+                                defaultSorted={[
+                                    {
+                                        dataField: 'default',
+                                        order: 'desc',
+                                    },
+                                ]}
+                            />
+                        </Col>
+                    </Row>
+                    {/* <div className="fixed-left mt-2 ml-2 mr-2">
                         <Table striped>
                             <thead>
                                 <tr>
@@ -294,11 +406,10 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                                     <tr key={img.id} id={img.id.toString()} onClick={editRow}>
                                         <td>
                                             <input
+                                                {...register(`delete-${img.id}`)}
                                                 type="checkbox"
                                                 key={img.id}
                                                 id={img.id.toString()}
-                                                name={`delete-${img.id}`}
-                                                ref={register}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     e.currentTarget.checked
@@ -386,7 +497,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                                 background-color: #eee;
                             }
                         `}</style>
-                    </div>
+                    </div> */}
                 </form>
             </>
         </Auth>

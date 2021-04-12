@@ -25,7 +25,6 @@ import { adaptAbundance, connectOrCreateGenus, updateAbundance } from './species
 import { taxonomyForSpecies } from './taxonomy';
 import { connectIfNotNull } from './utils';
 
-//TODO switch over to model like is beign done in gall.ts with derived type rather than explicit
 type DBHost = species & {
     abundance: abundance | null;
     host_galls: (host & {
@@ -178,7 +177,6 @@ export const getHosts = (
         ),
         TE.map(TE.sequenceArray),
         TE.flatten,
-        TE.map((x) => x),
         TE.map(adaptor),
     );
 };

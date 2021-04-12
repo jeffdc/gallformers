@@ -9,7 +9,7 @@ import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { ALL_FAMILY_TYPES } from '../../libs/api/apitypes';
-import { TaxonomyEntry, TaxonomyUpsertFields } from '../../libs/api/taxonomy';
+import { FAMILY, TaxonomyEntry, TaxonomyUpsertFields } from '../../libs/api/taxonomy';
 import { allFamilies } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
 import { genOptions } from '../../libs/utils/forms';
@@ -62,6 +62,13 @@ const updatedFormFields = async (fam: TaxFamily | undefined): Promise<FormFields
     };
 };
 
+const createNewFamily = (name: string): TaxFamily => ({
+    name: name,
+    description: '',
+    id: -1,
+    type: FAMILY,
+});
+
 const Family = ({ id, fs }: Props): JSX.Element => {
     const {
         selected,
@@ -84,6 +91,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         { keyProp: 'name', delEndpoint: '../api/family/', upsertEndpoint: '../api/family/upsert' },
         schema,
         updatedFormFields,
+        createNewFamily,
     );
 
     return (

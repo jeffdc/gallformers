@@ -6,12 +6,11 @@ import { Button, Col, Modal, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import { ALLRIGHTS, CC0, CCBY, ImageApi, LicenseType, SourceWithSpeciesSourceApi } from '../libs/api/apitypes';
-import ControlledTypeahead from './controlledtypeahead';
 import InfoTip from './infotip';
+import Typeahead from './Typeahead';
 
 type Props = {
     image: ImageApi;
-    speciesid: number;
     show: boolean;
     onSave: (image: ImageApi) => Promise<void>;
     onClose: () => void;
@@ -26,7 +25,7 @@ const Schema = yup.object().shape({
             is: (s: []) => s.length === 0,
             then: yup.string().required('You must provide a link to the source.'),
         }),
-    license: yup.string().required('You must select one a license.'),
+    license: yup.string().required('You must select a license.'),
     creator: yup.string().required('You must provide a reference to the creator.'),
     licenselink: yup
         .string()
@@ -65,17 +64,16 @@ const formFromImage = (img: ImageApi): FormFields => ({
     source: sourceFromOption(img.source),
 });
 
-const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Element => {
+const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
     const [sources, setSources] = useState(new Array<SourceWithSpeciesSourceApi>());
+    const [selected, setSelected] = useState(image);
 
     const {
         handleSubmit,
         register,
-        formState: { isDirty },
-        errors,
-        control,
-        getValues,
         setValue,
+        formState: { isDirty, errors },
+        control,
     } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
@@ -85,7 +83,7 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const res = await fetch(`../api/source?speciesid=${speciesid}`, {
+                const res = await fetch(`../api/source?speciesid=${selected.speciesid}`, {
                     method: 'GET',
                 });
 
@@ -99,18 +97,18 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
         };
 
         fetchData();
-    }, [speciesid]);
+        setValue('default', selected.default);
+        setValue('creator', selected.creator);
+        setValue('attribution', selected.attribution);
+        setValue('sourcelink', selected.sourcelink);
+        setValue('license', selected.license as LicenseType);
+        setValue('licenselink', selected.licenselink);
+        setValue('source', sourceFromOption(selected.source));
+    }, [selected, setValue]);
 
-    // I am not clear if this is the React way to deal with this or not.
     useEffect(() => {
-        setValue('default', image.default);
-        setValue('creator', image.creator);
-        setValue('attribution', image.attribution);
-        setValue('sourcelink', image.sourcelink);
-        setValue('license', image.license as LicenseType);
-        setValue('licenselink', image.licenselink);
-        setValue('source', sourceFromOption(image.source));
-    }, [image, setValue]);
+        setSelected(image);
+    }, [image]);
 
     const onSubmit = async (fields: FormFields) => {
         const newImg: ImageApi = {
@@ -135,12 +133,10 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                 <Modal.Body>
                     <Row>
                         <Col xs={3} className="">
-                            <img src={image.small} width="150" />
+                            <img src={selected.small} width="150" />
                         </Col>
                         <Col className="form-group">
-                            <Row className="form-group">
-                                <Col>Uploader:</Col>
-                                <Col>{image.uploader}</Col>
+                            <Row>
                                 <Col xs={3}>
                                     Default:
                                     <InfoTip
@@ -149,18 +145,8 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                                     />
                                 </Col>
                                 <Col>
-                                    <input
-                                        type="checkbox"
-                                        key={image.id}
-                                        name="default"
-                                        className="form-control"
-                                        ref={register}
-                                    />
+                                    <input {...register('default')} type="checkbox" key={selected.id} className="form-checkbox" />
                                 </Col>
-                            </Row>
-                            <Row>
-                                <Col xs={3}>Last Changed:</Col>
-                                <Col>{image.lastchangedby}</Col>
                             </Row>
                             <hr />
                             <Row className="form-group">
@@ -175,39 +161,43 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                                     />
                                 </Col>
                                 <Col>
-                                    <ControlledTypeahead
-                                        control={control}
+                                    <Typeahead
                                         name="source"
+                                        control={control}
                                         options={sources}
                                         labelKey={(s: SourceWithSpeciesSourceApi) => s.title}
                                         clearButton
+                                        selected={sourceFromOption(selected.source)}
+                                        onChange={(s) => {
+                                            setSelected({ ...selected, source: O.fromNullable(s[0]) });
+                                        }}
                                     />
                                 </Col>
                             </Row>
                             <Row className="form-group">
                                 <Col>
                                     <hr />
-                                    {getValues(['source']).source?.length > 0
+                                    {O.some(selected.source)
                                         ? ''
                                         : `If the image is from an observation on a site like iNat/Bugguide/etc. then start here:`}
                                 </Col>
                             </Row>
                             <Row className="form-group">
                                 <Col xs={3}>
-                                    {getValues(['source']).source?.length > 0
-                                        ? `Direct Link to Image in Publication:`
+                                    {O.some(selected.source)
+                                        ? `Direct Link to Image in Publication or Website:`
                                         : 'Observation Link:'}
                                     <InfoTip id="link" text="A URL that points to the image in the original publication." />
                                 </Col>
                                 <Col>
-                                    <input type="text" name="sourcelink" className="form-control" ref={register} />
+                                    <input {...register('sourcelink')} type="text" className="form-control" />
                                     {errors.sourcelink && <span className="text-danger">{errors.sourcelink.message}</span>}
                                 </Col>
                             </Row>
                             <Row className="form-group">
                                 <Col>
                                     <hr />
-                                    These fields should be filled out for both cases of source.
+                                    These fields should be filled out regardless of the source type.
                                 </Col>
                             </Row>
                             <Row className="form-group">
@@ -215,11 +205,11 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                                     License:
                                     <InfoTip
                                         id="license"
-                                        text="The license for the image. Currently we can only accept images with one of the 2 licenses that are listed as options. You must verify that this license is in place."
+                                        text="The license for the image. Currently we can only accept images with one of the 3 licenses that are listed as options. You must verify that this license is in place."
                                     />
                                 </Col>
                                 <Col>
-                                    <select name="license" className="form-control" ref={register}>
+                                    <select {...register('license')} className="form-control">
                                         <option>{CC0}</option>
                                         <option>{CCBY}</option>
                                         <option>{ALLRIGHTS}</option>
@@ -233,7 +223,7 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                                     <InfoTip id="licenselink" text="The link to the license. Mandatory if CC-BY is chosen." />
                                 </Col>
                                 <Col>
-                                    <input type="text" name="licenselink" className="form-control" ref={register} />
+                                    <input {...register('licenselink')} type="text" className="form-control" />
                                     {errors.licenselink && <span className="text-danger">{errors.licenselink.message}</span>}
                                 </Col>
                             </Row>
@@ -243,11 +233,11 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                                     Creator:
                                     <InfoTip
                                         id="creator"
-                                        text="Who created the image. Usually a link to the individual. Please no emails!"
+                                        text="Who created the image. Usually a link to the individual or their name. Please no emails!"
                                     />
                                 </Col>
                                 <Col>
-                                    <input type="text" name="creator" className="form-control" ref={register} />
+                                    <input {...register('creator')} type="text" className="form-control" />
                                     {errors.creator && <span className="text-danger">{errors.creator.message}</span>}
                                 </Col>
                             </Row>
@@ -257,9 +247,13 @@ const ImageEdit = ({ image, speciesid, show, onSave, onClose }: Props): JSX.Elem
                                     <InfoTip id="attrib" text="Any additional attribution information." />
                                 </Col>
                                 <Col>
-                                    <textarea name="attribution" className="form-control" ref={register} />
+                                    <textarea {...register('attribution')} className="form-control" />
                                     {errors.attribution && <span className="text-danger">{errors.attribution.message}</span>}
                                 </Col>
+                            </Row>
+                            <Row className="form-group">
+                                <Col>Uploader: {selected.uploader}</Col>
+                                <Col>Last Changed: {selected.lastchangedby}</Col>
                             </Row>
                         </Col>
                     </Row>
