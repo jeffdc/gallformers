@@ -34,7 +34,7 @@ export default function Home(): JSX.Element {
                                 <Link href="/explore">
                                     <a>
                                         <h3>Explore &rarr;</h3>
-                                        <p>Explore and investigate Galls, including locating primary sources.</p>
+                                        <p>Explore Galls (including Undescribed species) and Hosts.</p>
                                     </a>
                                 </Link>
                             </Card.Body>

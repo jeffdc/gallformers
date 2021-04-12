@@ -83,7 +83,6 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                     newSelectionPrefix={`Add a new ${placeholder}: `}
                     allowNew={!!createNew}
                     onChange={(s) => {
-                        console.log(`JDC: mainField.onChange: ${JSON.stringify(s, null, '  ')}`);
                         if (s.length <= 0) {
                             setSelected(undefined);
                             router.replace(``, undefined, { shallow: true });
@@ -99,7 +98,6 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                                 router.replace(`?id=${s[0].id}`, undefined, { shallow: true });
                             }
                         }
-                        // console.log(`JDC:SELECTED WAS: ${JSON.stringify(selected, null, '  ')}`);
                     }}
                 />
                 {form.formState.errors.mainField && <span className="text-danger">{`The ${placeholder} is required.`}</span>}
@@ -135,7 +133,6 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     };
 
     const formSubmit = async (fields: FormFields) => {
-        console.log(`JDC: submit with: ${JSON.stringify(fields, null, '  ')}`);
         await doDeleteOrUpsert(fields, postDelete, postUpdate, toUpsertFields)
             .then(() => {
                 form.reset();
@@ -155,7 +152,6 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     };
 
     const onDataChange = useCallback(async (t: T | undefined) => {
-        // console.log(`JDC: onDataChange T: ${JSON.stringify(t, null, '  ')}`);
         const ff = await updatedFormFields(t);
         form.reset(ff as UnpackNestedValue<DeepPartial<FormFields>>);
         // eslint-disable-next-line react-hooks/exhaustive-deps

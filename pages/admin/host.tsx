@@ -101,7 +101,6 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
     const updatedFormFields = async (s: HostApi | undefined): Promise<FormFields> => {
         if (s != undefined) {
             setAliasData(s?.aliases);
-            // const newFGS = await fetchFGS(s);
             return {
                 mainField: [s],
                 genus: [s.fgs?.genus],
@@ -110,12 +109,6 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                     s.fgs?.section,
                     O.fold(constant([]), (sec) => [sec]),
                 ),
-                // genus: [newFGS.genus],
-                // family: [newFGS.family],
-                // section: pipe(
-                //     newFGS.section,
-                //     O.fold(constant([]), (s) => [s]),
-                // ),
                 datacomplete: s.datacomplete,
                 abundance: [pipe(s.abundance, O.getOrElse(constant(EmptyAbundance)))],
                 del: false,

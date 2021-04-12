@@ -40,15 +40,6 @@ const update = (s: GallApi, newValue: string) => ({
     name: newValue,
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const toUpsertFields = (fields: FormFields, name: string, id: number): GallHostUpdateFields => {
-    return {
-        gall: id,
-        hosts: fields.hosts.map((h) => h.id),
-        genus: fields.genus[0],
-    };
-};
-
 const fetchGallHosts = async (id: number | undefined): Promise<GallHost[]> => {
     if (id == undefined) return [];
 
@@ -63,10 +54,22 @@ const fetchGallHosts = async (id: number | undefined): Promise<GallHost[]> => {
 
 const GallHostMapper = ({ id, galls, genera, hosts }: Props): JSX.Element => {
     const [genus, setGenus] = useState<string>();
+    const [gallHosts, setGallHosts] = useState<Array<GallHost>>([]);
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const toUpsertFields = (fields: FormFields, name: string, id: number): GallHostUpdateFields => {
+        return {
+            gall: id,
+            hosts: gallHosts.map((h) => h.id),
+            genus: genus ? genus : '',
+        };
+    };
 
     const updatedFormFields = async (gall: GallApi | undefined): Promise<FormFields> => {
         if (gall != undefined) {
-            const hosts = await fetchGallHosts(gall.id);
+            const hosts = gallHosts.length <= 0 ? await fetchGallHosts(gall.id) : gallHosts;
+            setGallHosts(hosts);
+
             return {
                 mainField: [gall],
                 hosts: hosts,
@@ -109,6 +112,7 @@ const GallHostMapper = ({ id, galls, genera, hosts }: Props): JSX.Element => {
 
     useEffect(() => {
         setGenus(undefined);
+        setGallHosts([]);
     }, [selected]);
 
     return (
@@ -158,12 +162,9 @@ const GallHostMapper = ({ id, galls, genera, hosts }: Props): JSX.Element => {
                                 multiple
                                 clearButton
                                 disabled={!selected}
-                                selected={selected?.hosts ? selected.hosts : []}
+                                selected={gallHosts ? gallHosts : []}
                                 onChange={(s) => {
-                                    if (selected) {
-                                        selected.hosts = s;
-                                        setSelected({ ...selected });
-                                    }
+                                    setGallHosts(s);
                                 }}
                             />
                         </Col>
