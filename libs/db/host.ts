@@ -1,18 +1,30 @@
-import { abundance, alias, aliasspecies, host, image, Prisma, source, species, speciessource } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function';
+import {
+    abundance,
+    alias,
+    aliasspecies,
+    host,
+    image,
+    Prisma,
+    PrismaPromise,
+    source,
+    species,
+    speciessource,
+} from '@prisma/client';
+import { flow, pipe } from 'fp-ts/lib/function';
+import * as A from 'fp-ts/lib/Array';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { DeleteResult, HostApi, HostSimple, HostTaxon, SpeciesApi, SpeciesUpsertFields } from '../api/apitypes';
-import { GENUS } from '../api/taxonomy';
+import { FGS, GENUS } from '../api/taxonomy';
 import { deleteImagesBySpeciesId } from '../images/images';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
 import { adaptImage } from './images';
 import { adaptAbundance, connectOrCreateGenus, updateAbundance } from './species';
+import { taxonomyForSpecies } from './taxonomy';
 import { connectIfNotNull } from './utils';
 
-//TODO switch over to model like is beign done in gall.ts with derived type rather than explicit
 type DBHost = species & {
     abundance: abundance | null;
     host_galls: (host & {
@@ -34,10 +46,11 @@ type DBHost = species & {
               })
             | null;
     })[];
+    fgs: FGS;
 };
 
 // we want a stronger non-null contract on what we return then is modelable in the DB
-const adaptor = (hosts: DBHost[]): HostApi[] =>
+const adaptor = (hosts: readonly DBHost[]): HostApi[] =>
     hosts.flatMap((h) => {
         // set the default description to make the caller's life easier
         const d = h.speciessource.find((s) => s.useasdefault === 1)?.description;
@@ -63,6 +76,7 @@ const adaptor = (hosts: DBHost[]): HostApi[] =>
             aliases: h.aliasspecies.map((a) => ({
                 ...a.alias,
             })),
+            fgs: h.fgs,
         };
         return newh;
     });
@@ -149,7 +163,22 @@ export const getHosts = (
             orderBy: { name: 'asc' },
         });
 
-    return pipe(TE.tryCatch(hosts, handleError), TE.map(adaptor));
+    return pipe(
+        TE.tryCatch(hosts, handleError),
+        TE.map(
+            flow(
+                A.map((h) =>
+                    pipe(
+                        taxonomyForSpecies(h.id),
+                        TE.map((fgs) => ({ ...h, fgs: fgs } as DBHost)),
+                    ),
+                ),
+            ),
+        ),
+        TE.map(TE.sequenceArray),
+        TE.flatten,
+        TE.map(adaptor),
+    );
 };
 
 /**
@@ -174,7 +203,7 @@ export const hostsByGenus = (genus: string): TaskEither<Error, HostApi[]> => {
 
     return getHosts([
         {
-            taxonomy: {
+            speciestaxonomy: {
                 some: {
                     taxonomy: { AND: [{ name: { equals: genus } }, { type: { equals: GENUS } }] },
                 },
@@ -184,8 +213,7 @@ export const hostsByGenus = (genus: string): TaskEither<Error, HostApi[]> => {
 };
 
 /////////////////////////////////////////
-const hostUpdateSteps = (host: SpeciesUpsertFields): Promise<unknown>[] => {
-    console.log(`${JSON.stringify(host, null, '  ')}`);
+const hostUpdateSteps = (host: SpeciesUpsertFields): PrismaPromise<unknown>[] => {
     return [
         db.species.update({
             where: { id: host.id },
@@ -226,31 +254,29 @@ const hostUpdateSteps = (host: SpeciesUpsertFields): Promise<unknown>[] => {
     ];
 };
 
-const hostCreateSteps = (host: SpeciesUpsertFields) => {
-    return [
-        db.species.create({
-            data: {
-                name: host.name,
-                taxontype: { connect: { taxoncode: HostTaxon } },
-                abundance: connectIfNotNull<Prisma.abundanceCreateOneWithoutSpeciesInput, string>('abundance', host.abundance),
-                taxonomy: {
-                    create: [
-                        // family must already exist
-                        { taxonomy: { connect: { id: host.fgs.family.id } } },
-                        // genus could be new
-                        {
-                            taxonomy: connectOrCreateGenus(host),
-                        },
-                    ],
-                },
-                aliasspecies: {
-                    create: host.aliases.map((a) => ({
-                        alias: { create: { description: a.description, name: a.name, type: a.type } },
-                    })),
-                },
+const hostCreate = (host: SpeciesUpsertFields) => {
+    return db.species.create({
+        data: {
+            name: host.name,
+            taxontype: { connect: { taxoncode: HostTaxon } },
+            abundance: connectIfNotNull<Prisma.abundanceCreateNestedOneWithoutSpeciesInput, string>('abundance', host.abundance),
+            speciestaxonomy: {
+                create: [
+                    // family must already exist
+                    { taxonomy: { connect: { id: host.fgs.family.id } } },
+                    // genus could be new
+                    {
+                        taxonomy: connectOrCreateGenus(host),
+                    },
+                ],
             },
-        }),
-    ];
+            aliasspecies: {
+                create: host.aliases.map((a) => ({
+                    alias: { create: { description: a.description, name: a.name, type: a.type } },
+                })),
+            },
+        },
+    });
 };
 
 /**
@@ -260,7 +286,10 @@ const hostCreateSteps = (host: SpeciesUpsertFields) => {
  */
 export const upsertHost = (h: SpeciesUpsertFields): TaskEither<Error, SpeciesApi> => {
     const updateHostTx = TE.tryCatch(() => db.$transaction(hostUpdateSteps(h)), handleError);
-    const createHostTx = TE.tryCatch(() => db.$transaction(hostCreateSteps(h)), handleError);
+    const createHostTx = pipe(
+        TE.tryCatch(() => hostCreate(h), handleError),
+        TE.map((s) => [s] as unknown[]),
+    );
 
     const getHost = () => {
         return hostByName(h.name);
@@ -282,7 +311,7 @@ export const upsertHost = (h: SpeciesUpsertFields): TaskEither<Error, SpeciesApi
  * See: https://github.com/prisma/prisma/issues/2057
  * @param speciesids an array of ids of the species (host) to delete
  */
-const hostDeleteSteps = (speciesids: number[]): Promise<Prisma.BatchPayload>[] => {
+const hostDeleteSteps = (speciesids: number[]): PrismaPromise<Prisma.BatchPayload>[] => {
     return [
         db.host.deleteMany({
             where: { host_species_id: { in: speciesids } },

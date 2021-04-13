@@ -32,9 +32,14 @@ const cellEditProps: CellEditFactoryProps<AliasApi> = {
 
 const AliasTable = ({ data, setData }: AliasTableProps): JSX.Element => {
     const [selected, setSelected] = useState(new Set<number>());
+    const [newId, setNewId] = useState(-1);
 
     const addAlias = () => {
-        data.push(EmptyAlias);
+        data.push({
+            ...EmptyAlias,
+            id: newId,
+        });
+        setNewId(newId - 1);
         setData([...data]);
     };
 

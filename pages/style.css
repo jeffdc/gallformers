@@ -1,16 +1,11 @@
 
-/* Hacks to deal with terrible bootstrap carousel controls and indicators. */
+.description-text {
+    font-size: 15px;
+    line-height: 180%;
+}
+
 .carousel-indicators li {
     filter: invert(100%);
-    /* width: 10px;
-    height: 10px;
-    margin-right: 5px;
-    margin-left: 5px;
-    margin-bottom: 5px;
-    border-radius: 50%;
-    border: 0;
-    background-color: transparent;
-    box-shadow: 0 0 0 0.1rem rgba(50, 50, 50, 1); */
 }
 
 .carousel-caption {
@@ -25,7 +20,7 @@
 }
 
 .table-header {
-    background-color:palegoldenrod;
+    background-color:rgba(0, 128, 0, 0.205);
 }
 
 .white-space-pre-wrap {

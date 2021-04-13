@@ -34,7 +34,7 @@ export default function Home(): JSX.Element {
                                 <Link href="/explore">
                                     <a>
                                         <h3>Explore &rarr;</h3>
-                                        <p>Explore and investigate Galls, including locating primary sources.</p>
+                                        <p>Explore Galls (including Undescribed species) and Hosts.</p>
                                     </a>
                                 </Link>
                             </Card.Body>
@@ -49,7 +49,7 @@ export default function Home(): JSX.Element {
                                 <ul>
                                     <li>
                                         If you are new to galls <a href="http://charleyeiseman.com/">Charley Eiseman</a> and Noah
-                                        Charney's{' '}
+                                        Charney&apos;s{' '}
                                         <a href="https://bookshop.org/books/tracks-sign-of-insects-other-invertebrates-a-guide-to-north-american-species/9780811736244">
                                             Tracks & Signs of Insects & Other Invertebrates: A Guide to North American Species
                                         </a>{' '}
@@ -59,7 +59,7 @@ export default function Home(): JSX.Element {
                                     <li>
                                         A long-anticipated update to{' '}
                                         <a href="https://press.princeton.edu/books/paperback/9780691205762/plant-galls-of-the-western-united-states">
-                                            Russo's guide to galls of the Western US
+                                            Russo&apos;s guide to galls of the Western US
                                         </a>{' '}
                                         is due from Princeton University Press in <del>March</del> April of 2021
                                     </li>

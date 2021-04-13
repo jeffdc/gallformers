@@ -3,6 +3,7 @@ import * as E from 'fp-ts/lib/Either';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as t from 'io-ts';
+import { AliasApi, SimpleSpecies } from './apitypes';
 
 export const TaxonomyTypeT = t.keyof({
     family: null,
@@ -25,6 +26,8 @@ export type TaxonomyEntry = {
     parent: O.Option<TaxonomyEntry>;
 };
 
+export type TaxonomyEntryNoParent = Omit<TaxonomyEntry, 'parent'>;
+
 export const EMPTY_TAXONOMYENTRY: TaxonomyEntry = {
     description: '',
     id: -1,
@@ -43,16 +46,18 @@ export const toTaxonomyEntry = (t: DBTaxonomyWithParent): TaxonomyEntry => {
     if (t == undefined) return EMPTY_TAXONOMYENTRY;
 
     return {
-        ...t,
+        id: t.id,
+        description: t.description == null ? '' : t.description,
+        name: t.name,
         type: pipe(TaxonomyTypeT.decode(t.type), E.getOrElse(invalidTaxonomyType)),
         parent: pipe(t.parent, O.fromNullable, O.map(toTaxonomyEntry)),
     };
 };
 
 export type FGS = {
-    family: TaxonomyEntry;
-    genus: TaxonomyEntry;
-    section: O.Option<TaxonomyEntry>;
+    family: TaxonomyEntryNoParent;
+    genus: TaxonomyEntryNoParent;
+    section: O.Option<TaxonomyEntryNoParent>;
 };
 export const EMPTY_FGS: FGS = {
     family: EMPTY_TAXONOMYENTRY,
@@ -102,4 +107,12 @@ export type TaxonomyUpsertFields = {
     type: TaxonomyType;
     species: number[];
     parent: O.Option<TaxonomyEntry>;
+};
+
+export type SectionApi = {
+    id: number;
+    name: string;
+    description: string;
+    species: SimpleSpecies[];
+    aliases: AliasApi[];
 };

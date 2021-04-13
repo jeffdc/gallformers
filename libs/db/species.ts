@@ -1,15 +1,13 @@
-import { abundance, Prisma, species } from '@prisma/client';
+import { abundance, Prisma, PrismaPromise, species } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
-import { AbundanceApi, SimpleSpecies, SpeciesApi, SpeciesUpsertFields } from '../api/apitypes';
+import { AbundanceApi, SimpleSpecies, SpeciesUpsertFields } from '../api/apitypes';
 import { GENUS } from '../api/taxonomy';
-import { ExtractTFromPromise } from '../utils/types';
-import { handleError, optionalWith } from '../utils/util';
+import { handleError } from '../utils/util';
 import db from './db';
-import { adaptImage } from './images';
 
-export const updateAbundance = (id: number, abundance: string | undefined | null): Promise<number> =>
+export const updateAbundance = (id: number, abundance: string | undefined | null): PrismaPromise<number> =>
     db.$executeRaw(
         abundance == undefined || abundance == null
             ? `
@@ -25,7 +23,9 @@ export const updateAbundance = (id: number, abundance: string | undefined | null
     );
 
 export const adaptAbundance = (a: abundance): AbundanceApi => ({
-    ...a,
+    id: a.id,
+    abundance: a.abundance,
+    description: a.description == null ? '' : a.description,
     reference: O.of(a.abundance),
 });
 
@@ -69,56 +69,56 @@ export const speciesByName = (name: string): TE.TaskEither<Error, O.Option<speci
     return pipe(TE.tryCatch(species, handleError), TE.map(O.fromNullable));
 };
 
-export const getSpecies = (
-    whereClause: Prisma.speciesWhereInput[],
-    operatorAnd = true,
-    distinct: Prisma.SpeciesScalarFieldEnum[] | undefined = undefined,
-): TE.TaskEither<Error, SpeciesApi[]> => {
-    const w: Prisma.speciesWhereInput = operatorAnd ? { AND: whereClause } : { OR: whereClause };
+// export const getSpecies = (
+//     whereClause: Prisma.speciesWhereInput[],
+//     operatorAnd = true,
+//     distinct: Prisma.SpeciesScalarFieldEnum[] | undefined = undefined,
+// ): TE.TaskEither<Error, SpeciesApi[]> => {
+//     const w: Prisma.speciesWhereInput = operatorAnd ? { AND: whereClause } : { OR: whereClause };
 
-    const allSpecies = () =>
-        db.species.findMany({
-            include: {
-                abundance: true,
-                speciessource: { include: { source: true } },
-                image: { include: { source: { include: { speciessource: true } } } },
-                taxonomy: { include: { taxonomy: true } },
-                aliasspecies: { include: { alias: true } },
-            },
-            where: w,
-            distinct: distinct,
-            orderBy: { name: 'asc' },
-        });
+//     const allSpecies = () =>
+//         db.species.findMany({
+//             include: {
+//                 abundance: true,
+//                 speciessource: { include: { source: true } },
+//                 image: { include: { source: { include: { speciessource: true } } } },
+//                 speciestaxonomy: { include: { taxonomy: true } },
+//                 aliasspecies: { include: { alias: true } },
+//             },
+//             where: w,
+//             distinct: distinct,
+//             orderBy: { name: 'asc' },
+//         });
 
-    type DBSpecies = ExtractTFromPromise<ReturnType<typeof allSpecies>>;
+//     type DBSpecies = ExtractTFromPromise<ReturnType<typeof allSpecies>>;
 
-    // we want a stronger no-null contract on what we return then is modelable in the DB
-    const clean = (species: DBSpecies): SpeciesApi[] =>
-        species.flatMap((s) => {
-            // set the default description to make the caller's life easier
-            const d = s.speciessource.find((s) => s.useasdefault === 1)?.description;
-            const species: SpeciesApi = {
-                ...s,
-                description: O.fromNullable(d),
-                taxoncode: s.taxoncode ? s.taxoncode : '',
-                abundance: optionalWith(s.abundance, adaptAbundance),
-                images: s.image.map(adaptImage),
-                aliases: s.aliasspecies.map((a) => a.alias),
-                // taxonomy: s.taxonomy.map((t) => adaptTaxonomy(t.taxonomy)),
-            };
-            return species;
-        });
+//     // we want a stronger no-null contract on what we return then is modelable in the DB
+//     const clean = (species: DBSpecies): SpeciesApi[] =>
+//         species.flatMap((s) => {
+//             // set the default description to make the caller's life easier
+//             const d = s.speciessource.find((s) => s.useasdefault === 1)?.description;
+//             const sp: SpeciesApi = {
+//                 ...s,
+//                 description: O.fromNullable(d),
+//                 taxoncode: s.taxoncode ? s.taxoncode : '',
+//                 abundance: optionalWith(s.abundance, adaptAbundance),
+//                 images: s.image.map(adaptImage),
+//                 aliases: s.aliasspecies.map((a) => a.alias),
+//                 fgs: s.,
+//             };
+//             return sp;
+//         });
 
-    // eslint-disable-next-line prettier/prettier
-    const cleaned = pipe(
-        TE.tryCatch(allSpecies, handleError),
-        TE.map(clean),
-    );
+//     // eslint-disable-next-line prettier/prettier
+//     const cleaned = pipe(
+//         TE.tryCatch(allSpecies, handleError),
+//         TE.map(clean),
+//     );
 
-    return cleaned;
-};
+//     return cleaned;
+// };
 
-export const connectOrCreateGenus = (sp: SpeciesUpsertFields): Prisma.taxonomyCreateOneWithoutTaxonomyInput => ({
+export const connectOrCreateGenus = (sp: SpeciesUpsertFields): Prisma.taxonomyCreateNestedOneWithoutTaxonomyInput => ({
     connectOrCreate: {
         where: { id: sp.fgs.genus.id },
         create: {

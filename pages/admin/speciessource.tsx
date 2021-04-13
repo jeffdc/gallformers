@@ -8,8 +8,8 @@ import React, { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
-import ControlledTypeahead from '../../components/controlledtypeahead';
 import Picker from '../../components/picker';
+import Typeahead from '../../components/Typeahead';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
@@ -17,7 +17,7 @@ import { SpeciesSourceApi, SpeciesSourceInsertFields } from '../../libs/api/apit
 import { allSources } from '../../libs/db/source';
 import { allSpecies } from '../../libs/db/species';
 import Admin from '../../libs/pages/admin';
-import { sourceToDisplay } from '../../libs/pages/renderhelpers';
+import { defaultSource, sourceToDisplay } from '../../libs/pages/renderhelpers';
 import { mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
@@ -27,8 +27,8 @@ type Props = {
 };
 
 const schema = yup.object().shape({
-    value: yup.string().required(),
-    source: yup.string().required(),
+    mainField: yup.array().required(),
+    sources: yup.array().required(),
 });
 
 type FormFields = AdminFormFields<species> & {
@@ -58,29 +58,19 @@ const fetchSources = async (id: number): Promise<SpeciesSourceApi[]> => {
 const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Element => {
     const [sourcesForSpecies, setSourcesForSpecies] = useState(new Array<SpeciesSourceApi>());
     const [showNewMapping, setShowNewMapping] = useState(false);
-    const [selectedSource, setSelectedSource] = useState<SpeciesSourceApi>();
+    const [selectedSource, setSelectedSource] = useState<SpeciesSourceApi[]>([]);
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const toUpsertFields = (fields: FormFields, name: string, id: number): SpeciesSourceInsertFields => {
+        const selSo = selectedSource[0];
         return {
-            id: selectedSource?.id != undefined ? selectedSource.id : -1,
+            id: selSo?.id != undefined ? selSo.id : -1,
             species: id,
-            source: selectedSource?.source_id != undefined ? selectedSource.source_id : -1,
+            source: selSo?.source_id != undefined ? selSo.source_id : -1,
             description: fields.description,
             externallink: fields.externallink,
             useasdefault: fields.useasdefault,
             delete: fields.del,
-        };
-    };
-
-    const fieldsFor = (sp: species, so: SpeciesSourceApi | undefined): FormFields => {
-        return {
-            value: [sp],
-            description: so ? so.description : '',
-            externallink: so ? so.externallink : '',
-            sources: sourcesForSpecies,
-            useasdefault: so ? so.useasdefault != 0 : false,
-            del: false,
         };
     };
 
@@ -89,15 +79,23 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
             if (sp != undefined) {
                 const sources = await fetchSources(sp.id);
                 setSourcesForSpecies(sources);
-                // go ahead and select the 1st source
-                const firstSource = sources[0];
-                setSelectedSource(firstSource);
 
-                return fieldsFor(sp, firstSource);
+                const so = defaultSource(sources);
+                setSelectedSource(so ? [so] : []);
+
+                return {
+                    mainField: [sp],
+                    description: so ? so.description : '',
+                    externallink: so ? so.externallink : '',
+                    sources: [],
+                    useasdefault: so ? so.useasdefault != 0 : false,
+                    del: false,
+                };
             }
             setSourcesForSpecies([]);
+            setSelectedSource([]);
             return {
-                value: [],
+                mainField: [],
                 description: '',
                 externallink: '',
                 sources: [],
@@ -108,7 +106,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
             console.error(e);
             setError(e);
             return {
-                value: sp ? [sp] : [],
+                mainField: sp ? [sp] : [],
                 description: '',
                 externallink: '',
                 sources: [],
@@ -120,7 +118,6 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
 
     // eslint-disable-next-line prettier/prettier
     const {
-        data,
         selected,
         setSelected,
         error,
@@ -130,6 +127,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
         form,
         postUpdate,
         postDelete,
+        mainField,
     } = useAdmin<species, FormFields, SpeciesSourceInsertFields>(
         'Species-Source Mapping',
         speciesid,
@@ -143,21 +141,6 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
 
     const router = useRouter();
 
-    const onSourceChange = async (sp: species | undefined, soid: string | null) => {
-        if (sp != undefined && soid != null) {
-            const spso = sourcesForSpecies.find((s) => s.source_id == parseInt(soid));
-            if (spso == undefined) {
-                setSelectedSource(undefined);
-                throw new Error('Missing mapping for selected source.');
-            }
-
-            setSelectedSource(spso);
-            form.setValue('description', spso.description);
-            form.setValue('externallink', spso.externallink);
-            form.setValue('useasdefault', spso.useasdefault > 0);
-        }
-    };
-
     const addMappedSource = (so: DBSource | undefined) => {
         if (so != undefined && selected != undefined) {
             const newSpSo: SpeciesSourceApi = {
@@ -170,10 +153,11 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                 useasdefault: 0,
             };
 
-            setSourcesForSpecies([...sourcesForSpecies, newSpSo]);
-            setSelectedSource(newSpSo);
+            const newSourcesForSpecies = [...sourcesForSpecies, newSpSo];
+            setSourcesForSpecies(newSourcesForSpecies);
+            setSelectedSource([newSpSo]);
 
-            form.setValue('source', [so]);
+            form.setValue('sources', [newSpSo], { shouldDirty: true });
             form.setValue('description', '');
             form.setValue('externallink', '');
             form.setValue('useasdefault', false);
@@ -184,25 +168,26 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
     const onSubmit = async (fields: FormFields) => {
         // for now we will write a custom form submit since what admin provides is not sufficient
         // TODO - tweak the useAdmin hook to allow for more flexibility in how this works - really a useAPIs issue.
-        if (selected == undefined || selectedSource == undefined) {
+        if (selected == undefined || selectedSource.length < 1) {
             //nothing to do
+            console.debug(`Did nothing in onSubmit. selected: '${selected}' | selectedSource: '${selectedSource}'`);
             return;
         }
 
         try {
             // DELETE
             if (fields.del) {
-                const res = await fetch(`../api/speciessource?speciesid=${selected.id}&sourceid=${selectedSource.source_id}`, {
+                const res = await fetch(`../api/speciessource?speciesid=${selected.id}&sourceid=${selectedSource[0].source_id}`, {
                     method: 'DELETE',
                 });
 
                 if (res.status === 200) {
-                    setSelectedSource(undefined);
+                    setSelectedSource([]);
                     const dr = await res.json();
                     setDeleteResults(dr);
                     // kludge: postDelete makes assumptions that are not good for this screen...
                     const sp = selected;
-                    postDelete(fields.value[0].id, dr);
+                    postDelete(fields.mainField[0].id, dr);
                     //... so we save the old species and re-select it after the delete
                     setSelected(sp);
                     router.replace(`?id=${sp.id}`, undefined, { shallow: true });
@@ -213,10 +198,11 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
             }
 
             // UPSERT
+            const selSo = selectedSource[0];
             const insertData: SpeciesSourceInsertFields = {
-                id: selectedSource.id,
+                id: selSo.id,
                 species: selected.id,
-                source: selectedSource.source_id,
+                source: selSo.source_id,
                 description: fields.description ? fields.description : '',
                 useasdefault: fields.useasdefault,
                 externallink: fields.externallink,
@@ -232,6 +218,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
 
             if (res.status == 200) {
                 postUpdate(res);
+                setSelectedSource([selSo]);
             } else {
                 throw new Error(await res.text());
             }
@@ -250,6 +237,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                 error={error}
                 setDeleteResults={setDeleteResults}
                 deleteResults={deleteResults}
+                selected={selected}
             >
                 <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pr-4">
                     <h4>Map Species & Sources</h4>
@@ -272,27 +260,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                     <Row className="form-group">
                         <Col>
                             Species:
-                            <ControlledTypeahead
-                                control={form.control}
-                                name="value"
-                                placeholder="Species"
-                                options={data}
-                                labelKey="name"
-                                isInvalid={!!form.errors.value}
-                                onChange={(s) => {
-                                    if (s.length > 0) {
-                                        setSelected(s[0]);
-                                        router.replace(`?id=${s[0].id}`, undefined, { shallow: true });
-                                    } else {
-                                        setSelected(undefined);
-                                        router.replace(``, undefined, { shallow: true });
-                                    }
-                                }}
-                                clearButton
-                            />
-                            {form.errors.value && (
-                                <span className="text-danger">You must provide a species or genus to map.</span>
-                            )}
+                            {mainField('name', 'Species')}
                         </Col>
                     </Row>
                     <Row>
@@ -305,29 +273,22 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                             <Row className="form-group">
                                 <Col>
                                     Mapped Source:
-                                    <select
-                                        name="source"
+                                    <Typeahead
+                                        name="sources"
+                                        control={form.control}
+                                        clearButton
+                                        options={sourcesForSpecies}
+                                        labelKey={(s) => sourceToDisplay(s.source)}
                                         disabled={!selected}
-                                        onChange={(s) =>
-                                            onSourceChange(
-                                                selected,
-                                                s.currentTarget.options[s.currentTarget.options.selectedIndex].getAttribute(
-                                                    'data-key',
-                                                ),
-                                            )
-                                        }
-                                        className="form-control"
-                                        ref={form.register}
-                                    >
-                                        {sourcesForSpecies
-                                            .sort((a, b) => a.source.pubyear.localeCompare(b.source.pubyear))
-                                            .map((s) => (
-                                                <option key={s.source_id} data-key={s.source_id}>
-                                                    {sourceToDisplay(s.source)}
-                                                </option>
-                                            ))}
-                                    </select>
-                                    {form.errors.sources && (
+                                        selected={selectedSource}
+                                        onChange={(s) => {
+                                            setSelectedSource(s);
+                                            form.setValue('description', s[0] ? s[0].description : '');
+                                            form.setValue('externallink', s[0] ? s[0].externallink : '');
+                                            form.setValue('useasdefault', s[0] ? s[0].useasdefault > 0 : false);
+                                        }}
+                                    />
+                                    {form.formState.errors.sources && (
                                         <span className="text-danger">You must provide a source to map.</span>
                                     )}
                                 </Col>
@@ -344,36 +305,23 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                     <Row className="form-group">
                         <Col>
                             Description (this is the relevant info from the selected Source about the selected Species):
-                            <textarea
-                                name="description"
-                                disabled={!selected}
-                                className="form-control"
-                                ref={form.register}
-                                rows={8}
-                            />
+                            <textarea {...form.register('description')} disabled={!selected} className="form-control" rows={8} />
                         </Col>
                     </Row>
                     <Row className="form-group">
                         <Col>
                             Direct Link to Description Page (if available, eg at BHL or HathiTrust. Do not duplicate main
                             source-level link or link to a pdf):
-                            <input
-                                type="text"
-                                disabled={!selected}
-                                name="externallink"
-                                className="form-control"
-                                ref={form.register}
-                            />
+                            <input {...form.register('externallink')} type="text" disabled={!selected} className="form-control" />
                         </Col>
                     </Row>
                     <Row className="form-group">
                         <Col>
                             <input
+                                {...form.register('useasdefault')}
                                 type="checkbox"
-                                name="useasdefault"
                                 disabled={!selected}
                                 className="form-check-inline"
-                                ref={form.register}
                             />
                             <label className="form-check-label">Use as Default?</label>
                         </Col>
@@ -381,12 +329,17 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                     <Row className="fromGroup" hidden={!selected}>
                         <Col xs="1">Delete?:</Col>
                         <Col className="mr-auto">
-                            <input name="del" type="checkbox" className="form-check-input" ref={form.register} />
+                            <input {...form.register('del')} type="checkbox" className="form-check-input" />
                         </Col>
                     </Row>
                     <Row className="formGroup">
                         <Col>
-                            <input type="submit" className="button" value="Submit" disabled={!selected} />
+                            <input
+                                type="submit"
+                                className="button"
+                                value="Submit"
+                                disabled={!selected || selectedSource.length <= 0}
+                            />
                         </Col>
                     </Row>
                 </form>

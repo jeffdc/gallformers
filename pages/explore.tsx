@@ -13,14 +13,14 @@ import { hasProp } from '../libs/utils/util';
 
 type Props = {
     gallmakers: TreeNodeInArray[];
+    undescribed: TreeNodeInArray[];
     hosts: TreeNodeInArray[];
 };
 
-const Explore = ({ gallmakers, hosts }: Props): JSX.Element => {
+const Explore = ({ gallmakers, undescribed, hosts }: Props): JSX.Element => {
     const router = useRouter();
 
     const handleClick = (item: Item) => {
-        console.log(JSON.stringify(item, null, ' '));
         if (hasProp(item, 'url')) {
             router.push(item.url as string);
         }
@@ -41,6 +41,12 @@ const Explore = ({ gallmakers, hosts }: Props): JSX.Element => {
                                 <TreeMenu data={gallmakers} onClickItem={handleClick} />
                             </Card.Body>
                         </Tab>
+                        <Tab eventKey="undescribed" title="Undescribed Galls">
+                            <Card.Body>
+                                <Card.Title>Browse Undescibed Galls</Card.Title>
+                                <TreeMenu data={undescribed} onClickItem={handleClick} />
+                            </Card.Body>
+                        </Tab>
                         <Tab eventKey="hosts" title="Hosts">
                             <Card.Body>
                                 <Card.Title>Browse Hosts - By Family</Card.Title>
@@ -59,6 +65,7 @@ export const getStaticProps: GetStaticProps = async () => {
     return {
         props: {
             gallmakers: toTree(await getStaticPropsWith(getFamiliesWithSpecies(true), 'gall families')),
+            undescribed: toTree(await getStaticPropsWith(getFamiliesWithSpecies(true, true), 'undescribed galls')),
             hosts: toTree(await getStaticPropsWith(getFamiliesWithSpecies(false), 'host familes')),
         },
         revalidate: 1,

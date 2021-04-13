@@ -1,12 +1,11 @@
 import { pipe } from 'fp-ts/lib/function';
 import * as T from 'fp-ts/lib/Task';
 import * as TE from 'fp-ts/lib/TaskEither';
-import * as O from 'fp-ts/lib/Option';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { GetStaticPathsResult, GetStaticPropsContext } from 'next';
 import { ParsedUrlQuery } from 'querystring';
-import { errorThrow } from '../utils/util';
 import { logger } from '../utils/logger';
+import { errorThrow } from '../utils/util';
 
 /**
  * Helper to hadnle the boilerplate for fetching static props for a next.js page.

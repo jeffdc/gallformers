@@ -18,6 +18,7 @@ const adaptor = (e: glossary): Entry => e;
 export const allGlossaryEntries = (): TaskEither<Error, Entry[]> => {
     const glossary = () =>
         // prisma does not handle sort order by collate nocase
+        // https://github.com/prisma/prisma/issues/5068
         db.$queryRaw<glossary[]>(`
             SELECT * from glossary
             ORDER BY word COLLATE NOCASE ASC;

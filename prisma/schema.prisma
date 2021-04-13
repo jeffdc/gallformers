@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["orderByRelation"]
 }
 
 datasource db {
@@ -7,45 +8,31 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model migration {
-  id   Int    @id @default(autoincrement())
-  name String
-  up   String
-  down String
-}
-
-model location {
-  id           Int            @id @default(autoincrement())
-  location     String         @unique
-  description  String?
-  galllocation galllocation[]
-}
-
-model texture {
-  id          Int           @id @default(autoincrement())
-  texture     String        @unique
+model abundance {
+  id          Int       @id @default(autoincrement())
+  abundance   String    @unique
   description String?
-  galltexture galltexture[]
+  reference   String?
+  species     species[]
 }
 
-model color {
-  id        Int         @id @default(autoincrement())
-  color     String      @unique
-  gallcolor gallcolor[]
+model alias {
+  id            Int             @id @default(autoincrement())
+  name          String
+  type          String
+  description   String          @default("")
+  aliasspecies  aliasspecies[]
+  speciessource speciessource[]
+  taxonomyalias taxonomyalias[]
 }
 
-model walls {
-  id          Int         @id @default(autoincrement())
-  walls       String      @unique
-  description String?
-  gallwalls   gallwalls[]
-}
+model aliasspecies {
+  species_id Int
+  alias_id   Int
+  alias      alias   @relation(fields: [alias_id], references: [id])
+  species    species @relation(fields: [species_id], references: [id])
 
-model cells {
-  id          Int         @id @default(autoincrement())
-  cells       String      @unique
-  description String?
-  gallcells   gallcells[]
+  @@id([species_id, alias_id])
 }
 
 model alignment {
@@ -55,103 +42,17 @@ model alignment {
   gallalignment gallalignment[]
 }
 
-model shape {
+model cells {
   id          Int         @id @default(autoincrement())
-  shape       String      @unique
+  cells       String      @unique
   description String?
-  gallshape   gallshape[]
+  gallcells   gallcells[]
 }
 
-model abundance {
-  id          Int       @id @default(autoincrement())
-  abundance   String    @unique
-  description String
-  reference   String?
-  species     species[]
-}
-
-model taxontype {
-  taxoncode   String    @id
-  description String    @unique
-  species     species[]
-  gall        gall[]
-}
-
-model species {
-  id            Int               @id @default(autoincrement())
-  taxoncode     String?
-  name          String            @unique
-  datacomplete  Boolean           @default(false)
-  abundance_id  Int?
-  abundance     abundance?        @relation(fields: [abundance_id], references: [id])
-  taxontype     taxontype?        @relation(fields: [taxoncode], references: [taxoncode])
-  gallspecies   gallspecies[]
-  hosts         host[]            @relation("host_gall_species_idTospecies")
-  host_galls    host[]            @relation("host_host_species_idTospecies")
-  speciessource speciessource[]
-  taxonomy      speciestaxonomy[]
-  aliasspecies  aliasspecies[]
-  image         image[]
-}
-
-model alias {
-  id            Int             @id @default(autoincrement())
-  name          String
-  type          String
-  description   String
-  aliasspecies  aliasspecies[]
-  taxonomyalias taxonomyalias[]
-  speciessource speciessource[]
-}
-
-model aliasspecies {
-  species_id Int
-  alias_id   Int
-  species    species @relation(fields: [species_id], references: [id])
-  alias      alias   @relation(fields: [alias_id], references: [id])
-
-  @@id([species_id, alias_id])
-}
-
-model taxonomy {
-  id               Int                @id @default(autoincrement())
-  name             String
-  description      String
-  type             String
-  parent_id        Int?
-  parent           taxonomy?          @relation("parent", fields: [parent_id], references: [id])
-  children         taxonomytaxonomy[] @relation("children")
-  taxonomy         taxonomy[]         @relation("parent")
-  taxonomytaxonomy taxonomytaxonomy[]
-  taxonomyalias    taxonomyalias[]
-  speciestaxonomy  speciestaxonomy[]
-}
-
-model taxonomytaxonomy {
-  taxonomy_id Int
-  taxonomy    taxonomy @relation(fields: [taxonomy_id], references: [id])
-  child_id    Int
-  child       taxonomy @relation(name: "children", fields: [child_id], references: [id])
-
-  @@id([taxonomy_id, child_id])
-}
-
-model taxonomyalias {
-  taxonomy_id Int
-  taxonomy    taxonomy @relation(fields: [taxonomy_id], references: [id])
-  alias_id    Int
-  alias       alias    @relation(fields: [alias_id], references: [id])
-
-  @@id([taxonomy_id, alias_id])
-}
-
-model speciestaxonomy {
-  taxonomy_id Int
-  taxonomy    taxonomy @relation(fields: [taxonomy_id], references: [id])
-  species_id  Int
-  species     species  @relation(fields: [species_id], references: [id])
-
-  @@id([taxonomy_id, species_id])
+model color {
+  id        Int         @id @default(autoincrement())
+  color     String      @unique
+  gallcolor gallcolor[]
 }
 
 model gall {
@@ -160,93 +61,139 @@ model gall {
   detachable    Int?
   undescribed   Boolean         @default(false)
   taxontype     taxontype       @relation(fields: [taxoncode], references: [taxoncode])
-  gallspecies   gallspecies[]
-  // added in 009 migration
-  galllocation  galllocation[]
-  galltexture   galltexture[]
-  gallcolor     gallcolor[]
-  gallcells     gallcells[]
-  gallwalls     gallwalls[]
   gallalignment gallalignment[]
+  gallcells     gallcells[]
+  gallcolor     gallcolor[]
+  galllocation  galllocation[]
   gallshape     gallshape[]
+  gallspecies   gallspecies[]
+  galltexture   galltexture[]
+  gallwalls     gallwalls[]
 }
 
-model gallspecies {
-  gall_id    Int
-  species_id Int
-  gall       gall    @relation(fields: [gall_id], references: [id])
-  species    species @relation(fields: [species_id], references: [id])
-  @@id([gall_id, species_id])
+model gallalignment {
+  gall_id      Int
+  alignment_id Int
+  alignment    alignment @relation(fields: [alignment_id], references: [id])
+  gall         gall      @relation(fields: [gall_id], references: [id])
+
+  @@id([gall_id, alignment_id])
+}
+
+model gallcells {
+  gall_id  Int
+  cells_id Int
+  cells    cells @relation(fields: [cells_id], references: [id])
+  gall     gall  @relation(fields: [gall_id], references: [id])
+
+  @@id([gall_id, cells_id])
+}
+
+model gallcolor {
+  gall_id  Int
+  color_id Int
+  color    color @relation(fields: [color_id], references: [id])
+  gall     gall  @relation(fields: [gall_id], references: [id])
+
+  @@id([gall_id, color_id])
 }
 
 model galllocation {
-  id          Int      @id @default(autoincrement())
   gall_id     Int
   location_id Int
   gall        gall     @relation(fields: [gall_id], references: [id])
   location    location @relation(fields: [location_id], references: [id])
+
+  @@id([gall_id, location_id])
 }
 
-model galltexture {
-  id         Int     @id @default(autoincrement())
-  gall_id    Int
-  texture_id Int
-  gall       gall    @relation(fields: [gall_id], references: [id])
-  texture    texture @relation(fields: [texture_id], references: [id])
-}
-
-// added in 009 migration
-model gallcolor {
-  id       Int   @id @default(autoincrement())
-  gall_id  Int
-  color_id Int
-  gall     gall  @relation(fields: [gall_id], references: [id])
-  color    color @relation(fields: [color_id], references: [id])
-}
-
-// added in 009 migration
 model gallshape {
-  id       Int   @id @default(autoincrement())
   gall_id  Int
   shape_id Int
   gall     gall  @relation(fields: [gall_id], references: [id])
   shape    shape @relation(fields: [shape_id], references: [id])
+
+  @@id([gall_id, shape_id])
 }
 
-// added in 009 migration
-model gallcells {
-  id       Int   @id @default(autoincrement())
-  gall_id  Int
-  cells_id Int
-  gall     gall  @relation(fields: [gall_id], references: [id])
-  cells    cells @relation(fields: [cells_id], references: [id])
+model gallspecies {
+  species_id Int
+  gall_id    Int
+  gall       gall    @relation(fields: [gall_id], references: [id])
+  species    species @relation(fields: [species_id], references: [id])
+
+  @@id([species_id, gall_id])
 }
 
-// added in 009 migration
+model galltexture {
+  gall_id    Int
+  texture_id Int
+  gall       gall    @relation(fields: [gall_id], references: [id])
+  texture    texture @relation(fields: [texture_id], references: [id])
+
+  @@id([gall_id, texture_id])
+}
+
 model gallwalls {
-  id       Int   @id @default(autoincrement())
   gall_id  Int
   walls_id Int
   gall     gall  @relation(fields: [gall_id], references: [id])
   walls    walls @relation(fields: [walls_id], references: [id])
+
+  @@id([gall_id, walls_id])
 }
 
-// added in 009 migration
-model gallalignment {
-  id           Int       @id @default(autoincrement())
-  gall_id      Int
-  alignment_id Int
-  gall         gall      @relation(fields: [gall_id], references: [id])
-  alignment    alignment @relation(fields: [alignment_id], references: [id])
+model glossary {
+  id         Int    @id @default(autoincrement())
+  word       String @unique
+  definition String
+  urls       String
 }
 
 model host {
   id              Int      @id @default(autoincrement())
-  // these need to be optional, otherwise they can not be deleted when a gall is deleted. this due defecincies in Prisma
   host_species_id Int?
   gall_species_id Int?
   gallspecies     species? @relation("host_gall_species_idTospecies", fields: [gall_species_id], references: [id])
   hostspecies     species? @relation("host_host_species_idTospecies", fields: [host_species_id], references: [id])
+}
+
+model image {
+  id            Int      @id @default(autoincrement())
+  species_id    Int
+  source_id     Int?
+  path          String   @unique
+  default       Boolean @default(false)
+  creator       String
+  attribution   String
+  sourcelink    String
+  license       String
+  licenselink   String
+  uploader      String
+  lastchangedby String
+  source        source?  @relation(fields: [source_id], references: [id])
+  species       species  @relation(fields: [species_id], references: [id])
+}
+
+model location {
+  id           Int            @id @default(autoincrement())
+  location     String         @unique
+  description  String?
+  galllocation galllocation[]
+}
+
+model migration {
+  id   Int    @id @default(autoincrement())
+  name String
+  up   String
+  down String
+}
+
+model shape {
+  id          Int         @id @default(autoincrement())
+  shape       String      @unique
+  description String?
+  gallshape   gallshape[]
 }
 
 model source {
@@ -256,53 +203,98 @@ model source {
   pubyear       String
   link          String
   citation      String
-  speciessource speciessource[]
   image         image[]
+  speciessource speciessource[]
+}
+
+model species {
+  id              Int               @id @default(autoincrement())
+  taxoncode       String?
+  name            String            @unique
+  datacomplete    Boolean           @default(false)
+  abundance_id    Int?
+  abundance       abundance?        @relation(fields: [abundance_id], references: [id])
+  taxontype       taxontype?        @relation(fields: [taxoncode], references: [taxoncode])
+  aliasspecies    aliasspecies[]
+  gallspecies     gallspecies[]
+  hosts           host[]            @relation("host_gall_species_idTospecies")
+  host_galls      host[]            @relation("host_host_species_idTospecies")
+  image           image[]
+  speciessource   speciessource[]
+  speciestaxonomy speciestaxonomy[]
 }
 
 model speciessource {
   id           Int     @id @default(autoincrement())
   species_id   Int
   source_id    Int
-  source       source  @relation(fields: [source_id], references: [id])
-  species      species @relation(fields: [species_id], references: [id])
-  // added in 003-gallformers.sql migration
-  description  String
-  // added in 004-gallformers.sql migration
+  description  String  @default("")
   useasdefault Int     @default(0)
-  // added in 006-gallformers.sql migration
-  externallink String
+  externallink String  @default("")
   alias_id     Int?
   alias        alias?  @relation(fields: [alias_id], references: [id])
+  source       source  @relation(fields: [source_id], references: [id])
+  species      species @relation(fields: [species_id], references: [id])
 }
 
-// Added in 003-gallformers.sql migration
-model glossary {
-  id         Int    @id @default(autoincrement())
-  word       String @unique
-  definition String
-  urls       String
+model speciestaxonomy {
+  species_id  Int
+  taxonomy_id Int
+  species     species  @relation(fields: [species_id], references: [id])
+  taxonomy    taxonomy @relation(fields: [taxonomy_id], references: [id])
+
+  @@id([species_id, taxonomy_id])
 }
 
-// Added in 005-gallformers.sql migration
-model image {
-  id            Int     @id @default(autoincrement())
-  path          String  @unique
-  default       Boolean @default(false)
-  creator       String
-  attribution   String
-  // renamed from source to sourcelink in 007
-  sourcelink    String
-  license       String
-  // added in 007
-  licenselink   String
-  uploader      String
-  // added in 007
-  lastchangedby String
-  species_id    Int
-  species       species @relation(fields: [species_id], references: [id])
-  // added in 007
-  source_id     Int?
-  // added in 007
-  source        source? @relation(fields: [source_id], references: [id])
+model taxonomy {
+  id                 Int                @id @default(autoincrement())
+  name               String
+  description        String?            @default("")
+  type               String
+  parent_id          Int?
+  parent             taxonomy?          @relation("taxonomyTotaxonomy_parent_id", fields: [parent_id], references: [id])
+  speciestaxonomy    speciestaxonomy[]
+  taxonomy           taxonomy[]         @relation("taxonomyTotaxonomy_parent_id")
+  taxonomyalias      taxonomyalias[]
+  children           taxonomytaxonomy[] @relation("taxonomyTotaxonomytaxonomy_child_id")
+  taxonomytaxonomy   taxonomytaxonomy[] @relation("taxonomyTotaxonomytaxonomy_taxonomy_id")
+}
+
+model taxonomyalias {
+  taxonomy_id Int
+  alias_id    Int
+  alias       alias    @relation(fields: [alias_id], references: [id])
+  taxonomy    taxonomy @relation(fields: [taxonomy_id], references: [id])
+
+  @@id([taxonomy_id, alias_id])
+}
+
+model taxonomytaxonomy {
+  taxonomy_id Int
+  child_id    Int
+  child       taxonomy @relation("taxonomyTotaxonomytaxonomy_child_id", fields: [child_id], references: [id])
+  taxonomy    taxonomy @relation("taxonomyTotaxonomytaxonomy_taxonomy_id", fields: [taxonomy_id], references: [id])
+
+  @@id([taxonomy_id, child_id])
+}
+
+model taxontype {
+  taxoncode   String    @id
+  description String    @unique
+  gall        gall[]
+  species     species[]
+}
+
+model texture {
+  id          Int           @id @default(autoincrement())
+  texture     String        @unique
+  description String?
+  galltexture galltexture[]
+}
+
+model walls {
+  id          Int         @id @default(autoincrement())
+  walls       String      @unique
+  description String?
+  gallwalls   gallwalls[]
 }

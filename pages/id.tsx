@@ -1,6 +1,4 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -8,8 +6,8 @@ import React, { useState } from 'react';
 import { Col, ListGroup, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
-import ControlledTypeahead from '../components/controlledtypeahead';
 import InfoTip from '../components/infotip';
+import Typeahead from '../components/Typeahead';
 import {
     AlignmentApi,
     CellsApi,
@@ -27,7 +25,7 @@ import {
     ShapeApi,
     WallsApi,
 } from '../libs/api/apitypes';
-import { SECTION, TaxonomyEntry } from '../libs/api/taxonomy';
+import { SECTION, TaxonomyEntry, TaxonomyEntryNoParent } from '../libs/api/taxonomy';
 import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
 import { allHostsSimple } from '../libs/db/host';
 import { allGenera, allSections } from '../libs/db/taxonomy';
@@ -42,7 +40,7 @@ type SearchFormHostField = {
 
 type SearchFormGenusField = {
     host?: never;
-    genus: TaxonomyEntry[];
+    genus: TaxonomyEntryNoParent[];
 };
 
 type SearchFormFields = SearchFormHostField | SearchFormGenusField;
@@ -59,13 +57,13 @@ type FilterFormFields = {
 };
 
 const invalidArraySelection = (arr: unknown[]) => {
-    return arr.length === 0;
+    return arr?.length === 0;
 };
 
 const Schema = yup.object().shape(
     {
         host: yup.array().when('genus', {
-            is: '',
+            is: invalidArraySelection,
             then: yup.array().required('You must provide a search,'),
             otherwise: yup.array(),
         }),
@@ -80,7 +78,7 @@ const Schema = yup.object().shape(
 
 type Props = {
     hosts: HostSimple[];
-    sectionsAndGenera: TaxonomyEntry[];
+    sectionsAndGenera: TaxonomyEntryNoParent[];
     locations: GallLocation[];
     colors: ColorApi[];
     shapes: ShapeApi[];
@@ -94,15 +92,20 @@ const IDGall = (props: Props): JSX.Element => {
     const [galls, setGalls] = useState(new Array<GallApi>());
     const [filtered, setFiltered] = useState(new Array<GallApi>());
     const [query, setQuery] = useState(emptySearchQuery());
+    const [host, setHost] = useState<Array<HostSimple>>([]);
+    const [genus, setGenus] = useState<Array<TaxonomyEntryNoParent>>([]);
 
     const disableFilter = (): boolean => {
-        const host = getValues(['host']);
-        const genus = getValues(['genus']);
-        return (!host || !host.host) && (!genus || !genus.genus);
+        return host.length < 1 && genus.length < 1;
     };
 
     // this is the search form on sepcies or genus
-    const { control, getValues, setValue, handleSubmit, errors } = useForm<SearchFormFields>({
+    const {
+        control,
+        // setValue,
+        handleSubmit,
+        formState: { errors },
+    } = useForm<SearchFormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
@@ -124,7 +127,7 @@ const IDGall = (props: Props): JSX.Element => {
     };
 
     // this is the handler for changing either species or genus, it makes a DB round trip.
-    const onSubmit = async ({ host, genus }: SearchFormFields) => {
+    const onSubmit = async () => {
         try {
             // make sure to clear all of the filters since we are getting a new set of galls
             filterReset();
@@ -168,9 +171,9 @@ const IDGall = (props: Props): JSX.Element => {
 
     const makeFormInput = (field: keyof FilterFormFields, opts: string[], multiple = false) => {
         return (
-            <ControlledTypeahead
-                control={filterControl}
+            <Typeahead
                 name={field}
+                control={filterControl}
                 onChange={(selected) => {
                     doSearch(field, selected);
                 }}
@@ -204,11 +207,13 @@ const IDGall = (props: Props): JSX.Element => {
                 <Row>
                     <Col>
                         <label className="col-form-label">Host:</label>
-                        <ControlledTypeahead
-                            control={control}
+                        <Typeahead
                             name="host"
-                            onBlur={() => {
-                                setValue('genus', []);
+                            control={control}
+                            selected={host ? host : []}
+                            onChange={(h) => {
+                                setGenus([]);
+                                setHost(h);
                             }}
                             placeholder="Host"
                             clearButton
@@ -231,16 +236,18 @@ const IDGall = (props: Props): JSX.Element => {
                     </Col>
                     <Col>
                         <label className="col-form-label">Genus (Section):</label>
-                        <ControlledTypeahead
-                            control={control}
+                        <Typeahead
                             name="genus"
-                            onBlur={() => {
-                                setValue('host', []);
+                            control={control}
+                            selected={genus ? genus : []}
+                            onChange={(h) => {
+                                setHost([]);
+                                setGenus(h);
                             }}
                             placeholder="Genus"
                             clearButton
                             options={props.sectionsAndGenera}
-                            labelKey={(tax: TaxonomyEntry) => {
+                            labelKey={(tax: TaxonomyEntryNoParent) => {
                                 if (tax) {
                                     if (tax.type === SECTION) {
                                         return `${tax.name} - ${tax.description}`;

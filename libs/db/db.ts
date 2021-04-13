@@ -34,7 +34,6 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // const db = new PrismaClient();
-Object.freeze(db);
 // make sure foreign key support is turned on
 db.$executeRaw('PRAGMA foreign_keys = ON');
 

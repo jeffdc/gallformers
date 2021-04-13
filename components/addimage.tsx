@@ -4,6 +4,7 @@ import { Col, ProgressBar, Row } from 'react-bootstrap';
 import axios from 'axios';
 import { ImageApi } from '../libs/api/apitypes';
 import * as O from 'fp-ts/lib/Option';
+import { sessionUserOrUnknown } from '../libs/utils/util';
 
 type Props = {
     id: number;
@@ -59,8 +60,8 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                     path: path,
                     sourcelink: '',
                     source: O.none,
-                    uploader: session.user.name,
-                    lastchangedby: session.user.name,
+                    uploader: sessionUserOrUnknown(session.user.name),
+                    lastchangedby: sessionUserOrUnknown(session.user.name),
                     speciesid: id,
                     default: false,
                     small: '',

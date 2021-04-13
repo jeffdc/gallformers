@@ -1,3 +1,4 @@
+import * as A from 'fp-ts/lib/Array';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
@@ -6,6 +7,7 @@ import { PorterStemmer, WordTokenizer } from 'natural';
 import React, { ReactNode } from 'react';
 import { allGlossaryEntries, Entry } from '../db/glossary';
 import { serialize } from '../utils/reactserialize';
+import { errorThrow } from '../utils/util';
 
 export type EntryLinked = Entry & {
     linkedDefinition: string | JSX.Element[];
@@ -117,4 +119,28 @@ export const entriesWithLinkedDefs = (): TaskEither<Error, readonly EntryLinked[
         TE.map(TE.sequenceArray),
         TE.flatten,
     );
+};
+
+/**
+ *
+ * @param data
+ * @returns
+ */
+export const linkTextToGlossary = async <T extends { description: string }>(data: T[]): Promise<T[]> => {
+    const updateSpeciesSource = (d: string, source: T): T => {
+        return {
+            ...source,
+            description: d,
+        };
+    };
+
+    return await pipe(
+        data,
+        A.map((s) => linkTextFromGlossary(O.fromNullable(s.description))),
+        A.map(TE.map(serialize)),
+        TE.sequenceArray,
+        // sequence makes the array readonly, the rest of the fp-ts API does not use readonly, ...sigh.
+        TE.map((d) => A.zipWith(d as string[], data, updateSpeciesSource)),
+        TE.getOrElse(errorThrow),
+    )();
 };

@@ -1,12 +1,10 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
-import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
-import ControlledTypeahead from '../../components/controlledtypeahead';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
@@ -16,7 +14,7 @@ import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
 
 const schema = yup.object().shape({
-    value: yup.mixed().required(),
+    mainField: yup.mixed().required(),
     definition: yup.string().required(),
     urls: yup.string().required(),
 });
@@ -44,7 +42,7 @@ const toUpsertFields = (fields: FormFields, word: string, id: number): GlossaryE
 const updatedFormFields = async (e: Entry | undefined): Promise<FormFields> => {
     if (e != undefined) {
         return {
-            value: [e],
+            mainField: [e],
             definition: e.definition,
             urls: e.urls,
             del: false,
@@ -52,7 +50,7 @@ const updatedFormFields = async (e: Entry | undefined): Promise<FormFields> => {
     }
 
     return {
-        value: [],
+        mainField: [],
         definition: '',
         urls: '',
         del: false,
@@ -61,9 +59,7 @@ const updatedFormFields = async (e: Entry | undefined): Promise<FormFields> => {
 
 const Glossary = ({ id, glossary }: Props): JSX.Element => {
     const {
-        data,
         selected,
-        setSelected,
         showRenameModal: showModal,
         setShowRenameModal: setShowModal,
         error,
@@ -73,6 +69,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
         renameCallback,
         form,
         formSubmit,
+        mainField,
     } = useAdmin(
         'Glossary Entry',
         id,
@@ -83,8 +80,6 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
         schema,
         updatedFormFields,
     );
-
-    const router = useRouter();
 
     return (
         <Admin
@@ -97,6 +92,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
             error={error}
             setDeleteResults={setDeleteResults}
             deleteResults={deleteResults}
+            selected={selected}
         >
             <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
                 <h4>Add/Edit Glossary Entries</h4>
@@ -106,29 +102,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                             <Col>Word:</Col>
                         </Row>
                         <Row>
-                            <Col>
-                                <ControlledTypeahead
-                                    control={form.control}
-                                    name="value"
-                                    onChangeWithNew={(e, isNew) => {
-                                        if (isNew || !e[0]) {
-                                            setSelected(undefined);
-                                            router.replace(``, undefined, { shallow: true });
-                                        } else {
-                                            setSelected(e[0]);
-                                            router.replace(`?id=${e[0].id}`, undefined, { shallow: true });
-                                        }
-                                    }}
-                                    placeholder="Word"
-                                    options={data}
-                                    labelKey={'word'}
-                                    clearButton
-                                    isInvalid={!!form.errors.value}
-                                    newSelectionPrefix="Add a new Word: "
-                                    allowNew={true}
-                                />
-                                {form.errors.value && <span className="text-danger">The Word is required.</span>}
-                            </Col>
+                            <Col>{mainField('word', 'Word')}</Col>
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowModal(true)}>
@@ -142,15 +116,15 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                 <Row className="form-group">
                     <Col>
                         Definition:
-                        <textarea name="definition" className="form-control" ref={form.register} rows={4} />
-                        {form.errors.definition && <span className="text-danger">You must provide the defintion.</span>}
+                        <textarea {...form.register('definition')} className="form-control" rows={4} />
+                        {form.formState.errors.definition && <span className="text-danger">You must provide the defintion.</span>}
                     </Col>
                 </Row>
                 <Row className="form-group">
                     <Col>
                         URLs (separated by a newline [enter]):
-                        <textarea name="urls" className="form-control" ref={form.register} rows={3} />
-                        {form.errors.urls && (
+                        <textarea {...form.register('urls')} className="form-control" rows={3} />
+                        {form.formState.errors.urls && (
                             <span className="text-danger">You must provide a URL for the source of the defintion.</span>
                         )}
                     </Col>
@@ -158,7 +132,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                 <Row className="fromGroup" hidden={!selected}>
                     <Col xs="1">Delete?:</Col>
                     <Col className="mr-auto">
-                        <input name="del" type="checkbox" className="form-check-input" ref={form.register} />
+                        <input {...form.register('del')} type="checkbox" className="form-check-input" />
                     </Col>
                 </Row>
                 <Row className="form-input">

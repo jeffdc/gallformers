@@ -4,16 +4,17 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import React, { MouseEvent, useState } from 'react';
-import { Button, Col, Container, ListGroup, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
+import React, { useState } from 'react';
+import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
+import SourceList from '../../../components/sourcelist';
 import { GallSimple, HostApi } from '../../../libs/api/apitypes';
 import { FGS } from '../../../libs/api/taxonomy';
 import { allHostIds, hostById } from '../../../libs/db/host';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
+import { linkTextToGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { sourceToDisplay } from '../../../libs/pages/renderhelpers';
 import { deserialize } from '../../../libs/utils/reactserialize';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
@@ -48,13 +49,6 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
     // the galls will not be sorted, so sort them for display
     host.galls.sort((a, b) => a.name.localeCompare(b.name));
     const gallLinker = gallAsLink(host.galls.length);
-
-    const changeDescription = (e: MouseEvent<HTMLButtonElement>) => {
-        e.preventDefault();
-        const id = e.currentTarget.id;
-        const s = host.speciessource.find((s) => s.source_id.toString() === id);
-        setSelectedSource(s);
-    };
 
     return (
         <div>
@@ -102,25 +96,16 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                             // eslint-disable-next-line react/jsx-key
                                             <span>
                                                 {' | '}
-                                                <strong> Section: </strong> {s.name} ({s.description})
+                                                <strong> Section: </strong>{' '}
+                                                <Link key={s.id} href={`/section/${s.id}`}>
+                                                    {`${s.name} (${s.description})`}
+                                                </Link>
                                             </span>
                                         )),
                                         O.map((s) => s),
                                         O.getOrElse(constant(<></>)),
                                     )}
                                 </p>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col className="">
-                                {selectedSource && selectedSource.description && (
-                                    <span>
-                                        <p className="small white-space-pre-wrap">{deserialize(selectedSource.description)}</p>
-                                        <a className="small" href={selectedSource.externallink} target="_blank" rel="noreferrer">
-                                            {selectedSource.externallink}
-                                        </a>
-                                    </span>
-                                )}
                             </Col>
                         </Row>
                         <Row>
@@ -144,27 +129,42 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                         <Images species={host} type="host" />
                     </Col>
                 </Row>
-
+                <hr />
+                <Row>
+                    <Col id="description" className="p-3">
+                        {selectedSource && selectedSource.description && (
+                            <span>
+                                <p className="white-space-pre-wrap description-text">{deserialize(selectedSource.description)}</p>
+                                <p className="description-text">
+                                    {selectedSource.externallink && (
+                                        <span>
+                                            Reference:{' '}
+                                            <a href={selectedSource.externallink} target="_blank" rel="noreferrer">
+                                                {selectedSource.externallink}
+                                            </a>
+                                        </span>
+                                    )}
+                                </p>
+                            </span>
+                        )}
+                    </Col>
+                </Row>
+                <hr />
                 <Row>
                     <Col>
+                        <Edit id={host.id} type="speciessource" />
                         <strong>Further Information:</strong>
-                        <ListGroup variant="flush" defaultActiveKey={selectedSource?.source_id}>
-                            {host.speciessource
-                                .sort((a, b) => a.source.citation.localeCompare(b.source.citation))
-                                .map((speciessource) => (
-                                    <ListGroup.Item
-                                        key={speciessource.source_id}
-                                        id={speciessource.source_id.toString()}
-                                        action
-                                        onClick={changeDescription}
-                                        variant={speciessource.source_id === selectedSource?.source_id ? 'dark' : ''}
-                                    >
-                                        <Link href={`/source/${speciessource.source?.id}`}>
-                                            <a>{sourceToDisplay(speciessource.source)}</a>
-                                        </Link>
-                                    </ListGroup.Item>
-                                ))}
-                        </ListGroup>
+                    </Col>
+                </Row>
+                <Row>
+                    <Col>
+                        <SourceList
+                            data={host.speciessource.map((s) => s.source)}
+                            defaultSelection={selectedSource?.source}
+                            onSelectionChange={(s) =>
+                                setSelectedSource(host.speciessource.find((spso) => spso.source_id == s?.id))
+                            }
+                        />
                         <hr />
                         <Row className="">
                             <Col className="align-self-center">
@@ -195,13 +195,15 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    const host = getStaticPropsWithContext(context, hostById, 'host');
-    const taxonomy = getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy');
+    const h = await getStaticPropsWithContext(context, hostById, 'host');
+    const host = h[0];
+    const sources = await linkTextToGlossary(host.speciessource);
+    const taxonomy = await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy');
 
     return {
         props: {
-            host: (await host)[0],
-            taxonomy: await taxonomy,
+            host: { ...host, speciessource: sources },
+            taxonomy: taxonomy,
         },
         revalidate: 1,
     };

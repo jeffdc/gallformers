@@ -1,9 +1,9 @@
 // Welcome to the inevitable utils file!!!
 
 import { constant, constFalse, constTrue, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import * as T from 'fp-ts/lib/Task';
 import * as TE from 'fp-ts/lib/TaskEither';
-import * as O from 'fp-ts/lib/Option';
 import { logger } from './logger';
 
 /**
@@ -97,7 +97,15 @@ export const truncateAtWord = (words: number) => (s: string): string => {
     }
 };
 
-export const capitalizeFirstLetter = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+const doToFirstLetter = (s: string | undefined, capitalize: boolean): string => {
+    if (s == undefined || s.length < 1) return '';
+
+    return capitalize ? s.charAt(0).toUpperCase() + s.slice(1) : s.charAt(0).toLowerCase() + s.slice(1);
+};
+
+export const capitalizeFirstLetter = (s: string): string => doToFirstLetter(s, true);
+
+export const lowercaseFirstLetter = (s: string): string => doToFirstLetter(s, false);
 
 /**
  *
@@ -145,3 +153,5 @@ export const csvAsNumberArr = (s: string): number[] => {
 export const extractGenus = (n: string): string => {
     return n.split(' ')[0];
 };
+
+export const sessionUserOrUnknown = (user: string | null | undefined): string => (user ? user : 'UNKNOWN!');

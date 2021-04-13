@@ -1,3 +1,4 @@
+import { PrismaPromise } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { GallApi, GallHostUpdateFields, SimpleSpecies } from '../api/apitypes';
@@ -10,7 +11,7 @@ import { extractId } from './utils';
 
 const toValues = (gallid: number, hostids: number[]) => hostids.map((h) => `(NULL, ${gallid}, ${h})`).join(',');
 
-const toInsertStatement = (gallid: number, hostids: number[]): Promise<number> =>
+const toInsertStatement = (gallid: number, hostids: number[]): PrismaPromise<number> =>
     db.$executeRaw(`INSERT INTO host (id, gall_species_id, host_species_id) VALUES ${toValues(gallid, hostids)};`);
 
 export const updateGallHosts = (gallhost: GallHostUpdateFields): TE.TaskEither<Error, GallApi> => {

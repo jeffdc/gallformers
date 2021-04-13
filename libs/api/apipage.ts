@@ -159,6 +159,7 @@ export type Err = {
     status: number;
     msg: string;
     e?: Error;
+    stack?: string;
 };
 
 /**
@@ -169,4 +170,5 @@ export const toErr = (e: Error): Err => ({
     status: 500,
     msg: e.message,
     e: e,
+    stack: e.stack,
 });

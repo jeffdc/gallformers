@@ -1,16 +1,20 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import router from 'next/router';
-import { useCallback, useEffect, useState } from 'react';
-import { DeepPartial, UnpackNestedValue, useForm, UseFormMethods } from 'react-hook-form';
+import React, { useCallback, useEffect, useState } from 'react';
+import { DeepPartial, Path, UnpackNestedValue, useForm, UseFormReturn } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import * as yup from 'yup';
+import { AnyObject, AssertsShape, ObjectShape, TypeOfShape } from 'yup/lib/object';
+import { Maybe } from 'yup/lib/types';
 import { RenameEvent } from '../components/editname';
+import Typeahead, { TypeaheadLabelKey } from '../components/Typeahead';
 import { DeleteResult } from '../libs/api/apitypes';
 import { WithID } from '../libs/utils/types';
+import { hasProp } from '../libs/utils/util';
 import { AdminFormFields, useAPIs } from './useAPIs';
 
 type AdminData<T, FormFields> = {
-    data: T[];
+    // data: T[];
     selected?: T;
     setSelected: (t: T | undefined) => void;
     showRenameModal: boolean;
@@ -20,10 +24,11 @@ type AdminData<T, FormFields> = {
     deleteResults?: DeleteResult;
     setDeleteResults: (dr: DeleteResult) => void;
     renameCallback: (doRename: (s: FormFields, e: RenameEvent) => void) => (e: RenameEvent) => void;
-    form: UseFormMethods<FormFields>;
+    form: UseFormReturn<FormFields>;
     formSubmit: (fields: FormFields) => Promise<void>;
     postUpdate: (res: Response) => void;
     postDelete: (id: number | string, result: DeleteResult) => void;
+    mainField: (key: TypeaheadLabelKey<T>, placeholder: string) => JSX.Element;
 };
 
 /**
@@ -46,8 +51,9 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     update: (t: T, tName: string) => T,
     toUpsertFields: (fields: FormFields, keyField: string, id: number) => UpsertFields,
     apiConfig: { keyProp: keyof T; delEndpoint: string; upsertEndpoint: string },
-    schema: yup.ObjectSchema,
+    schema: yup.ObjectSchema<ObjectShape, AnyObject, Maybe<TypeOfShape<ObjectShape>>, Maybe<AssertsShape<ObjectShape>>>,
     updatedFormFields: (t: T | undefined) => Promise<FormFields>,
+    createNew?: (v: string) => T,
 ): AdminData<T, FormFields> => {
     const [data, setData] = useState(ts);
     const [selected, setSelected] = useState<T | undefined>(id ? data.find((d) => d.id === parseInt(id)) : undefined);
@@ -62,17 +68,54 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         resolver: yupResolver(schema),
     });
 
+    const theMainField = (labelKey: TypeaheadLabelKey<T>, placeholder: string) => {
+        return (
+            <>
+                <Typeahead
+                    name={'mainField' as Path<FormFields>}
+                    control={form.control}
+                    options={data}
+                    labelKey={labelKey}
+                    selected={selected ? [selected] : []}
+                    placeholder={placeholder}
+                    clearButton
+                    isInvalid={!!form.formState.errors.mainField}
+                    newSelectionPrefix={`Add a new ${placeholder}: `}
+                    allowNew={!!createNew}
+                    onChange={(s) => {
+                        if (s.length <= 0) {
+                            setSelected(undefined);
+                            router.replace(``, undefined, { shallow: true });
+                        } else {
+                            if (hasProp(s[0], 'customOption') && hasProp(s[0], 'name')) {
+                                if (createNew) {
+                                    const x = createNew(s[0].name as string);
+                                    setSelected(x);
+                                }
+                                router.replace(``, undefined, { shallow: true });
+                            } else {
+                                setSelected(s[0]);
+                                router.replace(`?id=${s[0].id}`, undefined, { shallow: true });
+                            }
+                        }
+                    }}
+                />
+                {form.formState.errors.mainField && <span className="text-danger">{`The ${placeholder} is required.`}</span>}
+            </>
+        );
+    };
+
     const postDelete = (id: number | string, result: DeleteResult) => {
         setData(data.filter((d) => d.id !== id));
         setDeleteResults(result);
         setSelected(undefined);
+        setError('');
         toast.success(`${type} deleted`);
         router.replace(``, undefined, { shallow: true });
     };
 
     const postUpdate = async (res: Response) => {
         const s = (await res.json()) as T;
-        setSelected(s);
         let updated = data;
         if (data.find((d) => d.id === s.id) == undefined) {
             // add new if necessary
@@ -82,14 +125,18 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
             updated = data.filter((d) => d.id !== s.id);
             updated.push(s);
         }
+        setError('');
         setData(updated);
+        setSelected(s);
         toast.success(`${type} Updated`);
         router.replace(`?id=${s.id}`, undefined, { shallow: true });
     };
 
     const formSubmit = async (fields: FormFields) => {
         await doDeleteOrUpsert(fields, postDelete, postUpdate, toUpsertFields)
-            .then(() => form.reset())
+            .then(() => {
+                form.reset();
+            })
             .catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
     };
 
@@ -102,17 +149,11 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         }
         const updated = update(selected, e.new);
         doRename(await updatedFormFields(updated), e);
-        // const updatedData = data.map((d) => (d.id === updated.id ? updated : d));
-        // setData(updatedData);
-        // setSelected(updated);
     };
 
     const onDataChange = useCallback(async (t: T | undefined) => {
         const ff = await updatedFormFields(t);
         form.reset(ff as UnpackNestedValue<DeepPartial<FormFields>>);
-        // must do this since the value is bound to a control that is controlled (i.e., no ref prop) so it will not get updated
-        // during the reset. see: https://react-hook-form.com/api#reset
-        form.setValue('value', [t as never]);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -121,7 +162,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     }, [selected, onDataChange]);
 
     return {
-        data: data,
+        // data: data,
         selected: selected,
         setSelected: setSelected,
         showRenameModal: showModal,
@@ -135,6 +176,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         formSubmit: formSubmit,
         postUpdate: postUpdate,
         postDelete: postDelete,
+        mainField: theMainField,
     };
 };
 
