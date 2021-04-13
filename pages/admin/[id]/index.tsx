@@ -27,9 +27,9 @@ const Tester = ({ data }: Props): JSX.Element => {
 };
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-    // const data = await getStaticPropsWithContext(context, allFamilyIds, 'TEST', true, true);
+    const data = await getStaticPropsWithContext(context, allFamilyIds, 'TEST', true, true);
     // const data = await testTx();
-    const data = await mightFail(() => O.none)(taxonomyTreeForId(55));
+    // const data = await mightFail(() => O.none)(taxonomyTreeForId(55));
     return {
         props: {
             data: data,

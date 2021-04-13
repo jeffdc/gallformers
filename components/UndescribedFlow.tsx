@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
+import React from 'react';
 import { Button, Col, Form, Modal, Row } from 'react-bootstrap';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { HostSimple } from '../libs/api/apitypes';
 import { TaxonomyEntry } from '../libs/api/taxonomy';
 import { genOptionsWithId } from '../libs/utils/forms';
 import { lowercaseFirstLetter } from '../libs/utils/util';
-import * as O from 'fp-ts/lib/Option';
-import { constant, pipe } from 'fp-ts/lib/function';
 
 export type UndescribedData = {
     family: TaxonomyEntry;
@@ -33,10 +33,9 @@ type FormFields = {
 };
 
 const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX.Element => {
-    const [genusUnknown, setGenusUnknown] = useState(true);
-    const [formComplete, setFormComplete] = useState(false);
+    // const [genusUnknown, setGenusKnown] = useState(true);
 
-    const { register, getValues, setValue, reset } = useForm<FormFields>({
+    const { register, getValues, setValue, reset, control, watch } = useForm<FormFields>({
         mode: 'onBlur',
         defaultValues: {
             genus: 'Unknown',
@@ -44,15 +43,18 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
         },
     });
 
+    const watchName = watch('name', '');
+    const watchGenusKnown = watch('genusKnown', false);
+
     const done = (cancel: boolean) => {
         if (cancel) {
             onClose(undefined);
             return;
         }
 
-        const { family, genus, host, name } = getValues();
+        const { genusKnown, family, genus, host, name } = getValues();
         const f = families.find((f) => f.name.localeCompare(family) == 0);
-        const g = genera.find((g) => g.name.localeCompare(genusUnknown ? 'Unknown' : genus) == 0);
+        const g = genera.find((g) => g.name.localeCompare(genusKnown ? genus : 'Unknown') == 0);
         const h = hosts.find((h) => h.name.localeCompare(host) == 0);
         if (f == undefined || g == undefined || h == undefined) {
             throw new Error(
@@ -67,37 +69,25 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
         });
     };
 
-    const onUnknownGenusChange = (checked: boolean) => {
-        setGenusUnknown(!checked);
+    const onKnownGenusChange = (checked: boolean) => {
         if (!checked) {
             reset({
-                genusKnown: false,
+                genusKnown: checked,
                 genus: 'Unknown',
                 family: 'Unknown',
             });
         } else {
             reset({
-                genusKnown: true,
+                genusKnown: checked,
                 genus: '',
                 family: '',
             });
         }
-        setFormComplete(false);
     };
 
     const computeName = (genus: string, host: string, description: string) => {
-        return `${genusUnknown ? 'Unknown' : genus} ${lowercaseFirstLetter(host[0])}-${host?.split(' ')[1]}-${description}`;
-    };
-
-    const onChange = () => {
-        const name = computeName(getValues().genus, getValues().host, getValues().description);
-        setValue('name', name);
-        setFormComplete(
-            (getValues().genus?.length > 0 || genusUnknown) &&
-                getValues().family?.length > 0 &&
-                getValues().host?.length > 0 &&
-                getValues().name?.length > 0,
-        );
+        const h = host ? `${lowercaseFirstLetter(host[0])}-${host?.split(' ')[1]}` : '';
+        return `${getValues().genusKnown ? genus : 'Unknown'} ${h}-${description ? description : ''}`;
     };
 
     const lookupFamily = (genus: string): string => {
@@ -127,32 +117,79 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
                             {...register('genusKnown')}
                             type="checkbox"
                             label="Is this undescribed species part of a known Genus?"
-                            onChange={(e) => onUnknownGenusChange(e.currentTarget.checked)}
+                            onChange={(e) => {
+                                onKnownGenusChange(e.currentTarget.checked);
+                            }}
                         ></Form.Check>
                         <Form.Label>Genus</Form.Label>
-                        <Form.Control
-                            {...register('genus')}
-                            as="select"
-                            onChange={(e) => {
-                                if (!genusUnknown) {
-                                    setValue('family', lookupFamily(e.currentTarget.value));
-                                }
-                                onChange();
-                            }}
-                            disabled={genusUnknown}
-                        >
-                            {genOptionsWithId(genera.filter((g) => g.name.localeCompare('Unknown')))}
-                        </Form.Control>
+                        <Controller
+                            name="genus"
+                            control={control}
+                            render={({ field }) => (
+                                <Form.Control
+                                    as="select"
+                                    onChange={(e) => {
+                                        if (e.currentTarget.value) {
+                                            setValue('family', lookupFamily(e.currentTarget.value));
+                                        }
+                                        const name = computeName(
+                                            e.currentTarget.value,
+                                            getValues().host,
+                                            getValues().description,
+                                        );
+                                        setValue('name', name);
+                                        field.onChange(e);
+                                    }}
+                                    disabled={!watchGenusKnown}
+                                >
+                                    {genOptionsWithId(genera.filter((g) => g.name.localeCompare('Unknown')))}
+                                </Form.Control>
+                            )}
+                        />
                         <Form.Label>Family</Form.Label>
-                        <Form.Control {...register('family')} as="select" disabled={!genusUnknown}>
+                        <Form.Control {...register('family')} as="select" readOnly={watchGenusKnown}>
                             {genOptionsWithId(families)}
                         </Form.Control>
                         <Form.Label>Type Host</Form.Label>
-                        <Form.Control {...register('host')} as="select" onChange={onChange}>
-                            {genOptionsWithId(hosts)}
-                        </Form.Control>
+                        <Controller
+                            name="host"
+                            control={control}
+                            render={({ field }) => (
+                                <Form.Control
+                                    as="select"
+                                    onChange={(e) => {
+                                        const name = computeName(
+                                            getValues().genus,
+                                            e.currentTarget.value,
+                                            getValues().description,
+                                        );
+                                        setValue('name', name);
+                                        field.onChange(e);
+                                    }}
+                                >
+                                    {genOptionsWithId(hosts)}
+                                </Form.Control>
+                            )}
+                        />
                         <Form.Label>Description (2 or 3 adjectives separated by dashes, e.g. red-bead-gall)</Form.Label>
-                        <Form.Control {...register('description')} onChange={onChange}></Form.Control>
+                        <Controller
+                            name="description"
+                            control={control}
+                            render={({ field }) => (
+                                <Form.Control
+                                    onChange={(e) => {
+                                        // eslint-disable-next-line prettier/prettier
+                                        const name = computeName(
+                                            getValues().genus,
+                                            getValues().host,
+                                            e.currentTarget.value,
+                                        );
+                                        setValue('name', name);
+                                        field.onChange(e);
+                                    }}
+                                ></Form.Control>
+                            )}
+                        />
                         <Form.Label>Name (you can edit this but it is suggested that you accept the computed value)</Form.Label>
                         <Form.Control {...register('name')}></Form.Control>
                     </Form.Group>
@@ -162,12 +199,18 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
                 <div className="d-flex justify-content-end">
                     <Row>
                         <Col xs={4}>
-                            <Button variant="primary" disabled={!formComplete} onClick={() => done(false)}>
+                            <Button variant="primary" disabled={!watchName} onClick={() => done(false)}>
                                 Done
                             </Button>
                         </Col>
                         <Col>
-                            <Button variant="secondary" onClick={() => done(true)}>
+                            <Button
+                                variant="secondary"
+                                onClick={() => {
+                                    reset();
+                                    return done(true);
+                                }}
+                            >
                                 Cancel
                             </Button>
                         </Col>

@@ -289,13 +289,7 @@ const Gall = ({
             newG.fgs.genus = data.genus;
             newG.fgs.family = data.family;
             newG.gall.undescribed = true;
-            // form.setValue(mainField.name as Path<FormFields>, [
-            //     { customOption: true, id: '-1', name: data.name } as TypeaheadCustomOption,
-            // ]);
-            // form.setValue('genus', [data.genus]);
-            // form.setValue('family', [data.family]);
-            // form.setValue('hosts', [data.host]);
-            // form.setValue('undescribed', true);
+            setSelected(newG);
         }
     };
 

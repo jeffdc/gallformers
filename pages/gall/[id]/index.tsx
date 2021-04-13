@@ -3,6 +3,7 @@ import * as O from 'fp-ts/lib/Option';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
+import ErrorPage from 'next/error';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
 import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
@@ -43,6 +44,8 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
     // If the page is not yet generated, this will be displayed initially until getStaticProps() finishes running
     if (router.isFallback) {
         return <div>Loading...</div>;
+    } else if (species == null) {
+        return <ErrorPage statusCode={404} />;
     }
 
     // the hosts will not be sorted, so sort them for display
@@ -224,12 +227,12 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
 export const getStaticProps: GetStaticProps = async (context) => {
     const g = await getStaticPropsWithContext(context, gallById, 'gall');
     const gall = g[0];
-    const sources = await linkTextToGlossary(gall.speciessource);
-    const fgs = await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy');
+    const sources = gall ? await linkTextToGlossary(gall.speciessource) : null;
+    const fgs = gall ? await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy') : null;
 
     return {
         props: {
-            species: { ...gall, speciessource: sources },
+            species: gall ? { ...gall, speciessource: sources } : null,
             taxonomy: fgs,
         },
         revalidate: 1,
