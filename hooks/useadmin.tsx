@@ -1,20 +1,22 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import router from 'next/router';
 import React, { useCallback, useEffect, useState } from 'react';
+import { Button, Col, Row } from 'react-bootstrap';
 import { DeepPartial, Path, UnpackNestedValue, useForm, UseFormReturn } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import * as yup from 'yup';
 import { AnyObject, AssertsShape, ObjectShape, TypeOfShape } from 'yup/lib/object';
 import { Maybe } from 'yup/lib/types';
+import { ConfirmationOptions } from '../components/confirmationdialog';
 import { RenameEvent } from '../components/editname';
 import Typeahead, { TypeaheadLabelKey } from '../components/Typeahead';
 import { DeleteResult } from '../libs/api/apitypes';
 import { WithID } from '../libs/utils/types';
 import { hasProp } from '../libs/utils/util';
 import { AdminFormFields, useAPIs } from './useAPIs';
+import { useConfirmation } from './useconfirmation';
 
 type AdminData<T, FormFields> = {
-    // data: T[];
     selected?: T;
     setSelected: (t: T | undefined) => void;
     showRenameModal: boolean;
@@ -25,10 +27,12 @@ type AdminData<T, FormFields> = {
     setDeleteResults: (dr: DeleteResult) => void;
     renameCallback: (doRename: (s: FormFields, e: RenameEvent) => void) => (e: RenameEvent) => void;
     form: UseFormReturn<FormFields>;
+    confirm: (options: ConfirmationOptions) => Promise<void>;
     formSubmit: (fields: FormFields) => Promise<void>;
     postUpdate: (res: Response) => void;
     postDelete: (id: number | string, result: DeleteResult) => void;
     mainField: (key: TypeaheadLabelKey<T>, placeholder: string) => JSX.Element;
+    deleteButton: (warning: string, customDeleteHandler?: (fields: FormFields) => Promise<void>) => JSX.Element;
 };
 
 /**
@@ -50,7 +54,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     ts: T[],
     update: (t: T, tName: string) => T,
     toUpsertFields: (fields: FormFields, keyField: string, id: number) => UpsertFields,
-    apiConfig: { keyProp: keyof T; delEndpoint: string; upsertEndpoint: string },
+    apiConfig: { keyProp: keyof T; delEndpoint: string; upsertEndpoint: string; delQueryString?: () => string },
     schema: yup.ObjectSchema<ObjectShape, AnyObject, Maybe<TypeOfShape<ObjectShape>>, Maybe<AssertsShape<ObjectShape>>>,
     updatedFormFields: (t: T | undefined) => Promise<FormFields>,
     createNew?: (v: string) => T,
@@ -61,12 +65,19 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     const [error, setError] = useState('');
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
 
-    const { doDeleteOrUpsert } = useAPIs<T, UpsertFields>(apiConfig.keyProp, apiConfig.delEndpoint, apiConfig.upsertEndpoint);
+    const { doDeleteOrUpsert } = useAPIs<T, UpsertFields>(
+        apiConfig.keyProp,
+        apiConfig.delEndpoint,
+        apiConfig.upsertEndpoint,
+        apiConfig.delQueryString,
+    );
 
     const form = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(schema),
     });
+
+    const confirm = useConfirmation();
 
     const theMainField = (labelKey: TypeaheadLabelKey<T>, placeholder: string) => {
         return (
@@ -105,13 +116,51 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         );
     };
 
+    const doDelete = async (deleteHandler?: (fields: FormFields) => Promise<void>) => {
+        return confirm({
+            variant: 'danger',
+            catchOnCancel: true,
+            title: 'Are you sure want to delete?',
+            message: `This will delete the current ${type} and all associated data. Do you want to continue?`,
+        })
+            .then(() => {
+                if (deleteHandler) {
+                    deleteHandler({ ...form.getValues(), del: true } as FormFields);
+                } else {
+                    formSubmit({ ...form.getValues(), del: true } as FormFields);
+                }
+            })
+            .catch(() => Promise.resolve());
+    };
+
+    const deleteButton = (warning: string, customDeleteHandler?: (fields: FormFields) => Promise<void>) => {
+        return (
+            <Row hidden={!selected}>
+                <Col>
+                    <Row>
+                        <Col className="">
+                            <Button variant="danger" className="" onClick={() => doDelete(customDeleteHandler)}>
+                                Delete
+                            </Button>
+                        </Col>
+                    </Row>
+                    <Row>
+                        <Col>
+                            <em className="text-danger">{warning}</em>
+                        </Col>
+                    </Row>
+                </Col>
+            </Row>
+        );
+    };
+
     const postDelete = (id: number | string, result: DeleteResult) => {
         setData(data.filter((d) => d.id !== id));
-        setDeleteResults(result);
         setSelected(undefined);
+        router.replace(``, undefined, { shallow: true });
+        setDeleteResults(result);
         setError('');
         toast.success(`${type} deleted`);
-        router.replace(``, undefined, { shallow: true });
     };
 
     const postUpdate = async (res: Response) => {
@@ -173,10 +222,12 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         setDeleteResults: setDeleteResults,
         renameCallback: renameCallback,
         form: form,
+        confirm: confirm,
         formSubmit: formSubmit,
         postUpdate: postUpdate,
         postDelete: postDelete,
         mainField: theMainField,
+        deleteButton: deleteButton,
     };
 };
 

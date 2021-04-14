@@ -84,6 +84,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
         form,
         formSubmit,
         mainField,
+        deleteButton,
     } = useAdmin(
         'Source',
         id,
@@ -163,16 +164,11 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                         )}
                     </Col>
                 </Row>
-                <Row className="fromGroup" hidden={!selected}>
-                    <Col xs="1">Delete?:</Col>
-                    <Col className="mr-auto">
-                        <input {...form.register('del')} type="checkbox" className="form-check-input" />
-                    </Col>
-                </Row>
                 <Row className="formGroup">
                     <Col>
                         <input type="submit" className="button" value="Submit" />
                     </Col>
+                    <Col>{deleteButton('Caution. All data associated with this Source will be deleted.')}</Col>
                 </Row>
             </form>
         </Admin>

@@ -17,6 +17,7 @@ import Auth from '../../components/auth';
 import ImageEdit from '../../components/imageedit';
 import ImageGrid from '../../components/imagegrid';
 import Typeahead from '../../components/Typeahead';
+import { useConfirmation } from '../../hooks/useconfirmation';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { ImageApi } from '../../libs/api/apitypes';
 import { allSpecies } from '../../libs/db/species';
@@ -126,6 +127,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
 
     const [session] = useSession();
     const router = useRouter();
+    const confirm = useConfirmation();
 
     useEffect(() => {
         const fetchNewSelection = async (id: number | undefined) => {
@@ -205,28 +207,23 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
         }
     };
 
-    const saveImages = async (imgs: ImageApi[]) => {
+    const saveImage = async (img: ImageApi) => {
         try {
-            const updatedImages = imgs.map((i) => {
-                i.lastchangedby = session && session.user.name ? session.user.name : 'UNKNOWN!';
-                return i;
-            });
-
             const res = await fetch(`../api/images`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(updatedImages),
+                body: JSON.stringify(img),
             });
 
-            if (res.status !== 200) {
+            if (res.status == 200) {
+                const imgs = (await res.json()) as ImageApi[];
+                if (imgs) {
+                    setImages(imgs);
+                }
+            } else {
                 throw new Error(await res.text());
-            }
-
-            if (images) {
-                const updatedImageIds = new Set(updatedImages.map((i) => i.id));
-                setImages([...updatedImages, ...images.filter((img) => !updatedImageIds.has(img.id))]);
             }
 
             setCurrentImage(undefined);
@@ -242,22 +239,34 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
             return;
         }
 
-        await saveImages(
-            images
-                .filter((i) => selectedForCopy.has(i.id))
-                .map<ImageApi>((i) => ({
-                    ...i,
-                    lastchangedby: sessionUserOrUnknown(session?.user.name),
-                    source: copySource.source,
-                    sourcelink: copySource.sourcelink,
-                    license: copySource.license,
-                    licenselink: copySource.licenselink,
-                    creator: copySource.creator,
-                    attribution: copySource.attribution,
-                })),
-        ).catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
-
-        setShowCopy(false);
+        return confirm({
+            variant: 'danger',
+            catchOnCancel: true,
+            title: 'Are you sure want to copy?',
+            message: `This will copy all of the metadata from the original selected image to ALL of the other selected images. Do you want to continue?`,
+        })
+            .then(() => {
+                setShowCopy(false);
+                Promise.all(
+                    images
+                        .filter((i) => selectedForCopy.has(i.id))
+                        .map<ImageApi>((i) => ({
+                            ...i,
+                            lastchangedby: sessionUserOrUnknown(session?.user.name),
+                            source: copySource.source,
+                            sourcelink: copySource.sourcelink,
+                            license: copySource.license,
+                            licenselink: copySource.licenselink,
+                            creator: copySource.creator,
+                            attribution: copySource.attribution,
+                        }))
+                        .map((i) => saveImage(i)),
+                ).catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
+            })
+            .catch(() => {
+                setShowCopy(false);
+                Promise.resolve();
+            });
     };
 
     const selectRow: SelectRowProps<ImageApi> = {
@@ -295,7 +304,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                     // eslint-disable-next-line prettier/prettier
                     <ImageEdit 
                         image={currentImage}
-                        onSave={(i) => saveImages([i])}
+                        onSave={saveImage}
                         show={edit}
                         onClose={handleClose}
                     />

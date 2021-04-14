@@ -1,6 +1,5 @@
 import { image, Prisma, source, speciessource } from '@prisma/client';
 import { constant, pipe } from 'fp-ts/lib/function';
-import * as A from 'fp-ts/lib/Array';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
@@ -16,12 +15,14 @@ import {
     SMALL,
     XLARGE,
 } from '../images/images';
+import { ExtractTFromPromise } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
 import { connectIfNotNull } from './utils';
-import { ExtractTFromPromise } from '../utils/types';
 
 export const addImages = (images: ImageApi[]): TaskEither<Error, ImageApi[]> => {
+    // N.B. - the default will also be false for new images, only later can it be changed. So we do not need to worry about
+    // the logic of maintaining only a single default here, only on update.
     const add = () => {
         const creates = images.map((image) =>
             db.image.create({
@@ -43,13 +44,22 @@ export const addImages = (images: ImageApi[]): TaskEither<Error, ImageApi[]> => 
                 },
             }),
         );
+
         return db.$transaction(creates);
     };
 
-    // The create will not return the related sources so we need to requery to get them
+    // The create will not return the related images so we need to requery to get them
     const requeryWithSource = (images: image[]) => () =>
         db.image.findMany({
-            include: { source: { include: { speciessource: { where: { species_id: images[0].species_id } } } } },
+            include: {
+                source: {
+                    include: {
+                        speciessource: {
+                            where: { species_id: images[0].species_id },
+                        },
+                    },
+                },
+            },
             where: { id: { in: images.map((i) => i.id) } },
         });
 
@@ -62,7 +72,7 @@ export const addImages = (images: ImageApi[]): TaskEither<Error, ImageApi[]> => 
     );
 };
 
-export const updateImages = (images: ImageApi[]): TaskEither<Error, readonly ImageApi[]> => {
+export const updateImage = (theImage: ImageApi): TaskEither<Error, readonly ImageApi[]> => {
     const update = (image: ImageApi) =>
         db.image.update({
             where: { id: image.id },
@@ -99,29 +109,58 @@ export const updateImages = (images: ImageApi[]): TaskEither<Error, readonly Ima
              WHERE image.id = ${image.id}`,
         );
 
-    const doTx = (image: ImageApi) => db.$transaction([update(image), updateSourceRel(image)]).then((rs) => rs[0]);
+    // if this one is the new default, then make sure all of the other ones are not default
+    const setAsNewDefault = (image: ImageApi) => {
+        const spId = image.default ? image.speciesid : -999;
+        return db.image.updateMany({
+            where: {
+                AND: [{ species_id: { equals: spId } }, { id: { not: image.id } }],
+            },
+            data: {
+                default: false,
+            },
+        });
+    };
+
+    const doTx = (image: ImageApi) => {
+        return db.$transaction([
+            update(image),
+            setAsNewDefault(image),
+            updateSourceRel(image),
+            // refetch all of the images since some may have been updated by resetting defaults
+            db.image.findMany({
+                where: {
+                    species_id: { equals: image.speciesid },
+                },
+                include: {
+                    source: {
+                        include: {
+                            speciessource: true,
+                        },
+                    },
+                },
+            }),
+        ]);
+    };
+
     type TxRetType = ExtractTFromPromise<ReturnType<typeof doTx>>;
 
     // eslint-disable-next-line prettier/prettier
     return pipe(
-        images,
-        A.map((img) =>
-            pipe(
-                TE.tryCatch<Error, TxRetType>(() => doTx(img), handleError),
-                TE.map<TxRetType, ImageApi>((i) => ({
-                    ...i,
-                    speciesid: i.species_id,
-                    small: makePath(i.path, SMALL),
-                    medium: makePath(i.path, MEDIUM),
-                    large: makePath(i.path, LARGE),
-                    xlarge: makePath(i.path, XLARGE),
-                    original: makePath(i.path, ORIGINAL),
-                    source: img.source,
-                    license: asLicenseType(i.license),
-                })),
-            ),
+        TE.tryCatch<Error, TxRetType>(() => doTx(theImage), handleError),
+        TE.map<TxRetType, ImageApi[]>(([, , , images]) =>
+            images.map((i) => ({
+                ...i,
+                speciesid: i.species_id,
+                small: makePath(i.path, SMALL),
+                medium: makePath(i.path, MEDIUM),
+                large: makePath(i.path, LARGE),
+                xlarge: makePath(i.path, XLARGE),
+                original: makePath(i.path, ORIGINAL),
+                source: O.fromNullable(i.source),
+                license: asLicenseType(i.license),
+            })),
         ),
-        TE.sequenceArray,
     );
 };
 

@@ -32,7 +32,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({ show, ti
                     {variant === 'danger' && (
                         <Row>
                             <Col xs={4}>
-                                <Button variant="primary" onClick={onSubmit}>
+                                <Button variant="danger" onClick={onSubmit}>
                                     Yes
                                 </Button>
                             </Col>

@@ -45,6 +45,7 @@ export const useAPIs = <T extends WithID, U>(
     keyProp: keyof T,
     delEndpoint: string,
     upsertEndpoint: string,
+    delQueryString?: () => string,
 ): UseAPIsType<T, U> => {
     const doDeleteOrUpsert = async <FF extends AdminFormFields<T>>(
         data: FF,
@@ -55,7 +56,8 @@ export const useAPIs = <T extends WithID, U>(
         try {
             const value = data.mainField[0];
             if (data.del && hasProp(value, 'id')) {
-                const res = await fetch(`${delEndpoint}${value.id}`, {
+                const endpoint = delQueryString ? `${delEndpoint}${delQueryString()}` : `${delEndpoint}${value.id}`;
+                const res = await fetch(endpoint, {
                     method: 'DELETE',
                 });
 

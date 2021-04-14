@@ -82,6 +82,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         form,
         formSubmit,
         mainField,
+        deleteButton,
     } = useAdmin(
         'Family',
         id,
@@ -137,20 +138,14 @@ const Family = ({ id, fs }: Props): JSX.Element => {
                         )}
                     </Col>
                 </Row>
-                <Row className="fromGroup" hidden={!selected}>
-                    <Col xs="1">Delete?:</Col>
-                    <Col className="mr-auto">
-                        <input {...form.register('del')} type="checkbox" className="form-check-input" />
-                    </Col>
-                    <Col xs="8">
-                        <em className="text-danger">
-                            Caution. If there are any species (galls or hosts) assigned to this Family they too will be deleted.
-                        </em>
-                    </Col>
-                </Row>
-                <Row className="form-input">
+                <Row className="form-group">
                     <Col>
                         <input type="submit" className="button" value="Submit" />
+                    </Col>
+                    <Col>
+                        {deleteButton(
+                            'Caution. If there are any species (galls or hosts) assigned to this Family they too will be deleted.',
+                        )}
                     </Col>
                 </Row>
             </form>
