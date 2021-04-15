@@ -13,7 +13,6 @@ import { RenameEvent } from '../../components/editname';
 import Typeahead from '../../components/Typeahead';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
-import { useConfirmation } from '../../hooks/useconfirmation';
 import { extractQueryParam } from '../../libs/api/apipage';
 import {
     AbundanceApi,
@@ -165,8 +164,10 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
         setDeleteResults,
         renameCallback,
         form,
+        confirm,
         formSubmit,
         mainField,
+        deleteButton,
     } = useAdmin(
         'Host',
         id,
@@ -178,8 +179,6 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
         updatedFormFields,
         createNewHost,
     );
-
-    const confirm = useConfirmation();
 
     const rename = async (fields: FormFields, e: RenameEvent) => {
         if (e.old == undefined) throw new Error('Trying to add rename but old name is missing?!');
@@ -381,15 +380,11 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                         and other filters may not have been entered comprehensively or at all.
                     </Col>
                 </Row>
-                <Row className="fromGroup pb-1" hidden={!selected}>
-                    <Col className="mr-auto">
-                        <input {...form.register('del')} type="checkbox" className="form-input-checkbox" /> Delete?
-                    </Col>
-                </Row>
                 <Row className="formGroup">
                     <Col>
                         <input type="submit" className="button" value="Submit" />
                     </Col>
+                    <Col>{deleteButton('Caution. All data associated with this Host will be deleted.')}</Col>
                 </Row>
                 <Row hidden={!selected}>
                     <Col>

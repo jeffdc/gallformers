@@ -9,6 +9,7 @@ INSERT INTO texture (id, texture, description) VALUES (NULL, 'succulent', '');
 INSERT INTO texture (id, texture, description) VALUES (NULL, 'spiky/thorny', '');
 INSERT INTO cells (id, cells, description) VALUES (NULL, 'free-rolling', '');
 INSERT INTO walls (id, walls, description) VALUES (NULL, 'radiating-fibers', '');
+INSERT INTO walls (id, walls, description) VALUES (NULL, 'spongy', '');
 
 -- #117 clean up duplicate genera
 

@@ -17,6 +17,7 @@ import Auth from '../../components/auth';
 import ImageEdit from '../../components/imageedit';
 import ImageGrid from '../../components/imagegrid';
 import Typeahead from '../../components/Typeahead';
+import { useConfirmation } from '../../hooks/useconfirmation';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { ImageApi } from '../../libs/api/apitypes';
 import { allSpecies } from '../../libs/db/species';
@@ -126,11 +127,15 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
 
     const [session] = useSession();
     const router = useRouter();
+    const confirm = useConfirmation();
 
     useEffect(() => {
         const fetchNewSelection = async (id: number | undefined) => {
             try {
-                if (!id) return;
+                if (!id) {
+                    setImages(undefined);
+                    return;
+                }
 
                 const res = await fetch(`../api/images?speciesid=${id}`, {
                     method: 'GET',
@@ -149,14 +154,6 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
         };
         fetchNewSelection(selected?.id);
     }, [selected?.id]);
-
-    // const selectAll = (e: React.MouseEvent<HTMLInputElement, MouseEvent>) => {
-    //     images?.forEach((i) => {
-    //         setValue(`delete-${i.id}`, e.currentTarget.checked);
-    //         if (e.currentTarget.checked) selectedImages.add(i.id);
-    //     });
-    //     setSelectedImages(selectedImages);
-    // };
 
     const onSubmit = async () => {
         try {
@@ -210,28 +207,23 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
         }
     };
 
-    const saveImages = async (imgs: ImageApi[]) => {
+    const saveImage = async (img: ImageApi) => {
         try {
-            const updatedImages = imgs.map((i) => {
-                i.lastchangedby = session && session.user.name ? session.user.name : 'UNKNOWN!';
-                return i;
-            });
-
             const res = await fetch(`../api/images`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(updatedImages),
+                body: JSON.stringify(img),
             });
 
-            if (res.status !== 200) {
+            if (res.status == 200) {
+                const imgs = (await res.json()) as ImageApi[];
+                if (imgs) {
+                    setImages(imgs);
+                }
+            } else {
                 throw new Error(await res.text());
-            }
-
-            if (images) {
-                const updatedImageIds = new Set(updatedImages.map((i) => i.id));
-                setImages([...updatedImages, ...images.filter((img) => !updatedImageIds.has(img.id))]);
             }
 
             setCurrentImage(undefined);
@@ -247,22 +239,34 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
             return;
         }
 
-        await saveImages(
-            images
-                .filter((i) => selectedForCopy.has(i.id))
-                .map<ImageApi>((i) => ({
-                    ...i,
-                    lastchangedby: sessionUserOrUnknown(session?.user.name),
-                    source: copySource.source,
-                    sourcelink: copySource.sourcelink,
-                    license: copySource.license,
-                    licenselink: copySource.licenselink,
-                    creator: copySource.creator,
-                    attribution: copySource.attribution,
-                })),
-        ).catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
-
-        setShowCopy(false);
+        return confirm({
+            variant: 'danger',
+            catchOnCancel: true,
+            title: 'Are you sure want to copy?',
+            message: `This will copy all of the metadata from the original selected image to ALL of the other selected images. Do you want to continue?`,
+        })
+            .then(() => {
+                setShowCopy(false);
+                Promise.all(
+                    images
+                        .filter((i) => selectedForCopy.has(i.id))
+                        .map<ImageApi>((i) => ({
+                            ...i,
+                            lastchangedby: sessionUserOrUnknown(session?.user.name),
+                            source: copySource.source,
+                            sourcelink: copySource.sourcelink,
+                            license: copySource.license,
+                            licenselink: copySource.licenselink,
+                            creator: copySource.creator,
+                            attribution: copySource.attribution,
+                        }))
+                        .map((i) => saveImage(i)),
+                ).catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
+            })
+            .catch(() => {
+                setShowCopy(false);
+                Promise.resolve();
+            });
     };
 
     const selectRow: SelectRowProps<ImageApi> = {
@@ -300,7 +304,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                     // eslint-disable-next-line prettier/prettier
                     <ImageEdit 
                         image={currentImage}
-                        onSave={(i) => saveImages([i])}
+                        onSave={saveImage}
                         show={edit}
                         onClose={handleClose}
                     />
@@ -344,9 +348,12 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                                 clearButton
                                 selected={selected ? [selected] : []}
                                 onChange={(s: species[]) => {
-                                    if (selected) {
+                                    if (s.length > 0) {
                                         setSelected(s[0]);
-                                        router.push(`?speciesid=${selected?.id}`, undefined, { shallow: true });
+                                        router.push(`?speciesid=${s[0]?.id}`, undefined, { shallow: true });
+                                    } else {
+                                        setSelected(undefined);
+                                        router.push(``, undefined, { shallow: true });
                                     }
                                 }}
                             />
@@ -373,7 +380,6 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                                 striped
                                 headerClasses="table-header"
                                 rowEvents={rowEvents}
-                                // cellEdit={cellEditFactory(cellEditProps)}
                                 selectRow={selectRow}
                                 defaultSorted={[
                                     {
@@ -384,120 +390,6 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                             />
                         </Col>
                     </Row>
-                    {/* <div className="fixed-left mt-2 ml-2 mr-2">
-                        <Table striped>
-                            <thead>
-                                <tr>
-                                    <th>
-                                        <input type="checkbox" key={speciesid} onClick={selectAll} />
-                                    </th>
-                                    <th>image</th>
-                                    <th>default</th>
-                                    <th>source</th>
-                                    <th>source link</th>
-                                    <th>creator</th>
-                                    <th>attribution</th>
-                                    <th>license</th>
-                                    <th>license link</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {images?.map((img) => (
-                                    <tr key={img.id} id={img.id.toString()} onClick={editRow}>
-                                        <td>
-                                            <input
-                                                {...register(`delete-${img.id}`)}
-                                                type="checkbox"
-                                                key={img.id}
-                                                id={img.id.toString()}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    e.currentTarget.checked
-                                                        ? selectedImages.add(parseInt(e.currentTarget.id))
-                                                        : selectedImages.delete(parseInt(e.currentTarget.id));
-                                                    setSelectedImages(selectedImages);
-                                                }}
-                                            />
-                                        </td>
-                                        <td>
-                                            <img src={img.small} width="100" />
-                                        </td>
-                                        <td>
-                                            <span className="d-flex justify-content-center">{img.default ? '✓' : ''}</span>
-                                        </td>
-                                        <td>
-                                            {pipe(
-                                                img.source,
-                                                O.fold(constant(<>{'External'}</>), (s) => (
-                                                    <a
-                                                        href={`/source/${s.id}`}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                    >
-                                                        {s.title}
-                                                    </a>
-                                                )),
-                                            )}
-                                        </td>
-                                        <td>
-                                            <a
-                                                href={img.sourcelink}
-                                                onClick={(e) => e.stopPropagation()}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                            >
-                                                {img.sourcelink}
-                                            </a>
-                                        </td>
-                                        <td>{img.creator}</td>
-                                        <td>{img.attribution}</td>
-                                        <td>{img.license}</td>
-                                        <td>
-                                            <a
-                                                href={img.licenselink}
-                                                onClick={(e) => e.stopPropagation()}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                            >
-                                                {img.licenselink}
-                                            </a>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </Table>
-                        <style jsx>{`
-                            table {
-                                width: 100%;
-                                border-collapse: collapse;
-                            }
-
-                            thead th {
-                                text-align: left;
-                                border-bottom: 2px solid black;
-                            }
-
-                            thead button {
-                                border: 0;
-                                border-radius: none;
-                                font-family: inherit;
-                                font-weight: 700;
-                                font-size: inherit;
-                                padding: 0.5em;
-                                margin-bottom: 1px;
-                            }
-
-                            tbody td {
-                                padding: 0.5em;
-                                border-bottom: 1px solid #ccc;
-                            }
-
-                            tbody tr:hover {
-                                background-color: #eee;
-                            }
-                        `}</style>
-                    </div> */}
                 </form>
             </>
         </Auth>

@@ -127,6 +127,7 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
         form,
         formSubmit,
         mainField,
+        deleteButton,
     } = useAdmin(
         'Section',
         id,
@@ -214,16 +215,11 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
                         </p>
                     </Col>
                 </Row>
-                <Row className="form-group" hidden={!selected}>
-                    <Col xs="1">Delete?:</Col>
-                    <Col className="mr-auto">
-                        <input {...form.register('del')} type="checkbox" className="form-check-input" />
-                    </Col>
-                </Row>
                 <Row className="form-input">
                     <Col>
                         <input type="submit" className="button" value="Submit" />
                     </Col>
+                    <Col>{deleteButton('Caution. The Section will be deleted.')}</Col>
                 </Row>
             </form>
         </Admin>

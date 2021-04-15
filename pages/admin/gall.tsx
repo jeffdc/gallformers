@@ -12,7 +12,6 @@ import Typeahead from '../../components/Typeahead';
 import UndescribedFlow, { UndescribedData } from '../../components/UndescribedFlow';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
-import { useConfirmation } from '../../hooks/useconfirmation';
 import { extractQueryParam } from '../../libs/api/apipage';
 import * as AT from '../../libs/api/apitypes';
 import { FAMILY, FGS, GENUS, TaxonomyEntry, TaxonomyEntryNoParent } from '../../libs/api/taxonomy';
@@ -225,9 +224,11 @@ const Gall = ({
         deleteResults,
         setDeleteResults,
         renameCallback,
+        confirm,
         form,
         formSubmit,
         mainField,
+        deleteButton,
     } = useAdmin(
         'Gall',
         id,
@@ -239,8 +240,6 @@ const Gall = ({
         updatedFormFields,
         createNewGall,
     );
-
-    const confirm = useConfirmation();
 
     const rename = async (fields: FormFields, e: RenameEvent) => {
         if (e.old == undefined) throw new Error('Trying to add rename but old name is missing?!');
@@ -371,33 +370,6 @@ const Gall = ({
                         </Row>
                         <Row>
                             <Col>{mainField('name', 'Gall')}</Col>
-                            {/* 
-                                    onChangeWithNew={(e, isNew) => {
-                                        if (isNew || !e[0]) {
-                                            setSelected(undefined);
-                                            const g = genera.find((g) => g.name.localeCompare(e[0]?.name) == 0);
-                                            form.setValue(
-                                                'genus',
-                                                g
-                                                    ? [g]
-                                                    : [
-                                                          {
-                                                              id: -1,
-                                                              name: e[0] ? extractGenus(e[0].name) : '',
-                                                              description: '',
-                                                              type: GENUS,
-                                                              parent: O.none,
-                                                          },
-                                                      ],
-                                            );
-                                            router.replace(``, undefined, { shallow: true });
-                                        } else {
-                                            const gall: AT.GallApi = e[0];
-                                            setSelected(gall);
-                                            router.replace(`?id=${gall.id}`, undefined, { shallow: true });
-                                        }
-                                    }}
-                                */}
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowRenameModal(true)}>
@@ -440,13 +412,24 @@ const Gall = ({
                             selected={selected?.fgs?.family ? [selected.fgs.family] : []}
                             disabled={selected && selected.id > 0}
                             onChange={(f) => {
-                                if (selected) {
+                                if (f && f.length > 0 && selected) {
                                     // handle the case when a new species is created
+                                    // either the genus is new or is not
                                     const genus = genera.find((gg) => gg.id === selected.fgs.genus.id);
                                     if (genus && O.isNone(genus.parent)) {
                                         genus.parent = O.some({ ...f[0], parent: O.none });
-                                        setSelected({ ...selected, fgs: { ...selected.fgs, genus: genus } });
+                                        selected.fgs = { ...selected.fgs, genus: genus };
+                                        setSelected({ ...selected, fgs: { ...selected.fgs, family: f[0] } });
+                                    } else {
+                                        selected.fgs = { ...selected.fgs, family: f[0] };
+                                        setSelected({ ...selected });
                                     }
+                                } else if (selected) {
+                                    selected.fgs = {
+                                        ...selected.fgs,
+                                        family: { name: '', description: '', id: -1, type: FAMILY },
+                                    };
+                                    setSelected({ ...selected });
                                 }
                             }}
                             clearButton
@@ -660,20 +643,16 @@ const Gall = ({
                         data. However, filter criteria may not be comprehensive in every field.
                     </Col>
                 </Row>
-                <Row className="formGroups pb-1">
+                <Row className="formGroup pb-1">
                     <Col className="mr-auto">
                         <input {...form.register('undescribed')} type="checkbox" className="form-input-checkbox" /> Undescribed?
-                    </Col>
-                </Row>
-                <Row className="fromGroup pb-1" hidden={!selected}>
-                    <Col className="mr-auto">
-                        <input {...form.register('del')} type="checkbox" className="form-input-checkbox" /> Delete?
                     </Col>
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col>
                         <input type="submit" className="button" value="Submit" />
                     </Col>
+                    <Col>{deleteButton('Caution. All data associated with this Gall will be deleted.')}</Col>
                 </Row>
                 <Row hidden={!selected} className="formGroup">
                     <Col>

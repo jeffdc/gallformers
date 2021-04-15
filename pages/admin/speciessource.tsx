@@ -116,6 +116,10 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
         }
     };
 
+    const buildDelQueryString = (): string => {
+        return `?speciesid=${selected?.id}&sourceid=${selectedSource[0].source.id}`;
+    };
+
     // eslint-disable-next-line prettier/prettier
     const {
         selected,
@@ -128,13 +132,19 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
         postUpdate,
         postDelete,
         mainField,
+        deleteButton,
     } = useAdmin<species, FormFields, SpeciesSourceInsertFields>(
         'Species-Source Mapping',
         speciesid,
         allSpecies,
         update,
         toUpsertFields,
-        { keyProp: 'name', delEndpoint: '../api/speciessource/', upsertEndpoint: '../api/speciessource/insert' },
+        {
+            keyProp: 'name',
+            delEndpoint: '../api/speciessource/',
+            upsertEndpoint: '../api/speciessource/insert',
+            delQueryString: buildDelQueryString,
+        },
         schema,
         updatedFormFields,
     );
@@ -326,12 +336,6 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                             <label className="form-check-label">Use as Default?</label>
                         </Col>
                     </Row>
-                    <Row className="fromGroup" hidden={!selected}>
-                        <Col xs="1">Delete?:</Col>
-                        <Col className="mr-auto">
-                            <input {...form.register('del')} type="checkbox" className="form-check-input" />
-                        </Col>
-                    </Row>
                     <Row className="formGroup">
                         <Col>
                             <input
@@ -341,6 +345,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                                 disabled={!selected || selectedSource.length <= 0}
                             />
                         </Col>
+                        <Col>{deleteButton('Caution. The selected Species Source mapping will be deleted.', onSubmit)}</Col>
                     </Row>
                 </form>
             </Admin>
