@@ -52,11 +52,18 @@ const schema = yup.object().shape({
         )
         .min(1)
         .max(1),
-    family: yup.array().required(),
+    family: yup
+        .array()
+        .of(
+            yup.object({
+                name: yup.string().required(),
+            }),
+        )
+        .required(),
     // only force hosts to be present when adding, not deleting.
     hosts: yup.array().when('del', {
         is: false,
-        then: yup.array().required(),
+        then: yup.array().min(1),
     }),
 });
 
@@ -82,16 +89,6 @@ const updateGall = (s: AT.GallApi, newValue: string): AT.GallApi => ({
     name: newValue,
 });
 
-// const fetchFGS = async (h: AT.GallApi): Promise<FGS> => {
-//     const res = await fetch(`../api/taxonomy?id=${h.id}`);
-//     if (res.status === 200) {
-//         return await res.json();
-//     } else {
-//         console.error(await res.text());
-//         throw new Error('Failed to fetch taxonomy for the selected species. Check console.');
-//     }
-// };
-
 const Gall = ({
     id,
     gs,
@@ -111,6 +108,10 @@ const Gall = ({
     const [showNewUndescribed, setShowNewUndescribed] = useState(false);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): AT.GallUpsertFields => {
+        if (!selected) {
+            throw new Error('Trying to submit with a null selection which seems impossible but here we are.');
+        }
+
         return {
             gallid: hasProp(fields.mainField[0], 'gall') ? fields.mainField[0].gall.id : -1,
             abundance: fields.abundance[0].abundance,
@@ -120,7 +121,7 @@ const Gall = ({
             colors: fields.colors.map((c) => c.id),
             datacomplete: fields.datacomplete,
             detachable: fields.detachable,
-            fgs: { family: fields.family[0], genus: fields.genus[0], section: O.none },
+            fgs: selected.fgs,
             hosts: fields.hosts.map((h) => h.id),
             id: id,
             locations: fields.locations.map((l) => l.id),
@@ -133,6 +134,7 @@ const Gall = ({
     };
 
     const updatedFormFields = async (s: AT.GallApi | undefined): Promise<FormFields> => {
+        console.log(`JDC: ${JSON.stringify(s, null, '  ')}`);
         if (s != undefined) {
             setAliasData(s?.aliases);
             return {
@@ -140,17 +142,18 @@ const Gall = ({
                 genus: [s.fgs.genus],
                 family: [s.fgs.family],
                 abundance: [pipe(s.abundance, O.getOrElse(constant(AT.EmptyAbundance)))],
-                datacomplete: s.datacomplete,
                 alignments: s.gall.gallalignment,
                 cells: s.gall.gallcells,
                 colors: s.gall.gallcolor,
-                detachable: s.gall.detachable.value,
                 hosts: s.hosts,
                 locations: s.gall.galllocation,
                 shapes: s.gall.gallshape,
                 textures: s.gall.galltexture,
                 walls: s.gall.gallwalls,
-                undescribed: s.gall.undescribed,
+                // these next 3 fields are controlled so we have to read the value from the form
+                datacomplete: form.getValues().datacomplete,
+                detachable: form.getValues().detachable,
+                undescribed: form.getValues().undescribed,
                 del: false,
             };
         }

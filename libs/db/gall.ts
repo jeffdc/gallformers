@@ -86,7 +86,7 @@ export const getGalls = (
                                 source: true,
                             },
                         },
-                        image: { include: { source: { include: { speciessource: true } } } },
+                        image: { include: { source: true /*{ include: { speciessource: true } }*/ } },
                         speciestaxonomy: { include: { taxonomy: true } },
                         aliasspecies: { include: { alias: true } },
                     },
@@ -677,7 +677,7 @@ const gallUpdateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                 ],
             },
         }),
-        // now upsert a new species-taxonomy mapping (might be redundant if it already exists) and possibly create
+        // now upsert a new species-taxonomy mapping and possibly create
         // a new Genus Taxonomy record assinging it to the known Family
         db.speciestaxonomy.upsert({
             where: { species_id_taxonomy_id: { species_id: gall.id, taxonomy_id: gall.fgs.genus.id } },
@@ -701,8 +701,7 @@ const gallUpdateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                 },
             },
             update: {
-                species: { connect: { id: gall.id } },
-                taxonomy: { connect: { id: gall.fgs.genus.id } },
+                // no op
             },
         }),
     ];
@@ -716,13 +715,6 @@ const gallUpdateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
 export const upsertGall = (gall: GallUpsertFields): TaskEither<Error, GallApi> => {
     const updateGallTx = TE.tryCatch(() => db.$transaction(gallUpdateSteps(gall)), handleError);
     const createGallTx = TE.tryCatch(() => db.$transaction(gallCreateSteps(gall)), handleError);
-    // // // map potentially new genus to the family
-    // db.$executeRaw(`
-    //     INSERT OR IGNORE INTO taxonomytaxonomy (taxonomy_id, child_id)
-    //         SELECT parent_id, id
-    //         FROM taxonomy
-    //         WHERE name = 'Unknown' AND type = 'genus' AND parent_id = ${gall.fgs.family.id};
-    // `),
 
     const getGall = () => {
         return gallByName(gall.name);

@@ -7,6 +7,7 @@ import { allHosts } from '../../../libs/db/host';
 import { allFamilyIds, getAllSpeciesForSection, taxonomyTreeForId } from '../../../libs/db/taxonomy';
 import { getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { mightFail, mightFailWithArray } from '../../../libs/utils/util';
+import { allGalls } from '../../../libs/db/gall';
 
 type Props = {
     data: unknown[];
@@ -27,7 +28,8 @@ const Tester = ({ data }: Props): JSX.Element => {
 };
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-    const data = await getStaticPropsWithContext(context, allFamilyIds, 'TEST', true, true);
+    // const data = await getStaticPropsWithContext(context, allFamilyIds, 'TEST', true, true);
+    const data = await mightFailWithArray()(allGalls());
     // const data = await testTx();
     // const data = await mightFail(() => O.none)(taxonomyTreeForId(55));
     return {
