@@ -412,13 +412,24 @@ const Gall = ({
                             selected={selected?.fgs?.family ? [selected.fgs.family] : []}
                             disabled={selected && selected.id > 0}
                             onChange={(f) => {
-                                if (selected) {
+                                if (f && f.length > 0 && selected) {
                                     // handle the case when a new species is created
+                                    // either the genus is new or is not
                                     const genus = genera.find((gg) => gg.id === selected.fgs.genus.id);
                                     if (genus && O.isNone(genus.parent)) {
                                         genus.parent = O.some({ ...f[0], parent: O.none });
-                                        setSelected({ ...selected, fgs: { ...selected.fgs, genus: genus } });
+                                        selected.fgs = { ...selected.fgs, genus: genus };
+                                        setSelected({ ...selected, fgs: { ...selected.fgs, family: f[0] } });
+                                    } else {
+                                        selected.fgs = { ...selected.fgs, family: f[0] };
+                                        setSelected({ ...selected });
                                     }
+                                } else if (selected) {
+                                    selected.fgs = {
+                                        ...selected.fgs,
+                                        family: { name: '', description: '', id: -1, type: FAMILY },
+                                    };
+                                    setSelected({ ...selected });
                                 }
                             }}
                             clearButton
