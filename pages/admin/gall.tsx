@@ -134,6 +134,7 @@ const Gall = ({
     };
 
     const updatedFormFields = async (s: AT.GallApi | undefined): Promise<FormFields> => {
+        console.log(`JDC: ${JSON.stringify(s, null, '  ')}`);
         if (s != undefined) {
             setAliasData(s?.aliases);
             return {
@@ -141,17 +142,18 @@ const Gall = ({
                 genus: [s.fgs.genus],
                 family: [s.fgs.family],
                 abundance: [pipe(s.abundance, O.getOrElse(constant(AT.EmptyAbundance)))],
-                datacomplete: s.datacomplete,
                 alignments: s.gall.gallalignment,
                 cells: s.gall.gallcells,
                 colors: s.gall.gallcolor,
-                detachable: s.gall.detachable.value,
                 hosts: s.hosts,
                 locations: s.gall.galllocation,
                 shapes: s.gall.gallshape,
                 textures: s.gall.galltexture,
                 walls: s.gall.gallwalls,
-                undescribed: s.gall.undescribed,
+                // these next 3 fields are controlled so we have to read the value from the form
+                datacomplete: form.getValues().datacomplete,
+                detachable: form.getValues().detachable,
+                undescribed: form.getValues().undescribed,
                 del: false,
             };
         }
