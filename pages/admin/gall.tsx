@@ -52,11 +52,18 @@ const schema = yup.object().shape({
         )
         .min(1)
         .max(1),
-    family: yup.array().required(),
+    family: yup
+        .array()
+        .of(
+            yup.object({
+                name: yup.string().required(),
+            }),
+        )
+        .required(),
     // only force hosts to be present when adding, not deleting.
     hosts: yup.array().when('del', {
         is: false,
-        then: yup.array().required(),
+        then: yup.array().min(1),
     }),
 });
 
@@ -82,16 +89,6 @@ const updateGall = (s: AT.GallApi, newValue: string): AT.GallApi => ({
     name: newValue,
 });
 
-// const fetchFGS = async (h: AT.GallApi): Promise<FGS> => {
-//     const res = await fetch(`../api/taxonomy?id=${h.id}`);
-//     if (res.status === 200) {
-//         return await res.json();
-//     } else {
-//         console.error(await res.text());
-//         throw new Error('Failed to fetch taxonomy for the selected species. Check console.');
-//     }
-// };
-
 const Gall = ({
     id,
     gs,
@@ -111,6 +108,10 @@ const Gall = ({
     const [showNewUndescribed, setShowNewUndescribed] = useState(false);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): AT.GallUpsertFields => {
+        if (!selected) {
+            throw new Error('Trying to submit with a null selection which seems impossible but here we are.');
+        }
+
         return {
             gallid: hasProp(fields.mainField[0], 'gall') ? fields.mainField[0].gall.id : -1,
             abundance: fields.abundance[0].abundance,
@@ -120,7 +121,7 @@ const Gall = ({
             colors: fields.colors.map((c) => c.id),
             datacomplete: fields.datacomplete,
             detachable: fields.detachable,
-            fgs: { family: fields.family[0], genus: fields.genus[0], section: O.none },
+            fgs: selected.fgs,
             hosts: fields.hosts.map((h) => h.id),
             id: id,
             locations: fields.locations.map((l) => l.id),
