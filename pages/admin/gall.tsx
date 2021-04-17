@@ -150,10 +150,9 @@ const Gall = ({
                 shapes: s.gall.gallshape,
                 textures: s.gall.galltexture,
                 walls: s.gall.gallwalls,
-                // these next 3 fields are controlled so we have to read the value from the form
-                datacomplete: form.getValues().datacomplete,
-                detachable: form.getValues().detachable,
-                undescribed: form.getValues().undescribed,
+                datacomplete: s.datacomplete,
+                detachable: s.gall.detachable.value,
+                undescribed: s.gall.undescribed,
                 del: false,
             };
         }
@@ -306,6 +305,7 @@ const Gall = ({
             O.map((p) => p.id != family.id),
             O.fold(constant(false), (b) => b && genus.name.localeCompare('Unknown') == 0),
         );
+
         if (newGenusNeeded) {
             fields.genus = [{ id: -1, description: '', name: 'Unknown', type: GENUS }];
         }

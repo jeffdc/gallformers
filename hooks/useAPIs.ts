@@ -79,7 +79,7 @@ export const useAPIs = <T extends WithID, U>(
                     const keyFieldVal = (value[keyProp] as unknown) as string;
                     updated = convertFieldsToUpsert(data, keyFieldVal, value.id);
                 }
-
+                console.log(`JDC: UPDATED IN USEAPIS: ${JSON.stringify(updated, null, '  ')}`);
                 const res = await fetch(upsertEndpoint, {
                     method: 'POST',
                     headers: {

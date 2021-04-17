@@ -529,6 +529,7 @@ export const testTx = (): Promise<[species[]]> => {
 };
 
 const gallCreateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
+    console.log(`JDC: gall in create: ${JSON.stringify(gall, null, '  ')}`);
     return [
         db.species.create({
             data: {
@@ -566,11 +567,12 @@ const gallCreateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                     })),
                 },
                 speciestaxonomy: {
-                    // the genus might be new
-                    connectOrCreate: {
-                        where: { species_id_taxonomy_id: { species_id: gall.id, taxonomy_id: gall.fgs.genus.id } },
-                        create: {
-                            taxonomy: {
+                    // the speciestaxonomy records will be new since the gall is new
+                    create: {
+                        taxonomy: {
+                            // the genus might be new
+                            connectOrCreate: {
+                                where: { id: gall.fgs.genus.id },
                                 create: {
                                     description: gall.fgs.genus.description,
                                     name: gall.fgs.genus.name,
