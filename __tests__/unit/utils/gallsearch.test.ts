@@ -16,6 +16,7 @@ import {
     ShapeApi,
     WallsApi,
 } from '../../../libs/api/apitypes';
+import { FAMILY, GENUS } from '../../../libs/api/taxonomy';
 import { checkGall, testables } from '../../../libs/utils/gallsearch';
 
 const { dontCare } = testables;
@@ -31,10 +32,10 @@ describe('dontCare tests', () => {
 describe('checkGall tests', () => {
     const g: GallApi = {
         abundance: O.none,
-        commonnames: O.none,
         description: O.of('The chicken gall...'),
-        family: { id: 1, name: 'Phasianidae', description: '' },
         gall: {
+            id: -1,
+            undescribed: false,
             gallalignment: [],
             gallcells: [],
             gallcolor: [],
@@ -44,22 +45,26 @@ describe('checkGall tests', () => {
             gallshape: [],
             gallwalls: [],
         },
-        genus: 'Gallus',
         hosts: [],
         id: 1,
         name: 'Gallus gallus',
         speciessource: [],
-        synonyms: O.none,
         taxoncode: GallTaxon,
         images: [],
+        datacomplete: false,
+        aliases: [],
+        fgs: {
+            family: { id: 1, name: 'Phasianidae', description: '', type: FAMILY },
+            genus: { id: 1, name: 'Gallus', description: '', type: GENUS },
+            section: O.none,
+        },
     };
 
     const q: SearchQuery = {
         alignment: [],
         cells: [],
         color: [],
-        detachable: DetachableNone,
-        host: '',
+        detachable: [DetachableNone],
         locations: [],
         shape: [],
         textures: [],
@@ -156,7 +161,7 @@ describe('checkGall tests', () => {
             expect(
                 checkGall(makeG('detachable', a), {
                     ...q,
-                    detachable: b,
+                    detachable: [b],
                 }),
             ).toBe(expected);
         });

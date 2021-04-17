@@ -125,6 +125,18 @@ export const extractQueryParam = (q: ParsedUrlQuery, prop: string): O.Option<str
 };
 
 /**
+ * Given a @ParsedUrlQuery try and extract all of the named params that match the passed in @params.
+ * @param q
+ * @param params
+ * @returns an Object where the param is the key and an Option<string> is the value
+ */
+export const getQueryParams = (q: ParsedUrlQuery | undefined, params: string[]): Record<string, O.Option<string>> | undefined => {
+    if (q == undefined) return undefined;
+
+    return params.reduce((acc, p) => ({ ...acc, [p]: extractQueryParam(q, p) }), {} as Record<string, O.Option<string>>);
+};
+
+/**
  * Given a @NextApiRequest try and extract a query param from it that matches the @prop name passed in.
  * @param prop
  * @returns an Option that contains the query value as a string if it was found.

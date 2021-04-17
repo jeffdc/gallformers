@@ -45,7 +45,7 @@ export const checkGall = (g: GallApi, q: SearchQuery): boolean => {
         (!!g.gall.gallalignment && checkArray(g.gall.gallalignment, (a, b) => a.alignment === b, q.alignment));
     const cells = dontCare(q.cells) || (!!g.gall.gallcells && checkArray(g.gall.gallcells, (a, b) => a.cells === b, q.cells));
     const color = dontCare(q.color) || (!!g.gall.gallcolor && checkArray(g.gall.gallcolor, (a, b) => a.color === b, q.color));
-    const detachable = checkDetachable(g.gall.detachable, q.detachable);
+    const detachable = checkDetachable(g.gall.detachable, q.detachable[0]);
     const shape = dontCare(q.shape) || (!!g.gall.gallshape && checkArray(g.gall.gallshape, (a, b) => a.shape === b, q.shape));
     const walls = dontCare(q.walls) || (!!g.gall.gallwalls && checkArray(g.gall.gallwalls, (a, b) => a.walls === b, q.walls));
     const location = dontCare(q.locations) || (!!g.gall.galllocation && checkLocations(g.gall.galllocation, q.locations));

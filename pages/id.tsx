@@ -1,21 +1,27 @@
 import { yupResolver } from '@hookform/resolvers/yup';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
-import React, { useState } from 'react';
-import { Col, ListGroup, Row } from 'react-bootstrap';
+import { useRouter } from 'next/router';
+import { ParsedUrlQuery } from 'querystring';
+import React, { useEffect, useState } from 'react';
+import { Button, Col, ListGroup, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import InfoTip from '../components/infotip';
 import Typeahead from '../components/Typeahead';
+import { getQueryParams } from '../libs/api/apipage';
 import {
     AlignmentApi,
     CellsApi,
     ColorApi,
-    DetachableDetachable,
-    DetachableIntegral,
+    DetachableApi,
+    detachableFromString,
     DetachableNone,
-    emptySearchQuery,
+    Detachables,
+    EMPTYSEARCHQUERY,
     GallApi,
     GallLocation,
     GallTexture,
@@ -31,7 +37,7 @@ import { allHostsSimple } from '../libs/db/host';
 import { allGenera, allSections } from '../libs/db/taxonomy';
 import { defaultImage, truncateOptionString } from '../libs/pages/renderhelpers';
 import { checkGall } from '../libs/utils/gallsearch';
-import { capitalizeFirstLetter, mightFailWithArray } from '../libs/utils/util';
+import { capitalizeFirstLetter, hasProp, mightFailWithArray } from '../libs/utils/util';
 
 type SearchFormHostField = {
     host: HostSimple[];
@@ -47,7 +53,7 @@ type SearchFormFields = SearchFormHostField | SearchFormGenusField;
 
 type FilterFormFields = {
     locations: string[];
-    detachable: string;
+    detachable: DetachableApi[];
     textures: string[];
     alignment: string;
     walls: string;
@@ -59,6 +65,9 @@ type FilterFormFields = {
 const invalidArraySelection = (arr: unknown[]) => {
     return arr?.length === 0;
 };
+
+const isTaxonomy = (o: unknown): o is TaxonomyEntryNoParent => hasProp(o, 'type');
+const isHost = (o: unknown): o is HostSimple => hasProp(o, 'aliases');
 
 const Schema = yup.object().shape(
     {
@@ -77,6 +86,8 @@ const Schema = yup.object().shape(
 );
 
 type Props = {
+    hostOrTaxon: TaxonomyEntryNoParent | HostSimple | undefined | null;
+    query: SearchQuery | null;
     hosts: HostSimple[];
     sectionsAndGenera: TaxonomyEntryNoParent[];
     locations: GallLocation[];
@@ -88,99 +99,141 @@ type Props = {
     cells: CellsApi[];
 };
 
+const convertQForUrl = (hostOrTaxon: TaxonomyEntryNoParent | HostSimple | undefined, q: SearchQuery | undefined | null) => ({
+    hostOrTaxon: hostOrTaxon?.name,
+    type: isTaxonomy(hostOrTaxon) ? hostOrTaxon.type : 'host',
+    ...(q
+        ? {
+              detachable: q.detachable[0].value,
+              alignment: q.alignment.join(','),
+              cells: q.cells.join(','),
+              color: q.color.join(','),
+              locations: q.locations.join(','),
+              shape: q.shape.join(','),
+              textures: q.textures.join(','),
+              walls: q.walls.join(','),
+          }
+        : null),
+});
+
 const IDGall = (props: Props): JSX.Element => {
     const [galls, setGalls] = useState(new Array<GallApi>());
     const [filtered, setFiltered] = useState(new Array<GallApi>());
-    const [query, setQuery] = useState(emptySearchQuery());
-    const [host, setHost] = useState<Array<HostSimple>>([]);
-    const [genus, setGenus] = useState<Array<TaxonomyEntryNoParent>>([]);
+    const [hostOrTaxon, setHostOrTaxon] = useState(props?.hostOrTaxon);
+    const [query, setQuery] = useState(props.query);
 
     const disableFilter = (): boolean => {
-        return host.length < 1 && genus.length < 1;
+        return !hostOrTaxon;
     };
 
-    // this is the search form on sepcies or genus
+    // this is the search form on species or genus
     const {
         control,
-        // setValue,
-        handleSubmit,
         formState: { errors },
     } = useForm<SearchFormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
     });
 
+    const router = useRouter();
+
     // this is the faceted filter form
-    const { control: filterControl, reset: filterReset } = useForm<FilterFormFields>();
+    const { control: filterControl, reset: resetFilter } = useForm<FilterFormFields>();
 
-    const updateQuery = (f: keyof SearchQuery, v: string | string[]): SearchQuery => {
-        const qq: SearchQuery = { ...query };
-        if (f === 'host') {
-            qq.host = Array.isArray(v) ? v[0] : v;
-        } else if (f !== 'detachable') {
-            qq[f] = Array.isArray(v) ? v : [v];
-        } else {
-            // detachable
-            qq[f] = v[0] === 'yes' ? DetachableDetachable : v[0] === 'no' ? DetachableIntegral : DetachableNone;
-        }
-        return qq;
+    const resetForm = () => {
+        setHostOrTaxon(undefined);
+        setQuery(null);
     };
 
-    // this is the handler for changing either species or genus, it makes a DB round trip.
-    const onSubmit = async () => {
-        try {
-            // make sure to clear all of the filters since we are getting a new set of galls
-            filterReset();
-            let query = '';
-            if (host && host.length) {
-                query = encodeURI(`?host=${host[0].name}`);
-            } else if (genus && genus.length > 0) {
-                if (genus[0].type === SECTION) {
-                    query = `?section=${genus[0].name}`;
+    useEffect(() => {
+        const fetchData = async () => {
+            if (!hostOrTaxon) {
+                resetFilter();
+                setGalls([]);
+                setFiltered([]);
+                router.replace('', undefined, { shallow: true });
+
+                return;
+            }
+
+            try {
+                let queryString = '';
+                if (isTaxonomy(hostOrTaxon)) {
+                    if (hostOrTaxon.type === SECTION) {
+                        queryString = `?section=${hostOrTaxon.name}`;
+                    } else {
+                        queryString = `?genus=${hostOrTaxon.name}`;
+                    }
                 } else {
-                    query = `?genus=${genus[0].name}`;
+                    queryString = encodeURI(`?host=${hostOrTaxon.name}`);
                 }
-            }
 
-            const res = await fetch(`../api/search${query}`, {
-                method: 'GET',
-            });
+                const res = await fetch(`../api/search${queryString}`, {
+                    method: 'GET',
+                });
 
-            if (res.status === 200) {
-                const g = (await res.json()) as GallApi[];
-                if (!g || !Array.isArray(g)) {
-                    throw new Error('Received an invalid search result.');
+                if (res.status === 200) {
+                    const g = (await res.json()) as GallApi[];
+                    if (!g || !Array.isArray(g)) {
+                        throw new Error('Received an invalid search result.');
+                    }
+                    setGalls(g.sort((a, b) => a.name.localeCompare(b.name)));
+                    setFiltered(g);
+
+                    router.replace(
+                        {
+                            query: {
+                                ...convertQForUrl(hostOrTaxon, query),
+                            },
+                        },
+                        undefined,
+                        { shallow: true },
+                    );
+                } else {
+                    throw new Error(await res.text());
                 }
-                setGalls(g.sort((a, b) => a.name.localeCompare(b.name)));
-                setFiltered(g);
-            } else {
-                throw new Error(await res.text());
+            } catch (e) {
+                console.error(e);
             }
-        } catch (e) {
-            console.error(e);
+        };
+
+        fetchData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hostOrTaxon]);
+
+    useEffect(() => {
+        if (!query || !hostOrTaxon) {
+            router.replace('', undefined, { shallow: true });
+            return;
         }
-    };
 
-    // this is the handler for changing any other field, all work is done locally
-    const doSearch = async (field: keyof FilterFormFields, value: string | string[]) => {
-        const newq = updateQuery(field, value);
-        const f = galls.filter((g) => checkGall(g, newq));
+        const f = galls.filter((g) => checkGall(g, query));
         setFiltered(f);
-        setQuery(newq);
-    };
 
-    const makeFormInput = (field: keyof FilterFormFields, opts: string[], multiple = false) => {
+        router.replace(
+            {
+                query: {
+                    ...convertQForUrl(hostOrTaxon, query),
+                },
+            },
+            undefined,
+            { shallow: true },
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [query, galls]);
+
+    const makeFormInput = (field: keyof Omit<FilterFormFields, 'detachable'>, opts: string[], multiple = false) => {
         return (
             <Typeahead
                 name={field}
                 control={filterControl}
+                selected={query ? query[field] : []}
                 onChange={(selected) => {
-                    doSearch(field, selected);
-                }}
-                onKeyDownT={(e) => {
-                    if (e.key === 'Enter') {
-                        doSearch(field, e.currentTarget.value);
-                    }
+                    console.log(`${field} changed`);
+                    setQuery({
+                        ...(query ? query : EMPTYSEARCHQUERY),
+                        [field]: selected,
+                    });
                 }}
                 placeholder={capitalizeFirstLetter(field)}
                 options={opts}
@@ -197,7 +250,7 @@ const IDGall = (props: Props): JSX.Element => {
                 <title>ID Galls</title>
             </Head>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="fixed-left mt-2 ml-4 mr-2 form-group">
+            <form className="fixed-left mt-2 ml-4 mr-2 form-group">
                 <Row>
                     <Col>
                         First select either the host species or the genus/section for a host if you are unsure of the species,
@@ -210,10 +263,18 @@ const IDGall = (props: Props): JSX.Element => {
                         <Typeahead
                             name="host"
                             control={control}
-                            selected={host ? host : []}
+                            selected={hostOrTaxon && isHost(hostOrTaxon) ? [hostOrTaxon] : []}
                             onChange={(h) => {
-                                setGenus([]);
-                                setHost(h);
+                                setHostOrTaxon(h[0]);
+                                // if (query) {
+                                //     setQuery({
+                                //         ...query,
+                                //         detachable: query.detachable ? query.detachable : [],
+                                //         key: h[0] as HostSimple,
+                                //     });
+                                // } else {
+                                //     setQuery(EMPTYSEARCHQUERY);
+                                // }
                             }}
                             placeholder="Host"
                             clearButton
@@ -239,10 +300,13 @@ const IDGall = (props: Props): JSX.Element => {
                         <Typeahead
                             name="genus"
                             control={control}
-                            selected={genus ? genus : []}
-                            onChange={(h) => {
-                                setHost([]);
-                                setGenus(h);
+                            selected={hostOrTaxon && isTaxonomy(hostOrTaxon) ? [hostOrTaxon] : []}
+                            onChange={(g) => {
+                                setHostOrTaxon(g[0]);
+                                // setQuery({
+                                //     ...query,
+                                //     key: g[0],
+                                // });
                             }}
                             placeholder="Genus"
                             clearButton
@@ -269,20 +333,24 @@ const IDGall = (props: Props): JSX.Element => {
                         )}
                     </Col>
                 </Row>
-                <Row>
-                    <Col className="pt-2">
-                        <input type="submit" value="Search" className=" btn btn-secondary" />
-                    </Col>
-                </Row>
             </form>
             <hr />
             <Row>
                 <Col xs={3}>
                     <form className="fixed-left ml-4 form-group">
-                        <label className="col-form-label">
-                            Location(s):
-                            <InfoTip id="locations" text="Where on the host the gall is found." />
-                        </label>
+                        <Row>
+                            <Col>
+                                <label className="col-form-label">
+                                    Location(s):
+                                    <InfoTip id="locations" text="Where on the host the gall is found." />
+                                </label>
+                            </Col>
+                            <Col xs={5} className="mr-0 pr-0">
+                                <Button variant="outline-primary" size="sm" onClick={resetForm}>
+                                    Reset Form
+                                </Button>
+                            </Col>
+                        </Row>
                         {makeFormInput(
                             'locations',
                             props.locations.map((l) => l.loc),
@@ -308,7 +376,25 @@ const IDGall = (props: Props): JSX.Element => {
                         <label className="col-form-label">
                             Detachable: <InfoTip id="detachable" text="Can the gall be removed from the host without cutting?" />
                         </label>
-                        {makeFormInput('detachable', ['yes', 'no'])}
+                        <Typeahead
+                            name="detachable"
+                            control={filterControl}
+                            selected={query ? query.detachable : []}
+                            onChange={(selected) => {
+                                if (!query) {
+                                    return;
+                                }
+                                setQuery({
+                                    ...query,
+                                    detachable: selected,
+                                });
+                            }}
+                            placeholder="Detachable"
+                            options={Detachables}
+                            labelKey={'value'}
+                            disabled={disableFilter()}
+                            clearButton={true}
+                        />
                         <label className="col-form-label">
                             Alignment:{' '}
                             <InfoTip id="alignment" text="How the gall is positioned relative to the host substrate." />
@@ -356,7 +442,7 @@ const IDGall = (props: Props): JSX.Element => {
                     <Row className="m-2">
                         <ListGroup>
                             {filtered.length == 0 ? (
-                                query == undefined || query.host == undefined ? (
+                                hostOrTaxon == undefined ? (
                                     <h4 className="font-weight-lighter">
                                         To begin with select a Host or a Genus to see matching galls. Then you can use the filters
                                         on the left to narrow down the list.
@@ -368,13 +454,8 @@ const IDGall = (props: Props): JSX.Element => {
                                 filtered.map((g) => (
                                     <ListGroup.Item key={g.id}>
                                         <Row key={g.id}>
-                                            <Col xs={2} className="">
-                                                <img
-                                                    src={defaultImage(g)?.small}
-                                                    width="75px"
-                                                    height="75px"
-                                                    className="img-responsive"
-                                                />
+                                            <Col xs={3} className="">
+                                                <img src={defaultImage(g)?.small} width="125px" className="img-responsive" />
                                             </Col>
                                             <Col className="pl-0 pull-right">
                                                 <Link href={`gall/${g.id}`}>
@@ -394,14 +475,67 @@ const IDGall = (props: Props): JSX.Element => {
     );
 };
 
-export const getServerSideProps: GetServerSideProps = async () => {
+const queryUrlParams = [
+    'hostOrTaxon',
+    'type',
+    'detachable',
+    'alignment',
+    'walls',
+    'locations',
+    'textures',
+    'color',
+    'shape',
+    'cells',
+];
+
+export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
+    const hosts = await mightFailWithArray<HostSimple>()(allHostsSimple());
     const genera = await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon));
     const sections = await mightFailWithArray<TaxonomyEntry>()(allSections());
     const sectionsAndGenera = [...genera, ...sections].sort((a, b) => a.name.localeCompare(b.name));
 
+    const query = getQueryParams(context.query, queryUrlParams);
+    const hostOrTaxon = pipe(
+        O.fromNullable(query),
+        O.chain((q) =>
+            pipe(
+                q['hostOrTaxon'],
+                O.chain((k) =>
+                    pipe(
+                        q['type'],
+                        O.chain((t) =>
+                            O.fromNullable(
+                                t === 'host'
+                                    ? hosts.find((h) => h.name === k)
+                                    : sectionsAndGenera.find((g) => g.name === k && g.type === t),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        O.getOrElseW(constant(null)),
+    );
+    const split = (a: string): string[] => a.split(',');
+
+    const searchQuery: SearchQuery | null = query
+        ? {
+              alignment: pipe(query['alignment'], O.fold(constant([]), split)),
+              cells: pipe(query['cells'], O.fold(constant([]), split)),
+              color: pipe(query['color'], O.fold(constant([]), split)),
+              detachable: [pipe(query['detachable'], O.fold(constant(DetachableNone), detachableFromString))],
+              locations: pipe(query['locations'], O.fold(constant([]), split)),
+              shape: pipe(query['shape'], O.fold(constant([]), split)),
+              textures: pipe(query['textures'], O.fold(constant([]), split)),
+              walls: pipe(query['walls'], O.fold(constant([]), split)),
+          }
+        : null;
+
     return {
         props: {
-            hosts: await mightFailWithArray<HostSimple>()(allHostsSimple()),
+            hostOrTaxon: hostOrTaxon,
+            query: searchQuery,
+            hosts: hosts,
             sectionsAndGenera: sectionsAndGenera,
             locations: await mightFailWithArray<GallLocation>()(locations()),
             colors: await mightFailWithArray<ColorApi>()(colors()),
