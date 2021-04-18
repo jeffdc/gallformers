@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import React from 'react';
-import { Alert, Button, Col, Row } from 'react-bootstrap';
+import { Alert, Col, Row } from 'react-bootstrap';
 import { Toaster } from 'react-hot-toast';
 import Auth from '../../components/auth';
 import EditName, { RenameEvent } from '../../components/editname';

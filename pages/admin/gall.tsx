@@ -7,25 +7,22 @@ import React, { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
-import { RenameEvent } from '../../components/editname';
 import Typeahead from '../../components/Typeahead';
 import UndescribedFlow, { UndescribedData } from '../../components/UndescribedFlow';
 import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields } from '../../hooks/useAPIs';
+import useSpecies, { SpeciesFormFields, SpeciesProps } from '../../hooks/useSpecies';
 import { extractQueryParam } from '../../libs/api/apipage';
 import * as AT from '../../libs/api/apitypes';
-import { FAMILY, FGS, GENUS, TaxonomyEntry, TaxonomyEntryNoParent } from '../../libs/api/taxonomy';
+import { FAMILY, GENUS, TaxonomyEntry } from '../../libs/api/taxonomy';
 import { alignments, allGalls, cells, colors, locations, shapes, textures, walls } from '../../libs/db/gall';
 import { allHostsSimple } from '../../libs/db/host';
 import { abundances } from '../../libs/db/species';
 import { allFamilies, allGenera } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
-import { extractGenus, hasProp, mightFailWithArray } from '../../libs/utils/util';
+import { hasProp, mightFailWithArray } from '../../libs/utils/util';
 
-type Props = {
-    id: string;
+type Props = SpeciesProps & {
     gs: AT.GallApi[];
-    abundances: AT.AbundanceApi[];
     hosts: AT.HostSimple[];
     locations: AT.GallLocation[];
     colors: AT.ColorApi[];
@@ -34,8 +31,6 @@ type Props = {
     alignments: AT.AlignmentApi[];
     walls: AT.WallsApi[];
     cells: AT.CellsApi[];
-    families: TaxonomyEntry[];
-    genera: TaxonomyEntry[];
 };
 
 const schema = yup.object().shape({
@@ -67,10 +62,7 @@ const schema = yup.object().shape({
     }),
 });
 
-export type FormFields = AdminFormFields<AT.GallApi> & {
-    genus: TaxonomyEntryNoParent[];
-    family: TaxonomyEntryNoParent[];
-    abundance: AT.AbundanceApi[];
+export type FormFields = SpeciesFormFields<AT.GallApi> & {
     hosts: AT.GallHost[];
     detachable: AT.DetachableValues;
     walls: AT.WallsApi[];
@@ -80,14 +72,8 @@ export type FormFields = AdminFormFields<AT.GallApi> & {
     colors: AT.ColorApi[];
     locations: AT.GallLocation[];
     textures: AT.GallTexture[];
-    datacomplete: boolean;
     undescribed: boolean;
 };
-
-const updateGall = (s: AT.GallApi, newValue: string): AT.GallApi => ({
-    ...s,
-    name: newValue,
-});
 
 const Gall = ({
     id,
@@ -104,8 +90,16 @@ const Gall = ({
     families,
     genera,
 }: Props): JSX.Element => {
-    const [aliasData, setAliasData] = useState<Array<AT.AliasApi>>([]);
     const [showNewUndescribed, setShowNewUndescribed] = useState(false);
+
+    const {
+        renameSpecies,
+        createNewSpecies,
+        updatedSpeciesFormFields,
+        toSpeciesUpsertFields,
+        aliasData,
+        setAliasData,
+    } = useSpecies<AT.GallApi>(genera);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): AT.GallUpsertFields => {
         if (!selected) {
@@ -113,19 +107,16 @@ const Gall = ({
         }
 
         return {
+            ...toSpeciesUpsertFields(fields, name, id),
             gallid: hasProp(fields.mainField[0], 'gall') ? fields.mainField[0].gall.id : -1,
-            abundance: fields.abundance[0].abundance,
             aliases: aliasData,
             alignments: fields.alignments.map((a) => a.id),
             cells: fields.cells.map((c) => c.id),
             colors: fields.colors.map((c) => c.id),
-            datacomplete: fields.datacomplete,
             detachable: fields.detachable,
             fgs: selected.fgs,
             hosts: fields.hosts.map((h) => h.id),
-            id: id,
             locations: fields.locations.map((l) => l.id),
-            name: name,
             shapes: fields.shapes.map((s) => s.id),
             textures: fields.textures.map((t) => t.id),
             undescribed: fields.undescribed,
@@ -134,73 +125,40 @@ const Gall = ({
     };
 
     const updatedFormFields = async (s: AT.GallApi | undefined): Promise<FormFields> => {
-        console.log(`JDC: ${JSON.stringify(s, null, '  ')}`);
+        const speciesFields = updatedSpeciesFormFields(s);
         if (s != undefined) {
-            setAliasData(s?.aliases);
             return {
-                mainField: [s],
-                genus: [s.fgs.genus],
-                family: [s.fgs.family],
-                abundance: [pipe(s.abundance, O.getOrElse(constant(AT.EmptyAbundance)))],
+                ...speciesFields,
                 alignments: s.gall.gallalignment,
                 cells: s.gall.gallcells,
                 colors: s.gall.gallcolor,
+                detachable: s.gall.detachable.value,
                 hosts: s.hosts,
                 locations: s.gall.galllocation,
                 shapes: s.gall.gallshape,
                 textures: s.gall.galltexture,
-                walls: s.gall.gallwalls,
-                datacomplete: s.datacomplete,
-                detachable: s.gall.detachable.value,
                 undescribed: s.gall.undescribed,
-                del: false,
+                walls: s.gall.gallwalls,
             };
         }
 
-        setAliasData([]);
         return {
-            mainField: [],
-            genus: [],
-            family: [],
-            abundance: [AT.EmptyAbundance],
-            datacomplete: false,
+            ...speciesFields,
+            alignments: [],
+            cells: [],
+            colors: [],
             detachable: AT.DetachableNone.value,
+            hosts: [],
+            locations: [],
+            shapes: [],
+            textures: [],
             undescribed: false,
             walls: [],
-            cells: [],
-            alignments: [],
-            colors: [],
-            shapes: [],
-            locations: [],
-            textures: [],
-            hosts: [],
-            del: false,
-        };
-    };
-
-    const fgsFromName = (name: string): FGS => {
-        const genusName = extractGenus(name);
-        const genus = genera.find((g) => g.name.localeCompare(genusName) == 0);
-        const family = genus?.parent ? pipe(genus.parent, O.getOrElseW(constant(undefined))) : undefined;
-
-        return {
-            family: family ? family : { id: -1, description: '', name: '', type: FAMILY },
-            genus: genus ? { ...genus } : { id: -1, description: '', name: genusName, type: GENUS },
-            section: O.none,
         };
     };
 
     const createNewGall = (name: string): AT.GallApi => ({
-        name: name,
-        abundance: O.none,
-        aliases: [],
-        datacomplete: false,
-        description: O.none,
-        fgs: fgsFromName(name),
-        id: -1,
-        images: [],
-        speciessource: [],
-        taxoncode: AT.GallTaxon,
+        ...createNewSpecies(name, AT.GallTaxon),
         gall: {
             detachable: AT.DetachableNone,
             gallalignment: [],
@@ -235,52 +193,13 @@ const Gall = ({
         'Gall',
         id,
         gs,
-        updateGall,
+        renameSpecies,
         toUpsertFields,
         { keyProp: 'name', delEndpoint: '../api/gall/', upsertEndpoint: '../api/gall/upsert' },
         schema,
         updatedFormFields,
         createNewGall,
     );
-
-    const rename = async (fields: FormFields, e: RenameEvent) => {
-        if (e.old == undefined) throw new Error('Trying to add rename but old name is missing?!');
-
-        if (e.addAlias) {
-            aliasData.push({
-                id: -1,
-                name: e.old,
-                type: 'scientific',
-                description: 'Previous name',
-            });
-        }
-
-        // have to check for genus rename
-        const newGenus = extractGenus(e.new);
-        if (newGenus.localeCompare(extractGenus(e.old)) != 0) {
-            const g = genera.find((g) => g.name.localeCompare(newGenus) == 0);
-            if (g == undefined) {
-                return confirm({
-                    variant: 'danger',
-                    catchOnCancel: true,
-                    title: 'Are you sure want to create a new genus?',
-                    message: `Renaming the genus to ${newGenus} will create a new genus under the current family ${fields.family[0].name}. Do you want to continue?`,
-                }).then(() => {
-                    fields.genus[0] = {
-                        id: -1,
-                        description: '',
-                        name: newGenus,
-                        type: GENUS,
-                    };
-                    return Promise.bind(onSubmit(fields));
-                });
-            } else {
-                fields.genus[0] = g;
-            }
-        }
-
-        return onSubmit(fields);
-    };
 
     const newUndescribedDone = (data: UndescribedData | undefined) => {
         setShowNewUndescribed(false);
@@ -331,7 +250,7 @@ const Gall = ({
         <Admin
             type="Gall"
             keyField="name"
-            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback(rename) }}
+            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback }}
             setShowModal={setShowRenameModal}
             showModal={showRenameModal}
             setError={setError}

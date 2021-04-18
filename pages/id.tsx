@@ -121,6 +121,7 @@ const IDGall = (props: Props): JSX.Element => {
     const [filtered, setFiltered] = useState(new Array<GallApi>());
     const [hostOrTaxon, setHostOrTaxon] = useState(props?.hostOrTaxon);
     const [query, setQuery] = useState(props.query);
+    const [showAdvanced, setShowAdvanced] = useState(false);
 
     const disableFilter = (): boolean => {
         return !hostOrTaxon;
@@ -356,23 +357,6 @@ const IDGall = (props: Props): JSX.Element => {
                             props.locations.map((l) => l.loc),
                             true,
                         )}
-                        <hr />
-                        <p className="font-italic small">
-                            Start with Host/Genus & Location. Many galls will not have associated information for all of the below
-                            properties.
-                        </p>
-                        <label className="col-form-label">
-                            Texture(s):
-                            <InfoTip
-                                id="textures"
-                                text="The look and feel of the gall. If you are unsure what any of the terms mean check the glossary (? icon on top right)."
-                            />
-                        </label>
-                        {makeFormInput(
-                            'textures',
-                            props.textures.map((t) => t.tex),
-                            true,
-                        )}
                         <label className="col-form-label">
                             Detachable: <InfoTip id="detachable" text="Can the gall be removed from the host without cutting?" />
                         </label>
@@ -395,43 +379,72 @@ const IDGall = (props: Props): JSX.Element => {
                             disabled={disableFilter()}
                             clearButton={true}
                         />
-                        <label className="col-form-label">
-                            Alignment:{' '}
-                            <InfoTip id="alignment" text="How the gall is positioned relative to the host substrate." />
-                        </label>
-                        {makeFormInput(
-                            'alignment',
-                            props.alignments.map((a) => a.alignment),
-                        )}
-                        <label className="col-form-label">
-                            Walls:{' '}
-                            <InfoTip id="walls" text="What the walls between the outside and the inside of the gall are like." />
-                        </label>
-                        {makeFormInput(
-                            'walls',
-                            props.walls.map((w) => w.walls),
-                        )}
-                        <label className="col-form-label">
-                            Cells: <InfoTip id="locations" text="The number of internal chambers that the gall contains." />
-                        </label>
-                        {makeFormInput(
-                            'cells',
-                            props.cells.map((c) => c.cells),
-                        )}
-                        <label className="col-form-label">
-                            Shape: <InfoTip id="locations" text="The overall shape of the gall." />
-                        </label>
-                        {makeFormInput(
-                            'shape',
-                            props.shapes.map((s) => s.shape),
-                        )}
-                        <label className="col-form-label">
-                            Color: <InfoTip id="locations" text="The outside color of the gall." />
-                        </label>
-                        {makeFormInput(
-                            'color',
-                            props.colors.map((c) => c.color),
-                        )}
+                        <hr />
+                        <Button
+                            variant="outline-secondary"
+                            size="sm"
+                            className="mb-2"
+                            onClick={() => setShowAdvanced(!showAdvanced)}
+                        >
+                            {showAdvanced ? 'Hide Search Filters' : 'Advanced Search Filters'}
+                        </Button>
+                        <span hidden={!showAdvanced}>
+                            <p className="font-italic small">
+                                Be aware that many galls will not have associated information for all of the below properties.
+                            </p>
+                            <label className="col-form-label">
+                                Texture(s):
+                                <InfoTip
+                                    id="textures"
+                                    text="The look and feel of the gall. If you are unsure what any of the terms mean check the glossary (? icon on top right)."
+                                />
+                            </label>
+                            {makeFormInput(
+                                'textures',
+                                props.textures.map((t) => t.tex),
+                                true,
+                            )}
+                            <label className="col-form-label">
+                                Alignment:{' '}
+                                <InfoTip id="alignment" text="How the gall is positioned relative to the host substrate." />
+                            </label>
+                            {makeFormInput(
+                                'alignment',
+                                props.alignments.map((a) => a.alignment),
+                            )}
+                            <label className="col-form-label">
+                                Walls:{' '}
+                                <InfoTip
+                                    id="walls"
+                                    text="What the walls between the outside and the inside of the gall are like."
+                                />
+                            </label>
+                            {makeFormInput(
+                                'walls',
+                                props.walls.map((w) => w.walls),
+                            )}
+                            <label className="col-form-label">
+                                Cells: <InfoTip id="locations" text="The number of internal chambers that the gall contains." />
+                            </label>
+                            {makeFormInput(
+                                'cells',
+                                props.cells.map((c) => c.cells),
+                            )}
+                            <label className="col-form-label">
+                                Shape: <InfoTip id="locations" text="The overall shape of the gall." />
+                            </label>
+                            {makeFormInput(
+                                'shape',
+                                props.shapes.map((s) => s.shape),
+                            )}
+                            <label className="col-form-label">
+                                Color: <InfoTip id="locations" text="The outside color of the gall." />
+                            </label>
+                            {makeFormInput(
+                                'color',
+                                props.colors.map((c) => c.color),
+                            )}
+                        </span>
                     </form>
                 </Col>
                 <Col className="mt-2 form-group mr-4">

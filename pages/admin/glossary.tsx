@@ -5,6 +5,7 @@ import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
+import { RenameEvent } from '../../components/editname';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
@@ -26,9 +27,9 @@ type Props = {
 
 type FormFields = AdminFormFields<Entry> & Pick<Entry, 'definition' | 'urls'>;
 
-const updateEntry = (s: Entry, newValue: string): Entry => ({
+const renameEntry = async (s: Entry, e: RenameEvent): Promise<Entry> => ({
     ...s,
-    word: newValue,
+    word: e.new,
 });
 
 const toUpsertFields = (fields: FormFields, word: string, id: number): GlossaryEntryUpsertFields => {
@@ -75,7 +76,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
         'Glossary Entry',
         id,
         glossary,
-        updateEntry,
+        renameEntry,
         toUpsertFields,
         { keyProp: 'word', delEndpoint: '../api/glossary/', upsertEndpoint: '../api/glossary/upsert' },
         schema,
@@ -86,7 +87,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
         <Admin
             type="Glossary Entry"
             keyField="word"
-            editName={{ getDefault: () => selected?.word, renameCallback: renameCallback(formSubmit) }}
+            editName={{ getDefault: () => selected?.word, renameCallback: renameCallback }}
             setShowModal={setShowModal}
             showModal={showModal}
             setError={setError}

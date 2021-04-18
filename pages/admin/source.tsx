@@ -5,6 +5,7 @@ import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
+import { RenameEvent } from '../../components/editname';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
@@ -27,9 +28,9 @@ type Props = {
 
 type FormFields = AdminFormFields<SourceApi> & Omit<SourceApi, 'id' | 'title'>;
 
-const updateSource = (s: SourceApi, newValue: string) => ({
+const renameSource = async (s: SourceApi, e: RenameEvent) => ({
     ...s,
-    title: newValue,
+    title: e.new,
 });
 
 const toUpsertFields = (fields: FormFields, name: string, id: number): SourceUpsertFields => {
@@ -89,7 +90,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
         'Source',
         id,
         sources,
-        updateSource,
+        renameSource,
         toUpsertFields,
         { keyProp: 'title', delEndpoint: '../api/source/', upsertEndpoint: '../api/source/upsert' },
         schema,
@@ -101,7 +102,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
         <Admin
             type="Source"
             keyField="title"
-            editName={{ getDefault: () => selected?.title, renameCallback: renameCallback(formSubmit) }}
+            editName={{ getDefault: () => selected?.title, renameCallback: renameCallback }}
             setShowModal={setShowModal}
             showModal={showModal}
             setError={setError}

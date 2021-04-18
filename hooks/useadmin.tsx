@@ -25,7 +25,7 @@ type AdminData<T, FormFields> = {
     setError: (err: string) => void;
     deleteResults?: DeleteResult;
     setDeleteResults: (dr: DeleteResult) => void;
-    renameCallback: (doRename: (s: FormFields, e: RenameEvent) => void) => (e: RenameEvent) => void;
+    renameCallback: (e: RenameEvent) => void;
     form: UseFormReturn<FormFields>;
     confirm: (options: ConfirmationOptions) => Promise<void>;
     formSubmit: (fields: FormFields) => Promise<void>;
@@ -41,7 +41,7 @@ type AdminData<T, FormFields> = {
  * @param type a string representing the type of data being Adminstered.
  * @param id the initial id that is selected, could be undefined
  * @param ts an array of the data type
- * @param update a function to create a new T from a give T and a new value for its "key"
+ * @param rename a function to create a new T from a given T and a new value for its "name" aka the key
  * @param toUpsertFields a function that converts FormFields to UpsertFields
  * @param apiConfig the configuration for the API endpoints
  * @param schema the form validation schema
@@ -52,7 +52,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     type: string,
     id: string | undefined,
     ts: T[],
-    update: (t: T, tName: string) => T,
+    rename: (t: T, e: RenameEvent, confirm: (options: ConfirmationOptions) => Promise<void>) => Promise<T>,
     toUpsertFields: (fields: FormFields, keyField: string, id: number) => UpsertFields,
     apiConfig: { keyProp: keyof T; delEndpoint: string; upsertEndpoint: string; delQueryString?: () => string },
     schema: yup.ObjectSchema<ObjectShape, AnyObject, Maybe<TypeOfShape<ObjectShape>>, Maybe<AssertsShape<ObjectShape>>>,
@@ -189,15 +189,15 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
             .catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
     };
 
-    const renameCallback = (doRename: (s: FormFields, e: RenameEvent) => void) => async (e: RenameEvent) => {
+    const renameCallback = async (e: RenameEvent) => {
         if (selected == undefined) {
             const msg = `You encountered a bug. The current selection is invalid in the middle of a rename operation.`;
             console.error(msg);
             setError(msg);
             return;
         }
-        const updated = update(selected, e.new);
-        doRename(await updatedFormFields(updated), e);
+        const updated = await rename(selected, e, confirm);
+        formSubmit(await updatedFormFields(updated));
     };
 
     const onDataChange = useCallback(async (t: T | undefined) => {

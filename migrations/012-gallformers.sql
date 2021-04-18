@@ -94,6 +94,69 @@ DELETE FROM taxonomy
 DROP TABLE [temp].tax;
 DROP TABLE [temp].taxdup;
 
+-- also had some bad data where Families were related to species and genera where NOT related to families
+-- delete any species -> family mappings as these are invalid
+DELETE FROM speciestaxonomy
+WHERE EXISTS (
+    SELECT species_id,
+           taxonomy_id
+      FROM speciestaxonomy AS st2
+           INNER JOIN
+           taxonomy AS t ON t.id = st2.taxonomy_id
+     WHERE t.type = 'family' AND speciestaxonomy.taxonomy_id = t.id
+);
+
+CREATE TEMP TABLE bad (
+    id        INTEGER,
+    name      TEXT,
+    genid     INTEGER,
+    type      TEXT,
+    parent_id  INTEGER
+);
+
+-- find species mapped to genera that are not mapped to a family
+INSERT INTO [temp].bad (
+                           id,
+                           name,
+                           genid,
+                           type,
+                           parent_id
+                       )
+                       SELECT s.id,
+                              s.name,
+                              spt.taxonomy_id,
+                              tax.type,
+                              tax.parent_id
+                         FROM species AS s
+                              INNER JOIN
+                              speciestaxonomy AS spt ON s.id = spt.species_id
+                              INNER JOIN taxonomy as tax ON spt.taxonomy_id = tax.id
+                        WHERE s.id NOT IN (
+                                  SELECT s.id
+                                    FROM species AS s
+                                         INNER JOIN
+                                         speciestaxonomy AS st ON s.id = st.species_id
+                                         INNER JOIN
+                                         taxonomy AS gt ON st.taxonomy_id = gt.id
+                                         INNER JOIN
+                                         taxonomytaxonomy AS tt ON gt.id = tt.child_id
+                                         INNER JOIN
+                                         taxonomy AS pt ON tt.taxonomy_id = pt.id
+                              );
+
+
+
+-- assign an existing family to the bad records
+INSERT OR IGNORE INTO taxonomytaxonomy (
+                                 taxonomy_id,
+                                 child_id
+                             )
+                             SELECT parent_id,
+                                    genid
+                               FROM [temp].bad;
+
+DROP TABLE [temp].bad;
+
 VACUUM;
 
 PRAGMA foreign_keys=ON;

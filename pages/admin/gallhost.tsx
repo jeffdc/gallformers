@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
+import { RenameEvent } from '../../components/editname';
 import Typeahead from '../../components/Typeahead';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
@@ -35,9 +36,9 @@ type FormFields = AdminFormFields<GallApi> & {
     hosts: GallHost[];
 };
 
-const update = (s: GallApi, newValue: string) => ({
+const update = async (s: GallApi, e: RenameEvent) => ({
     ...s,
-    name: newValue,
+    name: e.new,
 });
 
 const fetchGallHosts = async (id: number | undefined): Promise<GallHost[]> => {

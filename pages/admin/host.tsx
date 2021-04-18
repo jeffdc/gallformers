@@ -3,42 +3,27 @@ import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useState } from 'react';
+import React from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import 'react-bootstrap-table-next/dist/react-bootstrap-table2.min.css';
 import { Path } from 'react-hook-form';
 import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
-import { RenameEvent } from '../../components/editname';
 import Typeahead from '../../components/Typeahead';
 import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields } from '../../hooks/useAPIs';
+import useSpecies, { SpeciesFormFields, SpeciesProps } from '../../hooks/useSpecies';
 import { extractQueryParam } from '../../libs/api/apipage';
-import {
-    AbundanceApi,
-    AliasApi,
-    EmptyAbundance,
-    HostApi,
-    HostTaxon,
-    HOST_FAMILY_TYPES,
-    SpeciesUpsertFields,
-} from '../../libs/api/apitypes';
-import { FAMILY, FGS, GENUS, TaxonomyEntry } from '../../libs/api/taxonomy';
+import { AbundanceApi, HostApi, HostTaxon, HOST_FAMILY_TYPES, SpeciesUpsertFields } from '../../libs/api/apitypes';
+import { TaxonomyEntry, TaxonomyEntryNoParent } from '../../libs/api/taxonomy';
 import { allHosts } from '../../libs/db/host';
 import { abundances } from '../../libs/db/species';
 import { allFamilies, allGenera, allSections } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
-import { extractGenus, mightFailWithArray } from '../../libs/utils/util';
+import { mightFailWithArray } from '../../libs/utils/util';
 
-type TaxNoParent = Omit<TaxonomyEntry, 'parent'>;
-
-type Props = {
-    id: string;
+type Props = SpeciesProps & {
     hs: HostApi[];
-    families: TaxonomyEntry[];
     sections: TaxonomyEntry[];
-    genera: TaxonomyEntry[];
-    abundances: AbundanceApi[];
 };
 
 const schema = yup.object().shape({
@@ -58,99 +43,56 @@ const schema = yup.object().shape({
     family: yup.mixed().required(),
 });
 
-export type FormFields = AdminFormFields<HostApi> & {
-    genus: TaxNoParent[];
-    family: TaxNoParent[];
-    section: TaxNoParent[];
-    abundance: AbundanceApi[];
-    datacomplete: boolean;
+export type FormFields = SpeciesFormFields<HostApi> & {
+    section: TaxonomyEntryNoParent[];
 };
 
 export const testables = {
     Schema: schema,
 };
 
-const updateHost = (s: HostApi, newValue: string): HostApi => ({
-    ...s,
-    name: newValue,
-});
-
 const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.Element => {
-    const [aliasData, setAliasData] = useState<AliasApi[]>([]);
+    const {
+        renameSpecies,
+        createNewSpecies,
+        updatedSpeciesFormFields,
+        toSpeciesUpsertFields,
+        aliasData,
+        setAliasData,
+    } = useSpecies<HostApi>(genera);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): SpeciesUpsertFields => {
-        const family = { ...fields.family[0], parent: O.none };
-        const genus = { ...fields.genus[0], parent: O.of(family) };
-        const section = O.fromNullable({ ...fields.section[0], parent: O.of(genus) });
+        if (!selected) {
+            throw new Error('Trying to submit with a null selection which seems impossible but here we are.');
+        }
 
         return {
-            abundance: fields.abundance.length > 0 ? fields.abundance[0].abundance : undefined,
-            aliases: aliasData,
-            datacomplete: fields.datacomplete,
-            fgs: {
-                family: family,
-                genus: genus,
-                section: section,
-            },
-            id: id,
-            name: name,
+            ...toSpeciesUpsertFields(fields, name, id),
+            fgs: { ...selected.fgs },
         };
     };
 
     const updatedFormFields = async (s: HostApi | undefined): Promise<FormFields> => {
+        const speciesFields = updatedSpeciesFormFields(s);
         if (s != undefined) {
-            setAliasData(s?.aliases);
             return {
-                mainField: [s],
-                genus: [s.fgs?.genus],
-                family: [s.fgs?.family],
+                ...speciesFields,
                 section: pipe(
                     s.fgs?.section,
                     O.fold(constant([]), (sec) => [sec]),
                 ),
-                datacomplete: s.datacomplete,
-                abundance: [pipe(s.abundance, O.getOrElse(constant(EmptyAbundance)))],
-                del: false,
             };
         }
 
-        setAliasData([]);
         return {
-            mainField: [],
-            genus: [],
-            family: [],
+            ...speciesFields,
             section: [],
-            datacomplete: false,
-            abundance: [EmptyAbundance],
-            del: false,
-        };
-    };
-
-    const fgsFromName = (name: string): FGS => {
-        const genusName = extractGenus(name);
-        const genus = genera.find((g) => g.name.localeCompare(genusName) == 0);
-        const family = genus?.parent ? pipe(genus.parent, O.getOrElseW(constant(undefined))) : undefined;
-        // if (!family) throw new Error('The selected Genus is missing its Family.');
-
-        return {
-            family: family ? family : { id: -1, description: '', name: '', type: FAMILY },
-            genus: genus ? { ...genus } : { id: -1, description: '', name: genusName, type: GENUS },
-            section: O.none,
         };
     };
 
     const createNewHost = (name: string): HostApi => ({
-        name: name,
-        abundance: O.none,
-        aliases: [],
-        datacomplete: false,
-        description: O.none,
-        fgs: fgsFromName(name),
+        ...createNewSpecies(name, HostTaxon),
         galls: [],
-        id: -1,
-        images: [],
-        speciessource: [],
-        taxoncode: HostTaxon,
     });
 
     const {
@@ -164,7 +106,6 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
         setDeleteResults,
         renameCallback,
         form,
-        confirm,
         formSubmit,
         mainField,
         deleteButton,
@@ -172,53 +113,13 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
         'Host',
         id,
         hs,
-        updateHost,
+        renameSpecies,
         toUpsertFields,
         { keyProp: 'name', delEndpoint: '../api/host/', upsertEndpoint: '../api/host/upsert' },
         schema,
         updatedFormFields,
         createNewHost,
     );
-
-    const rename = async (fields: FormFields, e: RenameEvent) => {
-        if (e.old == undefined) throw new Error('Trying to add rename but old name is missing?!');
-
-        if (e.addAlias) {
-            aliasData.push({
-                id: -1,
-                name: e.old,
-                type: 'scientific',
-                description: 'Previous name',
-            });
-        }
-
-        // have to check for genus rename
-        const newGenus = extractGenus(e.new);
-        if (newGenus.localeCompare(extractGenus(e.old)) != 0) {
-            const g = genera.find((g) => g.name.localeCompare(newGenus) == 0);
-            if (g == undefined) {
-                return confirm({
-                    variant: 'danger',
-                    catchOnCancel: true,
-                    title: 'Are you sure want to create a new genus?',
-                    message: `Renaming the genus to ${newGenus} will create a new genus under the current family ${fields.family[0].name}. Do you want to continue?`,
-                }).then(() => {
-                    fields.genus[0] = {
-                        id: -1,
-                        description: '',
-                        name: newGenus,
-                        type: GENUS,
-                        // parent: O.of(fields.family[0]),
-                    };
-                    return Promise.bind(onSubmit(fields));
-                });
-            } else {
-                fields.genus[0] = g;
-            }
-        }
-
-        return onSubmit(fields);
-    };
 
     const onSubmit = async (fields: FormFields) => {
         formSubmit(fields);
@@ -228,7 +129,7 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
         <Admin
             type="Host"
             keyField="name"
-            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback(rename) }}
+            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback }}
             setShowModal={setShowRenameModal}
             showModal={showRenameModal}
             setError={setError}
