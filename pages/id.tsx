@@ -142,8 +142,8 @@ const IDGall = (props: Props): JSX.Element => {
     const { control: filterControl, reset: resetFilter } = useForm<FilterFormFields>();
 
     const resetForm = () => {
-        setHostOrTaxon(undefined);
         setQuery(null);
+        setFiltered(galls);
     };
 
     useEffect(() => {
@@ -208,6 +208,7 @@ const IDGall = (props: Props): JSX.Element => {
             return;
         }
 
+        console.log(`JDC: ${JSON.stringify(query, null, '  ')}`);
         const f = galls.filter((g) => checkGall(g, query));
         setFiltered(f);
 
@@ -267,15 +268,6 @@ const IDGall = (props: Props): JSX.Element => {
                             selected={hostOrTaxon && isHost(hostOrTaxon) ? [hostOrTaxon] : []}
                             onChange={(h) => {
                                 setHostOrTaxon(h[0]);
-                                // if (query) {
-                                //     setQuery({
-                                //         ...query,
-                                //         detachable: query.detachable ? query.detachable : [],
-                                //         key: h[0] as HostSimple,
-                                //     });
-                                // } else {
-                                //     setQuery(EMPTYSEARCHQUERY);
-                                // }
                             }}
                             placeholder="Host"
                             clearButton
@@ -304,10 +296,6 @@ const IDGall = (props: Props): JSX.Element => {
                             selected={hostOrTaxon && isTaxonomy(hostOrTaxon) ? [hostOrTaxon] : []}
                             onChange={(g) => {
                                 setHostOrTaxon(g[0]);
-                                // setQuery({
-                                //     ...query,
-                                //     key: g[0],
-                                // });
                             }}
                             placeholder="Genus"
                             clearButton
@@ -370,7 +358,7 @@ const IDGall = (props: Props): JSX.Element => {
                                 }
                                 setQuery({
                                     ...query,
-                                    detachable: selected,
+                                    detachable: selected.length > 0 ? selected : [DetachableNone],
                                 });
                             }}
                             placeholder="Detachable"
