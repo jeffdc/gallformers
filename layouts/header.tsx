@@ -1,7 +1,8 @@
 import Head from 'next/head';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { KeyboardEvent, SyntheticEvent, useState } from 'react';
-import { Button, Form, FormControl, Nav, Navbar, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Button, Dropdown, Form, FormControl, Nav, Navbar, OverlayTrigger, Tooltip } from 'react-bootstrap';
 
 const Header = (): JSX.Element => {
     const [searchText, setSearchText] = useState('');
@@ -69,15 +70,20 @@ const Header = (): JSX.Element => {
                                 Search
                             </Button>
                         </Form>
-                        <OverlayTrigger placement="bottom" overlay={<Tooltip id="glossary">Glossary</Tooltip>}>
-                            <Nav.Link
-                                style={{ height: 38, width: 38 }}
-                                className="border border-success rounded m-1 text-center"
-                                href="/glossary"
+                        <Dropdown>
+                            <Dropdown.Toggle
+                                className="border border-success rounded m-1"
+                                id="resources-button"
+                                variant="outline-success"
                             >
-                                <span className="text-success">?</span>
-                            </Nav.Link>
-                        </OverlayTrigger>
+                                Resources
+                            </Dropdown.Toggle>
+                            <Dropdown.Menu align="right">
+                                <Dropdown.Item href="/guide">ID Guide</Dropdown.Item>
+                                <Dropdown.Item href="/filterguide">Filter Terms</Dropdown.Item>
+                                <Dropdown.Item href="/glossary">Plant and Insect Glossary</Dropdown.Item>
+                            </Dropdown.Menu>
+                        </Dropdown>
                     </Nav>
                 </Navbar.Collapse>
             </Navbar>

@@ -535,7 +535,6 @@ export const testTx = (): Promise<[species[]]> => {
 };
 
 const gallCreateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
-    console.log(`JDC: gall in create: ${JSON.stringify(gall, null, '  ')}`);
     return [
         db.species.create({
             data: {

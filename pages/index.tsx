@@ -45,6 +45,20 @@ export default function Home(): JSX.Element {
                     <Col>
                         <Card>
                             <Card.Body>
+                            <Card.Title>Resources</Card.Title>
+                                <ul>
+                                    <li><Link href="/guide">Our guide to gall identification.</Link></li>
+                                    <li><Link href="/filterguide">Detailed descriptions for our key filters.</Link></li>
+                                    <li><Link href="/glossary">Glossary for plant and insect terms.</Link></li>
+                                </ul>
+                            </Card.Body>
+                        </Card>
+                    </Col>
+                </Row>
+                <Row className="pt-4">
+                    <Col>
+                        <Card>
+                            <Card.Body>
                                 <Card.Title>Interesting Reading</Card.Title>
                                 <ul>
                                     <li>
