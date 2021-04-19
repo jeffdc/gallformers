@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { Button, Col, Modal, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
-import { ALLRIGHTS, CC0, CCBY, ImageApi, LicenseType, SourceWithSpeciesSourceApi } from '../libs/api/apitypes';
+import { ALLRIGHTS, asLicenseType, CC0, CCBY, ImageApi, LicenseType, SourceWithSpeciesSourceApi } from '../libs/api/apitypes';
 import InfoTip from './infotip';
 import Typeahead from './Typeahead';
 
@@ -169,7 +169,12 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                         clearButton
                                         selected={sourceFromOption(selected.source)}
                                         onChange={(s) => {
-                                            setSelected({ ...selected, source: O.fromNullable(s[0]) });
+                                            setSelected({
+                                                ...selected,
+                                                source: O.fromNullable(s[0]),
+                                                license: s[0] ? asLicenseType(s[0].license) : '',
+                                                licenselink: s[0] ? s[0].licenselink : '',
+                                            });
                                         }}
                                     />
                                 </Col>
@@ -197,7 +202,8 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                             <Row className="form-group">
                                 <Col>
                                     <hr />
-                                    These fields should be filled out regardless of the source type.
+                                    These fields should be filled out regardless of the source type. If you select a Source the
+                                    License info from the Source will pre-populate if it exists.
                                 </Col>
                             </Row>
                             <Row className="form-group">

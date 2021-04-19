@@ -75,6 +75,7 @@ export type SearchQuery = {
     locations: string[];
     textures: string[];
     color: string[];
+    season: string[];
     shape: string[];
     cells: string[];
 };
@@ -88,6 +89,7 @@ export const EMPTYSEARCHQUERY: SearchQuery = {
     color: [],
     shape: [],
     cells: [],
+    season: [],
 };
 
 export type Deletable = {
@@ -153,6 +155,7 @@ export type GallUpsertFields = SpeciesUpsertFields & {
     hosts: number[];
     locations: number[];
     colors: number[];
+    seasons: number[];
     shapes: number[];
     textures: number[];
     alignments: number[];
@@ -169,6 +172,9 @@ export type SourceApi = {
     pubyear: string;
     link: string;
     citation: string;
+    datacomplete: boolean;
+    license: string;
+    licenselink: string;
 };
 
 export type SourceWithSpeciesSourceApi = SourceApi & {
@@ -276,6 +282,15 @@ export const EmptyColor: ColorApi = {
     color: '',
 };
 
+export type SeasonApi = {
+    id: number;
+    season: string;
+};
+export const EmptySeason: SeasonApi = {
+    id: -1,
+    season: '',
+};
+
 export type ShapeApi = {
     id: number;
     shape: string;
@@ -304,6 +319,7 @@ export type GallApi = SpeciesApi & {
         gallalignment: AlignmentApi[];
         gallcells: CellsApi[];
         gallcolor: ColorApi[];
+        gallseason: SeasonApi[];
         detachable: DetachableApi;
         gallshape: ShapeApi[];
         gallwalls: WallsApi[];
@@ -336,6 +352,9 @@ export type SourceUpsertFields = Deletable & {
     pubyear: string;
     link: string;
     citation: string;
+    datacomplete: boolean;
+    license: string;
+    licenselink: string;
 };
 
 export type SpeciesSourceInsertFields = Deletable & {

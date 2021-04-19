@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["orderByRelation"]
 }
 
@@ -69,6 +69,7 @@ model gall {
   gallspecies   gallspecies[]
   galltexture   galltexture[]
   gallwalls     gallwalls[]
+  gallseason    gallseason[]
 }
 
 model gallalignment {
@@ -159,10 +160,10 @@ model host {
 }
 
 model image {
-  id            Int      @id @default(autoincrement())
+  id            Int     @id @default(autoincrement())
   species_id    Int
   source_id     Int?
-  path          String   @unique
+  path          String  @unique
   default       Boolean @default(false)
   creator       String
   attribution   String
@@ -171,8 +172,8 @@ model image {
   licenselink   String
   uploader      String
   lastchangedby String
-  source        source?  @relation(fields: [source_id], references: [id])
-  species       species  @relation(fields: [species_id], references: [id])
+  source        source? @relation(fields: [source_id], references: [id])
+  species       species @relation(fields: [species_id], references: [id])
 }
 
 model location {
@@ -203,6 +204,9 @@ model source {
   pubyear       String
   link          String
   citation      String
+  datacomplete  Boolean         @default(false)
+  license       String
+  licenselink   String
   image         image[]
   speciessource speciessource[]
 }
@@ -247,17 +251,17 @@ model speciestaxonomy {
 }
 
 model taxonomy {
-  id                 Int                @id @default(autoincrement())
-  name               String
-  description        String?            @default("")
-  type               String
-  parent_id          Int?
-  parent             taxonomy?          @relation("taxonomyTotaxonomy_parent_id", fields: [parent_id], references: [id])
-  speciestaxonomy    speciestaxonomy[]
-  taxonomy           taxonomy[]         @relation("taxonomyTotaxonomy_parent_id")
-  taxonomyalias      taxonomyalias[]
-  children           taxonomytaxonomy[] @relation("taxonomyTotaxonomytaxonomy_child_id")
-  taxonomytaxonomy   taxonomytaxonomy[] @relation("taxonomyTotaxonomytaxonomy_taxonomy_id")
+  id               Int                @id @default(autoincrement())
+  name             String
+  description      String?            @default("")
+  type             String
+  parent_id        Int?
+  parent           taxonomy?          @relation("taxonomyTotaxonomy_parent_id", fields: [parent_id], references: [id])
+  speciestaxonomy  speciestaxonomy[]
+  taxonomy         taxonomy[]         @relation("taxonomyTotaxonomy_parent_id")
+  taxonomyalias    taxonomyalias[]
+  children         taxonomytaxonomy[] @relation("taxonomyTotaxonomytaxonomy_child_id")
+  taxonomytaxonomy taxonomytaxonomy[] @relation("taxonomyTotaxonomytaxonomy_taxonomy_id")
 }
 
 model taxonomyalias {
@@ -297,4 +301,18 @@ model walls {
   walls       String      @unique
   description String?
   gallwalls   gallwalls[]
+}
+
+model gallseason {
+  id        Int     @id @default(autoincrement())
+  gall_id   Int?
+  season_id Int?
+  gall      gall?   @relation(fields: [gall_id], references: [id])
+  season    season? @relation(fields: [season_id], references: [id])
+}
+
+model season {
+  id         Int          @id @default(autoincrement())
+  season     String       @unique
+  gallseason gallseason[]
 }

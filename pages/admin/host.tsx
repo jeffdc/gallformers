@@ -6,7 +6,7 @@ import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import 'react-bootstrap-table-next/dist/react-bootstrap-table2.min.css';
-import { Path } from 'react-hook-form';
+import { Controller } from 'react-hook-form';
 import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
 import Typeahead from '../../components/Typeahead';
@@ -14,7 +14,7 @@ import useAdmin from '../../hooks/useadmin';
 import useSpecies, { SpeciesFormFields, SpeciesProps } from '../../hooks/useSpecies';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { AbundanceApi, HostApi, HostTaxon, HOST_FAMILY_TYPES, SpeciesUpsertFields } from '../../libs/api/apitypes';
-import { TaxonomyEntry, TaxonomyEntryNoParent } from '../../libs/api/taxonomy';
+import { FAMILY, TaxonomyEntry, TaxonomyEntryNoParent } from '../../libs/api/taxonomy';
 import { allHosts } from '../../libs/db/host';
 import { abundances } from '../../libs/db/species';
 import { allFamilies, allGenera, allSections } from '../../libs/db/taxonomy';
@@ -40,7 +40,14 @@ const schema = yup.object().shape({
         )
         .min(1)
         .max(1),
-    family: yup.mixed().required(),
+    family: yup
+        .array()
+        .of(
+            yup.object({
+                name: yup.string().required(),
+            }),
+        )
+        .required(),
 });
 
 export type FormFields = SpeciesFormFields<HostApi> & {
@@ -176,8 +183,10 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                             selected={selected?.fgs?.genus ? [selected.fgs.genus] : []}
                             disabled={true}
                             onChange={(g) => {
-                                if (selected) selected.fgs.genus = g[0];
-                                form.setValue('genus' as Path<FormFields>, g);
+                                if (selected) {
+                                    selected.fgs.genus = g[0];
+                                    setSelected({ ...selected });
+                                }
                             }}
                             clearButton
                             multiple
@@ -194,14 +203,24 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                             selected={selected?.fgs?.family ? [selected.fgs.family] : []}
                             disabled={selected && selected.id > 0}
                             onChange={(f) => {
-                                if (selected) {
+                                if (f && f.length > 0 && selected) {
                                     // handle the case when a new species is created
-                                    const g = form.getValues().genus[0];
-                                    const genus = genera.find((gg) => gg.id === g.id);
+                                    // either the genus is new or is not
+                                    const genus = genera.find((gg) => gg.id === selected.fgs.genus.id);
                                     if (genus && O.isNone(genus.parent)) {
                                         genus.parent = O.some({ ...f[0], parent: O.none });
-                                        setSelected({ ...selected, fgs: { ...selected.fgs, genus: genus } });
+                                        selected.fgs = { ...selected.fgs, genus: genus };
+                                        setSelected({ ...selected, fgs: { ...selected.fgs, family: f[0] } });
+                                    } else {
+                                        selected.fgs = { ...selected.fgs, family: f[0] };
+                                        setSelected({ ...selected });
                                     }
+                                } else if (selected) {
+                                    selected.fgs = {
+                                        ...selected.fgs,
+                                        family: { name: '', description: '', id: -1, type: FAMILY },
+                                    };
+                                    setSelected({ ...selected });
                                 }
                             }}
                             clearButton
@@ -275,10 +294,27 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col className="mr-auto">
-                        <input {...form.register('datacomplete')} type="checkbox" className="form-input-checkbox" /> All galls
-                        known to occur on this plant have been added to the database, and can be filtered by Location and
-                        Detachable. However, sources and images for galls associated with this host may be incomplete or absent,
-                        and other filters may not have been entered comprehensively or at all.
+                        <Controller
+                            control={form.control}
+                            name="datacomplete"
+                            render={({ field: { ref } }) => (
+                                <input
+                                    ref={ref}
+                                    type="checkbox"
+                                    className="form-input-checkbox"
+                                    checked={selected ? selected.datacomplete : false}
+                                    onChange={(e) => {
+                                        if (selected) {
+                                            selected.datacomplete = e.currentTarget.checked;
+                                            setSelected({ ...selected });
+                                        }
+                                    }}
+                                />
+                            )}
+                        />{' '}
+                        All galls known to occur on this plant have been added to the database, and can be filtered by Location
+                        and Detachable. However, sources and images for galls associated with this host may be incomplete or
+                        absent, and other filters may not have been entered comprehensively or at all.
                     </Col>
                 </Row>
                 <Row className="formGroup">

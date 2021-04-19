@@ -53,6 +53,14 @@ const Source = ({ source }: Props): JSX.Element => {
                     <i>{source.citation}</i>
                 </Col>
             </Row>
+            <Row>
+                <Col>
+                    <h5>License:</h5>
+                    <a href={source.licenselink} target="_blank" rel="noreferrer">
+                        {source.license}
+                    </a>
+                </Col>
+            </Row>
         </div>
     );
 };

@@ -149,6 +149,9 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
                             <Col>
                                 <strong>Shape:</strong> {species.gall.gallshape.map((s) => s.shape).join(', ')}
                             </Col>
+                            <Col>
+                                <strong>Season:</strong> {species.gall.gallseason.map((s) => s.season).join(', ')}
+                            </Col>
                         </Row>
                     </Col>
                     <Col xs={4} className="border rounded p-1 mx-auto">
@@ -174,6 +177,13 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
                                             </a>
                                         </span>
                                     )}
+                                </p>
+                                <p>
+                                    <InfoTip
+                                        id="copyright"
+                                        text="Source entries are edited for relevance, brevity, and formatting. All text is quoted from the selected source except where noted by [brackets]."
+                                        tip="© Info"
+                                    />
                                 </p>
                             </span>
                         )}

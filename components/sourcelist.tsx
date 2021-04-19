@@ -1,6 +1,6 @@
 import React from 'react';
 import BootstrapTable, { ColumnDescription, SelectRowProps } from 'react-bootstrap-table-next';
-import { SourceApi } from '../libs/api/apitypes';
+import { ALLRIGHTS, CC0, CCBY, SourceApi } from '../libs/api/apitypes';
 
 export type SourceListProps = {
     data: SourceApi[];
@@ -16,6 +16,27 @@ const linkTitle = (cell: string, row: SourceApi) => {
     );
 };
 
+const linkLicense = (cell: string, row: SourceApi) => {
+    return (
+        <span>
+            <a href={row.licenselink} target="_blank" rel="noreferrer">
+                <img
+                    alt={row.license}
+                    src={
+                        row.license === CC0
+                            ? '../images/cc0.png'
+                            : row.license === CCBY
+                            ? '../images/CCBY.png'
+                            : row.license === ALLRIGHTS
+                            ? '../images/allrights.svg'
+                            : ''
+                    }
+                    height="20"
+                />
+            </a>
+        </span>
+    );
+};
 const columns: ColumnDescription[] = [
     {
         dataField: 'author',
@@ -32,6 +53,12 @@ const columns: ColumnDescription[] = [
         text: 'Title',
         sort: true,
         formatter: linkTitle,
+    },
+    {
+        dataField: 'license',
+        text: 'License',
+        sort: true,
+        formatter: linkLicense,
     },
 ];
 

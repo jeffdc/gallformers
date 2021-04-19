@@ -9,6 +9,7 @@ import {
     gallcells,
     gallcolor,
     galllocation,
+    gallseason,
     gallshape,
     gallspecies,
     galltexture,
@@ -18,6 +19,7 @@ import {
     location,
     Prisma,
     PrismaPromise,
+    season,
     shape,
     source,
     species,
@@ -44,6 +46,7 @@ import {
     GallTaxon,
     GallTexture,
     GallUpsertFields,
+    SeasonApi,
     ShapeApi,
     WallsApi,
 } from '../api/apitypes';
@@ -102,6 +105,7 @@ export const getGalls = (
                         gallalignment: { include: { alignment: true } },
                         gallcells: { include: { cells: true } },
                         gallcolor: { include: { color: true } },
+                        gallseason: { include: { season: true } },
                         detachable: true,
                         galllocation: { include: { location: true } },
                         galltexture: { include: { texture: true } },
@@ -127,6 +131,9 @@ export const getGalls = (
             })[];
             gallcolor: (gallcolor & {
                 color: color;
+            })[];
+            gallseason: (gallseason & {
+                season: season;
             })[];
             detachable: number | null;
             galllocation: (galllocation & {
@@ -197,6 +204,7 @@ export const getGalls = (
                     gallalignment: adaptAlignments(g.gall.gallalignment.map((a) => a.alignment)),
                     gallcells: adaptCells(g.gall.gallcells.map((c) => c.cells)),
                     gallcolor: adaptColors(g.gall.gallcolor.map((c) => c.color)),
+                    gallseason: adaptSeasons(g.gall.gallseason.map((c) => c.season)),
                     gallshape: adaptShapes(g.gall.gallshape.map((s) => s.shape)),
                     gallwalls: adaptWalls(g.gall.gallwalls.map((w) => w.walls)),
                     detachable: detachableFromId(g.gall.detachable),
@@ -428,6 +436,17 @@ export const colors = (): TaskEither<Error, ColorApi[]> => {
     return pipe(TE.tryCatch(colors, handleError), TE.map(adaptColors));
 };
 
+const adaptSeasons = (seasons: season[]): SeasonApi[] => seasons.map((c) => c);
+
+/**
+ * Fetches all gall seasons
+ */
+export const seasons = (): TaskEither<Error, SeasonApi[]> => {
+    const seasons = () => db.season.findMany({});
+
+    return pipe(TE.tryCatch(seasons, handleError), TE.map(adaptSeasons));
+};
+
 const adaptShapes = (shapes: shape[]): ShapeApi[] =>
     shapes.map((s) => ({
         ...s,
@@ -551,6 +570,7 @@ const gallCreateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                                 gallalignment: { create: gall.alignments.map((id) => ({ alignment_id: id })) },
                                 gallcells: { create: gall.cells.map((id) => ({ cells_id: id })) },
                                 gallcolor: { create: gall.colors.map((id) => ({ color_id: id })) },
+                                gallseason: { create: gall.seasons.map((id) => ({ season_id: id })) },
                                 detachable: detachableFromString(gall.detachable).id,
                                 gallshape: { create: gall.shapes.map((id) => ({ shape_id: id })) },
                                 gallwalls: { create: gall.walls.map((id) => ({ walls_id: id })) },
@@ -591,6 +611,10 @@ const gallUpdateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                                     gallcolor: {
                                         deleteMany: { color_id: { notIn: [] } },
                                         create: gall.colors.map((c) => ({ color_id: c })),
+                                    },
+                                    gallseason: {
+                                        deleteMany: { season_id: { notIn: [] } },
+                                        create: gall.seasons.map((c) => ({ season_id: c })),
                                     },
                                     gallshape: {
                                         deleteMany: { shape_id: { notIn: [] } },

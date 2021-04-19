@@ -5,6 +5,7 @@ import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import { useSession } from 'next-auth/client';
 import Head from 'next/head';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useEffect, useState } from 'react';
@@ -388,6 +389,17 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                                     },
                                 ]}
                             />
+                        </Col>
+                    </Row>
+                    <Row hidden={!selected} className="formGroup">
+                        <Col>
+                            <br />
+                            <div>
+                                <Link href={`./gall?id=${selected?.id}`}>Edit the Gall</Link>
+                            </div>
+                            <div>
+                                <Link href={`./speciessource?id=${selected?.id}`}>Add/Edit Sources for this Gall</Link>
+                            </div>
                         </Col>
                     </Row>
                 </form>

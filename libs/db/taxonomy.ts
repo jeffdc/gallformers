@@ -289,24 +289,6 @@ export const allFamilyIds = (): TaskEither<Error, string[]> => {
     );
 };
 
-// /**
-//  * Fetches all of the species for a given family.
-//  * @param id the family to fetch species for
-//  */
-// export const getAllSpeciesForFamily = (id: number): TaskEither<Error, SpeciesApi[]> => {
-//     const extractSpeciesIds = (tt: TaxonomyTree): number[] =>
-//         tt.taxonomy.flatMap((s) => s.speciestaxonomy.map((st) => st.species_id));
-
-//     const get = (ids: number[]) => getSpecies([{ id: { in: ids } }]);
-
-//     // eslint-disable-next-line prettier/prettier
-//     return pipe(
-//         taxonomyTreeForId(id),
-//         TE.map(flow(O.fold(constant([]), extractSpeciesIds))),
-//         TE.chain(get),
-//     );
-// };
-
 export const getAllSpeciesForSection = (id: number): TaskEither<Error, SimpleSpecies[]> => {
     const sectionSpecies = () =>
         db.speciestaxonomy.findMany({

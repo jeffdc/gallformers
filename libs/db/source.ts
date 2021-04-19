@@ -1,4 +1,4 @@
-import { Prisma, PrismaPromise, source } from '@prisma/client';
+import { source } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
@@ -99,6 +99,9 @@ export const upsertSource = (source: SourceUpsertFields): TaskEither<Error, Sour
                 citation: source.citation,
                 link: source.link,
                 pubyear: source.pubyear,
+                datacomplete: source.datacomplete,
+                license: source.license,
+                licenselink: source.licenselink,
             },
             create: {
                 author: source.author,
@@ -106,6 +109,9 @@ export const upsertSource = (source: SourceUpsertFields): TaskEither<Error, Sour
                 link: source.link,
                 pubyear: source.pubyear,
                 title: source.title,
+                datacomplete: source.datacomplete,
+                license: source.license,
+                licenselink: source.licenselink,
             },
         });
 
