@@ -5,6 +5,7 @@ import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
+import { RenameEvent } from '../../components/editname';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
@@ -30,9 +31,9 @@ type Props = {
     fs: TaxFamily[];
 };
 
-const updateFamily = (s: TaxFamily, newValue: string) => ({
+const renameFamily = async (s: TaxFamily, e: RenameEvent) => ({
     ...s,
-    name: newValue,
+    name: e.new,
 });
 
 const toUpsertFields = (fields: FormFields, name: string, id: number): TaxonomyUpsertFields => {
@@ -87,7 +88,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         'Family',
         id,
         fs,
-        updateFamily,
+        renameFamily,
         toUpsertFields,
         { keyProp: 'name', delEndpoint: '../api/family/', upsertEndpoint: '../api/family/upsert' },
         schema,
@@ -99,7 +100,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         <Admin
             type="Family"
             keyField="name"
-            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback(formSubmit) }}
+            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback }}
             setShowModal={setShowRenameModal}
             showModal={showRenameModal}
             setError={setError}

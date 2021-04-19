@@ -54,9 +54,15 @@ import { logger } from '../utils/logger';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
 import { adaptImage } from './images';
-import { adaptAbundance, updateAbundance } from './species';
+import {
+    adaptAbundance,
+    speciesCreateData,
+    speciesTaxonomyAdditionalUpdateSteps,
+    speciesUpdateData,
+    updateAbundance,
+} from './species';
 import { taxonomyForSpecies } from './taxonomy';
-import { connectIfNotNull, connectWithIds } from './utils';
+import { connectWithIds } from './utils';
 
 /**
  * A general way to fetch galls. Check this file for pre-defined helpers that are easier to use.
@@ -532,12 +538,7 @@ const gallCreateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
     return [
         db.species.create({
             data: {
-                abundance: connectIfNotNull<Prisma.abundanceCreateNestedOneWithoutSpeciesInput, string>(
-                    'abundance',
-                    gall.abundance,
-                ),
-                datacomplete: gall.datacomplete,
-                name: gall.name,
+                ...speciesCreateData(gall),
                 taxontype: { connect: { taxoncode: GallTaxon } },
                 hosts: {
                     create: connectWithIds('hostspecies', gall.hosts),
@@ -560,34 +561,6 @@ const gallCreateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                         },
                     },
                 },
-                aliasspecies: {
-                    create: gall.aliases.map((a) => ({
-                        alias: { create: { description: a.description, name: a.name, type: a.type } },
-                    })),
-                },
-                speciestaxonomy: {
-                    // the genus might be new
-                    connectOrCreate: {
-                        where: { species_id_taxonomy_id: { species_id: gall.id, taxonomy_id: gall.fgs.genus.id } },
-                        create: {
-                            taxonomy: {
-                                create: {
-                                    description: gall.fgs.genus.description,
-                                    name: gall.fgs.genus.name,
-                                    type: GENUS,
-                                    parent: {
-                                        connect: {
-                                            id: gall.fgs.family.id,
-                                        },
-                                    },
-                                    children: {
-                                        create: { taxonomy_id: gall.fgs.family.id },
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
             },
         }),
     ];
@@ -598,18 +571,7 @@ const gallUpdateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
         db.species.update({
             where: { id: gall.id },
             data: {
-                // more Prisma stupidity: disconnecting a record that is not connected throws. :(
-                // so instead of this:
-                // abundance: host.abundance
-                //     ? {
-                //           connect: { abundance: host.abundance },
-                //       }
-                //     : {
-                //           disconnect: true,
-                //       },
-                //   we instead have to have a totally separate step in the transaction to update abundance 😠
-                datacomplete: gall.datacomplete,
-                name: gall.name,
+                ...speciesUpdateData(gall),
                 gallspecies: {
                     update: {
                         where: { species_id_gall_id: { gall_id: gall.gallid, species_id: gall.id } },
@@ -651,59 +613,14 @@ const gallUpdateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                         },
                     },
                 },
-                aliasspecies: {
-                    // typical hack, delete them all and then add
-                    deleteMany: { species_id: gall.id },
-                    create: gall.aliases.map((a) => ({
-                        alias: { create: { description: a.description, name: a.name, type: a.type } },
-                    })),
-                },
                 hosts: {
                     deleteMany: { id: { notIn: [] } },
                     create: connectWithIds('hostspecies', gall.hosts),
                 },
             },
         }),
-        // the abundance update referenced above:
         updateAbundance(gall.id, gall.abundance),
-        // the genus could have been changed and might be new
-        // delete any records that map this species to a genus that are not the same as what is inbound
-        db.speciestaxonomy.deleteMany({
-            where: {
-                AND: [
-                    { species_id: gall.id },
-                    { taxonomy: { type: GENUS } },
-                    { taxonomy: { name: { not: gall.fgs.genus.name } } },
-                ],
-            },
-        }),
-        // now upsert a new species-taxonomy mapping and possibly create
-        // a new Genus Taxonomy record assinging it to the known Family
-        db.speciestaxonomy.upsert({
-            where: { species_id_taxonomy_id: { species_id: gall.id, taxonomy_id: gall.fgs.genus.id } },
-            create: {
-                species: { connect: { id: gall.id } },
-                taxonomy: {
-                    connectOrCreate: {
-                        where: { id: gall.fgs.genus.id },
-                        create: {
-                            description: gall.fgs.genus.description,
-                            name: gall.fgs.genus.name,
-                            type: GENUS,
-                            parent: { connect: { id: gall.fgs.family.id } },
-                            children: {
-                                connect: {
-                                    taxonomy_id_child_id: { child_id: gall.fgs.genus.id, taxonomy_id: gall.fgs.family.id },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-            update: {
-                // no op
-            },
-        }),
+        ...speciesTaxonomyAdditionalUpdateSteps(gall),
     ];
 };
 

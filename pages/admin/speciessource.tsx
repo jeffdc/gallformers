@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
+import { RenameEvent } from '../../components/editname';
 import Picker from '../../components/picker';
 import Typeahead from '../../components/Typeahead';
 import useAdmin from '../../hooks/useadmin';
@@ -38,9 +39,9 @@ type FormFields = AdminFormFields<species> & {
     useasdefault: boolean;
 };
 
-const update = (s: species, newValue: string) => ({
+const update = async (s: species, e: RenameEvent) => ({
     ...s,
-    name: newValue,
+    name: e.new,
 });
 
 const fetchSources = async (id: number): Promise<SpeciesSourceApi[]> => {

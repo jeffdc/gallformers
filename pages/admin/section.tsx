@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Path } from 'react-hook-form';
 import * as yup from 'yup';
+import { RenameEvent } from '../../components/editname';
 import Typeahead from '../../components/Typeahead';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
@@ -48,9 +49,9 @@ type Props = {
 
 type FormFields = AdminFormFields<TaxSection> & Omit<TaxSection, 'id' | 'name' | 'type'>;
 
-const updateSection = (s: TaxSection, newValue: string) => ({
+const renameSection = async (s: TaxSection, e: RenameEvent) => ({
     ...s,
-    name: newValue,
+    name: e.new,
 });
 
 const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): JSX.Element => {
@@ -132,7 +133,7 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
         'Section',
         id,
         sections,
-        updateSection,
+        renameSection,
         toUpsertFields,
         { keyProp: 'name', delEndpoint: '../api/taxonomy/', upsertEndpoint: '../api/taxonomy/upsert' },
         schema,
@@ -144,7 +145,7 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
         <Admin
             type="Section"
             keyField="name"
-            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback(formSubmit) }}
+            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback }}
             setShowModal={setShowRenameModal}
             showModal={showRenameModal}
             setError={setError}

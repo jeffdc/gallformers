@@ -10,20 +10,25 @@ import {
     species,
     speciessource,
 } from '@prisma/client';
-import { flow, pipe } from 'fp-ts/lib/function';
 import * as A from 'fp-ts/lib/Array';
+import { constant, flow, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { DeleteResult, HostApi, HostSimple, HostTaxon, SpeciesApi, SpeciesUpsertFields } from '../api/apitypes';
-import { FGS, GENUS } from '../api/taxonomy';
+import { FGS, GENUS, SECTION } from '../api/taxonomy';
 import { deleteImagesBySpeciesId } from '../images/images';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
 import { adaptImage } from './images';
-import { adaptAbundance, connectOrCreateGenus, updateAbundance } from './species';
+import {
+    adaptAbundance,
+    speciesCreateData,
+    speciesTaxonomyAdditionalUpdateSteps,
+    speciesUpdateData,
+    updateAbundance,
+} from './species';
 import { taxonomyForSpecies } from './taxonomy';
-import { connectIfNotNull } from './utils';
 
 type DBHost = species & {
     abundance: abundance | null;
@@ -218,63 +223,32 @@ const hostUpdateSteps = (host: SpeciesUpsertFields): PrismaPromise<unknown>[] =>
         db.species.update({
             where: { id: host.id },
             data: {
-                // more Prisma stupidity: disconnecting a record that is not connected throws. :(
-                // so instead of this:
-                // abundance: host.abundance
-                //     ? {
-                //           connect: { abundance: host.abundance },
-                //       }
-                //     : {
-                //           disconnect: true,
-                //       },
-                //   we instead have to have a totally separate step in the transaction to update abundance 😠
-                datacomplete: host.datacomplete,
-                name: host.name,
-                aliasspecies: {
-                    // typical hack, delete them all and then add
-                    deleteMany: { species_id: host.id },
-                    create: host.aliases.map((a) => ({
-                        alias: { create: { description: a.description, name: a.name, type: a.type } },
-                    })),
-                },
+                ...speciesUpdateData(host),
             },
         }),
-        // the abundance update referenced above:
         updateAbundance(host.id, host.abundance),
-        // the genus could have been changed and might be new
-        // TODO I believe that this can lead to orphaned genus records in the taxonomy table.
-        // Also could lead to a genus being assigned to >1 Family
-        db.speciestaxonomy.deleteMany({ where: { AND: [{ species_id: host.id }, { taxonomy: { type: GENUS } }] } }),
-        db.speciestaxonomy.create({
-            data: {
-                species: { connect: { id: host.id } },
-                taxonomy: connectOrCreateGenus(host),
-            },
+        ...speciesTaxonomyAdditionalUpdateSteps(host),
+        db.speciestaxonomy.deleteMany({
+            where: { AND: [{ species_id: host.id }, { taxonomy: { type: { equals: SECTION } } }] },
         }),
+        // deal with a possible change to Section, added, changed, deleted
+        pipe(
+            host.fgs.section,
+            O.map((s) =>
+                db.speciestaxonomy.create({
+                    data: { species_id: host.id, taxonomy_id: s.id },
+                }),
+            ),
+            O.getOrElseW(constant(db.speciestaxonomy.count({ where: { species_id: -1 } }))),
+        ),
     ];
 };
 
 const hostCreate = (host: SpeciesUpsertFields) => {
     return db.species.create({
         data: {
-            name: host.name,
+            ...speciesCreateData(host),
             taxontype: { connect: { taxoncode: HostTaxon } },
-            abundance: connectIfNotNull<Prisma.abundanceCreateNestedOneWithoutSpeciesInput, string>('abundance', host.abundance),
-            speciestaxonomy: {
-                create: [
-                    // family must already exist
-                    { taxonomy: { connect: { id: host.fgs.family.id } } },
-                    // genus could be new
-                    {
-                        taxonomy: connectOrCreateGenus(host),
-                    },
-                ],
-            },
-            aliasspecies: {
-                create: host.aliases.map((a) => ({
-                    alias: { create: { description: a.description, name: a.name, type: a.type } },
-                })),
-            },
         },
     });
 };

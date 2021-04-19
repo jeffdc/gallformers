@@ -5,50 +5,71 @@
 import { alias } from '@prisma/client';
 import * as O from 'fp-ts/lib/Option';
 import { Option } from 'fp-ts/lib/Option';
-import { ParsedUrlQuery } from 'querystring';
 import { FGS } from './taxonomy';
 
 export const GallTaxon = 'gall';
 export const HostTaxon = 'plant';
 
-/**
- *
- * @param q
- */
-export const toSearchQuery = (q: ParsedUrlQuery): SearchQuery => {
-    if (!q.host) throw new Error('Received query without host!');
-
-    return {
-        alignment: q.alignment == undefined ? [] : [q.alignment].flat(),
-        cells: q.cells == undefined ? [] : [q.cells].flat(),
-        color: q.color == undefined ? [] : [q.color].flat(),
-        detachable: q.detachable == undefined ? DetachableNone : detachableFromString(q.detachable.toString()),
-        host: q.host.toString(),
-        locations: q.locations == undefined ? [] : [q.locations].flat(),
-        shape: q.shape == undefined ? [] : [q.shape].flat(),
-        textures: q.textures == undefined ? [] : [q.textures].flat(),
-        walls: q.walls == undefined ? [] : [q.walls].flat(),
-    };
+export type DetachableApi = {
+    id: number;
+    value: DetachableValues;
 };
 
-export const emptySearchQuery = (): SearchQuery => ({
-    host: '',
-    detachable: DetachableNone,
-    alignment: [],
-    walls: [],
-    locations: [],
-    textures: [],
-    color: [],
-    shape: [],
-    cells: [],
-});
+export const DetachableNone: DetachableApi = {
+    id: 0,
+    value: '',
+};
+
+export const DetachableIntegral: DetachableApi = {
+    id: 1,
+    value: 'integral',
+};
+
+export const DetachableDetachable: DetachableApi = {
+    id: 2,
+    value: 'detachable',
+};
+
+export const DetachableBoth: DetachableApi = {
+    id: 3,
+    value: 'both',
+};
+
+export const Detachables = [DetachableNone, DetachableIntegral, DetachableDetachable, DetachableBoth];
+export type DetachableValues = '' | 'integral' | 'detachable' | 'both';
+
+// there has got to be a better way of doing this...
+export const detachableFromString = (s: string): DetachableApi => {
+    switch (s) {
+        case '':
+            return DetachableNone;
+        case 'integral':
+            return DetachableIntegral;
+        case 'detachable':
+            return DetachableDetachable;
+        case 'both':
+            return DetachableBoth;
+        default:
+            console.error(`Received invalid value '${s}' for Detachable.`);
+            return DetachableNone;
+    }
+};
+
+export const detachableFromId = (id: null | undefined | number): DetachableApi => {
+    if (id == undefined || id == null) return DetachableNone;
+
+    const d = Detachables.find((d) => d.id === id);
+    if (d == undefined) {
+        throw new Error(`Received invalid id '${id}' for Detachable.`);
+    }
+    return d;
+};
 
 /**
  *
  */
 export type SearchQuery = {
-    host: string;
-    detachable: DetachableApi;
+    detachable: DetachableApi[];
     alignment: string[];
     walls: string[];
     locations: string[];
@@ -56,6 +77,17 @@ export type SearchQuery = {
     color: string[];
     shape: string[];
     cells: string[];
+};
+
+export const EMPTYSEARCHQUERY: SearchQuery = {
+    detachable: [DetachableNone],
+    alignment: [],
+    walls: [],
+    locations: [],
+    textures: [],
+    color: [],
+    shape: [],
+    cells: [],
 };
 
 export type Deletable = {
@@ -211,61 +243,6 @@ export const EmptyAlias: AliasApi = {
     name: '',
     type: 'common',
     description: '',
-};
-
-export type DetachableApi = {
-    id: number;
-    value: DetachableValues;
-};
-
-export const DetachableNone: DetachableApi = {
-    id: 0,
-    value: '',
-};
-
-export const DetachableIntegral: DetachableApi = {
-    id: 1,
-    value: 'integral',
-};
-
-export const DetachableDetachable: DetachableApi = {
-    id: 2,
-    value: 'detachable',
-};
-
-export const DetachableBoth: DetachableApi = {
-    id: 3,
-    value: 'both',
-};
-
-export const Detachables = [DetachableNone, DetachableIntegral, DetachableDetachable, DetachableBoth];
-export type DetachableValues = '' | 'integral' | 'detachable' | 'both';
-
-// there has got to be a better way of doing this...
-export const detachableFromString = (s: string): DetachableApi => {
-    switch (s) {
-        case '':
-            return DetachableNone;
-        case 'integral':
-            return DetachableIntegral;
-        case 'detachable':
-            return DetachableDetachable;
-        case 'both':
-            return DetachableBoth;
-        default:
-            console.error(`Received invalid value '${s}' for Detachable.`);
-            return DetachableNone;
-    }
-};
-
-export const detachableFromId = (id: null | undefined | number): DetachableApi => {
-    if (id == undefined || id == null) return DetachableNone;
-
-    const d = Detachables.find((d) => d.id === id);
-    if (d == undefined) {
-        throw new Error(`Received invalid id '${id}' for Detachable.`);
-    }
-    return d;
 };
 
 export type AlignmentApi = {
