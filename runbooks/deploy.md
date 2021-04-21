@@ -58,7 +58,7 @@ Apply schema changes:
 1) `sudo cp -r /mnt/gallformers_data/prisma /mnt/gallformers_data/prisma_XXXXXXXX` creates a backup of the previous database state, use the data rather than the XXXXXXXX as described above
 1) `sudo rm -rf /mnt/gallformers_data/prisma`
 1) `git pull origin main`  this will get the updated database that you committed earlier
-1) `sudo cp  -rprisma /mnt/gallformers_data`
+1) `sudo cp  -r prisma /mnt/gallformers_data`
 
 ### If there are no database changes or you have already completed any database changes
 

@@ -2,7 +2,7 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import React from 'react';
-import { Col, Row } from 'react-bootstrap';
+import { Button, Col, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
 import Edit from '../../../components/edit';
 import { SourceApi } from '../../../libs/api/apitypes';
 import { allSourceIds, sourceById } from '../../../libs/db/source';
@@ -26,9 +26,25 @@ const Source = ({ source }: Props): JSX.Element => {
             </Head>
 
             <Row className="pb-4">
-                <Edit id={source.id} type="source" />
                 <Col>
                     <h2>{source.title}</h2>
+                </Col>
+                <Col xs={2}>
+                    <span className="p-0 pr-1 my-auto">
+                        <Edit id={source.id} type="source" />
+                        <OverlayTrigger
+                            placement="left"
+                            overlay={
+                                <Tooltip id="datacomplete">
+                                    {source.datacomplete
+                                        ? 'This source has been comprehensively reviewed and all relevant information entered.'
+                                        : 'We are still working on this source so information from the source is potentially still missing.'}
+                                </Tooltip>
+                            }
+                        >
+                            <Button variant="outline-light">{source.datacomplete ? '💯' : '❓'}</Button>
+                        </OverlayTrigger>
+                    </span>
                 </Col>
             </Row>
             <Row className="pb-4">
@@ -36,6 +52,8 @@ const Source = ({ source }: Props): JSX.Element => {
                     <h5>Authors:</h5>
                     {source.author}
                 </Col>
+            </Row>
+            <Row className="pb-4">
                 <Col xs={3}>
                     <h5>Publication Year:</h5>
                     {source.pubyear}
@@ -51,6 +69,14 @@ const Source = ({ source }: Props): JSX.Element => {
                 <Col>
                     <h5>Citation:</h5>
                     <i>{source.citation}</i>
+                </Col>
+            </Row>
+            <Row>
+                <Col>
+                    <h5>License:</h5>
+                    <a href={source.licenselink} target="_blank" rel="noreferrer">
+                        {source.license}
+                    </a>
                 </Col>
             </Row>
         </div>

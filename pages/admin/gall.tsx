@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
+import { Controller } from 'react-hook-form';
 import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
 import Typeahead from '../../components/Typeahead';
@@ -14,7 +15,17 @@ import useSpecies, { SpeciesFormFields, SpeciesProps } from '../../hooks/useSpec
 import { extractQueryParam } from '../../libs/api/apipage';
 import * as AT from '../../libs/api/apitypes';
 import { FAMILY, GENUS, TaxonomyEntry } from '../../libs/api/taxonomy';
-import { alignments, allGalls, cells, colors, locations, shapes, textures, walls } from '../../libs/db/gall';
+import {
+    getAlignments,
+    allGalls,
+    getCells,
+    getColors,
+    getLocations,
+    getSeasons,
+    getShapes,
+    getTextures,
+    getWalls,
+} from '../../libs/db/gall';
 import { allHostsSimple } from '../../libs/db/host';
 import { abundances } from '../../libs/db/species';
 import { allFamilies, allGenera } from '../../libs/db/taxonomy';
@@ -26,6 +37,7 @@ type Props = SpeciesProps & {
     hosts: AT.HostSimple[];
     locations: AT.GallLocation[];
     colors: AT.ColorApi[];
+    seasons: AT.SeasonApi[];
     shapes: AT.ShapeApi[];
     textures: AT.GallTexture[];
     alignments: AT.AlignmentApi[];
@@ -70,6 +82,7 @@ export type FormFields = SpeciesFormFields<AT.GallApi> & {
     alignments: AT.AlignmentApi[];
     shapes: AT.ShapeApi[];
     colors: AT.ColorApi[];
+    seasons: AT.SeasonApi[];
     locations: AT.GallLocation[];
     textures: AT.GallTexture[];
     undescribed: boolean;
@@ -81,6 +94,7 @@ const Gall = ({
     hosts,
     locations,
     colors,
+    seasons,
     shapes,
     textures,
     alignments,
@@ -113,6 +127,7 @@ const Gall = ({
             alignments: fields.alignments.map((a) => a.id),
             cells: fields.cells.map((c) => c.id),
             colors: fields.colors.map((c) => c.id),
+            seasons: fields.seasons.map((c) => c.id),
             detachable: fields.detachable,
             fgs: selected.fgs,
             hosts: fields.hosts.map((h) => h.id),
@@ -126,6 +141,7 @@ const Gall = ({
 
     const updatedFormFields = async (s: AT.GallApi | undefined): Promise<FormFields> => {
         const speciesFields = updatedSpeciesFormFields(s);
+
         if (s != undefined) {
             return {
                 ...speciesFields,
@@ -135,6 +151,7 @@ const Gall = ({
                 detachable: s.gall.detachable.value,
                 hosts: s.hosts,
                 locations: s.gall.galllocation,
+                seasons: s.gall.gallseason,
                 shapes: s.gall.gallshape,
                 textures: s.gall.galltexture,
                 undescribed: s.gall.undescribed,
@@ -150,6 +167,7 @@ const Gall = ({
             detachable: AT.DetachableNone.value,
             hosts: [],
             locations: [],
+            seasons: [],
             shapes: [],
             textures: [],
             undescribed: false,
@@ -165,6 +183,7 @@ const Gall = ({
             gallcells: [],
             gallcolor: [],
             galllocation: [],
+            gallseason: [],
             gallshape: [],
             galltexture: [],
             gallwalls: [],
@@ -416,11 +435,28 @@ const Gall = ({
                 <Row className="form-group">
                     <Col>
                         Detachable:
-                        <select {...form.register('detachable')} placeholder="Detachable" className="form-control">
-                            {AT.Detachables.map((d) => (
-                                <option key={d.id}>{d.value}</option>
-                            ))}
-                        </select>
+                        <Controller
+                            control={form.control}
+                            name="detachable"
+                            render={({ field: { ref } }) => (
+                                <select
+                                    ref={ref}
+                                    value={selected ? selected.gall.detachable.value : AT.DetachableNone.value}
+                                    onChange={(e) => {
+                                        if (selected) {
+                                            selected.gall.detachable = AT.detachableFromString(e.currentTarget.value);
+                                            setSelected({ ...selected });
+                                        }
+                                    }}
+                                    placeholder="Detachable"
+                                    className="form-control"
+                                >
+                                    {AT.Detachables.map((d) => (
+                                        <option key={d.id}>{d.value}</option>
+                                    ))}
+                                </select>
+                            )}
+                        />
                     </Col>
                     <Col>
                         Walls:
@@ -514,6 +550,24 @@ const Gall = ({
                             }}
                         />
                     </Col>
+                    <Col>
+                        Season(s):
+                        <Typeahead
+                            name="seasons"
+                            control={form.control}
+                            options={seasons}
+                            labelKey="season"
+                            multiple
+                            clearButton
+                            selected={selected ? selected.gall.gallseason : []}
+                            onChange={(w) => {
+                                if (selected) {
+                                    selected.gall.gallseason = w;
+                                    setSelected({ ...selected });
+                                }
+                            }}
+                        />
+                    </Col>
                 </Row>
                 <Row className="form-group">
                     <Col>
@@ -560,14 +614,49 @@ const Gall = ({
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col className="mr-auto">
-                        <input {...form.register('datacomplete')} type="checkbox" className="form-input-checkbox" /> All sources
-                        containing unique information relevant to this gall have been added and are reflected in its associated
-                        data. However, filter criteria may not be comprehensive in every field.
+                        <Controller
+                            control={form.control}
+                            name="datacomplete"
+                            render={({ field: { ref } }) => (
+                                <input
+                                    ref={ref}
+                                    type="checkbox"
+                                    className="form-input-checkbox"
+                                    checked={selected ? selected.datacomplete : false}
+                                    onChange={(e) => {
+                                        if (selected) {
+                                            selected.datacomplete = e.currentTarget.checked;
+                                            setSelected({ ...selected });
+                                        }
+                                    }}
+                                />
+                            )}
+                        />{' '}
+                        All sources containing unique information relevant to this gall have been added and are reflected in its
+                        associated data. However, filter criteria may not be comprehensive in every field.
                     </Col>
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col className="mr-auto">
-                        <input {...form.register('undescribed')} type="checkbox" className="form-input-checkbox" /> Undescribed?
+                        <Controller
+                            control={form.control}
+                            name="undescribed"
+                            render={({ field: { ref } }) => (
+                                <input
+                                    ref={ref}
+                                    type="checkbox"
+                                    className="form-input-checkbox"
+                                    checked={selected ? selected.gall.undescribed : false}
+                                    onChange={(e) => {
+                                        if (selected) {
+                                            selected.gall.undescribed = e.currentTarget.checked;
+                                            setSelected({ ...selected });
+                                        }
+                                    }}
+                                />
+                            )}
+                        />{' '}
+                        Undescribed?
                     </Col>
                 </Row>
                 <Row className="formGroup pb-1">
@@ -607,13 +696,14 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             hosts: await mightFailWithArray<AT.HostSimple>()(allHostsSimple()),
             families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(AT.GALL_FAMILY_TYPES)),
             genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(AT.GallTaxon)),
-            locations: await mightFailWithArray<AT.GallLocation>()(locations()),
-            colors: await mightFailWithArray<AT.ColorApi>()(colors()),
-            shapes: await mightFailWithArray<AT.ShapeApi>()(shapes()),
-            textures: await mightFailWithArray<AT.GallTexture>()(textures()),
-            alignments: await mightFailWithArray<AT.AlignmentApi>()(alignments()),
-            walls: await mightFailWithArray<AT.WallsApi>()(walls()),
-            cells: await mightFailWithArray<AT.CellsApi>()(cells()),
+            locations: await mightFailWithArray<AT.GallLocation>()(getLocations()),
+            colors: await mightFailWithArray<AT.ColorApi>()(getColors()),
+            seasons: await mightFailWithArray<AT.SeasonApi>()(getSeasons()),
+            shapes: await mightFailWithArray<AT.ShapeApi>()(getShapes()),
+            textures: await mightFailWithArray<AT.GallTexture>()(getTextures()),
+            alignments: await mightFailWithArray<AT.AlignmentApi>()(getAlignments()),
+            walls: await mightFailWithArray<AT.WallsApi>()(getWalls()),
+            cells: await mightFailWithArray<AT.CellsApi>()(getCells()),
             abundances: await mightFailWithArray<AT.AbundanceApi>()(abundances()),
         },
     };

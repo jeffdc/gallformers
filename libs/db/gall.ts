@@ -9,6 +9,7 @@ import {
     gallcells,
     gallcolor,
     galllocation,
+    gallseason,
     gallshape,
     gallspecies,
     galltexture,
@@ -18,6 +19,7 @@ import {
     location,
     Prisma,
     PrismaPromise,
+    season,
     shape,
     source,
     species,
@@ -44,6 +46,7 @@ import {
     GallTaxon,
     GallTexture,
     GallUpsertFields,
+    SeasonApi,
     ShapeApi,
     WallsApi,
 } from '../api/apitypes';
@@ -102,6 +105,7 @@ export const getGalls = (
                         gallalignment: { include: { alignment: true } },
                         gallcells: { include: { cells: true } },
                         gallcolor: { include: { color: true } },
+                        gallseason: { include: { season: true } },
                         detachable: true,
                         galllocation: { include: { location: true } },
                         galltexture: { include: { texture: true } },
@@ -127,6 +131,9 @@ export const getGalls = (
             })[];
             gallcolor: (gallcolor & {
                 color: color;
+            })[];
+            gallseason: (gallseason & {
+                season: season;
             })[];
             detachable: number | null;
             galllocation: (galllocation & {
@@ -197,6 +204,7 @@ export const getGalls = (
                     gallalignment: adaptAlignments(g.gall.gallalignment.map((a) => a.alignment)),
                     gallcells: adaptCells(g.gall.gallcells.map((c) => c.cells)),
                     gallcolor: adaptColors(g.gall.gallcolor.map((c) => c.color)),
+                    gallseason: adaptSeasons(g.gall.gallseason.map((c) => c.season)),
                     gallshape: adaptShapes(g.gall.gallshape.map((s) => s.shape)),
                     gallwalls: adaptWalls(g.gall.gallwalls.map((w) => w.walls)),
                     detachable: detachableFromId(g.gall.detachable),
@@ -401,7 +409,7 @@ const adaptLocations = (ls: location[]): GallLocation[] => {
 /**
  * Fetches all gall locations
  */
-export const locations = (): TaskEither<Error, GallLocation[]> => {
+export const getLocations = (): TaskEither<Error, GallLocation[]> => {
     const locations = () =>
         db.location.findMany({
             orderBy: {
@@ -417,7 +425,7 @@ const adaptColors = (colors: color[]): ColorApi[] => colors.map((c) => c);
 /**
  * Fetches all gall colors
  */
-export const colors = (): TaskEither<Error, ColorApi[]> => {
+export const getColors = (): TaskEither<Error, ColorApi[]> => {
     const colors = () =>
         db.color.findMany({
             orderBy: {
@@ -426,6 +434,17 @@ export const colors = (): TaskEither<Error, ColorApi[]> => {
         });
 
     return pipe(TE.tryCatch(colors, handleError), TE.map(adaptColors));
+};
+
+const adaptSeasons = (seasons: season[]): SeasonApi[] => seasons.map((c) => c);
+
+/**
+ * Fetches all gall seasons
+ */
+export const getSeasons = (): TaskEither<Error, SeasonApi[]> => {
+    const seasons = () => db.season.findMany({});
+
+    return pipe(TE.tryCatch(seasons, handleError), TE.map(adaptSeasons));
 };
 
 const adaptShapes = (shapes: shape[]): ShapeApi[] =>
@@ -437,7 +456,7 @@ const adaptShapes = (shapes: shape[]): ShapeApi[] =>
 /**
  * Fetches all gall shapes
  */
-export const shapes = (): TaskEither<Error, ShapeApi[]> => {
+export const getShapes = (): TaskEither<Error, ShapeApi[]> => {
     const shapes = () =>
         db.shape.findMany({
             orderBy: {
@@ -459,7 +478,7 @@ const adaptTextures = (ts: texture[]): GallTexture[] => {
 /**
  * Fetches all gall textures
  */
-export const textures = (): TaskEither<Error, GallTexture[]> => {
+export const getTextures = (): TaskEither<Error, GallTexture[]> => {
     const textures = () =>
         db.texture.findMany({
             orderBy: {
@@ -479,7 +498,7 @@ const adaptAlignments = (as: alignment[]): AlignmentApi[] =>
 /**
  * Fetches all gall alignments
  */
-export const alignments = (): TaskEither<Error, AlignmentApi[]> => {
+export const getAlignments = (): TaskEither<Error, AlignmentApi[]> => {
     const alignments = () =>
         db.alignment.findMany({
             orderBy: {
@@ -499,7 +518,7 @@ const adaptWalls = (walls: ws[]): WallsApi[] =>
 /**
  * Fetches all gall walls
  */
-export const walls = (): TaskEither<Error, WallsApi[]> => {
+export const getWalls = (): TaskEither<Error, WallsApi[]> => {
     const walls = () =>
         db.walls.findMany({
             orderBy: {
@@ -519,7 +538,7 @@ const adaptCells = (cells: cs[]): CellsApi[] =>
 /**
  * Fetches all gall cells
  */
-export const cells = (): TaskEither<Error, CellsApi[]> => {
+export const getCells = (): TaskEither<Error, CellsApi[]> => {
     const cells = () =>
         db.cells.findMany({
             orderBy: {
@@ -551,6 +570,7 @@ const gallCreateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                                 gallalignment: { create: gall.alignments.map((id) => ({ alignment_id: id })) },
                                 gallcells: { create: gall.cells.map((id) => ({ cells_id: id })) },
                                 gallcolor: { create: gall.colors.map((id) => ({ color_id: id })) },
+                                gallseason: { create: gall.seasons.map((id) => ({ season_id: id })) },
                                 detachable: detachableFromString(gall.detachable).id,
                                 gallshape: { create: gall.shapes.map((id) => ({ shape_id: id })) },
                                 gallwalls: { create: gall.walls.map((id) => ({ walls_id: id })) },
@@ -591,6 +611,10 @@ const gallUpdateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                                     gallcolor: {
                                         deleteMany: { color_id: { notIn: [] } },
                                         create: gall.colors.map((c) => ({ color_id: c })),
+                                    },
+                                    gallseason: {
+                                        deleteMany: { season_id: { notIn: [] } },
+                                        create: gall.seasons.map((c) => ({ season_id: c })),
                                     },
                                     gallshape: {
                                         deleteMany: { shape_id: { notIn: [] } },

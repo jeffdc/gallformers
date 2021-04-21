@@ -11,13 +11,13 @@ import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import InfoTip from '../../../components/infotip';
 import SourceList from '../../../components/sourcelist';
-import { DetachableBoth, GallApi, GallHost } from '../../../libs/api/apitypes';
+import { CCBY, DetachableBoth, GallApi, GallHost } from '../../../libs/api/apitypes';
 import { FGS } from '../../../libs/api/taxonomy';
 import { allGallIds, gallById } from '../../../libs/db/gall';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkTextToGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { defaultSource } from '../../../libs/pages/renderhelpers';
+import { defaultSource, formatLicense } from '../../../libs/pages/renderhelpers';
 import { deserialize } from '../../../libs/utils/reactserialize';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
@@ -149,6 +149,9 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
                             <Col>
                                 <strong>Shape:</strong> {species.gall.gallshape.map((s) => s.shape).join(', ')}
                             </Col>
+                            <Col>
+                                <strong>Season:</strong> {species.gall.gallseason.map((s) => s.season).join(', ')}
+                            </Col>
                         </Row>
                     </Col>
                     <Col xs={4} className="border rounded p-1 mx-auto">
@@ -174,6 +177,15 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
                                             </a>
                                         </span>
                                     )}
+                                </p>
+                                <p>
+                                    <InfoTip
+                                        id="copyright"
+                                        text={`Source entries are edited for relevance, brevity, and formatting. All text is quoted from the selected source except where noted by [brackets]. This source: ${formatLicense(
+                                            selectedSource.source,
+                                        )}.`}
+                                        tip="© Info"
+                                    />
                                 </p>
                             </span>
                         )}

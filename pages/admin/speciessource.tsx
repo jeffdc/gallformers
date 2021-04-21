@@ -2,6 +2,7 @@ import { source as DBSource, species } from '@prisma/client';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useState } from 'react';
@@ -347,6 +348,17 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                             />
                         </Col>
                         <Col>{deleteButton('Caution. The selected Species Source mapping will be deleted.', onSubmit)}</Col>
+                    </Row>
+                    <Row hidden={!selected} className="formGroup">
+                        <Col>
+                            <br />
+                            <div>
+                                <Link href={`./gall?id=${selected?.id}`}>Edit the Gall</Link>
+                            </div>
+                            <div>
+                                <Link href={`./images?speciesid=${selected?.id}`}>Add/Edit Images for this Gall</Link>
+                            </div>
+                        </Col>
                     </Row>
                 </form>
             </Admin>

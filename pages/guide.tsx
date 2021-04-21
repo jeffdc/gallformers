@@ -82,7 +82,7 @@ export default function Guide(): JSX.Element {
                     using these filters include
                 </p>
                 <ul>
-                    <li>wrong host ID (try moving up to the genus level or checking your second or third guesses)</li>
+                    <li>Wrong host ID (try moving up to the genus level or checking your second or third guesses)</li>
                     <li>
                         Host not included in the database. Many hybrids or rare species, especially among highly speciose host
                         groups like oaks or goldenrods, may not appear in the database at all or may not have comprehensive gall
@@ -106,6 +106,10 @@ export default function Guide(): JSX.Element {
                     <li>
                         Gall-inducers, especially cynipid wasps, occasionally form galls on the opposite side of the leaf from
                         their normal habit; check the results for the opposite option
+                    </li>
+                    <li>
+                        Wrong season selected. Galls often persist long after their season of appearance. Only use this filter if
+                        the gall is obviously fresh
                     </li>
                 </ul>
                 <p>

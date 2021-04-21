@@ -9,7 +9,7 @@ import { RenameEvent } from '../../components/editname';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { SourceApi, SourceUpsertFields } from '../../libs/api/apitypes';
+import { ALLRIGHTS, CC0, CCBY, SourceApi, SourceUpsertFields } from '../../libs/api/apitypes';
 import { allSources } from '../../libs/db/source';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
@@ -19,6 +19,8 @@ const schema = yup.object().shape({
     author: yup.string().required(),
     pubyear: yup.string().matches(/([12][0-9]{3})/),
     citation: yup.string().required(),
+    license: yup.string().required('You must select a license.'),
+    licenselink: yup.string().url('The link must be a valid URL.').required('You must provide a link to the license.'),
 });
 
 type Props = {
@@ -49,6 +51,9 @@ const updatedFormFields = async (s: SourceApi | undefined): Promise<FormFields> 
             pubyear: s.pubyear,
             link: s.link,
             citation: s.citation,
+            datacomplete: s.datacomplete,
+            license: s.license,
+            licenselink: s.licenselink,
             del: false,
         };
     }
@@ -59,6 +64,9 @@ const updatedFormFields = async (s: SourceApi | undefined): Promise<FormFields> 
         pubyear: '',
         link: '',
         citation: '',
+        datacomplete: false,
+        license: '',
+        licenselink: '',
         del: false,
     };
 };
@@ -70,6 +78,9 @@ const createNewSource = (title: string): SourceApi => ({
     id: -1,
     link: '',
     pubyear: '',
+    datacomplete: false,
+    license: '',
+    licenselink: '',
 });
 
 const Source = ({ id, sources }: Props): JSX.Element => {
@@ -152,6 +163,33 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                 </Row>
                 <Row className="form-group">
                     <Col>
+                        License:
+                        <select {...form.register('license')} className="form-control">
+                            <option>{CC0}</option>
+                            <option>{CCBY}</option>
+                            <option>{ALLRIGHTS}</option>
+                        </select>{' '}
+                        {form.formState.errors.license && (
+                            <span className="text-danger">{form.formState.errors.license.message}</span>
+                        )}
+                    </Col>
+                </Row>
+                <Row className="form-group">
+                    <Col>
+                        License Link:
+                        <input
+                            {...form.register('licenselink')}
+                            type="text"
+                            placeholder="License Link"
+                            className="form-control"
+                        />
+                        {form.formState.errors.licenselink && (
+                            <span className="text-danger">{form.formState.errors.licenselink.message}</span>
+                        )}
+                    </Col>
+                </Row>
+                <Row className="form-group">
+                    <Col>
                         <p>
                             Citation (
                             <a href="https://www.mybib.com/tools/mla-citation-generator" target="_blank" rel="noreferrer">
@@ -165,6 +203,13 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                         )}
                     </Col>
                 </Row>
+                <Row className="formGroup pb-1">
+                    <Col className="mr-auto">
+                        <input {...form.register('datacomplete')} type="checkbox" className="form-input-checkbox" /> All
+                        information from this Source has been input into the database?
+                    </Col>
+                </Row>
+
                 <Row className="formGroup">
                     <Col>
                         <input type="submit" className="button" value="Submit" />

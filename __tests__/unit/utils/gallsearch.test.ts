@@ -13,6 +13,7 @@ import {
     GallTaxon,
     GallTexture,
     SearchQuery,
+    SeasonApi,
     ShapeApi,
     WallsApi,
 } from '../../../libs/api/apitypes';
@@ -41,6 +42,7 @@ describe('checkGall tests', () => {
             gallcolor: [],
             detachable: DetachableNone,
             galllocation: [],
+            gallseason: [],
             galltexture: [],
             gallshape: [],
             gallwalls: [],
@@ -66,6 +68,7 @@ describe('checkGall tests', () => {
         color: [],
         detachable: [DetachableNone],
         locations: [],
+        season: [],
         shape: [],
         textures: [],
         walls: [],
@@ -74,7 +77,16 @@ describe('checkGall tests', () => {
     // helper to create test galls in the tests.
     const makeG = (
         k: keyof GallApi['gall'],
-        v: AlignmentApi[] | CellsApi[] | ColorApi[] | DetachableApi | GallLocation[] | GallTexture[] | ShapeApi[] | WallsApi[],
+        v:
+            | AlignmentApi[]
+            | CellsApi[]
+            | ColorApi[]
+            | DetachableApi
+            | GallLocation[]
+            | GallTexture[]
+            | SeasonApi[]
+            | ShapeApi[]
+            | WallsApi[],
     ): GallApi => ({
         ...g,
         gall: { ...g.gall, [k]: v },
@@ -85,6 +97,7 @@ describe('checkGall tests', () => {
         expect(checkGall(makeG('gallalignment', [{ alignment: '', id: 1, description: O.of('') }]), q)).toBeTruthy();
         expect(checkGall(makeG('gallcells', [{ cells: '', id: 1, description: O.of('') }]), q)).toBeTruthy();
         expect(checkGall(makeG('gallcolor', [{ color: '', id: 1 }]), q)).toBeTruthy();
+        expect(checkGall(makeG('gallseason', [{ season: '', id: 1 }]), q)).toBeTruthy();
         expect(checkGall(makeG('gallshape', [{ shape: '', id: 1, description: O.of('') }]), q)).toBeTruthy();
         expect(checkGall(makeG('gallwalls', [{ walls: '', id: 1, description: O.of('') }]), q)).toBeTruthy();
         expect(checkGall(makeG('galllocation', [{ loc: '', id: 1, description: O.of('') }]), q)).toBeTruthy();
@@ -108,6 +121,12 @@ describe('checkGall tests', () => {
             checkGall(makeG('gallcolor', [{ color: 'foo', id: 1 }]), {
                 ...q,
                 color: ['foo'],
+            }),
+        ).toBeTruthy();
+        expect(
+            checkGall(makeG('gallseason', [{ season: 'foo', id: 1 }]), {
+                ...q,
+                season: ['foo'],
             }),
         ).toBeTruthy();
         expect(
@@ -177,6 +196,7 @@ describe('checkGall tests', () => {
                         gallalignment: [{ alignment: 'afoo', id: 1, description: O.none }],
                         gallcolor: [{ color: 'cofoo', id: 1 }],
                         gallcells: [{ cells: 'cefoo', id: 1, description: O.none }],
+                        gallseason: [{ season: 'sefoo', id: 1 }],
                         gallshape: [{ shape: 'sfoo', id: 1, description: O.none }],
                         gallwalls: [{ walls: 'wfoo', id: 1, description: O.none }],
                         galllocation: [{ loc: 'lfoo', id: 1, description: O.none }],
@@ -188,6 +208,7 @@ describe('checkGall tests', () => {
                     alignment: ['afoo'],
                     color: ['cofoo'],
                     cells: ['cefoo'],
+                    season: ['sefoo'],
                     shape: ['sfoo'],
                     walls: ['wfoo'],
                     locations: ['lfoo'],
@@ -209,6 +230,10 @@ describe('checkGall tests', () => {
                 gallcolor: [
                     { color: 'cfoo1', id: 1, description: O.of('') },
                     { color: 'cfoo2', id: 2, description: O.of('') },
+                ],
+                gallseason: [
+                    { season: 'sefoo1', id: 1, description: O.of('') },
+                    { season: 'sefoo2', id: 2, description: O.of('') },
                 ],
                 gallcells: [
                     { cells: 'cefoo1', id: 1, description: O.of('') },
@@ -243,6 +268,7 @@ describe('checkGall tests', () => {
                 ...q,
                 alignment: ['afoo1'],
                 color: ['cfoo1'],
+                season: ['sefoo1'],
                 cells: ['cefoo1'],
                 walls: ['wfoo1'],
                 shape: ['sfoo1'],
@@ -274,6 +300,7 @@ describe('checkGall tests', () => {
                 alignment: [],
                 color: [],
                 cells: [],
+                season: [],
                 walls: [],
                 shape: [],
                 locations: [],

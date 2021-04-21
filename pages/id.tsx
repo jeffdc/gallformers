@@ -28,11 +28,12 @@ import {
     HostSimple,
     HostTaxon,
     SearchQuery,
+    SeasonApi,
     ShapeApi,
     WallsApi,
 } from '../libs/api/apitypes';
 import { SECTION, TaxonomyEntry, TaxonomyEntryNoParent } from '../libs/api/taxonomy';
-import { alignments, cells, colors, locations, shapes, textures, walls } from '../libs/db/gall';
+import { getAlignments, getCells, getColors, getLocations, getSeasons, getShapes, getTextures, getWalls } from '../libs/db/gall';
 import { allHostsSimple } from '../libs/db/host';
 import { allGenera, allSections } from '../libs/db/taxonomy';
 import { defaultImage, truncateOptionString } from '../libs/pages/renderhelpers';
@@ -60,6 +61,7 @@ type FilterFormFields = {
     cells: string;
     shape: string;
     color: string;
+    season: string;
 };
 
 const invalidArraySelection = (arr: unknown[]) => {
@@ -92,6 +94,7 @@ type Props = {
     sectionsAndGenera: TaxonomyEntryNoParent[];
     locations: GallLocation[];
     colors: ColorApi[];
+    seasons: SeasonApi[];
     shapes: ShapeApi[];
     textures: GallTexture[];
     alignments: AlignmentApi[];
@@ -109,6 +112,7 @@ const convertQForUrl = (hostOrTaxon: TaxonomyEntryNoParent | HostSimple | undefi
               cells: q.cells.join(','),
               color: q.color.join(','),
               locations: q.locations.join(','),
+              season: q.season.join(','),
               shape: q.shape.join(','),
               textures: q.textures.join(','),
               walls: q.walls.join(','),
@@ -121,7 +125,16 @@ const IDGall = (props: Props): JSX.Element => {
     const [filtered, setFiltered] = useState(new Array<GallApi>());
     const [hostOrTaxon, setHostOrTaxon] = useState(props?.hostOrTaxon);
     const [query, setQuery] = useState(props.query);
-    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [showAdvanced, setShowAdvanced] = useState(
+        (props.query?.alignment?.length ?? -1) > 0 ||
+            (props.query?.cells?.length ?? -1) > 0 ||
+            (props.query?.color?.length ?? -1) > 0 ||
+            (props.query?.season?.length ?? -1) > 0 ||
+            (props.query?.shape?.length ?? -1) > 0 ||
+            (props.query?.textures?.length ?? -1) > 0 ||
+            (props.query?.walls?.length ?? -1) > 0,
+    );
+
     const [showBanner, setShowBanner] = useState(true);
 
     const disableFilter = (): boolean => {
@@ -400,6 +413,14 @@ const IDGall = (props: Props): JSX.Element => {
                                 Be aware that many galls will not have associated information for all of the below properties.
                             </p>
                             <label className="col-form-label">
+                                Season: <InfoTip id="seasons" text="The season when the gall first appears." />
+                            </label>
+                            {makeFormInput(
+                                'season',
+                                props.seasons.map((c) => c.season),
+                            )}
+
+                            <label className="col-form-label">
                                 Texture(s):
                                 <InfoTip
                                     id="textures"
@@ -517,6 +538,7 @@ const queryUrlParams = [
     'color',
     'shape',
     'cells',
+    'season',
 ];
 
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
@@ -556,6 +578,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
               color: pipe(query['color'], O.fold(constant([]), split)),
               detachable: [pipe(query['detachable'], O.fold(constant(DetachableNone), detachableFromString))],
               locations: pipe(query['locations'], O.fold(constant([]), split)),
+              season: pipe(query['season'], O.fold(constant([]), split)),
               shape: pipe(query['shape'], O.fold(constant([]), split)),
               textures: pipe(query['textures'], O.fold(constant([]), split)),
               walls: pipe(query['walls'], O.fold(constant([]), split)),
@@ -568,13 +591,14 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             query: searchQuery,
             hosts: hosts,
             sectionsAndGenera: sectionsAndGenera,
-            locations: await mightFailWithArray<GallLocation>()(locations()),
-            colors: await mightFailWithArray<ColorApi>()(colors()),
-            shapes: await mightFailWithArray<ShapeApi>()(shapes()),
-            textures: await mightFailWithArray<GallTexture>()(textures()),
-            alignments: await mightFailWithArray<AlignmentApi>()(alignments()),
-            walls: await mightFailWithArray<WallsApi>()(walls()),
-            cells: await mightFailWithArray<CellsApi>()(cells()),
+            locations: await mightFailWithArray<GallLocation>()(getLocations()),
+            colors: await mightFailWithArray<ColorApi>()(getColors()),
+            seasons: await mightFailWithArray<SeasonApi>()(getSeasons()),
+            shapes: await mightFailWithArray<ShapeApi>()(getShapes()),
+            textures: await mightFailWithArray<GallTexture>()(getTextures()),
+            alignments: await mightFailWithArray<AlignmentApi>()(getAlignments()),
+            walls: await mightFailWithArray<WallsApi>()(getWalls()),
+            cells: await mightFailWithArray<CellsApi>()(getCells()),
         },
     };
 };

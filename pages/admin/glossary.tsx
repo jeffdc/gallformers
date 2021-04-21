@@ -58,6 +58,13 @@ const updatedFormFields = async (e: Entry | undefined): Promise<FormFields> => {
     };
 };
 
+const createNewEntry = (word: string): Entry => ({
+    word: word,
+    definition: '',
+    urls: '',
+    id: -1,
+});
+
 const Glossary = ({ id, glossary }: Props): JSX.Element => {
     const {
         selected,
@@ -81,6 +88,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
         { keyProp: 'word', delEndpoint: '../api/glossary/', upsertEndpoint: '../api/glossary/upsert' },
         schema,
         updatedFormFields,
+        createNewEntry,
     );
 
     return (
