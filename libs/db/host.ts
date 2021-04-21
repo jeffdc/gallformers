@@ -18,6 +18,7 @@ import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { DeleteResult, HostApi, HostSimple, HostTaxon, SpeciesApi, SpeciesUpsertFields } from '../api/apitypes';
 import { FGS, GENUS, SECTION } from '../api/taxonomy';
 import { deleteImagesBySpeciesId } from '../images/images';
+import { ExtractTFromPromise } from '../utils/types';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
 import { adaptImage } from './images';
@@ -86,15 +87,6 @@ const adaptor = (hosts: readonly DBHost[]): HostApi[] =>
         return newh;
     });
 
-const simplify = (hosts: HostApi[]) =>
-    hosts.map((h) => {
-        return {
-            name: h.name,
-            id: h.id,
-            aliases: h.aliases,
-        };
-    });
-
 /**
  * Fetch all hosts.
  */
@@ -103,7 +95,28 @@ export const allHosts = (): TaskEither<Error, HostApi[]> => getHosts();
 /**
  * Fetch all hosts into a HostSimple format.
  */
-export const allHostsSimple = (): TaskEither<Error, HostSimple[]> => pipe(allHosts(), TE.map(simplify));
+export const allHostsSimple = (): TaskEither<Error, HostSimple[]> => {
+    // if we call allHosts() the performance is quite poor so this is an optimized version that minimizes the data fetched
+    const getSimpleHosts = () =>
+        db.species.findMany({
+            where: { taxoncode: { equals: HostTaxon } },
+            select: {
+                id: true,
+                name: true,
+                aliasspecies: { include: { alias: true } },
+            },
+        });
+
+    const simplify = (hosts: ExtractTFromPromise<ReturnType<typeof getSimpleHosts>>): HostSimple[] =>
+        hosts.map((h) => {
+            return {
+                ...h,
+                aliases: h.aliasspecies.map((a) => a.alias),
+            };
+        });
+
+    return pipe(TE.tryCatch(getSimpleHosts, handleError), TE.map(simplify));
+};
 
 /**
  * Fetch all host names as a string[].

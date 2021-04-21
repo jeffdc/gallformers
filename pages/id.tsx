@@ -541,6 +541,14 @@ const queryUrlParams = [
     'season',
 ];
 
+// Ideally we would generate this page and serve it statically via getStaticProps and use Incremental Static Regeneration.
+// See: https://nextjs.org/docs/basic-features/data-fetching#incremental-static-regeneration
+// However, as it stands right now next.js can not support query parameters for static content. This sucks given
+// that the query parameters that we have only fiter data on the client side.
+// It seems like it might be possible to "solve" this by implementing a convoluted approach using URL paths rather than
+// query parameters but I think that would introduce a ton of complexity.
+// This will likely end up the most frequently accessed page on the site AND the most resource intensive on the server
+// (other than Admin pages which will never have a lot of traffic). My guess is that we will revisiting this issue.
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
     const hosts = await mightFailWithArray<HostSimple>()(allHostsSimple());
     const genera = await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon));
@@ -585,20 +593,29 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
           }
         : null;
 
+    const locations = await mightFailWithArray<GallLocation>()(getLocations());
+    const colors = await mightFailWithArray<ColorApi>()(getColors());
+    const seasons = await mightFailWithArray<SeasonApi>()(getSeasons());
+    const shapes = await mightFailWithArray<ShapeApi>()(getShapes());
+    const textures = await mightFailWithArray<GallTexture>()(getTextures());
+    const alignments = await mightFailWithArray<AlignmentApi>()(getAlignments());
+    const walls = await mightFailWithArray<WallsApi>()(getWalls());
+    const cells = await mightFailWithArray<CellsApi>()(getCells());
+
     return {
         props: {
             hostOrTaxon: hostOrTaxon,
             query: searchQuery,
             hosts: hosts,
             sectionsAndGenera: sectionsAndGenera,
-            locations: await mightFailWithArray<GallLocation>()(getLocations()),
-            colors: await mightFailWithArray<ColorApi>()(getColors()),
-            seasons: await mightFailWithArray<SeasonApi>()(getSeasons()),
-            shapes: await mightFailWithArray<ShapeApi>()(getShapes()),
-            textures: await mightFailWithArray<GallTexture>()(getTextures()),
-            alignments: await mightFailWithArray<AlignmentApi>()(getAlignments()),
-            walls: await mightFailWithArray<WallsApi>()(getWalls()),
-            cells: await mightFailWithArray<CellsApi>()(getCells()),
+            locations: locations,
+            colors: colors,
+            seasons: seasons,
+            shapes: shapes,
+            textures: textures,
+            alignments: alignments,
+            walls: walls,
+            cells: cells,
         },
     };
 };
