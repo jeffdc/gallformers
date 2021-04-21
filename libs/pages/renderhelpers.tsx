@@ -1,6 +1,6 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
-import { ImageApi, SpeciesApi } from '../api/apitypes';
+import { CCBY, ImageApi, SourceApi, SpeciesApi } from '../api/apitypes';
 import { truncateAtWord } from '../utils/util';
 
 /**
@@ -41,6 +41,14 @@ export const defaultSource = <T extends { useasdefault: number; source: { pubyea
         return speciessource.reduce((acc, v) => (acc && acc.source.pubyear < v.source.pubyear ? acc : v), speciessource[0]);
     } else {
         return undefined;
+    }
+};
+
+export const formatLicense = (source: SourceApi): string => {
+    if (source.license === CCBY) {
+        return `${source.license}: ${source.author}`;
+    } else {
+        return source.license;
     }
 };
 

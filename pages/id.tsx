@@ -125,7 +125,16 @@ const IDGall = (props: Props): JSX.Element => {
     const [filtered, setFiltered] = useState(new Array<GallApi>());
     const [hostOrTaxon, setHostOrTaxon] = useState(props?.hostOrTaxon);
     const [query, setQuery] = useState(props.query);
-    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [showAdvanced, setShowAdvanced] = useState(
+        (props.query?.alignment?.length ?? -1) > 0 ||
+            (props.query?.cells?.length ?? -1) > 0 ||
+            (props.query?.color?.length ?? -1) > 0 ||
+            (props.query?.season?.length ?? -1) > 0 ||
+            (props.query?.shape?.length ?? -1) > 0 ||
+            (props.query?.textures?.length ?? -1) > 0 ||
+            (props.query?.walls?.length ?? -1) > 0,
+    );
+
     const [showBanner, setShowBanner] = useState(true);
 
     const disableFilter = (): boolean => {
