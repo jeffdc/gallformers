@@ -33,7 +33,7 @@ import {
     WallsApi,
 } from '../libs/api/apitypes';
 import { SECTION, TaxonomyEntry, TaxonomyEntryNoParent } from '../libs/api/taxonomy';
-import { alignments, cells, colors, locations, seasons, shapes, textures, walls } from '../libs/db/gall';
+import { getAlignments, getCells, getColors, getLocations, getSeasons, getShapes, getTextures, getWalls } from '../libs/db/gall';
 import { allHostsSimple } from '../libs/db/host';
 import { allGenera, allSections } from '../libs/db/taxonomy';
 import { defaultImage, truncateOptionString } from '../libs/pages/renderhelpers';
@@ -582,14 +582,14 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             query: searchQuery,
             hosts: hosts,
             sectionsAndGenera: sectionsAndGenera,
-            locations: await mightFailWithArray<GallLocation>()(locations()),
-            colors: await mightFailWithArray<ColorApi>()(colors()),
-            seasons: await mightFailWithArray<SeasonApi>()(seasons()),
-            shapes: await mightFailWithArray<ShapeApi>()(shapes()),
-            textures: await mightFailWithArray<GallTexture>()(textures()),
-            alignments: await mightFailWithArray<AlignmentApi>()(alignments()),
-            walls: await mightFailWithArray<WallsApi>()(walls()),
-            cells: await mightFailWithArray<CellsApi>()(cells()),
+            locations: await mightFailWithArray<GallLocation>()(getLocations()),
+            colors: await mightFailWithArray<ColorApi>()(getColors()),
+            seasons: await mightFailWithArray<SeasonApi>()(getSeasons()),
+            shapes: await mightFailWithArray<ShapeApi>()(getShapes()),
+            textures: await mightFailWithArray<GallTexture>()(getTextures()),
+            alignments: await mightFailWithArray<AlignmentApi>()(getAlignments()),
+            walls: await mightFailWithArray<WallsApi>()(getWalls()),
+            cells: await mightFailWithArray<CellsApi>()(getCells()),
         },
     };
 };

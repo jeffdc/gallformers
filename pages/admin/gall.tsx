@@ -15,7 +15,17 @@ import useSpecies, { SpeciesFormFields, SpeciesProps } from '../../hooks/useSpec
 import { extractQueryParam } from '../../libs/api/apipage';
 import * as AT from '../../libs/api/apitypes';
 import { FAMILY, GENUS, TaxonomyEntry } from '../../libs/api/taxonomy';
-import { alignments, allGalls, cells, colors, locations, seasons, shapes, textures, walls } from '../../libs/db/gall';
+import {
+    getAlignments,
+    allGalls,
+    getCells,
+    getColors,
+    getLocations,
+    getSeasons,
+    getShapes,
+    getTextures,
+    getWalls,
+} from '../../libs/db/gall';
 import { allHostsSimple } from '../../libs/db/host';
 import { abundances } from '../../libs/db/species';
 import { allFamilies, allGenera } from '../../libs/db/taxonomy';
@@ -686,14 +696,14 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             hosts: await mightFailWithArray<AT.HostSimple>()(allHostsSimple()),
             families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(AT.GALL_FAMILY_TYPES)),
             genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(AT.GallTaxon)),
-            locations: await mightFailWithArray<AT.GallLocation>()(locations()),
-            colors: await mightFailWithArray<AT.ColorApi>()(colors()),
-            seasons: await mightFailWithArray<AT.SeasonApi>()(seasons()),
-            shapes: await mightFailWithArray<AT.ShapeApi>()(shapes()),
-            textures: await mightFailWithArray<AT.GallTexture>()(textures()),
-            alignments: await mightFailWithArray<AT.AlignmentApi>()(alignments()),
-            walls: await mightFailWithArray<AT.WallsApi>()(walls()),
-            cells: await mightFailWithArray<AT.CellsApi>()(cells()),
+            locations: await mightFailWithArray<AT.GallLocation>()(getLocations()),
+            colors: await mightFailWithArray<AT.ColorApi>()(getColors()),
+            seasons: await mightFailWithArray<AT.SeasonApi>()(getSeasons()),
+            shapes: await mightFailWithArray<AT.ShapeApi>()(getShapes()),
+            textures: await mightFailWithArray<AT.GallTexture>()(getTextures()),
+            alignments: await mightFailWithArray<AT.AlignmentApi>()(getAlignments()),
+            walls: await mightFailWithArray<AT.WallsApi>()(getWalls()),
+            cells: await mightFailWithArray<AT.CellsApi>()(getCells()),
             abundances: await mightFailWithArray<AT.AbundanceApi>()(abundances()),
         },
     };

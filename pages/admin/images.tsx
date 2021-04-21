@@ -153,6 +153,14 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                 setError(e);
             }
         };
+
+        // clear out any selections from previous work
+        setSelectedImages(new Set<number>());
+        setCurrentImage(undefined);
+        setError('');
+        setSelectedForCopy(new Set<number>());
+        setCopySource(undefined);
+
         fetchNewSelection(selected?.id);
     }, [selected?.id]);
 
@@ -244,7 +252,9 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
             variant: 'danger',
             catchOnCancel: true,
             title: 'Are you sure want to copy?',
-            message: `This will copy all of the metadata from the original selected image to ALL of the other selected images. Do you want to continue?`,
+            message: `This will copy all of the metadata (source, source link, license, license link, creator, and attribution) from the original selected image to ${
+                selectedForCopy.size > 1 ? `ALL ${selectedForCopy.size} of the other selected images` : `the other selected image`
+            }. Do you want to continue?`,
         })
             .then(() => {
                 setShowCopy(false);
@@ -267,7 +277,8 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
             .catch(() => {
                 setShowCopy(false);
                 Promise.resolve();
-            });
+            })
+            .finally(() => setSelectedForCopy(new Set<number>()));
     };
 
     const selectRow: SelectRowProps<ImageApi> = {

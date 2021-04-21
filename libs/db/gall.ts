@@ -409,7 +409,7 @@ const adaptLocations = (ls: location[]): GallLocation[] => {
 /**
  * Fetches all gall locations
  */
-export const locations = (): TaskEither<Error, GallLocation[]> => {
+export const getLocations = (): TaskEither<Error, GallLocation[]> => {
     const locations = () =>
         db.location.findMany({
             orderBy: {
@@ -425,7 +425,7 @@ const adaptColors = (colors: color[]): ColorApi[] => colors.map((c) => c);
 /**
  * Fetches all gall colors
  */
-export const colors = (): TaskEither<Error, ColorApi[]> => {
+export const getColors = (): TaskEither<Error, ColorApi[]> => {
     const colors = () =>
         db.color.findMany({
             orderBy: {
@@ -441,7 +441,7 @@ const adaptSeasons = (seasons: season[]): SeasonApi[] => seasons.map((c) => c);
 /**
  * Fetches all gall seasons
  */
-export const seasons = (): TaskEither<Error, SeasonApi[]> => {
+export const getSeasons = (): TaskEither<Error, SeasonApi[]> => {
     const seasons = () => db.season.findMany({});
 
     return pipe(TE.tryCatch(seasons, handleError), TE.map(adaptSeasons));
@@ -456,7 +456,7 @@ const adaptShapes = (shapes: shape[]): ShapeApi[] =>
 /**
  * Fetches all gall shapes
  */
-export const shapes = (): TaskEither<Error, ShapeApi[]> => {
+export const getShapes = (): TaskEither<Error, ShapeApi[]> => {
     const shapes = () =>
         db.shape.findMany({
             orderBy: {
@@ -478,7 +478,7 @@ const adaptTextures = (ts: texture[]): GallTexture[] => {
 /**
  * Fetches all gall textures
  */
-export const textures = (): TaskEither<Error, GallTexture[]> => {
+export const getTextures = (): TaskEither<Error, GallTexture[]> => {
     const textures = () =>
         db.texture.findMany({
             orderBy: {
@@ -498,7 +498,7 @@ const adaptAlignments = (as: alignment[]): AlignmentApi[] =>
 /**
  * Fetches all gall alignments
  */
-export const alignments = (): TaskEither<Error, AlignmentApi[]> => {
+export const getAlignments = (): TaskEither<Error, AlignmentApi[]> => {
     const alignments = () =>
         db.alignment.findMany({
             orderBy: {
@@ -518,7 +518,7 @@ const adaptWalls = (walls: ws[]): WallsApi[] =>
 /**
  * Fetches all gall walls
  */
-export const walls = (): TaskEither<Error, WallsApi[]> => {
+export const getWalls = (): TaskEither<Error, WallsApi[]> => {
     const walls = () =>
         db.walls.findMany({
             orderBy: {
@@ -538,7 +538,7 @@ const adaptCells = (cells: cs[]): CellsApi[] =>
 /**
  * Fetches all gall cells
  */
-export const cells = (): TaskEither<Error, CellsApi[]> => {
+export const getCells = (): TaskEither<Error, CellsApi[]> => {
     const cells = () =>
         db.cells.findMany({
             orderBy: {

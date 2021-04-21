@@ -36,7 +36,7 @@ ALTER table source ADD COLUMN datacomplete BOOLEAN DEFAULT 0 NOT NULL;
 
 -- #91 Add License info to Sources
 ALTER table source ADD COLUMN license TEXT DEFAULT '' NOT NULL;
-ALTER table source ADD COLUMN liceselink TEXT DEFAULT '' NOT NULL;
+ALTER table source ADD COLUMN licenselink TEXT DEFAULT '' NOT NULL;
 
 
 PRAGMA foreign_keys=ON;
