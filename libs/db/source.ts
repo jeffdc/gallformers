@@ -2,7 +2,7 @@ import { source } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, SourceApi, SourceUpsertFields, SourceWithSpeciesSourceApi } from '../api/apitypes';
+import { DeleteResult, SourceApi, SourceUpsertFields, SourceWithSpeciesApi, SourceWithSpeciesSourceApi } from '../api/apitypes';
 import { isOfType } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
@@ -20,16 +20,34 @@ const adaptor = <T extends source>(source: T): SourceApi | SourceWithSpeciesSour
 
 const adaptMany = <T extends source>(sources: T[]): (SourceApi | SourceWithSpeciesSourceApi)[] => sources.map(adaptor);
 
-export const sourceById = (id: number): TaskEither<Error, SourceApi[]> => {
+export const sourceById = (id: number): TaskEither<Error, SourceWithSpeciesApi[]> => {
     const sources = () =>
         db.source.findMany({
+            include: {
+                speciessource: {
+                    include: {
+                        species: {
+                            select: {
+                                id: true,
+                                name: true,
+                                taxoncode: true,
+                            },
+                        },
+                    },
+                },
+            },
             where: { id: { equals: id } },
         });
 
     // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(sources, handleError),
-        TE.map(adaptMany),
+        TE.map((sources) =>
+            sources.map((s) => ({
+                ...s,
+                species: s.speciessource.map((spsp) => ({ ...spsp.species, taxoncode: spsp.species.taxoncode ?? '' })),
+            })),
+        ),
     );
 };
 

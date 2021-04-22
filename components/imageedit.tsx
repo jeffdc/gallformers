@@ -174,6 +174,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                                 source: O.fromNullable(s[0]),
                                                 license: s[0] ? asLicenseType(s[0].license) : '',
                                                 licenselink: s[0] ? s[0].licenselink : '',
+                                                creator: s[0] ? s[0].author : '',
                                             });
                                         }}
                                     />

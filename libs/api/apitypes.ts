@@ -177,6 +177,10 @@ export type SourceApi = {
     licenselink: string;
 };
 
+export type SourceWithSpeciesApi = SourceApi & {
+    species: SimpleSpecies[];
+};
+
 export type SourceWithSpeciesSourceApi = SourceApi & {
     speciessource: Omit<SpeciesSourceApi, 'source'>[];
 };
