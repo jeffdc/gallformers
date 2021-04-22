@@ -20,7 +20,13 @@ const schema = yup.object().shape({
     pubyear: yup.string().matches(/([12][0-9]{3})/),
     citation: yup.string().required(),
     license: yup.string().required('You must select a license.'),
-    licenselink: yup.string().url('The link must be a valid URL.').required('You must provide a link to the license.'),
+    licenselink: yup
+        .string()
+        .url('The link must be a valid URL.')
+        .when('license', {
+            is: (l: string) => l === CCBY,
+            then: yup.string().url().required('The CC-BY license requires that you provide a link to the license.'),
+        }),
 });
 
 type Props = {

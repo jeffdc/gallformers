@@ -1,16 +1,41 @@
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Head from 'next/head';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React from 'react';
 import { Button, Col, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
+import BootstrapTable, { ColumnDescription } from 'react-bootstrap-table-next';
 import Edit from '../../../components/edit';
-import { SourceApi } from '../../../libs/api/apitypes';
+import { GallTaxon, SimpleSpecies, SourceWithSpeciesApi } from '../../../libs/api/apitypes';
 import { allSourceIds, sourceById } from '../../../libs/db/source';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 
 type Props = {
-    source: SourceApi;
+    source: SourceWithSpeciesApi;
 };
+
+const linkSpecies = (cell: string, s: SimpleSpecies) => {
+    const hostOrGall = s.taxoncode === GallTaxon ? 'gall' : 'host';
+    return (
+        <Link key={s.id} href={`/${hostOrGall}/${s.id}`}>
+            <a>{s.name}</a>
+        </Link>
+    );
+};
+
+const columns: ColumnDescription[] = [
+    {
+        dataField: 'name',
+        text: 'Name',
+        sort: true,
+        formatter: linkSpecies,
+    },
+    {
+        dataField: 'taxoncode',
+        text: 'Taxon Type',
+        sort: true,
+    },
+];
 
 const Source = ({ source }: Props): JSX.Element => {
     const router = useRouter();
@@ -28,6 +53,9 @@ const Source = ({ source }: Props): JSX.Element => {
             <Row className="pb-4">
                 <Col>
                     <h2>{source.title}</h2>
+                    <span>
+                        <a href={source.link}>{source.link}</a>
+                    </span>
                 </Col>
                 <Col xs={2}>
                     <span className="p-0 pr-1 my-auto">
@@ -47,36 +75,48 @@ const Source = ({ source }: Props): JSX.Element => {
                     </span>
                 </Col>
             </Row>
-            <Row className="pb-4">
+            <Row className="pb-1">
                 <Col>
-                    <h5>Authors:</h5>
-                    {source.author}
+                    <strong>Authors:</strong> {source.author}
                 </Col>
-            </Row>
-            <Row className="pb-4">
-                <Col xs={3}>
-                    <h5>Publication Year:</h5>
-                    {source.pubyear}
-                </Col>
-            </Row>
-            <Row className="pb-4">
                 <Col>
-                    <h5>Link:</h5>
-                    <a href={source.link}>{source.link}</a>
+                    <strong>License:</strong>{' '}
+                    {source.licenselink ? (
+                        <a href={source.licenselink} target="_blank" rel="noreferrer">
+                            {source.license}
+                        </a>
+                    ) : (
+                        <span>{source.license}</span>
+                    )}
                 </Col>
             </Row>
             <Row className="pb-4">
                 <Col>
-                    <h5>Citation:</h5>
-                    <i>{source.citation}</i>
+                    <strong>Publication Year:</strong> {source.pubyear}
+                </Col>
+            </Row>
+            <Row className="pb-4">
+                <Col>
+                    <strong>Citation (MLA Form):</strong> <i>{source.citation}</i>
                 </Col>
             </Row>
             <Row>
                 <Col>
-                    <h5>License:</h5>
-                    <a href={source.licenselink} target="_blank" rel="noreferrer">
-                        {source.license}
-                    </a>
+                    <strong>Connected Species:</strong>
+                    <BootstrapTable
+                        keyField={'id'}
+                        data={source.species}
+                        columns={columns}
+                        bootstrap4
+                        striped
+                        headerClasses="table-header"
+                        defaultSorted={[
+                            {
+                                dataField: 'name',
+                                order: 'asc',
+                            },
+                        ]}
+                    />
                 </Col>
             </Row>
         </div>
