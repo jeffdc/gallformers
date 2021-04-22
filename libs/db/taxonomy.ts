@@ -39,6 +39,7 @@ export const taxonomyEntryById = (id: number): TaskEither<Error, O.Option<Taxono
     const tax = () =>
         db.taxonomy.findFirst({
             where: { id: { equals: id } },
+            include: { parent: true },
         });
 
     // eslint-disable-next-line prettier/prettier
@@ -289,7 +290,20 @@ export const allFamilyIds = (): TaskEither<Error, string[]> => {
     );
 };
 
-export const getAllSpeciesForSection = (id: number): TaskEither<Error, SimpleSpecies[]> => {
+export const allGenusIds = (): TaskEither<Error, string[]> => {
+    const genera = () =>
+        db.taxonomy.findMany({
+            select: { id: true },
+            where: { type: { equals: 'genus' } },
+        });
+
+    return pipe(
+        TE.tryCatch(genera, handleError),
+        TE.map((x) => x.map(extractId).map((n) => n.toString())),
+    );
+};
+
+export const getAllSpeciesForSectionOrGenus = (id: number): TaskEither<Error, SimpleSpecies[]> => {
     const sectionSpecies = () =>
         db.speciestaxonomy.findMany({
             where: { taxonomy_id: id },

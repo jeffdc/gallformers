@@ -105,6 +105,11 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                         O.map((s) => s),
                                         O.getOrElse(constant(<></>)),
                                     )}
+                                    {' | '}
+                                    <strong>Genus: </strong>
+                                    <Link key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
+                                        <a> {taxonomy.genus.name}</a>
+                                    </Link>
                                 </p>
                             </Col>
                         </Row>

@@ -1,13 +1,9 @@
 import { GetServerSideProps } from 'next';
-import * as O from 'fp-ts/lib/Option';
 import Head from 'next/head';
 import React from 'react';
 import Auth from '../../../components/auth';
-import { allHosts } from '../../../libs/db/host';
-import { allFamilyIds, getAllSpeciesForSection, getFamiliesWithSpecies, taxonomyTreeForId } from '../../../libs/db/taxonomy';
-import { getStaticPropsWith, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { mightFail, mightFailWithArray } from '../../../libs/utils/util';
-import { allGalls } from '../../../libs/db/gall';
+import { getFamiliesWithSpecies } from '../../../libs/db/taxonomy';
+import { getStaticPropsWith } from '../../../libs/pages/nextPageHelpers';
 
 type Props = {
     data: unknown[];

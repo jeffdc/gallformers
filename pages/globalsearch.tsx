@@ -5,9 +5,9 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
-import { Table } from 'react-bootstrap';
-import { useSortableData } from '../hooks/use-sortabletable';
+import BootstrapTable, { ColumnDescription } from 'react-bootstrap-table-next';
 import { extractQueryParam } from '../libs/api/apipage';
+import { TaxonomyEntryNoParent } from '../libs/api/taxonomy';
 import { globalSearch, GlobalSearchResults, TinySource, TinySpecies } from '../libs/db/search';
 import { EntryLinked } from '../libs/pages/glossary';
 import { logger } from '../libs/utils/logger';
@@ -24,7 +24,28 @@ type Props = {
     search: string;
 };
 
-const makeLink = (i: SearchResultItem) => {
+const imageForType = (cell: string, i: SearchResultItem) => {
+    switch (i.type) {
+        case 'gall':
+            return <img src="/images/gall.svg" alt="gallmaker" width="25px" height="25px" />;
+        case 'plant':
+            return <img src="/images/host.svg" alt="plant" width="25px" height="25px" />;
+        case 'entry':
+            return <img src="/images/entry.svg" alt="dictionary entry" width="25px" height="25px" />;
+        case 'source':
+            return <img src="/images/source.svg" alt="source" width="25px" height="25px" />;
+        case 'genus':
+            return <img src="/images/taxon.svg" alt="source" width="25px" height="25px" />;
+        case 'section':
+            return <img src="/images/taxon.svg" alt="source" width="25px" height="25px" />;
+        case 'family':
+            return <img src="/images/taxon.svg" alt="source" width="25px" height="25px" />;
+        default:
+            return <></>;
+    }
+};
+
+const linkItem = (cell: string, i: SearchResultItem) => {
     switch (i.type) {
         case 'gall':
             return (
@@ -50,36 +71,48 @@ const makeLink = (i: SearchResultItem) => {
                     <a>{i.name}</a>
                 </Link>
             );
+        case 'genus':
+            return (
+                <Link href={`/genus/${i.id}`}>
+                    <a>{`Genus ${i.name}`}</a>
+                </Link>
+            );
+        case 'section':
+            return (
+                <Link href={`/section/${i.id}`}>
+                    <a>{`Section ${i.name}`}</a>
+                </Link>
+            );
+        case 'family':
+            return (
+                <Link href={`/family/${i.id}`}>
+                    <a>{`Family ${i.name}`}</a>
+                </Link>
+            );
         default:
-            break;
+            return <></>;
     }
 };
 
-const imageForType = (type: string) => {
-    switch (type) {
-        case 'gall':
-            return <img src="/images/gall.svg" alt="gallmaker" width="25px" height="25px" />;
-        case 'plant':
-            return <img src="/images/host.svg" alt="plant" width="25px" height="25px" />;
-        case 'entry':
-            return <img src="/images/entry.svg" alt="dictionary entry" width="25px" height="25px" />;
-        case 'source':
-            return <img src="/images/source.svg" alt="source" width="25px" height="25px" />;
-        default:
-            break;
-    }
-};
+const columns: ColumnDescription[] = [
+    {
+        dataField: 'type',
+        text: 'Type',
+        sort: true,
+        formatter: imageForType,
+    },
+    {
+        dataField: 'name',
+        text: 'Name',
+        sort: true,
+        formatter: linkItem,
+    },
+];
 
 const GlobalSearch = ({ results, search }: Props): JSX.Element => {
-    const { items, requestSort, sortConfig } = useSortableData(results, { key: 'name', direction: 'asc' });
-
     if (results.length <= 0) {
         return <h1>No results</h1>;
     }
-
-    const getClassNamesFor = (name: keyof SearchResultItem): string => {
-        return sortConfig.key === name ? sortConfig.direction : '';
-    };
 
     return (
         <div className="fixed-left mt-2 ml-4 mr-2">
@@ -87,72 +120,20 @@ const GlobalSearch = ({ results, search }: Props): JSX.Element => {
                 <title>Search Results - {`'${search}'`}</title>
             </Head>
 
-            <Table striped>
-                <thead>
-                    <tr>
-                        <th className="thead-dark">
-                            <button type="button" onClick={() => requestSort('type')} className={getClassNamesFor('type')}>
-                                Type
-                            </button>
-                        </th>
-                        <th>
-                            <button type="button" onClick={() => requestSort('name')} className={getClassNamesFor('name')}>
-                                Name
-                            </button>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {items.map((s) => (
-                        <tr key={s.id}>
-                            <td>{imageForType(s.type)}</td>
-                            <td>{makeLink(s)}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </Table>
-            <style jsx>{`
-                table {
-                    width: 100%;
-                    border-collapse: collapse;
-                }
-
-                thead th {
-                    text-align: left;
-                    border-bottom: 2px solid black;
-                }
-
-                thead button {
-                    border: 0;
-                    border-radius: none;
-                    font-family: inherit;
-                    font-weight: 700;
-                    font-size: inherit;
-                    padding: 0.5em;
-                    margin-bottom: 1px;
-                }
-
-                thead button.asc::after {
-                    content: '↑';
-                    display: inline-block;
-                    margin-left: 1em;
-                }
-
-                thead button.desc::after {
-                    content: '↓';
-                    display: inline-block;
-                    margin-left: 1em;
-                }
-
-                tbody td {
-                    padding: 0.5em;
-                    border-bottom: 1px solid #ccc;
-                }
-
-                tbody tr:hover {
-                    background-color: #eee;
-                }
-            `}</style>
+            <BootstrapTable
+                keyField={'id'}
+                data={results}
+                columns={columns}
+                bootstrap4
+                striped
+                headerClasses="table-header"
+                defaultSorted={[
+                    {
+                        dataField: 'name',
+                        order: 'asc',
+                    },
+                ]}
+            />
         </div>
     );
 };
@@ -171,15 +152,17 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
         species: new Array<TinySpecies>(),
         glossary: new Array<EntryLinked>(),
         sources: new Array<TinySource>(),
+        taxa: new Array<TaxonomyEntryNoParent>(),
     });
 
-    const { species, glossary, sources } = await mightFail(emptySearch)(globalSearch(search));
+    const { species, glossary, sources, taxa } = await mightFail(emptySearch)(globalSearch(search));
     // an experiment - lets mash them all together and show them in a single table
 
     const r: SearchResultItem[] = species
         .map((s) => ({ id: s.id.toString(), type: s.taxoncode, name: s.name }))
         .concat(glossary.map((g) => ({ id: g.word, type: 'entry', name: capitalizeFirstLetter(g.word) })))
-        .concat(sources.map((s) => ({ id: s.id.toString(), type: 'source', name: s.source })));
+        .concat(sources.map((s) => ({ id: s.id.toString(), type: 'source', name: s.source })))
+        .concat(taxa.map((t) => ({ id: t.id.toString(), type: t.type, name: t.name })));
 
     return {
         props: {

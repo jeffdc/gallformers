@@ -1,41 +1,17 @@
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Head from 'next/head';
-import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React from 'react';
 import { Button, Col, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
-import BootstrapTable, { ColumnDescription } from 'react-bootstrap-table-next';
 import Edit from '../../../components/edit';
-import { GallTaxon, SimpleSpecies, SourceWithSpeciesApi } from '../../../libs/api/apitypes';
+import SpeciesTable from '../../../components/speciesTable';
+import { SourceWithSpeciesApi } from '../../../libs/api/apitypes';
 import { allSourceIds, sourceById } from '../../../libs/db/source';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 
 type Props = {
     source: SourceWithSpeciesApi;
 };
-
-const linkSpecies = (cell: string, s: SimpleSpecies) => {
-    const hostOrGall = s.taxoncode === GallTaxon ? 'gall' : 'host';
-    return (
-        <Link key={s.id} href={`/${hostOrGall}/${s.id}`}>
-            <a>{s.name}</a>
-        </Link>
-    );
-};
-
-const columns: ColumnDescription[] = [
-    {
-        dataField: 'name',
-        text: 'Name',
-        sort: true,
-        formatter: linkSpecies,
-    },
-    {
-        dataField: 'taxoncode',
-        text: 'Taxon Type',
-        sort: true,
-    },
-];
 
 const Source = ({ source }: Props): JSX.Element => {
     const router = useRouter();
@@ -103,20 +79,7 @@ const Source = ({ source }: Props): JSX.Element => {
             <Row>
                 <Col>
                     <strong>Connected Species:</strong>
-                    <BootstrapTable
-                        keyField={'id'}
-                        data={source.species}
-                        columns={columns}
-                        bootstrap4
-                        striped
-                        headerClasses="table-header"
-                        defaultSorted={[
-                            {
-                                dataField: 'name',
-                                order: 'asc',
-                            },
-                        ]}
-                    />
+                    <SpeciesTable species={source.species} />
                 </Col>
             </Row>
         </div>

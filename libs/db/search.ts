@@ -1,6 +1,7 @@
 import { source, species } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
+import { TaxonomyEntryNoParent, TaxonomyType } from '../api/taxonomy';
 import { entriesWithLinkedDefs, EntryLinked } from '../pages/glossary';
 import { sourceToDisplay } from '../pages/renderhelpers';
 import { ExtractTFromPromise } from '../utils/types';
@@ -22,6 +23,7 @@ export type GlobalSearchResults = {
     species: TinySpecies[];
     glossary: EntryLinked[];
     sources: TinySource[];
+    taxa: TaxonomyEntryNoParent[];
 };
 
 export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchResults> => {
@@ -56,6 +58,26 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
             orderBy: { title: 'asc' },
         });
 
+    const taxaSearch = () =>
+        db.taxonomy.findMany({
+            where: {
+                name: { contains: q },
+            },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                type: true,
+            },
+        });
+
+    const winnowTaxa = (taxa: ExtractTFromPromise<ReturnType<typeof taxaSearch>>): TaxonomyEntryNoParent[] =>
+        taxa.map((t) => ({
+            ...t,
+            description: t.description ?? '',
+            type: t.type as TaxonomyType,
+        }));
+
     const winnowSpecies = (sp: species[]): TinySpecies[] =>
         sp.map((s) => ({
             id: s.id,
@@ -72,12 +94,13 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
     const filterDefinitions = (entries: readonly EntryLinked[]): EntryLinked[] =>
         entries.filter((e) => e.word === search || e.definition.includes(search));
 
-    const buildResults = (species: TinySpecies[]) => (sources: TinySource[]) => (
-        glossary: EntryLinked[],
+    const buildResults = (species: TinySpecies[]) => (sources: TinySource[]) => (glossary: EntryLinked[]) => (
+        taxa: TaxonomyEntryNoParent[],
     ): GlobalSearchResults => ({
         species: species,
         glossary: glossary,
         sources: sources,
+        taxa: taxa,
     });
 
     return pipe(
@@ -108,6 +131,15 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
                 entriesWithLinkedDefs(),
                 TE.map(filterDefinitions),
                 // curry the glossary results into the builder
+                TE.map(builder),
+            ),
+        ),
+        TE.flatten,
+        TE.map((builder) =>
+            pipe(
+                TE.tryCatch(taxaSearch, handleError),
+                TE.map(winnowTaxa),
+                TE.map((x) => x),
                 TE.map(builder),
             ),
         ),
