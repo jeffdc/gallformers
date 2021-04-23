@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns="http://www.w3.org/2000/svg" xmlns:xl="http://www.w3.org/1999/xlink" version="1.1" viewBox="196 155 193 174" width="193" height="174">
+  <defs/>
+  <metadata> Produced by OmniGraffle 7.18.5\n2021-04-22 14:32:44 +0000</metadata>
+  <g id="Canvas_1" stroke="none" stroke-opacity="1" fill="none" fill-opacity="1" stroke-dasharray="none">
+    <title>Canvas 1</title>
+    <g id="Canvas_1_Layer_1">
+      <title>Layer 1</title>
+      <g id="Graphic_2">
+        <circle cx="293" cy="192.5" r="30.0000479370569" fill="white"/>
+        <circle cx="293" cy="192.5" r="30.0000479370569" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-width="15"/>
+      </g>
+      <g id="Graphic_3">
+        <circle cx="233.5" cy="291.5" r="30.0000479370569" fill="white"/>
+        <circle cx="233.5" cy="291.5" r="30.0000479370569" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-width="15"/>
+      </g>
+      <g id="Graphic_4">
+        <circle cx="351" cy="291.5" r="30.0000479370569" fill="white"/>
+        <circle cx="351" cy="291.5" r="30.0000479370569" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-width="15"/>
+      </g>
+      <g id="Line_12">
+        <line x1="273.678" y1="224.64922" x2="252.822" y2="259.35078" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-width="15"/>
+      </g>
+      <g id="Line_13">
+        <line x1="311.9607" y1="224.86397" x2="332.0393" y2="259.13603" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-width="15"/>
+      </g>
+    </g>
+  </g>
+</svg>

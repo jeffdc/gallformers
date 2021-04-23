@@ -94,12 +94,19 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
                             </Col>
                         </Row>
                         <Row>
+                            <Col> {species.aliases.map((a) => a.name).join(', ')}</Col>
+                        </Row>
+                        <Row>
                             <Col>
-                                {species.aliases.map((a) => a.name).join(', ')}
                                 <p className="font-italic">
                                     <strong>Family:</strong>
                                     <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
                                         <a> {taxonomy.family.name}</a>
+                                    </Link>
+                                    {' | '}
+                                    <strong>Genus:</strong>
+                                    <Link key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
+                                        <a> {taxonomy.genus.name}</a>
                                     </Link>
                                 </p>
                             </Col>
