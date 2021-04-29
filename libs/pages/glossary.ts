@@ -69,9 +69,9 @@ const linkHtml = (context: Context) => (text: string): string => {
 
 /** Make the helper functions available for unit testing. */
 export const testables = {
-    makeLink: makeLinkHtml,
+    makeLinkHtml: makeLinkHtml,
     stemText: stemText,
-    linkFromStems: linkHtml,
+    linkHtml: linkHtml,
 };
 
 const internalLinker = async <T extends unknown>(
