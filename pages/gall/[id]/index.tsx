@@ -1,24 +1,26 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetStaticPaths, GetStaticProps } from 'next';
+import ErrorPage from 'next/error';
 import Head from 'next/head';
 import Link from 'next/link';
-import ErrorPage from 'next/error';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
 import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import externalLinks from 'remark-external-links';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import InfoTip from '../../../components/infotip';
 import SourceList from '../../../components/sourcelist';
-import { CCBY, DetachableBoth, GallApi, GallHost } from '../../../libs/api/apitypes';
+import { DetachableBoth, GallApi, GallHost } from '../../../libs/api/apitypes';
 import { FGS } from '../../../libs/api/taxonomy';
 import { allGallIds, gallById } from '../../../libs/db/gall';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
-import { linkTextToGlossary } from '../../../libs/pages/glossary';
+import { linkSourceToGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { defaultSource, formatLicense } from '../../../libs/pages/renderhelpers';
-import { deserialize } from '../../../libs/utils/reactserialize';
+import { defaultSource, formatLicense, sourceToDisplay } from '../../../libs/pages/renderhelpers';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
@@ -174,7 +176,21 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
                     <Col id="description" className="lead p-3">
                         {selectedSource && selectedSource.description && (
                             <span>
-                                <p className="white-space-pre-wrap description-text">{deserialize(selectedSource.description)}</p>
+                                <span className="source-quotemark">&ldquo;</span>
+                                <ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[externalLinks]}>
+                                    {selectedSource.description}
+                                </ReactMarkdown>
+                                <span className="source-quotemark">&rdquo;</span>
+                                <p>
+                                    <i>- {sourceToDisplay(selectedSource.source)}</i>
+                                    <InfoTip
+                                        id="copyright"
+                                        text={`Source entries are edited for relevance, brevity, and formatting. All text is quoted from the selected source except where noted by [brackets].\nThis source: ${formatLicense(
+                                            selectedSource.source,
+                                        )}.`}
+                                        tip="©"
+                                    />
+                                </p>
                                 <p className="description-text">
                                     {selectedSource.externallink && (
                                         <span>
@@ -184,15 +200,6 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
                                             </a>
                                         </span>
                                     )}
-                                </p>
-                                <p>
-                                    <InfoTip
-                                        id="copyright"
-                                        text={`Source entries are edited for relevance, brevity, and formatting. All text is quoted from the selected source except where noted by [brackets]. This source: ${formatLicense(
-                                            selectedSource.source,
-                                        )}.`}
-                                        tip="© Info"
-                                    />
                                 </p>
                             </span>
                         )}
@@ -246,7 +253,7 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
 export const getStaticProps: GetStaticProps = async (context) => {
     const g = await getStaticPropsWithContext(context, gallById, 'gall');
     const gall = g[0];
-    const sources = gall ? await linkTextToGlossary(gall.speciessource) : null;
+    const sources = gall ? await linkSourceToGlossary(gall.speciessource) : null;
     const fgs = gall ? await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy') : null;
 
     return {

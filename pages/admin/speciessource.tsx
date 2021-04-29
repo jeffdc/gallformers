@@ -6,7 +6,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useState } from 'react';
-import { Button, Col, Row } from 'react-bootstrap';
+import { Button, Col, Row, Tab, Tabs } from 'react-bootstrap';
+import { Controller } from 'react-hook-form';
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import externalLinks from 'remark-external-links';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import { RenameEvent } from '../../components/editname';
@@ -15,12 +19,12 @@ import Typeahead from '../../components/Typeahead';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { SpeciesSourceApi, SpeciesSourceInsertFields } from '../../libs/api/apitypes';
+import { GallTaxon, SpeciesSourceApi, SpeciesSourceInsertFields } from '../../libs/api/apitypes';
 import { allSources } from '../../libs/db/source';
 import { allSpecies } from '../../libs/db/species';
 import Admin from '../../libs/pages/admin';
 import { defaultSource, sourceToDisplay } from '../../libs/pages/renderhelpers';
-import { mightFailWithArray } from '../../libs/utils/util';
+import { capitalizeFirstLetter, mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
     speciesid: string;
@@ -61,6 +65,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
     const [sourcesForSpecies, setSourcesForSpecies] = useState(new Array<SpeciesSourceApi>());
     const [showNewMapping, setShowNewMapping] = useState(false);
     const [selectedSource, setSelectedSource] = useState<SpeciesSourceApi[]>([]);
+    const [description, setDescription] = useState('');
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const toUpsertFields = (fields: FormFields, name: string, id: number): SpeciesSourceInsertFields => {
@@ -69,7 +74,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
             id: selSo?.id != undefined ? selSo.id : -1,
             species: id,
             source: selSo?.source_id != undefined ? selSo.source_id : -1,
-            description: fields.description,
+            description: description,
             externallink: fields.externallink,
             useasdefault: fields.useasdefault,
             delete: fields.del,
@@ -84,6 +89,8 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
 
                 const so = defaultSource(sources);
                 setSelectedSource(so ? [so] : []);
+
+                setDescription(so?.description ?? '');
 
                 return {
                     mainField: [sp],
@@ -215,7 +222,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                 id: selSo.id,
                 species: selected.id,
                 source: selSo.source_id,
-                description: fields.description ? fields.description : '',
+                description: description ? description : '',
                 useasdefault: fields.useasdefault,
                 externallink: fields.externallink,
             };
@@ -256,12 +263,15 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                     <p>
                         First select a species. This will load any existing source mappings. You can then select one and edit the
                         mapping. If there are no existing mappings or you want to add a new source mapping to the species just
-                        press the Add source mapping button. If you want to delete a Source-
+                        press the Add source mapping button.
                     </p>
 
                     <Picker
                         size="lg"
-                        data={allSources.sort((a, b) => sourceToDisplay(a).localeCompare(sourceToDisplay(b)))}
+                        data={allSources
+                            // remove the sources that are already mapped to this species
+                            .filter((s) => !sourcesForSpecies.find((sosp) => sosp.source_id === s.id))
+                            .sort((a, b) => sourceToDisplay(a).localeCompare(sourceToDisplay(b)))}
                         toLabel={sourceToDisplay}
                         title="Add Mapped Source"
                         placeholder="Choose a new source to map"
@@ -295,7 +305,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                                         selected={selectedSource}
                                         onChange={(s) => {
                                             setSelectedSource(s);
-                                            form.setValue('description', s[0] ? s[0].description : '');
+                                            setDescription(s[0]?.description ?? '');
                                             form.setValue('externallink', s[0] ? s[0].externallink : '');
                                             form.setValue('useasdefault', s[0] ? s[0].useasdefault > 0 : false);
                                         }}
@@ -317,7 +327,35 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                     <Row className="form-group">
                         <Col>
                             Description (this is the relevant info from the selected Source about the selected Species):
-                            <textarea {...form.register('description')} disabled={!selected} className="form-control" rows={8} />
+                            <Tabs defaultActiveKey="edit" className="pt-1">
+                                <Tab eventKey="edit" title="Edit">
+                                    <Controller
+                                        name="description"
+                                        control={form.control}
+                                        render={({ field: { ref } }) => (
+                                            <textarea
+                                                ref={ref}
+                                                value={description}
+                                                onChange={(d) => {
+                                                    setDescription(d.currentTarget.value);
+                                                }}
+                                                disabled={!selected}
+                                                className="form-control pt-2"
+                                                rows={8}
+                                            />
+                                        )}
+                                    />
+                                </Tab>
+                                <Tab eventKey="preview" title="Preview">
+                                    <ReactMarkdown
+                                        className="markdown-view"
+                                        rehypePlugins={[rehypeRaw]}
+                                        remarkPlugins={[externalLinks]}
+                                    >
+                                        {description}
+                                    </ReactMarkdown>
+                                </Tab>
+                            </Tabs>
                         </Col>
                     </Row>
                     <Row className="form-group">
@@ -353,10 +391,16 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                         <Col>
                             <br />
                             <div>
-                                <Link href={`./gall?id=${selected?.id}`}>Edit the Gall</Link>
+                                {selected?.taxoncode === GallTaxon ? (
+                                    <Link href={`./gall?id=${selected?.id}`}>Edit the Gall</Link>
+                                ) : (
+                                    <Link href={`./host?id=${selected?.id}`}>Edit the Plant</Link>
+                                )}
                             </div>
                             <div>
-                                <Link href={`./images?speciesid=${selected?.id}`}>Add/Edit Images for this Gall</Link>
+                                <Link href={`./images?speciesid=${selected?.id}`}>
+                                    {`Add/Edit Images for this ${capitalizeFirstLetter(selected?.taxoncode ?? '')}`}
+                                </Link>
                             </div>
                         </Col>
                     </Row>

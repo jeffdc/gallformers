@@ -60,6 +60,34 @@ export const allSources = (): TaskEither<Error, source[]> => {
     return TE.tryCatch(sources, handleError);
 };
 
+export const allSourcesWithSpecies = (): TaskEither<Error, SourceWithSpeciesApi[]> => {
+    const sources = () =>
+        db.source.findMany({
+            include: {
+                speciessource: {
+                    include: {
+                        species: {
+                            select: { id: true, name: true, taxoncode: true },
+                        },
+                    },
+                },
+            },
+        });
+
+    return pipe(
+        TE.tryCatch(sources, handleError),
+        TE.map((sos) =>
+            sos.map((s) => ({
+                ...s,
+                species: s.speciessource.map((spso) => ({
+                    ...spso.species,
+                    taxoncode: spso.species.taxoncode ? spso.species.taxoncode : '',
+                })),
+            })),
+        ),
+    );
+};
+
 export const allSourceIds = (): TaskEither<Error, string[]> => {
     const ids = () => db.source.findMany({ select: { id: true } });
 

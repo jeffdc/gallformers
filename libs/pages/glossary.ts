@@ -2,11 +2,9 @@ import * as A from 'fp-ts/lib/Array';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
-import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { PorterStemmer, WordTokenizer } from 'natural';
-import React, { ReactNode } from 'react';
+import { SpeciesSourceApi } from '../api/apitypes';
 import { allGlossaryEntries, Entry } from '../db/glossary';
-import { serialize } from '../utils/reactserialize';
 import { errorThrow } from '../utils/util';
 
 export type EntryLinked = Entry & {
@@ -18,9 +16,9 @@ type WordStem = {
     stem: string;
 };
 
-const makeLink = (linkname: string, display: string, samepage: boolean): JSX.Element => {
-    const href = samepage ? `#${linkname}` : `/glossary/#${linkname}`;
-    return React.createElement('a', { href: href }, display);
+type Context = {
+    stems: WordStem[];
+    glossary: Entry[];
 };
 
 const stemText = (es: Entry[]): WordStem[] =>
@@ -31,21 +29,30 @@ const stemText = (es: Entry[]): WordStem[] =>
         };
     });
 
-const linkFromStems = (text: string, samepage: boolean) => (stems: WordStem[]): ReactNode[] => {
-    const els: ReactNode[] = [];
+const makeLinkHtml = (display: string, entry: Entry | undefined): string => {
+    return `<span class="jargon-term"><a href="/glossary/${entry?.word}">${display}</a><span class="jargon-info">${entry?.definition}</span></span>`;
+};
+
+const linkHtml = (context: Context) => (text: string): string => {
+    const els: string[] = [];
     let curr = 0;
     const tokens = new WordTokenizer().tokenize(text);
     tokens.forEach((t, i) => {
         const stemmed = PorterStemmer.stem(t);
         const raw = tokens[i];
 
-        stems.forEach((stem) => {
+        context.stems.forEach((stem) => {
             if (stem.stem === stemmed) {
                 const left = text.substring(curr, text.indexOf(raw, curr));
                 curr = curr + left.length + raw.length;
 
                 els.push(left);
-                els.push(makeLink(stem.word, raw, samepage));
+                els.push(
+                    makeLinkHtml(
+                        raw,
+                        context.glossary.find((e) => e.word === stem.word),
+                    ),
+                );
             }
         });
     });
@@ -57,68 +64,45 @@ const linkFromStems = (text: string, samepage: boolean) => (stems: WordStem[]): 
         // there is text leftover that we need to append
         els.push(text.substring(curr, text.length));
     }
-    return els;
+    return els.reduce((acc, s) => acc.concat(s), '');
 };
 
 /** Make the helper functions available for unit testing. */
 export const testables = {
-    makeLink: makeLink,
+    makeLink: makeLinkHtml,
     stemText: stemText,
-    linkFromStems: linkFromStems,
+    linkFromStems: linkHtml,
 };
 
-/**
- * Given the input text, add links to any word that occurs in the global glossary.
- *
- * @param text the text to find and link glossary terms in.
- * @param samepage a flag to signify if the links are on the same page.
- */
-export function linkTextFromGlossary(text: O.Option<string>, samepage = false): TaskEither<Error, ReactNode[]> {
-    // eslint-disable-next-line prettier/prettier
-    return pipe(
+const internalLinker = async <T extends unknown>(
+    data: T[],
+    update: (d: string, t: T) => T,
+    getVal: (t: T) => string | undefined,
+) => {
+    const toContext = (glossary: Entry[]): Context => ({ stems: stemText(glossary), glossary: glossary });
+
+    const linkText = (context: Context) => (s: typeof data[0]): TE.TaskEither<Error, string> =>
+        // eslint-disable-next-line prettier/prettier
+        pipe(
+            O.fromNullable(getVal(s)),
+            TE.fromOption(constant(new Error('Received invalid text.'))),
+            TE.map(linkHtml(context)),
+        );
+
+    return await pipe(
         allGlossaryEntries(),
-        TE.map(stemText),
-        TE.map((stems) =>
+        TE.map(toContext),
+        TE.chain((context) =>
             pipe(
-                text,
-                TE.fromOption(constant(new Error('Received invalid text.'))),
-                TE.map((text) => linkFromStems(text, samepage)(stems)),
+                data,
+                A.map(linkText(context)),
+                TE.sequenceArray,
+                // sequence makes the array readonly, the rest of the fp-ts API does not use readonly, ...sigh.
+                TE.map((d) => A.zipWith(d as string[], data, update)),
             ),
         ),
-        TE.flatten,
-    );
-}
-
-/**
- * All of the Glossary entries with the definitions linked.
- */
-export const entriesWithLinkedDefs = (): TaskEither<Error, readonly EntryLinked[]> => {
-    const linkEntry = (e: Entry) => (def: string): EntryLinked => {
-        return {
-            ...e,
-            linkedDefinition: def,
-        };
-    };
-
-    const linkEntries = (es: Entry[]): TaskEither<Error, EntryLinked>[] => {
-        return es.map((e) => {
-            // eslint-disable-next-line prettier/prettier
-            return pipe(
-                linkTextFromGlossary(O.fromNullable(e.definition), true),
-                TE.map(serialize),
-                TE.map(linkEntry(e)),
-            );
-        });
-    };
-
-    // eslint-disable-next-line prettier/prettier
-    return pipe(
-        allGlossaryEntries(),
-        TE.map(linkEntries),
-        // deal with the fact that we have a TE<Error, LinkedEntry>[] but want a TE<Error, LinkedEntry[]>
-        TE.map(TE.sequenceArray),
-        TE.flatten,
-    );
+        TE.getOrElse(errorThrow),
+    )();
 };
 
 /**
@@ -126,21 +110,22 @@ export const entriesWithLinkedDefs = (): TaskEither<Error, readonly EntryLinked[
  * @param data
  * @returns
  */
-export const linkTextToGlossary = async <T extends { description: string }>(data: T[]): Promise<T[]> => {
-    const updateSpeciesSource = (d: string, source: T): T => {
+export const linkSourceToGlossary = async (data: SpeciesSourceApi[]): Promise<SpeciesSourceApi[]> => {
+    const update = (d: string, t: SpeciesSourceApi): SpeciesSourceApi => {
         return {
-            ...source,
+            ...t,
             description: d,
         };
     };
 
-    return await pipe(
-        data,
-        A.map((s) => linkTextFromGlossary(O.fromNullable(s.description))),
-        A.map(TE.map(serialize)),
-        TE.sequenceArray,
-        // sequence makes the array readonly, the rest of the fp-ts API does not use readonly, ...sigh.
-        TE.map((d) => A.zipWith(d as string[], data, updateSpeciesSource)),
-        TE.getOrElse(errorThrow),
-    )();
+    return await internalLinker(data, update, (e: SpeciesSourceApi) => e.description);
+};
+
+export const linkDefintionToGlossary = async (data: Entry[]): Promise<Entry[]> => {
+    const update = (d: string, e: Entry): Entry => ({
+        ...e,
+        definition: d,
+    });
+
+    return await internalLinker(data, update, (e: Entry) => e.definition);
 };

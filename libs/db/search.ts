@@ -2,11 +2,11 @@ import { source, species } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaxonomyEntryNoParent, TaxonomyType } from '../api/taxonomy';
-import { entriesWithLinkedDefs, EntryLinked } from '../pages/glossary';
 import { sourceToDisplay } from '../pages/renderhelpers';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
+import { allGlossaryEntries, Entry } from './glossary';
 
 export type TinySpecies = {
     id: number;
@@ -21,7 +21,7 @@ export type TinySource = {
 
 export type GlobalSearchResults = {
     species: TinySpecies[];
-    glossary: EntryLinked[];
+    glossary: Entry[];
     sources: TinySource[];
     taxa: TaxonomyEntryNoParent[];
 };
@@ -91,10 +91,10 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
             source: sourceToDisplay(s),
         }));
 
-    const filterDefinitions = (entries: readonly EntryLinked[]): EntryLinked[] =>
+    const filterDefinitions = (entries: readonly Entry[]): Entry[] =>
         entries.filter((e) => e.word === search || e.definition.includes(search));
 
-    const buildResults = (species: TinySpecies[]) => (sources: TinySource[]) => (glossary: EntryLinked[]) => (
+    const buildResults = (species: TinySpecies[]) => (sources: TinySource[]) => (glossary: Entry[]) => (
         taxa: TaxonomyEntryNoParent[],
     ): GlobalSearchResults => ({
         species: species,
@@ -128,7 +128,7 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
         TE.flatten,
         TE.map((builder) =>
             pipe(
-                entriesWithLinkedDefs(),
+                allGlossaryEntries(),
                 TE.map(filterDefinitions),
                 // curry the glossary results into the builder
                 TE.map(builder),

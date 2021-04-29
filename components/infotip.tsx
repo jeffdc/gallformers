@@ -7,7 +7,14 @@ type Props = {
 };
 const InfoTip = ({ id, text, tip }: Props): JSX.Element => {
     return (
-        <OverlayTrigger placement="top" overlay={<Tooltip id={id}>{text}</Tooltip>}>
+        <OverlayTrigger
+            placement="top"
+            overlay={
+                <Tooltip id={id} className="info-tip">
+                    {text}
+                </Tooltip>
+            }
+        >
             <sup>
                 <Badge pill variant="info" className="m-1">
                     {tip ? tip : 'i'}

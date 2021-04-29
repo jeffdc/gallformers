@@ -47,7 +47,12 @@
     "react-dom": "^16",
     "react-hook-form": "^7",
     "react-hot-toast": "^1",
+    "react-markdown": "^6.0.0",
     "react-simple-tree-menu": "^1",
+    "rehype-raw": "^5.1.0",
+    "remark": "^13.0.0",
+    "remark-external-links": "^8.0.0",
+    "remark-html": "^13.0.1",
     "yarn": "^1.22.10",
     "yup": "^0"
   },
