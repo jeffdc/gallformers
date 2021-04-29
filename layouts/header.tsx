@@ -1,8 +1,7 @@
 import Head from 'next/head';
-import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { KeyboardEvent, SyntheticEvent, useState } from 'react';
-import { Button, Dropdown, Form, FormControl, Nav, Navbar, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Button, Dropdown, Form, FormControl, Nav, Navbar } from 'react-bootstrap';
 
 const Header = (): JSX.Element => {
     const [searchText, setSearchText] = useState('');
@@ -38,7 +37,7 @@ const Header = (): JSX.Element => {
             </Head>
             <Navbar fixed="top" collapseOnSelect expand="sm" bg="dark" variant="dark">
                 <Navbar.Brand href="/">
-                    <img src="../images/fly.svg" width="25px" height="25px" /> Gallformers
+                    <img src="/images/fly.svg" width="25px" height="25px" /> Gallformers
                 </Navbar.Brand>
                 <Navbar.Toggle aria-controls="responsive-navbar-nav" />
                 <Navbar.Collapse id="responsive-navbar-nav">

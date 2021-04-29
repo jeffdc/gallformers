@@ -251,7 +251,7 @@ export type AliasApi = {
 export const EmptyAlias: AliasApi = {
     id: -1,
     name: '',
-    type: 'common',
+    type: 'scientific',
     description: '',
 };
 

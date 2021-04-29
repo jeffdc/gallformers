@@ -61,7 +61,7 @@ const linkItem = (cell: string, i: SearchResultItem) => {
             );
         case 'entry':
             return (
-                <Link href={`/glossary#${i.name}`}>
+                <Link href={`/glossary#${i.name.toLocaleLowerCase()}`}>
                     <a>{i.name}</a>
                 </Link>
             );

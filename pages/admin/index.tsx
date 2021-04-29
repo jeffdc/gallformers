@@ -44,6 +44,11 @@ const Admin = (): JSX.Element => {
                             <ListGroupItem>
                                 Create/modify <Link href="./admin/glossary">Glossary Entries</Link>
                             </ListGroupItem>
+                            <ListGroupItem>
+                                Browse <Link href="./admin/browse/galls">galls</Link>,{' '}
+                                <Link href="./admin/browse/hosts">hosts</Link>, or{' '}
+                                <Link href="./admin/browse/sources">sources</Link>.
+                            </ListGroupItem>
                         </ListGroup>
                     </Col>
                 </Row>
