@@ -24,11 +24,11 @@ const linkLicense = (cell: string, row: SourceApi) => {
                     alt={row.license}
                     src={
                         row.license === CC0
-                            ? '../images/cc0.png'
+                            ? '/images/cc0.png'
                             : row.license === CCBY
-                            ? '../images/CCBY.png'
+                            ? '/images/CCBY.png'
                             : row.license === ALLRIGHTS
-                            ? '../images/allrights.svg'
+                            ? '/images/allrights.svg'
                             : ''
                     }
                     height="20"

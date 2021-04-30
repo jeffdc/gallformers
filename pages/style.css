@@ -89,4 +89,6 @@ blockquote {
 .info-tip {
   font-size: 75%;
   white-space: pre-wrap;
+  /* without the next line Firefox will not work properly */
+  pointer-events: none;
 }

@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import remarkBreaks from 'remark-breaks';
 import externalLinks from 'remark-external-links';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
@@ -177,7 +178,7 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
                         {selectedSource && selectedSource.description && (
                             <span>
                                 <span className="source-quotemark">&ldquo;</span>
-                                <ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[externalLinks]}>
+                                <ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[externalLinks, remarkBreaks]}>
                                     {selectedSource.description}
                                 </ReactMarkdown>
                                 <span className="source-quotemark">&rdquo;</span>

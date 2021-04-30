@@ -29,8 +29,10 @@ const stemText = (es: Entry[]): WordStem[] =>
         };
     });
 
+//TODO - this is a bad implemenation. Figure out how to use Popper (via bootstrap OverlayTrigger). Not clear
+// how to inject a React component in to the Makrdown...
 const makeLinkHtml = (display: string, entry: Entry | undefined): string => {
-    return `<span class="jargon-term"><a href="/glossary/${entry?.word}">${display}</a><span class="jargon-info">${entry?.definition}</span></span>`;
+    return `<span class="jargon-term"><a href="/glossary/#${entry?.word}">${display}</a><span class="jargon-info">${entry?.definition}</span></span>`;
 };
 
 const linkHtml = (context: Context) => (text: string): string => {
