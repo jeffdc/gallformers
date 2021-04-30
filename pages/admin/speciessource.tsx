@@ -10,6 +10,7 @@ import { Button, Col, Row, Tab, Tabs } from 'react-bootstrap';
 import { Controller } from 'react-hook-form';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import remarkBreaks from 'remark-breaks';
 import externalLinks from 'remark-external-links';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
@@ -175,9 +176,9 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
             const newSourcesForSpecies = [...sourcesForSpecies, newSpSo];
             setSourcesForSpecies(newSourcesForSpecies);
             setSelectedSource([newSpSo]);
+            setDescription('');
 
             form.setValue('sources', [newSpSo], { shouldDirty: true });
-            form.setValue('description', '');
             form.setValue('externallink', '');
             form.setValue('useasdefault', false);
         }
@@ -350,7 +351,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                                     <ReactMarkdown
                                         className="markdown-view"
                                         rehypePlugins={[rehypeRaw]}
-                                        remarkPlugins={[externalLinks]}
+                                        remarkPlugins={[externalLinks, remarkBreaks]}
                                     >
                                         {description}
                                     </ReactMarkdown>

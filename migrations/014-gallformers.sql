@@ -14,6 +14,12 @@ DELETE FROM taxonomy
            )
 );
 
+DELETE FROM taxonomytaxonomy
+  WHERE child_id NOT IN (
+    SELECT id FROM taxonomy
+  );
+
+
 PRAGMA foreign_keys=ON;
 
 --------------------------------------------------------------

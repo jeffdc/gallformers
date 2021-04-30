@@ -11,7 +11,7 @@ const InfoTip = ({ id, text, tip }: Props): JSX.Element => {
             placement="top"
             overlay={
                 <Tooltip id={id} className="info-tip">
-                    {text}
+                    <p>{text}</p>
                 </Tooltip>
             }
         >

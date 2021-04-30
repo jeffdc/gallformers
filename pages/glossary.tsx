@@ -5,6 +5,7 @@ import { Col, Row } from 'react-bootstrap';
 import BootstrapTable, { ColumnDescription } from 'react-bootstrap-table-next';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import remarkBreaks from 'remark-breaks';
 import externalLinks from 'remark-external-links';
 import Edit from '../components/edit';
 import { allGlossaryEntries, Entry } from '../libs/db/glossary';
@@ -35,16 +36,16 @@ const formatRefs = (cell: string, e: EntryLinked) => {
 
 const formatWord = (cell: string, e: EntryLinked) => {
     return (
-        <span id={e.word.toLocaleLowerCase()}>
+        <p id={e.word.toLocaleLowerCase()}>
             <b>{e.word}</b>
             <Edit id={e.id} type="glossary" />
-        </span>
+        </p>
     );
 };
 
 const formatDef = (cell: string, e: EntryLinked) => {
     return (
-        <ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[externalLinks]}>
+        <ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[externalLinks, remarkBreaks]}>
             {e.definition}
         </ReactMarkdown>
     );
@@ -78,6 +79,7 @@ const Glossary = ({ es }: Props): JSX.Element => {
                 <title>Glossary</title>
             </Head>
             <h1 className="ml-3 pt-3">A Glossary of Gall Related Terminology</h1>
+            <a href="#gall">Foo</a>
             <Row className="p-3">
                 <Col>
                     <BootstrapTable
