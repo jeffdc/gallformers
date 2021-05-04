@@ -93,7 +93,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
 
     return (
         <Admin
-            type="Glossary Entry"
+            type="Glossary"
             keyField="word"
             editName={{ getDefault: () => selected?.word, renameCallback: renameCallback }}
             setShowModal={setShowModal}

@@ -323,12 +323,6 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                     </Col>
                     <Col>{deleteButton('Caution. All data associated with this Host will be deleted.')}</Col>
                 </Row>
-                <Row hidden={!selected}>
-                    <Col>
-                        <br />
-                        <Link href={`./images?speciesid=${selected?.id}`}>Add/Edit Images for this Host</Link>
-                    </Col>
-                </Row>
             </form>
         </Admin>
     );

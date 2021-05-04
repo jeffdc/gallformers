@@ -119,7 +119,7 @@ const GallHostMapper = ({ id, galls, genera, hosts }: Props): JSX.Element => {
     return (
         <Auth>
             <Admin
-                type="Gall & Host Mappings"
+                type="Gallhost"
                 keyField="name"
                 setError={setError}
                 error={error}

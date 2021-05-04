@@ -3,9 +3,11 @@ import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { PorterStemmer, WordTokenizer } from 'natural';
+import remark from 'remark';
 import { SpeciesSourceApi } from '../api/apitypes';
 import { allGlossaryEntries, Entry } from '../db/glossary';
 import { errorThrow } from '../utils/util';
+import remarkGlossary from './remark-glossary';
 
 export type EntryLinked = Entry & {
     linkedDefinition: string | JSX.Element[];
@@ -69,6 +71,19 @@ const linkHtml = (context: Context) => (text: string): string => {
     return els.reduce((acc, s) => acc.concat(s), '');
 };
 
+const linkHtml2 = (context: Context) => (text: string): string => {
+    let s = '';
+    remark()
+        .use(remarkGlossary, { glossary: context.glossary, stems: context.stems })
+        .process(text, (e, f) => {
+            if (e) throw e;
+            console.log(`JDC: ${JSON.stringify(f, null, '  ')}`);
+            s = f.toString();
+        });
+
+    return s;
+};
+
 /** Make the helper functions available for unit testing. */
 export const testables = {
     makeLinkHtml: makeLinkHtml,
@@ -88,7 +103,9 @@ const internalLinker = async <T extends unknown>(
         pipe(
             O.fromNullable(getVal(s)),
             TE.fromOption(constant(new Error('Received invalid text.'))),
-            TE.map(linkHtml(context)),
+            // for now turning this off while I work on a new solution.
+            // TE.map(linkHtml(context)),
+            // TE.map(linkHtml2(context)),
         );
 
     return await pipe(

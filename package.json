@@ -55,6 +55,7 @@
     "remark-breaks": "^2.0.2",
     "remark-external-links": "^8.0.0",
     "remark-html": "^13.0.1",
+    "remove": "^0.1.5",
     "yarn": "^1.22.10",
     "yup": "^0"
   },
@@ -72,6 +73,7 @@
     "@types/react-bootstrap-table-next": "^4",
     "@types/react-bootstrap-typeahead": "^5",
     "@types/react-dom": "^16",
+    "@types/unist": "^2.0.3",
     "@types/yup": "^0",
     "@typescript-eslint/eslint-plugin": "^4",
     "@typescript-eslint/parser": "^4",

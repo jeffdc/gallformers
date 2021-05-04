@@ -665,17 +665,6 @@ const Gall = ({
                     </Col>
                     <Col>{deleteButton('Caution. All data associated with this Gall will be deleted.')}</Col>
                 </Row>
-                <Row hidden={!selected} className="formGroup">
-                    <Col>
-                        <br />
-                        <div>
-                            <Link href={`./images?speciesid=${selected?.id}`}>Add/Edit Images for this Gall</Link>
-                        </div>
-                        <div>
-                            <Link href={`./speciessource?id=${selected?.id}`}>Add/Edit Sources for this Gall</Link>
-                        </div>
-                    </Col>
-                </Row>
             </form>
         </Admin>
     );
