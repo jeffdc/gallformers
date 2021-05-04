@@ -33,6 +33,10 @@ blockquote {
     filter: invert(100%);
 }
 
+.carousel-inner img {
+  margin: auto;
+}
+
 .table-header {
     background-color:rgba(0, 128, 0, 0.205);
 }

@@ -115,7 +115,7 @@ const GlobalSearch = ({ results, search }: Props): JSX.Element => {
     }
 
     return (
-        <div className="fixed-left mt-2 ml-4 mr-2">
+        <div className="fixed-left pt-2 m-2">
             <Head>
                 <title>Search Results - {`'${search}'`}</title>
             </Head>

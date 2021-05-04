@@ -41,41 +41,38 @@ const Section = ({ section }: Props): JSX.Element => {
     }
 
     return (
-        <div>
+        <Container className="p-2 m-2">
             <Head>
                 <title>{section.name}</title>
             </Head>
-            {/* <pre>{JSON.stringify(section, null, ' ')}</pre> */}
-            <Container>
-                <Row>
-                    <Col>
-                        <h2>{section.name}</h2>
-                    </Col>
-                    <Col xs={2} className="mr-1">
-                        <span className="p-0 pr-1 my-auto">
-                            <Edit id={section.id} type="section" />
-                        </span>
-                    </Col>
-                </Row>
-                <Row>
-                    <Col>{section.description}</Col>
-                    <Col> {section.aliases.map((a) => a.name).join(', ')}</Col>
-                </Row>
-                <Row className="pt-2">
-                    <Col>
-                        <BootstrapTable
-                            keyField={'id'}
-                            data={section.species.sort((a, b) => a.name.localeCompare(b.name))}
-                            columns={columns}
-                            bootstrap4
-                            striped
-                            headerClasses="table-header"
-                            rowStyle={{ lineHeight: 1 }}
-                        />
-                    </Col>
-                </Row>
-            </Container>
-        </div>
+            <Row>
+                <Col>
+                    <h2>{section.name}</h2>
+                </Col>
+                <Col xs={2} className="mr-1">
+                    <span className="p-0 pr-1 my-auto">
+                        <Edit id={section.id} type="section" />
+                    </span>
+                </Col>
+            </Row>
+            <Row>
+                <Col>{section.description}</Col>
+                <Col> {section.aliases.map((a) => a.name).join(', ')}</Col>
+            </Row>
+            <Row className="pt-2">
+                <Col>
+                    <BootstrapTable
+                        keyField={'id'}
+                        data={section.species.sort((a, b) => a.name.localeCompare(b.name))}
+                        columns={columns}
+                        bootstrap4
+                        striped
+                        headerClasses="table-header"
+                        rowStyle={{ lineHeight: 1 }}
+                    />
+                </Col>
+            </Row>
+        </Container>
     );
 };
 

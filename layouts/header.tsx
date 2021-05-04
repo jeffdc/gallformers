@@ -35,7 +35,7 @@ const Header = (): JSX.Element => {
                 <title>Gallformers</title>
                 <link rel="icon" href="/favicon.ico" />
             </Head>
-            <Navbar fixed="top" collapseOnSelect expand="sm" bg="dark" variant="dark">
+            <Navbar fixed="top" collapseOnSelect expand="md" bg="dark" variant="dark">
                 <Navbar.Brand href="/">
                     <img src="/images/fly.svg" width="25px" height="25px" /> Gallformers
                 </Navbar.Brand>
@@ -69,7 +69,7 @@ const Header = (): JSX.Element => {
                                 Search
                             </Button>
                         </Form>
-                        <Dropdown>
+                        <Dropdown className="ml-auto">
                             <Dropdown.Toggle
                                 className="border border-success rounded m-1"
                                 id="resources-button"

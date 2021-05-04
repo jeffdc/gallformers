@@ -9,7 +9,7 @@ export default function Guide(): JSX.Element {
             <Head>
                 <title>Guide</title>
             </Head>
-            <Container>
+            <Container className="mt-4 m-2">
                 <h1>Introduction to Gall ID</h1>
                 <br />
                 <p>

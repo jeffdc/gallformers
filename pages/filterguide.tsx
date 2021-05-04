@@ -11,7 +11,7 @@ export default function FilterGuide(): JSX.Element {
             <Head>
                 <title>Filter Guide</title>
             </Head>
-            <Container fluid className="ml-2">
+            <Container fluid className="mt-4 m-2">
                 <h1>ID Tool Filter Guide</h1>
                 <br />
                 <Accordion>

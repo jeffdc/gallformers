@@ -154,13 +154,11 @@ const Images = ({ species }: Props): JSX.Element => {
             >
                 {species.images.map((image) => (
                     <CarouselItem key={image.id}>
-                        <Image
-                            src={image.small}
-                            unoptimized
+                        <img
+                            src={image.medium}
                             alt={`image of ${species.name}`}
-                            width={'300'}
-                            height={'200'}
-                            objectFit={'contain'}
+                            width="300px"
+                            className="img-fluid mx-auto"
                             onClick={() => {
                                 setShowModal(true);
                             }}

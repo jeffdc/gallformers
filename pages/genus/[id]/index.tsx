@@ -33,37 +33,35 @@ const Genus = ({ genus, species }: Props): JSX.Element => {
     const fam = pipe(gen.parent, O.getOrElse(constant({} as TaxonomyEntry)));
 
     return (
-        <div>
+        <Container className="p-2 m-2">
             <Head>
                 <title>{gen.name}</title>
             </Head>
 
-            <Container className="p-1">
-                <Row>
-                    <Col>
-                        <h1>
-                            Genus <i>{gen.name}</i>
-                        </h1>
-                    </Col>
-                </Row>
-                <Row>
-                    <Col>
-                        <strong>Family:</strong>{' '}
-                        <Link key={fam.id} href={`/family/${fam.id}`}>
-                            <a>
-                                <i>{fam.name}</i>
-                            </a>
-                        </Link>
-                        {` (${fam.description})`}
-                    </Col>
-                </Row>
-                <Row className="pt-3">
-                    <Col>
-                        <SpeciesTable species={species} />
-                    </Col>
-                </Row>
-            </Container>
-        </div>
+            <Row>
+                <Col>
+                    <h1>
+                        Genus <i>{gen.name}</i>
+                    </h1>
+                </Col>
+            </Row>
+            <Row>
+                <Col>
+                    <strong>Family:</strong>{' '}
+                    <Link key={fam.id} href={`/family/${fam.id}`}>
+                        <a>
+                            <i>{fam.name}</i>
+                        </a>
+                    </Link>
+                    {` (${fam.description})`}
+                </Col>
+            </Row>
+            <Row className="pt-3">
+                <Col>
+                    <SpeciesTable species={species} />
+                </Col>
+            </Row>
+        </Container>
     );
 };
 

@@ -268,7 +268,7 @@ const IDGall = (props: Props): JSX.Element => {
                 <title>ID Galls</title>
             </Head>
 
-            <form className="fixed-left mt-2 ml-4 mr-2 form-group">
+            <form className="fixed-left pl-2 pt-3 m-2 form-group">
                 <Row>
                     <Col>
                         <Alert
@@ -295,7 +295,7 @@ const IDGall = (props: Props): JSX.Element => {
                     </Col>
                 </Row>
                 <Row>
-                    <Col>
+                    <Col sm={12} md={5}>
                         <label className="col-form-label">Host:</label>
                         <Typeahead
                             name="host"
@@ -320,10 +320,10 @@ const IDGall = (props: Props): JSX.Element => {
                             }}
                         />
                     </Col>
-                    <Col xs={1} className="align-self-end">
-                        - or -
+                    <Col sm={12} md={1} className="align-self-end my-2">
+                        or
                     </Col>
-                    <Col>
+                    <Col sm={12} md={5}>
                         <label className="col-form-label">Genus (Section):</label>
                         <Typeahead
                             name="genus"
@@ -359,20 +359,15 @@ const IDGall = (props: Props): JSX.Element => {
                 </Row>
             </form>
             <hr />
-            <Row>
-                <Col xs={3}>
+            <Row className="pr-2">
+                <Col sm={12} md={3}>
                     <form className="fixed-left ml-4 form-group">
                         <Row>
-                            <Col>
+                            <Col md={12}>
                                 <label className="col-form-label">
                                     Location(s):
                                     <InfoTip id="locations" text="Where on the host the gall is found." />
                                 </label>
-                            </Col>
-                            <Col xs={5} className="mr-0 pr-0">
-                                <Button variant="outline-primary" size="sm" onClick={resetForm}>
-                                    Reset Form
-                                </Button>
                             </Col>
                         </Row>
                         {makeFormInput(
@@ -402,6 +397,10 @@ const IDGall = (props: Props): JSX.Element => {
                             disabled={disableFilter()}
                             clearButton={true}
                         />
+                        <br />
+                        <Button variant="outline-primary" size="sm" onClick={resetForm}>
+                            Reset Form
+                        </Button>
                         <hr />
                         <Button
                             variant="outline-secondary"
@@ -483,48 +482,58 @@ const IDGall = (props: Props): JSX.Element => {
                         Showing {filtered.length} of {galls.length} galls:
                     </Row>
                     {/* <Row className='border m-2'><p className='text-right'>Pager TODO</p></Row> */}
-                    <Row className="m-2">
-                        <ListGroup>
-                            {filtered.length == 0 ? (
-                                hostOrTaxon == undefined ? (
-                                    <Alert variant="info" className="small">
-                                        To begin with select a Host or a Genus to see matching galls. Then you can use the filters
-                                        on the left to narrow down the list.
-                                    </Alert>
+                    <Row className="">
+                        <Col>
+                            <ListGroup>
+                                {filtered.length == 0 ? (
+                                    hostOrTaxon == undefined ? (
+                                        <Alert variant="info" className="small">
+                                            To begin with select a Host or a Genus to see matching galls. Then you can use the
+                                            filters on the left to narrow down the list.
+                                        </Alert>
+                                    ) : (
+                                        <Alert variant="info" className="small">
+                                            There are no galls that match your filter. It’s possible there are no described
+                                            species that fit this set of traits and your gall is undescribed. However, before
+                                            giving up, try{' '}
+                                            <Link href="/guide#troubleshooting">altering your filter choices.</Link>
+                                        </Alert>
+                                    )
                                 ) : (
-                                    <Alert variant="info" className="small">
-                                        There are no galls that match your filter. It’s possible there are no described species
-                                        that fit this set of traits and your gall is undescribed. However, before giving up, try{' '}
-                                        <Link href="/guide#troubleshooting">altering your filter choices.</Link>
-                                    </Alert>
-                                )
-                            ) : (
-                                <>
-                                    <Alert variant="info" className="small">
-                                        If none of these results match your gall, you may have found an undescribed species.
-                                        However, before concluding that your gall is not in the database, try{' '}
-                                        <Link href="/guide#troubleshooting">altering your filter choices.</Link>
-                                    </Alert>
-                                    {filtered.map((g) => (
-                                        <ListGroup.Item key={g.id}>
-                                            <Row key={g.id}>
-                                                <Col xs={4} className="">
-                                                    <img src={defaultImage(g)?.small} width="150px" className="img-responsive" />
-                                                </Col>
-                                                <Col className="pl-0 pull-right">
-                                                    <Link href={`gall/${g.id}`}>
-                                                        <a>{g.name}</a>
-                                                    </Link>
-                                                    <ReactMarkdown remarkPlugins={[externalLinks, remarkBreaks]}>
-                                                        {pipe(g.description, O.getOrElse(constant('')))}
-                                                    </ReactMarkdown>
-                                                </Col>
-                                            </Row>
-                                        </ListGroup.Item>
-                                    ))}
-                                </>
-                            )}
-                        </ListGroup>
+                                    <>
+                                        <Alert variant="info" className="small">
+                                            If none of these results match your gall, you may have found an undescribed species.
+                                            However, before concluding that your gall is not in the database, try{' '}
+                                            <Link href="/guide#troubleshooting">altering your filter choices.</Link>
+                                        </Alert>
+                                        {filtered.map((g) => (
+                                            <ListGroup.Item key={g.id}>
+                                                <Row key={g.id}>
+                                                    <Col sm={12} md={5}>
+                                                        {defaultImage(g) && (
+                                                            <img
+                                                                src={defaultImage(g)?.small}
+                                                                alt={`image of ${g.name}`}
+                                                                width="300px"
+                                                                className="img-fluid mx-auto"
+                                                            />
+                                                        )}
+                                                    </Col>
+                                                    <Col sm={12} md={7} className="pl-0 pull-right">
+                                                        <Link href={`gall/${g.id}`}>
+                                                            <a>{g.name}</a>
+                                                        </Link>
+                                                        <ReactMarkdown remarkPlugins={[externalLinks, remarkBreaks]}>
+                                                            {pipe(g.description, O.getOrElse(constant('')))}
+                                                        </ReactMarkdown>
+                                                    </Col>
+                                                </Row>
+                                            </ListGroup.Item>
+                                        ))}
+                                    </>
+                                )}
+                            </ListGroup>
+                        </Col>
                     </Row>
                 </Col>
             </Row>

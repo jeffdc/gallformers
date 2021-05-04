@@ -5,7 +5,7 @@ import ErrorPage from 'next/error';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import React from 'react';
-import { Card } from 'react-bootstrap';
+import { Card, Col, Container, Row } from 'react-bootstrap';
 import TreeMenu, { Item, TreeNodeInArray } from 'react-simple-tree-menu';
 import 'react-simple-tree-menu/dist/main.css';
 import Edit from '../../../components/edit';
@@ -39,28 +39,26 @@ const Family = ({ family, tree }: Props): JSX.Element => {
     };
 
     return (
-        <div
-            style={{
-                marginBottom: '5%',
-                marginRight: '5%',
-            }}
-        >
+        <Container className="p-2 m-2">
             <Head>
                 <title>{fam.name}</title>
             </Head>
-
-            <Card className="ml-3">
-                <Card.Header>
-                    <Edit id={fam.id} type="family" />
-                    <h1>
-                        {fam.name} - {fam.description}
-                    </h1>
-                </Card.Header>
-                <Card.Body>
-                    <TreeMenu data={tree} onClickItem={handleClick} initialOpenNodes={[fam.id.toString()]} />
-                </Card.Body>
-            </Card>
-        </div>
+            <Row>
+                <Col xs={12}>
+                    <Card>
+                        <Card.Header>
+                            <Edit id={fam.id} type="family" />
+                            <h1>
+                                {fam.name} - {fam.description}
+                            </h1>
+                        </Card.Header>
+                        <Card.Body>
+                            <TreeMenu data={tree} onClickItem={handleClick} initialOpenNodes={[fam.id.toString()]} />
+                        </Card.Body>
+                    </Card>
+                </Col>
+            </Row>
+        </Container>
     );
 };
 
