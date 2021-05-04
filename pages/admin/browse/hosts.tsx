@@ -18,10 +18,10 @@ type Props = {
 const linkHost = (cell: string, s: HostApi) => {
     return (
         <>
-            <Link key={s.id} href={`/${s}/${s.id}`}>
+            <Link key={s.id} href={`/host/${s.id}`}>
                 <a>{s.name}</a>
             </Link>
-            <Edit id={s.id} type="source" />
+            <Edit id={s.id} type="host" />
         </>
     );
 };

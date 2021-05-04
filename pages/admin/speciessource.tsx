@@ -251,7 +251,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
     return (
         <Auth>
             <Admin
-                type="Species & Source Mappings"
+                type="Speciessource"
                 keyField="name"
                 setError={setError}
                 error={error}
@@ -393,15 +393,13 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                             <br />
                             <div>
                                 {selected?.taxoncode === GallTaxon ? (
-                                    <Link href={`./gall?id=${selected?.id}`}>Edit the Gall</Link>
+                                    <Link href={`./gall?id=${selected?.id}`}>Edit the Species</Link>
                                 ) : (
-                                    <Link href={`./host?id=${selected?.id}`}>Edit the Plant</Link>
+                                    <Link href={`./host?id=${selected?.id}`}>Edit the Species</Link>
                                 )}
                             </div>
                             <div>
-                                <Link href={`./images?speciesid=${selected?.id}`}>
-                                    {`Add/Edit Images for this ${capitalizeFirstLetter(selected?.taxoncode ?? '')}`}
-                                </Link>
+                                <Link href={`./images?speciesid=${selected?.id}`}>{`Add/Edit Images for this Species`}</Link>
                             </div>
                         </Col>
                     </Row>

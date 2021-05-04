@@ -15,18 +15,19 @@ import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import InfoTip from '../../../components/infotip';
 import SourceList from '../../../components/sourcelist';
-import { DetachableBoth, GallApi, GallHost } from '../../../libs/api/apitypes';
+import { DetachableBoth, GallApi, GallHost, SimpleSpecies } from '../../../libs/api/apitypes';
 import { FGS } from '../../../libs/api/taxonomy';
-import { allGallIds, gallById } from '../../../libs/db/gall';
+import { allGallIds, gallById, getRelatedGalls } from '../../../libs/db/gall';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkSourceToGlossary } from '../../../libs/pages/glossary';
-import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
+import { getStaticPathsFromIds, getStaticPropsWith, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { defaultSource, formatLicense, sourceToDisplay } from '../../../libs/pages/renderhelpers';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
     species: GallApi;
     taxonomy: FGS;
+    relatedGalls: SimpleSpecies[];
 };
 
 // eslint-disable-next-line react/display-name
@@ -40,7 +41,7 @@ const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
     );
 };
 
-const Gall = ({ species, taxonomy }: Props): JSX.Element => {
+const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
     const [selectedSource, setSelectedSource] = useState(defaultSource(species?.speciessource));
 
     const router = useRouter();
@@ -163,6 +164,20 @@ const Gall = ({ species, taxonomy }: Props): JSX.Element => {
                                 <strong>Season:</strong> {species.gall.gallseason.map((s) => s.season).join(', ')}
                             </Col>
                         </Row>
+                        <Row>
+                            <Col>
+                                <strong>Related: </strong>
+                                {relatedGalls.map((g, i) => (
+                                    <span key={g.id}>
+                                        {' '}
+                                        <Link key={g.id} href={`/gall/${g.id}`}>
+                                            <a>{g.name}</a>
+                                        </Link>
+                                        {i < relatedGalls.length - 1 ? ', ' : ''}
+                                    </span>
+                                ))}
+                            </Col>
+                        </Row>
                     </Col>
                     <Col xs={4} className="border rounded p-1 mx-auto">
                         <Images species={species} type="gall" />
@@ -256,11 +271,13 @@ export const getStaticProps: GetStaticProps = async (context) => {
     const gall = g[0];
     const sources = gall ? await linkSourceToGlossary(gall.speciessource) : null;
     const fgs = gall ? await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy') : null;
+    const relatedGalls = gall ? await getStaticPropsWith<SimpleSpecies>(() => getRelatedGalls(gall), 'related galls') : null;
 
     return {
         props: {
             species: gall ? { ...gall, speciessource: sources } : null,
             taxonomy: fgs,
+            relatedGalls: relatedGalls,
         },
         revalidate: 1,
     };

@@ -15,13 +15,13 @@ type Props = {
     galls: GallApi[];
 };
 
-const linkHost = (cell: string, s: GallApi) => {
+const linkGall = (cell: string, s: GallApi) => {
     return (
         <>
-            <Link key={s.id} href={`/${s}/${s.id}`}>
+            <Link key={s.id} href={`/gall/${s.id}`}>
                 <a>{s.name}</a>
             </Link>
-            <Edit id={s.id} type="source" />
+            <Edit id={s.id} type="gall" />
         </>
     );
 };
@@ -40,7 +40,7 @@ const columns: ColumnDescription[] = [
         text: 'Name',
         sort: true,
         width: 4,
-        formatter: linkHost,
+        formatter: linkGall,
     },
     {
         dataField: 'datacomplete',

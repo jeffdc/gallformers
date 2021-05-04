@@ -9,6 +9,9 @@ import { ParsedUrlQuery } from 'querystring';
 import React, { useEffect, useState } from 'react';
 import { Alert, Button, Col, ListGroup, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
+import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
+import externalLinks from 'remark-external-links';
 import * as yup from 'yup';
 import InfoTip from '../components/infotip';
 import Typeahead from '../components/Typeahead';
@@ -36,7 +39,7 @@ import { SECTION, TaxonomyEntry, TaxonomyEntryNoParent } from '../libs/api/taxon
 import { getAlignments, getCells, getColors, getLocations, getSeasons, getShapes, getTextures, getWalls } from '../libs/db/gall';
 import { allHostsSimple } from '../libs/db/host';
 import { allGenera, allSections } from '../libs/db/taxonomy';
-import { defaultImage, truncateOptionString } from '../libs/pages/renderhelpers';
+import { defaultImage } from '../libs/pages/renderhelpers';
 import { checkGall } from '../libs/utils/gallsearch';
 import { capitalizeFirstLetter, hasProp, mightFailWithArray } from '../libs/utils/util';
 
@@ -496,7 +499,7 @@ const IDGall = (props: Props): JSX.Element => {
                                     </Alert>
                                 )
                             ) : (
-                                <React.Fragment>
+                                <>
                                     <Alert variant="info" className="small">
                                         If none of these results match your gall, you may have found an undescribed species.
                                         However, before concluding that your gall is not in the database, try{' '}
@@ -505,19 +508,21 @@ const IDGall = (props: Props): JSX.Element => {
                                     {filtered.map((g) => (
                                         <ListGroup.Item key={g.id}>
                                             <Row key={g.id}>
-                                                <Col xs={3} className="">
+                                                <Col xs={4} className="">
                                                     <img src={defaultImage(g)?.small} width="150px" className="img-responsive" />
                                                 </Col>
                                                 <Col className="pl-0 pull-right">
                                                     <Link href={`gall/${g.id}`}>
                                                         <a>{g.name}</a>
                                                     </Link>
-                                                    - {truncateOptionString(g.description)}
+                                                    <ReactMarkdown remarkPlugins={[externalLinks, remarkBreaks]}>
+                                                        {pipe(g.description, O.getOrElse(constant('')))}
+                                                    </ReactMarkdown>
                                                 </Col>
                                             </Row>
                                         </ListGroup.Item>
                                     ))}
-                                </React.Fragment>
+                                </>
                             )}
                         </ListGroup>
                     </Row>

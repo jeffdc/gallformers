@@ -4,17 +4,14 @@ import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import { useSession } from 'next-auth/client';
-import Head from 'next/head';
-import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Col, Modal, Row } from 'react-bootstrap';
+import { Button, Col, Modal, Row } from 'react-bootstrap';
 import BootstrapTable, { ColumnDescription, RowEventHandlerProps, SelectRowProps } from 'react-bootstrap-table-next';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import AddImage from '../../components/addimage';
-import Auth from '../../components/auth';
 import ImageEdit from '../../components/imageedit';
 import ImageGrid from '../../components/imagegrid';
 import Typeahead from '../../components/Typeahead';
@@ -22,6 +19,7 @@ import { useConfirmation } from '../../hooks/useconfirmation';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { ImageApi } from '../../libs/api/apitypes';
 import { allSpecies } from '../../libs/db/species';
+import Admin from '../../libs/pages/admin';
 import { mightFailWithArray, sessionUserOrUnknown } from '../../libs/utils/util';
 
 const Schema = yup.object().shape({});
@@ -299,19 +297,8 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
     };
 
     return (
-        <Auth>
+        <Admin type="Images" keyField="name" setError={setError} error={error} selected={selected}>
             <>
-                <Head>
-                    <title>Add/Edit Species Images</title>
-                </Head>
-
-                {error.length > 0 && (
-                    <Alert variant="danger" onClose={() => setError('')} dismissible>
-                        <Alert.Heading>Uh-oh</Alert.Heading>
-                        <p>{error}</p>
-                    </Alert>
-                )}
-
                 {currentImage && (
                     // eslint-disable-next-line prettier/prettier
                     <ImageEdit 
@@ -344,7 +331,6 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                         </Button>
                     </Modal.Body>
                 </Modal>
-
                 <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
                     <h4>Add/Edit Species Images</h4>
                     <Row className="form-group" xs={3}>
@@ -402,20 +388,9 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                             />
                         </Col>
                     </Row>
-                    <Row hidden={!selected} className="formGroup">
-                        <Col>
-                            <br />
-                            <div>
-                                <Link href={`./gall?id=${selected?.id}`}>Edit the Gall</Link>
-                            </div>
-                            <div>
-                                <Link href={`./speciessource?id=${selected?.id}`}>Add/Edit Sources for this Gall</Link>
-                            </div>
-                        </Col>
-                    </Row>
                 </form>
             </>
-        </Auth>
+        </Admin>
     );
 };
 

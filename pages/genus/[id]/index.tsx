@@ -72,7 +72,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
     return {
         props: {
             genus: await getStaticPropsWithContext(context, taxonomyEntryById, 'genus'),
-            species: await getStaticPropsWithContext(context, getAllSpeciesForSectionOrGenus, 'species', true, true),
+            species: await getStaticPropsWithContext(context, getAllSpeciesForSectionOrGenus, 'species for genus', false, true),
         },
         revalidate: 1,
     };

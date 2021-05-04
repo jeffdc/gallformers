@@ -48,6 +48,7 @@ import {
     GallUpsertFields,
     SeasonApi,
     ShapeApi,
+    SimpleSpecies,
     WallsApi,
 } from '../api/apitypes';
 import { FGS, GENUS, SECTION } from '../api/taxonomy';
@@ -331,6 +332,36 @@ export const gallsByHostSection = (hostSection: string): TaskEither<Error, GallA
             },
         },
     ]);
+};
+
+/**
+ * Gets all galls that have the same binomial name as the passed in name. This wokrs beacuse we are using a naming
+ * convention for different galls created by the same species.
+ * @param gall
+ * @returns
+ */
+export const getRelatedGalls = (gall: GallApi): TaskEither<Error, SimpleSpecies[]> => {
+    const nameParts = gall.name.split(' ');
+    if (nameParts.length <= 2) return TE.of([]);
+
+    const get = () =>
+        db.species.findMany({
+            select: {
+                id: true,
+                name: true,
+                taxoncode: true,
+            },
+            where: {
+                name: {
+                    startsWith: `${nameParts[0]} ${nameParts[1]}`,
+                },
+            },
+        });
+
+    return pipe(
+        TE.tryCatch(get, handleError),
+        TE.map((galls) => galls.filter((g) => g.id !== gall.id).map((g) => ({ ...g } as SimpleSpecies))),
+    );
 };
 
 /**

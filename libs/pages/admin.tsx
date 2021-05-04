@@ -1,14 +1,14 @@
 import Head from 'next/head';
 import React from 'react';
-import { Alert, Col, Row } from 'react-bootstrap';
+import { Alert, Col, Nav, Navbar, Row } from 'react-bootstrap';
 import { Toaster } from 'react-hot-toast';
 import Auth from '../../components/auth';
 import EditName, { RenameEvent } from '../../components/editname';
-import { DeleteResult } from '../api/apitypes';
+import { DeleteResult, GallTaxon, HostTaxon } from '../api/apitypes';
 import { WithID } from '../utils/types';
 
 export type AdminProps<T> = {
-    type: string;
+    type: 'Family' | 'Gall' | 'Gallhost' | 'Glossary' | 'Host' | 'Images' | 'Source' | 'Speciessource' | 'Section';
     keyField: string;
     children: JSX.Element;
     editName?: {
@@ -20,11 +20,13 @@ export type AdminProps<T> = {
     error: string;
     setError: (err: string) => void;
     deleteResults?: DeleteResult;
-    setDeleteResults: (dr: DeleteResult) => void;
+    setDeleteResults?: (dr: DeleteResult) => void;
     selected: T | undefined;
 };
 
 const validLinkableTypes = ['Gall', 'Host', 'Family', 'Section', 'Source'];
+
+type AdminType = WithID & { taxoncode?: string | null };
 
 /**
  * The Admin component handles the following things that are independent of what data is being manipulated:
@@ -36,7 +38,33 @@ const validLinkableTypes = ['Gall', 'Host', 'Family', 'Section', 'Source'];
  * @param props @see AdminProps
  * @returns
  */
-const Admin = <T extends WithID>(props: AdminProps<T>): JSX.Element => {
+const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
+    const params = (key: string, destination: string) => {
+        const allowed = () => {
+            if (
+                ['Speciessource', 'Images', 'Host'].includes(props.type) &&
+                ['Speciessource', 'Images', 'Host'].includes(destination) &&
+                props.selected?.taxoncode === HostTaxon
+            ) {
+                return true;
+            } else if (
+                ['Speciessource', 'Gallhost', 'Images', 'Gall'].includes(props.type) &&
+                ['Speciessource', 'Gallhost', 'Images', 'Gall'].includes(destination) &&
+                props.selected?.taxoncode === GallTaxon
+            ) {
+                return true;
+            } else {
+                return false;
+            }
+        };
+
+        if (props.selected?.id && allowed()) {
+            return `?${key}=${props.selected.id}`;
+        } else {
+            return '';
+        }
+    };
+
     return (
         <Auth>
             <>
@@ -64,16 +92,38 @@ const Admin = <T extends WithID>(props: AdminProps<T>): JSX.Element => {
                     </Alert>
                 )}
 
+                <Navbar bg="" variant="light">
+                    <Nav.Link
+                        disabled={!validLinkableTypes.includes(props.type) || !props.selected}
+                        href={
+                            validLinkableTypes.includes(props.type) || !props.selected
+                                ? `/${props.type.toLowerCase()}/${props.selected?.id}`
+                                : ''
+                        }
+                    >
+                        🔗
+                    </Nav.Link>
+                    <Nav variant="tabs" defaultActiveKey={props.type}>
+                        <Nav.Link eventKey="Gall" href={`./gall${params('id', 'Gall')}`}>{`Galls`}</Nav.Link>
+                        <Nav.Link eventKey="Host" href={`./host${params('id', 'Host')}`}>{`Hosts`}</Nav.Link>
+                        <Nav.Link eventKey="Images" href={`./images${params('speciesid', 'Images')}`}>{`Images`}</Nav.Link>
+                        <Nav.Link
+                            eventKey="Speciessource"
+                            href={`./speciessource${params('id', 'Speciessource')}`}
+                        >{`Source Map`}</Nav.Link>
+                        <Nav.Link eventKey="Gallhost" href={`./gallhost${params('id', 'Gall')}`}>{`Gall Hosts`}</Nav.Link>
+                        <Nav.Link eventKey="Source" href={`./source`}>{`Sources`}</Nav.Link>
+                        <Nav.Link eventKey="Family" href={`./family`}>{`Families`}</Nav.Link>
+                        <Nav.Link eventKey="Section" href={`./section`}>{`Sections`}</Nav.Link>
+                        <Nav.Link eventKey="Glossary" href={`./glossary`}>{`Glossary`}</Nav.Link>
+                    </Nav>
+                </Navbar>
+
                 {props.children}
 
                 <Row hidden={!props.deleteResults}>
                     <Col>{`Deleted ${props.deleteResults?.name}.`}</Col>
                 </Row>
-                {props.selected != undefined && validLinkableTypes.includes(props.type) && (
-                    <p className="pl-4">
-                        <a href={`/${props.type.toLowerCase()}/${props.selected.id}`}>{`Link to ${props.type}`}</a>
-                    </p>
-                )}
             </>
         </Auth>
     );

@@ -11,7 +11,7 @@ export type SourceTableProps = {
 const linkSource = (cell: string, s: SourceApi) => {
     return (
         <>
-            <Link key={s.id} href={`/${s}/${s.id}`}>
+            <Link key={s.id} href={`/source/${s.id}`}>
                 <a>{s.title}</a>
             </Link>
             <Edit id={s.id} type="source" />
