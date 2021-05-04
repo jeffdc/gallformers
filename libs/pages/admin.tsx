@@ -24,8 +24,6 @@ export type AdminProps<T> = {
     selected: T | undefined;
 };
 
-const validLinkableTypes = ['Gall', 'Host', 'Family', 'Section', 'Source'];
-
 type AdminType = WithID & { taxoncode?: string | null };
 
 /**
@@ -65,6 +63,30 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
         }
     };
 
+    const link = () => {
+        switch (props.type) {
+            case 'Gall':
+            case 'Gallhost':
+                return `/gall/${props.selected?.id}`;
+            case 'Host':
+                return `/host/${props.selected?.id}`;
+            case 'Section':
+                return `/section/${props.selected?.id}`;
+            case 'Family':
+                return `/family/${props.selected?.id}`;
+            case 'Glossary':
+                return `/glossary/${props.selected?.id}`;
+            case 'Source':
+                return `/source/${props.selected?.id}`;
+            case 'Images':
+            case 'Speciessource':
+                if (props.selected?.taxoncode == GallTaxon) {
+                    return `/gall/${props.selected?.id}`;
+                } else {
+                    return `/host/${props.selected?.id}`;
+                }
+        }
+    };
     return (
         <Auth>
             <>
@@ -94,12 +116,13 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
 
                 <Navbar bg="" variant="light">
                     <Nav.Link
-                        disabled={!validLinkableTypes.includes(props.type) || !props.selected}
-                        href={
-                            validLinkableTypes.includes(props.type) || !props.selected
-                                ? `/${props.type.toLowerCase()}/${props.selected?.id}`
-                                : ''
-                        }
+                        // disabled={!validLinkableTypes.includes(props.type) || !props.selected}
+                        disabled={!props.selected}
+                        href={link()}
+                        // validLinkableTypes.includes(props.type) || !props.selected
+                        //     ? `/${props.type.toLowerCase()}/${props.selected?.id}`
+                        //     : ''
+                        // }
                     >
                         🔗
                     </Nav.Link>

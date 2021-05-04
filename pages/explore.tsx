@@ -2,7 +2,7 @@ import { GetStaticProps } from 'next';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import React from 'react';
-import { Card, Tab, Tabs } from 'react-bootstrap';
+import { Card, Col, Container, Row, Tab, Tabs } from 'react-bootstrap';
 import TreeMenu, { Item, TreeNodeInArray } from 'react-simple-tree-menu';
 import 'react-simple-tree-menu/dist/main.css';
 import { GallTaxon } from '../libs/api/apitypes';
@@ -27,36 +27,40 @@ const Explore = ({ gallmakers, undescribed, hosts }: Props): JSX.Element => {
     };
 
     return (
-        <>
+        <Container className="m-2">
             <Head>
                 <title>Explore Galls & Hosts</title>
             </Head>
 
-            <Card>
-                <Card.Header>
-                    <Tabs defaultActiveKey="galls">
-                        <Tab eventKey="galls" title="Galls">
-                            <Card.Body>
-                                <Card.Title>Browse Galls - By Family</Card.Title>
-                                <TreeMenu data={gallmakers} onClickItem={handleClick} />
-                            </Card.Body>
-                        </Tab>
-                        <Tab eventKey="undescribed" title="Undescribed Galls">
-                            <Card.Body>
-                                <Card.Title>Browse Undescibed Galls</Card.Title>
-                                <TreeMenu data={undescribed} onClickItem={handleClick} />
-                            </Card.Body>
-                        </Tab>
-                        <Tab eventKey="hosts" title="Hosts">
-                            <Card.Body>
-                                <Card.Title>Browse Hosts - By Family</Card.Title>
-                                <TreeMenu data={hosts} onClickItem={handleClick} />
-                            </Card.Body>
-                        </Tab>
-                    </Tabs>
-                </Card.Header>
-            </Card>
-        </>
+            <Row>
+                <Col xs={12}>
+                    <Card>
+                        <Card.Header>
+                            <Tabs defaultActiveKey="galls">
+                                <Tab eventKey="galls" title="Galls">
+                                    <Card.Body>
+                                        <Card.Title>Browse Galls - By Family</Card.Title>
+                                        <TreeMenu data={gallmakers} onClickItem={handleClick} />
+                                    </Card.Body>
+                                </Tab>
+                                <Tab eventKey="undescribed" title="Undescribed Galls">
+                                    <Card.Body>
+                                        <Card.Title>Browse Undescibed Galls</Card.Title>
+                                        <TreeMenu data={undescribed} onClickItem={handleClick} />
+                                    </Card.Body>
+                                </Tab>
+                                <Tab eventKey="hosts" title="Hosts">
+                                    <Card.Body>
+                                        <Card.Title>Browse Hosts - By Family</Card.Title>
+                                        <TreeMenu data={hosts} onClickItem={handleClick} />
+                                    </Card.Body>
+                                </Tab>
+                            </Tabs>
+                        </Card.Header>
+                    </Card>
+                </Col>
+            </Row>
+        </Container>
     );
 };
 
