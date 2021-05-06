@@ -5,6 +5,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
+import { Col, Container, Row } from 'react-bootstrap';
 import BootstrapTable, { ColumnDescription } from 'react-bootstrap-table-next';
 import { extractQueryParam } from '../libs/api/apipage';
 import { TaxonomyEntryNoParent } from '../libs/api/taxonomy';
@@ -110,31 +111,38 @@ const columns: ColumnDescription[] = [
 ];
 
 const GlobalSearch = ({ results, search }: Props): JSX.Element => {
-    if (results.length <= 0) {
-        return <h1>No results</h1>;
-    }
-
     return (
-        <div className="fixed-left pt-2 m-2">
+        <Container className="pt-2" fluid>
             <Head>
                 <title>Search Results - {`'${search}'`}</title>
             </Head>
 
-            <BootstrapTable
-                keyField={'id'}
-                data={results}
-                columns={columns}
-                bootstrap4
-                striped
-                headerClasses="table-header"
-                defaultSorted={[
-                    {
-                        dataField: 'name',
-                        order: 'asc',
-                    },
-                ]}
-            />
-        </div>
+            {results.length <= 0 && (
+                <Row className="p-2">
+                    <Col>
+                        <strong>No results for {`'${search}'`}</strong>
+                    </Col>
+                </Row>
+            )}
+            <Row>
+                <Col xs={12}>
+                    <BootstrapTable
+                        keyField={'id'}
+                        data={results}
+                        columns={columns}
+                        bootstrap4
+                        striped
+                        headerClasses="table-header"
+                        defaultSorted={[
+                            {
+                                dataField: 'name',
+                                order: 'asc',
+                            },
+                        ]}
+                    />
+                </Col>
+            </Row>
+        </Container>
     );
 };
 

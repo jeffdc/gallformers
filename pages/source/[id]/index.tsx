@@ -21,7 +21,7 @@ const Source = ({ source }: Props): JSX.Element => {
     }
 
     return (
-        <div className="p-3 m-3">
+        <Container className="pt-2" fluid>
             <Head>
                 <title>{source.title}</title>
             </Head>

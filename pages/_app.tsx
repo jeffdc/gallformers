@@ -2,30 +2,18 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { Provider } from 'next-auth/client';
 import { AppProps } from 'next/app';
 import Head from 'next/head';
-import React, { CSSProperties } from 'react';
-import { Col, Row } from 'react-bootstrap';
+import React from 'react';
+import { Col, Container, Row } from 'react-bootstrap';
 import 'react-bootstrap-typeahead/css/Typeahead.css';
 import { ConfirmationServiceProvider } from '../hooks/useconfirmation';
 import Footer from '../layouts/footer';
 import Header from '../layouts/header';
-import './style.css';
-
-const layoutStyle: CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    minHeight: '100vh',
-};
-
-const contentStyle: CSSProperties = {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-};
+import './style.scss';
 
 function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
     return (
         <Provider session={pageProps.session}>
-            <div className="Layout" style={layoutStyle}>
+            <Container fluid className="pt-4">
                 <Head>
                     <script type="text/javascript">
                         {/* Fix for Firefox autofocus CSS bug See:
@@ -40,15 +28,15 @@ function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
                         <Header />
                     </Col>
                 </Row>
-                <ConfirmationServiceProvider>
-                    <Row className="pt-4 pb-4 mb-4" style={contentStyle}>
-                        <Col>
+                <Row className="pb-5 mb-5">
+                    <Col>
+                        <ConfirmationServiceProvider>
                             <Component {...pageProps} />
-                        </Col>
-                    </Row>
-                </ConfirmationServiceProvider>
+                        </ConfirmationServiceProvider>
+                    </Col>
+                </Row>
                 <Footer />
-            </div>
+            </Container>
         </Provider>
     );
 }

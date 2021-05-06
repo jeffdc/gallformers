@@ -27,7 +27,7 @@ const Explore = ({ gallmakers, undescribed, hosts }: Props): JSX.Element => {
     };
 
     return (
-        <Container className="m-2">
+        <Container className="pt-2" fluid>
             <Head>
                 <title>Explore Galls & Hosts</title>
             </Head>

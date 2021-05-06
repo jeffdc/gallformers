@@ -7,11 +7,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Col, ListGroup, Row } from 'react-bootstrap';
+import { Alert, Button, Card, Col, Container, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
-import ReactMarkdown from 'react-markdown';
-import remarkBreaks from 'remark-breaks';
-import externalLinks from 'remark-external-links';
 import * as yup from 'yup';
 import InfoTip from '../components/infotip';
 import Typeahead from '../components/Typeahead';
@@ -21,6 +18,7 @@ import {
     CellsApi,
     ColorApi,
     DetachableApi,
+    DetachableDetachable,
     detachableFromString,
     DetachableNone,
     Detachables,
@@ -72,7 +70,7 @@ const invalidArraySelection = (arr: unknown[]) => {
 };
 
 const isTaxonomy = (o: unknown): o is TaxonomyEntryNoParent => hasProp(o, 'type');
-const isHost = (o: unknown): o is HostSimple => hasProp(o, 'aliases');
+const isHost = (o: unknown): o is HostSimple => hasProp(o, 'datacomplete') && hasProp(o, 'aliases');
 
 const Schema = yup.object().shape(
     {
@@ -123,6 +121,34 @@ const convertQForUrl = (hostOrTaxon: TaxonomyEntryNoParent | HostSimple | undefi
         : null),
 });
 
+const pj = (vals: string[]): string => {
+    return vals.reduce((acc, s, i) => {
+        acc = acc.concat(s);
+        if (i < vals.length - 1) acc = acc.concat('/');
+        return acc;
+    }, '');
+};
+
+const punctIf = (punct: string, predicate: () => boolean) => (predicate() ? punct : '');
+
+const createSummary = (g: GallApi): string => {
+    const s = `${pj(g.gall.gallshape.map((s) => s.shape))}${punctIf(', ', () => g.gall.gallshape.length > 0)}${pj(
+        g.gall.gallcolor.map((c) => c.color),
+    )}${punctIf(', ', () => g.gall.gallcolor.length > 0)}${pj(g.gall.galltexture.map((t) => t.tex))}${punctIf(
+        ', ',
+        () => g.gall.galltexture.length > 0,
+    )}${g.gall.detachable.id === DetachableDetachable.id ? 'detachable' : 'integral'} gall found on the ${pj(
+        g.gall.galllocation.map((l) => l.loc),
+    )}${punctIf(' beginning in ', () => g.gall.gallseason.length > 0)}${pj(g.gall.gallseason.map((s) => s.season))}.`;
+
+    if (['a', 'e', 'i', 'o', 'u', 'y'].find((l) => l === s[0])) return `An ${s}`;
+    else return `A ${s}`;
+};
+
+const isHostIncomplete = (hostOrTaxon: TaxonomyEntryNoParent | HostSimple | null | undefined) => {
+    return isHost(hostOrTaxon) && !hostOrTaxon.datacomplete;
+};
+
 const IDGall = (props: Props): JSX.Element => {
     const [galls, setGalls] = useState(new Array<GallApi>());
     const [filtered, setFiltered] = useState(new Array<GallApi>());
@@ -138,7 +164,17 @@ const IDGall = (props: Props): JSX.Element => {
             (props.query?.walls?.length ?? -1) > 0,
     );
 
-    const [showBanner, setShowBanner] = useState(true);
+    const advancedHasSelection = () => {
+        return (
+            (query?.alignment && query?.alignment.length > 0) ||
+            (query?.cells && query?.cells.length > 0) ||
+            (query?.color && query?.color.length > 0) ||
+            (query?.season && query?.season.length > 0) ||
+            (query?.shape && query?.shape.length > 0) ||
+            (query?.textures && query?.textures.length > 0) ||
+            (query?.walls && query?.walls.length > 0)
+        );
+    };
 
     const disableFilter = (): boolean => {
         return !hostOrTaxon;
@@ -160,7 +196,8 @@ const IDGall = (props: Props): JSX.Element => {
 
     const resetForm = () => {
         setQuery(null);
-        setFiltered(galls);
+        setHostOrTaxon(undefined);
+        setFiltered([]);
     };
 
     useEffect(() => {
@@ -247,7 +284,6 @@ const IDGall = (props: Props): JSX.Element => {
                 control={filterControl}
                 selected={query ? query[field] : []}
                 onChange={(selected) => {
-                    console.log(`${field} changed`);
                     setQuery({
                         ...(query ? query : EMPTYSEARCHQUERY),
                         [field]: selected,
@@ -263,281 +299,315 @@ const IDGall = (props: Props): JSX.Element => {
     };
 
     return (
-        <>
+        <Container className="m-2" fluid>
             <Head>
                 <title>ID Galls</title>
             </Head>
 
-            <form className="fixed-left pl-2 pt-3 m-2 form-group">
-                <Row>
-                    <Col>
-                        <Alert
-                            variant="warning"
-                            className="ml-5 mr-5"
-                            hidden={!showBanner}
-                            onClose={() => setShowBanner(!showBanner)}
-                            dismissible
-                        >
-                            Note: our database is a work in progress. Except where indicated otherwise, the ID results for any
-                            given host should not be considered comprehensive, and the traits, host relationships, and source
-                            entries for any gall inducer that does appear in the database may be incomplete.
-                        </Alert>
-                    </Col>
-                </Row>
-                <Row>
-                    <Col>
-                        First select either the host species or the genus/section for a host if you are unsure of the species,
-                        then press Search. You can then filter the found galls using the boxes on the left. See the{' '}
-                        <Link href="/filterguide">Gall Filter Term Guide</Link> if you’re uncertain about our usage of the terms
-                        in the filters. Note that leaving a field blank doesn’t exclude any galls, whether they have values in
-                        that field or not. Choosing one or more values in a field removes all galls that don’t include at least
-                        those values.
-                    </Col>
-                </Row>
-                <Row>
-                    <Col sm={12} md={5}>
-                        <label className="col-form-label">Host:</label>
-                        <Typeahead
-                            name="host"
-                            control={control}
-                            selected={hostOrTaxon && isHost(hostOrTaxon) ? [hostOrTaxon] : []}
-                            onChange={(h) => {
-                                setHostOrTaxon(h[0]);
-                            }}
-                            placeholder="Host"
-                            clearButton
-                            options={props.hosts}
-                            labelKey={(host: HostSimple) => {
-                                if (host) {
-                                    const aliases = host.aliases
-                                        .map((a) => a.name)
-                                        .sort()
-                                        .join(', ');
-                                    return aliases.length > 0 ? `${host.name} (${aliases})` : host.name;
-                                } else {
-                                    return '';
-                                }
-                            }}
-                        />
-                    </Col>
-                    <Col sm={12} md={1} className="align-self-end my-2">
-                        or
-                    </Col>
-                    <Col sm={12} md={5}>
-                        <label className="col-form-label">Genus (Section):</label>
-                        <Typeahead
-                            name="genus"
-                            control={control}
-                            selected={hostOrTaxon && isTaxonomy(hostOrTaxon) ? [hostOrTaxon] : []}
-                            onChange={(g) => {
-                                setHostOrTaxon(g[0]);
-                            }}
-                            placeholder="Genus"
-                            clearButton
-                            options={props.sectionsAndGenera}
-                            labelKey={(tax: TaxonomyEntryNoParent) => {
-                                if (tax) {
-                                    if (tax.type === SECTION) {
-                                        return `${tax.name} - ${tax.description}`;
-                                    }
-                                    return tax.name;
-                                } else {
-                                    return '';
-                                }
-                            }}
-                        />
-                    </Col>
-                </Row>
-                <Row>
-                    <Col>
-                        {(errors.genus || errors.host) && (
-                            <span className="text-danger">
-                                You must provide a search selection, either a Host species or genus.
-                            </span>
-                        )}
-                    </Col>
-                </Row>
-            </form>
-            <hr />
-            <Row className="pr-2">
-                <Col sm={12} md={3}>
-                    <form className="fixed-left ml-4 form-group">
+            <Row className="fixed-left pl-2 pt-3 form-group">
+                <Col>
+                    <form>
                         <Row>
-                            <Col md={12}>
+                            <Col>
+                                First select either the host species or the genus/section for a host if you are unsure of the
+                                species, then press Search. You can then filter the found galls using the boxes on the left. See
+                                the <Link href="/filterguide">Gall Filter Term Guide</Link> if you’re uncertain about our usage of
+                                the terms in the filters. Note that leaving a field blank doesn’t exclude any galls, whether they
+                                have values in that field or not. Choosing one or more values in a field removes all galls that
+                                don’t include at least those values.
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col sm={12} md={5}>
+                                <label className="col-form-label">Host:</label>
+                                <Typeahead
+                                    name="host"
+                                    control={control}
+                                    selected={hostOrTaxon && isHost(hostOrTaxon) ? [hostOrTaxon] : []}
+                                    onChange={(h) => {
+                                        setHostOrTaxon(h[0]);
+                                    }}
+                                    placeholder="Host"
+                                    clearButton
+                                    options={props.hosts}
+                                    labelKey={(host: HostSimple) => {
+                                        if (host) {
+                                            const aliases = host.aliases
+                                                .map((a) => a.name)
+                                                .sort()
+                                                .join(', ');
+                                            return aliases.length > 0 ? `${host.name} (${aliases})` : host.name;
+                                        } else {
+                                            return '';
+                                        }
+                                    }}
+                                />
+                            </Col>
+                            <Col sm={12} md={1} className="align-self-end my-2">
+                                or
+                            </Col>
+                            <Col sm={12} md={5}>
+                                <label className="col-form-label">Genus (Section):</label>
+                                <Typeahead
+                                    name="genus"
+                                    control={control}
+                                    selected={hostOrTaxon && isTaxonomy(hostOrTaxon) ? [hostOrTaxon] : []}
+                                    onChange={(g) => {
+                                        setHostOrTaxon(g[0]);
+                                    }}
+                                    placeholder="Genus"
+                                    clearButton
+                                    options={props.sectionsAndGenera}
+                                    labelKey={(tax: TaxonomyEntryNoParent) => {
+                                        if (tax) {
+                                            if (tax.type === SECTION) {
+                                                return `${tax.name} - ${tax.description}`;
+                                            }
+                                            return tax.name;
+                                        } else {
+                                            return '';
+                                        }
+                                    }}
+                                />
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col>
+                                {(errors.genus || errors.host) && (
+                                    <span className="text-danger">
+                                        You must provide a search selection, either a Host species or genus.
+                                    </span>
+                                )}
+                            </Col>
+                        </Row>
+                    </form>
+                </Col>
+            </Row>
+            <hr />
+            {/* The filters */}
+            <Row className="fixed-left pl-2 form-group">
+                <Col>
+                    <form>
+                        {/* Always visibile filters */}
+                        <Row>
+                            <Col sm={12} md={5}>
                                 <label className="col-form-label">
                                     Location(s):
                                     <InfoTip id="locations" text="Where on the host the gall is found." />
                                 </label>
+                                {makeFormInput(
+                                    'locations',
+                                    props.locations.map((l) => l.loc),
+                                    true,
+                                )}
+                            </Col>
+                            <Col sm={12} md={4}>
+                                <label className="col-form-label">
+                                    Detachable:{' '}
+                                    <InfoTip id="detachable" text="Can the gall be removed from the host without cutting?" />
+                                </label>
+                                <Typeahead
+                                    name="detachable"
+                                    control={filterControl}
+                                    selected={query ? query.detachable : []}
+                                    onChange={(selected) => {
+                                        if (!query) {
+                                            return;
+                                        }
+                                        setQuery({
+                                            ...query,
+                                            detachable: selected.length > 0 ? selected : [DetachableNone],
+                                        });
+                                    }}
+                                    options={Detachables}
+                                    labelKey={'value'}
+                                    disabled={disableFilter()}
+                                    clearButton={true}
+                                />
+                            </Col>
+                            <Col sm={12} md={3}>
+                                <Row>
+                                    <Col xs={6} md={12} className="pt-2">
+                                        <Button variant="outline-danger" size="sm" onClick={resetForm}>
+                                            Clear All Filters
+                                        </Button>
+                                    </Col>
+                                    <Col xs={6} md={12} className="pt-2">
+                                        <Button
+                                            variant="outline-secondary"
+                                            size="sm"
+                                            onClick={() => setShowAdvanced(!showAdvanced)}
+                                        >
+                                            {showAdvanced ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
+                                        </Button>
+                                        {!showAdvanced && advancedHasSelection() && (
+                                            <p className="text-danger small">You have active selections in the hidden filters.</p>
+                                        )}
+                                    </Col>
+                                </Row>
                             </Col>
                         </Row>
-                        {makeFormInput(
-                            'locations',
-                            props.locations.map((l) => l.loc),
-                            true,
-                        )}
-                        <label className="col-form-label">
-                            Detachable: <InfoTip id="detachable" text="Can the gall be removed from the host without cutting?" />
-                        </label>
-                        <Typeahead
-                            name="detachable"
-                            control={filterControl}
-                            selected={query ? query.detachable : []}
-                            onChange={(selected) => {
-                                if (!query) {
-                                    return;
-                                }
-                                setQuery({
-                                    ...query,
-                                    detachable: selected.length > 0 ? selected : [DetachableNone],
-                                });
-                            }}
-                            placeholder="Detachable"
-                            options={Detachables}
-                            labelKey={'value'}
-                            disabled={disableFilter()}
-                            clearButton={true}
-                        />
-                        <br />
-                        <Button variant="outline-primary" size="sm" onClick={resetForm}>
-                            Reset Form
-                        </Button>
-                        <hr />
-                        <Button
-                            variant="outline-secondary"
-                            size="sm"
-                            className="mb-2"
-                            onClick={() => setShowAdvanced(!showAdvanced)}
-                        >
-                            {showAdvanced ? 'Hide Search Filters' : 'Advanced Search Filters'}
-                        </Button>
-                        <span hidden={!showAdvanced}>
-                            <p className="font-italic small">
-                                Be aware that many galls will not have associated information for all of the below properties.
-                            </p>
-                            <label className="col-form-label">
-                                Season: <InfoTip id="seasons" text="The season when the gall first appears." />
-                            </label>
-                            {makeFormInput(
-                                'season',
-                                props.seasons.map((c) => c.season),
-                            )}
-
-                            <label className="col-form-label">
-                                Texture(s):
-                                <InfoTip
-                                    id="textures"
-                                    text="The look and feel of the gall. If you are unsure what any of the terms mean check the glossary (? icon on top right)."
-                                />
-                            </label>
-                            {makeFormInput(
-                                'textures',
-                                props.textures.map((t) => t.tex),
-                                true,
-                            )}
-                            <label className="col-form-label">
-                                Alignment:{' '}
-                                <InfoTip id="alignment" text="How the gall is positioned relative to the host substrate." />
-                            </label>
-                            {makeFormInput(
-                                'alignment',
-                                props.alignments.map((a) => a.alignment),
-                            )}
-                            <label className="col-form-label">
-                                Walls:{' '}
-                                <InfoTip
-                                    id="walls"
-                                    text="What the walls between the outside and the inside of the gall are like."
-                                />
-                            </label>
-                            {makeFormInput(
-                                'walls',
-                                props.walls.map((w) => w.walls),
-                            )}
-                            <label className="col-form-label">
-                                Cells: <InfoTip id="locations" text="The number of internal chambers that the gall contains." />
-                            </label>
-                            {makeFormInput(
-                                'cells',
-                                props.cells.map((c) => c.cells),
-                            )}
-                            <label className="col-form-label">
-                                Shape: <InfoTip id="locations" text="The overall shape of the gall." />
-                            </label>
-                            {makeFormInput(
-                                'shape',
-                                props.shapes.map((s) => s.shape),
-                            )}
-                            <label className="col-form-label">
-                                Color: <InfoTip id="locations" text="The outside color of the gall." />
-                            </label>
-                            {makeFormInput(
-                                'color',
-                                props.colors.map((c) => c.color),
-                            )}
-                        </span>
+                        <Row hidden={!showAdvanced}>
+                            <Col xs={12}>
+                                <hr />
+                                <p className="font-italic small">
+                                    Be aware that many galls do not have associated information for all of the below properties.
+                                </p>
+                            </Col>
+                        </Row>
+                        <Row hidden={!showAdvanced}>
+                            <Col>
+                                <label className="col-form-label">
+                                    Season: <InfoTip id="seasons" text="The season when the gall first appears." />
+                                </label>
+                                {makeFormInput(
+                                    'season',
+                                    props.seasons.map((c) => c.season),
+                                )}
+                                <label className="col-form-label">
+                                    Texture(s):
+                                    <InfoTip id="textures" text="The look and feel of the gall." />
+                                </label>
+                                {makeFormInput(
+                                    'textures',
+                                    props.textures.map((t) => t.tex),
+                                    true,
+                                )}
+                            </Col>
+                            <Col>
+                                <label className="col-form-label">
+                                    Alignment:{' '}
+                                    <InfoTip id="alignment" text="How the gall is positioned relative to the host substrate." />
+                                </label>
+                                {makeFormInput(
+                                    'alignment',
+                                    props.alignments.map((a) => a.alignment),
+                                )}
+                                <label className="col-form-label">
+                                    Walls:{' '}
+                                    <InfoTip
+                                        id="walls"
+                                        text="What the walls between the outside and the inside of the gall are like."
+                                    />
+                                </label>
+                                {makeFormInput(
+                                    'walls',
+                                    props.walls.map((w) => w.walls),
+                                )}
+                            </Col>
+                            <Col>
+                                <label className="col-form-label">
+                                    Cells:{' '}
+                                    <InfoTip id="locations" text="The number of internal chambers that the gall contains." />
+                                </label>
+                                {makeFormInput(
+                                    'cells',
+                                    props.cells.map((c) => c.cells),
+                                )}
+                                <label className="col-form-label">
+                                    Shape: <InfoTip id="locations" text="The overall shape of the gall." />
+                                </label>
+                                {makeFormInput(
+                                    'shape',
+                                    props.shapes.map((s) => s.shape),
+                                )}
+                            </Col>
+                            <Col>
+                                <label className="col-form-label">
+                                    Color: <InfoTip id="locations" text="The outside color of the gall." />
+                                </label>
+                                {makeFormInput(
+                                    'color',
+                                    props.colors.map((c) => c.color),
+                                )}
+                            </Col>
+                        </Row>
                     </form>
                 </Col>
-                <Col className="mt-2 form-group mr-4">
-                    <Row className="m-2">
-                        Showing {filtered.length} of {galls.length} galls:
-                    </Row>
-                    {/* <Row className='border m-2'><p className='text-right'>Pager TODO</p></Row> */}
-                    <Row className="">
-                        <Col>
-                            <ListGroup>
-                                {filtered.length == 0 ? (
-                                    hostOrTaxon == undefined ? (
-                                        <Alert variant="info" className="small">
-                                            To begin with select a Host or a Genus to see matching galls. Then you can use the
-                                            filters on the left to narrow down the list.
-                                        </Alert>
-                                    ) : (
-                                        <Alert variant="info" className="small">
-                                            There are no galls that match your filter. It’s possible there are no described
-                                            species that fit this set of traits and your gall is undescribed. However, before
-                                            giving up, try{' '}
-                                            <Link href="/guide#troubleshooting">altering your filter choices.</Link>
-                                        </Alert>
-                                    )
-                                ) : (
-                                    <>
-                                        <Alert variant="info" className="small">
-                                            If none of these results match your gall, you may have found an undescribed species.
-                                            However, before concluding that your gall is not in the database, try{' '}
-                                            <Link href="/guide#troubleshooting">altering your filter choices.</Link>
-                                        </Alert>
-                                        {filtered.map((g) => (
-                                            <ListGroup.Item key={g.id}>
-                                                <Row key={g.id}>
-                                                    <Col sm={12} md={5}>
-                                                        {defaultImage(g) && (
-                                                            <img
-                                                                src={defaultImage(g)?.small}
-                                                                alt={`image of ${g.name}`}
-                                                                width="300px"
-                                                                className="img-fluid mx-auto"
-                                                            />
-                                                        )}
-                                                    </Col>
-                                                    <Col sm={12} md={7} className="pl-0 pull-right">
-                                                        <Link href={`gall/${g.id}`}>
-                                                            <a>{g.name}</a>
-                                                        </Link>
-                                                        <ReactMarkdown remarkPlugins={[externalLinks, remarkBreaks]}>
-                                                            {pipe(g.description, O.getOrElse(constant('')))}
-                                                        </ReactMarkdown>
-                                                    </Col>
-                                                </Row>
-                                            </ListGroup.Item>
-                                        ))}
-                                    </>
+            </Row>
+            {/* Results */}
+            {isHostIncomplete(hostOrTaxon) && (
+                <Row>
+                    <Col>
+                        <Alert variant="warning" className="ml-2 mr-4">
+                            This host does not yet have all of the known galls added to the database.
+                        </Alert>
+                    </Col>
+                </Row>
+            )}
+            <Row className="pl-2 pr-2">
+                <Col xs={12} sm={6} md={3}>
+                    Showing {filtered.length} of {galls.length} galls:
+                </Col>
+            </Row>
+            <Row className="pl-2 pr-2">
+                <Col>
+                    {filtered.length == 0 ? (
+                        hostOrTaxon == undefined ? (
+                            <Alert variant="info" className="small">
+                                To begin with select a Host or a Genus to see matching galls. Then you can use the filters on the
+                                left to narrow down the list.
+                            </Alert>
+                        ) : (
+                            <Alert variant="info" className="small">
+                                There are no galls that match your filter. It’s possible there are no described species that fit
+                                this set of traits and your gall is undescribed. However, before giving up, try{' '}
+                                <Link href="/guide#troubleshooting">altering your filter choices.</Link>{' '}
+                                {!isHostIncomplete(hostOrTaxon) && (
+                                    <span>
+                                        To our knowledge, every gall that occurs on the host you have selected is included in the
+                                        database. If you find a gall on this host that is not listed below,{' '}
+                                        <a href="mailto:gallformers@gmail.com">contact us</a>.
+                                    </span>
                                 )}
-                            </ListGroup>
-                        </Col>
+                            </Alert>
+                        )
+                    ) : (
+                        <Alert variant="info" className="small">
+                            If none of these results match your gall, you may have found an undescribed species. However, before
+                            concluding that your gall is not in the database, try{' '}
+                            <Link href="/guide#troubleshooting">altering your filter choices.</Link>
+                            {!isHostIncomplete(hostOrTaxon) && (
+                                <span>
+                                    To our knowledge, every gall that occurs on the host you have selected is included in the
+                                    database. If you find a gall on this host that is not listed below,{' '}
+                                    <a href="mailto:gallformers@gmail.com">contact us</a>.
+                                </span>
+                            )}
+                        </Alert>
+                    )}
+                </Col>
+            </Row>
+            <Row className="pl-2 pr-2">
+                <Col>
+                    <Row>
+                        {filtered.map((g) => (
+                            <Col key={g.id.toString() + 'col'} xs={6} md={3} className="pb-2">
+                                <Card key={g.id} border="secondary">
+                                    <Link href={`gall/${g.id}`}>
+                                        <a>
+                                            <Card.Img
+                                                variant="top"
+                                                src={defaultImage(g)?.small ? defaultImage(g)?.small : '/images/noimage.jpg'}
+                                                alt={`image of ${g.name}`}
+                                            />
+                                        </a>
+                                    </Link>
+                                    <Card.Body>
+                                        <Card.Title>
+                                            <Link href={`gall/${g.id}`}>
+                                                <a className="small">{g.name}</a>
+                                            </Link>
+                                        </Card.Title>
+                                        <Card.Text className="small">{!defaultImage(g) && createSummary(g)}</Card.Text>
+                                    </Card.Body>
+                                </Card>
+                            </Col>
+                        ))}
                     </Row>
                 </Col>
             </Row>
-        </>
+        </Container>
     );
 };
 

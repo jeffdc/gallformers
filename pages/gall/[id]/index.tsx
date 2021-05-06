@@ -57,7 +57,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
     const hostLinker = hostAsLink(species.hosts.length);
 
     return (
-        <Container className="p-2 m-2">
+        <Container className="pt-2" fluid>
             <Head>
                 <title>{species.name}</title>
             </Head>

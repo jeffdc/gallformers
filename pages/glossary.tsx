@@ -1,7 +1,7 @@
 import { GetStaticProps } from 'next';
 import Head from 'next/head';
 import React from 'react';
-import { Col, Row } from 'react-bootstrap';
+import { Col, Container, Row } from 'react-bootstrap';
 import BootstrapTable, { ColumnDescription } from 'react-bootstrap-table-next';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -74,7 +74,7 @@ const Glossary = ({ es }: Props): JSX.Element => {
         throw new Error('Invalid props passed to Glossary.');
     }
     return (
-        <div>
+        <Container className="pt-2" fluid>
             <Head>
                 <title>Glossary</title>
             </Head>
@@ -97,7 +97,7 @@ const Glossary = ({ es }: Props): JSX.Element => {
                     />
                 </Col>
             </Row>
-        </div>
+        </Container>
     );
 };
 
