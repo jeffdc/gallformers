@@ -30,19 +30,6 @@ type Props = {
     taxonomy: FGS;
 };
 
-// eslint-disable-next-line react/display-name
-const gallAsLink = (len: number) => (g: GallSimple, idx: number) => {
-    if (!g) throw new Error('Recieved invalid gall for host.');
-
-    return (
-        <Link key={g.id} href={`/gall/${g.id}`}>
-            <a>
-                {g.name} {idx < len - 1 ? ' / ' : ''}
-            </a>
-        </Link>
-    );
-};
-
 const linkGall = (cell: string, g: GallSimple) => {
     return (
         <>
@@ -75,7 +62,6 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
 
     // the galls will not be sorted, so sort them for display
     host.galls.sort((a, b) => a.name.localeCompare(b.name));
-    const gallLinker = gallAsLink(host.galls.length);
 
     return (
         <Container className="pt-2" fluid>
@@ -175,7 +161,6 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                     },
                                 ]}
                             />
-                            {/* {host.galls.map(gallLinker)} */}
                         </Col>
                     </Row>
                 </Col>

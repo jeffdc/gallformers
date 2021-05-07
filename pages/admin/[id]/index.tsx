@@ -17,7 +17,7 @@ const Tester = ({ data }: Props): JSX.Element => {
                 <Head>
                     <title>Tester</title>
                 </Head>
-                <p>Count: {data[0].galls.length}</p>
+                <p>Count: {data.length}</p>
                 <pre>{JSON.stringify(data, null, '  ')}</pre>
             </>
         </Auth>

@@ -2,7 +2,7 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import React from 'react';
-import { Button, Col, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
+import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
 import Edit from '../../../components/edit';
 import SpeciesTable from '../../../components/speciesTable';
 import { SourceWithSpeciesApi } from '../../../libs/api/apitypes';
@@ -82,7 +82,7 @@ const Source = ({ source }: Props): JSX.Element => {
                     <SpeciesTable species={source.species} />
                 </Col>
             </Row>
-        </div>
+        </Container>
     );
 };
 
