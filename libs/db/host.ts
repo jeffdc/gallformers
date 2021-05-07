@@ -104,6 +104,7 @@ export const allHostsSimple = (): TaskEither<Error, HostSimple[]> => {
                 id: true,
                 name: true,
                 aliasspecies: { include: { alias: true } },
+                datacomplete: true,
             },
         });
 

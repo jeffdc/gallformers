@@ -41,7 +41,7 @@ const Section = ({ section }: Props): JSX.Element => {
     }
 
     return (
-        <Container className="p-2 m-2">
+        <Container className="pt-2" fluid>
             <Head>
                 <title>{section.name}</title>
             </Head>

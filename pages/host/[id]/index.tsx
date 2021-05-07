@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
 import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
+import BootstrapTable, { ColumnDescription } from 'react-bootstrap-table-next';
+import paginationFactory from 'react-bootstrap-table2-paginator';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
@@ -28,18 +30,25 @@ type Props = {
     taxonomy: FGS;
 };
 
-// eslint-disable-next-line react/display-name
-const gallAsLink = (len: number) => (g: GallSimple, idx: number) => {
-    if (!g) throw new Error('Recieved invalid gall for host.');
-
+const linkGall = (cell: string, g: GallSimple) => {
     return (
-        <Link key={g.id} href={`/gall/${g.id}`}>
-            <a>
-                {g.name} {idx < len - 1 ? ' / ' : ''}
-            </a>
-        </Link>
+        <>
+            <Link key={g.id} href={`/gall/${g.id}`}>
+                <a>{g.name}</a>
+            </Link>
+            <Edit id={g.id} type="gall" />
+        </>
     );
 };
+
+const columns: ColumnDescription[] = [
+    {
+        dataField: 'name',
+        text: 'Gall',
+        sort: true,
+        formatter: linkGall,
+    },
+];
 
 const Host = ({ host, taxonomy }: Props): JSX.Element => {
     const source = host ? host.speciessource.find((s) => s.useasdefault !== 0) : undefined;
@@ -53,10 +62,9 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
 
     // the galls will not be sorted, so sort them for display
     host.galls.sort((a, b) => a.name.localeCompare(b.name));
-    const gallLinker = gallAsLink(host.galls.length);
 
     return (
-        <Container className="p-2 m-2">
+        <Container className="pt-2" fluid>
             <Head>
                 <title>{host.name}</title>
             </Head>
@@ -119,17 +127,40 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                     </Row>
                     <Row>
                         <Col>
-                            <strong>Galls:</strong> {host.galls.map(gallLinker)}
-                        </Col>
-                    </Row>
-                    <Row>
-                        <Col>
                             <strong>Abdundance:</strong>{' '}
                             {pipe(
                                 host.abundance,
                                 O.map((a) => a.abundance),
                                 O.getOrElse(constant('')),
                             )}
+                        </Col>
+                    </Row>
+                    <Row className="pt-2">
+                        <Col>
+                            <BootstrapTable
+                                keyField={'id'}
+                                data={host.galls}
+                                columns={columns}
+                                bootstrap4
+                                striped
+                                condensed
+                                headerClasses="table-header"
+                                pagination={paginationFactory({
+                                    alwaysShowAllBtns: true,
+                                    withFirstAndLast: false,
+                                    sizePerPageList: [
+                                        { text: '10', value: 10 },
+                                        { text: '20', value: 20 },
+                                        { text: 'All', value: host.galls.length },
+                                    ],
+                                })}
+                                defaultSorted={[
+                                    {
+                                        dataField: 'title',
+                                        order: 'asc',
+                                    },
+                                ]}
+                            />
                         </Col>
                     </Row>
                 </Col>

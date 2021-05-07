@@ -2,8 +2,9 @@ import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import React from 'react';
 import Auth from '../../../components/auth';
+import { hostById } from '../../../libs/db/host';
 import { getFamiliesWithSpecies } from '../../../libs/db/taxonomy';
-import { getStaticPropsWith } from '../../../libs/pages/nextPageHelpers';
+import { getStaticPropsWith, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 
 type Props = {
     data: unknown[];
@@ -24,8 +25,8 @@ const Tester = ({ data }: Props): JSX.Element => {
 };
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-    // const data = await getStaticPropsWithContext(context, allFamilyIds, 'TEST', true, true);
-    const data = await getStaticPropsWith(getFamiliesWithSpecies(true), 'gall families');
+    const data = await getStaticPropsWithContext(context, hostById, 'TEST', true, true);
+    // const data = await getStaticPropsWith(getFamiliesWithSpecies(true), 'gall families');
     // const data = await mightFail(() => O.none)(taxonomyTreeForId(55));
     return {
         props: {

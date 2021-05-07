@@ -338,6 +338,7 @@ export type HostSimple = {
     id: number;
     name: string;
     aliases: alias[];
+    datacomplete: boolean;
 };
 
 export type GallSimple = {

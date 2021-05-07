@@ -43,7 +43,9 @@ const Images = ({ species }: Props): JSX.Element => {
     species.images.sort((a) => (a.default ? -1 : 1));
 
     return species.images.length < 1 ? (
-        <p className="p-2">No images yet...</p>
+        <p className="p-2">
+            <img src="/images/noimage.jpg" alt={`missing image of ${species.name}`} width="300px" className="img-fluid mx-auto" />
+        </p>
     ) : (
         <>
             <Modal show={showModal} onHide={() => setShowModal(false)} size="xl">

@@ -4,7 +4,7 @@ import { Container, Jumbotron, Row, Col } from 'react-bootstrap';
 
 export default function FourOhFour(): JSX.Element {
     return (
-        <Container className="">
+        <Container className="pt-2" fluid>
             <Row>
                 <Col xs={12}>
                     <Jumbotron>

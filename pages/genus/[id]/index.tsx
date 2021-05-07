@@ -33,7 +33,7 @@ const Genus = ({ genus, species }: Props): JSX.Element => {
     const fam = pipe(gen.parent, O.getOrElse(constant({} as TaxonomyEntry)));
 
     return (
-        <Container className="p-2 m-2">
+        <Container className="pt-2" fluid>
             <Head>
                 <title>{gen.name}</title>
             </Head>
