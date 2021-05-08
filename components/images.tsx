@@ -59,6 +59,7 @@ const Images = ({ species }: Props): JSX.Element => {
                                     //TODO when all images have XL versions show those here rather than the original
                                     src={image.original}
                                     alt={`image of ${species.name}`}
+                                    unoptimized
                                     width={width - 2 * pad}
                                     height={(width - 2 * pad) * hwRatio}
                                     objectFit={'contain'}
