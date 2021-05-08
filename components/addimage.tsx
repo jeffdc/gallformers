@@ -5,6 +5,7 @@ import axios from 'axios';
 import { ImageApi } from '../libs/api/apitypes';
 import * as O from 'fp-ts/lib/Option';
 import { sessionUserOrUnknown } from '../libs/utils/util';
+import toast from 'react-hot-toast';
 
 type Props = {
     id: number;
@@ -22,6 +23,11 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
         e.preventDefault();
 
         if (e.target.files == null) return;
+
+        if (e.target.files.length > 4) {
+            toast.error('You can currently only upload 4 or fewer images at one time.');
+            return;
+        }
 
         setProgress(0);
         setUploading(true);

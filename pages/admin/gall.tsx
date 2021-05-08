@@ -4,7 +4,7 @@ import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useState } from 'react';
-import { Button, Col, Row } from 'react-bootstrap';
+import { Badge, Button, Col, OverlayTrigger, Popover, Row } from 'react-bootstrap';
 import { Controller } from 'react-hook-form';
 import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
@@ -307,7 +307,66 @@ const Gall = ({
                             </Col>
                         </Row>
                         <Row>
-                            <Col xs={8}>Name (binomial):</Col>
+                            <Col xs={8}>
+                                Name (binomial):
+                                <OverlayTrigger
+                                    placement="auto"
+                                    trigger="click"
+                                    rootClose
+                                    overlay={
+                                        <Popover id="help">
+                                            <Popover.Title>Naming Gallformers</Popover.Title>
+                                            <Popover.Content>
+                                                <p>
+                                                    All gallformers must have a name that is in the standard binomial form{' '}
+                                                    <mark>
+                                                        <i>Genus species</i>
+                                                    </mark>
+                                                    . Optionally you can also differeniate between forms of the species by adding
+                                                    one or two additional elements to the name.
+                                                </p>
+                                                <p>
+                                                    For wasps it is useful to break out the sexual vs agamic generations. To do
+                                                    this create a name like:
+                                                    <br />
+                                                    <mark>
+                                                        <i>Genus species (agamic/sexgen)</i>
+                                                    </mark>
+                                                    <br />
+                                                    choosing either agamic or sexgen as appropriate.
+                                                </p>
+                                                <p>
+                                                    For host variants name the gallformer like this:
+                                                    <br />
+                                                    <mark>
+                                                        <i>Genus species (agamic/sexgen) (host)</i>
+                                                    </mark>{' '}
+                                                    <br />
+                                                    The first parenthetical is optional. Host should be shortened as follows:
+                                                    <i>
+                                                        <mark>Quercus bicolor</mark>
+                                                    </i>{' '}
+                                                    becomes{' '}
+                                                    <i>
+                                                        <mark>q-bicolor</mark>
+                                                    </i>
+                                                </p>
+                                                <p>
+                                                    A full example:
+                                                    <br />
+                                                    <i>
+                                                        <mark>Neuroterus quercusbatatus (agamic) (q-bicolor)</mark>
+                                                    </i>
+                                                </p>
+                                            </Popover.Content>
+                                        </Popover>
+                                    }
+                                >
+                                    <Badge variant="info" className="m-1 larger">
+                                        ?
+                                    </Badge>
+                                </OverlayTrigger>
+                            </Col>
                         </Row>
                         <Row>
                             <Col>{mainField('name', 'Gall')}</Col>

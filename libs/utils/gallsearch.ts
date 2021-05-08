@@ -39,6 +39,8 @@ const checkDetachable = (g: DetachableApi, q: DetachableApi): boolean => {
     return q.value === g.value || g.value === DetachableBoth.value;
 };
 
+export const LEAF_ANYWHERE = 'leaf (anywhere)';
+
 export const checkGall = (g: GallApi, q: SearchQuery): boolean => {
     const alignment =
         dontCare(q.alignment) ||
@@ -50,7 +52,15 @@ export const checkGall = (g: GallApi, q: SearchQuery): boolean => {
     const detachable = checkDetachable(g.gall.detachable, q.detachable[0]);
     const shape = dontCare(q.shape) || (!!g.gall.gallshape && checkArray(g.gall.gallshape, (a, b) => a.shape === b, q.shape));
     const walls = dontCare(q.walls) || (!!g.gall.gallwalls && checkArray(g.gall.gallwalls, (a, b) => a.walls === b, q.walls));
-    const location = dontCare(q.locations) || (!!g.gall.galllocation && checkLocations(g.gall.galllocation, q.locations));
+    let location = false;
+    if (q.locations.find((l) => l === LEAF_ANYWHERE)) {
+        location = g.gall.galllocation.some((l) => l.loc.includes('leaf'));
+        const locs = q.locations.filter((l) => l !== LEAF_ANYWHERE);
+        console.log(`JDC: ${JSON.stringify(locs, null, '  ')}`);
+        location = location && (dontCare(locs) || (!!g.gall.galllocation && checkLocations(g.gall.galllocation, locs)));
+    } else {
+        location = dontCare(q.locations) || (!!g.gall.galllocation && checkLocations(g.gall.galllocation, q.locations));
+    }
     const texture = dontCare(q.textures) || (!!g.gall.galltexture && checkTextures(g.gall.galltexture, q.textures));
 
     return alignment && cells && color && season && detachable && shape && walls && location && texture;
