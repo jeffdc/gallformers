@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Card, Col, Container, Row } from 'react-bootstrap';
+import { Alert, Badge, Button, Card, Col, Container, OverlayTrigger, Popover, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import InfoTip from '../components/infotip';
@@ -38,7 +38,7 @@ import { getAlignments, getCells, getColors, getLocations, getSeasons, getShapes
 import { allHostsSimple } from '../libs/db/host';
 import { allGenera, allSections } from '../libs/db/taxonomy';
 import { defaultImage } from '../libs/pages/renderhelpers';
-import { checkGall } from '../libs/utils/gallsearch';
+import { checkGall, LEAF_ANYWHERE } from '../libs/utils/gallsearch';
 import { capitalizeFirstLetter, hasProp, mightFailWithArray } from '../libs/utils/util';
 
 type SearchFormHostField = {
@@ -307,7 +307,7 @@ const IDGall = (props: Props): JSX.Element => {
             <Row className="fixed-left pl-2 pt-3 form-group">
                 <Col>
                     <form>
-                        <Row>
+                        {/* <Row>
                             <Col>
                                 First select either the host species or the genus/section for a host if you are unsure of the
                                 species, then press Search. You can then filter the found galls using the boxes on the left. See
@@ -316,7 +316,7 @@ const IDGall = (props: Props): JSX.Element => {
                                 have values in that field or not. Choosing one or more values in a field removes all galls that
                                 don’t include at least those values.
                             </Col>
-                        </Row>
+                        </Row> */}
                         <Row>
                             <Col sm={12} md={5}>
                                 <label className="col-form-label">Host:</label>
@@ -370,6 +370,38 @@ const IDGall = (props: Props): JSX.Element => {
                                     }}
                                 />
                             </Col>
+                            <Col>
+                                <OverlayTrigger
+                                    placement="auto"
+                                    trigger="click"
+                                    rootClose
+                                    overlay={
+                                        <Popover id="help">
+                                            <Popover.Title>Gall ID Help</Popover.Title>
+                                            <Popover.Content>
+                                                <p>
+                                                    First select either the host species or the genus/section for a host. If you
+                                                    need help IDing the host try{' '}
+                                                    <a href="https://www.inaturalist.org" target="_blank" rel="noreferrer">
+                                                        iNaturalist.
+                                                    </a>{' '}
+                                                    You can then filter the found galls using the boxes below. See the{' '}
+                                                    <Link href="/filterguide">Gall Filter Term Guide</Link> for more details.
+                                                </p>
+                                                <p>
+                                                    Note: that leaving a field blank doesn’t exclude any galls, whether they have
+                                                    values in that field or not. Choosing one or more values in a field removes
+                                                    all galls that don’t include at least those values.
+                                                </p>
+                                            </Popover.Content>
+                                        </Popover>
+                                    }
+                                >
+                                    <Badge variant="info" className="m-1 larger">
+                                        ?
+                                    </Badge>
+                                </OverlayTrigger>
+                            </Col>
                         </Row>
                         <Row>
                             <Col>
@@ -395,11 +427,25 @@ const IDGall = (props: Props): JSX.Element => {
                                     Location(s):
                                     <InfoTip id="locations" text="Where on the host the gall is found." />
                                 </label>
-                                {makeFormInput(
-                                    'locations',
-                                    props.locations.map((l) => l.loc),
-                                    true,
-                                )}
+                                <Typeahead
+                                    name="locations"
+                                    control={filterControl}
+                                    selected={query ? query.locations : []}
+                                    onChange={(selected) => {
+                                        setQuery({
+                                            ...(query ? query : EMPTYSEARCHQUERY),
+                                            locations: selected,
+                                        });
+                                    }}
+                                    placeholder="Locations"
+                                    options={props.locations
+                                        .map((l) => l.loc)
+                                        .concat(LEAF_ANYWHERE)
+                                        .sort()}
+                                    disabled={disableFilter()}
+                                    clearButton={true}
+                                    multiple={true}
+                                />
                             </Col>
                             <Col sm={12} md={4}>
                                 <label className="col-form-label">
@@ -542,6 +588,35 @@ const IDGall = (props: Props): JSX.Element => {
             </Row>
             <Row className="pl-2 pr-2">
                 <Col>
+                    <Row>
+                        {filtered.map((g) => (
+                            <Col key={g.id.toString() + 'col'} xs={6} md={3} className="pb-2">
+                                <Card key={g.id} border="secondary">
+                                    <Link href={`gall/${g.id}`}>
+                                        <a>
+                                            <Card.Img
+                                                variant="top"
+                                                src={defaultImage(g)?.small ? defaultImage(g)?.small : '/images/noimage.jpg'}
+                                                alt={`image of ${g.name}`}
+                                            />
+                                        </a>
+                                    </Link>
+                                    <Card.Body>
+                                        <Card.Title>
+                                            <Link href={`gall/${g.id}`}>
+                                                <a className="small">{g.name}</a>
+                                            </Link>
+                                        </Card.Title>
+                                        <Card.Text className="small">{!defaultImage(g) && createSummary(g)}</Card.Text>
+                                    </Card.Body>
+                                </Card>
+                            </Col>
+                        ))}
+                    </Row>
+                </Col>
+            </Row>
+            <Row className="pl-2 pr-2">
+                <Col>
                     {filtered.length == 0 ? (
                         hostOrTaxon == undefined ? (
                             <Alert variant="info" className="small">
@@ -576,35 +651,6 @@ const IDGall = (props: Props): JSX.Element => {
                             )}
                         </Alert>
                     )}
-                </Col>
-            </Row>
-            <Row className="pl-2 pr-2">
-                <Col>
-                    <Row>
-                        {filtered.map((g) => (
-                            <Col key={g.id.toString() + 'col'} xs={6} md={3} className="pb-2">
-                                <Card key={g.id} border="secondary">
-                                    <Link href={`gall/${g.id}`}>
-                                        <a>
-                                            <Card.Img
-                                                variant="top"
-                                                src={defaultImage(g)?.small ? defaultImage(g)?.small : '/images/noimage.jpg'}
-                                                alt={`image of ${g.name}`}
-                                            />
-                                        </a>
-                                    </Link>
-                                    <Card.Body>
-                                        <Card.Title>
-                                            <Link href={`gall/${g.id}`}>
-                                                <a className="small">{g.name}</a>
-                                            </Link>
-                                        </Card.Title>
-                                        <Card.Text className="small">{!defaultImage(g) && createSummary(g)}</Card.Text>
-                                    </Card.Body>
-                                </Card>
-                            </Col>
-                        ))}
-                    </Row>
                 </Col>
             </Row>
         </Container>

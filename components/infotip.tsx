@@ -1,17 +1,20 @@
+import { ReactNode } from 'react';
 import { OverlayTrigger, Badge, Tooltip } from 'react-bootstrap';
 
 type Props = {
     id: string;
-    text: string;
+    text?: string;
+    children?: ReactNode;
     tip?: string;
 };
-const InfoTip = ({ id, text, tip }: Props): JSX.Element => {
+const InfoTip = ({ id, text, children, tip }: Props): JSX.Element => {
     return (
         <OverlayTrigger
-            placement="top"
+            placement="auto"
             overlay={
                 <Tooltip id={id} className="info-tip">
-                    <p>{text}</p>
+                    {text && <p>{text}</p>}
+                    {children && <>{children}</>}
                 </Tooltip>
             }
         >

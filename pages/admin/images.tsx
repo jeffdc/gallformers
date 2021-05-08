@@ -356,7 +356,16 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                                 }}
                             />
                         </Col>
-                        <Col>{selected?.id && <AddImage id={selected.id} onChange={addImages} />}</Col>
+                        <Col xs={7}>
+                            {selected?.id && (
+                                <>
+                                    <AddImage id={selected.id} onChange={addImages} />{' '}
+                                    <span className="text-danger">
+                                        Currently you are limited to uploading at most 4 images at a time.
+                                    </span>
+                                </>
+                            )}
+                        </Col>
                     </Row>
                     <Row className="form-group">
                         <Col xs={2}>

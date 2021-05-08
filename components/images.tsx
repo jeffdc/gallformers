@@ -30,6 +30,7 @@ type Props = {
 const Images = ({ species }: Props): JSX.Element => {
     const [showModal, setShowModal] = useState(false);
     const [currentImage, setCurrentImage] = useState(species.images.length > 0 ? species.images[0] : undefined);
+    const [imgIndex, setImgIndex] = useState(0);
     const [showInfo, setShowInfo] = useState(false);
     const { width } = useWindowDimensions();
 
@@ -44,21 +45,19 @@ const Images = ({ species }: Props): JSX.Element => {
 
     return species.images.length < 1 ? (
         <p className="p-2">
-            <img src="/images/noimage.jpg" alt={`missing image of ${species.name}`} width="300px" className="img-fluid mx-auto" />
+            <img src="/images/noimage.jpg" alt={`missing image of ${species.name}`} className="img-fluid d-block" />
         </p>
     ) : (
         <>
-            <Modal show={showModal} onHide={() => setShowModal(false)} size="xl">
+            <Modal show={showModal} onHide={() => setShowModal(false)} centered dialogClassName="modal-90w">
                 <Modal.Header closeButton />
                 <Modal.Body>
-                    {/* <Carousel interval={null} className="border-dark align-self-center p-2"> */}
-                    <Carousel interval={null}>
+                    <Carousel defaultActiveIndex={imgIndex} interval={null}>
                         {species.images.map((image) => (
-                            <CarouselItem key={image.id} className="">
+                            <CarouselItem key={image.id}>
                                 <Image
                                     //TODO when all images have XL versions show those here rather than the original
                                     src={image.original}
-                                    unoptimized
                                     alt={`image of ${species.name}`}
                                     width={width - 2 * pad}
                                     height={(width - 2 * pad) * hwRatio}
@@ -152,6 +151,7 @@ const Images = ({ species }: Props): JSX.Element => {
                 className="border-dark align-self-center px-2 pt-1"
                 onSelect={(i: number) => {
                     setCurrentImage(species.images[i]);
+                    setImgIndex(i);
                 }}
             >
                 {species.images.map((image) => (
@@ -160,7 +160,7 @@ const Images = ({ species }: Props): JSX.Element => {
                             src={image.medium}
                             alt={`image of ${species.name}`}
                             width="300px"
-                            className="img-fluid mx-auto"
+                            className="img-fluid d-block"
                             onClick={() => {
                                 setShowModal(true);
                             }}
