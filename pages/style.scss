@@ -1,8 +1,15 @@
 @import 'node_modules/bootstrap/scss/bootstrap';
 
+// super useful for debugging CSS layout issues (visualizing layout and whitespace)
+// * {
+//   background: #000 !important;
+//   color: #0f0 !important;
+//   outline: solid #f00 1px !important;
+// }
+
 .description-text {
-    font-size: 16px;
-    line-height: 180%;
+  font-size: 16px;
+  line-height: 180%;
 }
 
 .markdown-view {
@@ -18,25 +25,6 @@ blockquote {
   padding-left: 15px;
   border-left: 3px solid #ccc;
 } 
-
-.carousel-indicators li {
-    filter: invert(100%);
-}
-
-.carousel-caption {
-    position: relative;
-    left: 0;
-    top: -10;
-}
-
-.carousel-control-next,
-.carousel-control-prev {
-    filter: invert(100%);
-}
-
-.carousel-inner img {
-  margin: auto;
-}
 
 .modal-90w {
   max-width: 98%;

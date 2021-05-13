@@ -15,7 +15,7 @@ module.exports = (phase) => {
         //     cpus: PHASE_DEVELOPMENT_SERVER ? true : 1,
         //     profiling: true,
         // },
-        webpack: function (config, webpack) {
+        webpack: function (config, options) {
             config.plugins
                 .push
                 // add modules that should never be shipped in the client bundle here. mostly next.js is pretty good about

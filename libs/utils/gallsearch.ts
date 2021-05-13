@@ -56,7 +56,6 @@ export const checkGall = (g: GallApi, q: SearchQuery): boolean => {
     if (q.locations.find((l) => l === LEAF_ANYWHERE)) {
         location = g.gall.galllocation.some((l) => l.loc.includes('leaf'));
         const locs = q.locations.filter((l) => l !== LEAF_ANYWHERE);
-        console.log(`JDC: ${JSON.stringify(locs, null, '  ')}`);
         location = location && (dontCare(locs) || (!!g.gall.galllocation && checkLocations(g.gall.galllocation, locs)));
     } else {
         location = dontCare(q.locations) || (!!g.gall.galllocation && checkLocations(g.gall.galllocation, q.locations));

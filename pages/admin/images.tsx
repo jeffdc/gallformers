@@ -158,6 +158,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
         setError('');
         setSelectedForCopy(new Set<number>());
         setCopySource(undefined);
+        setEdit(false);
 
         fetchNewSelection(selected?.id);
     }, [selected?.id]);
@@ -165,19 +166,31 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
     const onSubmit = async () => {
         try {
             if (selected && selectedImages.size > 0) {
-                const res = await fetch(`../api/images?speciesid=${selected.id}&imageids=${[...selectedImages.values()]}`, {
-                    method: 'DELETE',
-                });
+                confirm({
+                    variant: 'danger',
+                    catchOnCancel: true,
+                    title: 'Are you sure want to delete?',
+                    message: `This will delete ALL ${selectedImages.size} currently selected images. Do you want to continue?`,
+                })
+                    .then(async () => {
+                        const res = await fetch(
+                            `../api/images?speciesid=${selected.id}&imageids=${[...selectedImages.values()]}`,
+                            {
+                                method: 'DELETE',
+                            },
+                        );
 
-                if (res.status === 200) {
-                    setImages(images?.filter((i) => !selectedImages.has(i.id)));
-                } else {
-                    throw new Error(await res.text());
-                }
+                        if (res.status === 200) {
+                            setImages(images?.filter((i) => !selectedImages.has(i.id)));
+                        } else {
+                            throw new Error(await res.text());
+                        }
 
-                reset({ delete: [], species: sp?.name });
-                selectedImages.clear();
-                setSelectedImages(selectedImages);
+                        reset({ delete: [], species: sp?.name });
+                        selectedImages.clear();
+                        setSelectedImages(selectedImages);
+                    })
+                    .catch(() => Promise.resolve());
             }
         } catch (e) {
             console.error(e);
