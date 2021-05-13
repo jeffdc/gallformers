@@ -5,22 +5,10 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
-import {
-    Button,
-    ButtonGroup,
-    ButtonToolbar,
-    Carousel,
-    CarouselItem,
-    Col,
-    Modal,
-    OverlayTrigger,
-    Popover,
-    Row,
-} from 'react-bootstrap';
+import { Button, ButtonGroup, ButtonToolbar, Col, Modal, OverlayTrigger, Popover, Row } from 'react-bootstrap';
 import useWindowDimensions from '../hooks/usewindowdimension';
 import { SpeciesApi } from '../libs/api/apitypes';
-
-// Modal.setAppElement('#__next');
+import Carousel from 'nuka-carousel';
 
 type Props = {
     species: SpeciesApi;
@@ -52,9 +40,24 @@ const Images = ({ species }: Props): JSX.Element => {
             <Modal show={showModal} onHide={() => setShowModal(false)} centered dialogClassName="modal-90w">
                 <Modal.Header closeButton />
                 <Modal.Body>
-                    <Carousel defaultActiveIndex={imgIndex} interval={null}>
+                    <Carousel
+                        renderCenterLeftControls={({ previousSlide }) => (
+                            <Button variant="secondary" size="sm" onClick={previousSlide} className="m-1">
+                                {'<'}
+                            </Button>
+                        )}
+                        renderCenterRightControls={({ nextSlide }) => (
+                            <Button variant="secondary" size="sm" onClick={nextSlide} className="m-1">
+                                {'>'}
+                            </Button>
+                        )}
+                        className="p-1"
+                        heightMode="max"
+                        slideIndex={imgIndex}
+                        wrapAround={true}
+                    >
                         {species.images.map((image) => (
-                            <CarouselItem key={image.id}>
+                            <div key={image.id}>
                                 <Image
                                     //TODO when all images have XL versions show those here rather than the original
                                     src={image.original}
@@ -65,14 +68,7 @@ const Images = ({ species }: Props): JSX.Element => {
                                     objectFit={'contain'}
                                     className="d-block"
                                 />
-                                <Carousel.Caption className="">
-                                    {image.sourcelink != undefined && image.sourcelink !== '' && (
-                                        <a href={image.sourcelink} target="_blank" rel="noreferrer">
-                                            Link to Original
-                                        </a>
-                                    )}
-                                </Carousel.Caption>
-                            </CarouselItem>
+                            </div>
                         ))}
                     </Carousel>
                 </Modal.Body>
@@ -147,60 +143,82 @@ const Images = ({ species }: Props): JSX.Element => {
                     </Row>
                 </Modal.Body>
             </Modal>
-            <Carousel
-                interval={null}
-                className="border-dark align-self-center px-2 pt-1"
-                onSelect={(i: number) => {
-                    setCurrentImage(species.images[i]);
-                    setImgIndex(i);
-                }}
-            >
-                {species.images.map((image) => (
-                    <CarouselItem key={image.id}>
-                        <img
-                            src={image.medium}
-                            alt={`image of ${species.name}`}
-                            width="300px"
-                            className="img-fluid d-block"
-                            onClick={() => {
-                                setShowModal(true);
-                            }}
-                        />
-                        <Carousel.Caption></Carousel.Caption>
-                    </CarouselItem>
-                ))}
-            </Carousel>
-            <ButtonToolbar className="row d-flex justify-content-center">
-                <ButtonGroup size="sm">
-                    <OverlayTrigger
-                        trigger="focus"
-                        placement="bottom"
-                        overlay={
-                            <Popover id="copyright-popover">
-                                <Popover.Content>{`${
-                                    currentImage?.license ? currentImage.license : 'No License'
-                                }`}</Popover.Content>
-                            </Popover>
-                        }
-                    >
-                        <Button variant="secondary" style={{ fontSize: '1.1em', fontWeight: 'lighter' }}>
-                            ©
-                        </Button>
-                    </OverlayTrigger>
-                    <Button variant="secondary" style={{ fontWeight: 'bold' }} onClick={() => setShowInfo(true)}>
-                        ⓘ
-                    </Button>
-                    {session && (
-                        <Button
-                            variant="secondary"
-                            style={{ fontSize: '1.0em' }}
-                            onClick={() => router.push(`/admin/images?speciesid=${species.id}`)}
-                        >
-                            ✎
+            <div className="border rounded pb-1">
+                <Carousel
+                    renderCenterLeftControls={({ previousSlide }) => (
+                        <Button variant="secondary" size="sm" onClick={previousSlide} className="m-1">
+                            {'<'}
                         </Button>
                     )}
-                </ButtonGroup>
-            </ButtonToolbar>
+                    renderCenterRightControls={({ nextSlide }) => (
+                        <Button variant="secondary" size="sm" onClick={nextSlide} className="m-1">
+                            {'>'}
+                        </Button>
+                    )}
+                    className="p-1"
+                    heightMode="max"
+                    beforeSlide={(c, e) => {
+                        setCurrentImage(species.images[e]);
+                        setImgIndex(e);
+                    }}
+                    wrapAround={true}
+                >
+                    {species.images.map((image) => (
+                        <div
+                            key={image.id}
+                            style={{ display: 'flex', alignItems: 'center', height: '100%' }}
+                            className="align-items-center"
+                        >
+                            <img
+                                src={image.medium}
+                                alt={`image of ${species.name}`}
+                                className="img-fluid d-block"
+                                onClick={() => {
+                                    setShowModal(true);
+                                }}
+                            />
+                        </div>
+                    ))}
+                </Carousel>
+                <ButtonToolbar className="row d-flex justify-content-center">
+                    <ButtonGroup size="sm">
+                        <OverlayTrigger
+                            trigger="focus"
+                            placement="bottom"
+                            overlay={
+                                <Popover id="copyright-popover">
+                                    <Popover.Content>{`${
+                                        currentImage?.license ? currentImage.license : 'No License'
+                                    }`}</Popover.Content>
+                                </Popover>
+                            }
+                        >
+                            <Button variant="secondary" style={{ fontSize: '1.1em', fontWeight: 'lighter' }}>
+                                ©
+                            </Button>
+                        </OverlayTrigger>
+                        <Button variant="secondary" style={{ fontWeight: 'bold' }} onClick={() => setShowInfo(true)}>
+                            ⓘ
+                        </Button>
+                        {session && (
+                            <Button
+                                variant="secondary"
+                                style={{ fontSize: '1.0em' }}
+                                onMouseDown={(e) => {
+                                    if (e.button === 1 || e.ctrlKey || e.metaKey) {
+                                        //  middle/command/ctrl click
+                                        window.open(`/admin/images?speciesid=${species.id}`, '_blank');
+                                    } else {
+                                        router.push(`/admin/images?speciesid=${species.id}`);
+                                    }
+                                }}
+                            >
+                                ✎
+                            </Button>
+                        )}
+                    </ButtonGroup>
+                </ButtonToolbar>
+            </div>
         </>
     );
 };

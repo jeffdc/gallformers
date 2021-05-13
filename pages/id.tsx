@@ -145,8 +145,8 @@ const createSummary = (g: GallApi): string => {
     else return `A ${s}`;
 };
 
-const isHostIncomplete = (hostOrTaxon: TaxonomyEntryNoParent | HostSimple | null | undefined) => {
-    return isHost(hostOrTaxon) && !hostOrTaxon.datacomplete;
+const isHostComplete = (hostOrTaxon: TaxonomyEntryNoParent | HostSimple | null | undefined) => {
+    return isHost(hostOrTaxon) && hostOrTaxon.datacomplete;
 };
 
 const IDGall = (props: Props): JSX.Element => {
@@ -307,16 +307,6 @@ const IDGall = (props: Props): JSX.Element => {
             <Row className="fixed-left pl-2 pt-3 form-group">
                 <Col>
                     <form>
-                        {/* <Row>
-                            <Col>
-                                First select either the host species or the genus/section for a host if you are unsure of the
-                                species, then press Search. You can then filter the found galls using the boxes on the left. See
-                                the <Link href="/filterguide">Gall Filter Term Guide</Link> if you’re uncertain about our usage of
-                                the terms in the filters. Note that leaving a field blank doesn’t exclude any galls, whether they
-                                have values in that field or not. Choosing one or more values in a field removes all galls that
-                                don’t include at least those values.
-                            </Col>
-                        </Row> */}
                         <Row>
                             <Col sm={12} md={5}>
                                 <label className="col-form-label">Host:</label>
@@ -572,7 +562,7 @@ const IDGall = (props: Props): JSX.Element => {
                 </Col>
             </Row>
             {/* Results */}
-            {isHostIncomplete(hostOrTaxon) && (
+            {!isHostComplete(hostOrTaxon) && isHost(hostOrTaxon) && (
                 <Row>
                     <Col>
                         <Alert variant="warning" className="ml-2 mr-4">
@@ -627,11 +617,11 @@ const IDGall = (props: Props): JSX.Element => {
                             <Alert variant="info" className="small">
                                 There are no galls that match your filter. It’s possible there are no described species that fit
                                 this set of traits and your gall is undescribed. However, before giving up, try{' '}
-                                <Link href="/guide#troubleshooting">altering your filter choices.</Link>{' '}
-                                {!isHostIncomplete(hostOrTaxon) && (
+                                <Link href="/guide#troubleshooting">altering your filter choices</Link>.{' '}
+                                {isHostComplete(hostOrTaxon) && (
                                     <span>
                                         To our knowledge, every gall that occurs on the host you have selected is included in the
-                                        database. If you find a gall on this host that is not listed below,{' '}
+                                        database. If you find a gall on this host that is not listed above,{' '}
                                         <a href="mailto:gallformers@gmail.com">contact us</a>.
                                     </span>
                                 )}
@@ -641,11 +631,11 @@ const IDGall = (props: Props): JSX.Element => {
                         <Alert variant="info" className="small">
                             If none of these results match your gall, you may have found an undescribed species. However, before
                             concluding that your gall is not in the database, try{' '}
-                            <Link href="/guide#troubleshooting">altering your filter choices.</Link>
-                            {!isHostIncomplete(hostOrTaxon) && (
+                            <Link href="/guide#troubleshooting">altering your filter choices</Link>.{' '}
+                            {isHostComplete(hostOrTaxon) && (
                                 <span>
                                     To our knowledge, every gall that occurs on the host you have selected is included in the
-                                    database. If you find a gall on this host that is not listed below,{' '}
+                                    database. If you find a gall on this host that is not listed above,{' '}
                                     <a href="mailto:gallformers@gmail.com">contact us</a>.
                                 </span>
                             )}

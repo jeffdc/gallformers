@@ -57,11 +57,11 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
     const hostLinker = hostAsLink(species.hosts.length);
 
     return (
-        <Container className="pt-2" fluid>
+        <Container className="pt-2 fluid">
             <Head>
                 <title>{species.name}</title>
             </Head>
-            <Row>
+            <Row className="mt-2">
                 {/* The Details Column */}
                 <Col sm={12} md={6} lg={8}>
                     <Row>
@@ -173,7 +173,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                         </Col>
                     </Row>
                 </Col>
-                <Col sm={12} md={6} lg={4} className="border rounded p-1">
+                <Col sm={12} md={6} lg={4} className="">
                     <Images species={species} type="gall" />
                 </Col>
             </Row>
@@ -215,7 +215,11 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                     )}
                 </Col>
             </Row>
-            <hr />
+            <Row>
+                <Col>
+                    <hr />
+                </Col>
+            </Row>
             <Row>
                 <Col>
                     <Edit id={species.id} type="speciessource" />
