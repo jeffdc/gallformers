@@ -2,14 +2,16 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
+import { useSession } from 'next-auth/client';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useEffect, useState } from 'react';
-import { Alert, Badge, Button, Card, Col, Container, OverlayTrigger, Popover, Row } from 'react-bootstrap';
+import { Alert, Badge, Button, Card, Col, Container, OverlayTrigger, Popover, Row, Tooltip } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
+import Edit from '../components/edit';
 import InfoTip from '../components/infotip';
 import Typeahead from '../components/Typeahead';
 import { getQueryParams } from '../libs/api/apipage';
@@ -190,6 +192,7 @@ const IDGall = (props: Props): JSX.Element => {
     });
 
     const router = useRouter();
+    const [session] = useSession();
 
     // this is the faceted filter form
     const { control: filterControl, reset: resetFilter } = useForm<FilterFormFields>();
@@ -597,7 +600,15 @@ const IDGall = (props: Props): JSX.Element => {
                                                 <a className="small">{g.name}</a>
                                             </Link>
                                         </Card.Title>
-                                        <Card.Text className="small">{!defaultImage(g) && createSummary(g)}</Card.Text>
+                                        <Card.Text className="small">
+                                            {!defaultImage(g) && createSummary(g)}
+                                            {session && (
+                                                <span className="p-0 pr-1 my-auto">
+                                                    <Edit id={g.id} type="gall" />
+                                                    {g.datacomplete ? '💯' : '❓'}
+                                                </span>
+                                            )}
+                                        </Card.Text>
                                     </Card.Body>
                                 </Card>
                             </Col>
@@ -610,8 +621,8 @@ const IDGall = (props: Props): JSX.Element => {
                     {filtered.length == 0 ? (
                         hostOrTaxon == undefined ? (
                             <Alert variant="info" className="small">
-                                To begin with select a Host or a Genus to see matching galls. Then you can use the filters on the
-                                left to narrow down the list.
+                                To begin with select a Host or a Genus to see matching galls. Then you can use the filters to
+                                narrow down the list.
                             </Alert>
                         ) : (
                             <Alert variant="info" className="small">

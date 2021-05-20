@@ -112,6 +112,7 @@ export const GALL_FAMILY_TYPES = [
     'Scale',
     'Thrips',
     'True Bug',
+    'Virus',
     'Wasp',
     'Unknown',
 ] as const;
@@ -133,6 +134,7 @@ export const ALL_FAMILY_TYPES = [
     'Scale',
     'Thrips',
     'True Bug',
+    'Virus',
     'Wasp',
     'Unknown',
 ] as const;

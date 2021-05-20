@@ -54,8 +54,19 @@ const Admin = (): JSX.Element => {
                 </Row>
                 <Row className="pt-5">
                     <Col>
-                        This stuff hopefully all works. I have tested a bunch but I am sure that there are still bugs. If you see
-                        wonkiness then message me (Jeff) on Slack and I will look into it.
+                        If you experience any issues with the Adminstration tools (or anything else on the site).{' '}
+                        <a href="https://github.com/jeffdc/gallformers/issues" target="_blank" rel="noreferrer">
+                            Look to see
+                        </a>{' '}
+                        if the issue has already been reported. If it has not, then create a new issue on{' '}
+                        <a href="https://github.com/jeffdc/gallformers/issues/new" target="_blank" rel="noreferrer">
+                            GitHub
+                        </a>
+                        . If the issue is critical or you are not sure that it is an issue, then reach out on{' '}
+                        <a href="https://gallformerdat-m1g8137.slack.com/archives/C01B319JAG6" target="_blank" rel="noreferrer">
+                            Slack
+                        </a>
+                        .
                     </Col>
                 </Row>
             </div>
