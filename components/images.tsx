@@ -68,6 +68,11 @@ const Images = ({ species }: Props): JSX.Element => {
                                     objectFit={'contain'}
                                     className="d-block"
                                 />
+                                {image.sourcelink != undefined && image.sourcelink !== '' && (
+                                    <a href={image.sourcelink} target="_blank" rel="noreferrer">
+                                        Link to Original
+                                    </a>
+                                )}
                             </div>
                         ))}
                     </Carousel>
@@ -156,7 +161,7 @@ const Images = ({ species }: Props): JSX.Element => {
                         </Button>
                     )}
                     className="p-1"
-                    heightMode="max"
+                    heightMode="first"
                     beforeSlide={(c, e) => {
                         setCurrentImage(species.images[e]);
                         setImgIndex(e);
