@@ -93,6 +93,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         { keyProp: 'name', delEndpoint: '../api/family/', upsertEndpoint: '../api/family/upsert' },
         schema,
         updatedFormFields,
+        false,
         createNewFamily,
     );
 
@@ -141,7 +142,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        <input type="submit" className="button" value="Submit" />
+                        <input type="submit" className="button" value="Submit" disabled={!selected} />
                     </Col>
                     <Col>
                         {deleteButton(

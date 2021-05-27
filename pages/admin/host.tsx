@@ -125,6 +125,7 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
         { keyProp: 'name', delEndpoint: '../api/host/', upsertEndpoint: '../api/host/upsert' },
         schema,
         updatedFormFields,
+        true,
         createNewHost,
     );
 
@@ -319,7 +320,7 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                 </Row>
                 <Row className="formGroup">
                     <Col>
-                        <input type="submit" className="button" value="Submit" />
+                        <input type="submit" className="button" value="Submit" disabled={!selected} />
                     </Col>
                     <Col>{deleteButton('Caution. All data associated with this Host will be deleted.')}</Col>
                 </Row>

@@ -25,7 +25,7 @@ import { allSources } from '../../libs/db/source';
 import { allSpecies } from '../../libs/db/species';
 import Admin from '../../libs/pages/admin';
 import { defaultSource, sourceToDisplay } from '../../libs/pages/renderhelpers';
-import { capitalizeFirstLetter, mightFailWithArray } from '../../libs/utils/util';
+import { mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
     speciesid: string;

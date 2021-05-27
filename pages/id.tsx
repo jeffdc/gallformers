@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useEffect, useState } from 'react';
-import { Alert, Badge, Button, Card, Col, Container, OverlayTrigger, Popover, Row, Tooltip } from 'react-bootstrap';
+import { Alert, Badge, Button, Card, Col, Container, OverlayTrigger, Popover, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Edit from '../components/edit';
@@ -20,7 +20,6 @@ import {
     CellsApi,
     ColorApi,
     DetachableApi,
-    DetachableDetachable,
     detachableFromString,
     DetachableNone,
     Detachables,
@@ -39,7 +38,7 @@ import { SECTION, TaxonomyEntry, TaxonomyEntryNoParent } from '../libs/api/taxon
 import { getAlignments, getCells, getColors, getLocations, getSeasons, getShapes, getTextures, getWalls } from '../libs/db/gall';
 import { allHostsSimple } from '../libs/db/host';
 import { allGenera, allSections } from '../libs/db/taxonomy';
-import { defaultImage } from '../libs/pages/renderhelpers';
+import { createSummary, defaultImage } from '../libs/pages/renderhelpers';
 import { checkGall, LEAF_ANYWHERE } from '../libs/utils/gallsearch';
 import { capitalizeFirstLetter, hasProp, mightFailWithArray } from '../libs/utils/util';
 
@@ -122,30 +121,6 @@ const convertQForUrl = (hostOrTaxon: TaxonomyEntryNoParent | HostSimple | undefi
           }
         : null),
 });
-
-const pj = (vals: string[]): string => {
-    return vals.reduce((acc, s, i) => {
-        acc = acc.concat(s);
-        if (i < vals.length - 1) acc = acc.concat('/');
-        return acc;
-    }, '');
-};
-
-const punctIf = (punct: string, predicate: () => boolean) => (predicate() ? punct : '');
-
-const createSummary = (g: GallApi): string => {
-    const s = `${pj(g.gall.gallshape.map((s) => s.shape))}${punctIf(', ', () => g.gall.gallshape.length > 0)}${pj(
-        g.gall.gallcolor.map((c) => c.color),
-    )}${punctIf(', ', () => g.gall.gallcolor.length > 0)}${pj(g.gall.galltexture.map((t) => t.tex))}${punctIf(
-        ', ',
-        () => g.gall.galltexture.length > 0,
-    )}${g.gall.detachable.id === DetachableDetachable.id ? 'detachable' : 'integral'} gall found on the ${pj(
-        g.gall.galllocation.map((l) => l.loc),
-    )}${punctIf(' beginning in ', () => g.gall.gallseason.length > 0)}${pj(g.gall.gallseason.map((s) => s.season))}.`;
-
-    if (['a', 'e', 'i', 'o', 'u', 'y'].find((l) => l === s[0])) return `An ${s}`;
-    else return `A ${s}`;
-};
 
 const isHostComplete = (hostOrTaxon: TaxonomyEntryNoParent | HostSimple | null | undefined) => {
     return isHost(hostOrTaxon) && hostOrTaxon.datacomplete;

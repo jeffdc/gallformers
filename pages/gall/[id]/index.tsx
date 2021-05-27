@@ -21,7 +21,7 @@ import { allGallIds, gallById, getRelatedGalls } from '../../../libs/db/gall';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkSourceToGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWith, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { defaultSource, formatLicense, sourceToDisplay } from '../../../libs/pages/renderhelpers';
+import { createSummary, defaultSource, formatLicense, sourceToDisplay } from '../../../libs/pages/renderhelpers';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
@@ -60,6 +60,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
         <Container className="pt-2 fluid">
             <Head>
                 <title>{species.name}</title>
+                <meta name={species.name} content={createSummary(species)} />
             </Head>
             <Row className="mt-2">
                 {/* Details */}

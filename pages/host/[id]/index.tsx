@@ -67,6 +67,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
         <Container className="pt-2" fluid>
             <Head>
                 <title>{host.name}</title>
+                <meta name={host.name} content={[host.name, ...host.aliases.map((a) => a.name)].join(', ')} />
             </Head>
 
             <Row>

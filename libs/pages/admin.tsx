@@ -111,6 +111,18 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
                     <Alert variant="danger" onClose={() => props.setError('')} dismissible>
                         <Alert.Heading>Uh-oh</Alert.Heading>
                         <p>{props.error}</p>
+                        <p>
+                            If you need to create an issue please do so in{' '}
+                            <a href="https://github.com/jeffdc/gallformers/issues/new" target="_blank" rel="noreferrer">
+                                Github
+                            </a>
+                            . Grabbing info from the browser console will help with solving the issue. If you are unsure how to to
+                            do that you can find instructions{' '}
+                            <a href="https://appuals.com/open-browser-console/" target="_blank" rel="noreferrer">
+                                here
+                            </a>
+                            .
+                        </p>
                     </Alert>
                 )}
 

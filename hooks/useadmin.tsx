@@ -57,6 +57,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     apiConfig: { keyProp: keyof T; delEndpoint: string; upsertEndpoint: string; delQueryString?: () => string },
     schema: yup.ObjectSchema<ObjectShape, AnyObject, Maybe<TypeOfShape<ObjectShape>>, Maybe<AssertsShape<ObjectShape>>>,
     updatedFormFields: (t: T | undefined) => Promise<FormFields>,
+    reloadOnUpdate = false,
     createNew?: (v: string) => T,
 ): AdminData<T, FormFields> => {
     const [data, setData] = useState(ts);
@@ -178,7 +179,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         setData(updated);
         setSelected(s);
         toast.success(`${type} Updated`);
-        router.replace(`?id=${s.id}`, undefined, { shallow: true });
+        router.replace(`?id=${s.id}`, undefined, { shallow: !reloadOnUpdate });
     };
 
     const formSubmit = async (fields: FormFields) => {

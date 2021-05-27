@@ -217,6 +217,7 @@ const Gall = ({
         { keyProp: 'name', delEndpoint: '../api/gall/', upsertEndpoint: '../api/gall/upsert' },
         schema,
         updatedFormFields,
+        true,
         createNewGall,
     );
 
@@ -720,7 +721,7 @@ const Gall = ({
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col>
-                        <input type="submit" className="button" value="Submit" />
+                        <input type="submit" className="button" value="Submit" disabled={!selected} />
                     </Col>
                     <Col>{deleteButton('Caution. All data associated with this Gall will be deleted.')}</Col>
                 </Row>

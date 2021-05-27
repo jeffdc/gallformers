@@ -1,6 +1,6 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
-import { CCBY, ImageApi, SourceApi, SpeciesApi } from '../api/apitypes';
+import { CCBY, DetachableDetachable, GallApi, ImageApi, SourceApi, SpeciesApi } from '../api/apitypes';
 import { truncateAtWord } from '../utils/util';
 
 /**
@@ -84,3 +84,27 @@ export const truncateOptionString = (description: O.Option<string>, truncateAfte
  */
 export const sourceToDisplay = (s: { pubyear: string; title: string; author: string }): string =>
     `${s.author}: (${s.pubyear}) ${s.title}`;
+
+const pj = (vals: string[]): string => {
+    return vals.reduce((acc, s, i) => {
+        acc = acc.concat(s);
+        if (i < vals.length - 1) acc = acc.concat('/');
+        return acc;
+    }, '');
+};
+
+const punctIf = (punct: string, predicate: () => boolean) => (predicate() ? punct : '');
+
+export const createSummary = (g: GallApi): string => {
+    const s = `${pj(g.gall.gallshape.map((s) => s.shape))}${punctIf(', ', () => g.gall.gallshape.length > 0)}${pj(
+        g.gall.gallcolor.map((c) => c.color),
+    )}${punctIf(', ', () => g.gall.gallcolor.length > 0)}${pj(g.gall.galltexture.map((t) => t.tex))}${punctIf(
+        ', ',
+        () => g.gall.galltexture.length > 0,
+    )}${g.gall.detachable.id === DetachableDetachable.id ? 'detachable' : 'integral'} gall found on the ${pj(
+        g.gall.galllocation.map((l) => l.loc),
+    )}${punctIf(' beginning in ', () => g.gall.gallseason.length > 0)}${pj(g.gall.gallseason.map((s) => s.season))}.`;
+
+    if (['a', 'e', 'i', 'o', 'u', 'y'].find((l) => l === s[0])) return `An ${s}`;
+    else return `A ${s}`;
+};
