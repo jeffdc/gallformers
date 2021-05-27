@@ -74,10 +74,10 @@ export const useAPIs = <T extends WithID, U>(
                     // to match the 'labelKey' that is used to extract the options. but there is no way to bind this
                     // until runtime so we can not do this in a type safe way.)
                     const keyFieldVal = (value[(keyProp as unknown) as keyof TypeaheadCustomOption] as unknown) as string;
-                    updated = convertFieldsToUpsert(data, keyFieldVal, -1);
+                    updated = convertFieldsToUpsert(data, keyFieldVal.trim(), -1);
                 } else {
                     const keyFieldVal = (value[keyProp] as unknown) as string;
-                    updated = convertFieldsToUpsert(data, keyFieldVal, value.id);
+                    updated = convertFieldsToUpsert(data, keyFieldVal.trim(), value.id);
                 }
                 const res = await fetch(upsertEndpoint, {
                     method: 'POST',
@@ -96,7 +96,7 @@ export const useAPIs = <T extends WithID, U>(
         } catch (e) {
             logger.error(e);
             throw new Error(
-                `Failed to update/delete data. Check the console and open a new bug copying any errors seen in the console as well as info about what you were doing when this occurred.`,
+                `Failed to update/delete data. Check the console and open a new issue in Github copying any errors seen in the console as well as info about what you were doing when this occurred.`,
             );
         }
     };

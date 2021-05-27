@@ -19,7 +19,7 @@ import { DeleteResult, HostApi, HostSimple, HostTaxon, SpeciesApi, SpeciesUpsert
 import { FGS, GENUS, SECTION } from '../api/taxonomy';
 import { deleteImagesBySpeciesId } from '../images/images';
 import { ExtractTFromPromise } from '../utils/types';
-import { handleError, optionalWith } from '../utils/util';
+import { handleError, hasProp, optionalWith } from '../utils/util';
 import db from './db';
 import { adaptImage } from './images';
 import {
@@ -299,7 +299,7 @@ export const upsertHost = (h: SpeciesUpsertFields): TaskEither<Error, SpeciesApi
  * See: https://github.com/prisma/prisma/issues/2057
  * @param speciesids an array of ids of the species (host) to delete
  */
-const hostDeleteSteps = (speciesids: number[]): PrismaPromise<Prisma.BatchPayload>[] => {
+const hostDeleteSteps = (speciesids: number[]): PrismaPromise<Prisma.BatchPayload | number>[] => {
     return [
         db.host.deleteMany({
             where: { host_species_id: { in: speciesids } },
@@ -320,6 +320,21 @@ const hostDeleteSteps = (speciesids: number[]): PrismaPromise<Prisma.BatchPayloa
         db.species.deleteMany({
             where: { id: { in: speciesids } },
         }),
+        // delete any orphaned genera since deleting a species may leave a genus behind
+        db.$executeRaw(
+            `
+                DELETE FROM taxonomy
+                WHERE id IN (
+                    SELECT id
+                    FROM taxonomy
+                    WHERE type = 'genus' AND 
+                        id NOT IN (
+                            SELECT taxonomy_id
+                            FROM speciestaxonomy
+                        )
+                );
+        `,
+        ),
     ];
 };
 
@@ -332,11 +347,12 @@ export const deleteHost = (speciesid: number): TaskEither<Error, DeleteResult> =
     const deleteImages = () => TE.tryCatch(() => deleteImagesBySpeciesId(speciesid), handleError);
     const deleteHostTx = () => TE.tryCatch(() => db.$transaction(hostDeleteSteps([speciesid])), handleError);
 
-    const toDeleteResult = (batch: Prisma.BatchPayload[]): DeleteResult => {
+    const toDeleteResult = (batch: Array<Prisma.BatchPayload | number>): DeleteResult => {
         return {
             type: 'host',
             name: 'host',
-            count: batch.reduce((acc, v) => acc + v.count, 0),
+            // Thanks Prisma: https://github.com/prisma/prisma/discussions/7284
+            count: batch.map((v) => (hasProp(v, 'count') ? v.count : v)).reduce((acc, v) => acc + v, 0),
         };
     };
 

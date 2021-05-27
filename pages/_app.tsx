@@ -22,6 +22,10 @@ function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
 
                     <title>Gallformers</title>
                     <link rel="icon" href="/favicon.ico" />
+                    <meta
+                        name="gallformers"
+                        content="Gallformers is the site to help identitfy galls on plants in North America."
+                    />
                 </Head>
                 <Row>
                     <Col>

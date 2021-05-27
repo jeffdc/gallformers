@@ -138,6 +138,7 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
         { keyProp: 'name', delEndpoint: '../api/taxonomy/', upsertEndpoint: '../api/taxonomy/upsert' },
         schema,
         updatedFormFields,
+        false,
         createNewSection,
     );
 
@@ -218,7 +219,7 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
                 </Row>
                 <Row className="form-input">
                     <Col>
-                        <input type="submit" className="button" value="Submit" />
+                        <input type="submit" className="button" value="Submit" disabled={!selected} />
                     </Col>
                     <Col>{deleteButton('Caution. The Section will be deleted.')}</Col>
                 </Row>

@@ -112,6 +112,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
         { keyProp: 'title', delEndpoint: '../api/source/', upsertEndpoint: '../api/source/upsert' },
         schema,
         updatedFormFields,
+        false,
         createNewSource,
     );
 
@@ -218,7 +219,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
 
                 <Row className="formGroup">
                     <Col>
-                        <input type="submit" className="button" value="Submit" />
+                        <input type="submit" className="button" value="Submit" disabled={!selected} />
                     </Col>
                     <Col>{deleteButton('Caution. All data associated with this Source will be deleted.')}</Col>
                 </Row>

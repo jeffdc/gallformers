@@ -88,6 +88,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
         { keyProp: 'word', delEndpoint: '../api/glossary/', upsertEndpoint: '../api/glossary/upsert' },
         schema,
         updatedFormFields,
+        false,
         createNewEntry,
     );
 
@@ -141,7 +142,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                 </Row>
                 <Row className="form-input">
                     <Col>
-                        <input type="submit" className="button" value="Submit" />
+                        <input type="submit" className="button" value="Submit" disabled={!selected} />
                     </Col>
                     <Col>{deleteButton('Caution. The glossary entry will deleted.')}</Col>
                 </Row>

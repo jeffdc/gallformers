@@ -17,11 +17,12 @@ const linkTitle = (cell: string, row: SourceApi) => {
 };
 
 const linkLicense = (cell: string, row: SourceApi) => {
+    const link = row.licenselink ? row.licenselink : 'https://creativecommons.org/publicdomain/mark/1.0/';
     return (
         <span>
-            <a href={row.licenselink} target="_blank" rel="noreferrer">
+            <a href={link} target="_blank" rel="noreferrer">
                 <img
-                    alt={row.license}
+                    alt={link}
                     src={
                         row.license === CC0
                             ? '/images/cc0.png'
