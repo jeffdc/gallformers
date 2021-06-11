@@ -410,10 +410,12 @@ const Gall = ({
                             placeholder="Family"
                             options={families}
                             labelKey="name"
-                            selected={selected?.fgs?.family ? [selected.fgs.family] : []}
-                            disabled={selected && selected.id > 0}
+                            selected={selected?.fgs?.family && selected.fgs.family.id >= 0 ? [selected.fgs.family] : []}
+                            disabled={(selected && selected.id > 0) || !selected}
                             onChange={(f) => {
-                                if (f && f.length > 0 && selected) {
+                                if (!selected) return;
+
+                                if (f && f.length > 0) {
                                     // handle the case when a new species is created
                                     // either the genus is new or is not
                                     const genus = genera.find((gg) => gg.id === selected.fgs.genus.id);
@@ -425,7 +427,7 @@ const Gall = ({
                                         selected.fgs = { ...selected.fgs, family: f[0] };
                                         setSelected({ ...selected });
                                     }
-                                } else if (selected) {
+                                } else {
                                     selected.fgs = {
                                         ...selected.fgs,
                                         family: { name: '', description: '', id: -1, type: FAMILY },
@@ -478,6 +480,7 @@ const Gall = ({
                             options={hosts}
                             labelKey="name"
                             multiple
+                            disabled={!selected}
                             selected={selected ? selected.hosts : []}
                             onChange={(h) => {
                                 if (selected) {
@@ -510,6 +513,7 @@ const Gall = ({
                                     }}
                                     placeholder="Detachable"
                                     className="form-control"
+                                    disabled={!selected}
                                 >
                                     {AT.Detachables.map((d) => (
                                         <option key={d.id}>{d.value}</option>
@@ -527,6 +531,7 @@ const Gall = ({
                             labelKey="walls"
                             multiple
                             clearButton
+                            disabled={!selected}
                             selected={selected ? selected.gall.gallwalls : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -545,6 +550,7 @@ const Gall = ({
                             labelKey="cells"
                             multiple
                             clearButton
+                            disabled={!selected}
                             selected={selected ? selected.gall.gallcells : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -563,6 +569,7 @@ const Gall = ({
                             labelKey="alignment"
                             multiple
                             clearButton
+                            disabled={!selected}
                             selected={selected ? selected.gall.gallalignment : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -583,6 +590,7 @@ const Gall = ({
                             labelKey="color"
                             multiple
                             clearButton
+                            disabled={!selected}
                             selected={selected ? selected.gall.gallcolor : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -601,6 +609,7 @@ const Gall = ({
                             labelKey="shape"
                             multiple
                             clearButton
+                            disabled={!selected}
                             selected={selected ? selected.gall.gallshape : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -619,6 +628,7 @@ const Gall = ({
                             labelKey="season"
                             multiple
                             clearButton
+                            disabled={!selected}
                             selected={selected ? selected.gall.gallseason : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -639,6 +649,7 @@ const Gall = ({
                             labelKey="loc"
                             multiple
                             clearButton
+                            disabled={!selected}
                             selected={selected ? selected.gall.galllocation : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -657,6 +668,7 @@ const Gall = ({
                             labelKey="tex"
                             multiple
                             clearButton
+                            disabled={!selected}
                             selected={selected ? selected.gall.galltexture : []}
                             onChange={(w) => {
                                 if (selected) {

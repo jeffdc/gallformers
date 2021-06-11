@@ -201,10 +201,12 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                             placeholder="Family"
                             options={families}
                             labelKey="name"
-                            selected={selected?.fgs?.family ? [selected.fgs.family] : []}
+                            selected={selected?.fgs?.family && selected.fgs.family.id >= 0 ? [selected.fgs.family] : []}
                             disabled={selected && selected.id > 0}
                             onChange={(f) => {
-                                if (f && f.length > 0 && selected) {
+                                if (!selected) return;
+
+                                if (f && f.length > 0) {
                                     // handle the case when a new species is created
                                     // either the genus is new or is not
                                     const genus = genera.find((gg) => gg.id === selected.fgs.genus.id);
@@ -216,7 +218,7 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                                         selected.fgs = { ...selected.fgs, family: f[0] };
                                         setSelected({ ...selected });
                                     }
-                                } else if (selected) {
+                                } else {
                                     selected.fgs = {
                                         ...selected.fgs,
                                         family: { name: '', description: '', id: -1, type: FAMILY },
