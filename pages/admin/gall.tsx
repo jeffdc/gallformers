@@ -25,9 +25,10 @@ import {
     getShapes,
     getTextures,
     getWalls,
+    getForms,
 } from '../../libs/db/gall';
 import { allHostsSimple } from '../../libs/db/host';
-import { abundances } from '../../libs/db/species';
+import { getAbundances } from '../../libs/db/species';
 import { allFamilies, allGenera } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
 import { hasProp, mightFailWithArray } from '../../libs/utils/util';
@@ -43,6 +44,7 @@ type Props = SpeciesProps & {
     alignments: AT.AlignmentApi[];
     walls: AT.WallsApi[];
     cells: AT.CellsApi[];
+    forms: AT.FormApi[];
 };
 
 const schema = yup.object().shape({
@@ -85,6 +87,7 @@ export type FormFields = SpeciesFormFields<AT.GallApi> & {
     seasons: AT.SeasonApi[];
     locations: AT.GallLocation[];
     textures: AT.GallTexture[];
+    forms: AT.FormApi[];
     undescribed: boolean;
 };
 
@@ -103,17 +106,12 @@ const Gall = ({
     abundances,
     families,
     genera,
+    forms,
 }: Props): JSX.Element => {
     const [showNewUndescribed, setShowNewUndescribed] = useState(false);
 
-    const {
-        renameSpecies,
-        createNewSpecies,
-        updatedSpeciesFormFields,
-        toSpeciesUpsertFields,
-        aliasData,
-        setAliasData,
-    } = useSpecies<AT.GallApi>(genera);
+    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields, aliasData, setAliasData } =
+        useSpecies<AT.GallApi>(genera);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): AT.GallUpsertFields => {
         if (!selected) {
@@ -136,6 +134,7 @@ const Gall = ({
             textures: fields.textures.map((t) => t.id),
             undescribed: fields.undescribed,
             walls: fields.walls.map((w) => w.id),
+            forms: fields.forms.map((f) => f.id),
         };
     };
 
@@ -156,6 +155,7 @@ const Gall = ({
                 textures: s.gall.galltexture,
                 undescribed: s.gall.undescribed,
                 walls: s.gall.gallwalls,
+                forms: s.gall.gallform,
             };
         }
 
@@ -172,6 +172,7 @@ const Gall = ({
             textures: [],
             undescribed: false,
             walls: [],
+            forms: [],
         };
     };
 
@@ -187,6 +188,7 @@ const Gall = ({
             gallshape: [],
             galltexture: [],
             gallwalls: [],
+            gallform: [],
             undescribed: false,
             id: -1,
         },
@@ -638,6 +640,25 @@ const Gall = ({
                             }}
                         />
                     </Col>
+                    <Col>
+                        Form(s):
+                        <Typeahead
+                            name="forms"
+                            control={form.control}
+                            options={forms}
+                            labelKey="form"
+                            multiple
+                            clearButton
+                            disabled={!selected}
+                            selected={selected ? selected.gall.gallform : []}
+                            onChange={(w) => {
+                                if (selected) {
+                                    selected.gall.gallform = w;
+                                    setSelected({ ...selected });
+                                }
+                            }}
+                        />
+                    </Col>
                 </Row>
                 <Row className="form-group">
                     <Col>
@@ -765,7 +786,8 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             alignments: await mightFailWithArray<AT.AlignmentApi>()(getAlignments()),
             walls: await mightFailWithArray<AT.WallsApi>()(getWalls()),
             cells: await mightFailWithArray<AT.CellsApi>()(getCells()),
-            abundances: await mightFailWithArray<AT.AbundanceApi>()(abundances()),
+            abundances: await mightFailWithArray<AT.AbundanceApi>()(getAbundances()),
+            forms: await mightFailWithArray<AT.FormApi>()(getForms()),
         },
     };
 };

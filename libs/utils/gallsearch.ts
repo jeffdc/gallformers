@@ -61,6 +61,8 @@ export const checkGall = (g: GallApi, q: SearchQuery): boolean => {
         location = dontCare(q.locations) || (!!g.gall.galllocation && checkLocations(g.gall.galllocation, q.locations));
     }
     const texture = dontCare(q.textures) || (!!g.gall.galltexture && checkTextures(g.gall.galltexture, q.textures));
+    const form = dontCare(q.form) || (!!g.gall.gallform && checkArray(g.gall.gallform, (a, b) => a.form === b, q.form));
+    const undescribed = !q.undescribed || g.gall.undescribed;
 
-    return alignment && cells && color && season && detachable && shape && walls && location && texture;
+    return alignment && cells && color && season && detachable && shape && walls && location && texture && form && undescribed;
 };

@@ -68,8 +68,8 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                     <Row>
                         <Col>
                             <Row>
-                                <Col className="">
-                                    <h2>{species.name}</h2>
+                                <Col>
+                                    <h2 className="font-italic">{species.name}</h2>
                                 </Col>
                                 <Col xs={2}>
                                     <span className="p-0 pr-1 my-auto">
@@ -95,21 +95,19 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                 </Col>
                             </Row>
                             <Row>
-                                <Col> {species.aliases.map((a) => a.name).join(', ')}</Col>
+                                <Col className="font-italic"> {species.aliases.map((a) => a.name).join(', ')}</Col>
                             </Row>
                             <Row>
                                 <Col>
-                                    <p className="font-italic">
-                                        <strong>Family:</strong>
-                                        <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
-                                            <a> {taxonomy.family.name}</a>
-                                        </Link>
-                                        {' | '}
-                                        <strong>Genus:</strong>
-                                        <Link key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
-                                            <a> {taxonomy.genus.name}</a>
-                                        </Link>
-                                    </p>
+                                    <strong>Family:</strong>
+                                    <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
+                                        <a> {taxonomy.family.name}</a>
+                                    </Link>
+                                    {' | '}
+                                    <strong>Genus:</strong>
+                                    <Link key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
+                                        <a className="font-italic"> {taxonomy.genus.name}</a>
+                                    </Link>
                                 </Col>
                             </Row>
                             <Row className="">
@@ -162,6 +160,9 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                 </Col>
                             </Row>
                             <Row>
+                                <Col xs={6} sm={4}>
+                                    <strong>Form:</strong> {species.gall.gallform.map((s) => s.form).join(', ')}
+                                </Col>
                                 <Col>
                                     <strong>Related: </strong>
                                     {relatedGalls.map((g, i) => (

@@ -16,9 +16,7 @@ import { gallsByHostGenus, gallsByHostName, gallsByHostSection } from '../../../
  * - section - the section name to search on
  */
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
-    const noParamsErr = O.of(
-        TE.left<Err, GallApi[]>({ status: 400, msg: 'No valid query params provided.' }),
-    );
+    const noParamsErr = O.of(TE.left<Err, GallApi[]>({ status: 400, msg: 'No valid query params provided.' }));
 
     await pipe(
         { host: 'host', genus: 'genus', section: 'section' },

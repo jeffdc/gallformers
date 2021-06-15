@@ -5,9 +5,11 @@ import {
     alignment,
     cells as cs,
     color,
+    form,
     gallalignment,
     gallcells,
     gallcolor,
+    gallform,
     galllocation,
     gallseason,
     gallshape,
@@ -41,6 +43,7 @@ import {
     DeleteResult,
     detachableFromId,
     detachableFromString,
+    FormApi,
     GallApi,
     GallLocation,
     GallTaxon,
@@ -112,6 +115,7 @@ export const getGalls = (
                         galltexture: { include: { texture: true } },
                         gallshape: { include: { shape: true } },
                         gallwalls: { include: { walls: true } },
+                        gallform: { include: { form: true } },
                         undescribed: true,
                     },
                 },
@@ -148,6 +152,9 @@ export const getGalls = (
             })[];
             gallwalls: (gallwalls & {
                 walls: ws;
+            })[];
+            gallform: (gallform & {
+                form: form;
             })[];
             undescribed: boolean;
         };
@@ -211,6 +218,7 @@ export const getGalls = (
                     detachable: detachableFromId(g.gall.detachable),
                     galllocation: adaptLocations(g.gall.galllocation.map((l) => l.location)),
                     galltexture: adaptTextures(g.gall.galltexture.map((t) => t.texture)),
+                    gallform: adaptForm(g.gall.gallform.map((c) => c.form)),
                     undescribed: g.gall.undescribed,
                 },
                 // remove the indirection of the many-to-many table for easier usage
@@ -580,6 +588,26 @@ export const getCells = (): TaskEither<Error, CellsApi[]> => {
     return pipe(TE.tryCatch(cells, handleError), TE.map(adaptCells));
 };
 
+const adaptForm = (form: fs[]): FormApi[] =>
+    form.map((c) => ({
+        ...c,
+        description: O.fromNullable(c.description),
+    }));
+
+/**
+ * Fetches all gall cells
+ */
+export const getForms = (): TaskEither<Error, FormApi[]> => {
+    const form = () =>
+        db.form.findMany({
+            orderBy: {
+                form: 'asc',
+            },
+        });
+
+    return pipe(TE.tryCatch(form, handleError), TE.map(adaptForm));
+};
+
 export const testTx = (): Promise<[species[]]> => {
     return db.$transaction([db.species.findMany({ where: { name: { contains: 'alba' } } })]);
 };
@@ -608,6 +636,7 @@ const gallCreateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                                 taxontype: { connect: { taxoncode: GallTaxon } },
                                 galllocation: { create: gall.locations.map((id) => ({ location_id: id })) },
                                 galltexture: { create: gall.textures.map((id) => ({ texture_id: id })) },
+                                gallform: { create: gall.forms.map((id) => ({ form_id: id })) },
                             },
                         },
                     },
@@ -662,6 +691,10 @@ const gallUpdateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                                     galltexture: {
                                         deleteMany: { texture_id: { notIn: [] } },
                                         create: gall.textures.map((t) => ({ texture_id: t })),
+                                    },
+                                    gallform: {
+                                        deleteMany: { form_id: { notIn: [] } },
+                                        create: gall.forms.map((c) => ({ form_id: c })),
                                     },
                                 },
                             },

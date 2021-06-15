@@ -55,6 +55,13 @@ model color {
   gallcolor gallcolor[]
 }
 
+model form {
+  id          Int         @id @default(autoincrement())
+  form        String      @unique
+  description String?
+  gallform   gallform[]
+}
+
 model gall {
   id            Int             @id @default(autoincrement())
   taxoncode     String
@@ -70,6 +77,7 @@ model gall {
   galltexture   galltexture[]
   gallwalls     gallwalls[]
   gallseason    gallseason[]
+  gallform      gallform[]
 }
 
 model gallalignment {
@@ -142,6 +150,15 @@ model gallwalls {
   walls    walls @relation(fields: [walls_id], references: [id])
 
   @@id([gall_id, walls_id])
+}
+
+model gallform {
+  gall_id  Int
+  form_id Int
+  gall     gall  @relation(fields: [gall_id], references: [id])
+  form     form  @relation(fields: [form_id], references: [id])
+
+  @@id([gall_id, form_id])
 }
 
 model glossary {

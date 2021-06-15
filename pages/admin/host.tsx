@@ -16,7 +16,7 @@ import { extractQueryParam } from '../../libs/api/apipage';
 import { AbundanceApi, HostApi, HostTaxon, HOST_FAMILY_TYPES, SpeciesUpsertFields } from '../../libs/api/apitypes';
 import { FAMILY, TaxonomyEntry, TaxonomyEntryNoParent } from '../../libs/api/taxonomy';
 import { allHosts } from '../../libs/db/host';
-import { abundances } from '../../libs/db/species';
+import { getAbundances } from '../../libs/db/species';
 import { allFamilies, allGenera, allSections } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
@@ -59,14 +59,8 @@ export const testables = {
 };
 
 const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.Element => {
-    const {
-        renameSpecies,
-        createNewSpecies,
-        updatedSpeciesFormFields,
-        toSpeciesUpsertFields,
-        aliasData,
-        setAliasData,
-    } = useSpecies<HostApi>(genera);
+    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields, aliasData, setAliasData } =
+        useSpecies<HostApi>(genera);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): SpeciesUpsertFields => {
         if (!selected) {
@@ -346,7 +340,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(HOST_FAMILY_TYPES)),
             genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon)),
             sections: await mightFailWithArray<TaxonomyEntry>()(allSections()),
-            abundances: await mightFailWithArray<AbundanceApi>()(abundances()),
+            abundances: await mightFailWithArray<AbundanceApi>()(getAbundances()),
         },
     };
 };

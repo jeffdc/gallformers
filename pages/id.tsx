@@ -1,5 +1,5 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { constant, pipe } from 'fp-ts/lib/function';
+import { constant, constFalse, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import { useSession } from 'next-auth/client';
@@ -9,7 +9,7 @@ import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, Col, Container, OverlayTrigger, Popover, Row } from 'react-bootstrap';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import Edit from '../components/edit';
 import InfoTip from '../components/infotip';
@@ -24,6 +24,7 @@ import {
     DetachableNone,
     Detachables,
     EMPTYSEARCHQUERY,
+    FormApi,
     GallApi,
     GallLocation,
     GallTexture,
@@ -35,7 +36,17 @@ import {
     WallsApi,
 } from '../libs/api/apitypes';
 import { SECTION, TaxonomyEntry, TaxonomyEntryNoParent } from '../libs/api/taxonomy';
-import { getAlignments, getCells, getColors, getLocations, getSeasons, getShapes, getTextures, getWalls } from '../libs/db/gall';
+import {
+    getAlignments,
+    getCells,
+    getColors,
+    getForms,
+    getLocations,
+    getSeasons,
+    getShapes,
+    getTextures,
+    getWalls,
+} from '../libs/db/gall';
 import { allHostsSimple } from '../libs/db/host';
 import { allGenera, allSections } from '../libs/db/taxonomy';
 import { createSummary, defaultImage } from '../libs/pages/renderhelpers';
@@ -64,6 +75,8 @@ type FilterFormFields = {
     shape: string;
     color: string;
     season: string;
+    form: string;
+    undescribed: boolean;
 };
 
 const invalidArraySelection = (arr: unknown[]) => {
@@ -102,6 +115,7 @@ type Props = {
     alignments: AlignmentApi[];
     walls: WallsApi[];
     cells: CellsApi[];
+    forms: FormApi[];
 };
 
 const convertQForUrl = (hostOrTaxon: TaxonomyEntryNoParent | HostSimple | undefined, q: SearchQuery | undefined | null) => ({
@@ -118,6 +132,8 @@ const convertQForUrl = (hostOrTaxon: TaxonomyEntryNoParent | HostSimple | undefi
               shape: q.shape.join(','),
               textures: q.textures.join(','),
               walls: q.walls.join(','),
+              form: q.form.join(','),
+              undescribed: q.undescribed,
           }
         : null),
 });
@@ -135,10 +151,12 @@ const IDGall = (props: Props): JSX.Element => {
         (props.query?.alignment?.length ?? -1) > 0 ||
             (props.query?.cells?.length ?? -1) > 0 ||
             (props.query?.color?.length ?? -1) > 0 ||
+            (props.query?.form?.length ?? -1) > 0 ||
             (props.query?.season?.length ?? -1) > 0 ||
             (props.query?.shape?.length ?? -1) > 0 ||
             (props.query?.textures?.length ?? -1) > 0 ||
-            (props.query?.walls?.length ?? -1) > 0,
+            (props.query?.walls?.length ?? -1) > 0 ||
+            props.query?.undescribed,
     );
 
     const advancedHasSelection = () => {
@@ -146,10 +164,12 @@ const IDGall = (props: Props): JSX.Element => {
             (query?.alignment && query?.alignment.length > 0) ||
             (query?.cells && query?.cells.length > 0) ||
             (query?.color && query?.color.length > 0) ||
+            (query?.form && query?.form.length > 0) ||
             (query?.season && query?.season.length > 0) ||
             (query?.shape && query?.shape.length > 0) ||
             (query?.textures && query?.textures.length > 0) ||
-            (query?.walls && query?.walls.length > 0)
+            (query?.walls && query?.walls.length > 0) ||
+            query?.undescribed
         );
     };
 
@@ -255,7 +275,11 @@ const IDGall = (props: Props): JSX.Element => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [query, galls]);
 
-    const makeFormInput = (field: keyof Omit<FilterFormFields, 'detachable'>, opts: string[], multiple = false) => {
+    const makeFormInput = (
+        field: keyof Omit<FilterFormFields, 'detachable' | 'undescribed'>,
+        opts: string[],
+        multiple = false,
+    ) => {
         return (
             <Typeahead
                 name={field}
@@ -471,69 +495,116 @@ const IDGall = (props: Props): JSX.Element => {
                         </Row>
                         <Row hidden={!showAdvanced}>
                             <Col>
-                                <label className="col-form-label">
-                                    Season: <InfoTip id="seasons" text="The season when the gall first appears." />
-                                </label>
-                                {makeFormInput(
-                                    'season',
-                                    props.seasons.map((c) => c.season),
-                                )}
-                                <label className="col-form-label">
-                                    Texture(s):
-                                    <InfoTip id="textures" text="The look and feel of the gall." />
-                                </label>
-                                {makeFormInput(
-                                    'textures',
-                                    props.textures.map((t) => t.tex),
-                                    true,
-                                )}
-                            </Col>
-                            <Col>
-                                <label className="col-form-label">
-                                    Alignment:{' '}
-                                    <InfoTip id="alignment" text="How the gall is positioned relative to the host substrate." />
-                                </label>
-                                {makeFormInput(
-                                    'alignment',
-                                    props.alignments.map((a) => a.alignment),
-                                )}
-                                <label className="col-form-label">
-                                    Walls:{' '}
-                                    <InfoTip
-                                        id="walls"
-                                        text="What the walls between the outside and the inside of the gall are like."
-                                    />
-                                </label>
-                                {makeFormInput(
-                                    'walls',
-                                    props.walls.map((w) => w.walls),
-                                )}
-                            </Col>
-                            <Col>
-                                <label className="col-form-label">
-                                    Cells:{' '}
-                                    <InfoTip id="locations" text="The number of internal chambers that the gall contains." />
-                                </label>
-                                {makeFormInput(
-                                    'cells',
-                                    props.cells.map((c) => c.cells),
-                                )}
-                                <label className="col-form-label">
-                                    Shape: <InfoTip id="locations" text="The overall shape of the gall." />
-                                </label>
-                                {makeFormInput(
-                                    'shape',
-                                    props.shapes.map((s) => s.shape),
-                                )}
-                            </Col>
-                            <Col>
-                                <label className="col-form-label">
-                                    Color: <InfoTip id="locations" text="The outside color of the gall." />
-                                </label>
-                                {makeFormInput(
-                                    'color',
-                                    props.colors.map((c) => c.color),
-                                )}
+                                <Row>
+                                    <Col xs={12} sm={6} md={3}>
+                                        <label className="col-form-label">
+                                            Season: <InfoTip id="seasons" text="The season when the gall first appears." />
+                                        </label>
+                                        {makeFormInput(
+                                            'season',
+                                            props.seasons.map((c) => c.season),
+                                        )}
+                                    </Col>
+                                    <Col xs={12} sm={6} md={3}>
+                                        <label className="col-form-label">
+                                            Texture(s):
+                                            <InfoTip id="textures" text="The look and feel of the gall." />
+                                        </label>
+                                        {makeFormInput(
+                                            'textures',
+                                            props.textures.map((t) => t.tex),
+                                            true,
+                                        )}
+                                    </Col>
+                                    <Col xs={12} sm={6} md={3}>
+                                        <label className="col-form-label">
+                                            Alignment:{' '}
+                                            <InfoTip
+                                                id="alignment"
+                                                text="How the gall is positioned relative to the host substrate."
+                                            />
+                                        </label>
+                                        {makeFormInput(
+                                            'alignment',
+                                            props.alignments.map((a) => a.alignment),
+                                        )}
+                                    </Col>
+                                    <Col xs={12} sm={6} md={3}>
+                                        <label className="col-form-label">
+                                            Form: <InfoTip id="form" text="The overall form of the gall." />
+                                        </label>
+                                        {makeFormInput(
+                                            'form',
+                                            props.forms.map((c) => c.form),
+                                        )}
+                                    </Col>
+                                </Row>
+                                <Row>
+                                    <Col xs={12} sm={6} md={3}>
+                                        <label className="col-form-label">
+                                            Walls:{' '}
+                                            <InfoTip
+                                                id="walls"
+                                                text="What the walls between the outside and the inside of the gall are like."
+                                            />
+                                        </label>
+                                        {makeFormInput(
+                                            'walls',
+                                            props.walls.map((w) => w.walls),
+                                        )}
+                                    </Col>
+                                    <Col xs={12} sm={6} md={3}>
+                                        <label className="col-form-label">
+                                            Cells:{' '}
+                                            <InfoTip id="cells" text="The number of internal chambers that the gall contains." />
+                                        </label>
+                                        {makeFormInput(
+                                            'cells',
+                                            props.cells.map((c) => c.cells),
+                                        )}
+                                    </Col>
+                                    <Col xs={12} sm={6} md={3}>
+                                        <label className="col-form-label">
+                                            Shape: <InfoTip id="shape" text="The overall shape of the gall." />
+                                        </label>
+                                        {makeFormInput(
+                                            'shape',
+                                            props.shapes.map((s) => s.shape),
+                                        )}
+                                    </Col>
+                                    <Col xs={12} sm={6} md={3}>
+                                        <label className="col-form-label">
+                                            Color: <InfoTip id="color" text="The outside color of the gall." />
+                                        </label>
+                                        {makeFormInput(
+                                            'color',
+                                            props.colors.map((c) => c.color),
+                                        )}
+                                    </Col>
+                                    <Col xs={12} sm={6} md={3}>
+                                        <label className="col-form-label">
+                                            Only Undescribed: <InfoTip id="undescribed" text="Show only undescribed galls." />
+                                        </label>
+                                        <Controller
+                                            control={filterControl}
+                                            name="undescribed"
+                                            render={({ field: { ref } }) => (
+                                                <input
+                                                    ref={ref}
+                                                    type="checkbox"
+                                                    className="form-input-checkbox"
+                                                    checked={!!query && query.undescribed}
+                                                    onChange={(selected) => {
+                                                        setQuery({
+                                                            ...(query ? query : EMPTYSEARCHQUERY),
+                                                            undescribed: selected.currentTarget.checked,
+                                                        });
+                                                    }}
+                                                />
+                                            )}
+                                        />
+                                    </Col>
+                                </Row>
                             </Col>
                         </Row>
                     </form>
@@ -645,6 +716,8 @@ const queryUrlParams = [
     'shape',
     'cells',
     'season',
+    'form',
+    'undescribed',
 ];
 
 // Ideally we would generate this page and serve it statically via getStaticProps and use Incremental Static Regeneration.
@@ -696,6 +769,12 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
               shape: pipe(query['shape'], O.fold(constant([]), split)),
               textures: pipe(query['textures'], O.fold(constant([]), split)),
               walls: pipe(query['walls'], O.fold(constant([]), split)),
+              form: pipe(query['form'], O.fold(constant([]), split)),
+              undescribed: pipe(
+                  query['undescribed'],
+                  O.map((u) => u === 'true'),
+                  O.getOrElse(constFalse),
+              ),
           }
         : null;
 
@@ -707,6 +786,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     const alignments = await mightFailWithArray<AlignmentApi>()(getAlignments());
     const walls = await mightFailWithArray<WallsApi>()(getWalls());
     const cells = await mightFailWithArray<CellsApi>()(getCells());
+    const forms = await mightFailWithArray<FormApi>()(getForms());
 
     return {
         props: {
@@ -722,6 +802,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             alignments: alignments,
             walls: walls,
             cells: cells,
+            forms: forms,
         },
     };
 };

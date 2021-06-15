@@ -30,7 +30,7 @@ export const adaptAbundance = (a: abundance): AbundanceApi => ({
     reference: O.of(a.abundance),
 });
 
-export const abundances = (): TE.TaskEither<Error, AbundanceApi[]> => {
+export const getAbundances = (): TE.TaskEither<Error, AbundanceApi[]> => {
     const abundances = () =>
         db.abundance.findMany({
             orderBy: {

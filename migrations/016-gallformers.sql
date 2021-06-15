@@ -2,6 +2,33 @@
 
 PRAGMA foreign_keys=OFF;
 
+-- the texture and location mapping tables are missing a CASCADE DELETE, add them
+CREATE TABLE galltexture__ (
+    gall_id    INTEGER NOT NULL,
+    texture_id INTEGER NOT NULL,
+    FOREIGN KEY (gall_id) REFERENCES gall (id) ON DELETE CASCADE,
+    FOREIGN KEY (texture_id) REFERENCES texture (id) ON DELETE CASCADE,
+    PRIMARY KEY (gall_id, texture_id)
+);
+INSERT INTO galltexture__ (gall_id, texture_id)
+    SELECT gall_id, texture_id 
+    FROM galltexture;
+DROP TABLE galltexture;
+ALTER TABLE galltexture__ RENAME TO galltexture;
+
+CREATE TABLE galllocation__ (
+    gall_id     INTEGER NOT NULL,
+    location_id INTEGER NOT NULL,
+    FOREIGN KEY (gall_id) REFERENCES gall (id) ON DELETE CASCADE,
+    FOREIGN KEY (location_id) REFERENCES location (id) ON DELETE CASCADE,
+    PRIMARY KEY (gall_id, location_id)
+);
+INSERT INTO galllocation__ (gall_id, location_id)
+    SELECT gall_id, location_id 
+    FROM galllocation;
+DROP TABLE galllocation;
+ALTER TABLE galllocation__ RENAME TO galllocation;
+
 -- add Gall Form metadata for #160
 CREATE TABLE form (
     id          INTEGER PRIMARY KEY
@@ -18,6 +45,8 @@ CREATE TABLE gallform (
     FOREIGN KEY (gall_id) REFERENCES gall (id) ON DELETE CASCADE,
     FOREIGN KEY (form_id) REFERENCES form (id) ON DELETE CASCADE
 );
+
+PRAGMA foreign_keys=ON;
 
 INSERT INTO form (id, form, description) VALUES (NULL, 'witches broom', 'A dense profusion of buds or shoots on woody plants.');
 INSERT INTO form (id, form, description) VALUES (NULL, 'leaf edge roll', 'A tight roll of tissue only at the edge of a leaf, of varying thickness.');
@@ -45,7 +74,7 @@ UPDATE shape SET description = 'The gall is a narrow line in shape for much of i
 INSERT INTO shape (id, shape, description) VALUES (NULL, 'hemispherical', 'Perfectly round or nearly so, but only in one half of a full sphere (often divided by a leaf)');
 INSERT INTO shape (id, shape, description) VALUES (NULL,  'cluster', 'Individual galls nearly always found in numbers, often pressing together and flattening against each other.');
 INSERT INTO shape (id, shape, description) VALUES (NULL,  'rosette', 'A layered bunch of leaves or similar.'); 
-INSERT INTO shape (id, shape, description) VALUES (NULL,  'numerous' 'Typically found in large numbers (>10) scattered across every leaf or other plant part on which they occur, but not clustered together.');
+INSERT INTO shape (id, shape, description) VALUES (NULL,  'numerous', 'Typically found in large numbers (>10) scattered across every leaf or other plant part on which they occur, but not clustered together.');
 INSERT INTO shape (id, shape, description) VALUES (NULL, 'spangle', 'A flat, circular disc-like structure. Often with a central umbo.');
 INSERT INTO shape (id, shape, description) VALUES (NULL, 'cup', 'A circular structure with walls enclosing a volume, open from above.');
 DELETE FROM shape where shape IN ('compact');
@@ -65,7 +94,7 @@ UPDATE texture SET description = 'The gall is surrounded by or composed of a pro
 UPDATE texture SET description = 'Multiple colors on the surface of the gall mix irregularly.' WHERE texture = 'mottled';
 UPDATE texture SET description = 'The surface of the gall is covered in dots, often red, that secrete sticky resin.' WHERE texture = 'resinous dots';
 UPDATE texture SET description = 'The gall is covered in sharp spines, prickles, etc.' WHERE texture = 'spiky/thorny';
-UPDATE texture SET description = 'The walls of the gall (when fresh) are juicy if cut.' WHERE texture = 'succulent');
+UPDATE texture SET description = 'The walls of the gall (when fresh) are juicy if cut.' WHERE texture = 'succulent';
 UPDATE texture SET description = 'Covered in a whitish layer of fine powder or wax that can be easily rubbed off.' WHERE texture = 'glaucous';
 UPDATE texture SET description = 'Galls releasing sugary solution. Often visible as a shiny wetness, but can be more apparent in the ants and wasps it attracts.', texture = 'honeydew' WHERE texture = 'sticky'; 
 UPDATE texture SET description = 'The gall is hard and incompressable to the touch, generally because they are woody, thick-walled, but sometimes with an almost plastic-like texture.' WHERE texture = 'stiff';
@@ -85,6 +114,14 @@ INSERT INTO gallshape (gall_id, shape_id)
           INNER JOIN
           cells AS c ON c.id = gc.cells_id
     WHERE c.cells = 'cluster';
+-- remap cells:scattered to the new shape:numerous
+INSERT INTO gallshape (gall_id, shape_id)
+  SELECT gall_id, s.id
+    FROM gallcells AS gc
+          INNER JOIN
+          cells AS c ON c.id = gc.cells_id
+          JOIN shape as s
+    WHERE c.cells = 'scattered' AND s.shape = 'numerous';
 DELETE FROM cells where cells IN ('scattered', 'cluster');
 
 -- walls
@@ -101,8 +138,6 @@ UPDATE alignment SET description = 'The gall stands at nearly 90 degrees from th
 UPDATE alignment SET description = 'The gall is integral with the surface it is attached to. It may not be flat, but it does not protrude out from the surface leaving an angled gap. Includes nearly all non-detachable galls.' WHERE alignment = 'integral';
 UPDATE alignment SET description = 'The gall is only attached at its base but lays nearly flat along the surface it is attached to for most of its length.' WHERE alignment = 'supine';
 UPDATE alignment SET description = 'The gall may have any alignment, but its tip is conspicuously curved toward the ground from whatever the primary orientation of the gall is.' WHERE alignment = 'drooping';
-
-PRAGMA foreign_keys=ON;
 
 --------------------------------------------------------------
 -- Down
