@@ -11,7 +11,7 @@ import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
 import Typeahead from '../../components/Typeahead';
 import useAdmin from '../../hooks/useadmin';
-import useSpecies, { SpeciesFormFields, SpeciesProps } from '../../hooks/useSpecies';
+import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '../../hooks/useSpecies';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { AbundanceApi, HostApi, HostTaxon, HOST_FAMILY_TYPES, SpeciesUpsertFields } from '../../libs/api/apitypes';
 import { FAMILY, TaxonomyEntry, TaxonomyEntryNoParent } from '../../libs/api/taxonomy';
@@ -19,7 +19,7 @@ import { allHosts } from '../../libs/db/host';
 import { getAbundances } from '../../libs/db/species';
 import { allFamilies, allGenera, allSections } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
-import { mightFailWithArray } from '../../libs/utils/util';
+import { mightFailWithArray, SPECIES_NAME_REGEX } from '../../libs/utils/util';
 
 type Props = SpeciesProps & {
     hs: HostApi[];
@@ -31,11 +31,7 @@ const schema = yup.object().shape({
         .array()
         .of(
             yup.object({
-                name: yup
-                    .string()
-                    // maybe? add this back but allow select punctuation in species name?
-                    // .matches(/([A-Z][a-z]+ [a-z]+$)/)
-                    .required(),
+                name: yup.string().matches(SPECIES_NAME_REGEX).required(),
             }),
         )
         .min(1)
@@ -152,7 +148,10 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                 <Row className="form-group">
                     <Col>
                         <Row>
-                            <Col xs={8}>Name (binomial):</Col>
+                            <Col xs={8}>
+                                Name (binomial):
+                                <SpeciesNamingHelp />
+                            </Col>
                         </Row>
                         <Row>
                             <Col>{mainField('name', 'Host')}</Col>

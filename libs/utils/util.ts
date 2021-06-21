@@ -51,15 +51,17 @@ export function randInt(min: number, max: number): number {
  * This is used to bridge the FP world TaskEithers into Promises while consistently handling failures.
  * @param s
  */
-export const mightFail = <T>(defaultT: () => T) => async <S extends TE.TaskEither<Error, T>>(s: S): Promise<T> => {
-    return pipe(
-        s,
-        TE.getOrElse((e) => {
-            logger.error(e);
-            return T.of(defaultT());
-        }),
-    )();
-};
+export const mightFail =
+    <T>(defaultT: () => T) =>
+    async <S extends TE.TaskEither<Error, T>>(s: S): Promise<T> => {
+        return pipe(
+            s,
+            TE.getOrElse((e) => {
+                logger.error(e);
+                return T.of(defaultT());
+            }),
+        )();
+    };
 
 export const mightFailWithArray = <T>(): (<S extends TE.TaskEither<Error, Array<T>>>(s: S) => Promise<Array<T>>) =>
     mightFail(constant(new Array<T>()));
@@ -97,13 +99,15 @@ export function handleError(e: unknown): Error {
  * If the given text is longer than the passed in len then truncate the text and add ... and return.
  * @param words the number of words at which to truncate and add ...
  */
-export const truncateAtWord = (words: number) => (s: string): string => {
-    if (s.length > words) {
-        return s.split(' ').splice(0, 40).join(' ') + '...';
-    } else {
-        return s;
-    }
-};
+export const truncateAtWord =
+    (words: number) =>
+    (s: string): string => {
+        if (s.length > words) {
+            return s.split(' ').splice(0, 40).join(' ') + '...';
+        } else {
+            return s;
+        }
+    };
 
 const doToFirstLetter = (s: string | undefined, capitalize: boolean): string => {
     if (s == undefined || s.length < 1) return '';
@@ -163,3 +167,5 @@ export const extractGenus = (n: string): string => {
 };
 
 export const sessionUserOrUnknown = (user: string | null | undefined): string => (user ? user : 'UNKNOWN!');
+
+export const SPECIES_NAME_REGEX = /(^[A-Z][a-z]+ (x|X)?\s?[a-z-]+\s?(\(.+\)\s*)*$)/;

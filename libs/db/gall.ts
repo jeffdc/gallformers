@@ -588,7 +588,7 @@ export const getCells = (): TaskEither<Error, CellsApi[]> => {
     return pipe(TE.tryCatch(cells, handleError), TE.map(adaptCells));
 };
 
-const adaptForm = (form: fs[]): FormApi[] =>
+const adaptForm = (form: form[]): FormApi[] =>
     form.map((c) => ({
         ...c,
         description: O.fromNullable(c.description),

@@ -11,7 +11,7 @@ import AliasTable from '../../components/aliastable';
 import Typeahead from '../../components/Typeahead';
 import UndescribedFlow, { UndescribedData } from '../../components/UndescribedFlow';
 import useAdmin from '../../hooks/useadmin';
-import useSpecies, { SpeciesFormFields, SpeciesProps } from '../../hooks/useSpecies';
+import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '../../hooks/useSpecies';
 import { extractQueryParam } from '../../libs/api/apipage';
 import * as AT from '../../libs/api/apitypes';
 import { FAMILY, GENUS, TaxonomyEntry } from '../../libs/api/taxonomy';
@@ -31,7 +31,7 @@ import { allHostsSimple } from '../../libs/db/host';
 import { getAbundances } from '../../libs/db/species';
 import { allFamilies, allGenera } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
-import { hasProp, mightFailWithArray } from '../../libs/utils/util';
+import { hasProp, mightFailWithArray, SPECIES_NAME_REGEX } from '../../libs/utils/util';
 
 type Props = SpeciesProps & {
     gs: AT.GallApi[];
@@ -52,11 +52,7 @@ const schema = yup.object().shape({
         .array()
         .of(
             yup.object({
-                name: yup
-                    .string()
-                    // maybe? add this back but allow select punctuation in species name?
-                    // .matches(/([A-Z][a-z]+ [a-z]+$)/)
-                    .required(),
+                name: yup.string().matches(SPECIES_NAME_REGEX).required(),
             }),
         )
         .min(1)
@@ -312,63 +308,7 @@ const Gall = ({
                         <Row>
                             <Col xs={8}>
                                 Name (binomial):
-                                <OverlayTrigger
-                                    placement="auto"
-                                    trigger="click"
-                                    rootClose
-                                    overlay={
-                                        <Popover id="help">
-                                            <Popover.Title>Naming Gallformers</Popover.Title>
-                                            <Popover.Content>
-                                                <p>
-                                                    All gallformers must have a name that is in the standard binomial form{' '}
-                                                    <mark>
-                                                        <i>Genus species</i>
-                                                    </mark>
-                                                    . Optionally you can also differeniate between forms of the species by adding
-                                                    one or two additional elements to the name.
-                                                </p>
-                                                <p>
-                                                    For wasps it is useful to break out the sexual vs agamic generations. To do
-                                                    this create a name like:
-                                                    <br />
-                                                    <mark>
-                                                        <i>Genus species (agamic/sexgen)</i>
-                                                    </mark>
-                                                    <br />
-                                                    choosing either agamic or sexgen as appropriate.
-                                                </p>
-                                                <p>
-                                                    For host variants name the gallformer like this:
-                                                    <br />
-                                                    <mark>
-                                                        <i>Genus species (agamic/sexgen) (host)</i>
-                                                    </mark>{' '}
-                                                    <br />
-                                                    The first parenthetical is optional. Host should be shortened as follows:
-                                                    <i>
-                                                        <mark>Quercus bicolor</mark>
-                                                    </i>{' '}
-                                                    becomes{' '}
-                                                    <i>
-                                                        <mark>q-bicolor</mark>
-                                                    </i>
-                                                </p>
-                                                <p>
-                                                    A full example:
-                                                    <br />
-                                                    <i>
-                                                        <mark>Neuroterus quercusbatatus (agamic) (q-bicolor)</mark>
-                                                    </i>
-                                                </p>
-                                            </Popover.Content>
-                                        </Popover>
-                                    }
-                                >
-                                    <Badge variant="info" className="m-1 larger">
-                                        ?
-                                    </Badge>
-                                </OverlayTrigger>
+                                <SpeciesNamingHelp />
                             </Col>
                         </Row>
                         <Row>

@@ -1,5 +1,5 @@
 import { abundance, Prisma, PrismaPromise, species } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function';
+import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { AbundanceApi, SimpleSpecies, SpeciesUpsertFields } from '../api/apitypes';
@@ -117,27 +117,38 @@ export const speciesCreateData = (sp: SpeciesUpsertFields) => ({
     },
     speciestaxonomy: {
         // the speciestaxonomy records will be new since the gall is new
-        create: {
-            taxonomy: {
-                // the genus might be new
-                connectOrCreate: {
-                    where: { id: sp.fgs.genus.id },
-                    create: {
-                        description: sp.fgs.genus.description,
-                        name: sp.fgs.genus.name,
-                        type: GENUS,
-                        parent: {
-                            connect: {
-                                id: sp.fgs.family.id,
+        // the genus and related
+        create: [
+            {
+                taxonomy: {
+                    // the genus might be new
+                    connectOrCreate: {
+                        where: { id: sp.fgs.genus.id },
+                        create: {
+                            description: sp.fgs.genus.description,
+                            name: sp.fgs.genus.name,
+                            type: GENUS,
+                            parent: {
+                                connect: {
+                                    id: sp.fgs.family.id,
+                                },
                             },
-                        },
-                        children: {
-                            create: { taxonomy_id: sp.fgs.family.id },
+                            children: {
+                                create: { taxonomy_id: sp.fgs.family.id },
+                            },
                         },
                     },
                 },
             },
-        },
+            // handle section for hosts
+            pipe(
+                sp.fgs.section,
+                O.map((s) => ({ taxonomy: { connect: { id: s.id } } })),
+                O.getOrElseW(constant(null)),
+            ),
+        ].filter((i) => i),
+        // This filter is a hack to remove a possibly null section connect. Prisma craps out otherwise and there is no way
+        // that I can find to optionally connect records.
     },
 });
 
