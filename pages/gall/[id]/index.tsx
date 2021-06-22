@@ -6,7 +6,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
-import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
+import { Button, Col, Container, OverlayTrigger, Row, Tooltip, Alert } from 'react-bootstrap';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
@@ -43,6 +43,7 @@ const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
 
 const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
     const [selectedSource, setSelectedSource] = useState(defaultSource(species?.speciessource));
+    const [notesAlertShown, setNotesAlertShown] = useState(true);
 
     const router = useRouter();
     // If the page is not yet generated, this will be displayed initially until getStaticProps() finishes running
@@ -55,6 +56,8 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
     // the hosts will not be sorted, so sort them for display
     species.hosts.sort((a, b) => a.name.localeCompare(b.name));
     const hostLinker = hostAsLink(species.hosts.length);
+
+    const notesSpeciesSource = species.speciessource?.find((s) => s.source?.id === 58);
 
     return (
         <Container className="pt-2 fluid">
@@ -188,6 +191,24 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                     <Row>
                         <Col>
                             <hr />
+                        </Col>
+                    </Row>
+                    <Row hidden={
+                        !notesAlertShown ||
+                        !(notesSpeciesSource && notesSpeciesSource.id !== selectedSource?.id)
+                    }>
+                        <Col id="notes-reminder">
+                            <Alert variant="info" dismissible onClose={() => setNotesAlertShown(false)}>
+                                Our ID notes may have important information about the taxanomic status and ID issues for this gall.
+                                <Button
+                                    className="ml-3"
+                                    variant="outline-info"
+                                    size="sm"
+                                    onClick={() => setSelectedSource(notesSpeciesSource)}
+                                >
+                                    Show notes
+                                </Button>
+                            </Alert>
                         </Col>
                     </Row>
                     <Row>
