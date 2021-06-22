@@ -70,6 +70,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                     lastchangedby: sessionUserOrUnknown(session?.user?.name),
                     speciesid: id,
                     default: false,
+                    caption: '',
                     small: '',
                     medium: '',
                     large: '',

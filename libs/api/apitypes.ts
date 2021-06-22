@@ -445,6 +445,7 @@ export type ImageApi = {
     source: Option<SourceWithSpeciesSourceApi>;
     uploader: string;
     lastchangedby: string;
+    caption: string;
     speciesid: number;
     default: boolean;
     small: string;

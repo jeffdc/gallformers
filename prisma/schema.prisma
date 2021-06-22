@@ -189,6 +189,7 @@ model image {
   licenselink   String
   uploader      String
   lastchangedby String
+  caption       String
   source        source? @relation(fields: [source_id], references: [id])
   species       species @relation(fields: [species_id], references: [id])
 }

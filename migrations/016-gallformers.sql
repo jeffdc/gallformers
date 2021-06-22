@@ -139,6 +139,9 @@ UPDATE alignment SET description = 'The gall is integral with the surface it is 
 UPDATE alignment SET description = 'The gall is only attached at its base but lays nearly flat along the surface it is attached to for most of its length.' WHERE alignment = 'supine';
 UPDATE alignment SET description = 'The gall may have any alignment, but its tip is conspicuously curved toward the ground from whatever the primary orientation of the gall is.' WHERE alignment = 'drooping';
 
+-- for #154 add caption for images
+ALTER TABLE image ADD COLUMN caption TEXT DEFAULT '';
+
 --------------------------------------------------------------
 -- Down
 PRAGMA foreign_keys=OFF;

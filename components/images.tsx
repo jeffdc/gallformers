@@ -68,6 +68,7 @@ const Images = ({ species }: Props): JSX.Element => {
                                     objectFit={'contain'}
                                     className="d-block"
                                 />
+                                <p>{image.caption}</p>
                                 {image.sourcelink != undefined && image.sourcelink !== '' && (
                                     <a href={image.sourcelink} target="_blank" rel="noreferrer">
                                         Link to Original
