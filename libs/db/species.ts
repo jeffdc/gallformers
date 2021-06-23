@@ -130,7 +130,7 @@ export const speciesCreateData = (sp: SpeciesUpsertFields) => {
     });
 
     // handle section for hosts
-    // This is a hack to deal with the fact that a Secion may not be presen. Prisma craps out if you pass an empty element
+    // This is a hack to deal with the fact that a Section may not be present. Prisma craps out if you pass an empty element
     // and I can find no way to optionally connect records.
     pipe(
         sp.fgs.section,

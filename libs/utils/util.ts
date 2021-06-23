@@ -168,4 +168,24 @@ export const extractGenus = (n: string): string => {
 
 export const sessionUserOrUnknown = (user: string | null | undefined): string => (user ? user : 'UNKNOWN!');
 
+/**
+ * These are all valid names:
+ * Foo bar
+ * Foo bar-baz
+ * Foo bar-baz-boo
+ * Foo bar-baz (boo)
+ * Foo bar-baz (boo) (boo)
+ * Foo x bar
+ * Foo x bar-baz
+ * Foo x bar-baz (boo)
+ * Foo x bar-baz (boo) (boo)
+ *
+ * These are not:
+ * Foo s bar
+ * Foo bar agamic
+ * foo bar
+ * F bar
+ *  Foo bar <-- note leading space on this one
+ *
+ */
 export const SPECIES_NAME_REGEX = /(^[A-Z][a-z]+ (x|X)?\s?[a-z-]+\s?(\(.+\)\s*)*$)/;

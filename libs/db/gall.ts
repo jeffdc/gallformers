@@ -595,7 +595,7 @@ const adaptForm = (form: form[]): FormApi[] =>
     }));
 
 /**
- * Fetches all gall cells
+ * Fetches all gall forms
  */
 export const getForms = (): TaskEither<Error, FormApi[]> => {
     const form = () =>
