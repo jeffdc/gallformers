@@ -47,7 +47,7 @@ CREATE TABLE gallform (
 );
 
 PRAGMA foreign_keys=ON;
-
+INSERT INTO form (id, form, description) VALUES (NULL, 'non-gall', 'Any gall-adjacent plant symptom or other structure that doesn’t meet the definition of a gall: a novel element of a plant caused by an organism living within the plant. Examples of non-galls include scale insects; leaf curl, spots, or blisters caused by pathogens or external herbivores; and stem swellings caused by miners or borers lacking internal cells. ');
 INSERT INTO form (id, form, description) VALUES (NULL, 'witches broom', 'A dense profusion of buds or shoots on woody plants.');
 INSERT INTO form (id, form, description) VALUES (NULL, 'leaf edge roll', 'A tight roll of tissue only at the edge of a leaf, of varying thickness.');
 INSERT INTO form (id, form, description) VALUES (NULL, 'leaf curl', 'Broad deformation of the lamina of a leaf, pulling the edges in. Typically irregular and sometimes causing entire leaves to roll up. Often accompanied by discoloration.');
