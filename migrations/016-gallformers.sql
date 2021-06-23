@@ -31,19 +31,17 @@ ALTER TABLE galllocation__ RENAME TO galllocation;
 
 -- add Gall Form metadata for #160
 CREATE TABLE form (
-    id          INTEGER PRIMARY KEY
-                        NOT NULL,
-    form        TEXT    UNIQUE
-                        NOT NULL,
+    id          INTEGER PRIMARY KEY NOT NULL,
+    form        TEXT    UNIQUE NOT NULL,
     description TEXT
 );
 
 CREATE TABLE gallform (
-    id       INTEGER PRIMARY KEY NOT NULL,
-    gall_id  INTEGER,
-    form_id INTEGER,
+    gall_id  INTEGER NOT NULL,
+    form_id INTEGER NOT NULL,
     FOREIGN KEY (gall_id) REFERENCES gall (id) ON DELETE CASCADE,
-    FOREIGN KEY (form_id) REFERENCES form (id) ON DELETE CASCADE
+    FOREIGN KEY (form_id) REFERENCES form (id) ON DELETE CASCADE,
+    PRIMARY KEY (gall_id, form_id)
 );
 
 PRAGMA foreign_keys=ON;
@@ -62,6 +60,23 @@ INSERT INTO form (id, form, description) VALUES (NULL, 'stem club', 'A substanti
 INSERT INTO form (id, form, description) VALUES (NULL, 'oak apple', 'A spherical or near-spherical gall with thin outer walls, a single central larval cell surrounded by either spongy tissue or fine radiating fibers.');
 INSERT INTO form (id, form, description) VALUES (NULL, 'leaf spot', 'A flat (never more than slightly thicker than the normal leaf), typically circular spot on the lamina of the leaf, sometimes with distinct rings of darker and lighter coloration (eye spots). Fungal leaf spots often have small dots above; midge spots have an exposed larva below.');
 INSERT INTO form (id, form, description) VALUES (NULL, 'pocket', 'A structure formed by pinching the leaf lamina together into a narrow opening (a point or line) and stretching it into various forms, from beads to sacks to spindles to long purses. The walls may or may not be thickened relative to the normal leaf.');
+
+-- map certain families to form:non-gall
+INSERT INTO gallform (gall_id, form_id) 
+    SELECT DISTINCT gs.gall_id, f.id
+      FROM species AS s
+           INNER JOIN
+           gallspecies as gs ON gs.species_id = s.id
+           INNER JOIN
+           speciestaxonomy AS st ON s.id = st.species_id
+           INNER JOIN
+           taxonomy AS t ON t.id = st.taxonomy_id
+           INNER JOIN
+           taxonomy as pt ON pt.id = t.parent_id
+           JOIN form as f      
+     WHERE pt.name IN ('Albuginaceae', 'Buprestidae', 'Cerambycidae', 'Cerococcidae', 'Cicadellidae', 'Closteroviridae', 'Coccidae', 'Diaspididae', 'Erysiphaceae', 'Kermesidae', 'Microstromataceae', 'Pucciniastraceae', 'Rhytismataceae', 'Sesiidae', 'Steingeliidae', 'Tombusviridae', 'Tortricidae')
+     AND f.form = 'non-gall';
+
 
 -- various changes for #160 updating descriptions, adding, remapping, deleting other gall metadata properties
 -- shape
@@ -98,7 +113,7 @@ UPDATE texture SET description = 'The walls of the gall (when fresh) are juicy i
 UPDATE texture SET description = 'Covered in a whitish layer of fine powder or wax that can be easily rubbed off.' WHERE texture = 'glaucous';
 UPDATE texture SET description = 'Galls releasing sugary solution. Often visible as a shiny wetness, but can be more apparent in the ants and wasps it attracts.', texture = 'honeydew' WHERE texture = 'sticky'; 
 UPDATE texture SET description = 'The gall is hard and incompressable to the touch, generally because they are woody, thick-walled, but sometimes with an almost plastic-like texture.' WHERE texture = 'stiff';
--- remap felt (1) to pubsecent (2)
+-- remap felt (1) to pubesecent (2)
 UPDATE galltexture SET texture_id = 2 WHERE texture_id = 1;
 DELETE FROM texture where texture IN ('felt', 'waxy');
 

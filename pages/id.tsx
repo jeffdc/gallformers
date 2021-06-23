@@ -449,11 +449,8 @@ const IDGall = (props: Props): JSX.Element => {
                                     control={filterControl}
                                     selected={query ? query.detachable : []}
                                     onChange={(selected) => {
-                                        if (!query) {
-                                            return;
-                                        }
                                         setQuery({
-                                            ...query,
+                                            ...(query ? query : EMPTYSEARCHQUERY),
                                             detachable: selected.length > 0 ? selected : [DetachableNone],
                                         });
                                     }}
