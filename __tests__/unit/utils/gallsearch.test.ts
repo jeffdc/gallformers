@@ -46,6 +46,7 @@ describe('checkGall tests', () => {
             galltexture: [],
             gallshape: [],
             gallwalls: [],
+            gallform: [],
         },
         hosts: [],
         id: 1,
@@ -72,6 +73,8 @@ describe('checkGall tests', () => {
         shape: [],
         textures: [],
         walls: [],
+        form: [],
+        undescribed: false,
     };
 
     // helper to create test galls in the tests.
