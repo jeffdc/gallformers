@@ -1,8 +1,16 @@
+import { GetStaticProps } from 'next';
 import Head from 'next/head';
 import React from 'react';
 import { Col, Row } from 'react-bootstrap';
+import { getCurrentStats, Stat } from '../libs/db/stats';
+import { mightFailWithArray } from '../libs/utils/util';
 
-export default function About(): JSX.Element {
+type Props = {
+    stats: Stat[];
+};
+
+const About = ({ stats }: Props): JSX.Element => {
+    const statMap = new Map(stats.map((s) => [s.type, s.count] as [string, number]));
     return (
         <div className="p-5">
             <Head>
@@ -30,6 +38,21 @@ export default function About(): JSX.Element {
                         This site is open source and you can view the all of the code/data and if so inclined even open a pull
                         request on <a href="https://github.com/jeffdc/gallformers">GitHub</a>.
                     </p>
+                    <p>
+                        <h4>Current Site Stats:</h4>
+                        There are currently
+                        <ul>
+                            <li>
+                                {statMap.get('galls')} gallformers across {statMap.get('gall-family')} familes and{' '}
+                                {statMap.get('gall-genera')} genera
+                            </li>
+                            <li>
+                                {statMap.get('hosts')} hosts across {statMap.get('host-family')} familes and{' '}
+                                {statMap.get('host-genera')} genera
+                            </li>
+                            <li>{statMap.get('sources')} sources</li>
+                        </ul>
+                    </p>
                 </Col>
                 <Col className="d-flex justify-content-center">
                     <img src="/images/gallmemaybe.jpg" alt="Gall Me Maybe" width={300} className="contain" />
@@ -42,4 +65,15 @@ export default function About(): JSX.Element {
             </Row>
         </div>
     );
-}
+};
+
+export const getStaticProps: GetStaticProps = async () => {
+    return {
+        props: {
+            stats: await mightFailWithArray<Stat>()(getCurrentStats()),
+        },
+        revalidate: 5 * 60, // every 5 minutes
+    };
+};
+
+export default About;
