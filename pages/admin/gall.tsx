@@ -11,7 +11,7 @@ import AliasTable from '../../components/aliastable';
 import Typeahead from '../../components/Typeahead';
 import UndescribedFlow, { UndescribedData } from '../../components/UndescribedFlow';
 import useAdmin from '../../hooks/useadmin';
-import useSpecies, { SpeciesFormFields, SpeciesProps } from '../../hooks/useSpecies';
+import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '../../hooks/useSpecies';
 import { extractQueryParam } from '../../libs/api/apipage';
 import * as AT from '../../libs/api/apitypes';
 import { FAMILY, GENUS, TaxonomyEntry } from '../../libs/api/taxonomy';
@@ -25,12 +25,13 @@ import {
     getShapes,
     getTextures,
     getWalls,
+    getForms,
 } from '../../libs/db/gall';
 import { allHostsSimple } from '../../libs/db/host';
-import { abundances } from '../../libs/db/species';
+import { getAbundances } from '../../libs/db/species';
 import { allFamilies, allGenera } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
-import { hasProp, mightFailWithArray } from '../../libs/utils/util';
+import { hasProp, mightFailWithArray, SPECIES_NAME_REGEX } from '../../libs/utils/util';
 
 type Props = SpeciesProps & {
     gs: AT.GallApi[];
@@ -43,6 +44,7 @@ type Props = SpeciesProps & {
     alignments: AT.AlignmentApi[];
     walls: AT.WallsApi[];
     cells: AT.CellsApi[];
+    forms: AT.FormApi[];
 };
 
 const schema = yup.object().shape({
@@ -50,11 +52,7 @@ const schema = yup.object().shape({
         .array()
         .of(
             yup.object({
-                name: yup
-                    .string()
-                    // maybe? add this back but allow select punctuation in species name?
-                    // .matches(/([A-Z][a-z]+ [a-z]+$)/)
-                    .required(),
+                name: yup.string().matches(SPECIES_NAME_REGEX).required(),
             }),
         )
         .min(1)
@@ -85,6 +83,7 @@ export type FormFields = SpeciesFormFields<AT.GallApi> & {
     seasons: AT.SeasonApi[];
     locations: AT.GallLocation[];
     textures: AT.GallTexture[];
+    forms: AT.FormApi[];
     undescribed: boolean;
 };
 
@@ -103,17 +102,12 @@ const Gall = ({
     abundances,
     families,
     genera,
+    forms,
 }: Props): JSX.Element => {
     const [showNewUndescribed, setShowNewUndescribed] = useState(false);
 
-    const {
-        renameSpecies,
-        createNewSpecies,
-        updatedSpeciesFormFields,
-        toSpeciesUpsertFields,
-        aliasData,
-        setAliasData,
-    } = useSpecies<AT.GallApi>(genera);
+    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields, aliasData, setAliasData } =
+        useSpecies<AT.GallApi>(genera);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): AT.GallUpsertFields => {
         if (!selected) {
@@ -136,6 +130,7 @@ const Gall = ({
             textures: fields.textures.map((t) => t.id),
             undescribed: fields.undescribed,
             walls: fields.walls.map((w) => w.id),
+            forms: fields.forms.map((f) => f.id),
         };
     };
 
@@ -156,6 +151,7 @@ const Gall = ({
                 textures: s.gall.galltexture,
                 undescribed: s.gall.undescribed,
                 walls: s.gall.gallwalls,
+                forms: s.gall.gallform,
             };
         }
 
@@ -172,6 +168,7 @@ const Gall = ({
             textures: [],
             undescribed: false,
             walls: [],
+            forms: [],
         };
     };
 
@@ -187,6 +184,7 @@ const Gall = ({
             gallshape: [],
             galltexture: [],
             gallwalls: [],
+            gallform: [],
             undescribed: false,
             id: -1,
         },
@@ -310,63 +308,7 @@ const Gall = ({
                         <Row>
                             <Col xs={8}>
                                 Name (binomial):
-                                <OverlayTrigger
-                                    placement="auto"
-                                    trigger="click"
-                                    rootClose
-                                    overlay={
-                                        <Popover id="help">
-                                            <Popover.Title>Naming Gallformers</Popover.Title>
-                                            <Popover.Content>
-                                                <p>
-                                                    All gallformers must have a name that is in the standard binomial form{' '}
-                                                    <mark>
-                                                        <i>Genus species</i>
-                                                    </mark>
-                                                    . Optionally you can also differeniate between forms of the species by adding
-                                                    one or two additional elements to the name.
-                                                </p>
-                                                <p>
-                                                    For wasps it is useful to break out the sexual vs agamic generations. To do
-                                                    this create a name like:
-                                                    <br />
-                                                    <mark>
-                                                        <i>Genus species (agamic/sexgen)</i>
-                                                    </mark>
-                                                    <br />
-                                                    choosing either agamic or sexgen as appropriate.
-                                                </p>
-                                                <p>
-                                                    For host variants name the gallformer like this:
-                                                    <br />
-                                                    <mark>
-                                                        <i>Genus species (agamic/sexgen) (host)</i>
-                                                    </mark>{' '}
-                                                    <br />
-                                                    The first parenthetical is optional. Host should be shortened as follows:
-                                                    <i>
-                                                        <mark>Quercus bicolor</mark>
-                                                    </i>{' '}
-                                                    becomes{' '}
-                                                    <i>
-                                                        <mark>q-bicolor</mark>
-                                                    </i>
-                                                </p>
-                                                <p>
-                                                    A full example:
-                                                    <br />
-                                                    <i>
-                                                        <mark>Neuroterus quercusbatatus (agamic) (q-bicolor)</mark>
-                                                    </i>
-                                                </p>
-                                            </Popover.Content>
-                                        </Popover>
-                                    }
-                                >
-                                    <Badge variant="info" className="m-1 larger">
-                                        ?
-                                    </Badge>
-                                </OverlayTrigger>
+                                <SpeciesNamingHelp />
                             </Col>
                         </Row>
                         <Row>
@@ -410,10 +352,12 @@ const Gall = ({
                             placeholder="Family"
                             options={families}
                             labelKey="name"
-                            selected={selected?.fgs?.family ? [selected.fgs.family] : []}
-                            disabled={selected && selected.id > 0}
+                            selected={selected?.fgs?.family && selected.fgs.family.id >= 0 ? [selected.fgs.family] : []}
+                            disabled={(selected && selected.id > 0) || !selected}
                             onChange={(f) => {
-                                if (f && f.length > 0 && selected) {
+                                if (!selected) return;
+
+                                if (f && f.length > 0) {
                                     // handle the case when a new species is created
                                     // either the genus is new or is not
                                     const genus = genera.find((gg) => gg.id === selected.fgs.genus.id);
@@ -425,7 +369,7 @@ const Gall = ({
                                         selected.fgs = { ...selected.fgs, family: f[0] };
                                         setSelected({ ...selected });
                                     }
-                                } else if (selected) {
+                                } else {
                                     selected.fgs = {
                                         ...selected.fgs,
                                         family: { name: '', description: '', id: -1, type: FAMILY },
@@ -478,6 +422,7 @@ const Gall = ({
                             options={hosts}
                             labelKey="name"
                             multiple
+                            disabled={!selected}
                             selected={selected ? selected.hosts : []}
                             onChange={(h) => {
                                 if (selected) {
@@ -510,6 +455,7 @@ const Gall = ({
                                     }}
                                     placeholder="Detachable"
                                     className="form-control"
+                                    disabled={!selected}
                                 >
                                     {AT.Detachables.map((d) => (
                                         <option key={d.id}>{d.value}</option>
@@ -527,6 +473,7 @@ const Gall = ({
                             labelKey="walls"
                             multiple
                             clearButton
+                            disabled={!selected}
                             selected={selected ? selected.gall.gallwalls : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -545,6 +492,7 @@ const Gall = ({
                             labelKey="cells"
                             multiple
                             clearButton
+                            disabled={!selected}
                             selected={selected ? selected.gall.gallcells : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -563,6 +511,7 @@ const Gall = ({
                             labelKey="alignment"
                             multiple
                             clearButton
+                            disabled={!selected}
                             selected={selected ? selected.gall.gallalignment : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -583,6 +532,7 @@ const Gall = ({
                             labelKey="color"
                             multiple
                             clearButton
+                            disabled={!selected}
                             selected={selected ? selected.gall.gallcolor : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -601,6 +551,7 @@ const Gall = ({
                             labelKey="shape"
                             multiple
                             clearButton
+                            disabled={!selected}
                             selected={selected ? selected.gall.gallshape : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -619,10 +570,30 @@ const Gall = ({
                             labelKey="season"
                             multiple
                             clearButton
+                            disabled={!selected}
                             selected={selected ? selected.gall.gallseason : []}
                             onChange={(w) => {
                                 if (selected) {
                                     selected.gall.gallseason = w;
+                                    setSelected({ ...selected });
+                                }
+                            }}
+                        />
+                    </Col>
+                    <Col>
+                        Form(s):
+                        <Typeahead
+                            name="forms"
+                            control={form.control}
+                            options={forms}
+                            labelKey="form"
+                            multiple
+                            clearButton
+                            disabled={!selected}
+                            selected={selected ? selected.gall.gallform : []}
+                            onChange={(w) => {
+                                if (selected) {
+                                    selected.gall.gallform = w;
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -639,6 +610,7 @@ const Gall = ({
                             labelKey="loc"
                             multiple
                             clearButton
+                            disabled={!selected}
                             selected={selected ? selected.gall.galllocation : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -657,6 +629,7 @@ const Gall = ({
                             labelKey="tex"
                             multiple
                             clearButton
+                            disabled={!selected}
                             selected={selected ? selected.gall.galltexture : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -753,7 +726,8 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             alignments: await mightFailWithArray<AT.AlignmentApi>()(getAlignments()),
             walls: await mightFailWithArray<AT.WallsApi>()(getWalls()),
             cells: await mightFailWithArray<AT.CellsApi>()(getCells()),
-            abundances: await mightFailWithArray<AT.AbundanceApi>()(abundances()),
+            abundances: await mightFailWithArray<AT.AbundanceApi>()(getAbundances()),
+            forms: await mightFailWithArray<AT.FormApi>()(getForms()),
         },
     };
 };

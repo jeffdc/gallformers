@@ -40,6 +40,8 @@ const checkDetachable = (g: DetachableApi, q: DetachableApi): boolean => {
 };
 
 export const LEAF_ANYWHERE = 'leaf (anywhere)';
+export const GALL_FORM = 'gall';
+export const NONGALL_FORM = 'non-gall';
 
 export const checkGall = (g: GallApi, q: SearchQuery): boolean => {
     const alignment =
@@ -61,6 +63,17 @@ export const checkGall = (g: GallApi, q: SearchQuery): boolean => {
         location = dontCare(q.locations) || (!!g.gall.galllocation && checkLocations(g.gall.galllocation, q.locations));
     }
     const texture = dontCare(q.textures) || (!!g.gall.galltexture && checkTextures(g.gall.galltexture, q.textures));
+    let form = false;
+    if (q.form.find((f) => f === GALL_FORM)) {
+        const forms = q.form.filter((f) => f !== GALL_FORM);
+        // gall selected as a form, which means not not_gall form
+        form = !g.gall.gallform.find((f) => f.form === NONGALL_FORM);
+        form = form && (dontCare(forms) || (!!g.gall.gallform && checkArray(g.gall.gallform, (a, b) => a.form === b, forms)));
+    } else {
+        // gall not selected as a form so we can just do the usual check
+        form = dontCare(q.form) || (!!g.gall.gallform && checkArray(g.gall.gallform, (a, b) => a.form === b, q.form));
+    }
+    const undescribed = !q.undescribed || g.gall.undescribed;
 
-    return alignment && cells && color && season && detachable && shape && walls && location && texture;
+    return alignment && cells && color && season && detachable && shape && walls && location && texture && form && undescribed;
 };

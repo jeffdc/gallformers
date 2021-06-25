@@ -21,8 +21,8 @@ const Footer = (): JSX.Element => {
             <NavbarBrand>
                 {session && (
                     <img
-                        src={session.user.image == null ? undefined : session.user.image}
-                        alt={sessionUserOrUnknown(session.user.name)}
+                        src={session?.user?.image == null ? undefined : session.user.image}
+                        alt={sessionUserOrUnknown(session?.user?.name)}
                         width="25px"
                         height="25px"
                     />

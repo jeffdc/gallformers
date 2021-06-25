@@ -78,6 +78,8 @@ export type SearchQuery = {
     season: string[];
     shape: string[];
     cells: string[];
+    form: string[];
+    undescribed: boolean;
 };
 
 export const EMPTYSEARCHQUERY: SearchQuery = {
@@ -90,6 +92,8 @@ export const EMPTYSEARCHQUERY: SearchQuery = {
     shape: [],
     cells: [],
     season: [],
+    form: [],
+    undescribed: false,
 };
 
 export type Deletable = {
@@ -165,6 +169,7 @@ export type GallUpsertFields = SpeciesUpsertFields & {
     alignments: number[];
     walls: number[];
     cells: number[];
+    forms: number[];
     detachable: DetachableValues;
     undescribed: boolean;
 };
@@ -321,6 +326,17 @@ export const EmptyWalls: WallsApi = {
     description: O.none,
 };
 
+export type FormApi = {
+    id: number;
+    form: string;
+    description: Option<string>;
+};
+export const EmptyForm: FormApi = {
+    id: -1,
+    form: '',
+    description: O.none,
+};
+
 export type GallApi = SpeciesApi & {
     gall: {
         id: number;
@@ -333,6 +349,7 @@ export type GallApi = SpeciesApi & {
         gallwalls: WallsApi[];
         galltexture: GallTexture[];
         galllocation: GallLocation[];
+        gallform: FormApi[];
         undescribed: boolean;
     };
     hosts: GallHost[];
@@ -428,6 +445,7 @@ export type ImageApi = {
     source: Option<SourceWithSpeciesSourceApi>;
     uploader: string;
     lastchangedby: string;
+    caption: string;
     speciesid: number;
     default: boolean;
     small: string;

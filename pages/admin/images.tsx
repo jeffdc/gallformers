@@ -102,6 +102,11 @@ const columns: ColumnDescription[] = [
         text: 'attribution',
         sort: true,
     },
+    {
+        dataField: 'caption',
+        text: 'caption',
+        sort: true,
+    },
 ];
 
 const Images = ({ speciesid, species }: Props): JSX.Element => {
@@ -274,13 +279,14 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                         .filter((i) => selectedForCopy.has(i.id))
                         .map<ImageApi>((i) => ({
                             ...i,
-                            lastchangedby: sessionUserOrUnknown(session?.user.name),
+                            lastchangedby: sessionUserOrUnknown(session?.user?.name),
                             source: copySource.source,
                             sourcelink: copySource.sourcelink,
                             license: copySource.license,
                             licenselink: copySource.licenselink,
                             creator: copySource.creator,
                             attribution: copySource.attribution,
+                            caption: copySource.caption,
                         }))
                         .map((i) => saveImage(i)),
                 ).catch((e: unknown) => setError(`Failed to save changes. ${e}.`));

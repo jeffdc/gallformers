@@ -11,7 +11,7 @@ export default function Home(): JSX.Element {
                     </Col>
                 </Row>
                 <Row>
-                    <Col>The place to ID and learn about galls on plants.</Col>
+                    <Col>The place to ID and learn about galls on plants in the US and Canada.</Col>
                 </Row>
             </Container>
             <Container>
@@ -45,11 +45,23 @@ export default function Home(): JSX.Element {
                     <Col>
                         <Card>
                             <Card.Body>
-                            <Card.Title>Resources</Card.Title>
+                                <Card.Title>Resources</Card.Title>
                                 <ul>
-                                    <li><Link href="/guide">Our guide to gall identification.</Link></li>
-                                    <li><Link href="/filterguide">Detailed descriptions for our key filters.</Link></li>
-                                    <li><Link href="/glossary">Glossary for plant and insect terms.</Link></li>
+                                    <li>
+                                        <Link href="/guide">Our guide to gall identification.</Link>
+                                    </li>
+                                    <li>
+                                        <Link href="/filterguide">Detailed descriptions for our key filters.</Link>
+                                    </li>
+                                    <li>
+                                        <Link href="/glossary">Glossary for plant and insect terms.</Link>
+                                    </li>
+                                    <li>
+                                        To ID galls and other plant symptoms in Europe, visit{' '}
+                                        <a href="https://bladmineerders.nl/" target="_blank" rel="noreferrer">
+                                            bladmineerders.nl
+                                        </a>
+                                    </li>
                                 </ul>
                             </Card.Body>
                         </Card>
@@ -75,7 +87,7 @@ export default function Home(): JSX.Element {
                                         <a href="https://press.princeton.edu/books/paperback/9780691205762/plant-galls-of-the-western-united-states">
                                             Russo&apos;s guide to galls of the Western US
                                         </a>{' '}
-                                        is due from Princeton University Press in <del>March</del> April of 2021
+                                        was recently released by Princeton University Press.
                                     </li>
                                     <li>
                                         Some{' '}

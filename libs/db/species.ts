@@ -1,5 +1,5 @@
 import { abundance, Prisma, PrismaPromise, species } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function';
+import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { AbundanceApi, SimpleSpecies, SpeciesUpsertFields } from '../api/apitypes';
@@ -30,7 +30,7 @@ export const adaptAbundance = (a: abundance): AbundanceApi => ({
     reference: O.of(a.abundance),
 });
 
-export const abundances = (): TE.TaskEither<Error, AbundanceApi[]> => {
+export const getAbundances = (): TE.TaskEither<Error, AbundanceApi[]> => {
     const abundances = () =>
         db.abundance.findMany({
             orderBy: {
@@ -106,40 +106,53 @@ export const speciesUpdateData = (sp: SpeciesUpsertFields) => ({
 });
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export const speciesCreateData = (sp: SpeciesUpsertFields) => ({
-    abundance: connectIfNotNull<Prisma.abundanceCreateNestedOneWithoutSpeciesInput, string>('abundance', sp.abundance),
-    datacomplete: sp.datacomplete,
-    name: sp.name,
-    aliasspecies: {
-        create: sp.aliases.map((a) => ({
-            alias: { create: { description: a.description, name: a.name, type: a.type } },
-        })),
-    },
-    speciestaxonomy: {
-        // the speciestaxonomy records will be new since the gall is new
-        create: {
-            taxonomy: {
-                // the genus might be new
-                connectOrCreate: {
-                    where: { id: sp.fgs.genus.id },
-                    create: {
-                        description: sp.fgs.genus.description,
-                        name: sp.fgs.genus.name,
-                        type: GENUS,
-                        parent: {
-                            connect: {
-                                id: sp.fgs.family.id,
-                            },
+export const speciesCreateData = (sp: SpeciesUpsertFields) => {
+    const speciesTaxonomyCreates = new Array<Prisma.speciestaxonomyCreateWithoutSpeciesInput>({
+        taxonomy: {
+            // the genus might be new
+            connectOrCreate: {
+                where: { id: sp.fgs.genus.id },
+                create: {
+                    description: sp.fgs.genus.description,
+                    name: sp.fgs.genus.name,
+                    type: GENUS,
+                    parent: {
+                        connect: {
+                            id: sp.fgs.family.id,
                         },
-                        children: {
-                            create: { taxonomy_id: sp.fgs.family.id },
-                        },
+                    },
+                    children: {
+                        create: { taxonomy_id: sp.fgs.family.id },
                     },
                 },
             },
         },
-    },
-});
+    });
+
+    // handle section for hosts
+    // This is a hack to deal with the fact that a Section may not be present. Prisma craps out if you pass an empty element
+    // and I can find no way to optionally connect records.
+    pipe(
+        sp.fgs.section,
+        O.map((s) => speciesTaxonomyCreates.push({ taxonomy: { connect: { id: s.id } } })),
+    );
+
+    return {
+        abundance: connectIfNotNull<Prisma.abundanceCreateNestedOneWithoutSpeciesInput, string>('abundance', sp.abundance),
+        datacomplete: sp.datacomplete,
+        name: sp.name,
+        aliasspecies: {
+            create: sp.aliases.map((a) => ({
+                alias: { create: { description: a.description, name: a.name, type: a.type } },
+            })),
+        },
+        speciestaxonomy: {
+            // the speciestaxonomy records will be new since the gall is new
+            // the genus and related
+            create: speciesTaxonomyCreates,
+        },
+    };
+};
 
 export const speciesTaxonomyAdditionalUpdateSteps = (sp: SpeciesUpsertFields): PrismaPromise<unknown>[] => [
     // the genus could have been changed and might be new

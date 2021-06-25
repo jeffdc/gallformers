@@ -14,7 +14,81 @@ import {
 } from '../libs/api/apitypes';
 import { FAMILY, FGS, GENUS, TaxonomyEntry, TaxonomyEntryNoParent } from '../libs/api/taxonomy';
 import { extractGenus } from '../libs/utils/util';
-import { Dispatch, SetStateAction, useState } from 'react';
+import React, { Dispatch, SetStateAction, useState } from 'react';
+import { Badge, OverlayTrigger, Popover } from 'react-bootstrap';
+
+export const SpeciesNamingHelp = (): JSX.Element => (
+    <OverlayTrigger
+        placement="auto"
+        trigger="click"
+        rootClose
+        overlay={
+            <Popover id="help">
+                <Popover.Title>Naming Species</Popover.Title>
+                <Popover.Content>
+                    <p>
+                        All species must have a name that is in the standard binomial form{' '}
+                        <mark>
+                            <i>Genus species</i>
+                        </mark>
+                        . You can indicate hybrids by placing an &lsquo;x&rsquo; between the genus and the specific name. The
+                        specific name can contain zero or more dashes &lsquo;-&rsquo;.
+                    </p>
+                    <p>
+                        Optionally you can also differeniate between forms of the species by adding one or two additional elements
+                        to the name. These elements must be placed in parentheses and separated by spaces.
+                    </p>
+                    <p>
+                        For wasps it is useful to break out the sexual vs agamic generations. To do this create a name like:
+                        <br />
+                        <mark>
+                            <i>Genus species (agamic/sexgen)</i>
+                        </mark>
+                        <br />
+                        choosing either agamic or sexgen as appropriate.
+                    </p>
+                    <p>
+                        For host variants name the gallformer like this:
+                        <br />
+                        <mark>
+                            <i>Genus species (agamic/sexgen) (host)</i>
+                        </mark>{' '}
+                        <br />
+                        The first parenthetical is optional. Host should be shortened as follows:
+                        <i>
+                            <mark>Quercus bicolor</mark>
+                        </i>{' '}
+                        becomes{' '}
+                        <i>
+                            <mark>q-bicolor</mark>
+                        </i>
+                    </p>
+                    <p>Some examples:</p>
+                    <i>
+                        <ul>
+                            <li>
+                                <mark>Asimina triloba</mark>
+                            </li>
+                            <li>
+                                <mark>Neuroterus quercusbatatus (agamic) (q-bicolor)</mark>
+                            </li>
+                            <li>
+                                <mark>Quercus x leana</mark>
+                            </li>
+                            <li>
+                                <mark>Unknown p-integrifolium-erineum-blisters</mark>
+                            </li>
+                        </ul>
+                    </i>
+                </Popover.Content>
+            </Popover>
+        }
+    >
+        <Badge variant="info" className="m-1 larger">
+            ?
+        </Badge>
+    </OverlayTrigger>
+);
 
 export type SpeciesProps = {
     id: string;

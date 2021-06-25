@@ -11,15 +11,15 @@ import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
 import Typeahead from '../../components/Typeahead';
 import useAdmin from '../../hooks/useadmin';
-import useSpecies, { SpeciesFormFields, SpeciesProps } from '../../hooks/useSpecies';
+import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '../../hooks/useSpecies';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { AbundanceApi, HostApi, HostTaxon, HOST_FAMILY_TYPES, SpeciesUpsertFields } from '../../libs/api/apitypes';
 import { FAMILY, TaxonomyEntry, TaxonomyEntryNoParent } from '../../libs/api/taxonomy';
 import { allHosts } from '../../libs/db/host';
-import { abundances } from '../../libs/db/species';
+import { getAbundances } from '../../libs/db/species';
 import { allFamilies, allGenera, allSections } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
-import { mightFailWithArray } from '../../libs/utils/util';
+import { mightFailWithArray, SPECIES_NAME_REGEX } from '../../libs/utils/util';
 
 type Props = SpeciesProps & {
     hs: HostApi[];
@@ -31,11 +31,7 @@ const schema = yup.object().shape({
         .array()
         .of(
             yup.object({
-                name: yup
-                    .string()
-                    // maybe? add this back but allow select punctuation in species name?
-                    // .matches(/([A-Z][a-z]+ [a-z]+$)/)
-                    .required(),
+                name: yup.string().matches(SPECIES_NAME_REGEX).required(),
             }),
         )
         .min(1)
@@ -59,14 +55,8 @@ export const testables = {
 };
 
 const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.Element => {
-    const {
-        renameSpecies,
-        createNewSpecies,
-        updatedSpeciesFormFields,
-        toSpeciesUpsertFields,
-        aliasData,
-        setAliasData,
-    } = useSpecies<HostApi>(genera);
+    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields, aliasData, setAliasData } =
+        useSpecies<HostApi>(genera);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): SpeciesUpsertFields => {
         if (!selected) {
@@ -158,7 +148,10 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                 <Row className="form-group">
                     <Col>
                         <Row>
-                            <Col xs={8}>Name (binomial):</Col>
+                            <Col xs={8}>
+                                Name (binomial):
+                                <SpeciesNamingHelp />
+                            </Col>
                         </Row>
                         <Row>
                             <Col>{mainField('name', 'Host')}</Col>
@@ -201,10 +194,12 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                             placeholder="Family"
                             options={families}
                             labelKey="name"
-                            selected={selected?.fgs?.family ? [selected.fgs.family] : []}
+                            selected={selected?.fgs?.family && selected.fgs.family.id >= 0 ? [selected.fgs.family] : []}
                             disabled={selected && selected.id > 0}
                             onChange={(f) => {
-                                if (f && f.length > 0 && selected) {
+                                if (!selected) return;
+
+                                if (f && f.length > 0) {
                                     // handle the case when a new species is created
                                     // either the genus is new or is not
                                     const genus = genera.find((gg) => gg.id === selected.fgs.genus.id);
@@ -216,7 +211,7 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                                         selected.fgs = { ...selected.fgs, family: f[0] };
                                         setSelected({ ...selected });
                                     }
-                                } else if (selected) {
+                                } else {
                                     selected.fgs = {
                                         ...selected.fgs,
                                         family: { name: '', description: '', id: -1, type: FAMILY },
@@ -344,7 +339,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(HOST_FAMILY_TYPES)),
             genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon)),
             sections: await mightFailWithArray<TaxonomyEntry>()(allSections()),
-            abundances: await mightFailWithArray<AbundanceApi>()(abundances()),
+            abundances: await mightFailWithArray<AbundanceApi>()(getAbundances()),
         },
     };
 };

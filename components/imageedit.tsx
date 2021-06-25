@@ -50,6 +50,7 @@ type FormFields = {
     source: SourceWithSpeciesSourceApi[];
     license: LicenseType;
     licenselink: string;
+    caption: string;
 };
 
 const sourceFromOption = (so: O.Option<SourceWithSpeciesSourceApi>): SourceWithSpeciesSourceApi[] =>
@@ -104,6 +105,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
         setValue('license', selected.license as LicenseType);
         setValue('licenselink', selected.licenselink);
         setValue('source', sourceFromOption(selected.source));
+        setValue('caption', selected.caption);
     }, [selected, setValue]);
 
     useEffect(() => {
@@ -256,6 +258,15 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                 <Col>
                                     <textarea {...register('attribution')} className="form-control" />
                                     {errors.attribution && <span className="text-danger">{errors.attribution.message}</span>}
+                                </Col>
+                            </Row>
+                            <Row className="form-group">
+                                <Col xs={3}>
+                                    Caption:
+                                    <InfoTip id="caption" text="An optional caption to be displayed with the image." />
+                                </Col>
+                                <Col>
+                                    <textarea {...register('caption')} className="form-control" />
                                 </Col>
                             </Row>
                             <Row className="form-group">

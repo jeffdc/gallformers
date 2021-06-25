@@ -232,6 +232,18 @@ export const hostsByGenus = (genus: string): TaskEither<Error, HostApi[]> => {
 };
 
 /////////////////////////////////////////
+const upsertSection = (host: SpeciesUpsertFields) => {
+    return pipe(
+        host.fgs.section,
+        O.map((s) =>
+            db.speciestaxonomy.create({
+                data: { species_id: host.id, taxonomy_id: s.id },
+            }),
+        ),
+        O.getOrElseW(constant(db.speciestaxonomy.count({ where: { species_id: -1 } }))),
+    );
+};
+
 const hostUpdateSteps = (host: SpeciesUpsertFields): PrismaPromise<unknown>[] => {
     return [
         db.species.update({
@@ -246,25 +258,19 @@ const hostUpdateSteps = (host: SpeciesUpsertFields): PrismaPromise<unknown>[] =>
             where: { AND: [{ species_id: host.id }, { taxonomy: { type: { equals: SECTION } } }] },
         }),
         // deal with a possible change to Section, added, changed, deleted
-        pipe(
-            host.fgs.section,
-            O.map((s) =>
-                db.speciestaxonomy.create({
-                    data: { species_id: host.id, taxonomy_id: s.id },
-                }),
-            ),
-            O.getOrElseW(constant(db.speciestaxonomy.count({ where: { species_id: -1 } }))),
-        ),
+        upsertSection(host),
     ];
 };
 
-const hostCreate = (host: SpeciesUpsertFields) => {
-    return db.species.create({
-        data: {
-            ...speciesCreateData(host),
-            taxontype: { connect: { taxoncode: HostTaxon } },
-        },
-    });
+const hostCreate = (host: SpeciesUpsertFields): PrismaPromise<unknown>[] => {
+    return [
+        db.species.create({
+            data: {
+                ...speciesCreateData(host),
+                taxontype: { connect: { taxoncode: HostTaxon } },
+            },
+        }),
+    ];
 };
 
 /**
@@ -274,10 +280,7 @@ const hostCreate = (host: SpeciesUpsertFields) => {
  */
 export const upsertHost = (h: SpeciesUpsertFields): TaskEither<Error, SpeciesApi> => {
     const updateHostTx = TE.tryCatch(() => db.$transaction(hostUpdateSteps(h)), handleError);
-    const createHostTx = pipe(
-        TE.tryCatch(() => hostCreate(h), handleError),
-        TE.map((s) => [s] as unknown[]),
-    );
+    const createHostTx = TE.tryCatch(() => db.$transaction(hostCreate(h)), handleError);
 
     const getHost = () => {
         return hostByName(h.name);

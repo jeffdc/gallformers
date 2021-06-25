@@ -36,6 +36,7 @@ export const addImages = (images: ImageApi[]): TaskEither<Error, ImageApi[]> => 
                     uploader: image.uploader,
                     lastchangedby: image.lastchangedby,
                     default: image.default,
+                    caption: image.caption,
                     species: { connect: { id: image.speciesid } },
                     source: connectIfNotNull<Prisma.sourceCreateNestedOneWithoutImageInput, number>(
                         'source',
@@ -84,6 +85,7 @@ export const updateImage = (theImage: ImageApi): TaskEither<Error, readonly Imag
                 license: image.license,
                 licenselink: image.licenselink,
                 sourcelink: image.sourcelink,
+                caption: image.caption,
                 // source: connectSource, // See below for why we can not do this here.
             },
         });
@@ -205,16 +207,18 @@ export const getImages = (speciesid: number): TaskEither<Error, ImageApi[]> => {
  * N.B. the function is meant to be curried with the species then applied with the imageids.
  * @param speciesid
  */
-export const deleteImages = (speciesid: number) => (ids: number[]): TaskEither<Error, number> => {
-    const deleteImages = () =>
-        db.image.deleteMany({
-            where: { id: { in: ids } },
-        });
+export const deleteImages =
+    (speciesid: number) =>
+    (ids: number[]): TaskEither<Error, number> => {
+        const deleteImages = () =>
+            db.image.deleteMany({
+                where: { id: { in: ids } },
+            });
 
-    return pipe(
-        TE.tryCatch(() => getImagePaths(speciesid, ids), handleError),
-        TE.chain((paths) => TE.tryCatch(() => deleteImagesByPaths(paths), handleError)),
-        TE.chain(() => TE.tryCatch(deleteImages, handleError)),
-        TE.map((pp) => pp.count),
-    );
-};
+        return pipe(
+            TE.tryCatch(() => getImagePaths(speciesid, ids), handleError),
+            TE.chain((paths) => TE.tryCatch(() => deleteImagesByPaths(paths), handleError)),
+            TE.chain(() => TE.tryCatch(deleteImages, handleError)),
+            TE.map((pp) => pp.count),
+        );
+    };

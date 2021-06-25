@@ -49,8 +49,19 @@ The datastore is a [sqlite](https://sqlite.org/index.html) database. The schema 
 
 The APIs for accessing the data from the front-end are implemented in [Prisma](https://www.prisma.io/) and are all called from the server (either statically rendered at build time or rendered on request if they could not be build statically, e.g., the search results).
 
+All of the images are stored on AWS S3, currently under Jeff's personal account. 
+
+The domains (gallformers.org and gallformers.com) are registered using namecheap and are currently in Jeff's personal account.
+
+The SSL certs are generated and auto-renewed via Let's Encrypt. There is a daemon process on the server that runs the auto-renewal process every 3 months.
+
+### Monitoring
+There is a very simple [down detector](lambdas/gallformers_downdetector.js) implemented as an AWS Lambda. The lambda checks the site every 2 minutes to see if it responds with an HTTP 200 response. If the site responds negatively more than once in the span of 5 minutes then an alert is sent out via a message sent from the lambda to AWS SQS to AWS SNS/CloudWatch. The CloudWatch alarm triggers [another lambda](lambdas/snsToSlack.js) that posts a message to the [site-monitoring](https://gallformerdat-m1g8137.slack.com/archives/C01DGA0E9EX) Slack channel and then SNS is used to send an email to Jeff.
+
+There are also several alarms configured on the DO Droplet that hosts the server. These are all resource utilization alarms and will send messages to the [site-monitoring](https://gallformerdat-m1g8137.slack.com/archives/C01DGA0E9EX) Slack channel if triggered.
+
 #### Database Schema Upates (Migrations)
-Changes to the schema must involve the follwoing steps:
+Changes to the schema must involve the following steps:
 
 1. Create a new migration script in [migrations](migrations). It must be named such that it is one larger than the latest.
 1. Add all schema changes to the script. There is an `Up` and `Down` sections. The `Up` section is where all of the changes go and then use the `Down` section to undo those changes. This is so that if the `Up` part fails the migration can rollback the changes.
@@ -69,7 +80,7 @@ Because [yarn is a PITA](https://github.com/yarnpkg/yarn/issues/3630) you will h
 If you leave them in you will not be able to build with docker as `better-sqlite3` requires python to build and there is no python in the docker container.
 
 ### Backup Strategy
-TBD. For now manual snapshots of the block volume are all we have. All of the source is on github and the site can easily be re-created from scratch on a new instance from the files there. The only real back up needed is the database.
+TBD. For now manual snapshots of the block volume are all we have. All of the source is on github and the site can be re-created from scratch on a new instance from the files there. The only real back up needed is the database.
 
 ### Front-End
 The front-end is mostly static pages as we expect most of this data to not change frequently.  next.js is built on [React](https://reactjs.org/) so you will need some familiarity with that to work on the site. The look-and-feel is built with [react-bootstrap](https://react-bootstrap.github.io/). Custom components are placed in the [pages/components](pages/components) directory and global layout components in [pages/layouts](pages/layouts). 
@@ -77,4 +88,4 @@ The front-end is mostly static pages as we expect most of this data to not chang
 ### Production and Staging (non-dev) Deployments
 The site is deployed on a Digital Ocean droplet with a mounted volume that contains the database. Details of how to access this etc. are not appropriate for this README.
 
-Currently user management is handled via Auth0. They have a reasonable free-tier that gives us whta we need for our current minimal needs. All user management happens via the Auth0 management console. The site is generally meant to be accessed with authentication. Authentication and authorization is only needed for data management/curation features.
+Currently user management is handled via Auth0. They have a reasonable free-tier that gives us whta we need for our current minimal needs. All user management happens via the Auth0 management console. The site is generally meant to be accessed without authentication. Authentication and authorization is only needed for data management/curation features.

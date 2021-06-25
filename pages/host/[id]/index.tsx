@@ -75,7 +75,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                 <Col sm={12} md={6} lg={8}>
                     <Row>
                         <Col className="">
-                            <h2>{host.name}</h2>
+                            <h2 className="font-italic">{host.name}</h2>
                         </Col>
                         <Col xs={2} className="mr-1">
                             <span className="p-0 pr-1 my-auto">
@@ -97,8 +97,8 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                     </Row>
                     <Row>
                         <Col>
-                            {host.aliases.map((a) => a.name).join(', ')}
-                            <p className="font-italic">
+                            <p className="font-italic">{host.aliases.map((a) => a.name).join(', ')}</p>
+                            <p>
                                 <strong>Family:</strong>
                                 <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
                                     <a> {taxonomy.family.name}</a>
@@ -111,7 +111,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                             {' | '}
                                             <strong> Section: </strong>{' '}
                                             <Link key={s.id} href={`/section/${s.id}`}>
-                                                {`${s.name} (${s.description})`}
+                                                <a className="font-italic">{`${s.name} (${s.description})`}</a>
                                             </Link>
                                         </span>
                                     )),
@@ -121,7 +121,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                 {' | '}
                                 <strong>Genus: </strong>
                                 <Link key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
-                                    <a> {taxonomy.genus.name}</a>
+                                    <a className="font-italic"> {taxonomy.genus.name}</a>
                                 </Link>
                             </p>
                         </Col>
