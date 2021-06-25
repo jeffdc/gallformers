@@ -23,9 +23,9 @@ export type ConnectTypes =
 
 export function connectIfNotNull<T extends ConnectTypes, V>(fieldName: string, value: V | undefined | null): T {
     if (value || (Array.isArray(value) && value.length > 0)) {
-        return ({ connect: { [fieldName]: value } } as unknown) as T;
+        return { connect: { [fieldName]: value } } as unknown as T;
     } else {
-        return ({} as unknown) as T;
+        return {} as unknown as T;
     }
 }
 
@@ -45,9 +45,9 @@ export type MapFieldName = 'alignment_id';
 
 export const mapToIdFieldForPrisma = <T extends ConnectTypes>(idField: MapFieldName, ids: number[]): T[] => {
     return ids.map((id) => {
-        return ({
+        return {
             [idField]: id,
-        } as unknown) as T;
+        } as unknown as T;
     });
 };
 
@@ -55,7 +55,7 @@ export function connectWithIds<T extends ConnectTypes>(fieldName: InsertFieldNam
     const key = fieldName as keyof T;
     return ids.map((l) => {
         // ugly casting due to what seems to be a TS bug. See: https://github.com/Microsoft/TypeScript/issues/13948
-        return ({ [key]: { connect: { id: l } } } as unknown) as T;
+        return { [key]: { connect: { id: l } } } as unknown as T;
     });
 }
 
@@ -63,15 +63,15 @@ export function createWithIds<T extends ConnectTypes>(fieldName: InsertFieldName
     const key = fieldName as keyof T;
     return ids.map((l) => {
         // ugly casting due to what seems to be a TS bug. See: https://github.com/Microsoft/TypeScript/issues/13948
-        return ({ [key]: { create: { id: l } } } as unknown) as T;
+        return { [key]: { create: { id: l } } } as unknown as T;
     });
 }
 
 export function mapToIdsForPrisma<T extends ConnectTypes>(ids: number[]): T[] {
     return ids.map((id) => {
-        return ({
+        return {
             id: id,
-        } as unknown) as T;
+        } as unknown as T;
     });
 }
 

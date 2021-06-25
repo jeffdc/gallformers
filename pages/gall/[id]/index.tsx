@@ -166,6 +166,9 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                 <Col xs={6} sm={4}>
                                     <strong>Form:</strong> {species.gall.gallform.map((s) => s.form).join(', ')}
                                 </Col>
+                                <Col xs={6} sm={4}>
+                                    <strong>Cells:</strong> {species.gall.gallcells.map((s) => s.cells).join(', ')}
+                                </Col>
                                 <Col>
                                     <strong>Related: </strong>
                                     {relatedGalls.map((g, i) => (
@@ -193,13 +196,11 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                             <hr />
                         </Col>
                     </Row>
-                    <Row hidden={
-                        !notesAlertShown ||
-                        !(notesSpeciesSource && notesSpeciesSource.id !== selectedSource?.id)
-                    }>
+                    <Row hidden={!notesAlertShown || !(notesSpeciesSource && notesSpeciesSource.id !== selectedSource?.id)}>
                         <Col id="notes-reminder">
                             <Alert variant="info" dismissible onClose={() => setNotesAlertShown(false)}>
-                                Our ID notes may have important information about the taxanomic status and ID issues for this gall.
+                                Our ID Notes may contain important tips necessary for distinguishing this gall from similar galls
+                                and/or important information about the taxonomic status of this gall inducer.
                                 <Button
                                     className="ml-3"
                                     variant="outline-info"
