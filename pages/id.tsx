@@ -50,7 +50,7 @@ import {
 import { allHostsSimple } from '../libs/db/host';
 import { allGenera, allSections } from '../libs/db/taxonomy';
 import { createSummary, defaultImage } from '../libs/pages/renderhelpers';
-import { checkGall, LEAF_ANYWHERE } from '../libs/utils/gallsearch';
+import { checkGall, GALL_FORM, LEAF_ANYWHERE } from '../libs/utils/gallsearch';
 import { capitalizeFirstLetter, hasProp, mightFailWithArray } from '../libs/utils/util';
 
 type SearchFormHostField = {
@@ -532,7 +532,10 @@ const IDGall = (props: Props): JSX.Element => {
                                         </label>
                                         {makeFormInput(
                                             'form',
-                                            props.forms.map((c) => c.form),
+                                            props.forms
+                                                .map((c) => c.form)
+                                                .concat(GALL_FORM)
+                                                .sort(),
                                         )}
                                     </Col>
                                 </Row>
