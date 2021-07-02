@@ -1,38 +1,54 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Button } from 'react-bootstrap';
-import BootstrapTable, { ColumnDescription, SelectRowProps } from 'react-bootstrap-table-next';
-import cellEditFactory, { CellEditFactoryProps } from 'react-bootstrap-table2-editor';
+import DataTable from 'react-data-table-component';
 import { AliasApi, EmptyAlias } from '../libs/api/apitypes';
+import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
 
 export type AliasTableProps = {
     data: AliasApi[];
     setData: (d: AliasApi[]) => void;
 };
 
-const aliasColumns: ColumnDescription[] = [
-    { dataField: 'name', text: 'Alias Name' },
-    {
-        dataField: 'type',
-        text: 'Alias Type',
-        editor: {
-            type: 'select',
-            options: [
-                { value: 'common', label: 'common' },
-                { value: 'scientific', label: 'scientific' },
-            ],
-        },
-    },
-    { dataField: 'description', text: 'Alias Description' },
-];
-
-const cellEditProps: CellEditFactoryProps<AliasApi> = {
-    mode: 'click',
-    blurToSave: true,
-};
-
 const AliasTable = ({ data, setData }: AliasTableProps): JSX.Element => {
     const [selected, setSelected] = useState(new Set<number>());
     const [newId, setNewId] = useState(-1);
+
+    const columns = useMemo(
+        () => [
+            {
+                id: 'name',
+                selector: (row: AliasApi) => row.name,
+                name: 'Alias Name',
+                sortable: true,
+                wrap: true,
+                maxWidth: '300px',
+                editable: true,
+            },
+            {
+                id: 'type',
+                selector: (row: AliasApi) => row.type,
+                name: 'Type',
+                sortable: true,
+                maxWidth: '100px',
+                editable: true,
+                editor: {
+                    type: 'select',
+                    options: [
+                        { value: 'common', label: 'common' },
+                        { value: 'scientific', label: 'scientific' },
+                    ],
+                },
+            },
+            {
+                id: 'description',
+                selector: (row: AliasApi) => row.description,
+                name: 'Description',
+                wrap: true,
+                editable: true,
+            },
+        ],
+        [],
+    );
 
     const addAlias = () => {
         data.push({
@@ -48,35 +64,42 @@ const AliasTable = ({ data, setData }: AliasTableProps): JSX.Element => {
         setSelected(new Set());
     };
 
-    const selectRow: SelectRowProps<AliasApi> = {
-        mode: 'checkbox',
-        clickToSelect: false,
-        clickToEdit: true,
-        onSelect: (row) => {
-            const selection = new Set(selected);
-            selection.has(row.id) ? selection.delete(row.id) : selection.add(row.id);
-            setSelected(selection);
-        },
-        onSelectAll: (isSelect) => {
-            if (isSelect) {
-                setSelected(new Set(data.map((a) => a.id)));
-            } else {
-                setSelected(new Set());
-            }
-        },
+    // const selectRow: SelectRowProps<AliasApi> = {
+    //     mode: 'checkbox',
+    //     clickToSelect: false,
+    //     clickToEdit: true,
+    //     onSelect: (row) => {
+    //         const selection = new Set(selected);
+    //         selection.has(row.id) ? selection.delete(row.id) : selection.add(row.id);
+    //         setSelected(selection);
+    //     },
+    //     onSelectAll: (isSelect) => {
+    //         if (isSelect) {
+    //             setSelected(new Set(data.map((a) => a.id)));
+    //         } else {
+    //             setSelected(new Set());
+    //         }
+    //     },
+    // };
+
+    const onSelectionChange = (selected: { allSelected: boolean; selectedCount: number; selectedRows: AliasApi[] }) => {
+        const selection = new Set(selected.selectedRows.map((r) => r.id));
+        setSelected(selection);
     };
 
     return (
         <>
-            <BootstrapTable
+            <DataTable
                 keyField={'id'}
                 data={data}
-                columns={aliasColumns}
-                bootstrap4
+                columns={columns}
                 striped
-                headerClasses="table-header"
-                cellEdit={cellEditFactory(cellEditProps)}
-                selectRow={selectRow}
+                noHeader
+                responsive={false}
+                defaultSortFieldId="name"
+                customStyles={TABLE_CUSTOM_STYLES}
+                selectableRows
+                onSelectedRowsChange={onSelectionChange}
             />
             <Button variant="secondary" className="btn-sm mr-2" onClick={addAlias}>
                 Add Alias

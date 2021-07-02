@@ -3,19 +3,20 @@ import * as O from 'fp-ts/Option';
 import { GetStaticProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card } from 'react-bootstrap';
-import BootstrapTable, { ColumnDescription } from 'react-bootstrap-table-next';
+import DataTable from 'react-data-table-component';
 import Edit from '../../../components/edit';
 import { GallApi } from '../../../libs/api/apitypes';
 import { allGalls } from '../../../libs/db/gall';
 import { getStaticPropsWith } from '../../../libs/pages/nextPageHelpers';
+import { TABLE_CUSTOM_STYLES } from '../../../libs/utils/DataTableConstants';
 
 type Props = {
     galls: GallApi[];
 };
 
-const linkGall = (cell: string, s: GallApi) => {
+const linkGall = (s: GallApi) => {
     return (
         <>
             <Link key={s.id} href={`/gall/${s.id}`}>
@@ -26,42 +27,48 @@ const linkGall = (cell: string, s: GallApi) => {
     );
 };
 
-const formatAliases = (cell: string, h: GallApi) => <>{h.aliases.map((a) => a.name).join(', ')}</>;
-
-const formatAbundance = (cell: string, h: GallApi) =>
-    pipe(
-        h.abundance,
-        O.fold(constant(''), (a) => a.abundance),
+const BrowseGalls = ({ galls }: Props): JSX.Element => {
+    const columns = useMemo(
+        () => [
+            {
+                id: 'name',
+                selector: (row: GallApi) => row.name,
+                name: 'Name',
+                sortable: true,
+                format: linkGall,
+                maxWidth: '250px',
+            },
+            {
+                id: 'datacomplete',
+                selector: (row: GallApi) => row.datacomplete,
+                name: 'Complete',
+                sortable: true,
+                wrap: true,
+                format: (g: GallApi) => (g.datacomplete ? 'YES' : 'NO'),
+                maxWidth: '150px',
+            },
+            {
+                id: 'aliases',
+                selector: (g: GallApi) => g.aliases.map((a) => a.name).join(', '),
+                name: 'Aliases',
+                sort: true,
+                wrap: true,
+            },
+            {
+                id: 'abundance',
+                selector: (g: GallApi) =>
+                    pipe(
+                        g.abundance,
+                        O.fold(constant(''), (a) => a.abundance),
+                    ),
+                name: 'Abundance',
+                sort: true,
+                maxWidth: '150px',
+            },
+        ],
+        [],
     );
 
-const columns: ColumnDescription[] = [
-    {
-        dataField: 'name',
-        text: 'Name',
-        sort: true,
-        width: 4,
-        formatter: linkGall,
-    },
-    {
-        dataField: 'datacomplete',
-        text: 'Complete',
-        sort: true,
-    },
-    {
-        dataField: 'aliases',
-        text: 'Aliases',
-        sort: true,
-        formatter: formatAliases,
-    },
-    {
-        dataField: 'abundance',
-        text: 'Abundance',
-        sort: true,
-        formatter: formatAbundance,
-    },
-];
-
-const BrowseGalls = ({ galls }: Props): JSX.Element => {
     return (
         <>
             <Head>
@@ -71,19 +78,16 @@ const BrowseGalls = ({ galls }: Props): JSX.Element => {
             <Card>
                 <Card.Body>
                     <Card.Title>Browse Galls</Card.Title>
-                    <BootstrapTable
+                    <DataTable
                         keyField={'id'}
                         data={galls}
                         columns={columns}
-                        bootstrap4
                         striped
-                        headerClasses="table-header"
-                        defaultSorted={[
-                            {
-                                dataField: 'name',
-                                order: 'asc',
-                            },
-                        ]}
+                        noHeader
+                        fixedHeader
+                        responsive={false}
+                        defaultSortFieldId="name"
+                        customStyles={TABLE_CUSTOM_STYLES}
                     />
                 </Card.Body>
             </Card>

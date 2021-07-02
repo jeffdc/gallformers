@@ -46,6 +46,7 @@
     "react-bootstrap-table2-editor": "^1.4",
     "react-bootstrap-table2-paginator": "^2.1.2",
     "react-bootstrap-typeahead": "^5",
+    "react-data-table-component": "^7.0.0-rc1",
     "react-dom": "^16",
     "react-hook-form": "^7",
     "react-hot-toast": "^1",
@@ -59,6 +60,7 @@
     "remark-html": "^13.0.1",
     "remove": "^0.1.5",
     "sass": "^1",
+    "styled-components": "^5.3.0",
     "yarn": "^1.22.10",
     "yup": "^0"
   },
