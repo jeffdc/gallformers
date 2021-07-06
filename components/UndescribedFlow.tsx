@@ -1,9 +1,9 @@
 import { constant, constFalse, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import React, { useEffect, useState } from 'react';
-import { Button, Col, Form, Modal, Row } from 'react-bootstrap';
+import { Alert, Button, Col, Form, Modal, Row } from 'react-bootstrap';
 import { Controller, useForm } from 'react-hook-form';
-import { HostSimple } from '../libs/api/apitypes';
+import { GallApi, HostSimple } from '../libs/api/apitypes';
 import { GENUS, TaxonomyEntry, TaxonomyEntryNoParent } from '../libs/api/taxonomy';
 import Typeahead from './Typeahead';
 
@@ -20,6 +20,7 @@ type Props = {
     hosts: HostSimple[];
     genera: TaxonomyEntry[];
     families: TaxonomyEntry[];
+    galls: GallApi[];
 };
 
 type FormFields = {
@@ -31,13 +32,14 @@ type FormFields = {
     name: string;
 };
 
-const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX.Element => {
+const UndescribedFlow = ({ show, onClose, hosts, genera, families, galls }: Props): JSX.Element => {
     const [genusKnown, setGenusKnown] = useState(false);
     const [genus, setGenus] = useState<TaxonomyEntryNoParent>();
     const [family, setFamily] = useState<TaxonomyEntryNoParent>();
     const [host, setHost] = useState<HostSimple>();
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
+    const [errMessage, setErrMessage] = useState('');
 
     const { register, getValues, control, watch } = useForm<FormFields>({
         mode: 'onBlur',
@@ -64,11 +66,20 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
             return;
         }
 
+        // The guard against this is that the Done button is disabled until all of these have a value, but just in case.
         if (family == undefined || genus == undefined || host == undefined) {
             throw new Error(
                 `Somehow we have an undefined value for one of the family, genus, or host while trying to save the new undescribed species values.`,
             );
         }
+
+        if (galls.find((g) => g.name.localeCompare(name) == 0)) {
+            setErrMessage(
+                `The name you have chosen, (${name}), already exists in the database. Either chose a new name or Cancel out of this and edit the existing gall.`,
+            );
+            return;
+        }
+
         const fam = { ...family, parent: O.none };
         onClose({
             family: fam,
@@ -235,6 +246,9 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
                         </Form.Text>
                     </Form.Group>
                 </Form>
+                <Alert hidden={!errMessage} key="errAlert" variant="danger">
+                    {errMessage}
+                </Alert>
             </Modal.Body>
             <Modal.Footer>
                 <div className="d-flex justify-content-end">
