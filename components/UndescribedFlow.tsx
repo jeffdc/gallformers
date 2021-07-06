@@ -106,7 +106,7 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
     return (
         <Modal size="lg" show={show} onHide={() => done(true)}>
             <Modal.Header id="create-new-undescribed-gall" closeButton>
-                <Modal.Title>Create New Undescribed Gall Species</Modal.Title>
+                <Modal.Title>Create a New Undescribed Gall Species</Modal.Title>
             </Modal.Header>
             <Modal.Body>
                 <Form>
@@ -143,6 +143,10 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
                             options={genera.filter((g) => g.name.localeCompare('Unknown'))}
                             labelKey="name"
                         />
+                        <Form.Text id="genusHelp" muted>
+                            The genus, if it is known. Required if known.
+                        </Form.Text>
+
                         <Form.Label>Family</Form.Label>
                         <Typeahead
                             name="family"
@@ -177,6 +181,9 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
                             options={families}
                             labelKey="name"
                         />
+                        <Form.Text id="familyHelp" muted>
+                            The family. If it is Unknown, select the Family Unknown from the list. Required.
+                        </Form.Text>
                         <Form.Label>Type Host</Form.Label>
                         <Typeahead
                             name="host"
@@ -189,7 +196,10 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
                             options={hosts}
                             labelKey="name"
                         />
-                        <Form.Label>Description (2 or 3 adjectives separated by dashes, e.g. red-bead-gall)</Form.Label>
+                        <Form.Text id="hostHelp" muted>
+                            The host that is the Type for this undecribed gall. Required.
+                        </Form.Text>
+                        <Form.Label>Description</Form.Label>
                         <Controller
                             name="description"
                             control={control}
@@ -203,7 +213,10 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
                                 ></Form.Control>
                             )}
                         />
-                        <Form.Label>Name (you can edit this but it is suggested that you accept the computed value)</Form.Label>
+                        <Form.Text id="descriptionHelp" muted>
+                            2 or 3 adjectives separated by dashes, e.g. red-bead-gall.
+                        </Form.Text>
+                        <Form.Label>Name</Form.Label>
                         <Controller
                             name="name"
                             control={control}
@@ -217,6 +230,9 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
                                 ></Form.Control>
                             )}
                         />
+                        <Form.Text id="nameHelp" muted>
+                            You can edit this but it is suggested that you accept the computed value.
+                        </Form.Text>
                     </Form.Group>
                 </Form>
             </Modal.Body>
@@ -224,7 +240,7 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families }: Props): JSX
                 <div className="d-flex justify-content-end">
                     <Row>
                         <Col xs={4}>
-                            <Button variant="primary" disabled={!name} onClick={() => done(false)}>
+                            <Button variant="primary" disabled={!name || !genus || !family || !host} onClick={() => done(false)}>
                                 Done
                             </Button>
                         </Col>
