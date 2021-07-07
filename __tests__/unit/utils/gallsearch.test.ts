@@ -165,10 +165,10 @@ describe('checkGall tests', () => {
             { a: DetachableIntegral, b: DetachableNone, expected: true },
             { a: DetachableBoth, b: DetachableNone, expected: true },
             { a: DetachableNone, b: DetachableNone, expected: true },
-            // 3 Both cases all should match
+            // 3 Both cases one match two not
             { a: DetachableBoth, b: DetachableBoth, expected: true },
-            { a: DetachableDetachable, b: DetachableBoth, expected: true },
-            { a: DetachableIntegral, b: DetachableBoth, expected: true },
+            { a: DetachableDetachable, b: DetachableBoth, expected: false },
+            { a: DetachableIntegral, b: DetachableBoth, expected: false },
             // 3 Detachable cases two match one not
             { a: DetachableDetachable, b: DetachableDetachable, expected: true },
             { a: DetachableBoth, b: DetachableDetachable, expected: true },

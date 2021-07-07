@@ -4,7 +4,7 @@ import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useState } from 'react';
-import { Badge, Button, Col, OverlayTrigger, Popover, Row } from 'react-bootstrap';
+import { Button, Col, Row } from 'react-bootstrap';
 import { Controller } from 'react-hook-form';
 import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
@@ -16,16 +16,16 @@ import { extractQueryParam } from '../../libs/api/apipage';
 import * as AT from '../../libs/api/apitypes';
 import { FAMILY, GENUS, TaxonomyEntry } from '../../libs/api/taxonomy';
 import {
-    getAlignments,
     allGalls,
+    getAlignments,
     getCells,
     getColors,
+    getForms,
     getLocations,
     getSeasons,
     getShapes,
     getTextures,
     getWalls,
-    getForms,
 } from '../../libs/db/gall';
 import { allHostsSimple } from '../../libs/db/host';
 import { getAbundances } from '../../libs/db/species';
@@ -284,6 +284,7 @@ const Gall = ({
                     hosts={hosts}
                     genera={genera}
                     families={families}
+                    galls={gs}
                 />
                 <h4>Add/Edit Gallformers</h4>
                 <p>

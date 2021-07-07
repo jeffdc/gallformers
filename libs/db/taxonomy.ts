@@ -362,17 +362,33 @@ export const getSection = (id: number): TaskEither<Error, O.Option<SectionApi>> 
  */
 export const deleteTaxonomyEntry = (id: number): TaskEither<Error, DeleteResult> => {
     const doDelete = () => {
-        // have to do a raw call since Prisma does not support cascade deletion.
-        return db.$executeRaw(`
-            DELETE FROM taxonomy WHERE id = ${id}
-        `);
+        // have to do raw calls since Prisma does not support cascade deletion.
+        return db.$transaction([
+            db.$executeRaw(`
+                DELETE FROM species
+                    WHERE id IN (
+                    SELECT s.id
+                    FROM taxonomy AS f
+                        INNER JOIN
+                        taxonomy AS g ON f.id = g.parent_id
+                        INNER JOIN
+                        speciestaxonomy AS st ON st.taxonomy_id = g.id
+                        INNER JOIN
+                        species AS s ON s.id = st.species_id
+                    WHERE f.id = ${id}
+                );
+            `),
+            db.$executeRaw(`
+                DELETE FROM taxonomy WHERE id = ${id}
+        `),
+        ]);
     };
 
-    const toDeleteResult = (t: number): DeleteResult => {
+    const toDeleteResult = (t: number[]): DeleteResult => {
         return {
             type: 'taxonomy',
             name: id.toString(),
-            count: t,
+            count: t.reduce((t, x) => t + x, 0),
         };
     };
 
