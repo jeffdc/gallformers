@@ -33,8 +33,8 @@ export default function FilterGuide(): JSX.Element {
                             </Item>
                             <Item key="integral">
                                 <b>Integral -</b> the gall is integral with the surface it is attached to. It may not be flat, but
-                                it doesn&apos;t protrude out from the surface leaving an angled gap. Includes nearly all non-detachable
-                                galls.
+                                it doesn&apos;t protrude out from the surface leaving an angled gap. Includes nearly all
+                                non-detachable galls.
                             </Item>
                             <Item key="supine">
                                 <b>Supine -</b> the gall is only attached at its base but lays nearly flat along the surface it is
@@ -56,18 +56,18 @@ export default function FilterGuide(): JSX.Element {
                     <Accordion.Collapse eventKey="cells">
                         <ListGroup>
                             <Item key="monothalamous">
-                                <b>Monothalamous -</b> one cell or chamber containing a larva or larvae of the inducing insect
-                                is present within the gall if single, or within each gall in a cluster. May include galls with
-                                empty false chambers.
+                                <b>Monothalamous -</b> one cell or chamber containing a larva or larvae of the inducing insect is
+                                present within the gall if single, or within each gall in a cluster. May include galls with empty
+                                false chambers.
                             </Item>
                             <Item key="polythalamous">
                                 <b>Polythalamous -</b> more than one cell or chamber containing a single larva of the inducing
-                                insect is present within the gall if single, or within each gall in a cluster. Does not
-                                include galls with empty false chambers.
+                                insect is present within the gall if single, or within each gall in a cluster. Does not include
+                                galls with empty false chambers.
                             </Item>
                             <Item key="free-rolling">
-                                <b>Free-rolling -</b> the cell containing the larva is loose within an open cavity formed
-                                by the walls of the gall, free to roll around when disturbed.
+                                <b>Free-rolling -</b> the cell containing the larva is loose within an open cavity formed by the
+                                walls of the gall, free to roll around when disturbed.
                             </Item>
                             <Item>
                                 NOTE: If multiple larvae are found in one space, these may be{' '}
@@ -110,22 +110,22 @@ export default function FilterGuide(): JSX.Element {
                         <ListGroup>
                             <Item key="abrupt swelling">
                                 <b>Abrupt Swelling -</b> a significant increase in the diameter of a stem, petiole, etc, emerging
-                                directly from tissue of normal proportions; ie, without a gradual increase along the length of
-                                the affected tissue. Sometimes encircling the stem, other times emerging only from one side.
+                                directly from tissue of normal proportions; ie, without a gradual increase along the length of the
+                                affected tissue. Sometimes encircling the stem, other times emerging only from one side.
                             </Item>
                             <Item key="gall">
                                 <b>Gall -</b> a novel element of a plant caused by an organism living within the plant.
                             </Item>
                             <Item key="hidden cell">
-                                <b>Hidden cell -</b> a gall making no externally visible change to the host (typically in a
-                                stem or fruit) until the inducer chews its egress hole.
+                                <b>Hidden cell -</b> a gall making no externally visible change to the host (typically in a stem
+                                or fruit) until the inducer chews its egress hole.
                             </Item>
                             <Item key="lead edge fold">
                                 <b>Leaf edge fold -</b> a single layer of the leaf edge folded back against the leaf.
                             </Item>
                             <Item key="leaf blister">
-                                <b>Leaf blister -</b> localized distortions of the leaf lamina, typically creating a cup
-                                opening toward the lower side of the leaf.
+                                <b>Leaf blister -</b> localized distortions of the leaf lamina, typically creating a cup opening
+                                toward the lower side of the leaf.
                             </Item>
                             <Item key="leaf curl">
                                 <b>Leaf curl -</b> broad deformation of the lamina of a leaf, pulling the edges in. Typically
@@ -137,40 +137,40 @@ export default function FilterGuide(): JSX.Element {
                             <Item key="leaf spot">
                                 <b>Leaf spot -</b> a flat (never more than slightly thicker than the normal leaf), typically
                                 circular spot on the lamina of the leaf, sometimes with distinct rings of darker and lighter
-                                coloration (eye spots). Fungal leaf spots often have small dots above; midge spots have an
-                                exposed larva below
+                                coloration (eye spots). Fungal leaf spots often have small dots above; midge spots have an exposed
+                                larva below
                             </Item>
                             <Item key="non-gall">
                                 <b>Non-gall -</b> any gall-adjacent plant symptom or other structure that doesn’t meet the
                                 definition of a gall: a novel element of a plant caused by an organism living within the plant.
-                                Examples of non-galls include scale insects; leaf curl, spots, or blisters caused by pathogens
-                                or external herbivores; and stem swellings caused by miners or borers lacking internal cells.
+                                Examples of non-galls include scale insects; leaf curl, spots, or blisters caused by pathogens or
+                                external herbivores; and stem swellings caused by miners or borers lacking internal cells.
                             </Item>
                             <Item key="oak apple">
                                 <b>Oak apple -</b> a spherical or near-spherical gall with thin outer walls, a single central
                                 larval cell surrounded by either spongy tissue or fine radiating fibers.
                             </Item>
                             <Item key="pocket">
-                                <b>Pocket -</b> a structure formed by pinching the leaf lamina together into a narrow opening
-                                (a point or line) and stretching it into various forms, from beads to sacks to spindles to
-                                long purses. The walls may or may not be thickened relative to the normal leaf.
+                                <b>Pocket -</b> a structure formed by pinching the leaf lamina together into a narrow opening (a
+                                point or line) and stretching it into various forms, from beads to sacks to spindles to long
+                                purses. The walls may or may not be thickened relative to the normal leaf.
                             </Item>
                             <Item key="rust">
-                                <b>Rust -</b> plant deformations caused by fungi in the order Pucciniales. They cause swelling
-                                and curling of stems and petioles and blisters on leaves, easily recognizable for their bright
-                                orange coloration, seen in characteristic rings.
+                                <b>Rust -</b> plant deformations caused by fungi in the order Pucciniales. They cause swelling and
+                                curling of stems and petioles and blisters on leaves, easily recognizable for their bright orange
+                                coloration, seen in characteristic rings.
                             </Item>
                             <Item key="scale">
-                                <b>Scale -</b> an herbivorous insect of the superfamily Coccoidea. The post-reproductive
-                                females of the family Kermesidae have thin, globular, hollow shells fixed in place on their host.
+                                <b>Scale -</b> an herbivorous insect of the superfamily Coccoidea. The post-reproductive females
+                                of the family Kermesidae have thin, globular, hollow shells fixed in place on their host.
                             </Item>
                             <Item key="stem club">
-                                <b>Stem club -</b> A substantial enlargement of the growing tip of a woody plant, tapering more
-                                or less gradually from normal stem width below it, blunt or rounded above.
+                                <b>Stem club -</b> A substantial enlargement of the growing tip of a woody plant, tapering more or
+                                less gradually from normal stem width below it, blunt or rounded above.
                             </Item>
                             <Item key="tapered swelling">
-                                <b>Tapered swelling -</b> an increase in the diameter of a stem, petiole, etc, gradual from
-                                either side of the gall.
+                                <b>Tapered swelling -</b> an increase in the diameter of a stem, petiole, etc, gradual from either
+                                side of the gall.
                             </Item>
                             <Item key="witches broom">
                                 <b>Witches broom -</b> a dense profusion of buds or shoots on woody plants.
@@ -246,45 +246,45 @@ export default function FilterGuide(): JSX.Element {
                     <Accordion.Collapse eventKey="shape">
                         <ListGroup>
                             <Item key="cluster">
-                              <b>Cluster -</b> individual galls nearly always found in numbers, often pressing together
-                              and flattening against each other.
+                                <b>Cluster -</b> individual galls nearly always found in numbers, often pressing together and
+                                flattening against each other.
                             </Item>
                             <Item key="conical">
-                              <b>Conical -</b> wide and round at the base, tapering on all sides to a point above.
+                                <b>Conical -</b> wide and round at the base, tapering on all sides to a point above.
                             </Item>
                             <Item key="cup">
-                              <b>Cup -</b> a circular structure with walls enclosing a volume, open from above.
+                                <b>Cup -</b> a circular structure with walls enclosing a volume, open from above.
                             </Item>
                             <Item key="globular">
-                              <b>Globular -</b> the gall is rounded but not perfectly spherical (including ovate, ellipsoid,
-                              irregular, etc).
+                                <b>Globular -</b> the gall is rounded but not perfectly spherical (including ovate, ellipsoid,
+                                irregular, etc).
                             </Item>
                             <Item key="hemispherical">
-                              <b>Hemispherical -</b> perfectly round or nearly so, but only in one half of a full sphere
-                              (often divided by a leaf).
+                                <b>Hemispherical -</b> perfectly round or nearly so, but only in one half of a full sphere (often
+                                divided by a leaf).
                             </Item>
                             <Item key="linear">
-                              <b>Linear -</b> the gall is a narrow line in shape for much of its form. Often seen as
-                              extensions of leaf veins, sometimes widening at a club or spindle-like end. 
+                                <b>Linear -</b> the gall is a narrow line in shape for much of its form. Often seen as extensions
+                                of leaf veins, sometimes widening at a club or spindle-like end.
                             </Item>
                             <Item key="numerous">
-                              <b>Numerous -</b> typically found in large numbers (>10) scattered across every leaf
-                              or other plant part on which they occur, but not clustered together.
+                                <b>Numerous -</b> typically found in large numbers (&gt;10) scattered across every leaf or other
+                                plant part on which they occur, but not clustered together.
                             </Item>
                             <Item key="rosette">
-                              <b>Rosette -</b> a layered bunch of leaves or similar.
+                                <b>Rosette -</b> a layered bunch of leaves or similar.
                             </Item>
                             <Item key="spangle">
-                              <b>Spangle -</b> a flat, circular disc-like structure. Often with a central umbo.
+                                <b>Spangle -</b> a flat, circular disc-like structure. Often with a central umbo.
                             </Item>
                             <Item key="sphere">
-                              <b>Sphere -</b> perfectly round, of equal diameter in every dimension.
+                                <b>Sphere -</b> perfectly round, of equal diameter in every dimension.
                             </Item>
                             <Item key="spindle">
-                              <b>Spindle -</b> elongated, round in the middle and narrowed above and below, often pointed above.
+                                <b>Spindle -</b> elongated, round in the middle and narrowed above and below, often pointed above.
                             </Item>
                             <Item key="tuft">
-                              <b>Tuft -</b> small galls with structure entirely obscured by long woolly fibers.
+                                <b>Tuft -</b> small galls with structure entirely obscured by long woolly fibers.
                             </Item>
                         </ListGroup>
                     </Accordion.Collapse>
@@ -305,7 +305,8 @@ export default function FilterGuide(): JSX.Element {
                                 <b>Bumpy -</b> the surface of the gall is covered with some kind of slight protrusions.
                             </Item>
                             <Item key="erineum">
-                                <b>Erineum -</b> the distinctive "sugary" crystalline texture formed by many eriophyid mites.
+                                <b>Erineum -</b> the distinctive &ldquo;sugary&rdquo; crystalline texture formed by many eriophyid
+                                mites.
                             </Item>
                             <Item key="glaucous">
                                 <b>Glaucous -</b> covered in a whitish layer of fine powder or wax that can be easily rubbed off.
@@ -315,12 +316,13 @@ export default function FilterGuide(): JSX.Element {
                                 wear off some galls.
                             </Item>
                             <Item key="hairy">
-                                <b>Hairy -</b> the gall has some hairs, whether that&apos;s only a sparse pubescence of short hairs or
-                                a dense coat of long wool that obscures the gall or stiff bristles (as in Acraspis erinacei).
+                                <b>Hairy -</b> the gall has some hairs, whether that&apos;s only a sparse pubescence of short
+                                hairs or a dense coat of long wool that obscures the gall or stiff bristles (as in Acraspis
+                                erinacei).
                             </Item>
                             <Item key="honeydew">
-                                <b>Honeydew -</b> galls releasing sugary solution. Often visible as a shiny wetness, but
-                                can be more apparent in the ants and wasps it attracts.
+                                <b>Honeydew -</b> galls releasing sugary solution. Often visible as a shiny wetness, but can be
+                                more apparent in the ants and wasps it attracts.
                             </Item>
                             <Item key="leafy">
                                 <b>Leafy -</b> the gall is surrounded by or composed of a profusion of altered leaves, bud scales,
@@ -330,15 +332,16 @@ export default function FilterGuide(): JSX.Element {
                                 <b>Mottled -</b> multiple colors on the surface of the gall mix irregularly.
                             </Item>
                             <Item key="pubescent">
-                                <b>Pubescent -</b> the hair covering the gall is short, soft, and dense. May or may not
-                                obscure the color and texture of the surface, but not concealing its shape.
+                                <b>Pubescent -</b> the hair covering the gall is short, soft, and dense. May or may not obscure
+                                the color and texture of the surface, but not concealing its shape.
                             </Item>
                             <Item key="resinous dots">
-                                <b>Resinous dots -</b> the surface of the gall is covered in dots, often red, that secret sticky resin.
+                                <b>Resinous dots -</b> the surface of the gall is covered in dots, often red, that secret sticky
+                                resin.
                             </Item>
                             <Item key="ribbed">
-                                <b>Ribbed -</b> the external surface has linear grooves and ridges, typically running from the bottom
-                                to the top of the gall.
+                                <b>Ribbed -</b> the external surface has linear grooves and ridges, typically running from the
+                                bottom to the top of the gall.
                             </Item>
                             <Item key="spiky-thorny">
                                 <b>Spiky/thorny -</b> the gall is covered in sharp spines, prickles, etc.
@@ -372,8 +375,8 @@ export default function FilterGuide(): JSX.Element {
                     <Accordion.Collapse eventKey="walls">
                         <ListGroup>
                             <Item key="thin">
-                                <b>Thin -</b> when the gall is cut open, it reveals an interior matching the shape of the exterior.
-                                The walls are not thick enough to conceal the shape of the chamber within.
+                                <b>Thin -</b> when the gall is cut open, it reveals an interior matching the shape of the
+                                exterior. The walls are not thick enough to conceal the shape of the chamber within.
                             </Item>
                             <Item key="thick">
                                 <b>Thick -</b> when the gall is cut open, the interior is full of tissue except for the small
