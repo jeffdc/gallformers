@@ -32,8 +32,8 @@ const checkDetachable = (g: DetachableApi, q: DetachableApi): boolean => {
     // query of None matches all
     if (q.value === DetachableNone.value) return true;
 
-    // query of Both matches everything but None
-    if (q.value === DetachableBoth.value && g.value !== DetachableNone.value) return true;
+    // query of Both matches only those with literal Both
+    if (q.value === DetachableBoth.value && g.value === DetachableBoth.value) return true;
 
     // otherwise must match including matches on Both
     return q.value === g.value || g.value === DetachableBoth.value;
