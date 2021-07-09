@@ -1,9 +1,9 @@
 use serde_json::Value;
 use serde_json::Map;
 use std::path::PathBuf;
-use rusqlite::Statement;
-use rusqlite::{ Connection, Error };
+use rusqlite::{ Connection, Error, Statement };
 use std::fs::File;
+use std::io::Read;
 use serde_derive::Deserialize;
 
 #[derive(Debug,Deserialize)]
@@ -129,18 +129,32 @@ type Res<T> = Result<T, Err>;
 
 fn import() -> Res<()> {
     let mut db_file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    db_file.pop();
-    db_file.push("prisma/plants.db");
+    db_file.push("plants.db");
+
     let conn = Connection::open(db_file.as_path())?;
     let mut ctx = DBContext::new(&conn);
 
+    // load the schema into the new DB
+    let mut sql_file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    sql_file.push("plants.sql");
+    match File::open(sql_file.as_path()) {
+        Ok(mut file) => {
+            let mut sql = String::new();
+            file.read_to_string(&mut sql).unwrap();
+            ctx.conn.execute_batch(&sql)?;
+        },
+        Err(e) => {
+            println!("Failed to open database schema {:?}. {}", sql_file, e);
+        }
+    }
+
     let mut region_json = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    region_json.push("data/regions.json");
+    region_json.push("regions.json");
     let parsed: Value = serde_json::from_str(&std::fs::read_to_string(region_json)?)?;
     let region_map: Map<String, Value> = parsed.as_object().unwrap().clone();
     
     let mut csv_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    csv_dir.push("data/20210708");
+    csv_dir.push("data");
 
     ctx.conn.execute_batch("BEGIN TRANSACTION;")?;
     for csv_file in csv_dir.read_dir()? {

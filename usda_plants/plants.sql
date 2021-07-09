@@ -27,16 +27,16 @@ CREATE TABLE plant (
 
 -- Table: plantcommonname
 CREATE TABLE plantcommonname (
-    plant_id       REFERENCES plant (id) ON DELETE CASCADE,
-    commonname_id  REFERENCES commonname (id) ON DELETE CASCADE
+    plant_id       INTEGER REFERENCES plant (id) ON DELETE CASCADE,
+    commonname_id  INTEGER REFERENCES commonname (id) ON DELETE CASCADE
 );
 
 
 -- Table: plantregion
 CREATE TABLE plantregion (
-    plant_id   REFERENCES plant (id) ON DELETE CASCADE
+    plant_id   INTEGER REFERENCES plant (id) ON DELETE CASCADE
                NOT NULL,
-    region_id  REFERENCES region (id) ON DELETE CASCADE
+    region_id  INTEGER REFERENCES region (id) ON DELETE CASCADE
                NOT NULL
 );
 

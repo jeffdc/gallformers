@@ -11,7 +11,9 @@ yarn-error.log
 gallformers-docker.tar
 .type-coverage
 .coverage
-prisma/plants.db
+
+# generated database
+usda_plants/plants.db
 
 # Rust related
 debug/
