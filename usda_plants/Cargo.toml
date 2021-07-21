@@ -11,3 +11,6 @@ csv = { version = "*" }
 serde = { version = "*" }
 serde_derive = "*"
 serde_json = "*"
+nom = "6"
+strum ="*"
+strum_macros = "*"
