@@ -111,16 +111,19 @@ pub(self) mod parsers {
 
     // Parse the pair of species for a hybrid: [species1 × species2]
     // N.B., the symbol is not an ASCII x but × the unicode multiplcation sign. https://codepoints.net/U+00d7
+    // Anything but a comma can be part of the names separated by the hybrid symbol.
     fn hybrid(i: &str) -> IResult<&str, (&str, &str)> {
-        delimited(
-            tag(HYBRID_START),
-            separated_pair(alphanumeric1, tag(" × "), alphanumeric1),
-            tag("]"),
-        )(i)
+        //TODO this is hideous and there has got to be a better way
+        let p = separated_pair(
+            preceded(tag(HYBRID_START), take_while1(|c| c != '×')),
+            tag("×"),
+            terminated(take_while1(|c| c != ',' && c != ']'), tag("]")),
+        );
+        map(p, |(a, b): (&str, &str)| (a.trim(), b.trim()))(i)
     }
 
-    fn sspvar(i: &str) -> IResult<&str, &str> {
-        terminated(is_not(" "), multispace1)(i)
+    fn sspvar(i: &str) -> IResult<&str, Option<&str>> {
+        opt(terminated(is_not(" "), multispace1))(i)
     }
 
     fn modifier(i: &str) -> IResult<&str, &str> {
@@ -171,11 +174,11 @@ pub(self) mod parsers {
         let (i, species_type, hybrid, sspvar) = match modifier(i) {
             Ok((i, VARIETY)) => {
                 let (ii, sv) = sspvar(i)?;
-                (ii, SpeciesType::Variety, None, Some(sv.to_string()))
+                (ii, SpeciesType::Variety, None, sv.map(|x| x.to_string()))
             }
             Ok((i, SUBSPECIES)) => {
                 let (ii, sv) = sspvar(i)?;
-                (ii, SpeciesType::Subspecies, None, Some(sv.to_string()))
+                (ii, SpeciesType::Subspecies, None, sv.map(|x| x.to_string()))
             }
             Ok((i, HYBRID_START)) => {
                 let (ii, (a, b)) = hybrid(i)?;
@@ -244,6 +247,14 @@ pub(self) mod parsers {
                 Ok(("", ("alba", "michauxii")))
             );
             assert_eq!(
+                hybrid(" [Agrostis stolonifera × Polypogon monospeliensis]"),
+                Ok(("", ("Agrostis stolonifera", "Polypogon monospeliensis")))
+            );
+            assert_eq!(
+                hybrid(" [ericoides × novae-angliae]"),
+                Ok(("", ("ericoides", "novae-angliae")))
+            );
+            assert_eq!(
                 hybrid("Foo bar"),
                 Err(nom::Err::Error(nom::error::Error {
                     input: "Foo bar",
@@ -303,8 +314,10 @@ pub(self) mod parsers {
 
         #[test]
         fn test_sspvar() {
-            assert_eq!(sspvar("foo "), Ok(("", "foo")));
-            assert_eq!(sspvar("foo bar"), Ok(("bar", "foo")));
+            assert_eq!(sspvar("foo "), Ok(("", Some("foo"))));
+            assert_eq!(sspvar("foo bar"), Ok(("bar", Some("foo"))));
+            assert_eq!(sspvar("foo bar baz"), Ok(("bar baz", Some("foo"))));
+            assert_eq!(sspvar(""), Ok(("", None)));
         }
 
         #[test]

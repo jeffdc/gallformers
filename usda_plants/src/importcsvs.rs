@@ -9,6 +9,7 @@ use serde_json::Map;
 use serde_json::Value;
 use std::fs::File;
 use std::io::Read;
+use std::io::Write;
 use std::path::PathBuf;
 
 pub fn import() -> Res<()> {
@@ -38,6 +39,7 @@ pub fn import() -> Res<()> {
     let mut csv_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     csv_dir.push("data");
 
+    let mut failures = Vec::new();
     plant_db.conn.execute_batch("BEGIN TRANSACTION;")?;
     for csv_file in csv_dir.read_dir()? {
         let csv = csv_file?.path();
@@ -64,25 +66,47 @@ pub fn import() -> Res<()> {
         for r in rdr.deserialize() {
             let plant: PlantCSV = r?;
             let raw_name = plant.name.to_string();
-            let name = PlantName::new(raw_name)?;
-            if name.species_type == SpeciesType::OrthVar || name.species_type == SpeciesType::Other
-            {
-                // for now we are going to skip all of the weird taxonomy naming  variations and related
-            } else {
-                let id = plant_db.create_plant(&plant, name)?;
-                if !plant.common_name.trim().is_empty() {
-                    let cn_id = plant_db.create_alias(&plant.common_name)?;
-                    plant_db.relate_alias_to_plant(
-                        &cn_id.to_string(),
-                        AliasType::Common,
-                        &id.to_string(),
-                    )?;
+            // println!("{:?}", plant.name.to_string());
+            let name_result = PlantName::new(raw_name);
+            if let Ok(name) = name_result {
+                if name.species_type == SpeciesType::OrthVar
+                    || name.species_type == SpeciesType::Other
+                {
+                    // for now we are going to skip all of the weird taxonomy naming  variations and related
+                } else {
+                    let id = plant_db.create_plant(&plant, name)?;
+                    if !plant.common_name.trim().is_empty() {
+                        let cn_id = plant_db.create_alias(&plant.common_name)?;
+                        plant_db.relate_alias_to_plant(
+                            &cn_id.to_string(),
+                            AliasType::Common,
+                            &id.to_string(),
+                        )?;
+                    }
+                    plant_db.create_plant_region(&id.to_string(), &region_id.to_string())?;
                 }
-                plant_db.create_plant_region(&id.to_string(), &region_id.to_string())?;
+            } else {
+                failures.push(plant.name.to_string());
             }
         }
     }
     plant_db.conn.execute_batch("END TRANSACTION;")?;
+
+    if !failures.is_empty() {
+        let parse_failures_filename = "parse_failures.txt";
+        println!(
+            "There were {} items that were not parseable into Plants. Check {} for details.",
+            parse_failures_filename,
+            failures.len()
+        );
+
+        let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        p.push(parse_failures_filename);
+        let mut file = File::create(p)?;
+        for f in failures {
+            writeln!(&mut file, "{}", f)?;
+        }
+    }
 
     Ok(())
 }

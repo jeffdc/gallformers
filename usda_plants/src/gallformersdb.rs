@@ -1,18 +1,26 @@
+use crate::util::Region;
 use rusqlite::{Connection, Error, Statement};
+use std::convert::TryInto;
 
 /// simple context struct to manage the DB connection and prepared statements
 pub struct GallformersDB<'a> {
     pub conn: &'a Connection,
-    // create_plant_statement: Option<Statement<'a>>,
     host_exists_statement: Option<Statement<'a>>,
+    add_place_for_plant_statement: Option<Statement<'a>>,
+    create_place_statement: Option<Statement<'a>>,
+    select_place_by_code_statement: Option<Statement<'a>>,
+    create_place_place_statement: Option<Statement<'a>>,
 }
 
 impl<'a> GallformersDB<'a> {
     pub fn new(conn: &'a Connection) -> Self {
         GallformersDB {
             conn,
-            // create_plant_statement: None,
             host_exists_statement: None,
+            add_place_for_plant_statement: None,
+            create_place_statement: None,
+            select_place_by_code_statement: None,
+            create_place_place_statement: None,
         }
     }
 
@@ -33,15 +41,73 @@ impl<'a> GallformersDB<'a> {
         Ok(row.is_some())
     }
 
-    // /// inserts a plant, if it does not already exist. uniqueness is determined by name. returns the id of the plant.
-    // pub fn create_plant(&mut self, plant: &PlantCSV) -> Result<i64, Error> {
-    //     if let None = &self.create_plant_statement {
-    //         let stmt = self.connection.unwrap().prepare("INSERT OR IGNORE INTO plant (name, symbol, symbolsynonym, family) VALUES (:name, :symbol, :symbolsynonym, :family)")?;
-    //         self.create_plant_statement = Some(stmt);
-    //     };
-    //     // println!("Creating plant {:?}", plant);
-    //     self.create_plant_statement.as_mut().unwrap().execute(&[(":name", &plant.name), (":symbol", &plant.symbol), (":symbolsynonym", &plant.syn_symbol), (":family", &plant.family)])?;
+    pub fn select_place_by_code(&mut self, code: &str) -> Result<Option<Region>, Error> {
+        if self.select_place_by_code_statement.is_none() {
+            let stmt = self
+                .conn
+                .prepare("SELECT id, name, code, type FROM place WHERE code = :code;")?;
+            self.select_place_by_code_statement = Some(stmt);
+        }
+        let mut rows = self
+            .select_place_by_code_statement
+            .as_mut()
+            .unwrap()
+            .query_map(&[(":code", &code)], {
+                |r| {
+                    Ok(Region {
+                        id: r.get(0)?,
+                        name: r.get(1)?,
+                        code: r.get(2)?,
+                        typ: r.get(3)?,
+                    })
+                }
+            })?;
+        rows.next().transpose()
+    }
 
-    //     return self.select_plantid(&plant.name);
-    // }
+    pub fn create_or_fetch_place(&mut self, region: &Region) -> Result<i64, Error> {
+        if self.create_place_statement.is_none() {
+            let stmt = self.conn.prepare(
+                "INSERT OR IGNORE INTO place (name, code, type) VALUES (:name, :code, :type);",
+            )?;
+            self.create_place_statement = Some(stmt);
+        }
+        let r = self.create_place_statement.as_mut().unwrap().execute(&[
+            (":name", &region.name),
+            (":code", &region.code),
+            (":type", &region.typ),
+        ])?;
+        match r {
+            0 => Ok(self.select_place_by_code(&region.code)?.unwrap().id),
+            id => Ok(id.try_into().unwrap()),
+        }
+    }
+
+    pub fn add_place_for_plant(&mut self, species_id: i64, place_id: i64) -> Result<(), Error> {
+        if self.add_place_for_plant_statement.is_none() {
+            let stmt = self.conn.prepare(
+                "INSERT INTO speciesplace (species_id, place_id) VALUES (:species_id, :place_id);",
+            )?;
+            self.add_place_for_plant_statement = Some(stmt);
+        }
+        self.add_place_for_plant_statement
+            .as_mut()
+            .unwrap()
+            .execute(&[(":species_id", &species_id), (":place_id", &place_id)])?;
+        Ok(())
+    }
+
+    pub fn create_place_place(&mut self, parent_id: i64, place_id: i64) -> Result<(), Error> {
+        if self.create_place_place_statement.is_none() {
+            let stmt = self.conn.prepare(
+                "INSERT OR IGNORE INTO placeplace (parent_id, place_id) VALUES (:parent_id, :place_id);",
+            )?;
+            self.create_place_place_statement = Some(stmt);
+        }
+        self.create_place_place_statement
+            .as_mut()
+            .unwrap()
+            .execute(&[(":parent_id", &parent_id), (":place_id", &place_id)])?;
+        Ok(())
+    }
 }

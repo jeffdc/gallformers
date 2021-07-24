@@ -18,6 +18,7 @@ CREATE TABLE plant (
     symbolsynonym TEXT    NOT NULL DEFAULT "",
     family        TEXT    NOT NULL,
     genus         TEXT    NOT NULL,
+    specific      TEXT    NOT NULL,
     type          TEXT    NOT NULL CHECK (type IN ("ssp.", "var.", "sp.", "x") ),
     sspvar        TEXT    NOT NULL DEFAULT "",
     hybridpair    TEXT    NOT NULL DEFAULT "",
@@ -28,7 +29,7 @@ CREATE TABLE plant (
 CREATE TABLE plantalias (
     plant_id  INTEGER REFERENCES plant (id) ON DELETE CASCADE,
     alias_id  INTEGER REFERENCES alias (id) ON DELETE CASCADE,
-    type      TEXT NOT NULL CHECK (type IN ("common", "orth. var.")
+    type      TEXT NOT NULL CHECK (type IN ("common", "orth. var.") )
 );
 
 CREATE TABLE plantregion (
