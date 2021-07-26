@@ -8,7 +8,7 @@ pub struct GallformersDB<'a> {
     host_exists_statement: Option<Statement<'a>>,
     add_place_for_plant_statement: Option<Statement<'a>>,
     create_place_statement: Option<Statement<'a>>,
-    select_place_by_code_statement: Option<Statement<'a>>,
+    select_place_by_name_statement: Option<Statement<'a>>,
     create_place_place_statement: Option<Statement<'a>>,
 }
 
@@ -19,7 +19,7 @@ impl<'a> GallformersDB<'a> {
             host_exists_statement: None,
             add_place_for_plant_statement: None,
             create_place_statement: None,
-            select_place_by_code_statement: None,
+            select_place_by_name_statement: None,
             create_place_place_statement: None,
         }
     }
@@ -41,18 +41,18 @@ impl<'a> GallformersDB<'a> {
         Ok(row.is_some())
     }
 
-    pub fn select_place_by_code(&mut self, code: &str) -> Result<Option<Region>, Error> {
-        if self.select_place_by_code_statement.is_none() {
+    pub fn select_place_by_name(&mut self, name: &str) -> Result<Option<Region>, Error> {
+        if self.select_place_by_name_statement.is_none() {
             let stmt = self
                 .conn
-                .prepare("SELECT id, name, code, type FROM place WHERE code = :code;")?;
-            self.select_place_by_code_statement = Some(stmt);
+                .prepare("SELECT id, name, code, type FROM place WHERE name = :name;")?;
+            self.select_place_by_name_statement = Some(stmt);
         }
         let mut rows = self
-            .select_place_by_code_statement
+            .select_place_by_name_statement
             .as_mut()
             .unwrap()
-            .query_map(&[(":code", &code)], {
+            .query_map(&[(":name", &name)], {
                 |r| {
                     Ok(Region {
                         id: r.get(0)?,
@@ -78,7 +78,7 @@ impl<'a> GallformersDB<'a> {
             (":type", &region.typ),
         ])?;
         match r {
-            0 => Ok(self.select_place_by_code(&region.code)?.unwrap().id),
+            0 => Ok(self.select_place_by_name(&region.name)?.unwrap().id),
             id => Ok(id.try_into().unwrap()),
         }
     }

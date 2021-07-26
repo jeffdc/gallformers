@@ -80,6 +80,7 @@ export type SearchQuery = {
     cells: string[];
     form: string[];
     undescribed: boolean;
+    place: string[];
 };
 
 export const EMPTYSEARCHQUERY: SearchQuery = {
@@ -94,6 +95,7 @@ export const EMPTYSEARCHQUERY: SearchQuery = {
     season: [],
     form: [],
     undescribed: false,
+    place: [],
 };
 
 export type Deletable = {
@@ -239,16 +241,19 @@ export type SimpleSpecies = {
     taxoncode: string;
     name: string;
 };
-
-export type SpeciesApi = SimpleSpecies & {
-    datacomplete: boolean;
-    abundance: Option<AbundanceApi>;
-    description: Option<string>; // to make the caller's life easier we will load the default if we can
-    speciessource: SpeciesSourceApi[];
-    images: ImageApi[];
-    aliases: AliasApi[];
-    fgs: FGS;
+export type WithImages = {
+    images: ImageApi[] | ImageNoSourceApi[];
 };
+
+export type SpeciesApi = SimpleSpecies &
+    WithImages & {
+        datacomplete: boolean;
+        abundance: Option<AbundanceApi>;
+        description: Option<string>; // to make the caller's life easier we will load the default if we can
+        speciessource: SpeciesSourceApi[];
+        aliases: AliasApi[];
+        fgs: FGS;
+    };
 
 export type AliasApi = {
     id: number;
@@ -337,6 +342,38 @@ export const EmptyForm: FormApi = {
     description: O.none,
 };
 
+export type PlaceApi = {
+    id: number;
+    name: string;
+    code: string;
+    type: string;
+    parent: PlaceApi[];
+    children: PlaceApi[];
+};
+
+export type PlaceWithHostsApi = PlaceApi & {
+    hosts: HostSimple[];
+};
+
+// a cut down structure for the ID page
+export type GallIDApi = WithImages & {
+    id: number;
+    name: string;
+    datacomplete: boolean;
+    alignments: string[];
+    cells: string[];
+    colors: string[];
+    detachable: DetachableApi;
+    forms: string[];
+    locations: string[];
+    places: string[];
+    seasons: string[];
+    shapes: string[];
+    textures: string[];
+    undescribed: boolean;
+    walls: string[];
+};
+
 export type GallApi = SpeciesApi & {
     gall: {
         id: number;
@@ -369,6 +406,7 @@ export type GallSimple = {
 
 export type HostApi = SpeciesApi & {
     galls: GallSimple[];
+    places: PlaceApi[];
 };
 
 export type SourceUpsertFields = Deletable & {
@@ -434,15 +472,11 @@ export const asLicenseType = (l: string): LicenseType => {
     }
 };
 
-export type ImageApi = {
+export type ImageNoSourceApi = {
     id: number;
     attribution: string;
     creator: string;
-    license: LicenseType;
-    licenselink: string;
     path: string;
-    sourcelink: string;
-    source: Option<SourceWithSpeciesSourceApi>;
     uploader: string;
     lastchangedby: string;
     caption: string;
@@ -453,6 +487,13 @@ export type ImageApi = {
     large: string;
     xlarge: string;
     original: string;
+};
+
+export type ImageApi = ImageNoSourceApi & {
+    license: LicenseType;
+    licenselink: string;
+    sourcelink: string;
+    source: Option<SourceWithSpeciesSourceApi>;
 };
 
 export type ImagePaths = {

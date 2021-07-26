@@ -1,11 +1,11 @@
-import { pipe } from 'fp-ts/lib/function';
 import * as E from 'fp-ts/lib/Either';
+import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as R from 'fp-ts/lib/Record';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Err, getQueryParam, sendErrResponse, sendSuccResponse, toErr } from '../../../libs/api/apipage';
-import { GallApi } from '../../../libs/api/apitypes';
+import { GallIDApi } from '../../../libs/api/apitypes';
 import { gallsByHostGenus, gallsByHostName, gallsByHostSection } from '../../../libs/db/gall';
 
 /**
@@ -16,7 +16,7 @@ import { gallsByHostGenus, gallsByHostName, gallsByHostSection } from '../../../
  * - section - the section name to search on
  */
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
-    const noParamsErr = O.of(TE.left<Err, GallApi[]>({ status: 400, msg: 'No valid query params provided.' }));
+    const noParamsErr = O.of(TE.left<Err, GallIDApi[]>({ status: 400, msg: 'No valid query params provided.' }));
 
     await pipe(
         { host: 'host', genus: 'genus', section: 'section' },

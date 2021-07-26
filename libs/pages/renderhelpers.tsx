@@ -1,6 +1,6 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
-import { CCBY, DetachableDetachable, GallApi, ImageApi, SourceApi, SpeciesApi } from '../api/apitypes';
+import { CCBY, DetachableDetachable, GallIDApi, ImageApi, SourceApi, WithImages } from '../api/apitypes';
 import { truncateAtWord } from '../utils/util';
 
 /**
@@ -57,7 +57,7 @@ export const formatLicense = (source: SourceApi): string => {
  * image is marked as default then an image will be returned but it is not necessarily determenisitc which one.
  * @param species
  */
-export const defaultImage = <T extends SpeciesApi>(species: T): ImageApi | undefined => {
+export const defaultImage = <T extends WithImages>(species: T): ImageApi | undefined => {
     let defaultImage = species.images.find((i) => i.default);
     if (!defaultImage && species.images.length > 0) defaultImage = species.images[0];
 
@@ -95,15 +95,13 @@ const pj = (vals: string[]): string => {
 
 const punctIf = (punct: string, predicate: () => boolean) => (predicate() ? punct : '');
 
-export const createSummary = (g: GallApi): string => {
-    const s = `${pj(g.gall.gallshape.map((s) => s.shape))}${punctIf(', ', () => g.gall.gallshape.length > 0)}${pj(
-        g.gall.gallcolor.map((c) => c.color),
-    )}${punctIf(', ', () => g.gall.gallcolor.length > 0)}${pj(g.gall.galltexture.map((t) => t.tex))}${punctIf(
+export const createSummary = (g: GallIDApi): string => {
+    const s = `${pj(g.shapes)}${punctIf(', ', () => g.shapes.length > 0)}${pj(g.colors)}${punctIf(
         ', ',
-        () => g.gall.galltexture.length > 0,
-    )}${g.gall.detachable.id === DetachableDetachable.id ? 'detachable' : 'integral'} gall found on the ${pj(
-        g.gall.galllocation.map((l) => l.loc),
-    )}${punctIf(' beginning in ', () => g.gall.gallseason.length > 0)}${pj(g.gall.gallseason.map((s) => s.season))}.`;
+        () => g.colors.length > 0,
+    )}${pj(g.textures)}${punctIf(', ', () => g.textures.length > 0)}${
+        g.detachable.id === DetachableDetachable.id ? 'detachable' : 'integral'
+    } gall found on the ${pj(g.locations)}${punctIf(' beginning in ', () => g.seasons.length > 0)}${pj(g.seasons)}.`;
 
     if (['a', 'e', 'i', 'o', 'u', 'y'].find((l) => l === s[0])) return `An ${s}`;
     else return `A ${s}`;

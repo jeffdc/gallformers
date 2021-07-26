@@ -38,7 +38,7 @@ pub fn export() -> Res<()> {
     gf_db.conn.execute_batch("BEGIN TRANSACTION;")?;
 
     // add all of the regions in the plants db as places and since they are all states assign them to the US
-    let country_us = gf_db.select_place_by_code("US")?.unwrap();
+    let country_us = gf_db.select_place_by_name("United States")?.unwrap();
     let mut places = HashMap::new();
     for r in plant_db.select_all_regions()? {
         let id = gf_db.create_or_fetch_place(&r)?;

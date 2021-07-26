@@ -125,6 +125,7 @@ INSERT INTO placeplace (place_id, parent_id)
 FROM place WHERE type ="province";
 
 PRAGMA foreign_keys=ON;
+VACUUM;
 
 --------------------------------------------------------------
 -- Down

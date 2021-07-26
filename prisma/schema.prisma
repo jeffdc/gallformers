@@ -213,16 +213,16 @@ model place {
   name     String         @unique
   code     String
   type     String
-  parents  placeplace[]   @relation("placeToplaceplace_place_id")
-  children placeplace[]   @relation("placeToplacepalce_parent_id")
+  children placeplace[]   @relation("children")
+  parent   placeplace[]   @relation("parent")
   species  speciesplace[] @relation("placeTospeciesplace_place_id")
 }
 
 model placeplace {
   place_id  Int
   parent_id Int
-  place     place @relation("placeToplaceplace_place_id", fields: [place_id], references: [id])
-  parent    place @relation("placeToplacepalce_parent_id", fields: [parent_id], references: [id])
+  child     place @relation("children", fields: [place_id], references: [id])
+  parent    place @relation("parent", fields: [parent_id], references: [id])
 
   @@id([place_id, parent_id])
 }
@@ -353,10 +353,10 @@ model walls {
 
 model gallseason {
   id        Int     @id @default(autoincrement())
-  gall_id   Int?
-  season_id Int?
-  gall      gall?   @relation(fields: [gall_id], references: [id])
-  season    season? @relation(fields: [season_id], references: [id])
+  gall_id   Int
+  season_id Int
+  gall      gall   @relation(fields: [gall_id], references: [id])
+  season    season @relation(fields: [season_id], references: [id])
 }
 
 model season {
