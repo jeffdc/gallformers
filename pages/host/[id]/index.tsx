@@ -98,6 +98,10 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                     <Row>
                         <Col>
                             <p className="font-italic">{host.aliases.map((a) => a.name).join(', ')}</p>
+                        </Col>
+                    </Row>
+                    <Row>
+                        <Col>
                             <p>
                                 <strong>Family:</strong>
                                 <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
@@ -136,6 +140,16 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                             )}
                         </Col>
                     </Row>
+                    <Row>
+                        <Col>
+                            <strong>Range:</strong>{' '}
+                            {host.places.map((p) => (
+                                <Link key={p.id} href={`/place/${p.id}`}>
+                                    <a>{p.code} </a>
+                                </Link>
+                            ))}
+                        </Col>
+                    </Row>
                     <Row className="pt-2">
                         <Col>
                             <BootstrapTable
@@ -167,7 +181,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                 </Col>
 
                 <Col sm={12} md={6} lg={4} className="border rounded p-1">
-                    <Images species={host} type="host" />
+                    <Images sp={host} type="host" />
                 </Col>
             </Row>
             <hr />

@@ -25,11 +25,12 @@ import {
     Detachables,
     EMPTYSEARCHQUERY,
     FormApi,
-    GallApi,
+    GallIDApi,
     GallLocation,
     GallTexture,
     HostSimple,
     HostTaxon,
+    PlaceApi,
     SearchQuery,
     SeasonApi,
     ShapeApi,
@@ -48,6 +49,7 @@ import {
     getWalls,
 } from '../libs/db/gall';
 import { allHostsSimple } from '../libs/db/host';
+import { getPlaces } from '../libs/db/place';
 import { allGenera, allSections } from '../libs/db/taxonomy';
 import { createSummary, defaultImage } from '../libs/pages/renderhelpers';
 import { checkGall, GALL_FORM, LEAF_ANYWHERE } from '../libs/utils/gallsearch';
@@ -77,6 +79,7 @@ type FilterFormFields = {
     season: string;
     form: string;
     undescribed: boolean;
+    place: string[];
 };
 
 const invalidArraySelection = (arr: unknown[]) => {
@@ -116,6 +119,7 @@ type Props = {
     walls: WallsApi[];
     cells: CellsApi[];
     forms: FormApi[];
+    places: PlaceApi[];
 };
 
 const convertQForUrl = (hostOrTaxon: TaxonomyEntryNoParent | HostSimple | undefined, q: SearchQuery | undefined | null) => ({
@@ -134,6 +138,7 @@ const convertQForUrl = (hostOrTaxon: TaxonomyEntryNoParent | HostSimple | undefi
               walls: q.walls.join(','),
               form: q.form.join(','),
               undescribed: q.undescribed,
+              place: q.place,
           }
         : null),
 });
@@ -143,8 +148,8 @@ const isHostComplete = (hostOrTaxon: TaxonomyEntryNoParent | HostSimple | null |
 };
 
 const IDGall = (props: Props): JSX.Element => {
-    const [galls, setGalls] = useState(new Array<GallApi>());
-    const [filtered, setFiltered] = useState(new Array<GallApi>());
+    const [galls, setGalls] = useState(new Array<GallIDApi>());
+    const [filtered, setFiltered] = useState(new Array<GallIDApi>());
     const [hostOrTaxon, setHostOrTaxon] = useState(props?.hostOrTaxon);
     const [query, setQuery] = useState(props.query);
     const [showAdvanced, setShowAdvanced] = useState(
@@ -226,7 +231,7 @@ const IDGall = (props: Props): JSX.Element => {
                 });
 
                 if (res.status === 200) {
-                    const g = (await res.json()) as GallApi[];
+                    const g = (await res.json()) as GallIDApi[];
                     if (!g || !Array.isArray(g)) {
                         throw new Error('Received an invalid search result.');
                     }
@@ -318,6 +323,8 @@ const IDGall = (props: Props): JSX.Element => {
                                     selected={hostOrTaxon && isHost(hostOrTaxon) ? [hostOrTaxon] : []}
                                     onChange={(h) => {
                                         setHostOrTaxon(h[0]);
+                                        // clear the Place if any
+                                        if (query) query.place = [];
                                     }}
                                     placeholder="Host"
                                     clearButton
@@ -441,7 +448,7 @@ const IDGall = (props: Props): JSX.Element => {
                             </Col>
                             <Col sm={12} md={4}>
                                 <label className="col-form-label">
-                                    Detachable:{' '}
+                                    Detachable:
                                     <InfoTip id="detachable" text="Can the gall be removed from the host without cutting?" />
                                 </label>
                                 <Typeahead
@@ -461,13 +468,33 @@ const IDGall = (props: Props): JSX.Element => {
                                 />
                             </Col>
                             <Col sm={12} md={3}>
+                                <label className="col-form-label">
+                                    Place:
+                                    <InfoTip
+                                        id="place"
+                                        text="Where did you see the Gall? (US states or CAN provinces). This is only active if you are searching by Genus or Section since individual species are already range constrained."
+                                    />
+                                </label>
+                                <Typeahead
+                                    name="place"
+                                    control={filterControl}
+                                    selected={query ? query.place : []}
+                                    onChange={(selected) => {
+                                        setQuery({
+                                            ...(query ? query : EMPTYSEARCHQUERY),
+                                            place: selected.length > 0 ? selected : [],
+                                        });
+                                    }}
+                                    options={props.places.map((p) => p.name)}
+                                    disabled={disableFilter() || isHost(hostOrTaxon)}
+                                    clearButton={true}
+                                />
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col xs={12}>
                                 <Row>
-                                    <Col xs={6} md={12} className="pt-2">
-                                        <Button variant="outline-danger" size="sm" onClick={resetForm}>
-                                            Clear All Filters
-                                        </Button>
-                                    </Col>
-                                    <Col xs={6} md={12} className="pt-2">
+                                    <Col className="pt-2">
                                         <Button
                                             variant="outline-secondary"
                                             size="sm"
@@ -478,6 +505,11 @@ const IDGall = (props: Props): JSX.Element => {
                                         {!showAdvanced && advancedHasSelection() && (
                                             <p className="text-danger small">You have active selections in the hidden filters.</p>
                                         )}
+                                    </Col>
+                                    <Col className="pt-2 text-right">
+                                        <Button variant="outline-danger" size="sm" onClick={resetForm}>
+                                            Clear All Filters
+                                        </Button>
                                     </Col>
                                 </Row>
                             </Col>
@@ -628,37 +660,40 @@ const IDGall = (props: Props): JSX.Element => {
             <Row className="pl-2 pr-2">
                 <Col>
                     <Row>
-                        {filtered.map((g) => (
-                            <Col key={g.id.toString() + 'col'} xs={6} md={3} className="pb-2">
-                                <Card key={g.id} border="secondary">
-                                    <Link href={`gall/${g.id}`}>
-                                        <a>
-                                            <Card.Img
-                                                variant="top"
-                                                src={defaultImage(g)?.small ? defaultImage(g)?.small : '/images/noimage.jpg'}
-                                                alt={`image of ${g.name}`}
-                                            />
-                                        </a>
-                                    </Link>
-                                    <Card.Body>
-                                        <Card.Title>
-                                            <Link href={`gall/${g.id}`}>
-                                                <a className="small">{g.name}</a>
-                                            </Link>
-                                        </Card.Title>
-                                        <Card.Text className="small">
-                                            {!defaultImage(g) && createSummary(g)}
-                                            {session && (
-                                                <span className="p-0 pr-1 my-auto">
-                                                    <Edit id={g.id} type="gall" />
-                                                    {g.datacomplete ? '💯' : '❓'}
-                                                </span>
-                                            )}
-                                        </Card.Text>
-                                    </Card.Body>
-                                </Card>
-                            </Col>
-                        ))}
+                        {filtered.map((g) => {
+                            const summary = createSummary(g);
+                            return (
+                                <Col key={g.id.toString() + 'col'} xs={6} md={3} className="pb-2">
+                                    <Card key={g.id} border="secondary">
+                                        <Link href={`gall/${g.id}`}>
+                                            <a>
+                                                <Card.Img
+                                                    variant="top"
+                                                    src={defaultImage(g)?.small ? defaultImage(g)?.small : '/images/noimage.jpg'}
+                                                    alt={`${g.name} - ${summary}`}
+                                                />
+                                            </a>
+                                        </Link>
+                                        <Card.Body>
+                                            <Card.Title>
+                                                <Link href={`gall/${g.id}`}>
+                                                    <a className="small">{g.name}</a>
+                                                </Link>
+                                            </Card.Title>
+                                            <Card.Text className="small">
+                                                {!defaultImage(g) && summary}
+                                                {session && (
+                                                    <span className="p-0 pr-1 my-auto">
+                                                        <Edit id={g.id} type="gall" />
+                                                        {g.datacomplete ? '💯' : '❓'}
+                                                    </span>
+                                                )}
+                                            </Card.Text>
+                                        </Card.Body>
+                                    </Card>
+                                </Col>
+                            );
+                        })}
                     </Row>
                 </Col>
             </Row>
@@ -718,6 +753,7 @@ const queryUrlParams = [
     'season',
     'form',
     'undescribed',
+    'place',
 ];
 
 // Ideally we would generate this page and serve it statically via getStaticProps and use Incremental Static Regeneration.
@@ -775,6 +811,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
                   O.map((u) => u === 'true'),
                   O.getOrElse(constFalse),
               ),
+              place: pipe(query['place'], O.fold(constant([]), split)),
           }
         : null;
 
@@ -787,6 +824,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     const walls = await mightFailWithArray<WallsApi>()(getWalls());
     const cells = await mightFailWithArray<CellsApi>()(getCells());
     const forms = await mightFailWithArray<FormApi>()(getForms());
+    const places = await mightFailWithArray<PlaceApi>()(getPlaces({ type: { in: ['state', 'province'] } }));
 
     return {
         props: {
@@ -803,6 +841,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             walls: walls,
             cells: cells,
             forms: forms,
+            places: places,
         },
     };
 };

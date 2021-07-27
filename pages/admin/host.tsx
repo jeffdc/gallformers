@@ -90,6 +90,7 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
     const createNewHost = (name: string): HostApi => ({
         ...createNewSpecies(name, HostTaxon),
         galls: [],
+        places: [],
     });
 
     const {

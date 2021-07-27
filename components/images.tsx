@@ -7,17 +7,29 @@ import { useRouter } from 'next/router';
 import React, { useState } from 'react';
 import { Button, ButtonGroup, ButtonToolbar, Col, Modal, OverlayTrigger, Popover, Row } from 'react-bootstrap';
 import useWindowDimensions from '../hooks/usewindowdimension';
-import { SpeciesApi } from '../libs/api/apitypes';
+import { ImageApi, ImageNoSourceApi, SpeciesApi } from '../libs/api/apitypes';
 import Carousel from 'nuka-carousel';
+import { hasProp } from '../libs/utils/util';
+
+// type guard for dealing with possible Images without Source data. If this happens there is an upstream
+// programming error so we will fail fast and hard.
+const checkHasSource = (i: ImageApi | ImageNoSourceApi): i is ImageApi => hasProp(i, 'sourcelink');
+const checkSource = (i: ImageApi | ImageNoSourceApi): ImageApi => {
+    if (checkHasSource(i)) {
+        return i;
+    } else {
+        throw new Error('Received an Image missing Source typings.');
+    }
+};
 
 type Props = {
-    species: SpeciesApi;
+    sp: SpeciesApi;
     type: 'gall' | 'host';
 };
 
-const Images = ({ species }: Props): JSX.Element => {
+const Images = ({ sp }: Props): JSX.Element => {
     const [showModal, setShowModal] = useState(false);
-    const [currentImage, setCurrentImage] = useState(species.images.length > 0 ? species.images[0] : undefined);
+    const [currentImage, setCurrentImage] = useState(sp.images.length > 0 ? checkSource(sp.images[0]) : undefined);
     const [imgIndex, setImgIndex] = useState(0);
     const [showInfo, setShowInfo] = useState(false);
     const { width } = useWindowDimensions();
@@ -27,6 +39,11 @@ const Images = ({ species }: Props): JSX.Element => {
 
     const pad = 25;
     const hwRatio = 2 / 3;
+
+    const species = {
+        ...sp,
+        images: sp.images.map((i) => checkSource(i)),
+    };
 
     // sort so that the default image always is first
     species.images.sort((a) => (a.default ? -1 : 1));

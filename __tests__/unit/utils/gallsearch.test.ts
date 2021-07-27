@@ -1,23 +1,12 @@
-import * as O from 'fp-ts/lib/Option';
 import {
-    AlignmentApi,
-    CellsApi,
-    ColorApi,
     DetachableApi,
     DetachableBoth,
     DetachableDetachable,
     DetachableIntegral,
     DetachableNone,
-    GallApi,
-    GallLocation,
-    GallTaxon,
-    GallTexture,
+    GallIDApi,
     SearchQuery,
-    SeasonApi,
-    ShapeApi,
-    WallsApi,
 } from '../../../libs/api/apitypes';
-import { FAMILY, GENUS } from '../../../libs/api/taxonomy';
 import { checkGall, testables } from '../../../libs/utils/gallsearch';
 
 const { dontCare } = testables;
@@ -31,36 +20,23 @@ describe('dontCare tests', () => {
 });
 
 describe('checkGall tests', () => {
-    const g: GallApi = {
-        abundance: O.none,
-        description: O.of('The chicken gall...'),
-        gall: {
-            id: -1,
-            undescribed: false,
-            gallalignment: [],
-            gallcells: [],
-            gallcolor: [],
-            detachable: DetachableNone,
-            galllocation: [],
-            gallseason: [],
-            galltexture: [],
-            gallshape: [],
-            gallwalls: [],
-            gallform: [],
-        },
-        hosts: [],
-        id: 1,
+    const g: GallIDApi = {
+        id: -1,
+        undescribed: false,
+        alignments: [],
+        cells: [],
+        colors: [],
+        detachable: DetachableNone,
+        locations: [],
+        seasons: [],
+        textures: [],
+        shapes: [],
+        walls: [],
+        forms: [],
         name: 'Gallus gallus',
-        speciessource: [],
-        taxoncode: GallTaxon,
         images: [],
         datacomplete: false,
-        aliases: [],
-        fgs: {
-            family: { id: 1, name: 'Phasianidae', description: '', type: FAMILY },
-            genus: { id: 1, name: 'Gallus', description: '', type: GENUS },
-            section: O.none,
-        },
+        places: [],
     };
 
     const q: SearchQuery = {
@@ -75,85 +51,81 @@ describe('checkGall tests', () => {
         walls: [],
         form: [],
         undescribed: false,
+        place: [],
     };
 
     // helper to create test galls in the tests.
-    const makeG = (
-        k: keyof GallApi['gall'],
-        v:
-            | AlignmentApi[]
-            | CellsApi[]
-            | ColorApi[]
-            | DetachableApi
-            | GallLocation[]
-            | GallTexture[]
-            | SeasonApi[]
-            | ShapeApi[]
-            | WallsApi[],
-    ): GallApi => ({
+    const makeG = (k: keyof GallIDApi, v: string[] | DetachableApi): GallIDApi => ({
         ...g,
-        gall: { ...g.gall, [k]: v },
+        [k]: v,
     });
 
     test('Should not fail to match for any search field that is undefined, empty string, or empty array', () => {
         expect(checkGall(g, q)).toBeTruthy();
-        expect(checkGall(makeG('gallalignment', [{ alignment: '', id: 1, description: O.of('') }]), q)).toBeTruthy();
-        expect(checkGall(makeG('gallcells', [{ cells: '', id: 1, description: O.of('') }]), q)).toBeTruthy();
-        expect(checkGall(makeG('gallcolor', [{ color: '', id: 1 }]), q)).toBeTruthy();
-        expect(checkGall(makeG('gallseason', [{ season: '', id: 1 }]), q)).toBeTruthy();
-        expect(checkGall(makeG('gallshape', [{ shape: '', id: 1, description: O.of('') }]), q)).toBeTruthy();
-        expect(checkGall(makeG('gallwalls', [{ walls: '', id: 1, description: O.of('') }]), q)).toBeTruthy();
-        expect(checkGall(makeG('galllocation', [{ loc: '', id: 1, description: O.of('') }]), q)).toBeTruthy();
-        expect(checkGall(makeG('galltexture', [{ tex: '', id: 1, description: O.of('') }]), q)).toBeTruthy();
+        expect(checkGall(makeG('alignments', ['']), q)).toBeTruthy();
+        expect(checkGall(makeG('cells', ['']), q)).toBeTruthy();
+        expect(checkGall(makeG('colors', ['']), q)).toBeTruthy();
+        expect(checkGall(makeG('seasons', ['']), q)).toBeTruthy();
+        expect(checkGall(makeG('shapes', ['']), q)).toBeTruthy();
+        expect(checkGall(makeG('walls', ['']), q)).toBeTruthy();
+        expect(checkGall(makeG('locations', ['']), q)).toBeTruthy();
+        expect(checkGall(makeG('textures', ['']), q)).toBeTruthy();
+        expect(checkGall(makeG('places', ['']), q)).toBeTruthy();
     });
 
     test('Should match when provided query has single matches', () => {
         expect(
-            checkGall(makeG('gallalignment', [{ alignment: 'foo', id: 1, description: O.of('') }]), {
+            checkGall(makeG('alignments', ['foo']), {
                 ...q,
                 alignment: ['foo'],
             }),
         ).toBeTruthy();
         expect(
-            checkGall(makeG('gallcells', [{ cells: 'foo', id: 1, description: O.of('') }]), {
+            checkGall(makeG('cells', ['foo']), {
                 ...q,
                 cells: ['foo'],
             }),
         ).toBeTruthy();
         expect(
-            checkGall(makeG('gallcolor', [{ color: 'foo', id: 1 }]), {
+            checkGall(makeG('colors', ['foo']), {
                 ...q,
                 color: ['foo'],
             }),
         ).toBeTruthy();
         expect(
-            checkGall(makeG('gallseason', [{ season: 'foo', id: 1 }]), {
+            checkGall(makeG('seasons', ['foo']), {
                 ...q,
                 season: ['foo'],
             }),
         ).toBeTruthy();
         expect(
-            checkGall(makeG('gallshape', [{ shape: 'foo', id: 1, description: O.of('') }]), {
+            checkGall(makeG('shapes', ['foo']), {
                 ...q,
                 shape: ['foo'],
             }),
         ).toBeTruthy();
         expect(
-            checkGall(makeG('gallwalls', [{ walls: 'foo', id: 1, description: O.of('') }]), {
+            checkGall(makeG('walls', ['foo']), {
                 ...q,
                 walls: ['foo'],
             }),
         ).toBeTruthy();
         expect(
-            checkGall(makeG('galllocation', [{ loc: 'foo', id: 1, description: O.of('') }]), {
+            checkGall(makeG('locations', ['foo']), {
                 ...q,
                 locations: ['foo'],
             }),
         ).toBeTruthy();
         expect(
-            checkGall(makeG('galltexture', [{ tex: 'foo', id: 1, description: O.of('') }]), {
+            checkGall(makeG('textures', ['foo']), {
                 ...q,
                 textures: ['foo'],
+            }),
+        ).toBeTruthy();
+        expect(
+            checkGall(makeG('places', ['foo']), {
+                ...q,
+                place: ['foo'],
             }),
         ).toBeTruthy();
     });
@@ -194,17 +166,15 @@ describe('checkGall tests', () => {
             checkGall(
                 {
                     ...g,
-                    gall: {
-                        ...g.gall,
-                        gallalignment: [{ alignment: 'afoo', id: 1, description: O.none }],
-                        gallcolor: [{ color: 'cofoo', id: 1 }],
-                        gallcells: [{ cells: 'cefoo', id: 1, description: O.none }],
-                        gallseason: [{ season: 'sefoo', id: 1 }],
-                        gallshape: [{ shape: 'sfoo', id: 1, description: O.none }],
-                        gallwalls: [{ walls: 'wfoo', id: 1, description: O.none }],
-                        galllocation: [{ loc: 'lfoo', id: 1, description: O.none }],
-                        galltexture: [{ tex: 'tfoo', id: 1, description: O.none }],
-                    },
+                    alignments: ['afoo'],
+                    colors: ['cofoo'],
+                    cells: ['cefoo'],
+                    seasons: ['sefoo'],
+                    shapes: ['sfoo'],
+                    walls: ['wfoo'],
+                    locations: ['lfoo'],
+                    textures: ['tfoo'],
+                    places: ['pfoo'],
                 },
                 {
                     ...q,
@@ -216,6 +186,7 @@ describe('checkGall tests', () => {
                     walls: ['wfoo'],
                     locations: ['lfoo'],
                     textures: ['tfoo'],
+                    place: ['pfoo'],
                 },
             ),
         ).toBeTruthy();
@@ -224,38 +195,14 @@ describe('checkGall tests', () => {
     test('Handles array types correctly', () => {
         const theG = {
             ...g,
-            gall: {
-                ...g.gall,
-                gallalignment: [
-                    { alignment: 'afoo1', id: 1, description: O.of('') },
-                    { alignment: 'afoo2', id: 2, description: O.of('') },
-                ],
-                gallcolor: [
-                    { color: 'cfoo1', id: 1, description: O.of('') },
-                    { color: 'cfoo2', id: 2, description: O.of('') },
-                ],
-                gallseason: [
-                    { season: 'sefoo1', id: 1, description: O.of('') },
-                    { season: 'sefoo2', id: 2, description: O.of('') },
-                ],
-                gallcells: [
-                    { cells: 'cefoo1', id: 1, description: O.of('') },
-                    { cells: 'cefoo2', id: 2, description: O.of('') },
-                ],
-                gallwalls: [
-                    { walls: 'wfoo1', id: 1, description: O.of('') },
-                    { walls: 'wfoo2', id: 2, description: O.of('') },
-                ],
-                gallshape: [
-                    { shape: 'sfoo1', id: 1, description: O.of('') },
-                    { shape: 'sfoo2', id: 2, description: O.of('') },
-                ],
-                galllocation: [
-                    { loc: 'lfoo1', id: 1, description: O.of('') },
-                    { loc: 'lfoo2', id: 2, description: O.of('') },
-                ],
-                galltexture: [{ tex: 'tfoo', id: 1, description: O.of('') }],
-            },
+            alignments: ['afoo1', 'afoo2'],
+            colors: ['cfoo1', 'cfoo2'],
+            seasons: ['sefoo1', 'sefoo2'],
+            cells: ['cefoo1', 'cefoo2'],
+            walls: ['wfoo1', 'wfoo2'],
+            shapes: ['sfoo1', 'sfoo2'],
+            locations: ['lfoo1', 'lfoo2'],
+            textures: ['tfoo'],
         };
 
         expect(
