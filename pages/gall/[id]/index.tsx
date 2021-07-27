@@ -6,7 +6,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
-import { Button, Col, Container, OverlayTrigger, Row, Tooltip, Alert } from 'react-bootstrap';
+import { Alert, Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
@@ -21,7 +21,7 @@ import { allGallIds, gallById, getRelatedGalls } from '../../../libs/db/gall';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkSourceToGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWith, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { createSummary, defaultSource, formatLicense, sourceToDisplay } from '../../../libs/pages/renderhelpers';
+import { createSummaryGall, defaultSource, formatLicense, sourceToDisplay } from '../../../libs/pages/renderhelpers';
 import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
@@ -63,7 +63,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
         <Container className="pt-2 fluid">
             <Head>
                 <title>{species.name}</title>
-                <meta name={species.name} content={createSummary(species)} />
+                <meta name={species.name} content={createSummaryGall(species)} />
             </Head>
             <Row className="mt-2">
                 {/* Details */}
@@ -187,7 +187,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                 </Col>
                 {/* Images */}
                 <Col sm={{ span: 12 }} md={4}>
-                    <Images species={species} type="gall" />
+                    <Images sp={species} type="gall" />
                 </Col>
                 {/* Description */}
                 <Col>

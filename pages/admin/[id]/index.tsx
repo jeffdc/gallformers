@@ -2,14 +2,8 @@ import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import React from 'react';
 import Auth from '../../../components/auth';
-import { hostById } from '../../../libs/db/host';
-import { getPlaces, placeById } from '../../../libs/db/place';
-import { getFamiliesWithSpecies } from '../../../libs/db/taxonomy';
-import { getStaticPropsWith, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { mightFail, mightFailWithArray } from '../../../libs/utils/util';
-import * as O from 'fp-ts/lib/Option';
-import { GallIDApi, PlaceApi } from '../../../libs/api/apitypes';
-import { gallsByHostGenus } from '../../../libs/db/gall';
+import { placeById } from '../../../libs/db/place';
+import { getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 
 type Props = {
     data: unknown[];

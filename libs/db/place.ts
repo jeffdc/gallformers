@@ -95,12 +95,5 @@ export const placeById = (id: number): TaskEither<Error, PlaceWithHostsApi[]> =>
             hosts: p.species.map((s) => ({ ...s.species, aliases: s.species.aliasspecies.map((a) => a.alias) })),
         }));
 
-    return pipe(
-        TE.tryCatch(places, handleError),
-        TE.map((p) => {
-            console.log(`JDC: ${JSON.stringify(p, null, '  ')}`);
-            return p;
-        }),
-        TE.map(adaptor),
-    );
+    return pipe(TE.tryCatch(places, handleError), TE.map(adaptor));
 };

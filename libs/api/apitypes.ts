@@ -342,11 +342,14 @@ export const EmptyForm: FormApi = {
     description: O.none,
 };
 
-export type PlaceApi = {
+export type PlaceNoTreeApi = {
     id: number;
     name: string;
     code: string;
     type: string;
+};
+
+export type PlaceApi = PlaceNoTreeApi & {
     parent: PlaceApi[];
     children: PlaceApi[];
 };
@@ -406,7 +409,7 @@ export type GallSimple = {
 
 export type HostApi = SpeciesApi & {
     galls: GallSimple[];
-    places: PlaceApi[];
+    places: PlaceNoTreeApi[];
 };
 
 export type SourceUpsertFields = Deletable & {

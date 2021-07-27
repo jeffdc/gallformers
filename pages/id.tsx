@@ -660,37 +660,40 @@ const IDGall = (props: Props): JSX.Element => {
             <Row className="pl-2 pr-2">
                 <Col>
                     <Row>
-                        {filtered.map((g) => (
-                            <Col key={g.id.toString() + 'col'} xs={6} md={3} className="pb-2">
-                                <Card key={g.id} border="secondary">
-                                    <Link href={`gall/${g.id}`}>
-                                        <a>
-                                            <Card.Img
-                                                variant="top"
-                                                src={defaultImage(g)?.small ? defaultImage(g)?.small : '/images/noimage.jpg'}
-                                                alt={`image of ${g.name}`}
-                                            />
-                                        </a>
-                                    </Link>
-                                    <Card.Body>
-                                        <Card.Title>
-                                            <Link href={`gall/${g.id}`}>
-                                                <a className="small">{g.name}</a>
-                                            </Link>
-                                        </Card.Title>
-                                        <Card.Text className="small">
-                                            {!defaultImage(g) && createSummary(g)}
-                                            {session && (
-                                                <span className="p-0 pr-1 my-auto">
-                                                    <Edit id={g.id} type="gall" />
-                                                    {g.datacomplete ? '💯' : '❓'}
-                                                </span>
-                                            )}
-                                        </Card.Text>
-                                    </Card.Body>
-                                </Card>
-                            </Col>
-                        ))}
+                        {filtered.map((g) => {
+                            const summary = createSummary(g);
+                            return (
+                                <Col key={g.id.toString() + 'col'} xs={6} md={3} className="pb-2">
+                                    <Card key={g.id} border="secondary">
+                                        <Link href={`gall/${g.id}`}>
+                                            <a>
+                                                <Card.Img
+                                                    variant="top"
+                                                    src={defaultImage(g)?.small ? defaultImage(g)?.small : '/images/noimage.jpg'}
+                                                    alt={`${g.name} - ${summary}`}
+                                                />
+                                            </a>
+                                        </Link>
+                                        <Card.Body>
+                                            <Card.Title>
+                                                <Link href={`gall/${g.id}`}>
+                                                    <a className="small">{g.name}</a>
+                                                </Link>
+                                            </Card.Title>
+                                            <Card.Text className="small">
+                                                {!defaultImage(g) && summary}
+                                                {session && (
+                                                    <span className="p-0 pr-1 my-auto">
+                                                        <Edit id={g.id} type="gall" />
+                                                        {g.datacomplete ? '💯' : '❓'}
+                                                    </span>
+                                                )}
+                                            </Card.Text>
+                                        </Card.Body>
+                                    </Card>
+                                </Col>
+                            );
+                        })}
                     </Row>
                 </Col>
             </Row>

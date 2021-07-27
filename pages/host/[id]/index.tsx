@@ -181,7 +181,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                 </Col>
 
                 <Col sm={12} md={6} lg={4} className="border rounded p-1">
-                    <Images species={host} type="host" />
+                    <Images sp={host} type="host" />
                 </Col>
             </Row>
             <hr />

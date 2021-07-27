@@ -1,6 +1,15 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
-import { CCBY, DetachableDetachable, GallIDApi, ImageApi, SourceApi, WithImages } from '../api/apitypes';
+import {
+    CCBY,
+    DetachableDetachable,
+    GallApi,
+    GallIDApi,
+    ImageApi,
+    ImageNoSourceApi,
+    SourceApi,
+    WithImages,
+} from '../api/apitypes';
 import { truncateAtWord } from '../utils/util';
 
 /**
@@ -57,7 +66,7 @@ export const formatLicense = (source: SourceApi): string => {
  * image is marked as default then an image will be returned but it is not necessarily determenisitc which one.
  * @param species
  */
-export const defaultImage = <T extends WithImages>(species: T): ImageApi | undefined => {
+export const defaultImage = <T extends WithImages>(species: T): ImageApi | ImageNoSourceApi | undefined => {
     let defaultImage = species.images.find((i) => i.default);
     if (!defaultImage && species.images.length > 0) defaultImage = species.images[0];
 
@@ -95,7 +104,28 @@ const pj = (vals: string[]): string => {
 
 const punctIf = (punct: string, predicate: () => boolean) => (predicate() ? punct : '');
 
-export const createSummary = (g: GallIDApi): string => {
+const gallIdApiFromGallApi = (g: GallApi): Omit<GallIDApi, 'places' | 'images'> => ({
+    alignments: g.gall.gallalignment.map((a) => a.alignment),
+    cells: g.gall.gallcells.map((a) => a.cells),
+    colors: g.gall.gallcells.map((a) => a.cells),
+    datacomplete: g.datacomplete,
+    detachable: g.gall.detachable,
+    forms: g.gall.gallform.map((a) => a.form),
+    id: g.id,
+    locations: g.gall.galllocation.map((a) => a.loc),
+    name: g.name,
+    seasons: g.gall.gallseason.map((a) => a.season),
+    shapes: g.gall.gallshape.map((a) => a.shape),
+    textures: g.gall.galltexture.map((a) => a.tex),
+    undescribed: g.gall.undescribed,
+    walls: g.gall.gallwalls.map((a) => a.walls),
+});
+
+export const createSummaryGall = (g: GallApi): string => createSummary(gallIdApiFromGallApi(g));
+
+// Create a human understandable summary of a gall. Mostly this is used for when galls do not have photos and for
+// meta tags on the galls.
+export const createSummary = (g: Omit<GallIDApi, 'places' | 'images'>): string => {
     const s = `${pj(g.shapes)}${punctIf(', ', () => g.shapes.length > 0)}${pj(g.colors)}${punctIf(
         ', ',
         () => g.colors.length > 0,

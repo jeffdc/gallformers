@@ -35,6 +35,9 @@ pub fn export() -> Res<()> {
         species_map.insert(sp_name, sp.unwrap().id);
     }
 
+    // this code is slow and could be sped up by at least an order of magnitude if we were to reverse the loops and only
+    // traverse the large USDA plants set once. However the APIs we need for the more general lookup do not work that way
+    // so we will just live with slow code. It is run only rarely anyhow.
     gf_db.conn.execute_batch("BEGIN TRANSACTION;")?;
 
     // add all of the regions in the plants db as places and since they are all states assign them to the US
