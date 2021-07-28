@@ -8,7 +8,7 @@ import { DeleteResult, GallTaxon, HostTaxon } from '../api/apitypes';
 import { WithID } from '../utils/types';
 
 export type AdminProps<T> = {
-    type: 'Family' | 'Gall' | 'Gallhost' | 'Glossary' | 'Host' | 'Images' | 'Source' | 'Speciessource' | 'Section';
+    type: 'Family' | 'Gall' | 'Gallhost' | 'Glossary' | 'Host' | 'Images' | 'Source' | 'Speciessource' | 'Section' | 'Place';
     keyField: string;
     children: JSX.Element;
     editName?: {
@@ -85,6 +85,8 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
                 } else {
                     return `/host/${props.selected?.id}`;
                 }
+            case 'Place':
+                return `/place/${props.selected?.id}`;
         }
     };
     return (
@@ -151,6 +153,7 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
                         <Nav.Link eventKey="Family" href={`./family`}>{`Families`}</Nav.Link>
                         <Nav.Link eventKey="Section" href={`./section`}>{`Sections`}</Nav.Link>
                         <Nav.Link eventKey="Glossary" href={`./glossary`}>{`Glossary`}</Nav.Link>
+                        <Nav.Link eventKey="Place" href={`./place`}>{`Place`}</Nav.Link>
                     </Nav>
                 </Navbar>
 

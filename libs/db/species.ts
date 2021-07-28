@@ -1,5 +1,5 @@
 import { abundance, Prisma, PrismaPromise, species } from '@prisma/client';
-import { constant, pipe } from 'fp-ts/lib/function';
+import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { AbundanceApi, SimpleSpecies, SpeciesUpsertFields } from '../api/apitypes';
@@ -103,6 +103,11 @@ export const speciesUpdateData = (sp: SpeciesUpsertFields) => ({
             alias: { create: { description: a.description, name: a.name, type: a.type } },
         })),
     },
+    // standard pattern of delete, then re-add for Places
+    places: {
+        deleteMany: { species_id: sp.id },
+        create: sp.places.map((p) => ({ place_id: p.id })),
+    },
 });
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
@@ -150,6 +155,9 @@ export const speciesCreateData = (sp: SpeciesUpsertFields) => {
             // the speciestaxonomy records will be new since the gall is new
             // the genus and related
             create: speciesTaxonomyCreates,
+        },
+        places: {
+            create: sp.places.map((p) => ({ place_id: p.id })),
         },
     };
 };
