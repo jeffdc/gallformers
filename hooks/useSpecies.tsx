@@ -234,6 +234,8 @@ const useSpecies = <T extends SpeciesApi>(genera: TaxonomyEntry[]): UseSpecies<T
             },
             id: id,
             name: name,
+            // for now only Hosts have places so default to an empty array
+            places: [],
         };
     };
 

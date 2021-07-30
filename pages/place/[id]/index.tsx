@@ -50,16 +50,20 @@ const PlacePage = ({ place }: Props): JSX.Element => {
             </Head>
             <Row>
                 <Col>
-                    <h2>{place.parent.length > 0 ? `${place.parent[0].name} / ${place.name}` : place.name}</h2>
+                    <h2>{`${place.name} - ${place.code}`}</h2>
                 </Col>
                 <Col xs={2} className="mr-1">
                     <span className="p-0 pr-1 my-auto">
-                        <Edit id={place.id} type="section" />
+                        <Edit id={place.id} type="place" />
                     </span>
                 </Col>
             </Row>
             <Row>
-                <Col>{place.code}</Col>
+                <Col>
+                    {place.parent.length > 0
+                        ? `a ${place.type} of ${place.parent[0].name === 'United States' ? 'the' : ''} ${place.parent[0].name}`
+                        : ''}
+                </Col>
             </Row>
             <Row className="pt-2">
                 <Col>

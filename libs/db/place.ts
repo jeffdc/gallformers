@@ -1,8 +1,9 @@
 import { Prisma } from '.prisma/client';
+import { place } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { PlaceApi, PlaceWithHostsApi } from '../api/apitypes';
+import { DeleteResult, PlaceApi, PlaceNoTreeApi, PlaceNoTreeUpsertFields, PlaceWithHostsApi } from '../api/apitypes';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
@@ -96,4 +97,52 @@ export const placeById = (id: number): TaskEither<Error, PlaceWithHostsApi[]> =>
         }));
 
     return pipe(TE.tryCatch(places, handleError), TE.map(adaptor));
+};
+
+export const deletePlace = (id: number): TaskEither<Error, DeleteResult> => {
+    const results = () =>
+        // since Prisma does not yet handle cascade deletion
+        db.$executeRaw(`
+            DELETE FROM place WHERE id = ${id}
+        `);
+
+    const toDeleteResult = (result: number): DeleteResult => {
+        return {
+            type: 'place',
+            name: '',
+            count: result,
+        };
+    };
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        TE.tryCatch(results, handleError),
+        TE.map(toDeleteResult),
+    );
+};
+
+export const upsertPlace = (place: PlaceNoTreeUpsertFields): TaskEither<Error, PlaceNoTreeApi> => {
+    const upsert = () =>
+        db.place.upsert({
+            where: { id: place.id },
+            update: {
+                name: place.name,
+                code: place.code,
+                type: place.type,
+            },
+            create: {
+                name: place.name,
+                code: place.code,
+                type: place.type,
+            },
+        });
+
+    const adaptor = (p: place): PlaceNoTreeApi => ({
+        ...p,
+    });
+
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        TE.tryCatch(upsert, handleError),
+        TE.map(adaptor),
+    );
 };

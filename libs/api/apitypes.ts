@@ -158,6 +158,7 @@ export type SpeciesUpsertFields = {
     aliases: AliasApi[];
     abundance: string | null | undefined;
     fgs: FGS;
+    places: PlaceNoTreeApi[];
 };
 
 export type GallUpsertFields = SpeciesUpsertFields & {
@@ -342,12 +343,17 @@ export const EmptyForm: FormApi = {
     description: O.none,
 };
 
+// For now only these two until we support the Place hierarchy.
+export const PLACE_TYPES = ['state', 'province'];
+
 export type PlaceNoTreeApi = {
     id: number;
     name: string;
     code: string;
     type: string;
 };
+
+export type PlaceNoTreeUpsertFields = PlaceNoTreeApi & Deletable;
 
 export type PlaceApi = PlaceNoTreeApi & {
     parent: PlaceApi[];
