@@ -1,6 +1,13 @@
+use crate::species::Species;
 use crate::util::Region;
 use rusqlite::{Connection, Error, Statement};
 use std::convert::TryInto;
+
+#[derive(Debug, Eq, Hash, PartialEq)]
+pub struct PlantSpecies {
+    id: u32,
+    name: String,
+}
 
 /// simple context struct to manage the DB connection and prepared statements
 pub struct GallformersDB<'a> {
@@ -10,6 +17,7 @@ pub struct GallformersDB<'a> {
     create_place_statement: Option<Statement<'a>>,
     select_place_by_name_statement: Option<Statement<'a>>,
     create_place_place_statement: Option<Statement<'a>>,
+    select_all_plants_statement: Option<Statement<'a>>,
 }
 
 impl<'a> GallformersDB<'a> {
@@ -21,6 +29,7 @@ impl<'a> GallformersDB<'a> {
             create_place_statement: None,
             select_place_by_name_statement: None,
             create_place_place_statement: None,
+            select_all_plants_statement: None,
         }
     }
 
@@ -109,5 +118,29 @@ impl<'a> GallformersDB<'a> {
             .unwrap()
             .execute(&[(":parent_id", &parent_id), (":place_id", &place_id)])?;
         Ok(())
+    }
+
+    pub fn select_all_plants(&mut self) -> Result<Vec<Species>, Error> {
+        if self.select_all_plants_statement.is_none() {
+            let stmt = self
+                .conn
+                .prepare("SELECT id, name from species WHERE taxoncode = 'plant' and id = 296;")?;
+            self.select_all_plants_statement = Some(stmt);
+        }
+        let rows = self
+            .select_all_plants_statement
+            .as_mut()
+            .unwrap()
+            .query_map([], |row| {
+                Ok(Species {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                })
+            })?;
+        let mut species = Vec::new();
+        for p in rows {
+            species.push(p?);
+        }
+        Ok(species)
     }
 }
