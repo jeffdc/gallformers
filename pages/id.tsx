@@ -824,7 +824,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     const walls = await mightFailWithArray<WallsApi>()(getWalls());
     const cells = await mightFailWithArray<CellsApi>()(getCells());
     const forms = await mightFailWithArray<FormApi>()(getForms());
-    const places = await mightFailWithArray<PlaceApi>()(getPlaces({ type: { in: ['state', 'province'] } }));
+    const places = await mightFailWithArray<PlaceApi>()(getPlaces());
 
     return {
         props: {
