@@ -26,10 +26,10 @@ export const allPlaceIds = (): TaskEither<Error, string[]> => {
 
 /**
  * A general way to fetch places. Check this file for pre-defined helpers that are easier to use.
- * @param whereClause a where clause by which to filter places
+ * @param whereClause a where clause by which to filter places - defaults to returning only states and provinces
  */
 export const getPlaces = (
-    whereClause: Prisma.placeWhereInput = {},
+    whereClause: Prisma.placeWhereInput = { type: { in: ['state', 'province'] } },
     distinct: Prisma.PlaceScalarFieldEnum[] = ['id'],
 ): TaskEither<Error, PlaceApi[]> => {
     const places = () =>

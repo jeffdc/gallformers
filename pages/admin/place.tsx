@@ -145,7 +145,6 @@ const PlaceAdmin = ({ id, places }: Props): JSX.Element => {
                     </Col>
                     <Col>
                         Type:
-                        {/* <input {...form.register('type')} type="text" placeholder="Type" className="form-control" /> */}
                         <select {...form.register('type')} placeholder="Type" className="form-control" disabled={!selected}>
                             {PLACE_TYPES.map((t) => (
                                 <option key={t}>{t}</option>
