@@ -46,7 +46,6 @@ UPDATE texture SET description = 'The surface of the gall is often irregular or 
 
 -- add FR-PM as a region. It is included in Canadian plant data.
 INSERT INTO place (type, code, name) VALUES ("province", "PM", "Saint Pierre and Miquelon");
-INSERT INTO place (type, code, name) VALUES ("province", "GL", "Greenland");
 
 VACUUM;
 
