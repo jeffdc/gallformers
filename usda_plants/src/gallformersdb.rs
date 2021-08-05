@@ -1,6 +1,7 @@
 use crate::species::Species;
 use crate::util::Region;
 use rusqlite::{Connection, Error, Statement};
+use std::collections::HashMap;
 use std::convert::TryInto;
 
 #[derive(Debug, Eq, Hash, PartialEq)]
@@ -18,6 +19,7 @@ pub struct GallformersDB<'a> {
     select_place_by_name_statement: Option<Statement<'a>>,
     create_place_place_statement: Option<Statement<'a>>,
     select_all_plants_statement: Option<Statement<'a>>,
+    select_places_by_type_statement: Option<Statement<'a>>,
 }
 
 impl<'a> GallformersDB<'a> {
@@ -30,6 +32,7 @@ impl<'a> GallformersDB<'a> {
             select_place_by_name_statement: None,
             create_place_place_statement: None,
             select_all_plants_statement: None,
+            select_places_by_type_statement: None,
         }
     }
 
@@ -95,7 +98,7 @@ impl<'a> GallformersDB<'a> {
     pub fn add_place_for_plant(&mut self, species_id: i64, place_id: i64) -> Result<(), Error> {
         if self.add_place_for_plant_statement.is_none() {
             let stmt = self.conn.prepare(
-                "INSERT INTO speciesplace (species_id, place_id) VALUES (:species_id, :place_id);",
+                "INSERT OR IGNORE INTO speciesplace (species_id, place_id) VALUES (:species_id, :place_id);",
             )?;
             self.add_place_for_plant_statement = Some(stmt);
         }
@@ -120,11 +123,11 @@ impl<'a> GallformersDB<'a> {
         Ok(())
     }
 
-    pub fn select_all_plants(&mut self) -> Result<Vec<Species>, Error> {
+    pub fn select_all_plants(&mut self) -> Result<HashMap<String, Species>, Error> {
         if self.select_all_plants_statement.is_none() {
             let stmt = self
                 .conn
-                .prepare("SELECT id, name from species WHERE taxoncode = 'plant' and id = 296;")?;
+                .prepare("SELECT id, name from species WHERE taxoncode = 'plant';")?;
             self.select_all_plants_statement = Some(stmt);
         }
         let rows = self
@@ -137,10 +140,43 @@ impl<'a> GallformersDB<'a> {
                     name: row.get(1)?,
                 })
             })?;
-        let mut species = Vec::new();
+        let mut species = HashMap::new();
         for p in rows {
-            species.push(p?);
+            let plant = p?;
+            species.insert(plant.name.clone(), plant);
         }
         Ok(species)
+    }
+
+    pub fn select_places_by_type(
+        &mut self,
+        place_type: &str,
+    ) -> Result<HashMap<String, Region>, Error> {
+        if self.select_places_by_type_statement.is_none() {
+            let stmt = self
+                .conn
+                .prepare("SELECT id, name, code, type FROM place WHERE type = :place_type;")?;
+            self.select_places_by_type_statement = Some(stmt);
+        }
+        let rows = self
+            .select_places_by_type_statement
+            .as_mut()
+            .unwrap()
+            .query_map(&[(":place_type", &place_type)], {
+                |r| {
+                    Ok(Region {
+                        id: r.get(0)?,
+                        name: r.get(1)?,
+                        code: r.get(2)?,
+                        typ: r.get(3)?,
+                    })
+                }
+            })?;
+        let mut rs = HashMap::new();
+        for r in rows {
+            let reg = r?;
+            rs.insert(reg.code.clone(), reg);
+        }
+        Ok(rs)
     }
 }

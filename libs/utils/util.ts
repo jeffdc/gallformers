@@ -37,6 +37,10 @@ export function gScholarUrl(species: string): string {
     return `https://scholar.google.com/scholar?hl=en&q=${parseSpecies(species)}`;
 }
 
+export function bhlUrl(species: string): string {
+    return `https://www.biodiversitylibrary.org/search?SearchTerm=${parseSpecies(species)}&SearchCat=M&return=ADV#/names`;
+}
+
 /**
  * Returns a random integer between [min, max]
  * @param min
