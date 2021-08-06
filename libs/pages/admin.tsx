@@ -22,6 +22,7 @@ export type AdminProps<T> = {
     deleteResults?: DeleteResult;
     setDeleteResults?: (dr: DeleteResult) => void;
     selected: T | undefined;
+    superAdmin?: boolean;
 };
 
 type AdminType = WithID & { taxoncode?: string | null };
@@ -90,7 +91,7 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
         }
     };
     return (
-        <Auth>
+        <Auth superAdmin={!!props.superAdmin}>
             <>
                 <Head>
                     <title>{`Add/ Edit ${props.type}s`}</title>

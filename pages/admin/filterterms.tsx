@@ -158,6 +158,7 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
             setDeleteResults={setDeleteResults}
             deleteResults={deleteResults}
             selected={selected}
+            superAdmin={true}
         >
             <>
                 <form className="m-4 pr-4">
