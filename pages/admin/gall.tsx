@@ -16,7 +16,6 @@ import { extractQueryParam } from '../../libs/api/apipage';
 import * as AT from '../../libs/api/apitypes';
 import { FAMILY, GENUS, TaxonomyEntry } from '../../libs/api/taxonomy';
 import {
-    allGalls,
     getAlignments,
     getCells,
     getColors,
@@ -26,7 +25,8 @@ import {
     getShapes,
     getTextures,
     getWalls,
-} from '../../libs/db/gall';
+} from '../../libs/db/filterfield';
+import { allGalls } from '../../libs/db/gall';
 import { allHostsSimple } from '../../libs/db/host';
 import { getAbundances } from '../../libs/db/species';
 import { allFamilies, allGenera } from '../../libs/db/taxonomy';
@@ -36,15 +36,15 @@ import { hasProp, mightFailWithArray, SPECIES_NAME_REGEX } from '../../libs/util
 type Props = SpeciesProps & {
     gs: AT.GallApi[];
     hosts: AT.HostSimple[];
-    locations: AT.GallLocation[];
-    colors: AT.ColorApi[];
-    seasons: AT.SeasonApi[];
-    shapes: AT.ShapeApi[];
-    textures: AT.GallTexture[];
-    alignments: AT.AlignmentApi[];
-    walls: AT.WallsApi[];
-    cells: AT.CellsApi[];
-    forms: AT.FormApi[];
+    locations: AT.FilterField[];
+    colors: AT.FilterField[];
+    seasons: AT.FilterField[];
+    shapes: AT.FilterField[];
+    textures: AT.FilterField[];
+    alignments: AT.FilterField[];
+    walls: AT.FilterField[];
+    cells: AT.FilterField[];
+    forms: AT.FilterField[];
 };
 
 const schema = yup.object().shape({
@@ -75,15 +75,15 @@ const schema = yup.object().shape({
 export type FormFields = SpeciesFormFields<AT.GallApi> & {
     hosts: AT.GallHost[];
     detachable: AT.DetachableValues;
-    walls: AT.WallsApi[];
-    cells: AT.CellsApi[];
-    alignments: AT.AlignmentApi[];
-    shapes: AT.ShapeApi[];
-    colors: AT.ColorApi[];
-    seasons: AT.SeasonApi[];
-    locations: AT.GallLocation[];
-    textures: AT.GallTexture[];
-    forms: AT.FormApi[];
+    walls: AT.FilterField[];
+    cells: AT.FilterField[];
+    alignments: AT.FilterField[];
+    shapes: AT.FilterField[];
+    colors: AT.FilterField[];
+    seasons: AT.FilterField[];
+    locations: AT.FilterField[];
+    textures: AT.FilterField[];
+    forms: AT.FilterField[];
     undescribed: boolean;
 };
 
@@ -471,7 +471,7 @@ const Gall = ({
                             name="walls"
                             control={form.control}
                             options={walls}
-                            labelKey="walls"
+                            labelKey="field"
                             multiple
                             clearButton
                             disabled={!selected}
@@ -490,7 +490,7 @@ const Gall = ({
                             name="cells"
                             control={form.control}
                             options={cells}
-                            labelKey="cells"
+                            labelKey="field"
                             multiple
                             clearButton
                             disabled={!selected}
@@ -509,7 +509,7 @@ const Gall = ({
                             name="alignments"
                             control={form.control}
                             options={alignments}
-                            labelKey="alignment"
+                            labelKey="field"
                             multiple
                             clearButton
                             disabled={!selected}
@@ -530,7 +530,7 @@ const Gall = ({
                             name="colors"
                             control={form.control}
                             options={colors}
-                            labelKey="color"
+                            labelKey="field"
                             multiple
                             clearButton
                             disabled={!selected}
@@ -549,7 +549,7 @@ const Gall = ({
                             name="shapes"
                             control={form.control}
                             options={shapes}
-                            labelKey="shape"
+                            labelKey="field"
                             multiple
                             clearButton
                             disabled={!selected}
@@ -568,7 +568,7 @@ const Gall = ({
                             name="seasons"
                             control={form.control}
                             options={seasons}
-                            labelKey="season"
+                            labelKey="field"
                             multiple
                             clearButton
                             disabled={!selected}
@@ -587,7 +587,7 @@ const Gall = ({
                             name="forms"
                             control={form.control}
                             options={forms}
-                            labelKey="form"
+                            labelKey="field"
                             multiple
                             clearButton
                             disabled={!selected}
@@ -608,7 +608,7 @@ const Gall = ({
                             name="locations"
                             control={form.control}
                             options={locations}
-                            labelKey="loc"
+                            labelKey="field"
                             multiple
                             clearButton
                             disabled={!selected}
@@ -627,7 +627,7 @@ const Gall = ({
                             name="textures"
                             control={form.control}
                             options={textures}
-                            labelKey="tex"
+                            labelKey="field"
                             multiple
                             clearButton
                             disabled={!selected}
@@ -719,16 +719,16 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             hosts: await mightFailWithArray<AT.HostSimple>()(allHostsSimple()),
             families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(AT.GALL_FAMILY_TYPES)),
             genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(AT.GallTaxon)),
-            locations: await mightFailWithArray<AT.GallLocation>()(getLocations()),
-            colors: await mightFailWithArray<AT.ColorApi>()(getColors()),
-            seasons: await mightFailWithArray<AT.SeasonApi>()(getSeasons()),
-            shapes: await mightFailWithArray<AT.ShapeApi>()(getShapes()),
-            textures: await mightFailWithArray<AT.GallTexture>()(getTextures()),
-            alignments: await mightFailWithArray<AT.AlignmentApi>()(getAlignments()),
-            walls: await mightFailWithArray<AT.WallsApi>()(getWalls()),
-            cells: await mightFailWithArray<AT.CellsApi>()(getCells()),
+            locations: await mightFailWithArray<AT.FilterField>()(getLocations()),
+            colors: await mightFailWithArray<AT.FilterField>()(getColors()),
+            seasons: await mightFailWithArray<AT.FilterField>()(getSeasons()),
+            shapes: await mightFailWithArray<AT.FilterField>()(getShapes()),
+            textures: await mightFailWithArray<AT.FilterField>()(getTextures()),
+            alignments: await mightFailWithArray<AT.FilterField>()(getAlignments()),
+            walls: await mightFailWithArray<AT.FilterField>()(getWalls()),
+            cells: await mightFailWithArray<AT.FilterField>()(getCells()),
             abundances: await mightFailWithArray<AT.AbundanceApi>()(getAbundances()),
-            forms: await mightFailWithArray<AT.FormApi>()(getForms()),
+            forms: await mightFailWithArray<AT.FilterField>()(getForms()),
         },
     };
 };

@@ -16,25 +16,17 @@ import InfoTip from '../components/infotip';
 import Typeahead from '../components/Typeahead';
 import { getQueryParams } from '../libs/api/apipage';
 import {
-    AlignmentApi,
-    CellsApi,
-    ColorApi,
     DetachableApi,
     detachableFromString,
     DetachableNone,
     Detachables,
     EMPTYSEARCHQUERY,
-    FormApi,
+    FilterField,
     GallIDApi,
-    GallLocation,
-    GallTexture,
     HostSimple,
     HostTaxon,
     PlaceApi,
     SearchQuery,
-    SeasonApi,
-    ShapeApi,
-    WallsApi,
 } from '../libs/api/apitypes';
 import { SECTION, TaxonomyEntry, TaxonomyEntryNoParent } from '../libs/api/taxonomy';
 import {
@@ -47,7 +39,7 @@ import {
     getShapes,
     getTextures,
     getWalls,
-} from '../libs/db/gall';
+} from '../libs/db/filterfield';
 import { allHostsSimple } from '../libs/db/host';
 import { getPlaces } from '../libs/db/place';
 import { allGenera, allSections } from '../libs/db/taxonomy';
@@ -110,15 +102,15 @@ type Props = {
     query: SearchQuery | null;
     hosts: HostSimple[];
     sectionsAndGenera: TaxonomyEntryNoParent[];
-    locations: GallLocation[];
-    colors: ColorApi[];
-    seasons: SeasonApi[];
-    shapes: ShapeApi[];
-    textures: GallTexture[];
-    alignments: AlignmentApi[];
-    walls: WallsApi[];
-    cells: CellsApi[];
-    forms: FormApi[];
+    locations: FilterField[];
+    colors: FilterField[];
+    seasons: FilterField[];
+    shapes: FilterField[];
+    textures: FilterField[];
+    alignments: FilterField[];
+    walls: FilterField[];
+    cells: FilterField[];
+    forms: FilterField[];
     places: PlaceApi[];
 };
 
@@ -438,7 +430,7 @@ const IDGall = (props: Props): JSX.Element => {
                                     }}
                                     placeholder="Locations"
                                     options={props.locations
-                                        .map((l) => l.loc)
+                                        .map((l) => l.field)
                                         .concat(LEAF_ANYWHERE)
                                         .sort()}
                                     disabled={disableFilter()}
@@ -531,7 +523,7 @@ const IDGall = (props: Props): JSX.Element => {
                                         </label>
                                         {makeFormInput(
                                             'season',
-                                            props.seasons.map((c) => c.season),
+                                            props.seasons.map((c) => c.field),
                                         )}
                                     </Col>
                                     <Col xs={12} sm={6} md={3}>
@@ -541,7 +533,7 @@ const IDGall = (props: Props): JSX.Element => {
                                         </label>
                                         {makeFormInput(
                                             'textures',
-                                            props.textures.map((t) => t.tex),
+                                            props.textures.map((t) => t.field),
                                             true,
                                         )}
                                     </Col>
@@ -555,7 +547,7 @@ const IDGall = (props: Props): JSX.Element => {
                                         </label>
                                         {makeFormInput(
                                             'alignment',
-                                            props.alignments.map((a) => a.alignment),
+                                            props.alignments.map((a) => a.field),
                                         )}
                                     </Col>
                                     <Col xs={12} sm={6} md={3}>
@@ -565,7 +557,7 @@ const IDGall = (props: Props): JSX.Element => {
                                         {makeFormInput(
                                             'form',
                                             props.forms
-                                                .map((c) => c.form)
+                                                .map((c) => c.field)
                                                 .concat(GALL_FORM)
                                                 .sort(),
                                         )}
@@ -582,7 +574,7 @@ const IDGall = (props: Props): JSX.Element => {
                                         </label>
                                         {makeFormInput(
                                             'walls',
-                                            props.walls.map((w) => w.walls),
+                                            props.walls.map((w) => w.field),
                                         )}
                                     </Col>
                                     <Col xs={12} sm={6} md={3}>
@@ -592,7 +584,7 @@ const IDGall = (props: Props): JSX.Element => {
                                         </label>
                                         {makeFormInput(
                                             'cells',
-                                            props.cells.map((c) => c.cells),
+                                            props.cells.map((c) => c.field),
                                         )}
                                     </Col>
                                     <Col xs={12} sm={6} md={3}>
@@ -601,7 +593,7 @@ const IDGall = (props: Props): JSX.Element => {
                                         </label>
                                         {makeFormInput(
                                             'shape',
-                                            props.shapes.map((s) => s.shape),
+                                            props.shapes.map((s) => s.field),
                                         )}
                                     </Col>
                                     <Col xs={12} sm={6} md={3}>
@@ -610,7 +602,7 @@ const IDGall = (props: Props): JSX.Element => {
                                         </label>
                                         {makeFormInput(
                                             'color',
-                                            props.colors.map((c) => c.color),
+                                            props.colors.map((c) => c.field),
                                         )}
                                     </Col>
                                     <Col xs={12} sm={6} md={3}>
@@ -815,15 +807,15 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
           }
         : null;
 
-    const locations = await mightFailWithArray<GallLocation>()(getLocations());
-    const colors = await mightFailWithArray<ColorApi>()(getColors());
-    const seasons = await mightFailWithArray<SeasonApi>()(getSeasons());
-    const shapes = await mightFailWithArray<ShapeApi>()(getShapes());
-    const textures = await mightFailWithArray<GallTexture>()(getTextures());
-    const alignments = await mightFailWithArray<AlignmentApi>()(getAlignments());
-    const walls = await mightFailWithArray<WallsApi>()(getWalls());
-    const cells = await mightFailWithArray<CellsApi>()(getCells());
-    const forms = await mightFailWithArray<FormApi>()(getForms());
+    const locations = await mightFailWithArray<FilterField>()(getLocations());
+    const colors = await mightFailWithArray<FilterField>()(getColors());
+    const seasons = await mightFailWithArray<FilterField>()(getSeasons());
+    const shapes = await mightFailWithArray<FilterField>()(getShapes());
+    const textures = await mightFailWithArray<FilterField>()(getTextures());
+    const alignments = await mightFailWithArray<FilterField>()(getAlignments());
+    const walls = await mightFailWithArray<FilterField>()(getWalls());
+    const cells = await mightFailWithArray<FilterField>()(getCells());
+    const forms = await mightFailWithArray<FilterField>()(getForms());
     const places = await mightFailWithArray<PlaceApi>()(getPlaces());
 
     return {

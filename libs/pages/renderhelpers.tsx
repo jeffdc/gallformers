@@ -105,20 +105,20 @@ const pj = (vals: string[]): string => {
 const punctIf = (punct: string, predicate: () => boolean) => (predicate() ? punct : '');
 
 const gallIdApiFromGallApi = (g: GallApi): Omit<GallIDApi, 'places' | 'images'> => ({
-    alignments: g.gall.gallalignment.map((a) => a.alignment),
-    cells: g.gall.gallcells.map((a) => a.cells),
-    colors: g.gall.gallcells.map((a) => a.cells),
+    alignments: g.gall.gallalignment.map((a) => a.field),
+    cells: g.gall.gallcells.map((a) => a.field),
+    colors: g.gall.gallcells.map((a) => a.field),
     datacomplete: g.datacomplete,
     detachable: g.gall.detachable,
-    forms: g.gall.gallform.map((a) => a.form),
+    forms: g.gall.gallform.map((a) => a.field),
     id: g.id,
-    locations: g.gall.galllocation.map((a) => a.loc),
+    locations: g.gall.galllocation.map((a) => a.field),
     name: g.name,
-    seasons: g.gall.gallseason.map((a) => a.season),
-    shapes: g.gall.gallshape.map((a) => a.shape),
-    textures: g.gall.galltexture.map((a) => a.tex),
+    seasons: g.gall.gallseason.map((a) => a.field),
+    shapes: g.gall.gallshape.map((a) => a.field),
+    textures: g.gall.galltexture.map((a) => a.field),
     undescribed: g.gall.undescribed,
-    walls: g.gall.gallwalls.map((a) => a.walls),
+    walls: g.gall.gallwalls.map((a) => a.field),
 });
 
 export const createSummaryGall = (g: GallApi): string => createSummary(gallIdApiFromGallApi(g));

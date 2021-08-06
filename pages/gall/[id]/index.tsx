@@ -130,21 +130,21 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                     )}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Color:</strong> {species.gall.gallcolor.map((c) => c.color).join(', ')}
+                                    <strong>Color:</strong> {species.gall.gallcolor.map((c) => c.field).join(', ')}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.tex).join(', ')}
+                                    <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.field).join(', ')}
                                 </Col>
                             </Row>
                             <Row>
                                 <Col xs={6} sm={4}>
-                                    <strong>Alignment:</strong> {species.gall.gallalignment.map((a) => a.alignment).join(', ')}
+                                    <strong>Alignment:</strong> {species.gall.gallalignment.map((a) => a.field).join(', ')}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Walls:</strong> {species.gall.gallwalls.map((w) => w.walls).join(', ')}
+                                    <strong>Walls:</strong> {species.gall.gallwalls.map((w) => w.field).join(', ')}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Location:</strong> {species.gall.galllocation.map((l) => l.loc).join(', ')}
+                                    <strong>Location:</strong> {species.gall.galllocation.map((l) => l.field).join(', ')}
                                 </Col>
                             </Row>
                             <Row>
@@ -156,18 +156,18 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                     )}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Shape:</strong> {species.gall.gallshape.map((s) => s.shape).join(', ')}
+                                    <strong>Shape:</strong> {species.gall.gallshape.map((s) => s.field).join(', ')}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Season:</strong> {species.gall.gallseason.map((s) => s.season).join(', ')}
+                                    <strong>Season:</strong> {species.gall.gallseason.map((s) => s.field).join(', ')}
                                 </Col>
                             </Row>
                             <Row>
                                 <Col xs={6} sm={4}>
-                                    <strong>Form:</strong> {species.gall.gallform.map((s) => s.form).join(', ')}
+                                    <strong>Form:</strong> {species.gall.gallform.map((s) => s.field).join(', ')}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Cells:</strong> {species.gall.gallcells.map((s) => s.cells).join(', ')}
+                                    <strong>Cells:</strong> {species.gall.gallcells.map((s) => s.field).join(', ')}
                                 </Col>
                                 <Col>
                                     <strong>Related: </strong>

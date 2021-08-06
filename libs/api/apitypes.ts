@@ -212,18 +212,6 @@ export type GallHost = {
     name: string;
 };
 
-export type GallLocation = {
-    id: number;
-    loc: string;
-    description: Option<string>;
-};
-
-export type GallTexture = {
-    id: number;
-    tex: string;
-    description: Option<string>;
-};
-
 export type AbundanceApi = {
     id: number;
     abundance: string;
@@ -270,77 +258,62 @@ export const EmptyAlias: AliasApi = {
     description: '',
 };
 
-export type AlignmentApi = {
+export const FILTER_FIELD_ALIGNMENTS = 'alignments';
+export const FILTER_FIELD_CELLS = 'cells';
+export const FILTER_FIELD_COLORS = 'colors';
+export const FILTER_FIELD_FORMS = 'forms';
+export const FILTER_FIELD_LOCATIONS = 'locations';
+export const FILTER_FIELD_SEASONS = 'seasons';
+export const FILTER_FIELD_SHAPES = 'shapes';
+export const FILTER_FIELD_TEXTURES = 'textures';
+export const FILTER_FIELD_WALLS = 'walls';
+export const FILTER_FIELD_TYPES = [
+    FILTER_FIELD_ALIGNMENTS,
+    FILTER_FIELD_CELLS,
+    FILTER_FIELD_COLORS,
+    FILTER_FIELD_FORMS,
+    FILTER_FIELD_LOCATIONS,
+    FILTER_FIELD_SEASONS,
+    FILTER_FIELD_SHAPES,
+    FILTER_FIELD_TEXTURES,
+    FILTER_FIELD_WALLS,
+] as const;
+export type FilterFieldTypeTuple = typeof FILTER_FIELD_TYPES;
+export type FilterFieldType = FilterFieldTypeTuple[number];
+export const asFilterFieldType = (f: string): FilterFieldType => {
+    // Seems like there should be a better way to handle this and maintain types.
+    switch (f) {
+        case FILTER_FIELD_ALIGNMENTS:
+            return FILTER_FIELD_ALIGNMENTS;
+        case FILTER_FIELD_CELLS:
+            return FILTER_FIELD_CELLS;
+        case FILTER_FIELD_COLORS:
+            return FILTER_FIELD_COLORS;
+        case FILTER_FIELD_FORMS:
+            return FILTER_FIELD_FORMS;
+        case FILTER_FIELD_LOCATIONS:
+            return FILTER_FIELD_LOCATIONS;
+        case FILTER_FIELD_SEASONS:
+            return FILTER_FIELD_SEASONS;
+        case FILTER_FIELD_SHAPES:
+            return FILTER_FIELD_SHAPES;
+        case FILTER_FIELD_TEXTURES:
+            return FILTER_FIELD_TEXTURES;
+        case FILTER_FIELD_WALLS:
+            return FILTER_FIELD_WALLS;
+        default:
+            throw new Error(`Invalid filter field type: '${f}'.`);
+    }
+};
+
+export type FilterField = {
     id: number;
-    alignment: string;
+    field: string;
     description: Option<string>;
 };
-export const EmptyAlignment: AlignmentApi = {
-    id: -1,
-    alignment: '',
-    description: O.none,
-};
 
-export type CellsApi = {
-    id: number;
-    cells: string;
-    description: Option<string>;
-};
-export const EmptyCells: CellsApi = {
-    id: -1,
-    cells: '',
-    description: O.none,
-};
-
-export type ColorApi = {
-    id: number;
-    color: string;
-};
-export const EmptyColor: ColorApi = {
-    id: -1,
-    color: '',
-};
-
-export type SeasonApi = {
-    id: number;
-    season: string;
-};
-export const EmptySeason: SeasonApi = {
-    id: -1,
-    season: '',
-};
-
-export type ShapeApi = {
-    id: number;
-    shape: string;
-    description: Option<string>;
-};
-export const EmptyShape: ShapeApi = {
-    id: -1,
-    shape: '',
-    description: O.none,
-};
-
-export type WallsApi = {
-    id: number;
-    walls: string;
-    description: Option<string>;
-};
-export const EmptyWalls: WallsApi = {
-    id: -1,
-    walls: '',
-    description: O.none,
-};
-
-export type FormApi = {
-    id: number;
-    form: string;
-    description: Option<string>;
-};
-export const EmptyForm: FormApi = {
-    id: -1,
-    form: '',
-    description: O.none,
+export type FilterFieldWithType = FilterField & {
+    fieldType: FilterFieldType;
 };
 
 // For now only these two until we support the Place hierarchy.
@@ -386,16 +359,16 @@ export type GallIDApi = WithImages & {
 export type GallApi = SpeciesApi & {
     gall: {
         id: number;
-        gallalignment: AlignmentApi[];
-        gallcells: CellsApi[];
-        gallcolor: ColorApi[];
-        gallseason: SeasonApi[];
+        gallalignment: FilterField[];
+        gallcells: FilterField[];
+        gallcolor: FilterField[];
+        gallseason: FilterField[];
         detachable: DetachableApi;
-        gallshape: ShapeApi[];
-        gallwalls: WallsApi[];
-        galltexture: GallTexture[];
-        galllocation: GallLocation[];
-        gallform: FormApi[];
+        gallshape: FilterField[];
+        gallwalls: FilterField[];
+        galltexture: FilterField[];
+        galllocation: FilterField[];
+        gallform: FilterField[];
         undescribed: boolean;
     };
     hosts: GallHost[];

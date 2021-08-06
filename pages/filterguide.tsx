@@ -1,25 +1,35 @@
+import { constant } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/Option';
 import { GetStaticProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
 import React from 'react';
 import { Accordion, Button, Card, Container, ListGroup } from 'react-bootstrap';
-import { AlignmentApi, CellsApi, FormApi, GallLocation, GallTexture, ShapeApi, WallsApi } from '../libs/api/apitypes';
-import { getAlignments, getCells, getForms, getLocations, getShapes, getTextures, getWalls } from '../libs/db/gall';
+import { FilterField } from '../libs/api/apitypes';
+import { getAlignments, getCells, getForms, getLocations, getShapes, getTextures, getWalls } from '../libs/db/filterfield';
 import { mightFailWithArray } from '../libs/utils/util';
-import * as O from 'fp-ts/Option';
-import { constant } from 'fp-ts/lib/function';
 
 const { Item } = ListGroup;
 
 type Props = {
-    alignments: AlignmentApi[];
-    cells: CellsApi[];
-    forms: FormApi[];
-    locations: GallLocation[];
-    shapes: ShapeApi[];
-    textures: GallTexture[];
-    walls: WallsApi[];
+    alignments: FilterField[];
+    cells: FilterField[];
+    forms: FilterField[];
+    locations: FilterField[];
+    shapes: FilterField[];
+    textures: FilterField[];
+    walls: FilterField[];
 };
+
+const filterFieldsToItems = (fields: FilterField[]) =>
+    fields
+        .sort((a, b) => a.field.localeCompare(b.field))
+        .map((a) => (
+            <Item key={a.field}>
+                <b>{a.field} - </b>
+                {O.getOrElse(constant(''))(a.description)}
+            </Item>
+        ));
 
 const FilterGuide = ({ alignments, cells, forms, locations, shapes, textures, walls }: Props): JSX.Element => {
     return (
@@ -39,16 +49,7 @@ const FilterGuide = ({ alignments, cells, forms, locations, shapes, textures, wa
                         </Card.Header>
                     </Card>
                     <Accordion.Collapse eventKey="alignment">
-                        <ListGroup>
-                            {alignments
-                                .sort((a, b) => a.alignment.localeCompare(b.alignment))
-                                .map((a) => (
-                                    <Item key={a.alignment}>
-                                        <b>{a.alignment} - </b>
-                                        {O.getOrElse(constant(''))(a.description)}
-                                    </Item>
-                                ))}
-                        </ListGroup>
+                        <ListGroup>{filterFieldsToItems(alignments)}</ListGroup>
                     </Accordion.Collapse>
                     <Card>
                         <Card.Header>
@@ -59,14 +60,7 @@ const FilterGuide = ({ alignments, cells, forms, locations, shapes, textures, wa
                     </Card>
                     <Accordion.Collapse eventKey="cells">
                         <ListGroup>
-                            {cells
-                                .sort((a, b) => a.cells.localeCompare(b.cells))
-                                .map((a) => (
-                                    <Item key={a.cells}>
-                                        <b>{a.cells} - </b>
-                                        {O.getOrElse(constant(''))(a.description)}
-                                    </Item>
-                                ))}
+                            {filterFieldsToItems(cells)}
                             <Item>
                                 NOTE: If multiple larvae are found in one space, these may be{' '}
                                 <Link href="/glossary#inquiline">inquilines</Link> rather than gall-inducers.
@@ -106,14 +100,7 @@ const FilterGuide = ({ alignments, cells, forms, locations, shapes, textures, wa
                     </Card>
                     <Accordion.Collapse eventKey="forms">
                         <ListGroup>
-                            {forms
-                                .sort((a, b) => a.form.localeCompare(b.form))
-                                .map((a) => (
-                                    <Item key={a.form}>
-                                        <b>{a.form} - </b>
-                                        {O.getOrElse(constant(''))(a.description)}
-                                    </Item>
-                                ))}
+                            {filterFieldsToItems(forms)}
                             {/* <Item key="gall">
                                 <b>Gall -</b> a novel element of a plant caused by an organism living within the plant.
                             </Item> */}
@@ -126,16 +113,7 @@ const FilterGuide = ({ alignments, cells, forms, locations, shapes, textures, wa
                             </Accordion.Toggle>
                         </Card.Header>
                         <Accordion.Collapse eventKey="location">
-                            <ListGroup>
-                                {locations
-                                    .sort((a, b) => a.loc.localeCompare(b.loc))
-                                    .map((a) => (
-                                        <Item key={a.loc}>
-                                            <b>{a.loc} - </b>
-                                            {O.getOrElse(constant(''))(a.description)}
-                                        </Item>
-                                    ))}
-                            </ListGroup>
+                            <ListGroup>{filterFieldsToItems(locations)}</ListGroup>
                         </Accordion.Collapse>
                     </Card>
                     <Card>
@@ -146,16 +124,7 @@ const FilterGuide = ({ alignments, cells, forms, locations, shapes, textures, wa
                         </Card.Header>
                     </Card>
                     <Accordion.Collapse eventKey="shape">
-                        <ListGroup>
-                            {shapes
-                                .sort((a, b) => a.shape.localeCompare(b.shape))
-                                .map((a) => (
-                                    <Item key={a.shape}>
-                                        <b>{a.shape} - </b>
-                                        {O.getOrElse(constant(''))(a.description)}
-                                    </Item>
-                                ))}
-                        </ListGroup>
+                        <ListGroup>{filterFieldsToItems(shapes)}</ListGroup>
                     </Accordion.Collapse>
                     <Card>
                         <Card.Header>
@@ -165,16 +134,7 @@ const FilterGuide = ({ alignments, cells, forms, locations, shapes, textures, wa
                         </Card.Header>
                     </Card>
                     <Accordion.Collapse eventKey="texture">
-                        <ListGroup>
-                            {textures
-                                .sort((a, b) => a.tex.localeCompare(b.tex))
-                                .map((a) => (
-                                    <Item key={a.tex}>
-                                        <b>{a.tex} - </b>
-                                        {O.getOrElse(constant(''))(a.description)}
-                                    </Item>
-                                ))}
-                        </ListGroup>
+                        <ListGroup>{filterFieldsToItems(textures)}</ListGroup>
                     </Accordion.Collapse>
                     <Card>
                         <Card.Header>
@@ -184,16 +144,7 @@ const FilterGuide = ({ alignments, cells, forms, locations, shapes, textures, wa
                         </Card.Header>
                     </Card>
                     <Accordion.Collapse eventKey="walls">
-                        <ListGroup>
-                            {walls
-                                .sort((a, b) => a.walls.localeCompare(b.walls))
-                                .map((a) => (
-                                    <Item key={a.walls}>
-                                        <b>{a.walls} - </b>
-                                        {O.getOrElse(constant(''))(a.description)}
-                                    </Item>
-                                ))}
-                        </ListGroup>
+                        <ListGroup>{filterFieldsToItems(walls)}</ListGroup>
                     </Accordion.Collapse>
                 </Accordion>
             </Container>
@@ -204,13 +155,13 @@ const FilterGuide = ({ alignments, cells, forms, locations, shapes, textures, wa
 export const getStaticProps: GetStaticProps = async () => {
     return {
         props: {
-            alignments: await mightFailWithArray<AlignmentApi>()(getAlignments()),
-            cells: await mightFailWithArray<CellsApi>()(getCells()),
-            forms: await mightFailWithArray<FormApi>()(getForms()),
-            locations: await mightFailWithArray<GallLocation>()(getLocations()),
-            shapes: await mightFailWithArray<ShapeApi>()(getShapes()),
-            textures: await mightFailWithArray<GallTexture>()(getTextures()),
-            walls: await mightFailWithArray<WallsApi>()(getWalls()),
+            alignments: await mightFailWithArray<FilterField>()(getAlignments()),
+            cells: await mightFailWithArray<FilterField>()(getCells()),
+            forms: await mightFailWithArray<FilterField>()(getForms()),
+            locations: await mightFailWithArray<FilterField>()(getLocations()),
+            shapes: await mightFailWithArray<FilterField>()(getShapes()),
+            textures: await mightFailWithArray<FilterField>()(getTextures()),
+            walls: await mightFailWithArray<FilterField>()(getWalls()),
         },
         revalidate: 1,
     };
