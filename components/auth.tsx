@@ -1,7 +1,7 @@
 import { signIn, useSession } from 'next-auth/client';
 import React from 'react';
 
-const Auth = ({ superAdmin, children }: { superAdmin: boolean; children: JSX.Element }): JSX.Element => {
+const Auth = ({ superAdmin, children }: { superAdmin?: boolean; children: JSX.Element }): JSX.Element => {
     const [session, loading] = useSession();
 
     if (!session) {
@@ -18,7 +18,7 @@ const Auth = ({ superAdmin, children }: { superAdmin: boolean; children: JSX.Ele
     }
 
     const superAdmins = ['jeff', 'adamjameskranz'];
-    if (superAdmin && session.user && session.user.name && !superAdmins.includes(session.user.name)) {
+    if (!!superAdmin && session.user && session.user.name && !superAdmins.includes(session.user.name)) {
         return (
             <div className="m-3 p-3">
                 <p>Hmmm. You should probably not be here.</p>
