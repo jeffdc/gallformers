@@ -23,7 +23,7 @@ import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkSourceToGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { formatLicense, sourceToDisplay } from '../../../libs/pages/renderhelpers';
-import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
+import { bhlUrl, bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
     host: HostApi;
@@ -233,23 +233,30 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                         onSelectionChange={(s) => setSelectedSource(host.speciessource.find((spso) => spso.source_id == s?.id))}
                     />
                     <hr />
-                    <Row className="">
+                    <Row>
                         <Col className="align-self-center">
                             <strong>See Also:</strong>
                         </Col>
-                        <Col className="align-self-center">
+                    </Row>
+                    <Row className="">
+                        <Col xs={12} md={6} lg={3} className="align-self-center">
                             <a href={iNatUrl(host.name)} target="_blank" rel="noreferrer">
                                 <img src="/images/inatlogo-small.png" />
                             </a>
                         </Col>
-                        <Col className="align-self-center">
+                        <Col xs={12} md={6} lg={3} className="align-self-center">
                             <a href={bugguideUrl(host.name)} target="_blank" rel="noreferrer">
                                 <img src="/images/bugguide-small.png" />
                             </a>
                         </Col>
-                        <Col className="align-self-center">
+                        <Col xs={12} md={6} lg={3} className="align-self-center">
                             <a href={gScholarUrl(host.name)} target="_blank" rel="noreferrer">
                                 <img src="/images/gscholar-small.png" />
+                            </a>
+                        </Col>
+                        <Col xs={12} md={6} lg={3} className="align-self-center">
+                            <a href={bhlUrl(host.name)} target="_blank" rel="noreferrer">
+                                <img src="/images/bhllogo.png" />
                             </a>
                         </Col>
                     </Row>

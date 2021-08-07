@@ -11,7 +11,7 @@ type Props = {
 
 const Tester = ({ data }: Props): JSX.Element => {
     return (
-        <Auth>
+        <Auth superAdmin={true}>
             <>
                 <Head>
                     <title>Tester</title>

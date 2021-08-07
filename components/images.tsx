@@ -49,9 +49,29 @@ const Images = ({ sp }: Props): JSX.Element => {
     species.images.sort((a) => (a.default ? -1 : 1));
 
     return species.images.length < 1 ? (
-        <p className="p-2">
+        <div className="p-2">
             <img src="/images/noimage.jpg" alt={`missing image of ${species.name}`} className="img-fluid d-block" />
-        </p>
+            {session && (
+                <ButtonToolbar className="row d-flex justify-content-center">
+                    <ButtonGroup size="sm">
+                        <Button
+                            variant="secondary"
+                            style={{ fontSize: '1.0em' }}
+                            onMouseDown={(e) => {
+                                if (e.button === 1 || e.ctrlKey || e.metaKey) {
+                                    //  middle/command/ctrl click
+                                    window.open(`/admin/images?speciesid=${species.id}`, '_blank');
+                                } else {
+                                    router.push(`/admin/images?speciesid=${species.id}`);
+                                }
+                            }}
+                        >
+                            ✎
+                        </Button>
+                    </ButtonGroup>
+                </ButtonToolbar>
+            )}
+        </div>
     ) : (
         <>
             <Modal show={showModal} onHide={() => setShowModal(false)} centered dialogClassName="modal-90w">

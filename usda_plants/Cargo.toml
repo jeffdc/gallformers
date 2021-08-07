@@ -14,3 +14,5 @@ serde_json = "*"
 nom = "6"
 strum ="*"
 strum_macros = "*"
+reqwest= { version = "*", features = ["json"] }
+tokio = { version = "*", features = ["full"] }

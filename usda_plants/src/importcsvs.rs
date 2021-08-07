@@ -12,7 +12,7 @@ use std::io::Read;
 use std::io::Write;
 use std::path::PathBuf;
 
-pub fn import() -> Res<()> {
+pub async fn import() -> Res<()> {
     let mut plant_db_file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     plant_db_file.push("plants.db");
     let plant_c = Connection::open(plant_db_file.as_path())?;

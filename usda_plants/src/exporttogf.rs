@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-pub fn export() -> Res<()> {
+pub async fn export() -> Res<()> {
     let mut gf_db_file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     gf_db_file.pop();
     gf_db_file.push("prisma/gallformers.sqlite");

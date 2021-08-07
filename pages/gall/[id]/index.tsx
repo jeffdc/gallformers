@@ -22,7 +22,7 @@ import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkSourceToGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWith, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { createSummaryGall, defaultSource, formatLicense, sourceToDisplay } from '../../../libs/pages/renderhelpers';
-import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
+import { bhlUrl, bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
     species: GallApi;
@@ -130,21 +130,21 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                     )}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Color:</strong> {species.gall.gallcolor.map((c) => c.color).join(', ')}
+                                    <strong>Color:</strong> {species.gall.gallcolor.map((c) => c.field).join(', ')}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.tex).join(', ')}
+                                    <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.field).join(', ')}
                                 </Col>
                             </Row>
                             <Row>
                                 <Col xs={6} sm={4}>
-                                    <strong>Alignment:</strong> {species.gall.gallalignment.map((a) => a.alignment).join(', ')}
+                                    <strong>Alignment:</strong> {species.gall.gallalignment.map((a) => a.field).join(', ')}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Walls:</strong> {species.gall.gallwalls.map((w) => w.walls).join(', ')}
+                                    <strong>Walls:</strong> {species.gall.gallwalls.map((w) => w.field).join(', ')}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Location:</strong> {species.gall.galllocation.map((l) => l.loc).join(', ')}
+                                    <strong>Location:</strong> {species.gall.galllocation.map((l) => l.field).join(', ')}
                                 </Col>
                             </Row>
                             <Row>
@@ -156,18 +156,18 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                     )}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Shape:</strong> {species.gall.gallshape.map((s) => s.shape).join(', ')}
+                                    <strong>Shape:</strong> {species.gall.gallshape.map((s) => s.field).join(', ')}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Season:</strong> {species.gall.gallseason.map((s) => s.season).join(', ')}
+                                    <strong>Season:</strong> {species.gall.gallseason.map((s) => s.field).join(', ')}
                                 </Col>
                             </Row>
                             <Row>
                                 <Col xs={6} sm={4}>
-                                    <strong>Form:</strong> {species.gall.gallform.map((s) => s.form).join(', ')}
+                                    <strong>Form:</strong> {species.gall.gallform.map((s) => s.field).join(', ')}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Cells:</strong> {species.gall.gallcells.map((s) => s.cells).join(', ')}
+                                    <strong>Cells:</strong> {species.gall.gallcells.map((s) => s.field).join(', ')}
                                 </Col>
                                 <Col>
                                     <strong>Related: </strong>
@@ -268,23 +268,30 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                         }
                     />
                     <hr />
-                    <Row className="">
+                    <Row>
                         <Col className="align-self-center">
                             <strong>See Also:</strong>
                         </Col>
-                        <Col className="align-self-center">
+                    </Row>
+                    <Row className="">
+                        <Col xs={12} md={6} lg={3} className="align-self-center">
                             <a href={iNatUrl(species.name)} target="_blank" rel="noreferrer">
                                 <img src="/images/inatlogo-small.png" />
                             </a>
                         </Col>
-                        <Col className="align-self-center">
+                        <Col xs={12} md={6} lg={3} className="align-self-center">
                             <a href={bugguideUrl(species.name)} target="_blank" rel="noreferrer">
                                 <img src="/images/bugguide-small.png" />
                             </a>
                         </Col>
-                        <Col className="align-self-center">
+                        <Col xs={12} md={6} lg={3} className="align-self-center">
                             <a href={gScholarUrl(species.name)} target="_blank" rel="noreferrer">
                                 <img src="/images/gscholar-small.png" />
+                            </a>
+                        </Col>
+                        <Col xs={12} md={6} lg={3} className="align-self-center">
+                            <a href={bhlUrl(species.name)} target="_blank" rel="noreferrer">
+                                <img src="/images/bhllogo.png" />
                             </a>
                         </Col>
                     </Row>
