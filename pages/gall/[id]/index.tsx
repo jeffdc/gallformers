@@ -6,7 +6,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
-import { Alert, Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
+import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
