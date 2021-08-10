@@ -36,6 +36,7 @@ const Genus = ({ genus, species }: Props): JSX.Element => {
         <Container className="pt-2" fluid>
             <Head>
                 <title>{gen.name}</title>
+                <meta name="description" content={`Genus ${gen.name}`} />
             </Head>
 
             <Row>

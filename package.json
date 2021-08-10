@@ -6,6 +6,7 @@
     "dev": "NODE_OPTIONS='--inspect' next dev",
     "build": "next build",
     "start": "next start",
+    "analyze": "ANALYZE=true next build",
     "generate": "npx prisma generate",
     "type-coverage": "npx type-coverage",
     "lint": "eslint '*/**/*.{js,ts,tsx}' --quiet --fix",
@@ -64,6 +65,7 @@
   },
   "devDependencies": {
     "@hookform/devtools": "^3",
+    "@next/bundle-analyzer": "^11.0.1",
     "@simbathesailor/use-what-changed": "^1.0.0",
     "@testing-library/jest-dom": "^5.11.6",
     "@testing-library/react": "^11",

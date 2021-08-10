@@ -7,7 +7,8 @@ export default function Guide(): JSX.Element {
     return (
         <React.Fragment>
             <Head>
-                <title>Guide</title>
+                <title>Gall Identification Guide</title>
+                <meta name="description" content="An introduction to IDing galls on plants." />
             </Head>
             <Container className="mt-4 m-2">
                 <h1>Introduction to Gall ID</h1>
@@ -36,7 +37,7 @@ export default function Guide(): JSX.Element {
                     these organisms, but a few inquilines modify developing galls and create distinct galls, and in these cases
                     the gall is listed as a separate entry in the database.
                 </p>
-                <h3 className="mb-3">Using our ID tool</h3>
+                <h2 className="mb-3">Using our ID tool</h2>
                 <p>
                     The most important step in gall ID is the correct identification of the host plant. If you’re not sure what
                     your plant is, you can take a photo and make an observation on iNaturalist. The site’s computer vision
@@ -74,9 +75,9 @@ export default function Guide(): JSX.Element {
                     if you find a gall that is not listed on a host that is marked complete, please contact us at
                     gallformers@gmail.com.
                 </p>
-                <h3 className="mb-3" id="troubleshooting">
+                <h2 className="mb-3" id="troubleshooting">
                     ID tips and troubleshooting
-                </h3>
+                </h2>
                 <p>
                     If you’re not finding a match, try using only host, location, and detachable before you give up. Common issues
                     using these filters include

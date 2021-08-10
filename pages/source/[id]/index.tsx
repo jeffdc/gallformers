@@ -24,6 +24,7 @@ const Source = ({ source }: Props): JSX.Element => {
         <Container className="pt-2" fluid>
             <Head>
                 <title>{source.title}</title>
+                <meta name="description" content={`${source.citation}`} />
             </Head>
 
             <Row className="pb-4">

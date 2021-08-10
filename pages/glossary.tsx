@@ -77,6 +77,7 @@ const Glossary = ({ es }: Props): JSX.Element => {
         <Container className="pt-2" fluid>
             <Head>
                 <title>Glossary</title>
+                <meta name="description" content="A Glossary of Gall Related Terminology" />
             </Head>
             <h1 className="ml-3 pt-3">A Glossary of Gall Related Terminology</h1>
             <Row className="p-3">
