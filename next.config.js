@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
-const { PHASE_DEVELOPMENT_SERVER } = require('next/constants');
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+    enabled: process.env.ANALYZE === 'true',
+});
 
 module.exports = (phase) => {
     const d = new Date();
@@ -7,14 +9,10 @@ module.exports = (phase) => {
         d.getUTCMonth() + 1
     }${d.getUTCDate()}-${d.getUTCHours()}${d.getUTCMinutes()}.${d.getUTCMilliseconds()}`;
 
-    return {
+    return withBundleAnalyzer({
         env: {
             BUILD_ID: buildid,
         },
-        // experimental: {
-        //     cpus: PHASE_DEVELOPMENT_SERVER ? true : 1,
-        //     profiling: true,
-        // },
         webpack: function (config, options) {
             config.plugins
                 .push
@@ -35,5 +33,9 @@ module.exports = (phase) => {
         future: {
             webpack5: true,
         },
-    };
+        i18n: {
+            locales: ['en'],
+            defaultLocale: 'en',
+        },
+    });
 };

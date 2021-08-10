@@ -4,10 +4,12 @@ import {
     aliasspecies,
     host,
     image,
+    place,
     Prisma,
     PrismaPromise,
     source,
     species,
+    speciesplace,
     speciessource,
 } from '@prisma/client';
 import * as A from 'fp-ts/lib/Array';
@@ -53,6 +55,9 @@ type DBHost = species & {
             | null;
     })[];
     fgs: FGS;
+    places: (speciesplace & {
+        place: place;
+    })[];
 };
 
 // we want a stronger non-null contract on what we return then is modelable in the DB
@@ -83,6 +88,9 @@ const adaptor = (hosts: readonly DBHost[]): HostApi[] =>
                 ...a.alias,
             })),
             fgs: h.fgs,
+            places: h.places.map((p) => ({
+                ...p.place,
+            })),
         };
         return newh;
     });
@@ -176,6 +184,7 @@ export const getHosts = (
                 },
                 image: { include: { source: { include: { speciessource: true } } } },
                 aliasspecies: { include: { alias: true } },
+                places: { include: { place: true } },
             },
             where: w,
             distinct: distinct,

@@ -30,6 +30,7 @@ const Explore = ({ gallmakers, undescribed, hosts }: Props): JSX.Element => {
         <Container className="pt-2" fluid>
             <Head>
                 <title>Explore Galls & Hosts</title>
+                <meta name="description" content="Browse all of the galls and hosts that gallformers has in its database." />
             </Head>
 
             <Row>

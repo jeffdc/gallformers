@@ -15,6 +15,7 @@ import externalLinks from 'remark-external-links';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import InfoTip from '../../../components/infotip';
+import SeeAlso from '../../../components/seealso';
 import SourceList from '../../../components/sourcelist';
 import { GallSimple, HostApi } from '../../../libs/api/apitypes';
 import { FGS } from '../../../libs/api/taxonomy';
@@ -23,7 +24,6 @@ import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkSourceToGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { formatLicense, sourceToDisplay } from '../../../libs/pages/renderhelpers';
-import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
     host: HostApi;
@@ -67,7 +67,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
         <Container className="pt-2" fluid>
             <Head>
                 <title>{host.name}</title>
-                <meta name={host.name} content={[host.name, ...host.aliases.map((a) => a.name)].join(', ')} />
+                <meta name="description" content={[host.name, ...host.aliases.map((a) => a.name)].join(', ')} />
             </Head>
 
             <Row>
@@ -98,6 +98,10 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                     <Row>
                         <Col>
                             <p className="font-italic">{host.aliases.map((a) => a.name).join(', ')}</p>
+                        </Col>
+                    </Row>
+                    <Row>
+                        <Col>
                             <p>
                                 <strong>Family:</strong>
                                 <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
@@ -136,6 +140,16 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                             )}
                         </Col>
                     </Row>
+                    <Row>
+                        <Col>
+                            <strong>Range:</strong>{' '}
+                            {host.places.map((p) => (
+                                <Link key={p.id} href={`/place/${p.id}`}>
+                                    <a>{p.code} </a>
+                                </Link>
+                            ))}
+                        </Col>
+                    </Row>
                     <Row className="pt-2">
                         <Col>
                             <BootstrapTable
@@ -167,7 +181,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                 </Col>
 
                 <Col sm={12} md={6} lg={4} className="border rounded p-1">
-                    <Images species={host} type="host" />
+                    <Images sp={host} type="host" />
                 </Col>
             </Row>
             <hr />
@@ -219,26 +233,12 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                         onSelectionChange={(s) => setSelectedSource(host.speciessource.find((spso) => spso.source_id == s?.id))}
                     />
                     <hr />
-                    <Row className="">
+                    <Row>
                         <Col className="align-self-center">
                             <strong>See Also:</strong>
                         </Col>
-                        <Col className="align-self-center">
-                            <a href={iNatUrl(host.name)} target="_blank" rel="noreferrer">
-                                <img src="/images/inatlogo-small.png" />
-                            </a>
-                        </Col>
-                        <Col className="align-self-center">
-                            <a href={bugguideUrl(host.name)} target="_blank" rel="noreferrer">
-                                <img src="/images/bugguide-small.png" />
-                            </a>
-                        </Col>
-                        <Col className="align-self-center">
-                            <a href={gScholarUrl(host.name)} target="_blank" rel="noreferrer">
-                                <img src="/images/gscholar-small.png" />
-                            </a>
-                        </Col>
                     </Row>
+                    <SeeAlso name={host.name} />
                 </Col>
             </Row>
         </Container>

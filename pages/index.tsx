@@ -1,9 +1,14 @@
+import Head from 'next/head';
 import Link from 'next/link';
+import React from 'react';
 import { Card, Col, Container, Row } from 'react-bootstrap';
 
 export default function Home(): JSX.Element {
     return (
         <div>
+            <Head>
+                <meta name="description" content="The place to ID and learn about galls on plants in the US and Canada." />
+            </Head>
             <Container className="text-center p-5 ">
                 <Row>
                     <Col>
@@ -21,7 +26,7 @@ export default function Home(): JSX.Element {
                             <Card.Body>
                                 <Link href="/id">
                                     <a>
-                                        <h3>ID a Gall &rarr;</h3>
+                                        <h2>ID a Gall &rarr;</h2>
                                         <p>Try and get an ID for a gall by providing known information.</p>
                                     </a>
                                 </Link>
@@ -33,7 +38,7 @@ export default function Home(): JSX.Element {
                             <Card.Body>
                                 <Link href="/explore">
                                     <a>
-                                        <h3>Explore &rarr;</h3>
+                                        <h2>Explore &rarr;</h2>
                                         <p>Explore Galls (including Undescribed species) and Hosts.</p>
                                     </a>
                                 </Link>

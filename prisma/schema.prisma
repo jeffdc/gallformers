@@ -56,10 +56,10 @@ model color {
 }
 
 model form {
-  id          Int         @id @default(autoincrement())
-  form        String      @unique
+  id          Int        @id @default(autoincrement())
+  form        String     @unique
   description String?
-  gallform   gallform[]
+  gallform    gallform[]
 }
 
 model gall {
@@ -153,10 +153,10 @@ model gallwalls {
 }
 
 model gallform {
-  gall_id  Int
+  gall_id Int
   form_id Int
-  gall     gall  @relation(fields: [gall_id], references: [id])
-  form     form  @relation(fields: [form_id], references: [id])
+  gall    gall @relation(fields: [gall_id], references: [id])
+  form    form @relation(fields: [form_id], references: [id])
 
   @@id([gall_id, form_id])
 }
@@ -208,6 +208,35 @@ model migration {
   down String
 }
 
+model place {
+  id       Int            @id @default(autoincrement())
+  name     String         @unique
+  code     String
+  type     String
+  children placeplace[]   @relation("children")
+  parent   placeplace[]   @relation("parent")
+  species  speciesplace[] @relation("placeTospeciesplace_place_id")
+}
+
+model placeplace {
+  place_id  Int
+  parent_id Int
+  child     place @relation("children", fields: [place_id], references: [id])
+  parent    place @relation("parent", fields: [parent_id], references: [id])
+
+  @@id([place_id, parent_id])
+}
+
+model speciesplace {
+  species_id Int
+  place_id   Int
+  species    species @relation("speciesTospeciespalce_species_id", fields: [species_id], references: [id])
+  place      place   @relation("placeTospeciesplace_place_id", fields: [place_id], references: [id])
+
+
+  @@id([species_id, place_id])
+}
+
 model shape {
   id          Int         @id @default(autoincrement())
   shape       String      @unique
@@ -244,6 +273,7 @@ model species {
   image           image[]
   speciessource   speciessource[]
   speciestaxonomy speciestaxonomy[]
+  places          speciesplace[]    @relation("speciesTospeciespalce_species_id")
 }
 
 model speciessource {
@@ -323,10 +353,10 @@ model walls {
 
 model gallseason {
   id        Int     @id @default(autoincrement())
-  gall_id   Int?
-  season_id Int?
-  gall      gall?   @relation(fields: [gall_id], references: [id])
-  season    season? @relation(fields: [season_id], references: [id])
+  gall_id   Int
+  season_id Int
+  gall      gall   @relation(fields: [gall_id], references: [id])
+  season    season @relation(fields: [season_id], references: [id])
 }
 
 model season {

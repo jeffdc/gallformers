@@ -1,26 +1,14 @@
-import { DetachableApi, DetachableBoth, DetachableNone, GallApi, GallLocation, GallTexture, SearchQuery } from '../api/apitypes';
+import { DetachableApi, DetachableBoth, DetachableNone, GallIDApi, SearchQuery } from '../api/apitypes';
 
 const dontCare = (o: string | string[] | undefined): boolean => {
     const truthy = !!o;
     return !truthy || (truthy && Array.isArray(o) ? o.length === 0 : false);
 };
 
-const checkLocations = (locs: GallLocation[], queryvals: string[] | undefined): boolean => {
+const checkArray = (ts: string[], queryvals: string[] | undefined): boolean => {
     if (queryvals == undefined) return false;
 
-    return queryvals.every((q) => locs.find((l) => l.loc === q));
-};
-
-const checkTextures = (textures: GallTexture[], queryvals: string[] | undefined): boolean => {
-    if (queryvals == undefined) return false;
-
-    return queryvals.every((q) => textures.find((l) => l.tex === q));
-};
-
-const checkArray = <T>(ts: T[], pred: (t: T, s: string) => boolean, queryvals: string[] | undefined): boolean => {
-    if (queryvals == undefined) return false;
-
-    return queryvals.every((q) => ts.find((t) => pred(t, q)));
+    return queryvals.every((q) => ts.find((t) => t === q));
 };
 
 /** Make the helper functions available for unit testing. */
@@ -43,37 +31,48 @@ export const LEAF_ANYWHERE = 'leaf (anywhere)';
 export const GALL_FORM = 'gall';
 export const NONGALL_FORM = 'non-gall';
 
-export const checkGall = (g: GallApi, q: SearchQuery): boolean => {
-    const alignment =
-        dontCare(q.alignment) ||
-        (!!g.gall.gallalignment && checkArray(g.gall.gallalignment, (a, b) => a.alignment === b, q.alignment));
-    const cells = dontCare(q.cells) || (!!g.gall.gallcells && checkArray(g.gall.gallcells, (a, b) => a.cells === b, q.cells));
-    const color = dontCare(q.color) || (!!g.gall.gallcolor && checkArray(g.gall.gallcolor, (a, b) => a.color === b, q.color));
-    const season =
-        dontCare(q.season) || (!!g.gall.gallseason && checkArray(g.gall.gallseason, (a, b) => a.season === b, q.season));
-    const detachable = checkDetachable(g.gall.detachable, q.detachable[0]);
-    const shape = dontCare(q.shape) || (!!g.gall.gallshape && checkArray(g.gall.gallshape, (a, b) => a.shape === b, q.shape));
-    const walls = dontCare(q.walls) || (!!g.gall.gallwalls && checkArray(g.gall.gallwalls, (a, b) => a.walls === b, q.walls));
+export const checkGall = (g: GallIDApi, q: SearchQuery): boolean => {
+    const alignment = dontCare(q.alignment) || (!!g.alignments && checkArray(g.alignments, q.alignment));
+    const cells = dontCare(q.cells) || (!!g.cells && checkArray(g.cells, q.cells));
+    const color = dontCare(q.color) || (!!g.colors && checkArray(g.colors, q.color));
+    const season = dontCare(q.season) || (!!g.seasons && checkArray(g.seasons, q.season));
+    const detachable = checkDetachable(g.detachable, q.detachable[0]);
+    const shape = dontCare(q.shape) || (!!g.shapes && checkArray(g.shapes, q.shape));
+    const walls = dontCare(q.walls) || (!!g.walls && checkArray(g.walls, q.walls));
     let location = false;
     if (q.locations.find((l) => l === LEAF_ANYWHERE)) {
-        location = g.gall.galllocation.some((l) => l.loc.includes('leaf'));
+        location = g.locations.some((l) => l.includes('leaf'));
         const locs = q.locations.filter((l) => l !== LEAF_ANYWHERE);
-        location = location && (dontCare(locs) || (!!g.gall.galllocation && checkLocations(g.gall.galllocation, locs)));
+        location = location && (dontCare(locs) || (!!g.locations && checkArray(g.locations, locs)));
     } else {
-        location = dontCare(q.locations) || (!!g.gall.galllocation && checkLocations(g.gall.galllocation, q.locations));
+        location = dontCare(q.locations) || (!!g.locations && checkArray(g.locations, q.locations));
     }
-    const texture = dontCare(q.textures) || (!!g.gall.galltexture && checkTextures(g.gall.galltexture, q.textures));
+    const texture = dontCare(q.textures) || (!!g.textures && checkArray(g.textures, q.textures));
     let form = false;
     if (q.form.find((f) => f === GALL_FORM)) {
         const forms = q.form.filter((f) => f !== GALL_FORM);
         // gall selected as a form, which means not not_gall form
-        form = !g.gall.gallform.find((f) => f.form === NONGALL_FORM);
-        form = form && (dontCare(forms) || (!!g.gall.gallform && checkArray(g.gall.gallform, (a, b) => a.form === b, forms)));
+        form = !g.forms.find((f) => f === NONGALL_FORM);
+        form = form && (dontCare(forms) || (!!g.forms && checkArray(g.forms, forms)));
     } else {
         // gall not selected as a form so we can just do the usual check
-        form = dontCare(q.form) || (!!g.gall.gallform && checkArray(g.gall.gallform, (a, b) => a.form === b, q.form));
+        form = dontCare(q.form) || (!!g.forms && checkArray(g.forms, q.form));
     }
-    const undescribed = !q.undescribed || g.gall.undescribed;
+    const undescribed = !q.undescribed || g.undescribed;
+    const place = dontCare(q.place) || (!!g.places && checkArray(g.places, q.place));
 
-    return alignment && cells && color && season && detachable && shape && walls && location && texture && form && undescribed;
+    return (
+        alignment &&
+        cells &&
+        color &&
+        season &&
+        detachable &&
+        shape &&
+        walls &&
+        location &&
+        texture &&
+        form &&
+        undescribed &&
+        place
+    );
 };
