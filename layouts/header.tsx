@@ -37,7 +37,8 @@ const Header = (): JSX.Element => {
             </Head>
             <Navbar fixed="top" collapseOnSelect expand="md" bg="dark" variant="dark">
                 <Navbar.Brand href="/">
-                    <img src="/images/fly.svg" width="25px" height="25px" /> Gallformers
+                    <img src="/images/fly.svg" width="25px" height="25px" alt="The gallformers logo, an abstract insect." />{' '}
+                    Gallformers
                 </Navbar.Brand>
                 <Navbar.Toggle aria-controls="responsive-navbar-nav" />
                 <Navbar.Collapse id="responsive-navbar-nav">

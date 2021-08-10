@@ -47,6 +47,7 @@ const PlacePage = ({ place }: Props): JSX.Element => {
         <Container className="pt-2" fluid>
             <Head>
                 <title>{place.name}</title>
+                <meta name="description" content={`Place ${place.name}`} />
             </Head>
             <Row>
                 <Col>

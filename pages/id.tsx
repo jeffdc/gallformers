@@ -301,6 +301,7 @@ const IDGall = (props: Props): JSX.Element => {
         <Container className="m-2" fluid>
             <Head>
                 <title>ID Galls</title>
+                <meta name="description" content="A tool for IDign galls." />
             </Head>
 
             <Row className="fixed-left pl-2 pt-3 form-group">
@@ -416,71 +417,71 @@ const IDGall = (props: Props): JSX.Element => {
                             <Col sm={12} md={5}>
                                 <label className="col-form-label">
                                     Location(s):
-                                    <InfoTip id="locations" text="Where on the host the gall is found." />
+                                    <InfoTip id="locationstip" text="Where on the host the gall is found." />
+                                    <Typeahead
+                                        name="locations"
+                                        control={filterControl}
+                                        selected={query ? query.locations : []}
+                                        onChange={(selected) => {
+                                            setQuery({
+                                                ...(query ? query : EMPTYSEARCHQUERY),
+                                                locations: selected,
+                                            });
+                                        }}
+                                        placeholder="Locations"
+                                        options={props.locations
+                                            .map((l) => l.field)
+                                            .concat(LEAF_ANYWHERE)
+                                            .sort()}
+                                        disabled={disableFilter()}
+                                        clearButton={true}
+                                        multiple={true}
+                                    />
                                 </label>
-                                <Typeahead
-                                    name="locations"
-                                    control={filterControl}
-                                    selected={query ? query.locations : []}
-                                    onChange={(selected) => {
-                                        setQuery({
-                                            ...(query ? query : EMPTYSEARCHQUERY),
-                                            locations: selected,
-                                        });
-                                    }}
-                                    placeholder="Locations"
-                                    options={props.locations
-                                        .map((l) => l.field)
-                                        .concat(LEAF_ANYWHERE)
-                                        .sort()}
-                                    disabled={disableFilter()}
-                                    clearButton={true}
-                                    multiple={true}
-                                />
                             </Col>
                             <Col sm={12} md={4}>
                                 <label className="col-form-label">
                                     Detachable:
-                                    <InfoTip id="detachable" text="Can the gall be removed from the host without cutting?" />
+                                    <InfoTip id="detachabletip" text="Can the gall be removed from the host without cutting?" />
+                                    <Typeahead
+                                        name="detachable"
+                                        control={filterControl}
+                                        selected={query ? query.detachable : []}
+                                        onChange={(selected) => {
+                                            setQuery({
+                                                ...(query ? query : EMPTYSEARCHQUERY),
+                                                detachable: selected.length > 0 ? selected : [DetachableNone],
+                                            });
+                                        }}
+                                        options={Detachables}
+                                        labelKey={'value'}
+                                        disabled={disableFilter()}
+                                        clearButton={true}
+                                    />
                                 </label>
-                                <Typeahead
-                                    name="detachable"
-                                    control={filterControl}
-                                    selected={query ? query.detachable : []}
-                                    onChange={(selected) => {
-                                        setQuery({
-                                            ...(query ? query : EMPTYSEARCHQUERY),
-                                            detachable: selected.length > 0 ? selected : [DetachableNone],
-                                        });
-                                    }}
-                                    options={Detachables}
-                                    labelKey={'value'}
-                                    disabled={disableFilter()}
-                                    clearButton={true}
-                                />
                             </Col>
                             <Col sm={12} md={3}>
                                 <label className="col-form-label">
                                     Place:
                                     <InfoTip
-                                        id="place"
+                                        id="placetip"
                                         text="Where did you see the Gall? (US states or CAN provinces). This is only active if you are searching by Genus or Section since individual species are already range constrained."
                                     />
+                                    <Typeahead
+                                        name="place"
+                                        control={filterControl}
+                                        selected={query ? query.place : []}
+                                        onChange={(selected) => {
+                                            setQuery({
+                                                ...(query ? query : EMPTYSEARCHQUERY),
+                                                place: selected.length > 0 ? selected : [],
+                                            });
+                                        }}
+                                        options={props.places.map((p) => p.name)}
+                                        disabled={disableFilter() || isHost(hostOrTaxon)}
+                                        clearButton={true}
+                                    />
                                 </label>
-                                <Typeahead
-                                    name="place"
-                                    control={filterControl}
-                                    selected={query ? query.place : []}
-                                    onChange={(selected) => {
-                                        setQuery({
-                                            ...(query ? query : EMPTYSEARCHQUERY),
-                                            place: selected.length > 0 ? selected : [],
-                                        });
-                                    }}
-                                    options={props.places.map((p) => p.name)}
-                                    disabled={disableFilter() || isHost(hostOrTaxon)}
-                                    clearButton={true}
-                                />
                             </Col>
                         </Row>
                         <Row>

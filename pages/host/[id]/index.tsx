@@ -15,6 +15,7 @@ import externalLinks from 'remark-external-links';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import InfoTip from '../../../components/infotip';
+import SeeAlso from '../../../components/seealso';
 import SourceList from '../../../components/sourcelist';
 import { GallSimple, HostApi } from '../../../libs/api/apitypes';
 import { FGS } from '../../../libs/api/taxonomy';
@@ -23,7 +24,6 @@ import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkSourceToGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { formatLicense, sourceToDisplay } from '../../../libs/pages/renderhelpers';
-import { bhlUrl, bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
     host: HostApi;
@@ -67,7 +67,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
         <Container className="pt-2" fluid>
             <Head>
                 <title>{host.name}</title>
-                <meta name={host.name} content={[host.name, ...host.aliases.map((a) => a.name)].join(', ')} />
+                <meta name="description" content={[host.name, ...host.aliases.map((a) => a.name)].join(', ')} />
             </Head>
 
             <Row>
@@ -238,28 +238,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                             <strong>See Also:</strong>
                         </Col>
                     </Row>
-                    <Row className="">
-                        <Col xs={12} md={6} lg={3} className="align-self-center">
-                            <a href={iNatUrl(host.name)} target="_blank" rel="noreferrer">
-                                <img src="/images/inatlogo-small.png" />
-                            </a>
-                        </Col>
-                        <Col xs={12} md={6} lg={3} className="align-self-center">
-                            <a href={bugguideUrl(host.name)} target="_blank" rel="noreferrer">
-                                <img src="/images/bugguide-small.png" />
-                            </a>
-                        </Col>
-                        <Col xs={12} md={6} lg={3} className="align-self-center">
-                            <a href={gScholarUrl(host.name)} target="_blank" rel="noreferrer">
-                                <img src="/images/gscholar-small.png" />
-                            </a>
-                        </Col>
-                        <Col xs={12} md={6} lg={3} className="align-self-center">
-                            <a href={bhlUrl(host.name)} target="_blank" rel="noreferrer">
-                                <img src="/images/bhllogo.png" />
-                            </a>
-                        </Col>
-                    </Row>
+                    <SeeAlso name={host.name} />
                 </Col>
             </Row>
         </Container>

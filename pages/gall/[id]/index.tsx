@@ -14,6 +14,7 @@ import externalLinks from 'remark-external-links';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import InfoTip from '../../../components/infotip';
+import SeeAlso from '../../../components/seealso';
 import SourceList from '../../../components/sourcelist';
 import { DetachableBoth, GallApi, GallHost, SimpleSpecies } from '../../../libs/api/apitypes';
 import { FGS } from '../../../libs/api/taxonomy';
@@ -22,7 +23,6 @@ import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkSourceToGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWith, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { createSummaryGall, defaultSource, formatLicense, sourceToDisplay } from '../../../libs/pages/renderhelpers';
-import { bhlUrl, bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
 
 type Props = {
     species: GallApi;
@@ -63,7 +63,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
         <Container className="pt-2 fluid">
             <Head>
                 <title>{species.name}</title>
-                <meta name={species.name} content={createSummaryGall(species)} />
+                <meta name="description" content={`${species.name} - ${createSummaryGall(species)}`} />
             </Head>
             <Row className="mt-2">
                 {/* Details */}
@@ -273,28 +273,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                             <strong>See Also:</strong>
                         </Col>
                     </Row>
-                    <Row className="">
-                        <Col xs={12} md={6} lg={3} className="align-self-center">
-                            <a href={iNatUrl(species.name)} target="_blank" rel="noreferrer">
-                                <img src="/images/inatlogo-small.png" />
-                            </a>
-                        </Col>
-                        <Col xs={12} md={6} lg={3} className="align-self-center">
-                            <a href={bugguideUrl(species.name)} target="_blank" rel="noreferrer">
-                                <img src="/images/bugguide-small.png" />
-                            </a>
-                        </Col>
-                        <Col xs={12} md={6} lg={3} className="align-self-center">
-                            <a href={gScholarUrl(species.name)} target="_blank" rel="noreferrer">
-                                <img src="/images/gscholar-small.png" />
-                            </a>
-                        </Col>
-                        <Col xs={12} md={6} lg={3} className="align-self-center">
-                            <a href={bhlUrl(species.name)} target="_blank" rel="noreferrer">
-                                <img src="/images/bhllogo.png" />
-                            </a>
-                        </Col>
-                    </Row>
+                    <SeeAlso name={species.name} />
                 </Col>
             </Row>
         </Container>

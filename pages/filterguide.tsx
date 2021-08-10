@@ -36,6 +36,7 @@ const FilterGuide = ({ alignments, cells, forms, locations, shapes, textures, wa
         <React.Fragment>
             <Head>
                 <title>Filter Guide</title>
+                <meta name="description" content="A Guide to all of the terms that used on the gallformers ID page." />
             </Head>
             <Container fluid className="mt-4 m-2">
                 <h1>ID Tool Filter Guide</h1>

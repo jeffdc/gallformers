@@ -115,6 +115,7 @@ const GlobalSearch = ({ results, search }: Props): JSX.Element => {
         <Container className="pt-2" fluid>
             <Head>
                 <title>Search Results - {`'${search}'`}</title>
+                <meta name="description" content="Gallformer Search Results" />
             </Head>
 
             {results.length <= 0 && (
