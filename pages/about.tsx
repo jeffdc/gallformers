@@ -15,6 +15,7 @@ const About = ({ stats }: Props): JSX.Element => {
         <div className="p-5">
             <Head>
                 <title>About Gallformers</title>
+                <meta name="description" content="About the creators of gallformers and why we built the site." />
             </Head>
 
             <Row>

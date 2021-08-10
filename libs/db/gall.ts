@@ -37,30 +37,34 @@ import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import {
-    AlignmentApi,
-    CellsApi,
-    ColorApi,
     DeleteResult,
     detachableFromId,
     detachableFromString,
-    FormApi,
     GallApi,
-    GallLocation,
+    GallIDApi,
     GallTaxon,
-    GallTexture,
     GallUpsertFields,
-    SeasonApi,
-    ShapeApi,
     SimpleSpecies,
-    WallsApi,
 } from '../api/apitypes';
 import { FGS, GENUS, SECTION } from '../api/taxonomy';
 import { deleteImagesBySpeciesId } from '../images/images';
 import { defaultSource } from '../pages/renderhelpers';
 import { logger } from '../utils/logger';
+import { ExtractTFromPromise } from '../utils/types';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
-import { adaptImage } from './images';
+import {
+    adaptAlignments,
+    adaptCells,
+    adaptColors,
+    adaptSeasons,
+    adaptShapes,
+    adaptWalls,
+    adaptLocations,
+    adaptTextures,
+    adaptForm,
+} from './filterfield';
+import { adaptImage, adaptImageNoSource } from './images';
 import {
     adaptAbundance,
     speciesCreateData,
@@ -286,20 +290,110 @@ export const allGallIds = (): TaskEither<Error, string[]> => {
     );
 };
 
+const gallsByHostGenusForID = (whereClause: Prisma.gallspeciesWhereInput[]): TaskEither<Error, GallIDApi[]> => {
+    const w = { AND: [...whereClause, { species: { taxoncode: GallTaxon } }] };
+    const galls = () =>
+        db.gallspecies.findMany({
+            include: {
+                species: {
+                    include: {
+                        hosts: {
+                            include: {
+                                hostspecies: {
+                                    select: {
+                                        id: true,
+                                        name: true,
+                                        places: { include: { place: { select: { name: true, type: true } } } },
+                                    },
+                                },
+                            },
+                        },
+                        image: true,
+                        speciestaxonomy: { include: { taxonomy: true } },
+                    },
+                },
+                gall: {
+                    select: {
+                        gallalignment: { include: { alignment: true } },
+                        gallcells: { include: { cells: true } },
+                        gallcolor: { include: { color: true } },
+                        gallseason: { include: { season: true } },
+                        detachable: true,
+                        galllocation: { include: { location: true } },
+                        galltexture: { include: { texture: true } },
+                        gallshape: { include: { shape: true } },
+                        gallwalls: { include: { walls: true } },
+                        gallform: { include: { form: true } },
+                        undescribed: true,
+                    },
+                },
+            },
+            where: w,
+            orderBy: { species: { name: 'asc' } },
+        });
+
+    // helper type that makes dealing wuth the next function a lot easier
+    type DBGall = ExtractTFromPromise<ReturnType<typeof galls>>;
+
+    const clean = (galls: DBGall): GallIDApi[] =>
+        galls.flatMap((g) => {
+            if (g.gall == null) {
+                logger.error(
+                    `Detected a species with id ${g.species.id} that is supposed to be a gall but does not have a corresponding gall!`,
+                );
+                return []; // will resolve to nothing since we are in a flatMap
+            }
+
+            const newg: GallIDApi = {
+                id: g.species_id,
+                name: g.species.name,
+                datacomplete: g.species.datacomplete,
+                alignments: g.gall.gallalignment.map((a) => a.alignment.alignment),
+                cells: g.gall.gallcells.map((c) => c.cells.cells),
+                colors: g.gall.gallcolor.map((c) => c.color.color),
+                seasons: g.gall.gallseason.map((c) => c.season.season),
+                shapes: g.gall.gallshape.map((s) => s.shape.shape),
+                walls: g.gall.gallwalls.map((w) => w.walls.walls),
+                detachable: detachableFromId(g.gall.detachable),
+                locations: g.gall.galllocation.map((l) => l.location.location),
+                textures: g.gall.galltexture.map((t) => t.texture.texture),
+                forms: g.gall.gallform.map((c) => c.form.form),
+                undescribed: g.gall.undescribed,
+                // remove the indirection of the many-to-many table for easier usage
+                places: g.species.hosts.flatMap((h) => {
+                    if (h.hostspecies == null) {
+                        return [];
+                    }
+                    return h.hostspecies.places
+                        .filter((p) => p.place.type == 'state' || p.place.type == 'province')
+                        .map((p) => p.place.name);
+                }),
+                images: g.species.image.map(adaptImageNoSource),
+            };
+            return newg;
+        });
+
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        TE.tryCatch(galls, handleError),
+        TE.map(clean),
+    );
+};
+
 /**
  * Fetch all Galls of the given host
  * @param hostName the host name to filter by
  */
-export const gallsByHostName = (hostName: string): TaskEither<Error, GallApi[]> => {
-    return getGalls([{ species: { hosts: { some: { hostspecies: { name: { equals: hostName } } } } } }]);
+export const gallsByHostName = (hostName: string): TaskEither<Error, GallIDApi[]> => {
+    return gallsByHostGenusForID([{ species: { hosts: { some: { hostspecies: { name: { equals: hostName } } } } } }]);
 };
 
 /**
- * Fetch all Galls of the given host genus or section
+ * Fetch all Galls of the given host genus or section. This is for the ID screen so we will minimize the data we fetch.
  * @param hostGenus the host genus or section to filter by
  */
-export const gallsByHostGenus = (hostGenus: string): TaskEither<Error, GallApi[]> => {
-    return getGalls([
+export const gallsByHostGenus = (hostGenus: string): TaskEither<Error, GallIDApi[]> => {
+    return gallsByHostGenusForID([
         {
             species: {
                 hosts: {
@@ -320,8 +414,8 @@ export const gallsByHostGenus = (hostGenus: string): TaskEither<Error, GallApi[]
     ]);
 };
 
-export const gallsByHostSection = (hostSection: string): TaskEither<Error, GallApi[]> => {
-    return getGalls([
+export const gallsByHostSection = (hostSection: string): TaskEither<Error, GallIDApi[]> => {
+    return gallsByHostGenusForID([
         {
             species: {
                 hosts: {
@@ -435,177 +529,6 @@ export const getGallIdFromSpeciesId = (speciesid: number): TaskEither<Error, O.O
         TE.tryCatch(gall, handleError),
         TE.map((g) => O.fromNullable(g?.gall_id)),
     );
-};
-
-const adaptLocations = (ls: location[]): GallLocation[] => {
-    return ls.map((l) => ({
-        id: l.id,
-        loc: l.location,
-        description: O.fromNullable(l.description),
-    }));
-};
-
-/**
- * Fetches all gall locations
- */
-export const getLocations = (): TaskEither<Error, GallLocation[]> => {
-    const locations = () =>
-        db.location.findMany({
-            orderBy: {
-                location: 'asc',
-            },
-        });
-
-    return pipe(TE.tryCatch(locations, handleError), TE.map(adaptLocations));
-};
-
-const adaptColors = (colors: color[]): ColorApi[] => colors.map((c) => c);
-
-/**
- * Fetches all gall colors
- */
-export const getColors = (): TaskEither<Error, ColorApi[]> => {
-    const colors = () =>
-        db.color.findMany({
-            orderBy: {
-                color: 'asc',
-            },
-        });
-
-    return pipe(TE.tryCatch(colors, handleError), TE.map(adaptColors));
-};
-
-const adaptSeasons = (seasons: season[]): SeasonApi[] => seasons.map((c) => c);
-
-/**
- * Fetches all gall seasons
- */
-export const getSeasons = (): TaskEither<Error, SeasonApi[]> => {
-    const seasons = () => db.season.findMany({});
-
-    return pipe(TE.tryCatch(seasons, handleError), TE.map(adaptSeasons));
-};
-
-const adaptShapes = (shapes: shape[]): ShapeApi[] =>
-    shapes.map((s) => ({
-        ...s,
-        description: O.fromNullable(s.description),
-    }));
-
-/**
- * Fetches all gall shapes
- */
-export const getShapes = (): TaskEither<Error, ShapeApi[]> => {
-    const shapes = () =>
-        db.shape.findMany({
-            orderBy: {
-                shape: 'asc',
-            },
-        });
-
-    return pipe(TE.tryCatch(shapes, handleError), TE.map(adaptShapes));
-};
-
-const adaptTextures = (ts: texture[]): GallTexture[] => {
-    return ts.map((t) => ({
-        id: t.id,
-        tex: t.texture,
-        description: O.fromNullable(t.description),
-    }));
-};
-
-/**
- * Fetches all gall textures
- */
-export const getTextures = (): TaskEither<Error, GallTexture[]> => {
-    const textures = () =>
-        db.texture.findMany({
-            orderBy: {
-                texture: 'asc',
-            },
-        });
-
-    return pipe(TE.tryCatch(textures, handleError), TE.map(adaptTextures));
-};
-
-const adaptAlignments = (as: alignment[]): AlignmentApi[] =>
-    as.map((a) => ({
-        ...a,
-        description: O.fromNullable(a.description),
-    }));
-
-/**
- * Fetches all gall alignments
- */
-export const getAlignments = (): TaskEither<Error, AlignmentApi[]> => {
-    const alignments = () =>
-        db.alignment.findMany({
-            orderBy: {
-                alignment: 'asc',
-            },
-        });
-
-    return pipe(TE.tryCatch(alignments, handleError), TE.map(adaptAlignments));
-};
-
-const adaptWalls = (walls: ws[]): WallsApi[] =>
-    walls.map((w) => ({
-        ...w,
-        description: O.fromNullable(w.description),
-    }));
-
-/**
- * Fetches all gall walls
- */
-export const getWalls = (): TaskEither<Error, WallsApi[]> => {
-    const walls = () =>
-        db.walls.findMany({
-            orderBy: {
-                walls: 'asc',
-            },
-        });
-
-    return pipe(TE.tryCatch(walls, handleError), TE.map(adaptWalls));
-};
-
-const adaptCells = (cells: cs[]): CellsApi[] =>
-    cells.map((c) => ({
-        ...c,
-        description: O.fromNullable(c.description),
-    }));
-
-/**
- * Fetches all gall cells
- */
-export const getCells = (): TaskEither<Error, CellsApi[]> => {
-    const cells = () =>
-        db.cells.findMany({
-            orderBy: {
-                cells: 'asc',
-            },
-        });
-
-    return pipe(TE.tryCatch(cells, handleError), TE.map(adaptCells));
-};
-
-const adaptForm = (form: form[]): FormApi[] =>
-    form.map((c) => ({
-        ...c,
-        description: O.fromNullable(c.description),
-    }));
-
-/**
- * Fetches all gall forms
- */
-export const getForms = (): TaskEither<Error, FormApi[]> => {
-    const form = () =>
-        db.form.findMany({
-            orderBy: {
-                form: 'asc',
-            },
-        });
-
-    return pipe(TE.tryCatch(form, handleError), TE.map(adaptForm));
 };
 
 export const testTx = (): Promise<[species[]]> => {

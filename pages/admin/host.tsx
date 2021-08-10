@@ -13,9 +13,17 @@ import Typeahead from '../../components/Typeahead';
 import useAdmin from '../../hooks/useadmin';
 import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '../../hooks/useSpecies';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { AbundanceApi, HostApi, HostTaxon, HOST_FAMILY_TYPES, SpeciesUpsertFields } from '../../libs/api/apitypes';
+import {
+    AbundanceApi,
+    HostApi,
+    HostTaxon,
+    HOST_FAMILY_TYPES,
+    PlaceNoTreeApi,
+    SpeciesUpsertFields,
+} from '../../libs/api/apitypes';
 import { FAMILY, TaxonomyEntry, TaxonomyEntryNoParent } from '../../libs/api/taxonomy';
 import { allHosts } from '../../libs/db/host';
+import { getPlaces } from '../../libs/db/place';
 import { getAbundances } from '../../libs/db/species';
 import { allFamilies, allGenera, allSections } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
@@ -24,6 +32,7 @@ import { mightFailWithArray, SPECIES_NAME_REGEX } from '../../libs/utils/util';
 type Props = SpeciesProps & {
     hs: HostApi[];
     sections: TaxonomyEntry[];
+    places: PlaceNoTreeApi[];
 };
 
 const schema = yup.object().shape({
@@ -48,13 +57,14 @@ const schema = yup.object().shape({
 
 export type FormFields = SpeciesFormFields<HostApi> & {
     section: TaxonomyEntryNoParent[];
+    places: PlaceNoTreeApi[];
 };
 
 export const testables = {
     Schema: schema,
 };
 
-const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.Element => {
+const Host = ({ id, hs, genera, families, sections, abundances, places }: Props): JSX.Element => {
     const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields, aliasData, setAliasData } =
         useSpecies<HostApi>(genera);
 
@@ -66,6 +76,7 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
         return {
             ...toSpeciesUpsertFields(fields, name, id),
             fgs: { ...selected.fgs },
+            places: selected.places,
         };
     };
 
@@ -78,18 +89,21 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                     s.fgs?.section,
                     O.fold(constant([]), (sec) => [sec]),
                 ),
+                places: s.places,
             };
         }
 
         return {
             ...speciesFields,
             section: [],
+            places: [],
         };
     };
 
     const createNewHost = (name: string): HostApi => ({
         ...createNewSpecies(name, HostTaxon),
         galls: [],
+        places: [],
     });
 
     const {
@@ -283,6 +297,28 @@ const Host = ({ id, hs, genera, families, sections, abundances }: Props): JSX.El
                         />
                     </Col>
                 </Row>
+                <Row className="formGroup pb-1">
+                    <Col>
+                        Range:
+                        <Typeahead
+                            name="places"
+                            control={form.control}
+                            placeholder=""
+                            options={places}
+                            labelKey="code"
+                            disabled={!selected}
+                            multiple
+                            selected={selected ? selected.places : []}
+                            onChange={(p) => {
+                                if (selected) {
+                                    selected.places = p;
+                                    setSelected({ ...selected });
+                                }
+                            }}
+                            clearButton
+                        />
+                    </Col>
+                </Row>
                 <Row className="form-group">
                     <Col>
                         <AliasTable data={aliasData} setData={setAliasData} />
@@ -340,6 +376,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon)),
             sections: await mightFailWithArray<TaxonomyEntry>()(allSections()),
             abundances: await mightFailWithArray<AbundanceApi>()(getAbundances()),
+            places: await mightFailWithArray<PlaceNoTreeApi>()(getPlaces()),
         },
     };
 };

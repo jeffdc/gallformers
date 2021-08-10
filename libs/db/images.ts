@@ -3,7 +3,7 @@ import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { asLicenseType, ImageApi } from '../api/apitypes';
+import { asLicenseType, ImageApi, ImageNoSourceApi } from '../api/apitypes';
 import {
     createOtherSizes,
     deleteImagesByPaths,
@@ -176,6 +176,16 @@ export const adaptImage = <T extends ImageWithSource>(img: T): ImageApi => ({
     original: makePath(img.path, ORIGINAL),
     source: O.fromNullable(img.source),
     license: asLicenseType(img.license),
+});
+
+export const adaptImageNoSource = <T extends image>(img: T): ImageNoSourceApi => ({
+    ...img,
+    speciesid: img.species_id,
+    small: makePath(img.path, SMALL),
+    medium: makePath(img.path, MEDIUM),
+    large: makePath(img.path, LARGE),
+    xlarge: makePath(img.path, XLARGE),
+    original: makePath(img.path, ORIGINAL),
 });
 
 const adaptMany = <T extends ImageWithSource>(imgs: T[]): ImageApi[] => imgs.map(adaptImage);

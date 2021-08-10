@@ -6,7 +6,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
-import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
+import { Alert, Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
@@ -14,6 +14,7 @@ import externalLinks from 'remark-external-links';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import InfoTip from '../../../components/infotip';
+import SeeAlso from '../../../components/seealso';
 import SourceList from '../../../components/sourcelist';
 import { DetachableBoth, GallApi, GallHost, SimpleSpecies } from '../../../libs/api/apitypes';
 import { FGS } from '../../../libs/api/taxonomy';
@@ -21,8 +22,7 @@ import { allGallIds, gallById, getRelatedGalls } from '../../../libs/db/gall';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkSourceToGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWith, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { createSummary, defaultSource, formatLicense, sourceToDisplay } from '../../../libs/pages/renderhelpers';
-import { bugguideUrl, gScholarUrl, iNatUrl } from '../../../libs/utils/util';
+import { createSummaryGall, defaultSource, formatLicense, sourceToDisplay } from '../../../libs/pages/renderhelpers';
 
 type Props = {
     species: GallApi;
@@ -43,6 +43,7 @@ const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
 
 const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
     const [selectedSource, setSelectedSource] = useState(defaultSource(species?.speciessource));
+    const [notesAlertShown, setNotesAlertShown] = useState(true);
 
     const router = useRouter();
     // If the page is not yet generated, this will be displayed initially until getStaticProps() finishes running
@@ -56,11 +57,13 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
     species.hosts.sort((a, b) => a.name.localeCompare(b.name));
     const hostLinker = hostAsLink(species.hosts.length);
 
+    const notesSpeciesSource = species.speciessource?.find((s) => s.source?.id === 58);
+
     return (
         <Container className="pt-2 fluid">
             <Head>
                 <title>{species.name}</title>
-                <meta name={species.name} content={createSummary(species)} />
+                <meta name="description" content={`${species.name} - ${createSummaryGall(species)}`} />
             </Head>
             <Row className="mt-2">
                 {/* Details */}
@@ -127,21 +130,21 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                     )}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Color:</strong> {species.gall.gallcolor.map((c) => c.color).join(', ')}
+                                    <strong>Color:</strong> {species.gall.gallcolor.map((c) => c.field).join(', ')}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.tex).join(', ')}
+                                    <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.field).join(', ')}
                                 </Col>
                             </Row>
                             <Row>
                                 <Col xs={6} sm={4}>
-                                    <strong>Alignment:</strong> {species.gall.gallalignment.map((a) => a.alignment).join(', ')}
+                                    <strong>Alignment:</strong> {species.gall.gallalignment.map((a) => a.field).join(', ')}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Walls:</strong> {species.gall.gallwalls.map((w) => w.walls).join(', ')}
+                                    <strong>Walls:</strong> {species.gall.gallwalls.map((w) => w.field).join(', ')}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Location:</strong> {species.gall.galllocation.map((l) => l.loc).join(', ')}
+                                    <strong>Location:</strong> {species.gall.galllocation.map((l) => l.field).join(', ')}
                                 </Col>
                             </Row>
                             <Row>
@@ -153,18 +156,18 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                     )}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Shape:</strong> {species.gall.gallshape.map((s) => s.shape).join(', ')}
+                                    <strong>Shape:</strong> {species.gall.gallshape.map((s) => s.field).join(', ')}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Season:</strong> {species.gall.gallseason.map((s) => s.season).join(', ')}
+                                    <strong>Season:</strong> {species.gall.gallseason.map((s) => s.field).join(', ')}
                                 </Col>
                             </Row>
                             <Row>
                                 <Col xs={6} sm={4}>
-                                    <strong>Form:</strong> {species.gall.gallform.map((s) => s.form).join(', ')}
+                                    <strong>Form:</strong> {species.gall.gallform.map((s) => s.field).join(', ')}
                                 </Col>
                                 <Col xs={6} sm={4}>
-                                    <strong>Cells:</strong> {species.gall.gallcells.map((s) => s.cells).join(', ')}
+                                    <strong>Cells:</strong> {species.gall.gallcells.map((s) => s.field).join(', ')}
                                 </Col>
                                 <Col>
                                     <strong>Related: </strong>
@@ -184,13 +187,29 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                 </Col>
                 {/* Images */}
                 <Col sm={{ span: 12 }} md={4}>
-                    <Images species={species} type="gall" />
+                    <Images sp={species} type="gall" />
                 </Col>
                 {/* Description */}
                 <Col>
                     <Row>
                         <Col>
                             <hr />
+                        </Col>
+                    </Row>
+                    <Row hidden={!notesAlertShown || !(notesSpeciesSource && notesSpeciesSource.id !== selectedSource?.id)}>
+                        <Col id="notes-reminder">
+                            <Alert variant="info" dismissible onClose={() => setNotesAlertShown(false)}>
+                                Our ID Notes may contain important tips necessary for distinguishing this gall from similar galls
+                                and/or important information about the taxonomic status of this gall inducer.
+                                <Button
+                                    className="ml-3"
+                                    variant="outline-info"
+                                    size="sm"
+                                    onClick={() => setSelectedSource(notesSpeciesSource)}
+                                >
+                                    Show notes
+                                </Button>
+                            </Alert>
                         </Col>
                     </Row>
                     <Row>
@@ -242,33 +261,19 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
             <Row>
                 <Col>
                     <SourceList
-                        data={species.speciessource}
+                        data={species.speciessource.map((s) => s.source)}
                         defaultSelection={selectedSource?.source}
                         onSelectionChange={(s) =>
                             setSelectedSource(species.speciessource.find((spso) => spso.source_id == s?.id))
                         }
                     />
                     <hr />
-                    <Row className="">
+                    <Row>
                         <Col className="align-self-center">
                             <strong>See Also:</strong>
                         </Col>
-                        <Col className="align-self-center">
-                            <a href={iNatUrl(species.name)} target="_blank" rel="noreferrer">
-                                <img src="/images/inatlogo-small.png" />
-                            </a>
-                        </Col>
-                        <Col className="align-self-center">
-                            <a href={bugguideUrl(species.name)} target="_blank" rel="noreferrer">
-                                <img src="/images/bugguide-small.png" />
-                            </a>
-                        </Col>
-                        <Col className="align-self-center">
-                            <a href={gScholarUrl(species.name)} target="_blank" rel="noreferrer">
-                                <img src="/images/gscholar-small.png" />
-                            </a>
-                        </Col>
                     </Row>
+                    <SeeAlso name={species.name} />
                 </Col>
             </Row>
         </Container>

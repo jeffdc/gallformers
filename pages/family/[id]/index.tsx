@@ -42,6 +42,7 @@ const Family = ({ family, tree }: Props): JSX.Element => {
         <Container className="pt-2" fluid>
             <Head>
                 <title>{fam.name}</title>
+                <meta name="description" content={`Family ${fam.name}`} />
             </Head>
             <Row>
                 <Col xs={12}>

@@ -44,6 +44,7 @@ const Section = ({ section }: Props): JSX.Element => {
         <Container className="pt-2" fluid>
             <Head>
                 <title>{section.name}</title>
+                <meta name="description" content={`Section ${section.name}`} />
             </Head>
             <Row>
                 <Col>

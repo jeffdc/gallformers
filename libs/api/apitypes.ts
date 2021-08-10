@@ -80,6 +80,7 @@ export type SearchQuery = {
     cells: string[];
     form: string[];
     undescribed: boolean;
+    place: string[];
 };
 
 export const EMPTYSEARCHQUERY: SearchQuery = {
@@ -94,6 +95,7 @@ export const EMPTYSEARCHQUERY: SearchQuery = {
     season: [],
     form: [],
     undescribed: false,
+    place: [],
 };
 
 export type Deletable = {
@@ -156,6 +158,7 @@ export type SpeciesUpsertFields = {
     aliases: AliasApi[];
     abundance: string | null | undefined;
     fgs: FGS;
+    places: PlaceNoTreeApi[];
 };
 
 export type GallUpsertFields = SpeciesUpsertFields & {
@@ -209,18 +212,6 @@ export type GallHost = {
     name: string;
 };
 
-export type GallLocation = {
-    id: number;
-    loc: string;
-    description: Option<string>;
-};
-
-export type GallTexture = {
-    id: number;
-    tex: string;
-    description: Option<string>;
-};
-
 export type AbundanceApi = {
     id: number;
     abundance: string;
@@ -239,16 +230,19 @@ export type SimpleSpecies = {
     taxoncode: string;
     name: string;
 };
-
-export type SpeciesApi = SimpleSpecies & {
-    datacomplete: boolean;
-    abundance: Option<AbundanceApi>;
-    description: Option<string>; // to make the caller's life easier we will load the default if we can
-    speciessource: SpeciesSourceApi[];
-    images: ImageApi[];
-    aliases: AliasApi[];
-    fgs: FGS;
+export type WithImages = {
+    images: ImageApi[] | ImageNoSourceApi[];
 };
+
+export type SpeciesApi = SimpleSpecies &
+    WithImages & {
+        datacomplete: boolean;
+        abundance: Option<AbundanceApi>;
+        description: Option<string>; // to make the caller's life easier we will load the default if we can
+        speciessource: SpeciesSourceApi[];
+        aliases: AliasApi[];
+        fgs: FGS;
+    };
 
 export type AliasApi = {
     id: number;
@@ -264,92 +258,117 @@ export const EmptyAlias: AliasApi = {
     description: '',
 };
 
-export type AlignmentApi = {
+export const FILTER_FIELD_ALIGNMENTS = 'alignments';
+export const FILTER_FIELD_CELLS = 'cells';
+export const FILTER_FIELD_COLORS = 'colors';
+export const FILTER_FIELD_FORMS = 'forms';
+export const FILTER_FIELD_LOCATIONS = 'locations';
+export const FILTER_FIELD_SEASONS = 'seasons';
+export const FILTER_FIELD_SHAPES = 'shapes';
+export const FILTER_FIELD_TEXTURES = 'textures';
+export const FILTER_FIELD_WALLS = 'walls';
+export const FILTER_FIELD_TYPES = [
+    FILTER_FIELD_ALIGNMENTS,
+    FILTER_FIELD_CELLS,
+    FILTER_FIELD_COLORS,
+    FILTER_FIELD_FORMS,
+    FILTER_FIELD_LOCATIONS,
+    FILTER_FIELD_SEASONS,
+    FILTER_FIELD_SHAPES,
+    FILTER_FIELD_TEXTURES,
+    FILTER_FIELD_WALLS,
+] as const;
+export type FilterFieldTypeTuple = typeof FILTER_FIELD_TYPES;
+export type FilterFieldType = FilterFieldTypeTuple[number];
+export const asFilterFieldType = (f: string): FilterFieldType => {
+    // Seems like there should be a better way to handle this and maintain types.
+    switch (f) {
+        case FILTER_FIELD_ALIGNMENTS:
+            return FILTER_FIELD_ALIGNMENTS;
+        case FILTER_FIELD_CELLS:
+            return FILTER_FIELD_CELLS;
+        case FILTER_FIELD_COLORS:
+            return FILTER_FIELD_COLORS;
+        case FILTER_FIELD_FORMS:
+            return FILTER_FIELD_FORMS;
+        case FILTER_FIELD_LOCATIONS:
+            return FILTER_FIELD_LOCATIONS;
+        case FILTER_FIELD_SEASONS:
+            return FILTER_FIELD_SEASONS;
+        case FILTER_FIELD_SHAPES:
+            return FILTER_FIELD_SHAPES;
+        case FILTER_FIELD_TEXTURES:
+            return FILTER_FIELD_TEXTURES;
+        case FILTER_FIELD_WALLS:
+            return FILTER_FIELD_WALLS;
+        default:
+            throw new Error(`Invalid filter field type: '${f}'.`);
+    }
+};
+
+export type FilterField = {
     id: number;
-    alignment: string;
+    field: string;
     description: Option<string>;
 };
-export const EmptyAlignment: AlignmentApi = {
-    id: -1,
-    alignment: '',
-    description: O.none,
+
+export type FilterFieldWithType = FilterField & {
+    fieldType: FilterFieldType;
 };
 
-export type CellsApi = {
+// For now only these two until we support the Place hierarchy.
+export const PLACE_TYPES = ['state', 'province'];
+
+export type PlaceNoTreeApi = {
     id: number;
-    cells: string;
-    description: Option<string>;
-};
-export const EmptyCells: CellsApi = {
-    id: -1,
-    cells: '',
-    description: O.none,
+    name: string;
+    code: string;
+    type: string;
 };
 
-export type ColorApi = {
-    id: number;
-    color: string;
-};
-export const EmptyColor: ColorApi = {
-    id: -1,
-    color: '',
+export type PlaceNoTreeUpsertFields = PlaceNoTreeApi & Deletable;
+
+export type PlaceApi = PlaceNoTreeApi & {
+    parent: PlaceApi[];
+    children: PlaceApi[];
 };
 
-export type SeasonApi = {
-    id: number;
-    season: string;
-};
-export const EmptySeason: SeasonApi = {
-    id: -1,
-    season: '',
+export type PlaceWithHostsApi = PlaceApi & {
+    hosts: HostSimple[];
 };
 
-export type ShapeApi = {
+// a cut down structure for the ID page
+export type GallIDApi = WithImages & {
     id: number;
-    shape: string;
-    description: Option<string>;
-};
-export const EmptyShape: ShapeApi = {
-    id: -1,
-    shape: '',
-    description: O.none,
-};
-
-export type WallsApi = {
-    id: number;
-    walls: string;
-    description: Option<string>;
-};
-export const EmptyWalls: WallsApi = {
-    id: -1,
-    walls: '',
-    description: O.none,
-};
-
-export type FormApi = {
-    id: number;
-    form: string;
-    description: Option<string>;
-};
-export const EmptyForm: FormApi = {
-    id: -1,
-    form: '',
-    description: O.none,
+    name: string;
+    datacomplete: boolean;
+    alignments: string[];
+    cells: string[];
+    colors: string[];
+    detachable: DetachableApi;
+    forms: string[];
+    locations: string[];
+    places: string[];
+    seasons: string[];
+    shapes: string[];
+    textures: string[];
+    undescribed: boolean;
+    walls: string[];
 };
 
 export type GallApi = SpeciesApi & {
     gall: {
         id: number;
-        gallalignment: AlignmentApi[];
-        gallcells: CellsApi[];
-        gallcolor: ColorApi[];
-        gallseason: SeasonApi[];
+        gallalignment: FilterField[];
+        gallcells: FilterField[];
+        gallcolor: FilterField[];
+        gallseason: FilterField[];
         detachable: DetachableApi;
-        gallshape: ShapeApi[];
-        gallwalls: WallsApi[];
-        galltexture: GallTexture[];
-        galllocation: GallLocation[];
-        gallform: FormApi[];
+        gallshape: FilterField[];
+        gallwalls: FilterField[];
+        galltexture: FilterField[];
+        galllocation: FilterField[];
+        gallform: FilterField[];
         undescribed: boolean;
     };
     hosts: GallHost[];
@@ -369,6 +388,7 @@ export type GallSimple = {
 
 export type HostApi = SpeciesApi & {
     galls: GallSimple[];
+    places: PlaceNoTreeApi[];
 };
 
 export type SourceUpsertFields = Deletable & {
@@ -434,15 +454,11 @@ export const asLicenseType = (l: string): LicenseType => {
     }
 };
 
-export type ImageApi = {
+export type ImageNoSourceApi = {
     id: number;
     attribution: string;
     creator: string;
-    license: LicenseType;
-    licenselink: string;
     path: string;
-    sourcelink: string;
-    source: Option<SourceWithSpeciesSourceApi>;
     uploader: string;
     lastchangedby: string;
     caption: string;
@@ -453,6 +469,13 @@ export type ImageApi = {
     large: string;
     xlarge: string;
     original: string;
+};
+
+export type ImageApi = ImageNoSourceApi & {
+    license: LicenseType;
+    licenselink: string;
+    sourcelink: string;
+    source: Option<SourceWithSpeciesSourceApi>;
 };
 
 export type ImagePaths = {
