@@ -1,55 +1,60 @@
 import Link from 'next/link';
-import React from 'react';
-import BootstrapTable, { ColumnDescription } from 'react-bootstrap-table-next';
+import React, { useMemo } from 'react';
+import DataTable from 'react-data-table-component';
 import { GallTaxon, SimpleSpecies } from '../libs/api/apitypes';
+import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
 
 export type SourceListProps = {
     species: SimpleSpecies[];
 };
 
-const linkSpecies = (cell: string, s: SimpleSpecies) => {
+const linkSpecies = (s: SimpleSpecies) => {
     const hostOrGall = s.taxoncode === GallTaxon ? 'gall' : 'host';
     return (
         <Link key={s.id} href={`/${hostOrGall}/${s.id}`}>
-            <a>{s.name}</a>
+            <a>
+                <i>{s.name}</i>
+            </a>
         </Link>
     );
 };
 
-const taxonDisplay = (cell: string, s: SimpleSpecies) => {
+const taxonDisplay = (s: SimpleSpecies) => {
     return s.taxoncode === GallTaxon ? 'Gall Former' : 'Host';
 };
 
-const columns: ColumnDescription[] = [
-    {
-        dataField: 'name',
-        text: 'Name',
-        sort: true,
-        formatter: linkSpecies,
-    },
-    {
-        dataField: 'taxoncode',
-        text: 'Taxon Type',
-        sort: true,
-        formatter: taxonDisplay,
-    },
-];
-
 const SpeciesTable = ({ species }: SourceListProps): JSX.Element => {
+    const columns = useMemo(
+        () => [
+            {
+                id: 'name',
+                selector: (row: SimpleSpecies) => row.name,
+                name: 'Name',
+                sortable: true,
+                format: linkSpecies,
+            },
+            {
+                id: 'taxoncode',
+                selector: (row: SimpleSpecies) => row.taxoncode,
+                name: 'Taxon Type',
+                sortable: true,
+                format: taxonDisplay,
+            },
+        ],
+        [],
+    );
+
     return (
-        <BootstrapTable
+        <DataTable
             keyField={'id'}
             data={species}
             columns={columns}
-            bootstrap4
             striped
-            headerClasses="table-header"
-            defaultSorted={[
-                {
-                    dataField: 'name',
-                    order: 'asc',
-                },
-            ]}
+            noHeader
+            fixedHeader
+            responsive={false}
+            defaultSortFieldId="name"
+            customStyles={TABLE_CUSTOM_STYLES}
         />
     );
 };

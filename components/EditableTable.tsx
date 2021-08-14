@@ -1,131 +1,172 @@
-import React, { useCallback, useRef, useState } from 'react';
-import DataTable, { TableColumn, TableProps } from 'react-data-table-component';
+import React, { useCallback, useState } from 'react';
+import DataTable, { RowRecord, TableColumn, TableProps } from 'react-data-table-component';
 import { WithID } from '../libs/utils/types';
 import { hasProp } from '../libs/utils/util';
 
-export type EditableTableColumn = TableColumn & {
+export type SelectEditorOptions = {
+    value: string;
+    label: string;
+};
+
+// Currently only support the default editor type (text input) or a select
+export type EditableTableEditor = {
+    type: 'select';
+    options: SelectEditorOptions[];
+};
+
+export type EditableTableColumn<T> = Omit<TableColumn<T>, 'selector'> & {
     editable: boolean;
+    // force it to a function which is the way the main library is headed anyhow
+    selector: (t: T) => string;
+    key: keyof T;
+    editing?: boolean;
+    editor?: EditableTableEditor;
 };
 
 type EditableCellProps<T extends WithID> = {
     row: T;
     index: number;
-    column: EditableTableColumn;
-    col: unknown;
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    column: EditableTableColumn<T>;
+    editing: boolean;
+    col: EditableTableColumn<T>;
+    onChange: (field: keyof T, value: string) => void;
+    onBlur: () => void;
+    onClick: (row: T, col: EditableTableColumn<T>) => void;
 };
 
-const EditableCell = <T extends WithID>({ row, index, column, col, onChange }: EditableCellProps<T>) => {
-    const [value, setValue] = useState(row[column.selector]);
+export const EditableCell = <T extends WithID>({
+    row,
+    index,
+    column,
+    editing,
+    col,
+    onChange,
+    onBlur,
+    onClick,
+}: EditableCellProps<T>): JSX.Element => {
+    const [value, setValue] = useState(column.selector(row));
+    if (editing) {
+        switch (column?.editor?.type) {
+            case 'select':
+                return (
+                    <select
+                        autoFocus
+                        data-tag="allowRowEvents"
+                        className="form-control"
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                            const v = e.currentTarget.value;
+                            console.log(`JDC: VV ${JSON.stringify(v, null, '  ')}`);
+                            setValue(v);
+                            onChange?.(column.key, v);
+                        }}
+                        onBlur={onBlur}
+                        value={value}
+                    >
+                        {column.editor.options.map(({ value, label }) => (
+                            <option key={value} value={value}>
+                                {label}
+                            </option>
+                        ))}
+                    </select>
+                );
 
-    const handleOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setValue(e.target.value);
-        onChange?.(e);
-    };
-
-    if (column?.editing) {
-        return (
-            <input
-                type={column.type || 'text'}
-                name={column.selector}
-                style={{ width: '100%' }}
-                onChange={handleOnChange}
-                value={value}
-            />
-        );
+            default:
+                return (
+                    <input
+                        autoFocus
+                        data-tag="allowRowEvents"
+                        type={'text'}
+                        className="form-control"
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            setValue(e.target.value);
+                            onChange?.(column.key, e.target.value);
+                        }}
+                        onBlur={onBlur}
+                        value={value}
+                    />
+                );
+        }
     }
 
     if (col.cell) {
-        return col.cell(row, index, column);
+        return <div onClick={() => onClick(row, col)}>{col.cell(row, index, column, column.id ? column.id : -1)}</div>;
     }
-    return row[column.selector];
+
+    return (
+        <div className="editable-table-cell" onClick={() => onClick(row, col)}>
+            {column.selector(row)}
+        </div>
+    );
 };
 
-const EditableTable = <T extends WithID>(props: TableProps): JSX.Element => {
+export type EditableTableProps<T extends RowRecord> = TableProps<T> & {
+    columns: EditableTableColumn<T>[];
+    data: T[];
+    updateData: (t: T) => void;
+};
+
+const EditableTable = <T extends WithID>(props: EditableTableProps<T>): JSX.Element => {
     const [innerData, setInnerData] = useState(props.data);
-    const [editingId, setEditingId] = useState(-1);
-    let formData = useRef({}).current;
-    const isEditing = (record: T) => record.id === editingId;
+    const [editData, setEditData] = useState<T>();
+    const [editCell, setEditCell] = useState<[number, keyof T]>([-1, 'id']);
 
-    const formOnChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const nam = event.target.name;
-        const val = event.target.value;
+    const isEditing = (row: T, key: keyof T) => row.id === editCell[0] && key === editCell[1];
 
-        formData = {
-            ...formData,
-            [nam]: val,
-        };
-    };
-
-    const edit = (record: T) => {
-        setEditingId(record.id);
-    };
-
-    const cancel = () => {
-        setEditingId(-1);
-    };
-
-    const save = (item: T) => {
-        const payload = { ...item, ...formData };
-        const tempData = [...innerData];
-
-        const index = tempData.findIndex((item) => editingId === item.id);
-        if (index > -1) {
-            const item = tempData[index];
-            tempData.splice(index, 1, {
-                ...item,
-                ...payload,
-            });
-            setEditingId(-1);
-            setInnerData(tempData);
+    const dataChange = (field: keyof T, value: string) => {
+        if (!editData) {
+            throw new Error(
+                'editData is undefined after data changes. This is a sign of a programming error. Make sure to set the state based on the current row selection.',
+            );
         }
+        setEditData({ ...editData, [field]: value });
     };
 
-    const mergedColumns = props.columns.map((col) => {
-        if (!col.editable) {
+    const edit = (row: T, col: EditableTableColumn<T>) => {
+        setEditData(row);
+        setEditCell([row.id, col.key]);
+    };
+
+    const save = () => {
+        setInnerData(innerData.map((d) => (d.id === editData?.id ? editData : d)));
+        setEditCell([-1, 'id']);
+        if (editData) {
+            props.updateData(editData);
+        }
+        setEditData(undefined);
+    };
+
+    const createCell = (row: T, index: number, column: EditableTableColumn<T>, col: EditableTableColumn<T>) => {
+        const editing = isEditing(row, column.key);
+        return (
+            <EditableCell
+                row={row}
+                index={index}
+                column={column}
+                editing={editing}
+                col={col}
+                onChange={dataChange}
+                onBlur={() => save()}
+                onClick={() => edit(row, column)}
+            />
+        );
+    };
+
+    const mergedColumns = props.columns.map((col: EditableTableColumn<T>) => {
+        if (!hasProp(col, 'editable') || !col.editable) {
             return col;
         }
         return {
             ...col,
-            cell: (row, index, column) => {
-                const editing = isEditing(row);
-                return <EditableCell row={row} index={index} column={{ ...column, editing }} col={col} onChange={formOnChange} />;
-            },
+            cell: createCell,
         };
     });
 
     const createColumns = useCallback(() => {
-        return [
-            ...mergedColumns,
-            {
-                name: 'Actions',
-                allowOverflow: true,
-                minWidth: '200px',
-                cell: (row) => {
-                    const editable = isEditing(row);
-                    if (editable) {
-                        return (
-                            <div>
-                                <button type="button" onClick={() => save(row)} style={{ backgroundColor: 'lightgreen' }}>
-                                    save
-                                </button>
-                                <button type="button" onClick={cancel} style={{ backgroundColor: 'orangered' }}>
-                                    cancel
-                                </button>
-                            </div>
-                        );
-                    }
-                    return (
-                        <button type="button" onClick={() => edit(row)} style={{ backgroundColor: 'aliceblue' }}>
-                            edit
-                        </button>
-                    );
-                },
-            },
-        ];
+        return [...mergedColumns];
     }, [mergedColumns]);
 
-    return <DataTable {...props} columns={createColumns()} data={innerData} />;
+    //TODO eliminate the cast
+    return <DataTable {...props} columns={createColumns() as TableColumn<T>[]} data={props.data} />;
 };
 
 export default EditableTable;

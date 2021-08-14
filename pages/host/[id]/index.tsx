@@ -4,10 +4,9 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
-import BootstrapTable, { ColumnDescription } from 'react-bootstrap-table-next';
-import paginationFactory from 'react-bootstrap-table2-paginator';
+import DataTable from 'react-data-table-component';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
@@ -24,35 +23,45 @@ import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkSourceToGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { formatLicense, sourceToDisplay } from '../../../libs/pages/renderhelpers';
+import { TABLE_CUSTOM_STYLES } from '../../../libs/utils/DataTableConstants';
 
 type Props = {
     host: HostApi;
     taxonomy: FGS;
 };
 
-const linkGall = (cell: string, g: GallSimple) => {
+const linkGall = (g: GallSimple) => {
     return (
         <>
             <Link key={g.id} href={`/gall/${g.id}`}>
-                <a>{g.name}</a>
+                <a>
+                    <i>{g.name}</i>
+                </a>
             </Link>
             <Edit id={g.id} type="gall" />
         </>
     );
 };
 
-const columns: ColumnDescription[] = [
-    {
-        dataField: 'name',
-        text: 'Gall',
-        sort: true,
-        formatter: linkGall,
-    },
-];
-
 const Host = ({ host, taxonomy }: Props): JSX.Element => {
+    // this is needed as the table component uses window.document inside its pagination implementation.
+    const ssr = typeof window !== 'object';
+
     const source = host ? host.speciessource.find((s) => s.useasdefault !== 0) : undefined;
     const [selectedSource, setSelectedSource] = useState(source);
+
+    const columns = useMemo(
+        () => [
+            {
+                id: 'name',
+                selector: (row: GallSimple) => row.name,
+                name: 'Gall',
+                sortable: true,
+                format: linkGall,
+            },
+        ],
+        [],
+    );
 
     const router = useRouter();
     // If the page is not yet generated, this will be displayed initially until getStaticProps() finishes running
@@ -152,29 +161,17 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                     </Row>
                     <Row className="pt-2">
                         <Col>
-                            <BootstrapTable
+                            <DataTable
                                 keyField={'id'}
                                 data={host.galls}
                                 columns={columns}
-                                bootstrap4
                                 striped
-                                condensed
-                                headerClasses="table-header"
-                                pagination={paginationFactory({
-                                    alwaysShowAllBtns: true,
-                                    withFirstAndLast: false,
-                                    sizePerPageList: [
-                                        { text: '10', value: 10 },
-                                        { text: '20', value: 20 },
-                                        { text: 'All', value: host.galls.length },
-                                    ],
-                                })}
-                                defaultSorted={[
-                                    {
-                                        dataField: 'title',
-                                        order: 'asc',
-                                    },
-                                ]}
+                                noHeader
+                                fixedHeader
+                                responsive={false}
+                                defaultSortFieldId="name"
+                                customStyles={TABLE_CUSTOM_STYLES}
+                                pagination={!ssr}
                             />
                         </Col>
                     </Row>
@@ -228,7 +225,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
             <Row>
                 <Col>
                     <SourceList
-                        data={host.speciessource.map((s) => s.source)}
+                        data={host.speciessource}
                         defaultSelection={selectedSource?.source}
                         onSelectionChange={(s) => setSelectedSource(host.speciessource.find((spso) => spso.source_id == s?.id))}
                     />

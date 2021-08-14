@@ -17,30 +17,6 @@ export function hasProp<T extends unknown, K extends PropertyKey>(o: T, prop: K)
     return Object.prototype.hasOwnProperty.call(o, prop);
 }
 
-// we allow species names to contain subspecies of the form 'Genus species subspecies' and for gallformers
-// sexual generation info 'Genus species (sexgen)'. For external linking we want to only link to the main species.
-function parseSpecies(species: string): string {
-    const p = species.split(' ');
-
-    return `${p[0]} ${p[1]}`;
-}
-
-export function bugguideUrl(species: string): string {
-    return `https://bugguide.net/index.php?q=search&keys=${encodeURI(parseSpecies(species))}&search=Search`;
-}
-
-export function iNatUrl(species: string): string {
-    return `https://www.inaturalist.org/search?q=${encodeURI(parseSpecies(species))}`;
-}
-
-export function gScholarUrl(species: string): string {
-    return `https://scholar.google.com/scholar?hl=en&q=${parseSpecies(species)}`;
-}
-
-export function bhlUrl(species: string): string {
-    return `https://www.biodiversitylibrary.org/search?SearchTerm=${parseSpecies(species)}&SearchCat=M&return=ADV#/names`;
-}
-
 /**
  * Returns a random integer between [min, max]
  * @param min

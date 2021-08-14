@@ -254,7 +254,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                             <strong>See Also:</strong>
                         </Col>
                     </Row>
-                    <SeeAlso name={species.name} />
+                    <SeeAlso name={species.name} undescribed={species.gall.undescribed} />
                 </Col>
             </Row>
         </Container>

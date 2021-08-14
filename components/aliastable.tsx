@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Button } from 'react-bootstrap';
-import DataTable from 'react-data-table-component';
 import { AliasApi, EmptyAlias } from '../libs/api/apitypes';
 import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
+import EditableTable, { EditableTableColumn } from './EditableTable';
 
 export type AliasTableProps = {
     data: AliasApi[];
@@ -12,12 +12,14 @@ export type AliasTableProps = {
 const AliasTable = ({ data, setData }: AliasTableProps): JSX.Element => {
     const [selected, setSelected] = useState(new Set<number>());
     const [newId, setNewId] = useState(-1);
+    const [toggleCleared, setToggleCleared] = useState(false);
 
-    const columns = useMemo(
+    const columns: EditableTableColumn<AliasApi>[] = useMemo(
         () => [
             {
                 id: 'name',
                 selector: (row: AliasApi) => row.name,
+                key: 'name',
                 name: 'Alias Name',
                 sortable: true,
                 wrap: true,
@@ -27,9 +29,10 @@ const AliasTable = ({ data, setData }: AliasTableProps): JSX.Element => {
             {
                 id: 'type',
                 selector: (row: AliasApi) => row.type,
+                key: 'type',
                 name: 'Type',
                 sortable: true,
-                maxWidth: '100px',
+                maxWidth: '150px',
                 editable: true,
                 editor: {
                     type: 'select',
@@ -42,6 +45,7 @@ const AliasTable = ({ data, setData }: AliasTableProps): JSX.Element => {
             {
                 id: 'description',
                 selector: (row: AliasApi) => row.description,
+                key: 'description',
                 name: 'Description',
                 wrap: true,
                 editable: true,
@@ -50,63 +54,77 @@ const AliasTable = ({ data, setData }: AliasTableProps): JSX.Element => {
         [],
     );
 
+    const updateData = useCallback(
+        (d: AliasApi[]) => {
+            const dd = [...d];
+            setData(dd);
+        },
+        [setData],
+    );
+
+    const updateAlias = useCallback(
+        (updated: AliasApi) => {
+            const d = data.map((orig) => (orig.id === updated.id ? updated : orig));
+            updateData(d);
+        },
+        [data, updateData],
+    );
+
     const addAlias = () => {
         data.push({
             ...EmptyAlias,
             id: newId,
         });
+        updateData([...data]);
         setNewId(newId - 1);
-        setData([...data]);
     };
 
-    const deleteAliases = () => {
-        setData(data.filter((a) => !selected.has(a.id)));
-        setSelected(new Set());
-    };
+    const onSelectionChange = useCallback(
+        (selected: { allSelected: boolean; selectedCount: number; selectedRows: AliasApi[] }) => {
+            const selection = new Set(selected.selectedRows.map((r) => r.id));
+            setSelected(selection);
+        },
+        [],
+    );
 
-    // const selectRow: SelectRowProps<AliasApi> = {
-    //     mode: 'checkbox',
-    //     clickToSelect: false,
-    //     clickToEdit: true,
-    //     onSelect: (row) => {
-    //         const selection = new Set(selected);
-    //         selection.has(row.id) ? selection.delete(row.id) : selection.add(row.id);
-    //         setSelected(selection);
-    //     },
-    //     onSelectAll: (isSelect) => {
-    //         if (isSelect) {
-    //             setSelected(new Set(data.map((a) => a.id)));
-    //         } else {
-    //             setSelected(new Set());
-    //         }
-    //     },
-    // };
+    const contextActions = useMemo(() => {
+        const handleDelete = () => {
+            updateData(data.filter((a) => !selected.has(a.id)));
+            setSelected(new Set());
+            setToggleCleared(!toggleCleared);
+        };
 
-    const onSelectionChange = (selected: { allSelected: boolean; selectedCount: number; selectedRows: AliasApi[] }) => {
-        const selection = new Set(selected.selectedRows.map((r) => r.id));
-        setSelected(selection);
-    };
+        return (
+            <>
+                <Button key="delete" onClick={handleDelete} variant="danger" className="btn-sm">
+                    Delete
+                </Button>
+            </>
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selected]);
 
     return (
         <>
-            <DataTable
+            <EditableTable
                 keyField={'id'}
                 data={data}
                 columns={columns}
                 striped
-                noHeader
                 responsive={false}
                 defaultSortFieldId="name"
                 customStyles={TABLE_CUSTOM_STYLES}
                 selectableRows
                 onSelectedRowsChange={onSelectionChange}
+                clearSelectedRows={toggleCleared}
+                actions={
+                    <Button variant="secondary" className="btn-sm" onClick={addAlias}>
+                        Add New Alias
+                    </Button>
+                }
+                contextActions={contextActions}
+                updateData={updateAlias}
             />
-            <Button variant="secondary" className="btn-sm mr-2" onClick={addAlias}>
-                Add Alias
-            </Button>
-            <Button variant="secondary" className="btn-sm" disabled={selected.size == 0} onClick={deleteAliases}>
-                Delete Selected Alias(es)
-            </Button>
             <p className="font-italic small">
                 Changes to the aliases will not be saved until you save the whole form by clicking &lsquo;Submit&rsquo; below.
             </p>

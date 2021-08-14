@@ -2194,13 +2194,6 @@
   resolved "https://registry.yarnpkg.com/@types/prop-types/-/prop-types-15.7.3.tgz#2ab0d5da2e5815f94b0b9d4b95d1e5f243ab2ca7"
   integrity sha512-KfRL3PuHmqQLOG+2tGpRO26Ctg+Cq1E01D2DMriKEATHgWLfeNDmq9e29Q9WIky0dQ3NPkd1mzYH8Lm936Z9qw==
 
-"@types/react-bootstrap-table-next@^4":
-  version "4.0.13"
-  resolved "https://registry.yarnpkg.com/@types/react-bootstrap-table-next/-/react-bootstrap-table-next-4.0.13.tgz#0f02ef3f3dddff298564621ff5b86ca39f3aead2"
-  integrity sha512-vphk6SWBO/AOfimSLSONvWOMNQFQPJq+dFj6cikGtXsW9eRZu4U+lhAwtgtfYNgLgIWODA1U2D2GXljKQYm5EQ==
-  dependencies:
-    "@types/react" "*"
-
 "@types/react-bootstrap-typeahead@^5":
   version "5.1.5"
   resolved "https://registry.yarnpkg.com/@types/react-bootstrap-typeahead/-/react-bootstrap-typeahead-5.1.5.tgz#87a0c53dc9ab3cef9fd462ef1c2cbff628f89374"
@@ -3176,7 +3169,7 @@ classnames@2.2.6:
   resolved "https://registry.yarnpkg.com/classnames/-/classnames-2.2.6.tgz#43935bffdd291f326dad0a205309b38d00f650ce"
   integrity sha512-JR/iSQOSt+LQIWwrwEzJ9uk0xfN3mTVYMwt1Ir5mUcSN6pU+V4zQFFaJsclJbPuAUQH+yfWef6tm7l1quW3C8Q==
 
-classnames@^2.2.0, classnames@^2.2.5, classnames@^2.2.6, classnames@^2.3.1:
+classnames@^2.2.0, classnames@^2.2.6, classnames@^2.3.1:
   version "2.3.1"
   resolved "https://registry.yarnpkg.com/classnames/-/classnames-2.3.1.tgz#dfcfa3891e306ec1dad105d0e88f4417b8535e8e"
   integrity sha512-OlQdbZ7gLfGarSqxesMesDa5uz7KFbID8Kpq/SxIoNGDqY8lSYs0D+hhtBXhcdB3rcbXArFr7vlHheLk1voeNA==
@@ -7093,25 +7086,6 @@ raw-body@2.4.1:
     iconv-lite "0.4.24"
     unpipe "1.0.0"
 
-react-bootstrap-table-next@^4:
-  version "4.0.3"
-  resolved "https://registry.yarnpkg.com/react-bootstrap-table-next/-/react-bootstrap-table-next-4.0.3.tgz#b55873b01adfe22a7181904b784a9d24ac2822cf"
-  integrity sha512-uKxC73qUdUfusRf2uzDfMiF9LvTG5vuhTZa0lbAgHWSLLLaKTsI0iHf1e4+c7gP71q8dFsp7StvkP65SxC1JRg==
-  dependencies:
-    classnames "^2.2.5"
-    react-transition-group "^4.2.0"
-    underscore "1.9.1"
-
-react-bootstrap-table2-editor@^1.4:
-  version "1.4.0"
-  resolved "https://registry.yarnpkg.com/react-bootstrap-table2-editor/-/react-bootstrap-table2-editor-1.4.0.tgz#2d73de4a88d23865e966aeb164abf78d71b17e60"
-  integrity sha512-18yDCwsVt3b5Fwy0jidNDAbUA6vC7k9JjQVmykazWSw8G115+mmZnhe9/7RO7jAu8X7lhmobwlNwECzwPu1nDg==
-
-react-bootstrap-table2-paginator@^2.1.2:
-  version "2.1.2"
-  resolved "https://registry.yarnpkg.com/react-bootstrap-table2-paginator/-/react-bootstrap-table2-paginator-2.1.2.tgz#a62151909e594719db568cede6e5d2962cbf8ddb"
-  integrity sha512-LC5znEphhgKJvaSY1q8d+Gj0Nc/1X+VS3tKJjkmWmfv9P61YC/BnwJ+aoqEmQzsLiVGowrzss+i/u+Tip5H+Iw==
-
 react-bootstrap-typeahead@^5:
   version "5.1.4"
   resolved "https://registry.yarnpkg.com/react-bootstrap-typeahead/-/react-bootstrap-typeahead-5.1.4.tgz#856d30438bb7a254cfeafa3ec03ddf90285f7a4d"
@@ -7286,7 +7260,7 @@ react-simple-tree-menu@^1:
     is-empty "^1.2.0"
     tiny-debounce "^0.1.1"
 
-react-transition-group@^4.2.0, react-transition-group@^4.4.1:
+react-transition-group@^4.4.1:
   version "4.4.2"
   resolved "https://registry.yarnpkg.com/react-transition-group/-/react-transition-group-4.4.2.tgz#8b59a56f09ced7b55cbd53c36768b922890d5470"
   integrity sha512-/RNYfRAMlZwDSr6z4zNKV6xu53/e2BuaBbGhbyYIXTrmgu/bGHzmqOs7mJSJBHy9Ud+ApHx3QjrkKSp1pxvlFg==
@@ -8561,11 +8535,6 @@ uncontrollable@^7.0.0, uncontrollable@^7.2.1:
     "@types/react" ">=16.9.11"
     invariant "^2.2.4"
     react-lifecycles-compat "^3.0.4"
-
-underscore@1.9.1:
-  version "1.9.1"
-  resolved "https://registry.yarnpkg.com/underscore/-/underscore-1.9.1.tgz#06dce34a0e68a7babc29b365b8e74b8925203961"
-  integrity sha512-5/4etnCkd9c8gwgowi5/om/mYO5ajCaOgdzj/oW+0eQV9WxKBDZw5+ycmKmeaTXjInS/W0BzpGLo2xR2aBwZdg==
 
 underscore@^1.9.1:
   version "1.13.1"

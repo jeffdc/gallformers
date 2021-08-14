@@ -8,6 +8,7 @@ import React, { useMemo } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
 import DataTable from 'react-data-table-component';
 import { extractQueryParam } from '../libs/api/apipage';
+import { PlaceNoTreeApi } from '../libs/api/apitypes';
 import { TaxonomyEntryNoParent } from '../libs/api/taxonomy';
 import { globalSearch, GlobalSearchResults, TinySource, TinySpecies } from '../libs/db/search';
 import { EntryLinked } from '../libs/pages/glossary';
@@ -42,6 +43,8 @@ const imageForType = (i: SearchResultItem) => {
             return <img src="/images/taxon.svg" alt="section" aria-label="section" width="25px" height="25px" />;
         case 'family':
             return <img src="/images/taxon.svg" alt="family" aria-label="family" width="25px" height="25px" />;
+        case 'place':
+            return <img src="/images/place.svg" alt="place" aria-label="place" width="25px" height="25px" />;
         default:
             return <></>;
     }
@@ -89,6 +92,12 @@ const linkItem = (i: SearchResultItem) => {
             return (
                 <Link href={`/family/${i.id}`}>
                     <a>{`Family ${i.name}`}</a>
+                </Link>
+            );
+        case 'place':
+            return (
+                <Link href={`/place/${i.id}`}>
+                    <a>{i.name}</a>
                 </Link>
             );
         default:
@@ -142,9 +151,6 @@ const GlobalSearch = ({ results, search }: Props): JSX.Element => {
                         data={results}
                         columns={columns}
                         striped
-                        dense
-                        noHeader
-                        fixedHeader
                         responsive={false}
                         defaultSortFieldId="pubyear"
                         customStyles={TABLE_CUSTOM_STYLES}
@@ -170,15 +176,17 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
         glossary: new Array<EntryLinked>(),
         sources: new Array<TinySource>(),
         taxa: new Array<TaxonomyEntryNoParent>(),
+        places: new Array<PlaceNoTreeApi>(),
     });
 
-    const { species, glossary, sources, taxa } = await mightFail(emptySearch)(globalSearch(search));
+    const { species, glossary, sources, taxa, places } = await mightFail(emptySearch)(globalSearch(search));
     // an experiment - lets mash them all together and show them in a single table
 
     const r: SearchResultItem[] = species
         .map((s) => ({ id: s.id.toString(), type: s.taxoncode, name: s.name }))
         .concat(glossary.map((g) => ({ id: g.word, type: 'entry', name: capitalizeFirstLetter(g.word) })))
         .concat(sources.map((s) => ({ id: s.id.toString(), type: 'source', name: s.source })))
+        .concat(places.map((p) => ({ id: p.id.toString(), type: 'place', name: `${p.name} - ${p.code}` })))
         .concat(taxa.map((t) => ({ id: t.id.toString(), type: t.type, name: t.name })));
 
     return {
