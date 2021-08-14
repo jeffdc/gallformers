@@ -44,7 +44,7 @@
     "react": "^16",
     "react-bootstrap": "^1.6",
     "react-bootstrap-typeahead": "^5",
-    "react-data-table-component": "^7.0.0-rc1",
+    "react-data-table-component": "^7.0.0-rc2",
     "react-dom": "^16",
     "react-hook-form": "^7",
     "react-hot-toast": "^1",
