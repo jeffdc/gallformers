@@ -4,13 +4,15 @@ import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
-import BootstrapTable, { ColumnDescription } from 'react-bootstrap-table-next';
+import DataTable from 'react-data-table-component';
 import { extractQueryParam } from '../libs/api/apipage';
+import { PlaceNoTreeApi } from '../libs/api/apitypes';
 import { TaxonomyEntryNoParent } from '../libs/api/taxonomy';
 import { globalSearch, GlobalSearchResults, TinySource, TinySpecies } from '../libs/db/search';
 import { EntryLinked } from '../libs/pages/glossary';
+import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
 import { logger } from '../libs/utils/logger';
 import { capitalizeFirstLetter, mightFail } from '../libs/utils/util';
 
@@ -25,28 +27,30 @@ type Props = {
     search: string;
 };
 
-const imageForType = (cell: string, i: SearchResultItem) => {
+const imageForType = (i: SearchResultItem) => {
     switch (i.type) {
         case 'gall':
-            return <img src="/images/gall.svg" alt="gallmaker" width="25px" height="25px" />;
+            return <img src="/images/gall.svg" alt="gallformer" aria-label="gallformer" width="25px" height="25px" />;
         case 'plant':
-            return <img src="/images/host.svg" alt="plant" width="25px" height="25px" />;
+            return <img src="/images/host.svg" alt="plant" aria-label="plant" width="25px" height="25px" />;
         case 'entry':
-            return <img src="/images/entry.svg" alt="dictionary entry" width="25px" height="25px" />;
+            return <img src="/images/entry.svg" alt="glossary entry" aria-label="glossary entry" width="25px" height="25px" />;
         case 'source':
-            return <img src="/images/source.svg" alt="source" width="25px" height="25px" />;
+            return <img src="/images/source.svg" alt="source" aria-label="source" width="25px" height="25px" />;
         case 'genus':
-            return <img src="/images/taxon.svg" alt="source" width="25px" height="25px" />;
+            return <img src="/images/taxon.svg" alt="genus" aria-label="genus" width="25px" height="25px" />;
         case 'section':
-            return <img src="/images/taxon.svg" alt="source" width="25px" height="25px" />;
+            return <img src="/images/taxon.svg" alt="section" aria-label="section" width="25px" height="25px" />;
         case 'family':
-            return <img src="/images/taxon.svg" alt="source" width="25px" height="25px" />;
+            return <img src="/images/taxon.svg" alt="family" aria-label="family" width="25px" height="25px" />;
+        case 'place':
+            return <img src="/images/place.svg" alt="place" aria-label="place" width="25px" height="25px" />;
         default:
             return <></>;
     }
 };
 
-const linkItem = (cell: string, i: SearchResultItem) => {
+const linkItem = (i: SearchResultItem) => {
     switch (i.type) {
         case 'gall':
             return (
@@ -90,27 +94,42 @@ const linkItem = (cell: string, i: SearchResultItem) => {
                     <a>{`Family ${i.name}`}</a>
                 </Link>
             );
+        case 'place':
+            return (
+                <Link href={`/place/${i.id}`}>
+                    <a>{i.name}</a>
+                </Link>
+            );
         default:
             return <></>;
     }
 };
 
-const columns: ColumnDescription[] = [
-    {
-        dataField: 'type',
-        text: 'Type',
-        sort: true,
-        formatter: imageForType,
-    },
-    {
-        dataField: 'name',
-        text: 'Name',
-        sort: true,
-        formatter: linkItem,
-    },
-];
-
 const GlobalSearch = ({ results, search }: Props): JSX.Element => {
+    const columns = useMemo(
+        () => [
+            {
+                id: 'type',
+                selector: (row: SearchResultItem) => row.type,
+                name: 'Type',
+                sortable: true,
+                center: true,
+                compact: true,
+                maxWidth: '100px',
+                format: imageForType,
+            },
+            {
+                id: 'name',
+                selector: (row: SearchResultItem) => row.name,
+                name: 'Name',
+                sortable: true,
+                wrap: true,
+                format: linkItem,
+            },
+        ],
+        [],
+    );
+
     return (
         <Container className="pt-2" fluid>
             <Head>
@@ -127,19 +146,14 @@ const GlobalSearch = ({ results, search }: Props): JSX.Element => {
             )}
             <Row>
                 <Col xs={12}>
-                    <BootstrapTable
+                    <DataTable
                         keyField={'id'}
                         data={results}
                         columns={columns}
-                        bootstrap4
                         striped
-                        headerClasses="table-header"
-                        defaultSorted={[
-                            {
-                                dataField: 'name',
-                                order: 'asc',
-                            },
-                        ]}
+                        responsive={false}
+                        defaultSortFieldId="pubyear"
+                        customStyles={TABLE_CUSTOM_STYLES}
                     />
                 </Col>
             </Row>
@@ -162,15 +176,17 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
         glossary: new Array<EntryLinked>(),
         sources: new Array<TinySource>(),
         taxa: new Array<TaxonomyEntryNoParent>(),
+        places: new Array<PlaceNoTreeApi>(),
     });
 
-    const { species, glossary, sources, taxa } = await mightFail(emptySearch)(globalSearch(search));
+    const { species, glossary, sources, taxa, places } = await mightFail(emptySearch)(globalSearch(search));
     // an experiment - lets mash them all together and show them in a single table
 
     const r: SearchResultItem[] = species
         .map((s) => ({ id: s.id.toString(), type: s.taxoncode, name: s.name }))
         .concat(glossary.map((g) => ({ id: g.word, type: 'entry', name: capitalizeFirstLetter(g.word) })))
         .concat(sources.map((s) => ({ id: s.id.toString(), type: 'source', name: s.source })))
+        .concat(places.map((p) => ({ id: p.id.toString(), type: 'place', name: `${p.name} - ${p.code}` })))
         .concat(taxa.map((t) => ({ id: t.id.toString(), type: t.type, name: t.name })));
 
     return {

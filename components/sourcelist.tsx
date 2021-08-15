@@ -1,22 +1,24 @@
-import React from 'react';
-import BootstrapTable, { ColumnDescription, SelectRowProps } from 'react-bootstrap-table-next';
-import { ALLRIGHTS, CC0, CCBY, SourceApi } from '../libs/api/apitypes';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Alert, Button } from 'react-bootstrap';
+import DataTable from 'react-data-table-component';
+import { ALLRIGHTS, CC0, CCBY, SourceApi, SpeciesSourceApi } from '../libs/api/apitypes';
+import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
 
 export type SourceListProps = {
-    data: SourceApi[];
+    data: SpeciesSourceApi[];
     defaultSelection: SourceApi | undefined;
     onSelectionChange: (selected: SourceApi | undefined) => void;
 };
 
-const linkTitle = (cell: string, row: SourceApi) => {
+const linkTitle = (row: SourceApi) => {
     return (
         <span>
-            <a href={`/source/${row.id}`}>{cell}</a>
+            <a href={`/source/${row.id}`}>{row.title}</a>
         </span>
     );
 };
 
-const linkLicense = (cell: string, row: SourceApi) => {
+const linkLicense = (row: SourceApi) => {
     const link = row.licenselink ? row.licenselink : 'https://creativecommons.org/publicdomain/mark/1.0/';
     return (
         <span>
@@ -38,57 +40,104 @@ const linkLicense = (cell: string, row: SourceApi) => {
         </span>
     );
 };
-const columns: ColumnDescription[] = [
-    {
-        dataField: 'author',
-        text: 'Author',
-        sort: true,
-    },
-    {
-        dataField: 'pubyear',
-        text: 'Year',
-        sort: true,
-    },
-    {
-        dataField: 'title',
-        text: 'Title',
-        sort: true,
-        formatter: linkTitle,
-    },
-    {
-        dataField: 'license',
-        text: 'License',
-        sort: true,
-        formatter: linkLicense,
-    },
-];
 
 const SourceList = ({ data, defaultSelection, onSelectionChange }: SourceListProps): JSX.Element => {
-    const selectRow: SelectRowProps<SourceApi> = {
-        mode: 'radio',
-        clickToSelect: true,
-        onSelect: (row) => {
+    const [selectedId, setSelectedId] = useState(defaultSelection?.id);
+    const [notesAlertShown, setNotesAlertShown] = useState(true);
+
+    const gallformersNotes = data.find((s) => s.source?.id === 58)?.source;
+
+    const columns = useMemo(
+        () => [
+            {
+                id: 'author',
+                selector: (row: SourceApi) => row.author,
+                name: 'Author(s)',
+                sortable: true,
+                wrap: true,
+                maxWidth: '200px',
+            },
+            {
+                id: 'pubyear',
+                selector: (row: SourceApi) => row.pubyear,
+                name: 'Year',
+                sortable: true,
+                maxWidth: '50px',
+                center: true,
+                hide: 599,
+            },
+            {
+                id: 'title',
+                selector: (row: SourceApi) => row.title,
+                name: 'Title',
+                sortable: true,
+                format: linkTitle,
+                wrap: true,
+                maxWidth: '500px',
+            },
+            {
+                id: 'license',
+                selector: (row: SourceApi) => row.license,
+                name: 'License',
+                sortable: true,
+                format: linkLicense,
+                maxWidth: '50px',
+                center: true,
+                hide: 599,
+            },
+        ],
+        [],
+    );
+
+    const selectRow = useCallback(
+        (row?: SourceApi) => {
+            setSelectedId(row?.id);
             onSelectionChange(row);
         },
-        selected: defaultSelection != undefined ? [defaultSelection.id] : [],
-    };
+        [onSelectionChange],
+    );
+
+    const condRowStyles = useMemo(
+        () => [
+            {
+                when: (row: SourceApi) => row.id == selectedId,
+                style: () => ({
+                    backgroundColor: '#FCFF6C',
+                }),
+            },
+        ],
+        [selectedId],
+    );
 
     return (
-        <BootstrapTable
-            keyField={'id'}
-            data={data}
-            columns={columns}
-            bootstrap4
-            striped
-            headerClasses="table-header"
-            selectRow={selectRow}
-            defaultSorted={[
-                {
-                    dataField: 'year',
-                    order: 'desc',
-                },
-            ]}
-        />
+        <>
+            <Alert
+                variant="info"
+                dismissible
+                onClose={() => setNotesAlertShown(false)}
+                hidden={!notesAlertShown || !(gallformersNotes && gallformersNotes.id !== selectedId)}
+            >
+                Our ID Notes may contain important tips necessary for distinguishing this gall from similar galls and/or important
+                information about the taxonomic status of this gall inducer.
+                <Button className="ml-3" variant="outline-info" size="sm" onClick={() => selectRow(gallformersNotes)}>
+                    Show notes
+                </Button>
+            </Alert>
+
+            <DataTable
+                keyField={'id'}
+                data={data.map((s) => s.source)}
+                columns={columns}
+                striped
+                dense
+                noHeader
+                responsive={false}
+                defaultSortFieldId="pubyear"
+                customStyles={TABLE_CUSTOM_STYLES}
+                onRowClicked={selectRow}
+                conditionalRowStyles={condRowStyles}
+            />
+        </>
     );
 };
 

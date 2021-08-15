@@ -6,9 +6,9 @@ import { GetServerSideProps } from 'next';
 import { useSession } from 'next-auth/client';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Col, Modal, Row } from 'react-bootstrap';
-import BootstrapTable, { ColumnDescription, RowEventHandlerProps, SelectRowProps } from 'react-bootstrap-table-next';
+import DataTable from 'react-data-table-component';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import AddImage from '../../components/addimage';
@@ -20,6 +20,7 @@ import { extractQueryParam } from '../../libs/api/apipage';
 import { ImageApi } from '../../libs/api/apitypes';
 import { allSpecies } from '../../libs/db/species';
 import Admin from '../../libs/pages/admin';
+import { TABLE_CUSTOM_STYLES } from '../../libs/utils/DataTableConstants';
 import { mightFailWithArray, sessionUserOrUnknown } from '../../libs/utils/util';
 
 const Schema = yup.object().shape({});
@@ -34,18 +35,19 @@ type FormFields = {
     delete: [];
 };
 
-const externalLinkFormatter = (link: string) => {
+const linkFormatter = (link: string) => {
     return (
         <a href={link} target="_blank" rel="noreferrer">
             {link}
         </a>
     );
 };
-const imageFormatter = (cell: string, row: ImageApi) => {
-    return <img src={row.small} width="100" />;
+
+const imageFormatter = (row: ImageApi) => {
+    return <img data-tag="allowRowEvents" src={row.small} width="100" />;
 };
 
-const sourceFormatter = (cell: string, row: ImageApi) => {
+const sourceFormatter = (row: ImageApi) => {
     return pipe(
         row.source,
         O.fold(constant(<span></span>), (s) => (
@@ -56,63 +58,15 @@ const sourceFormatter = (cell: string, row: ImageApi) => {
     );
 };
 
-const columns: ColumnDescription[] = [
-    {
-        dataField: 'small',
-        text: 'image',
-        sort: true,
-        editable: false,
-        formatter: imageFormatter,
-    },
-    {
-        dataField: 'default',
-        text: 'default',
-        sort: true,
-    },
-    {
-        dataField: 'source',
-        text: 'source',
-        sort: true,
-        formatter: sourceFormatter,
-    },
-    {
-        dataField: 'sourcelink',
-        text: 'source link',
-        sort: true,
-        formatter: externalLinkFormatter,
-    },
-    {
-        dataField: 'creator',
-        text: 'creator',
-        sort: true,
-    },
-    {
-        dataField: 'license',
-        text: 'license',
-        sort: true,
-    },
-    {
-        dataField: 'licenselink',
-        text: 'license link',
-        sort: true,
-        formatter: externalLinkFormatter,
-    },
-    {
-        dataField: 'attribution',
-        text: 'attribution',
-        sort: true,
-    },
-    {
-        dataField: 'caption',
-        text: 'caption',
-        sort: true,
-    },
-];
+const defaultFieldFormatter = (img: ImageApi) => {
+    return <span>{img.default ? '✓' : ''}</span>;
+};
 
 const Images = ({ speciesid, species }: Props): JSX.Element => {
     const sp = species.find((s) => s.id === parseInt(speciesid));
     const [selected, setSelected] = useState(species.find((s) => s.id === parseInt(speciesid)));
-    const [selectedImages, setSelectedImages] = useState(new Set<number>());
+    const [selectedImages, setSelectedImages] = useState(new Array<ImageApi>());
+    const [toggleCleared, setToggleCleared] = useState(false);
     const [images, setImages] = useState<ImageApi[]>();
     const [edit, setEdit] = useState(false);
     const [currentImage, setCurrentImage] = useState<ImageApi>();
@@ -121,7 +75,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
     const [selectedForCopy, setSelectedForCopy] = useState(new Set<number>());
     const [copySource, setCopySource] = useState<ImageApi>();
 
-    const { handleSubmit, control, reset } = useForm<FormFields>({
+    const { control, reset } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
         defaultValues: {
@@ -132,6 +86,83 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
     const [session] = useSession();
     const router = useRouter();
     const confirm = useConfirmation();
+
+    const columns = useMemo(
+        () => [
+            {
+                id: 'small',
+                selector: (row: ImageApi) => row.small,
+                name: 'Image',
+                sortable: true,
+                format: imageFormatter,
+            },
+            {
+                id: 'default',
+                selector: (row: ImageApi) => row.default,
+                name: 'Default',
+                sortable: true,
+                maxWidth: '100px',
+                format: defaultFieldFormatter,
+            },
+            {
+                id: 'source',
+                selector: (g: ImageApi) => g.source,
+                name: 'Source',
+                sort: true,
+                wrap: true,
+                format: sourceFormatter,
+            },
+            {
+                id: 'sourcelink',
+                selector: (g: ImageApi) => g.sourcelink,
+                name: 'Source Link',
+                sort: true,
+                maxWidth: '200px',
+                wrap: true,
+                format: (img: ImageApi) => linkFormatter(img.sourcelink),
+            },
+            {
+                id: 'creator',
+                selector: (g: ImageApi) => g.creator,
+                name: 'Creator',
+                maxWidth: '100px',
+                wrap: true,
+                sort: true,
+            },
+            {
+                id: 'license',
+                selector: (g: ImageApi) => g.license,
+                maxWidth: '100px',
+                wrap: true,
+                name: 'License',
+                sort: true,
+            },
+            {
+                id: 'licenselink',
+                selector: (g: ImageApi) => g.licenselink,
+                name: 'License Link',
+                maxWidth: '200px',
+                wrap: true,
+                sort: true,
+                format: (img: ImageApi) => linkFormatter(img.licenselink),
+            },
+            {
+                id: 'attribution',
+                selector: (g: ImageApi) => g.attribution,
+                name: 'Attribution',
+                wrap: true,
+                sort: true,
+            },
+            {
+                id: 'caption',
+                selector: (g: ImageApi) => g.caption,
+                name: 'Caption',
+                wrap: true,
+                sort: true,
+            },
+        ],
+        [],
+    );
 
     useEffect(() => {
         const fetchNewSelection = async (id: number | undefined) => {
@@ -158,7 +189,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
         };
 
         // clear out any selections from previous work
-        setSelectedImages(new Set<number>());
+        setSelectedImages([]);
         setCurrentImage(undefined);
         setError('');
         setSelectedForCopy(new Set<number>());
@@ -167,41 +198,6 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
 
         fetchNewSelection(selected?.id);
     }, [selected?.id]);
-
-    const onSubmit = async () => {
-        try {
-            if (selected && selectedImages.size > 0) {
-                confirm({
-                    variant: 'danger',
-                    catchOnCancel: true,
-                    title: 'Are you sure want to delete?',
-                    message: `This will delete ALL ${selectedImages.size} currently selected images. Do you want to continue?`,
-                })
-                    .then(async () => {
-                        const res = await fetch(
-                            `../api/images?speciesid=${selected.id}&imageids=${[...selectedImages.values()]}`,
-                            {
-                                method: 'DELETE',
-                            },
-                        );
-
-                        if (res.status === 200) {
-                            setImages(images?.filter((i) => !selectedImages.has(i.id)));
-                        } else {
-                            throw new Error(await res.text());
-                        }
-
-                        reset({ delete: [], species: sp?.name });
-                        selectedImages.clear();
-                        setSelectedImages(selectedImages);
-                    })
-                    .catch(() => Promise.resolve());
-            }
-        } catch (e) {
-            console.error(e);
-            setError(e);
-        }
-    };
 
     const addImages = async (newImages: ImageApi[]) => {
         //hack: add a delay here to hopefully give a chance for the image to be picked up by the CDN
@@ -212,24 +208,10 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
 
     const handleClose = () => setEdit(false);
 
-    const rowEvents: RowEventHandlerProps<ImageApi> = {
-        onClick: (e, row) => {
-            const image = images?.find((i) => i.id === row.id);
-            setCurrentImage(image);
-            setEdit(true);
-        },
-    };
-
-    const startCopy = () => {
-        if (selectedImages.size === 1) {
-            setError('');
-            setCopySource(images?.find((i) => selectedImages.has(i.id)));
-            setShowCopy(true);
-        } else if (images && images.length < 2) {
-            setError('There is only one image so you can not copy yet. Upload another image first.');
-        } else {
-            setError('You need to select one (and only one) image to begin a copy.');
-        }
+    const handleRowClick = (img: ImageApi) => {
+        const image = images?.find((i) => i.id === img.id);
+        setCurrentImage(image);
+        setEdit(true);
     };
 
     const saveImage = async (img: ImageApi) => {
@@ -295,25 +277,78 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                 setShowCopy(false);
                 Promise.resolve();
             })
-            .finally(() => setSelectedForCopy(new Set<number>()));
+            .finally(() => {
+                setSelectedForCopy(new Set<number>());
+                setToggleCleared(!toggleCleared);
+            });
     };
 
-    const selectRow: SelectRowProps<ImageApi> = {
-        mode: 'checkbox',
-        clickToSelect: false,
-        onSelect: (row) => {
-            const selection = new Set(selectedImages);
-            selection.has(row.id) ? selection.delete(row.id) : selection.add(row.id);
-            setSelectedImages(selection);
-        },
-        onSelectAll: (isSelect) => {
-            if (isSelect) {
-                setSelectedImages(new Set(images?.map((a) => a.id)));
-            } else {
-                setSelectedImages(new Set());
+    const handleRowSelected = useCallback((state) => {
+        setSelectedImages(state.selectedRows);
+    }, []);
+
+    const contextActions = useMemo(() => {
+        const handleDelete = () => {
+            try {
+                if (selected && selectedImages.length > 0) {
+                    confirm({
+                        variant: 'danger',
+                        catchOnCancel: true,
+                        title: 'Are you sure want to delete?',
+                        message: `This will delete ALL ${selectedImages.length} currently selected images. Do you want to continue?`,
+                    })
+                        .then(async () => {
+                            const res = await fetch(
+                                `../api/images?speciesid=${selected.id}&imageids=${[
+                                    ...selectedImages.map((img) => img.id).values(),
+                                ]}`,
+                                {
+                                    method: 'DELETE',
+                                },
+                            );
+
+                            if (res.status === 200) {
+                                setImages(images?.filter((i) => !selectedImages.find((oi) => oi.id === i.id)));
+                            } else {
+                                throw new Error(await res.text());
+                            }
+
+                            reset({ delete: [], species: sp?.name });
+                            setToggleCleared(!toggleCleared);
+                        })
+                        .catch(() => Promise.resolve());
+                }
+            } catch (e) {
+                console.error(e);
+                setError(e);
             }
-        },
-    };
+        };
+
+        const handleCopy = () => {
+            if (selectedImages.length === 1) {
+                setError('');
+                setCopySource(images?.find((i) => selectedImages.find((oi) => oi.id === i.id)));
+                setShowCopy(true);
+            } else if (images && images.length < 2) {
+                setError('There is only one image so you can not copy yet. Upload another image first.');
+            } else {
+                setError('You need to select one (and only one) image to begin a copy.');
+            }
+        };
+
+        return (
+            <>
+                <Button key="add" onClick={handleCopy} variant="primary" disabled={selectedImages.length > 1}>
+                    Copy One to Others
+                </Button>
+                &nbsp;
+                <Button key="delete" onClick={handleDelete} variant="danger">
+                    Delete
+                </Button>
+            </>
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedImages, toggleCleared]);
 
     return (
         <Admin type="Images" keyField="name" setError={setError} error={error} selected={selected}>
@@ -337,7 +372,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                         {images && (
                             <ImageGrid
                                 colCount={6}
-                                images={images.filter((img) => !selectedImages.has(img.id))}
+                                images={images.filter((img) => !selectedImages.find((oi) => oi.id === img.id))}
                                 selected={selectedForCopy}
                                 setSelected={setSelectedForCopy}
                             />
@@ -350,7 +385,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                         </Button>
                     </Modal.Body>
                 </Modal>
-                <form onSubmit={handleSubmit(onSubmit)} className="m-4 pr-4">
+                <form className="m-4 pr-4">
                     <h4>Add/Edit Species Images</h4>
                     <Row className="form-group" xs={3}>
                         <Col xs={1} style={{ paddingTop: '5px' }}>
@@ -387,32 +422,22 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                         </Col>
                     </Row>
                     <Row className="form-group">
-                        <Col xs={2}>
-                            <input type="submit" className="btn btn-secondary" value="Delete Selected" />
-                        </Col>
                         <Col>
-                            <Button variant="secondary" onClick={startCopy}>
-                                Copy One to Others
-                            </Button>
-                        </Col>
-                    </Row>
-                    <Row className="form-group">
-                        <Col>
-                            <BootstrapTable
+                            <DataTable
                                 keyField={'id'}
                                 data={images ? images : []}
                                 columns={columns}
-                                bootstrap4
                                 striped
-                                headerClasses="table-header"
-                                rowEvents={rowEvents}
-                                selectRow={selectRow}
-                                defaultSorted={[
-                                    {
-                                        dataField: 'default',
-                                        order: 'desc',
-                                    },
-                                ]}
+                                selectableRows
+                                actions={<></>}
+                                contextActions={contextActions}
+                                onSelectedRowsChange={handleRowSelected}
+                                clearSelectedRows={toggleCleared}
+                                onRowClicked={handleRowClick}
+                                responsive={false}
+                                defaultSortFieldId="default"
+                                defaultSortAsc={false}
+                                customStyles={TABLE_CUSTOM_STYLES}
                             />
                         </Col>
                     </Row>

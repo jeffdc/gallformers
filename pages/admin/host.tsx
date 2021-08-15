@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
-import 'react-bootstrap-table-next/dist/react-bootstrap-table2.min.css';
 import { Controller } from 'react-hook-form';
 import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
@@ -304,11 +303,16 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                             name="places"
                             control={form.control}
                             placeholder=""
-                            options={places}
+                            options={places.sort((a, b) => a.name.localeCompare(b.name))}
+                            renderMenuItemChildren={(option) => (
+                                <>
+                                    {option.name} - <b>{option.code}</b>
+                                </>
+                            )}
                             labelKey="code"
-                            disabled={!selected}
                             multiple
-                            selected={selected ? selected.places : []}
+                            disabled={!selected}
+                            selected={selected ? selected.places.sort((a, b) => a.code.localeCompare(b.code)) : []}
                             onChange={(p) => {
                                 if (selected) {
                                     selected.places = p;
@@ -316,6 +320,8 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                                 }
                             }}
                             clearButton
+                            // need to look into why this is needed. the component should be handling this already
+                            filterBy={(o) => (selected ? !selected.places.find((p) => p.code === o.code) : false)}
                         />
                     </Col>
                 </Row>

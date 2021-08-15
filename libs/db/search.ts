@@ -1,6 +1,7 @@
 import { source, species } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
+import { PlaceNoTreeApi } from '../api/apitypes';
 import { TaxonomyEntryNoParent, TaxonomyType } from '../api/taxonomy';
 import { sourceToDisplay } from '../pages/renderhelpers';
 import { ExtractTFromPromise } from '../utils/types';
@@ -24,6 +25,7 @@ export type GlobalSearchResults = {
     glossary: Entry[];
     sources: TinySource[];
     taxa: TaxonomyEntryNoParent[];
+    places: PlaceNoTreeApi[];
 };
 
 export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchResults> => {
@@ -42,13 +44,15 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
             where: { name: { contains: q } },
         });
 
-    const mergeSpeciesAndAliases = (s: species[]) => (a: ExtractTFromPromise<ReturnType<typeof aliasSearch>>): species[] => {
-        const other = a.map((aa) => aa.aliasspecies.map((as) => as.species)).flat();
-        other.forEach((o) => {
-            if (!s.find((s) => s.id === o.id)) s.push(o);
-        });
-        return s.sort((a, b) => a.name.localeCompare(b.name));
-    };
+    const mergeSpeciesAndAliases =
+        (s: species[]) =>
+        (a: ExtractTFromPromise<ReturnType<typeof aliasSearch>>): species[] => {
+            const other = a.map((aa) => aa.aliasspecies.map((as) => as.species)).flat();
+            other.forEach((o) => {
+                if (!s.find((s) => s.id === o.id)) s.push(o);
+            });
+            return s.sort((a, b) => a.name.localeCompare(b.name));
+        };
 
     const sourceSearch = () =>
         db.source.findMany({
@@ -69,6 +73,14 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
                 description: true,
                 type: true,
             },
+        });
+
+    const placeSearch = () =>
+        db.place.findMany({
+            where: {
+                OR: [{ name: { contains: q } }, { code: { contains: q } }],
+            },
+            orderBy: { name: 'asc' },
         });
 
     const winnowTaxa = (taxa: ExtractTFromPromise<ReturnType<typeof taxaSearch>>): TaxonomyEntryNoParent[] =>
@@ -94,14 +106,18 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
     const filterDefinitions = (entries: readonly Entry[]): Entry[] =>
         entries.filter((e) => e.word === search || e.definition.includes(search));
 
-    const buildResults = (species: TinySpecies[]) => (sources: TinySource[]) => (glossary: Entry[]) => (
-        taxa: TaxonomyEntryNoParent[],
-    ): GlobalSearchResults => ({
-        species: species,
-        glossary: glossary,
-        sources: sources,
-        taxa: taxa,
-    });
+    const buildResults =
+        (species: TinySpecies[]) =>
+        (sources: TinySource[]) =>
+        (glossary: Entry[]) =>
+        (places: PlaceNoTreeApi[]) =>
+        (taxa: TaxonomyEntryNoParent[]): GlobalSearchResults => ({
+            species: species,
+            glossary: glossary,
+            sources: sources,
+            taxa: taxa,
+            places: places,
+        });
 
     return pipe(
         TE.tryCatch(speciesSearch, handleError),
@@ -131,6 +147,14 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
                 allGlossaryEntries(),
                 TE.map(filterDefinitions),
                 // curry the glossary results into the builder
+                TE.map(builder),
+            ),
+        ),
+        TE.flatten,
+        TE.map((builder) =>
+            pipe(
+                TE.tryCatch(placeSearch, handleError),
+                // curry the place results into the builder
                 TE.map(builder),
             ),
         ),

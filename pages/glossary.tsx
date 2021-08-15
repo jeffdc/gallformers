@@ -1,8 +1,8 @@
 import { GetStaticProps } from 'next';
 import Head from 'next/head';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
-import BootstrapTable, { ColumnDescription } from 'react-bootstrap-table-next';
+import DataTable from 'react-data-table-component';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
@@ -10,13 +10,14 @@ import externalLinks from 'remark-external-links';
 import Edit from '../components/edit';
 import { allGlossaryEntries, Entry } from '../libs/db/glossary';
 import { EntryLinked, linkDefintionToGlossary } from '../libs/pages/glossary';
+import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
 import { mightFailWithArray } from '../libs/utils/util';
 
 type Props = {
     es: EntryLinked[];
 };
 
-const formatRefs = (cell: string, e: EntryLinked) => {
+const formatRefs = (e: EntryLinked) => {
     const urls = e.urls.split('\n');
     if (urls === undefined || urls === null) {
         return <></>;
@@ -34,16 +35,16 @@ const formatRefs = (cell: string, e: EntryLinked) => {
     return <>{refs}</>;
 };
 
-const formatWord = (cell: string, e: EntryLinked) => {
+const formatWord = (e: EntryLinked) => {
     return (
-        <p id={e.word.toLocaleLowerCase()}>
+        <div id={e.word.toLocaleLowerCase()}>
             <b>{e.word}</b>
             <Edit id={e.id} type="glossary" />
-        </p>
+        </div>
     );
 };
 
-const formatDef = (cell: string, e: EntryLinked) => {
+const formatDef = (e: EntryLinked) => {
     return (
         <ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[externalLinks, remarkBreaks]}>
             {e.definition}
@@ -51,25 +52,39 @@ const formatDef = (cell: string, e: EntryLinked) => {
     );
 };
 
-const columns: ColumnDescription[] = [
-    {
-        dataField: 'word',
-        text: 'Word',
-        formatter: formatWord,
-    },
-    {
-        dataField: 'definition',
-        text: 'Definition',
-        formatter: formatDef,
-    },
-    {
-        dataField: 'urls',
-        text: 'Refs',
-        formatter: formatRefs,
-    },
-];
-
 const Glossary = ({ es }: Props): JSX.Element => {
+    const columns = useMemo(
+        () => [
+            {
+                id: 'word',
+                selector: (row: EntryLinked) => row.word,
+                name: 'Word',
+                sortable: true,
+                format: formatWord,
+                wrap: true,
+                maxWidth: '250px',
+            },
+            {
+                id: 'defintion',
+                selector: (row: EntryLinked) => row.definition,
+                name: 'Defintion',
+                format: formatDef,
+                sortable: true,
+                wrap: true,
+            },
+            {
+                id: 'refs',
+                selector: (g: EntryLinked) => g.urls,
+                name: 'Refs',
+                format: formatRefs,
+                sort: true,
+                wrap: true,
+                maxWidth: '100px',
+            },
+        ],
+        [],
+    );
+
     if (es == undefined || es == null) {
         throw new Error('Invalid props passed to Glossary.');
     }
@@ -82,19 +97,16 @@ const Glossary = ({ es }: Props): JSX.Element => {
             <h1 className="ml-3 pt-3">A Glossary of Gall Related Terminology</h1>
             <Row className="p-3">
                 <Col>
-                    <BootstrapTable
+                    <DataTable
                         keyField={'id'}
                         data={es}
                         columns={columns}
-                        bootstrap4
                         striped
-                        headerClasses="table-header"
-                        defaultSorted={[
-                            {
-                                dataField: 'word',
-                                order: 'asc',
-                            },
-                        ]}
+                        noHeader
+                        fixedHeader
+                        responsive={false}
+                        defaultSortFieldId="word"
+                        customStyles={TABLE_CUSTOM_STYLES}
                     />
                 </Col>
             </Row>

@@ -7,6 +7,22 @@
 //   outline: solid #f00 1px !important;
 // }
 
+// palette
+$cadet-blue: #96ADC8;
+$mindaro: #D7FFAB;
+$laser-lemon: #FCFF6C;
+$tan-crayola: #D89D6A;
+$rose-ebony: #6D454C;
+
+// tables
+$table-header-background: $cadet-blue;
+$table-selected-row: $laser-lemon;
+
+:export {
+  tableheaderbackground: $table-header-background;
+  tableselectedrow: $table-selected-row;
+}
+
 .description-text {
   font-size: 16px;
   line-height: 180%;
@@ -32,6 +48,9 @@ blockquote {
 
 .table-header {
     background-color:rgba(0, 128, 0, 0.205);
+}
+.rdt_TableHeadRow {
+  background-color:rgba(0, 128, 0, 0.205);
 }
 
 .white-space-pre-wrap {
@@ -106,4 +125,12 @@ blockquote {
   @include media-breakpoint-only(xl) {
     column-count: 5;
   }
+}
+
+// expand clickable area of editable cell to fill the entire cell of the table
+.editable-table-cell {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
 }

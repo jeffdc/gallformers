@@ -6,7 +6,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { useState } from 'react';
-import { Alert, Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
+import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
@@ -43,7 +43,6 @@ const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
 
 const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
     const [selectedSource, setSelectedSource] = useState(defaultSource(species?.speciessource));
-    const [notesAlertShown, setNotesAlertShown] = useState(true);
 
     const router = useRouter();
     // If the page is not yet generated, this will be displayed initially until getStaticProps() finishes running
@@ -56,8 +55,6 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
     // the hosts will not be sorted, so sort them for display
     species.hosts.sort((a, b) => a.name.localeCompare(b.name));
     const hostLinker = hostAsLink(species.hosts.length);
-
-    const notesSpeciesSource = species.speciessource?.find((s) => s.source?.id === 58);
 
     return (
         <Container className="pt-2 fluid">
@@ -196,22 +193,6 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                             <hr />
                         </Col>
                     </Row>
-                    <Row hidden={!notesAlertShown || !(notesSpeciesSource && notesSpeciesSource.id !== selectedSource?.id)}>
-                        <Col id="notes-reminder">
-                            <Alert variant="info" dismissible onClose={() => setNotesAlertShown(false)}>
-                                Our ID Notes may contain important tips necessary for distinguishing this gall from similar galls
-                                and/or important information about the taxonomic status of this gall inducer.
-                                <Button
-                                    className="ml-3"
-                                    variant="outline-info"
-                                    size="sm"
-                                    onClick={() => setSelectedSource(notesSpeciesSource)}
-                                >
-                                    Show notes
-                                </Button>
-                            </Alert>
-                        </Col>
-                    </Row>
                     <Row>
                         <Col id="description" className="lead p-3">
                             {selectedSource && selectedSource.description && (
@@ -261,7 +242,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
             <Row>
                 <Col>
                     <SourceList
-                        data={species.speciessource.map((s) => s.source)}
+                        data={species.speciessource}
                         defaultSelection={selectedSource?.source}
                         onSelectionChange={(s) =>
                             setSelectedSource(species.speciessource.find((spso) => spso.source_id == s?.id))
@@ -273,7 +254,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                             <strong>See Also:</strong>
                         </Col>
                     </Row>
-                    <SeeAlso name={species.name} />
+                    <SeeAlso name={species.name} undescribed={species.gall.undescribed} />
                 </Col>
             </Row>
         </Container>
