@@ -37,7 +37,7 @@
     "jimp": "^0.16.1",
     "logging-ts": "^0.3.4",
     "natural": "^5",
-    "next": "^10",
+    "next": "^11",
     "next-auth": "^3",
     "nuka-carousel": "^4.7.8",
     "pino": "^6",
