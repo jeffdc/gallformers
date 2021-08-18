@@ -26,5 +26,11 @@ const debugLogger = L.filter(getLoggerEntry('debug.log'), (e) => e.level === 'De
 const productionLogger = L.filter(getLoggerEntry('production.log'), (e) => e.level !== 'Debug');
 export const flogger = L.getMonoid<Entry>().concat(debugLogger, productionLogger);
 
-export const info = (message: string) => (time: Date): IO<void> => flogger({ message, time, level: 'Info' });
-export const debug = (message: string) => (time: Date): IO<void> => flogger({ message, time, level: 'Debug' });
+export const info =
+    (message: string) =>
+    (time: Date): IO<void> =>
+        flogger({ message, time, level: 'Info' });
+export const debug =
+    (message: string) =>
+    (time: Date): IO<void> =>
+        flogger({ message, time, level: 'Debug' });

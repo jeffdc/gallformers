@@ -44,9 +44,6 @@ const linkGall = (g: GallSimple) => {
 };
 
 const Host = ({ host, taxonomy }: Props): JSX.Element => {
-    // this is needed as the table component uses window.document inside its pagination implementation.
-    const ssr = typeof window !== 'object';
-
     const source = host ? host.speciessource.find((s) => s.useasdefault !== 0) : undefined;
     const [selectedSource, setSelectedSource] = useState(source);
 
@@ -171,7 +168,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                 responsive={false}
                                 defaultSortFieldId="name"
                                 customStyles={TABLE_CUSTOM_STYLES}
-                                pagination={!ssr}
+                                pagination={true}
                             />
                         </Col>
                     </Row>

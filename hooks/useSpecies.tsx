@@ -14,7 +14,7 @@ import {
 } from '../libs/api/apitypes';
 import { FAMILY, FGS, GENUS, TaxonomyEntry, TaxonomyEntryNoParent } from '../libs/api/taxonomy';
 import { extractGenus } from '../libs/utils/util';
-import React, { Dispatch, SetStateAction, useState } from 'react';
+import React, { Dispatch, SetStateAction, useEffect, useState } from 'react';
 import { Badge, OverlayTrigger, Popover } from 'react-bootstrap';
 
 export const SpeciesNamingHelp = (): JSX.Element => (
@@ -115,6 +115,10 @@ export type UseSpecies<T extends SpeciesApi> = {
 
 const useSpecies = <T extends SpeciesApi>(genera: TaxonomyEntry[]): UseSpecies<T> => {
     const [aliasData, setAliasData] = useState<AliasApi[]>([]);
+
+    // useEffect(() => {
+    //     console.log(`JDC: useSpecies alias data change: ${JSON.stringify(aliasData, null, '  ')}`);
+    // }, [aliasData]);
 
     const fgsFromName = (name: string): FGS => {
         const genusName = extractGenus(name);

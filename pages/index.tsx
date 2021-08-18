@@ -5,7 +5,7 @@ import { Card, Col, Container, Row } from 'react-bootstrap';
 
 export default function Home(): JSX.Element {
     return (
-        <div>
+        <>
             <Head>
                 <meta name="description" content="The place to ID and learn about galls on plants in the US and Canada." />
             </Head>
@@ -107,6 +107,6 @@ export default function Home(): JSX.Element {
                     </Col>
                 </Row>
             </Container>
-        </div>
+        </>
     );
 }

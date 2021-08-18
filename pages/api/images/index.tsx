@@ -22,9 +22,11 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
     if (!session) {
         res.status(401).end();
     }
-    const errMsg = (msg: string) => <T extends unknown>(): TE.TaskEither<Error, T> => {
-        return TE.left(new Error(msg));
-    };
+    const errMsg =
+        (msg: string) =>
+        <T extends unknown>(): TE.TaskEither<Error, T> => {
+            return TE.left(new Error(msg));
+        };
 
     if (req.method === 'GET') {
         await pipe(

@@ -29,7 +29,7 @@ RUN rm node_modules/@prisma/engines/migration-engine-linux-musl
 RUN rm node_modules/@prisma/engines/prisma-fmt-linux-musl
 
 ## Shrink final image, copy built nextjs and startup the server
-FROM node:15-alpine
+FROM node:16-alpine
 
 WORKDIR /usr/src/app
 ENV NODE_ENV production
