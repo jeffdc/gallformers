@@ -45,9 +45,13 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({ show, ti
                     )}
 
                     {variant === 'info' && (
-                        <Button color="primary" onClick={onSubmit}>
-                            OK
-                        </Button>
+                        <Row>
+                            <Col>
+                                <Button color="primary" onClick={onSubmit}>
+                                    OK
+                                </Button>
+                            </Col>
+                        </Row>
                     )}
                 </div>
             </Modal.Footer>

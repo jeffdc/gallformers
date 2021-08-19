@@ -27,7 +27,7 @@ const linkLicense = (row: SourceApi) => {
                     alt={link}
                     src={
                         row.license === CC0
-                            ? '/images/cc0.png'
+                            ? '/images/CC0.png'
                             : row.license === CCBY
                             ? '/images/CCBY.png'
                             : row.license === ALLRIGHTS

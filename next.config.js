@@ -1,19 +1,15 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
-const withBundleAnalyzer = require('@next/bundle-analyzer')({
-    enabled: process.env.ANALYZE === 'true',
-});
-
 module.exports = (phase) => {
     const d = new Date();
     const buildid = `${d.getUTCFullYear()}${
         d.getUTCMonth() + 1
     }${d.getUTCDate()}-${d.getUTCHours()}${d.getUTCMinutes()}.${d.getUTCMilliseconds()}`;
 
-    return withBundleAnalyzer({
+    return {
         env: {
             BUILD_ID: buildid,
         },
-        webpack: function (config, options) {
+        webpack5: function (config, options) {
             config.plugins
                 .push
                 // add modules that should never be shipped in the client bundle here. mostly next.js is pretty good about
@@ -30,12 +26,10 @@ module.exports = (phase) => {
             //TODO convert this to the latest git hash
             return buildid;
         },
-        future: {
-            webpack5: true,
-        },
-        i18n: {
-            locales: ['en'],
-            defaultLocale: 'en',
-        },
-    });
+        // this causes failures on Linux. Not sure why but for now disabling it.
+        // i18n: {
+        //     locales: ['en'],
+        //     defaultLocale: 'en',
+        // },
+    };
 };

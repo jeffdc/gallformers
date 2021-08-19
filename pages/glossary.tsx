@@ -45,11 +45,12 @@ const formatWord = (e: EntryLinked) => {
 };
 
 const formatDef = (e: EntryLinked) => {
-    return (
-        <ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[externalLinks, remarkBreaks]}>
-            {e.definition}
-        </ReactMarkdown>
-    );
+    return <span className="padded-table-cell">{e.definition}</span>;
+    // return (
+    //     <ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[externalLinks, remarkBreaks]}>
+    //         {e.definition}
+    //     </ReactMarkdown>
+    // );
 };
 
 const Glossary = ({ es }: Props): JSX.Element => {
@@ -103,7 +104,6 @@ const Glossary = ({ es }: Props): JSX.Element => {
                         columns={columns}
                         striped
                         noHeader
-                        fixedHeader
                         responsive={false}
                         defaultSortFieldId="word"
                         customStyles={TABLE_CUSTOM_STYLES}
