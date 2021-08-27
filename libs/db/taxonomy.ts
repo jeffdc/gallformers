@@ -1,3 +1,4 @@
+import { taxonomy, taxonomytaxonomy } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
@@ -116,6 +117,33 @@ export const allFamilies = (
     );
 };
 
+export type FamilyWithGenera = taxonomy & {
+    children: taxonomytaxonomy[];
+    taxonomy: taxonomy[];
+    taxonomytaxonomy: (taxonomytaxonomy & {
+        child: taxonomy;
+    })[];
+};
+
+export const allFamiliesWithGenera = (): TaskEither<Error, FamilyWithGenera[]> => {
+    const families = () =>
+        db.taxonomy.findMany({
+            include: {
+                children: true,
+                taxonomy: true,
+                taxonomytaxonomy: {
+                    include: { child: true },
+                },
+            },
+            orderBy: { name: 'asc' },
+            where: { type: { equals: 'family' } },
+        });
+
+    return pipe(
+        TE.tryCatch(families, handleError),
+        // TE.map((f) => f.map(toTaxonomyEntry)),
+    );
+};
 /**
  * Fetch all genera for the given taxon.
  * @param taxon

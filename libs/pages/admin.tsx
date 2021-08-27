@@ -8,7 +8,7 @@ import { DeleteResult, GallTaxon, HostTaxon } from '../api/apitypes';
 import { WithID } from '../utils/types';
 
 export type AdminProps<T> = {
-    type: 'Family' | 'Gall' | 'Gallhost' | 'Glossary' | 'Host' | 'Images' | 'Source' | 'Speciessource' | 'Section' | 'Place';
+    type: 'Taxonomy' | 'Section' | 'Gall' | 'Gallhost' | 'Glossary' | 'Host' | 'Images' | 'Source' | 'Speciessource' | 'Place';
     keyField: string;
     children: JSX.Element;
     editName?: {
@@ -73,8 +73,8 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
                 return `/host/${props.selected?.id}`;
             case 'Section':
                 return `/section/${props.selected?.id}`;
-            case 'Family':
-                return `/family/${props.selected?.id}`;
+            // case 'Family':
+            //     return `/family/${props.selected?.id}`;
             case 'Glossary':
                 return `/glossary/${props.selected?.id}`;
             case 'Source':
@@ -151,7 +151,7 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
                         >{`Source Map`}</Nav.Link>
                         <Nav.Link eventKey="Gallhost" href={`./gallhost${params('id', 'Gall')}`}>{`Gall Hosts`}</Nav.Link>
                         <Nav.Link eventKey="Source" href={`./source`}>{`Sources`}</Nav.Link>
-                        <Nav.Link eventKey="Family" href={`./family`}>{`Families`}</Nav.Link>
+                        <Nav.Link eventKey="Taxonomy" href={`./taxonomy`}>{`Taxonomy`}</Nav.Link>
                         <Nav.Link eventKey="Section" href={`./section`}>{`Sections`}</Nav.Link>
                         <Nav.Link eventKey="Glossary" href={`./glossary`}>{`Glossary`}</Nav.Link>
                         <Nav.Link eventKey="Place" href={`./place`}>{`Place`}</Nav.Link>
