@@ -92,6 +92,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                         heightMode="max"
                         slideIndex={imgIndex}
                         wrapAround={true}
+                        transitionMode="fade"
                     >
                         {species.images.map((image) => (
                             <div key={image.id}>
@@ -189,12 +190,12 @@ const Images = ({ sp }: Props): JSX.Element => {
             <div className="border rounded pb-1">
                 <Carousel
                     renderCenterLeftControls={({ previousSlide }) => (
-                        <Button variant="secondary" size="sm" onClick={previousSlide} className="m-1">
+                        <Button variant="secondary" size="sm" onClick={previousSlide} className="ml-1">
                             {'<'}
                         </Button>
                     )}
                     renderCenterRightControls={({ nextSlide }) => (
-                        <Button variant="secondary" size="sm" onClick={nextSlide} className="m-1">
+                        <Button variant="secondary" size="sm" onClick={nextSlide} className="mr-1">
                             {'>'}
                         </Button>
                     )}
@@ -205,6 +206,9 @@ const Images = ({ sp }: Props): JSX.Element => {
                         setImgIndex(e);
                     }}
                     wrapAround={true}
+                    transitionMode="fade"
+                    // t, r, b, l
+                    framePadding="0px 10px 0px 10px"
                 >
                     {species.images.map((image) => (
                         <div

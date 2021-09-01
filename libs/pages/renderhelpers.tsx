@@ -38,10 +38,16 @@ export const renderParagraph = (p: string): React.ReactNode => {
  * are not sources marked as default, then the source with the oldest publication year will be used.
  * @param species
  */
-export const defaultSource = <T extends { useasdefault: number; source: { pubyear: string } }>(
+export const defaultSource = <T extends { useasdefault: number; source: { id: number; pubyear: string } }>(
     speciessource: T[],
+    overrideId?: string | string[],
 ): T | undefined => {
     if (speciessource && speciessource.length > 0) {
+        // if there is an override try to get that
+        if (overrideId && typeof overrideId === 'string') {
+            const s = speciessource.find((s) => s.source.id.toString() === overrideId);
+            if (s) return s;
+        }
         // if there is one marked as default, use that
         const source = speciessource.find((s) => s.useasdefault !== 0);
         if (source) return source;
