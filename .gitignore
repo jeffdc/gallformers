@@ -12,6 +12,15 @@ gallformers-docker.tar
 .type-coverage
 .coverage
 
+# yarn 2 related
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
 # generated database
 usda_plants/plants.db
 

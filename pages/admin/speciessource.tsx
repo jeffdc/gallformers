@@ -113,8 +113,10 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                 del: false,
             };
         } catch (e) {
-            console.error(e);
-            setError(e);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const err: any = e;
+            console.error(err);
+            setError(err.toString());
             return {
                 mainField: sp ? [sp] : [],
                 description: '',
@@ -243,8 +245,10 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                 throw new Error(await res.text());
             }
         } catch (e) {
-            console.error(e);
-            setError(e);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const err: any = e;
+            console.error(err);
+            setError(err.toString());
         }
     };
 

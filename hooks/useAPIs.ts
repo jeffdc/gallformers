@@ -93,7 +93,7 @@ export const useAPIs = <T extends WithID, U>(
                     throw new Error(await res.text());
                 }
             }
-        } catch (e) {
+        } catch (e: any) {
             logger.error(e);
             throw new Error(
                 `Failed to update/delete data. Check the console and open a new issue in Github copying any errors seen in the console as well as info about what you were doing when this occurred.`,

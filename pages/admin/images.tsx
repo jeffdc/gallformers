@@ -183,8 +183,10 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                     throw new Error(await res.text());
                 }
             } catch (e) {
-                console.error(e);
-                setError(e);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const err: any = e;
+                console.error(err);
+                setError(err.toString());
             }
         };
 
@@ -235,8 +237,10 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
 
             setCurrentImage(undefined);
         } catch (e) {
-            console.error(e);
-            setError(e);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const err: any = e;
+            console.error(err);
+            setError(err.toString());
         }
     };
 
@@ -319,8 +323,10 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                         .catch(() => Promise.resolve());
                 }
             } catch (e) {
-                console.error(e);
-                setError(e);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const err: any = e;
+                console.error(err);
+                setError(err.toString());
             }
         };
 

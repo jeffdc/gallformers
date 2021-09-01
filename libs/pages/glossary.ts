@@ -3,11 +3,9 @@ import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { PorterStemmer, WordTokenizer } from 'natural';
-import remark from 'remark';
 import { SpeciesSourceApi } from '../api/apitypes';
 import { allGlossaryEntries, Entry } from '../db/glossary';
 import { errorThrow } from '../utils/util';
-import remarkGlossary from './remark-glossary';
 
 export type EntryLinked = Entry & {
     linkedDefinition: string | JSX.Element[];
@@ -73,20 +71,20 @@ const linkHtml =
         return els.reduce((acc, s) => acc.concat(s), '');
     };
 
-const linkHtml2 =
-    (context: Context) =>
-    (text: string): string => {
-        let s = '';
-        remark()
-            .use(remarkGlossary, { glossary: context.glossary, stems: context.stems })
-            .process(text, (e, f) => {
-                if (e) throw e;
-                console.log(`JDC: ${JSON.stringify(f, null, '  ')}`);
-                s = f.toString();
-            });
+// const linkHtml2 =
+//     (context: Context) =>
+//     (text: string): string => {
+//         let s = '';
+//         remark()
+//             .use(remarkGlossary, { glossary: context.glossary, stems: context.stems })
+//             .process(text, (e, f) => {
+//                 if (e) throw e;
+//                 console.log(`JDC: ${JSON.stringify(f, null, '  ')}`);
+//                 s = f.toString();
+//             });
 
-        return s;
-    };
+//         return s;
+//     };
 
 /** Make the helper functions available for unit testing. */
 export const testables = {
