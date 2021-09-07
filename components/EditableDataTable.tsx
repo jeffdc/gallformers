@@ -99,10 +99,16 @@ const EditableCell = <T extends WithID>({ row, rowIndex, col, onChange, columnKe
     );
 };
 
+export type CustomAction<T extends WithID> = {
+    name: string;
+    onUpdate: (ts: T[]) => void;
+};
+
 export type EditableTableProps<T extends WithID> = Omit<TableProps<T>, 'columns'> & {
     createEmpty: () => T;
     columns: EditableTableColumn<T>[];
     update: (ts: T[]) => void;
+    customActions?: Array<CustomAction<T>>;
 };
 
 const EditableTable = <T extends WithID>(props: EditableTableProps<T>): JSX.Element => {
@@ -140,6 +146,16 @@ const EditableTable = <T extends WithID>(props: EditableTableProps<T>): JSX.Elem
 
     const contextActions = (
         <>
+            {props.customActions?.map((ca) => (
+                <Button
+                    key={ca.name}
+                    variant="secondary"
+                    className="btn-sm mr-1"
+                    onClick={() => ca.onUpdate(props.data.filter((a) => selected.has(a.id)))}
+                >
+                    {ca.name}
+                </Button>
+            ))}
             <Button key="delete" variant="danger" className="btn-sm" onClick={deleteSelected}>
                 Delete
             </Button>

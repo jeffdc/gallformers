@@ -1,4 +1,4 @@
-import { taxonomy, taxonomytaxonomy } from '@prisma/client';
+import { PrismaPromise } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
@@ -17,6 +17,8 @@ import {
 import {
     FAMILY,
     FamilyTaxonomy,
+    FamilyUpsertFields,
+    FamilyWithGenera,
     FGS,
     GENUS,
     SECTION,
@@ -54,6 +56,29 @@ export const taxonomyByName = (name: string): TaskEither<Error, O.Option<Taxonom
     return pipe(
         TE.tryCatch(() => db.taxonomy.findFirst({ where: { name: { equals: name } } }), handleError),
         TE.map((t) => pipe(t, O.fromNullable, O.map(toTaxonomyEntry))),
+    );
+};
+
+export const familyByName = (name: string): TaskEither<Error, O.Option<FamilyWithGenera>> => {
+    return pipe(
+        TE.tryCatch(
+            () =>
+                db.taxonomy.findFirst({
+                    include: { taxonomy: true },
+                    where: { AND: [{ name: { equals: name } }, { type: { equals: FAMILY } }] },
+                }),
+            handleError,
+        ),
+        TE.map((t) =>
+            pipe(
+                t,
+                O.fromNullable,
+                O.map((t) => ({
+                    ...toTaxonomyEntry(t),
+                    genera: t.taxonomy.map(toTaxonomyEntry),
+                })),
+            ),
+        ),
     );
 };
 
@@ -117,23 +142,15 @@ export const allFamilies = (
     );
 };
 
-export type FamilyWithGenera = taxonomy & {
-    children: taxonomytaxonomy[];
-    taxonomy: taxonomy[];
-    taxonomytaxonomy: (taxonomytaxonomy & {
-        child: taxonomy;
-    })[];
-};
-
 export const allFamiliesWithGenera = (): TaskEither<Error, FamilyWithGenera[]> => {
     const families = () =>
         db.taxonomy.findMany({
             include: {
-                children: true,
+                // children: true,
                 taxonomy: true,
-                taxonomytaxonomy: {
-                    include: { child: true },
-                },
+                // taxonomytaxonomy: {
+                //     include: { child: true },
+                // },
             },
             orderBy: { name: 'asc' },
             where: { type: { equals: 'family' } },
@@ -141,9 +158,15 @@ export const allFamiliesWithGenera = (): TaskEither<Error, FamilyWithGenera[]> =
 
     return pipe(
         TE.tryCatch(families, handleError),
-        // TE.map((f) => f.map(toTaxonomyEntry)),
+        TE.map((taxs) =>
+            taxs.map((tax) => ({
+                ...toTaxonomyEntry(tax),
+                genera: tax.taxonomy.map(toTaxonomyEntry),
+            })),
+        ),
     );
 };
+
 /**
  * Fetch all genera for the given taxon.
  * @param taxon
@@ -470,5 +493,81 @@ export const upsertTaxonomy = (f: TaxonomyUpsertFields): TaskEither<Error, Taxon
     return pipe(
         TE.tryCatch(upsert, handleError),
         TE.map(toTaxonomyEntry),
+    );
+};
+
+const familyUpdateSteps = (fam: FamilyUpsertFields): PrismaPromise<unknown>[] => {
+    return [
+        db.taxonomy.update({
+            where: { id: fam.id },
+            data: {
+                name: fam.name,
+                description: fam.description,
+                taxonomytaxonomy: {
+                    // typical hack, delete them all and then add
+                    deleteMany: { taxonomy_id: fam.id },
+                    create: fam.genera.map((g) => ({
+                        //TODO here lies the issue - need to update the actual Genera Taxonomy records which this does not do.
+                        child: { create: { description: g.description, name: g.name, type: GENUS } },
+                    })),
+                },
+            },
+        }),
+    ];
+};
+
+const familyCreate = (f: FamilyUpsertFields): PrismaPromise<unknown>[] => {
+    return [
+        db.taxonomy.create({
+            data: {
+                name: f.name,
+                description: f.description,
+                type: f.type,
+                parent: {},
+                taxonomytaxonomy: {
+                    create: f.genera.map((g) => ({
+                        child: {
+                            create: {
+                                name: g.name,
+                                description: g.description,
+                                type: GENUS,
+                            },
+                        },
+                    })),
+                },
+            },
+        }),
+    ];
+};
+
+/**
+ * Update or insert a Family Taxonomy entry.
+ * @param f
+ * @returns the count of the number of records added, will be 1 for success and 0 for a failure
+ */
+export const upsertFamily = (f: FamilyUpsertFields): TaskEither<Error, FamilyWithGenera> => {
+    const updateFamilyTx = TE.tryCatch(() => db.$transaction(familyUpdateSteps(f)), handleError);
+    const createFamilyTx = TE.tryCatch(() => db.$transaction(familyCreate(f)), handleError);
+
+    const getFam = () => {
+        return familyByName(f.name);
+    };
+
+    console.log(`JDC: upserting with: ${JSON.stringify(f, null, '  ')}`);
+    return pipe(
+        f.id < 0 ? createFamilyTx : updateFamilyTx,
+        TE.chain(getFam),
+        TE.fold(
+            (e) => TE.left(e),
+            (s) =>
+                pipe(
+                    s,
+                    O.fold(
+                        () => TE.left(new Error('Failed to get upserted data.')),
+                        (te) => TE.right(te),
+                    ),
+                ),
+        ),
+        TE.map((x) => x),
     );
 };

@@ -1,28 +1,21 @@
-import classNames from 'classnames';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
-import React, { ReactNode } from 'react';
-import { Button, Col, Form, FormGroup } from 'react-bootstrap';
-import TreeMenu, {
-    Item,
-    ItemComponent,
-    MatchSearchFunction,
-    TreeMenuChildren,
-    TreeMenuProps,
-    TreeNodeInArray,
-} from 'react-simple-tree-menu';
+import React from 'react';
+import { Button, Col, Form, FormGroup, Row } from 'react-bootstrap';
 import 'react-simple-tree-menu/dist/main.css';
 import * as yup from 'yup';
+import EditableDataTable, { EditableTableColumn } from '../../components/EditableDataTable';
 import { RenameEvent } from '../../components/editname';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { ALL_FAMILY_TYPES } from '../../libs/api/apitypes';
-import { FAMILY, TaxonomyEntry, TaxonomyUpsertFields } from '../../libs/api/taxonomy';
-import { allFamiliesWithGenera, FamilyWithGenera } from '../../libs/db/taxonomy';
+import { EMPTY_TAXONOMYENTRY, FAMILY, FamilyUpsertFields, FamilyWithGenera, Genus } from '../../libs/api/taxonomy';
+import { allFamiliesWithGenera } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
+import { TABLE_CUSTOM_STYLES } from '../../libs/utils/DataTableConstants';
 import { genOptions } from '../../libs/utils/forms';
 import { mightFailWithArray } from '../../libs/utils/util';
 
@@ -32,13 +25,14 @@ const schema = yup.object().shape({
 });
 
 // We have to remove the parent property as the Form library can not handle circular references in the data.
-type TaxFamily = Omit<TaxonomyEntry, 'parent'>;
+// type TaxFamily = Omit<FamilyWithGenera, 'taxonomy'>;
+type TaxFamily = Omit<FamilyWithGenera, 'parent'>;
 
-type FormFields = AdminFormFields<TaxFamily> & Omit<TaxFamily, 'id' | 'name' | 'type'>;
+type FormFields = AdminFormFields<TaxFamily> & Pick<TaxFamily, 'description' | 'genera'>;
 
 type Props = {
     id: string;
-    fs: TreeNodeInArray[];
+    fs: FamilyWithGenera[];
 };
 
 const renameFamily = async (s: TaxFamily, e: RenameEvent) => ({
@@ -46,23 +40,13 @@ const renameFamily = async (s: TaxFamily, e: RenameEvent) => ({
     name: e.new,
 });
 
-const toUpsertFields = (fields: FormFields, name: string, id: number): TaxonomyUpsertFields => {
-    return {
-        ...fields,
-        name: name,
-        type: 'family',
-        id: id,
-        species: [],
-        parent: O.none,
-    };
-};
-
 const updatedFormFields = async (fam: TaxFamily | undefined): Promise<FormFields> => {
     if (fam != undefined) {
         return {
             mainField: [fam],
             description: fam.description,
             del: false,
+            genera: fam.genera,
         };
     }
 
@@ -70,6 +54,19 @@ const updatedFormFields = async (fam: TaxFamily | undefined): Promise<FormFields
         mainField: [],
         description: '',
         del: false,
+        genera: [],
+    };
+};
+
+const toUpsertFields = (fields: FormFields, name: string, id: number): FamilyUpsertFields => {
+    console.log(`JDC: update fields ${JSON.stringify(fields, null, '  ')}`);
+    return {
+        ...fields,
+        name: name,
+        type: 'family',
+        id: id,
+        description: fields.description ?? '',
+        genera: fields.genera ?? [],
     };
 };
 
@@ -78,20 +75,32 @@ const createNewFamily = (name: string): TaxFamily => ({
     description: '',
     id: -1,
     type: FAMILY,
+    genera: [],
 });
 
-const DEFAULT_PADDING = 0.75;
-const ICON_SIZE = 2;
-const LEVEL_SPACE = 1.75;
-const ToggleIcon = ({ on, openedIcon, closedIcon }: { on: boolean; openedIcon: ReactNode; closedIcon: ReactNode }) => (
-    <div role="img" aria-label="Toggle" className="rstm-toggle-icon-symbol">
-        {on ? openedIcon : closedIcon}
-    </div>
-);
+const columns: EditableTableColumn<Genus>[] = [
+    {
+        id: 'name',
+        name: 'Genus',
+        selector: (row: Genus) => row.name,
+        sortable: true,
+        wrap: true,
+        maxWidth: '300px',
+        editKey: 'name',
+    },
+    {
+        id: 'description',
+        name: 'Friendly Name',
+        selector: (row: Genus) => row.description,
+        wrap: true,
+        editKey: 'description',
+    },
+];
 
-const Family = ({ id, fs }: Props): JSX.Element => {
+const TaxonomyAdmin = ({ id, fs }: Props): JSX.Element => {
     const {
         selected,
+        setSelected,
         showRenameModal,
         setShowRenameModal,
         error,
@@ -116,15 +125,14 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         createNewFamily,
     );
 
-    const onClickItem = (props: Item) => {
-        console.log(`JDC: ${JSON.stringify(props, null, '  ')}`);
+    const updateGenera = (genera: Genus[]) => {
+        if (selected) {
+            setSelected({ ...selected, genera: genera });
+        }
     };
 
-    const customSearch: MatchSearchFunction = ({ label, searchTerm, childLabels }) => {
-        const lowerSearch = searchTerm.toLocaleLowerCase();
-        const labelMatch = label.toLocaleLowerCase().includes(lowerSearch);
-
-        return labelMatch || (childLabels ? childLabels.includes(lowerSearch) : labelMatch);
+    const moveSelected = (g: Genus[]) => {
+        //TODO: move genus workflow...
     };
 
     return (
@@ -142,72 +150,9 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         >
             <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
                 <h4>Manage Taxonomy</h4>
-                <TreeMenu data={fs} onClickItem={onClickItem} matchSearch={customSearch}>
-                    {({ items, search }) => {
-                        const onSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-                            const { value } = e.target;
-                            search && search(value);
-                        };
-                        return (
-                            <>
-                                {search && (
-                                    <input
-                                        className="rstm-search"
-                                        aria-label="Type and search"
-                                        type="search"
-                                        placeholder="Type and search"
-                                        onChange={onSearch}
-                                    />
-                                )}
-                                <ul className="rstm-tree-item-group">
-                                    {items.map(({ key, ...props }) => {
-                                        // console.log(`JDC: ${JSON.stringify(props, null, '  ')}`);
-                                        return (
-                                            // <ItemComponent {...props} key={key} />
-                                            <li
-                                                key={key}
-                                                className={classNames(
-                                                    'rstm-tree-item',
-                                                    `rstm-tree-item-level${props.level}`,
-                                                    { 'rstm-tree-item--active': props.active },
-                                                    { 'rstm-tree-item--focused': props.focused },
-                                                )}
-                                                style={{
-                                                    paddingLeft: `${
-                                                        DEFAULT_PADDING +
-                                                        ICON_SIZE * (props.hasNodes ? 0 : 1) +
-                                                        props.level * LEVEL_SPACE
-                                                    }rem`,
-                                                    ...props.style,
-                                                }}
-                                                role="button"
-                                                aria-pressed={props.active}
-                                                onClick={props.onClick}
-                                            >
-                                                {props.hasNodes && (
-                                                    <div
-                                                        className="rstm-toggle-icon"
-                                                        onClick={(e) => {
-                                                            props.hasNodes && props.toggleNode && props.toggleNode();
-                                                            e.stopPropagation();
-                                                        }}
-                                                    >
-                                                        <ToggleIcon on={props.isOpen} openedIcon={'-'} closedIcon={'+'} />
-                                                    </div>
-                                                )}
-                                                {props.label}
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            </>
-                        );
-                    }}
-                </TreeMenu>
-
                 <Form.Row>
                     <FormGroup as={Col}>
-                        <Form.Label>Name:</Form.Label>
+                        <Form.Label>Family Name:</Form.Label>
                         {mainField('name', 'Family')}
                     </FormGroup>
                     <FormGroup as={Col}>
@@ -220,6 +165,24 @@ const Family = ({ id, fs }: Props): JSX.Element => {
                         )}
                     </FormGroup>
                 </Form.Row>
+                <Row>
+                    <Col>
+                        <Form.Label>Genera:</Form.Label>
+                    </Col>
+                </Row>
+                <EditableDataTable
+                    keyField={'id'}
+                    data={selected?.genera ?? []}
+                    columns={columns}
+                    striped
+                    responsive={false}
+                    defaultSortFieldId={'name'}
+                    customStyles={TABLE_CUSTOM_STYLES}
+                    createEmpty={() => EMPTY_TAXONOMYENTRY}
+                    update={updateGenera}
+                    customActions={[{ name: 'Move', onUpdate: moveSelected }]}
+                />
+                <hr />
                 <Form.Row>
                     <Col xs={2} className="mr-3">
                         <Button variant="primary" type="submit" value="Submit" disabled={!selected}>
@@ -244,23 +207,6 @@ const Family = ({ id, fs }: Props): JSX.Element => {
     );
 };
 
-const toTree = (fwg: readonly FamilyWithGenera[]): TreeNodeInArray[] =>
-    fwg.map((f) => {
-        return {
-            key: f.id.toString(),
-            label: `${f.name} - ${f.description}`,
-            data: f,
-            childLabels: f.taxonomytaxonomy.map((c) => c.child.name.toLocaleLowerCase()).join(' '),
-            nodes: f.taxonomytaxonomy
-                .sort((a, b) => a.child.name.localeCompare(b.child.name))
-                .map((tt) => ({
-                    key: tt.child.id.toString(),
-                    label: `${tt.child.name} - ${tt.child.description}`,
-                    data: tt.child,
-                })),
-        };
-    });
-
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
     const queryParam = 'id';
     // eslint-disable-next-line prettier/prettier
@@ -272,9 +218,9 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     return {
         props: {
             id: id,
-            fs: toTree(await mightFailWithArray<FamilyWithGenera>()(allFamiliesWithGenera())),
+            fs: await mightFailWithArray<FamilyWithGenera>()(allFamiliesWithGenera()),
         },
     };
 };
 
-export default Family;
+export default TaxonomyAdmin;

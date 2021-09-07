@@ -97,6 +97,16 @@ export type TaxonomyTree = taxonomy & {
     taxonomyalias: taxonomyalias[];
 };
 
+export type Genus = Omit<TaxonomyEntry, 'parent'>;
+
+export type FamilyWithGenera = TaxonomyEntry & {
+    // children: taxonomytaxonomy[];
+    genera: Genus[];
+    // taxonomytaxonomy: (taxonomytaxonomy & {
+    //     child: taxonomy;
+    // })[];
+};
+
 /**
  * The id should be set to any number less than 0 to indicate a new record.
  */
@@ -107,6 +117,10 @@ export type TaxonomyUpsertFields = {
     type: TaxonomyType;
     species: number[];
     parent: O.Option<TaxonomyEntry>;
+};
+
+export type FamilyUpsertFields = Omit<TaxonomyUpsertFields, 'species' | 'parent'> & {
+    genera: Genus[];
 };
 
 export type SectionApi = {
