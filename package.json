@@ -54,7 +54,7 @@
     "remark": "^13.0.0",
     "remark-breaks": "^2.0.2",
     "remark-external-links": "^8.0.0",
-    "remark-html": "^13.0.1",
+    "remark-html": "^13.0.2",
     "remove": "^0.1.5",
     "sass": "^1",
     "styled-components": "^5.3.0",
