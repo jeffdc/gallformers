@@ -10,6 +10,7 @@ import useWindowDimensions from '../hooks/usewindowdimension';
 import { ImageApi, ImageNoSourceApi, SpeciesApi } from '../libs/api/apitypes';
 import Carousel from 'nuka-carousel';
 import { hasProp } from '../libs/utils/util';
+import NoImage from '../public/images/noimage.jpg';
 
 // type guard for dealing with possible Images without Source data. If this happens there is an upstream
 // programming error so we will fail fast and hard.
@@ -50,7 +51,7 @@ const Images = ({ sp }: Props): JSX.Element => {
 
     return species.images.length < 1 ? (
         <div className="p-2">
-            <img src="/images/noimage.jpg" alt={`missing image of ${species.name}`} className="img-fluid d-block" />
+            <Image src={NoImage} alt={`missing image of ${species.name}`} className="img-fluid d-block" />
             {session && (
                 <ButtonToolbar className="row d-flex justify-content-center">
                     <ButtonGroup size="sm">
@@ -125,14 +126,14 @@ const Images = ({ sp }: Props): JSX.Element => {
                 <Modal.Body>
                     <Row>
                         <Col className="p-0 m-0 border" xs={4}>
-                            <Image
-                                src={currentImage ? currentImage.small : ''}
-                                unoptimized
-                                alt={`image of ${species.name}`}
-                                width={'300'}
-                                height={'200'}
-                                objectFit={'contain'}
-                            />
+                            <div className={'image-container'}>
+                                <Image
+                                    src={currentImage ? currentImage.small : ''}
+                                    alt={`image of ${species.name}`}
+                                    layout="fill"
+                                    className={'image'}
+                                />
+                            </div>
                         </Col>
                         <Col>
                             <Row>
@@ -183,6 +184,12 @@ const Images = ({ sp }: Props): JSX.Element => {
                                     <b>Last Modified:</b> {currentImage?.lastchangedby}
                                 </Col>
                             </Row>
+                            <Row>
+                                <Col>
+                                    <b>Caption: </b>
+                                    {currentImage?.caption}
+                                </Col>
+                            </Row>
                         </Col>
                     </Row>
                 </Modal.Body>
@@ -216,6 +223,8 @@ const Images = ({ sp }: Props): JSX.Element => {
                             style={{ display: 'flex', alignItems: 'center', height: '100%' }}
                             className="align-items-center"
                         >
+                            {/* the Carousel and next.js Image do not play well together and layout becomes an issue */}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                                 src={image.medium}
                                 alt={`image of ${species.name}`}

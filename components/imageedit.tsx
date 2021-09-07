@@ -8,6 +8,7 @@ import * as yup from 'yup';
 import { ALLRIGHTS, asLicenseType, CC0, CCBY, ImageApi, LicenseType, SourceWithSpeciesSourceApi } from '../libs/api/apitypes';
 import InfoTip from './infotip';
 import Typeahead from './Typeahead';
+import Image from 'next/image';
 
 type Props = {
     image: ImageApi;
@@ -134,8 +135,8 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                 </Modal.Header>
                 <Modal.Body>
                     <Row>
-                        <Col xs={3} className="">
-                            <img src={selected.small} width="150" />
+                        <Col xs={3} className="ml-2">
+                            <Image src={selected.small} layout="fill" objectFit="contain" objectPosition="top" />
                         </Col>
                         <Col className="form-group">
                             <Row>
@@ -143,7 +144,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                     Default:
                                     <InfoTip
                                         id="default"
-                                        text="The default image is always the first one displayed. Only one image can be the default."
+                                        text="The default image is always the first one displayed. Only one image can be the default. If you set this one to be the default, any previous default will be overridden once you save your changes."
                                     />
                                 </Col>
                                 <Col>

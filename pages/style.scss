@@ -142,3 +142,20 @@ blockquote {
   padding-top: 2%;
   padding-bottom: 2%;
 }
+
+// next.js Image is good but not great, need to tweak some styling stuff so that images can expand to fill height from fixed width
+// See: https://dev.to/felixhaeberle/responsive-fix-for-the-next-js-image-component-1351 
+.image-container {
+  width: 100%;
+
+  > div {
+    position: unset !important;
+  }
+
+  .image {
+    object-fit: contain;
+    width: 100% !important;
+    position: relative !important;
+    height: unset !important;
+  }
+}
