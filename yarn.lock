@@ -5734,7 +5734,7 @@ __metadata:
     react: ^17
     react-bootstrap: ^1.6
     react-bootstrap-typeahead: ^5
-    react-data-table-component: ^7.0.0-rc6
+    react-data-table-component: ^7
     react-dom: ^17
     react-hook-form: ^7
     react-hot-toast: ^2
@@ -5743,10 +5743,10 @@ __metadata:
     react-simple-tree-menu: ^1
     rehype-raw: ^6
     rehype-react: ^6.2
-    remark: ^14.0
-    remark-breaks: ^3.0
-    remark-external-links: ^9.0
-    remark-html: ^14.0
+    remark: ^14
+    remark-breaks: ^3
+    remark-external-links: ^9
+    remark-html: ^14
     remove: ^0.1.5
     sass: ^1
     styled-components: ^5.3
@@ -9920,16 +9920,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-data-table-component@npm:^7.0.0-rc6":
-  version: 7.0.0-rc6
-  resolution: "react-data-table-component@npm:7.0.0-rc6"
+"react-data-table-component@npm:^7":
+  version: 7.0.0
+  resolution: "react-data-table-component@npm:7.0.0"
   dependencies:
     deepmerge: ^4.2.2
     lodash.orderby: ^4.6.0
   peerDependencies:
-    react: ^17.0.2
-    styled-components: ^5.3.0
-  checksum: 5d700d0b39f9d75f42a80956ec0dea1a3b1c880dafc071b69df397cafb45b8a94d4597b387726444ae0b5c290e671a12b70b2147e28d0b86ae5c9d2726651776
+    react: ">= 16.8.3"
+    styled-components: ">= 4"
+  checksum: f5e83f6ddbf46d9a63095f894cb66349a2f2d4d59ca30104fb752da05ee296910495be19b8e6a7bf9a97e1d088e8bf7c448d2b5bb751ac519f8947e5aefa3f4c
   languageName: node
   linkType: hard
 
@@ -10257,7 +10257,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"remark-breaks@npm:^3.0":
+"remark-breaks@npm:^3":
   version: 3.0.1
   resolution: "remark-breaks@npm:3.0.1"
   dependencies:
@@ -10268,7 +10268,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"remark-external-links@npm:^9.0":
+"remark-external-links@npm:^9":
   version: 9.0.1
   resolution: "remark-external-links@npm:9.0.1"
   dependencies:
@@ -10284,16 +10284,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"remark-html@npm:^14.0":
-  version: 14.0.0
-  resolution: "remark-html@npm:14.0.0"
+"remark-html@npm:^14":
+  version: 14.0.1
+  resolution: "remark-html@npm:14.0.1"
   dependencies:
     "@types/mdast": ^3.0.0
     hast-util-sanitize: ^4.0.0
     hast-util-to-html: ^8.0.0
     mdast-util-to-hast: ^11.0.0
     unified: ^10.0.0
-  checksum: 5677ed98e7e58bf1af19fab0d92f60928fbbabd15f343d154c7a3aa9b5f2e6f6e2da1afe58d661ee51e8dd8ff73d9744b239303104f372f6dd8a9dd3e3700477
+  checksum: 5d689b05dc6b4f24e08ece07aabca98685949198a8b6ceacb2fbf7fba8f45f55cea5623caddfd92aaf6e6f082bc1c93797dfb82dc48a6f6e1c5263947a4779c9
   languageName: node
   linkType: hard
 
@@ -10331,7 +10331,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"remark@npm:^14.0":
+"remark@npm:^14":
   version: 14.0.1
   resolution: "remark@npm:14.0.1"
   dependencies:
