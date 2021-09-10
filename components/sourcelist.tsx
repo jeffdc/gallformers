@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, Button } from 'react-bootstrap';
 import DataTable from 'react-data-table-component';
 import { ALLRIGHTS, CC0, CCBY, SourceApi, SpeciesSourceApi } from '../libs/api/apitypes';
-import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
+import { SELECTED_ROW_STYLE, TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
 
 export type SourceListProps = {
     data: SpeciesSourceApi[];
@@ -101,9 +101,7 @@ const SourceList = ({ data, defaultSelection, onSelectionChange }: SourceListPro
         () => [
             {
                 when: (row: SourceApi) => row.id == selectedId,
-                style: () => ({
-                    backgroundColor: '#FCFF6C',
-                }),
+                style: () => SELECTED_ROW_STYLE,
             },
         ],
         [selectedId],

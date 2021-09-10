@@ -5,3 +5,10 @@ Dockerfile
 .gitignore
 .eslintrc.js
 cache
+gallformers-docker.tar
+yarn-error.log
+.vscode
+.github
+.type-coverage
+.next
+.coverage

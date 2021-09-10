@@ -1,6 +1,8 @@
 import { signIn, useSession } from 'next-auth/client';
 import React from 'react';
 
+export const superAdmins = ['jeff', 'adamjameskranz'];
+
 const Auth = ({ superAdmin, children }: { superAdmin?: boolean; children: JSX.Element }): JSX.Element => {
     const [session, loading] = useSession();
 
@@ -17,7 +19,6 @@ const Auth = ({ superAdmin, children }: { superAdmin?: boolean; children: JSX.El
         );
     }
 
-    const superAdmins = ['jeff', 'adamjameskranz'];
     if (!!superAdmin && session.user && session.user.name && !superAdmins.includes(session.user.name)) {
         return (
             <div className="m-3 p-3">

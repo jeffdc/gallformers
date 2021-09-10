@@ -57,7 +57,8 @@ export const getImagePaths = async (speciesId: number, imageids: number[] = []):
 
         return toImagePaths(images);
     } catch (e) {
-        logger.error(e);
+        /* eslint-disable @typescript-eslint/no-explicit-any */
+        logger.error(e as never);
     }
 
     return {

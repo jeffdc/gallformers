@@ -444,7 +444,7 @@ export const gallsByHostSection = (hostSection: string): TaskEither<Error, GallI
  */
 export const getRelatedGalls = (gall: GallApi): TaskEither<Error, SimpleSpecies[]> => {
     const nameParts = gall.name.split(' ');
-    if (nameParts.length <= 2) return TE.of([]);
+    if (nameParts.length < 2) return TE.of([]);
 
     const get = () =>
         db.species.findMany({

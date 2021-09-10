@@ -9,14 +9,14 @@
 
 // palette
 $cadet-blue: #96ADC8;
-$mindaro: #D7FFAB;
-$laser-lemon: #FCFF6C;
-$tan-crayola: #D89D6A;
-$rose-ebony: #6D454C;
+$canary: #F8F991;
+$independence: #585563;
+$new-york-pink: #CE796B;
+$persian-orange: #C18C5D;
 
 // tables
 $table-header-background: $cadet-blue;
-$table-selected-row: $laser-lemon;
+$table-selected-row: $canary;
 
 :export {
   tableheaderbackground: $table-header-background;
@@ -141,4 +141,21 @@ blockquote {
   height: 100%;
   padding-top: 2%;
   padding-bottom: 2%;
+}
+
+// next.js Image is good but not great, need to tweak some styling stuff so that images can expand to fill height from fixed width
+// See: https://dev.to/felixhaeberle/responsive-fix-for-the-next-js-image-component-1351 
+.image-container {
+  width: 100%;
+
+  > div {
+    position: unset !important;
+  }
+
+  .image {
+    object-fit: contain;
+    width: 100% !important;
+    position: relative !important;
+    height: unset !important;
+  }
 }

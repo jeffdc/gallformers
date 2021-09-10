@@ -42,9 +42,32 @@ const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
 };
 
 const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
-    const [selectedSource, setSelectedSource] = useState(defaultSource(species?.speciessource));
-
     const router = useRouter();
+    const defSource = defaultSource(species?.speciessource, router.query.source);
+    const [selectedSource, setSelectedSource] = useState(defSource);
+
+    // useEffect(() => {
+    //     // console.log(`JDC: In useEffect with: ${JSON.stringify(selectedSource?.source_id, null, '  ')}`);
+    //     if (selectedSource && selectedSource.source_id !== defSource?.source_id) {
+    //         router.replace(
+    //             {
+    //                 query: { id: species.id, source: selectedSource.source_id },
+    //             },
+    //             undefined,
+    //             { shallow: true },
+    //         );
+    //     } else {
+    //         router.replace(
+    //             {
+    //                 query: { id: species.id },
+    //             },
+    //             undefined,
+    //             { shallow: true },
+    //         );
+    //     }
+    //     // eslint-disable-next-line react-hooks/exhaustive-deps
+    // }, [selectedSource]);
+
     // If the page is not yet generated, this will be displayed initially until getStaticProps() finishes running
     if (router.isFallback) {
         return <div>Loading...</div>;

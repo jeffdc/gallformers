@@ -113,8 +113,10 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
                 }
             }
         } catch (e) {
-            console.error(e);
-            setError(e);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const err: any = e;
+            console.error(err);
+            setError(err.toString());
         }
     };
 

@@ -35,6 +35,9 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
         const files = e.target.files;
         const images = new Array<ImageApi>();
 
+        let filesRemaining = files.length;
+        const uploadMaxPercent = 0.6;
+
         for (const file of files) {
             // get presigned URL from server so that we can upload without needing secrets
             const d = new Date();
@@ -52,9 +55,12 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                     headers: {
                         'Content-Type': file.type,
                     },
-                    onUploadProgress: (e) => setProgress(Math.round((100 * e.loaded) / e.total)),
+                    onUploadProgress: (e) =>
+                        setProgress(Math.round((100 * e.loaded) / e.total / filesRemaining) * uploadMaxPercent),
                 })
                 .catch((e) => console.error(`Image upload failed with error: ${JSON.stringify(e, null, ' ')}`));
+
+            filesRemaining -= 1;
 
             if (resp) {
                 images.push({
@@ -89,6 +95,15 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
         });
 
         const newImages: ImageApi[] = await dbres.json();
+
+        //hack: add a delay here to hopefully give a chance for the image to be picked up by the CDN
+        const steps = 100;
+        const waitPercent = 100 - uploadMaxPercent * 100;
+        for (let i = 1; i <= steps; ++i) {
+            await new Promise((r) => setTimeout(r, 100));
+            setProgress(Math.round(uploadMaxPercent * 100 + (waitPercent / steps) * i));
+        }
+
         onChange(newImages);
 
         setUploading(false);

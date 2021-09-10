@@ -1,4 +1,6 @@
-export const TABLE_CUSTOM_STYLES = {
+import { TableStyles } from 'react-data-table-component';
+
+export const TABLE_CUSTOM_STYLES: TableStyles = {
     headRow: {
         style: {
             backgroundColor: '#96ADC8', //TODO how to get this from global scss styles?
@@ -18,4 +20,8 @@ export const TABLE_CUSTOM_STYLES = {
             paddingRight: '4px',
         },
     },
+};
+
+export const SELECTED_ROW_STYLE = {
+    backgroundColor: '#F8F991',
 };

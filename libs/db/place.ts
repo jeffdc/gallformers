@@ -1,5 +1,4 @@
-import { Prisma } from '.prisma/client';
-import { place } from '@prisma/client';
+import { place, Prisma } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
