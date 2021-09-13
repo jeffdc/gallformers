@@ -46,9 +46,12 @@ const linkFormatter = (link: string) => {
 
 const imageFormatter = (row: ImageApi) => {
     return (
-        <div className={'image-container'}>
-            <Image data-tag="allowRowEvents" src={row.small} layout="fill" className={'image'} />
-        </div>
+        // I tried to use Next/Image but it chokes in production with non-static images for some reason.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img data-tag="allowRowEvents" src={row.small} width="100" />
+        // <div className={'image-container'}>
+        //     <Image data-tag="allowRowEvents" src={row.small} layout="fill" className={'image'} />
+        // </div>
     );
 };
 

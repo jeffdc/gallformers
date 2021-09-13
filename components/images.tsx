@@ -132,6 +132,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                                     alt={`image of ${species.name}`}
                                     layout="fill"
                                     className={'image'}
+                                    unoptimized
                                 />
                             </div>
                         </Col>
