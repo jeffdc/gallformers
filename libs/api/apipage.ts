@@ -72,13 +72,19 @@ export async function apiUpsertEndpoint<T, R>(
         msg: 'Can not upsert. No valid item provided in request body.',
     };
 
+    //JDC: added this to try and help figure out what is causing the weird crash that Chris triggers
+    logger.info(req, 'Upsert request');
+    logger.info(req.body, 'Upsert request body');
+
     //TODO - figure out how to make this type safe. Maybe need to have caller pass conversion f?
     const t = !req.body ? O.none : O.of(req.body as T);
 
     await pipe(
         t,
         O.map(fUpsert),
+        // if the upsert failed for any reason convert the Err for downstream processing
         O.map(TE.mapLeft(toErr)),
+        // if the Option is None then the original request was bad
         // eslint-disable-next-line prettier/prettier
         O.fold(
             () => E.left<Err, TE.TaskEither<Err, R>>(invalidQueryErr), 
@@ -86,6 +92,11 @@ export async function apiUpsertEndpoint<T, R>(
         ),
         TE.fromEither,
         TE.flatten,
+        //JDC: added this to try and help figure out what is causing the weird crash that Chris triggers
+        TE.mapLeft((e) => {
+            logger.error(e, 'Failed doing upsert.');
+            return e;
+        }),
         TE.fold(sendErrResponse(res), onComplete(res)),
     )();
 }

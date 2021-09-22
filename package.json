@@ -60,6 +60,7 @@
     "remark-html": "^14",
     "remove": "^0.1.5",
     "sass": "^1",
+    "sharp": "^0.29.1",
     "styled-components": "^5.3",
     "yarn": "^1.22",
     "yup": "^0"
