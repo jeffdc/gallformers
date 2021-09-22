@@ -3,6 +3,7 @@ import { species } from '@prisma/client';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
+import Image from 'next/image';
 import { useSession } from 'next-auth/client';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
@@ -44,7 +45,14 @@ const linkFormatter = (link: string) => {
 };
 
 const imageFormatter = (row: ImageApi) => {
-    return <img data-tag="allowRowEvents" src={row.small} width="100" />;
+    return (
+        // I tried to use Next/Image but it chokes in production with non-static images for some reason.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img data-tag="allowRowEvents" src={row.small} width="100" />
+        // <div className={'image-container'}>
+        //     <Image data-tag="allowRowEvents" src={row.small} layout="fill" className={'image'} />
+        // </div>
+    );
 };
 
 const sourceFormatter = (row: ImageApi) => {
@@ -202,9 +210,6 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
     }, [selected?.id]);
 
     const addImages = async (newImages: ImageApi[]) => {
-        //hack: add a delay here to hopefully give a chance for the image to be picked up by the CDN
-        await new Promise((r) => setTimeout(r, 2000));
-
         setImages([...(images !== undefined ? images : []), ...newImages]);
     };
 
@@ -223,7 +228,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(img),
+                body: JSON.stringify({ ...img, lastchangedby: sessionUserOrUnknown(session?.user?.name) }),
             });
 
             if (res.status == 200) {

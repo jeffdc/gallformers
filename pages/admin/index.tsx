@@ -1,10 +1,13 @@
+import { useSession } from 'next-auth/client';
 import Head from 'next/head';
 import Link from 'next/link';
 import React from 'react';
 import { Col, ListGroup, ListGroupItem, Row } from 'react-bootstrap';
-import Auth from '../../components/auth';
+import Auth, { superAdmins } from '../../components/auth';
 
 const Admin = (): JSX.Element => {
+    const [session] = useSession();
+
     return (
         <Auth>
             <div className="p-3 m-3">
@@ -18,7 +21,7 @@ const Admin = (): JSX.Element => {
                     <Col>
                         <ListGroup className="pt-3">
                             <ListGroupItem>
-                                Create/modify <Link href="./admin/family">Families</Link>
+                                Create/modify the <Link href="./admin/taxonomy">Taxonomy</Link>
                             </ListGroupItem>
                             <ListGroupItem>
                                 Create/modify <Link href="./admin/section">Sections</Link>
@@ -49,6 +52,11 @@ const Admin = (): JSX.Element => {
                                 <Link href="./admin/browse/hosts">hosts</Link>, or{' '}
                                 <Link href="./admin/browse/sources">sources</Link>.
                             </ListGroupItem>
+                            {session?.user?.name && superAdmins.includes(session.user.name) && (
+                                <ListGroupItem>
+                                    Create/modify <Link href="./admin/filterterms">Filter Terms</Link>
+                                </ListGroupItem>
+                            )}
                         </ListGroup>
                     </Col>
                 </Row>

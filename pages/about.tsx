@@ -1,15 +1,18 @@
 import { GetStaticProps } from 'next';
 import Head from 'next/head';
+import Image from 'next/image';
 import React from 'react';
 import { Col, Row } from 'react-bootstrap';
 import { getCurrentStats, Stat } from '../libs/db/stats';
 import { mightFailWithArray } from '../libs/utils/util';
+import GallMeMaybe from '../public/images/gallmemaybe.jpg';
 
 type Props = {
     stats: Stat[];
+    genTime: string;
 };
 
-const About = ({ stats }: Props): JSX.Element => {
+const About = ({ stats, genTime }: Props): JSX.Element => {
     const statMap = new Map(stats.map((s) => [s.type, s.count] as [string, number]));
     return (
         <div className="p-5">
@@ -39,13 +42,13 @@ const About = ({ stats }: Props): JSX.Element => {
                         This site is open source and you can view the all of the code/data and if so inclined even open a pull
                         request on <a href="https://github.com/jeffdc/gallformers">GitHub</a>.
                     </p>
-                    <p>
+                    <div>
                         <h4>Current Site Stats:</h4>
-                        There are currently
+                        As of <span className="font-italic">{genTime}</span> there are:
                         <ul>
                             <li>
                                 {statMap.get('galls')} gallformers across {statMap.get('gall-family')} familes and{' '}
-                                {statMap.get('gall-genera')} genera
+                                {statMap.get('gall-genera')} genera, of which {statMap.get('undescribed')} are undescribed
                             </li>
                             <li>
                                 {statMap.get('hosts')} hosts across {statMap.get('host-family')} familes and{' '}
@@ -53,10 +56,10 @@ const About = ({ stats }: Props): JSX.Element => {
                             </li>
                             <li>{statMap.get('sources')} sources</li>
                         </ul>
-                    </p>
+                    </div>
                 </Col>
                 <Col className="d-flex justify-content-center">
-                    <img src="/images/gallmemaybe.jpg" alt="Gall Me Maybe" width={300} className="contain" />
+                    <Image src={GallMeMaybe} alt="Gall Me Maybe" width="300" height="532" layout="fixed" />
                 </Col>
             </Row>
             <Row className="mt-1 pt-1">
@@ -72,6 +75,7 @@ export const getStaticProps: GetStaticProps = async () => {
     return {
         props: {
             stats: await mightFailWithArray<Stat>()(getCurrentStats()),
+            genTime: new Date().toUTCString(),
         },
         revalidate: 5 * 60, // every 5 minutes
     };

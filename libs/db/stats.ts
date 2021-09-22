@@ -67,7 +67,13 @@ export const getCurrentStats = (): TaskEither<Error, Stat[]> => {
             UNION
             SELECT 'sources',
                 count( * ) 
-            FROM source;
+            FROM source
+            UNION
+            SELECT 'undescribed',
+                count( * )
+            FROM gall
+            WHERE undescribed = 1
+            ;
        `);
 
     return TE.tryCatch(stats, handleError);
