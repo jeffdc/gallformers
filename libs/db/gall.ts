@@ -455,7 +455,9 @@ export const getRelatedGalls = (gall: GallApi): TaskEither<Error, SimpleSpecies[
             },
             where: {
                 name: {
-                    startsWith: `${nameParts[0]} ${nameParts[1]}`,
+                    // Careful, the space at the end of this startsWith phrase is critical. We only want to match
+                    // on names that have the same couplet as the passed in gall then a space, then anything else.
+                    startsWith: `${nameParts[0]} ${nameParts[1]} `,
                 },
             },
         });
