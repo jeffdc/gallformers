@@ -337,6 +337,17 @@ export type PlaceWithHostsApi = PlaceApi & {
     hosts: HostSimple[];
 };
 
+export type RandomGall = {
+    id: number;
+    name: string;
+    undescribed: boolean;
+    imagePath: string;
+    creator: string;
+    license: string;
+    sourceLink: string;
+    licenseLink: string;
+};
+
 // a cut down structure for the ID page
 export type GallIDApi = WithImages & {
     id: number;
