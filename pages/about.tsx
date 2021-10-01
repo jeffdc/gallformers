@@ -57,6 +57,32 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
                             <li>{statMap.get('sources')} sources</li>
                         </ul>
                     </div>
+                    <h4>Citing Gallformers</h4>
+                    <p>
+                        All of our original content is released under a{' '}
+                        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">
+                            CC-BY
+                        </a>{' '}
+                        license.
+                    </p>
+                    <p>
+                        Gallformers would be impossible without the many contributions from the scientific literature as well as
+                        the many individuals that have allowed usage of their wonderful photos. We have made every effort to
+                        verify and document the license for all content that we use. If you find anything that you think is
+                        incorrect please contact us: <a href="mailto:gallformers@gmail.com">Email</a> or{' '}
+                        <a href="https://twitter.com/gallformers" target="_blank" rel="noreferrer">
+                            Twitter
+                        </a>
+                    </p>
+                    <p>
+                        If you are interested in using information on Gallformers in your own research please do. All we ask is
+                        that you cite Gallformers and that if you are using any content that is not orignal to Gallformers that
+                        you please cite the original source.
+                    </p>
+                    <h5>Citation</h5>
+                    <p>
+                        <pre>“Gallformers Contributors.” Www.gallformers.org, www.gallformers.org.‌</pre>
+                    </p>
                 </Col>
                 <Col className="d-flex justify-content-center">
                     <Image src={GallMeMaybe} alt="Gall Me Maybe" width="300" height="532" layout="fixed" />

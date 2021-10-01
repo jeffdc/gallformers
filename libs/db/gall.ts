@@ -510,7 +510,7 @@ export const randomGall = (): TaskEither<Error, RandomGall[]> => {
         TE.tryCatch(gall, handleError),
         TE.map((g) => [
             {
-                id: g[0].id,
+                id: g[0].species_id,
                 name: g[0].name,
                 undescribed: g[0].undescribed,
                 imagePath: makePath(g[0].path, SMALL),
