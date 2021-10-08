@@ -114,7 +114,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                             </Row>
                             <Row hidden={!species.gall.undescribed}>
                                 <Col>
-                                    <span className="text-danger">This is an undescribed species.</span>
+                                    <span className="text-danger">The inducer of this gall is unknown or undescribed.</span>
                                 </Col>
                             </Row>
                             <Row>
