@@ -81,6 +81,7 @@ export type SearchQuery = {
     form: string[];
     undescribed: boolean;
     place: string[];
+    family: string[];
 };
 
 export const EMPTYSEARCHQUERY: SearchQuery = {
@@ -96,6 +97,7 @@ export const EMPTYSEARCHQUERY: SearchQuery = {
     form: [],
     undescribed: false,
     place: [],
+    family: [],
 };
 
 export type Deletable = {
@@ -244,6 +246,9 @@ export type SpeciesApi = SimpleSpecies &
         fgs: FGS;
     };
 
+export const COMMON_NAME = 'common';
+export const SCIENTIFIC_NAME = 'scientific';
+
 export type AliasApi = {
     id: number;
     name: string;
@@ -254,7 +259,7 @@ export type AliasApi = {
 export const EmptyAlias: AliasApi = {
     id: -1,
     name: '',
-    type: 'scientific',
+    type: SCIENTIFIC_NAME,
     description: '',
 };
 
@@ -365,6 +370,7 @@ export type GallIDApi = WithImages & {
     textures: string[];
     undescribed: boolean;
     walls: string[];
+    family: string;
 };
 
 export type GallApi = SpeciesApi & {

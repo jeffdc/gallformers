@@ -72,6 +72,7 @@ type FilterFormFields = {
     form: string;
     undescribed: boolean;
     place: string[];
+    family: string;
 };
 
 const invalidArraySelection = (arr: unknown[]) => {
@@ -131,6 +132,7 @@ const convertQForUrl = (hostOrTaxon: TaxonomyEntryNoParent | HostSimple | undefi
               form: q.form.join(','),
               undescribed: q.undescribed,
               place: q.place,
+              family: q.family,
           }
         : null),
 });
@@ -144,6 +146,8 @@ const IDGall = (props: Props): JSX.Element => {
     const [filtered, setFiltered] = useState(new Array<GallIDApi>());
     const [hostOrTaxon, setHostOrTaxon] = useState(props?.hostOrTaxon);
     const [query, setQuery] = useState(props.query);
+    const [gallFamilies, setGallFamilies] = useState(new Array<string>());
+
     const [showAdvanced, setShowAdvanced] = useState(
         (props.query?.alignment?.length ?? -1) > 0 ||
             (props.query?.cells?.length ?? -1) > 0 ||
@@ -229,6 +233,7 @@ const IDGall = (props: Props): JSX.Element => {
                     }
                     setGalls(g.sort((a, b) => a.name.localeCompare(b.name)));
                     setFiltered(g);
+                    setGallFamilies([...new Set(g.map((gg) => gg.family))].sort());
 
                     router.replace(
                         {
@@ -414,7 +419,7 @@ const IDGall = (props: Props): JSX.Element => {
                     <form>
                         {/* Always visibile filters */}
                         <Row>
-                            <Col sm={12} md={5}>
+                            <Col sm={12} md={6} lg={3}>
                                 <label className="col-form-label">
                                     Location(s):
                                     <InfoTip id="locationstip" text="Where on the host the gall is found." />
@@ -439,7 +444,7 @@ const IDGall = (props: Props): JSX.Element => {
                                     />
                                 </label>
                             </Col>
-                            <Col sm={12} md={4}>
+                            <Col sm={12} md={6} lg={3}>
                                 <label className="col-form-label">
                                     Detachable:
                                     <InfoTip id="detachabletip" text="Can the gall be removed from the host without cutting?" />
@@ -460,7 +465,7 @@ const IDGall = (props: Props): JSX.Element => {
                                     />
                                 </label>
                             </Col>
-                            <Col sm={12} md={3}>
+                            <Col sm={12} md={6} lg={3}>
                                 <label className="col-form-label">
                                     Place:
                                     <InfoTip
@@ -479,6 +484,26 @@ const IDGall = (props: Props): JSX.Element => {
                                         }}
                                         options={props.places.map((p) => p.name)}
                                         disabled={disableFilter() || isHost(hostOrTaxon)}
+                                        clearButton={true}
+                                    />
+                                </label>
+                            </Col>
+                            <Col sm={12} md={6} lg={3}>
+                                <label className="col-form-label">
+                                    Gall Family:
+                                    <InfoTip id="familytip" text="The taxonomic Family of the Gallformer." />
+                                    <Typeahead
+                                        name="family"
+                                        control={filterControl}
+                                        selected={query ? query.family : []}
+                                        onChange={(selected) => {
+                                            setQuery({
+                                                ...(query ? query : EMPTYSEARCHQUERY),
+                                                family: selected.length > 0 ? selected : [],
+                                            });
+                                        }}
+                                        options={gallFamilies}
+                                        disabled={disableFilter()}
                                         clearButton={true}
                                     />
                                 </label>
@@ -747,6 +772,7 @@ const queryUrlParams = [
     'form',
     'undescribed',
     'place',
+    'family',
 ];
 
 // Ideally we would generate this page and serve it statically via getStaticProps and use Incremental Static Regeneration.
@@ -805,6 +831,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
                   O.getOrElse(constFalse),
               ),
               place: pipe(query['place'], O.fold(constant([]), split)),
+              family: pipe(query['family'], O.fold(constant([]), split)),
           }
         : null;
 

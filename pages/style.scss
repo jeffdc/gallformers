@@ -8,49 +8,54 @@
 // }
 
 // palette
-$cadet-blue: #96ADC8;
-$canary: #F8F991;
+$cadet-blue: #96adc8;
+$canary: #f8f991;
 $independence: #585563;
-$new-york-pink: #CE796B;
-$persian-orange: #C18C5D;
+$new-york-pink: #ce796b;
+$persian-orange: #c18c5d;
 
 // tables
 $table-header-background: $cadet-blue;
 $table-selected-row: $canary;
 
 :export {
-  tableheaderbackground: $table-header-background;
-  tableselectedrow: $table-selected-row;
+    tableheaderbackground: $table-header-background;
+    tableselectedrow: $table-selected-row;
 }
 
 .description-text {
-  font-size: 16px;
-  line-height: 180%;
+    font-size: 16px;
+    line-height: 180%;
 }
 
 .markdown-view {
-  border: lightgray 1px solid;
-  padding: 10px;
-  border-radius: 2px; 
+    border: lightgray 1px solid;
+    padding: 10px;
+    border-radius: 2px;
 }
 
 blockquote {
-  margin-top: 10px;
-  margin-bottom: 10px;
-  margin-left: 50px;
-  padding-left: 15px;
-  border-left: 3px solid #ccc;
-} 
+    margin-top: 10px;
+    margin-bottom: 10px;
+    margin-left: 50px;
+    padding-left: 15px;
+    border-left: 3px solid #ccc;
+}
+
+.citation {
+    font-size: 12px;
+    font-family: 'Courier New', Courier, monospace;
+}
 
 .modal-90w {
-  max-width: 98%;
+    max-width: 98%;
 }
 
 .table-header {
-    background-color:rgba(0, 128, 0, 0.205);
+    background-color: rgba(0, 128, 0, 0.205);
 }
 .rdt_TableHeadRow {
-  background-color:rgba(0, 128, 0, 0.205);
+    background-color: rgba(0, 128, 0, 0.205);
 }
 
 .white-space-pre-wrap {
@@ -58,104 +63,104 @@ blockquote {
 }
 
 .jargon-term {
-  text-decoration: underline dotted #228be6
+    text-decoration: underline dotted #228be6;
 }
 
 .jargon-term::after {
-  content: "?";
-  font-weight: bold;
-  display: inline-block;
-  transform: translate(0, -0.5em);
-  font-size: 75%;
-  color: #228be6;
-  margin-left: 3px;
+    content: '?';
+    font-weight: bold;
+    display: inline-block;
+    transform: translate(0, -0.5em);
+    font-size: 75%;
+    color: #228be6;
+    margin-left: 3px;
 }
 
 .jargon-term:hover {
-  position: relative;
-  text-decoration: none;
-  cursor: help;
+    position: relative;
+    text-decoration: none;
+    cursor: help;
 }
 
 .jargon-term .jargon-info {
-  display: none
+    display: none;
 }
 
 .jargon-term:hover .jargon-info {
-  display: block;
-  position: absolute;
-  top: 1.5em;
-  left: 0;
-  background: #F8F8F8;
-  border: 1px solid #228be6;
-  padding: 1rem;
-  border-radius: 4px;
-  font-size: 75%;
-  min-width: 250px;
-  max-width: 450px;
-  z-index: 1;
+    display: block;
+    position: absolute;
+    top: 1.5em;
+    left: 0;
+    background: #f8f8f8;
+    border: 1px solid #228be6;
+    padding: 1rem;
+    border-radius: 4px;
+    font-size: 75%;
+    min-width: 250px;
+    max-width: 450px;
+    z-index: 1;
 }
 
 .source-quotemark {
-  font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
-  font-size: 150%;
-  font-weight: 'bolder';
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-size: 150%;
+    font-weight: 'bolder';
 }
 
 .info-tip {
-  font-size: 75%;
-  white-space: pre-wrap;
-  /* without the next line Firefox will not work properly */
-  pointer-events: none;
+    font-size: 75%;
+    white-space: pre-wrap;
+    /* without the next line Firefox will not work properly */
+    pointer-events: none;
 }
 
 .card-columns {
-  @include media-breakpoint-only(xs) {
-    column-count: 1;
-  }
-  @include media-breakpoint-only(sm) {
-    column-count: 2;
-  }
-  @include media-breakpoint-only(med) {
-    column-count: 3;
-  }
-  @include media-breakpoint-only(lg) {
-    column-count: 4;
-  }
-  @include media-breakpoint-only(xl) {
-    column-count: 5;
-  }
+    @include media-breakpoint-only(xs) {
+        column-count: 1;
+    }
+    @include media-breakpoint-only(sm) {
+        column-count: 2;
+    }
+    @include media-breakpoint-only(med) {
+        column-count: 3;
+    }
+    @include media-breakpoint-only(lg) {
+        column-count: 4;
+    }
+    @include media-breakpoint-only(xl) {
+        column-count: 5;
+    }
 }
 
 // expand clickable area of editable cell to fill the entire cell of the table
 .editable-table-cell {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  align-items: center;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    align-items: center;
 }
 
 .padded-table-cell {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  padding-top: 2%;
-  padding-bottom: 2%;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    padding-top: 2%;
+    padding-bottom: 2%;
 }
 
 // next.js Image is good but not great, need to tweak some styling stuff so that images can expand to fill height from fixed width
-// See: https://dev.to/felixhaeberle/responsive-fix-for-the-next-js-image-component-1351 
+// See: https://dev.to/felixhaeberle/responsive-fix-for-the-next-js-image-component-1351
 .image-container {
-  width: 100%;
+    width: 100%;
 
-  > div {
-    position: unset !important;
-  }
+    > div {
+        position: unset !important;
+    }
 
-  .image {
-    object-fit: contain;
-    width: 100% !important;
-    position: relative !important;
-    height: unset !important;
-  }
+    .image {
+        object-fit: contain;
+        width: 100% !important;
+        position: relative !important;
+        height: unset !important;
+    }
 }
