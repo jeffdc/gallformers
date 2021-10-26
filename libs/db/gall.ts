@@ -47,7 +47,7 @@ import {
     RandomGall,
     SimpleSpecies,
 } from '../api/apitypes';
-import { FGS, GENUS, SECTION } from '../api/taxonomy';
+import { FAMILY, FGS, GENUS, SECTION } from '../api/taxonomy';
 import { deleteImagesBySpeciesId, makePath, SMALL } from '../images/images';
 import { defaultSource } from '../pages/renderhelpers';
 import { logger } from '../utils/logger';
@@ -310,7 +310,15 @@ const gallsByHostGenusForID = (whereClause: Prisma.gallspeciesWhereInput[]): Tas
                             },
                         },
                         image: true,
-                        speciestaxonomy: { include: { taxonomy: true } },
+                        speciestaxonomy: {
+                            include: {
+                                taxonomy: {
+                                    include: {
+                                        parent: true,
+                                    },
+                                },
+                            },
+                        },
                     },
                 },
                 gall: {
@@ -344,7 +352,6 @@ const gallsByHostGenusForID = (whereClause: Prisma.gallspeciesWhereInput[]): Tas
                 );
                 return []; // will resolve to nothing since we are in a flatMap
             }
-
             const newg: GallIDApi = {
                 id: g.species_id,
                 name: g.species.name,
@@ -370,6 +377,7 @@ const gallsByHostGenusForID = (whereClause: Prisma.gallspeciesWhereInput[]): Tas
                         .map((p) => p.place.name);
                 }),
                 images: g.species.image.map(adaptImageNoSource),
+                family: g.species.speciestaxonomy.find((t) => t.taxonomy.parent?.type === FAMILY)?.taxonomy.parent?.name ?? '',
             };
             return newg;
         });

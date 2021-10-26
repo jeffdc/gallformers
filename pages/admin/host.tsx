@@ -14,6 +14,7 @@ import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '
 import { extractQueryParam } from '../../libs/api/apipage';
 import {
     AbundanceApi,
+    AliasApi,
     HostApi,
     HostTaxon,
     HOST_FAMILY_TYPES,
@@ -64,8 +65,7 @@ export const testables = {
 };
 
 const Host = ({ id, hs, genera, families, sections, abundances, places }: Props): JSX.Element => {
-    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields, aliasData, setAliasData } =
-        useSpecies<HostApi>(genera);
+    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields } = useSpecies<HostApi>(genera);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): SpeciesUpsertFields => {
         if (!selected) {
@@ -327,7 +327,15 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        <AliasTable data={aliasData} setData={setAliasData} />
+                        <AliasTable
+                            data={selected?.aliases ?? []}
+                            setData={(aliases: AliasApi[]) => {
+                                if (selected) {
+                                    selected.aliases = aliases;
+                                    setSelected({ ...selected });
+                                }
+                            }}
+                        />
                     </Col>
                 </Row>
                 <Row className="formGroup pb-1">

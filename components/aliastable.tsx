@@ -1,5 +1,5 @@
 import React from 'react';
-import { AliasApi, EmptyAlias } from '../libs/api/apitypes';
+import { AliasApi, COMMON_NAME, EmptyAlias, SCIENTIFIC_NAME } from '../libs/api/apitypes';
 import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
 import EditableDataTable, { EditableTableColumn } from './EditableDataTable';
 
@@ -27,8 +27,8 @@ const AliasTable = ({ data, setData }: AliasTableProps): JSX.Element => {
             editor: {
                 type: 'select',
                 options: [
-                    { value: 'common', label: 'common' },
-                    { value: 'scientific', label: 'scientific' },
+                    { value: COMMON_NAME, label: COMMON_NAME },
+                    { value: SCIENTIFIC_NAME, label: SCIENTIFIC_NAME },
                 ],
             },
         },

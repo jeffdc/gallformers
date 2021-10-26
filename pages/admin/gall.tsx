@@ -106,8 +106,7 @@ const Gall = ({
 }: Props): JSX.Element => {
     const [showNewUndescribed, setShowNewUndescribed] = useState(false);
 
-    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields, aliasData, setAliasData } =
-        useSpecies<AT.GallApi>(genera);
+    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields } = useSpecies<AT.GallApi>(genera);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): AT.GallUpsertFields => {
         if (!selected) {
@@ -117,7 +116,6 @@ const Gall = ({
         return {
             ...toSpeciesUpsertFields(fields, name, id),
             gallid: hasProp(fields.mainField[0], 'gall') ? fields.mainField[0].gall.id : -1,
-            aliases: aliasData,
             alignments: fields.alignments.map((a) => a.id),
             cells: fields.cells.map((c) => c.id),
             colors: fields.colors.map((c) => c.id),
@@ -643,7 +641,15 @@ const Gall = ({
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        <AliasTable data={aliasData} setData={setAliasData} />
+                        <AliasTable
+                            data={selected?.aliases ?? []}
+                            setData={(aliases: AT.AliasApi[]) => {
+                                if (selected) {
+                                    selected.aliases = aliases;
+                                    setSelected({ ...selected });
+                                }
+                            }}
+                        />
                     </Col>
                 </Row>
                 <Row className="formGroup pb-1">
