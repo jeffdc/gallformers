@@ -641,15 +641,21 @@ const Gall = ({
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        <AliasTable
-                            data={selected?.aliases ?? []}
-                            setData={(aliases: AT.AliasApi[]) => {
-                                if (selected) {
-                                    selected.aliases = aliases;
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                        />
+                        <Controller
+                            control={form.control}
+                            name="aliases"
+                            render={() => (
+                                <AliasTable
+                                    data={selected?.aliases ?? []}
+                                    setData={(aliases: AT.AliasApi[]) => {
+                                        if (selected) {
+                                            selected.aliases = aliases;
+                                            setSelected({ ...selected });
+                                        }
+                                    }}
+                                />
+                            )}
+                        ></Controller>
                     </Col>
                 </Row>
                 <Row className="formGroup pb-1">
