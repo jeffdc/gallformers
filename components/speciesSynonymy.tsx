@@ -24,6 +24,7 @@ const SpeciesSynonymy = ({ aliases }: SpeciesSynonymyProps): JSX.Element => {
                 id: 'notes',
                 selector: (row: AliasApi) => row.description,
                 name: 'Notes',
+                wrap: true,
             },
         ],
         [],
@@ -50,7 +51,7 @@ const SpeciesSynonymy = ({ aliases }: SpeciesSynonymyProps): JSX.Element => {
                         textOverflow: 'ellipsis',
                     }}
                 >
-                    <strong>Synoynmy: </strong>{' '}
+                    <strong>Synonymy: </strong>{' '}
                     {juniorSynonyms
                         .map((s) => s.name)
                         .sort()

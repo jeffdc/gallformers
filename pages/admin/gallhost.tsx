@@ -197,7 +197,7 @@ const GallHostMapper = ({ id, galls, genera, hosts }: Props): JSX.Element => {
                     </Row>
                     <Row className="form-group">
                         <Col>
-                            <input type="submit" className="button" value="Submit" />
+                            <input type="submit" className="button" value="Submit" disabled={!selected} />
                         </Col>
                     </Row>
                 </form>

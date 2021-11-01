@@ -31,7 +31,7 @@ const schema = yup.object().shape({
         .array()
         .required('At least one species must be selected.')
         .of(SpeciesSchema)
-        .test('same genus', 'All species must be of the same genus', (v) => {
+        .test('same genus', 'You must select at least one species and all selected species must be of the same genus', (v) => {
             return new Set(v?.map((s) => (s.name ? extractGenus(s?.name) : undefined))).size === 1;
         }),
 });
@@ -120,6 +120,7 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
         selected,
         showRenameModal,
         setShowRenameModal,
+        isValid,
         error,
         setError,
         deleteResults,
@@ -177,12 +178,13 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        Description:
+                        Description (required):
                         <textarea
                             {...form.register('description')}
                             placeholder="A short friendly name/description, e.g., Red Oaks"
                             className="form-control"
                             rows={1}
+                            disabled={!selected}
                         />
                         {form.formState.errors.description && (
                             <span className="text-danger">{form.formState.errors.description.message}</span>
@@ -191,7 +193,7 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        Species:
+                        Species (required):
                         <Typeahead
                             name="species"
                             control={form.control}
@@ -200,12 +202,14 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
                             placeholder="Mapped Species"
                             clearButton
                             multiple
+                            rules={{ required: true }}
                             isInvalid={!!form.formState.errors.species}
                             selected={species ? species : []}
                             onChange={(s) => {
                                 setSpecies(s);
                                 form.setValue('species' as Path<FormFields>, s);
                             }}
+                            disabled={!selected}
                         />
                         {form.formState.errors.species && hasProp(form.formState.errors.species, 'message') && (
                             <span className="text-danger">{form.formState.errors.species.message as string}</span>
@@ -219,7 +223,7 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
                 </Row>
                 <Row className="form-input">
                     <Col>
-                        <input type="submit" className="button" value="Submit" disabled={!selected} />
+                        <input type="submit" className="button" value="Submit" disabled={!selected && !isValid} />
                     </Col>
                     <Col>{deleteButton('Caution. The Section will be deleted.')}</Col>
                 </Row>

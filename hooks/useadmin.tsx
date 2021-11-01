@@ -22,6 +22,7 @@ type AdminData<T, FormFields> = {
     setSelected: (t: T | undefined) => void;
     showRenameModal: boolean;
     setShowRenameModal: (show: boolean) => void;
+    isValid: boolean;
     error: string;
     setError: (err: string) => void;
     deleteResults?: DeleteResult;
@@ -78,6 +79,8 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         mode: 'onBlur',
         resolver: yupResolver(schema),
     });
+
+    const { isValid } = form.formState;
 
     const confirm = useConfirmation();
 
@@ -218,6 +221,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         setSelected: setSelected,
         showRenameModal: showModal,
         setShowRenameModal: setShowModal,
+        isValid: isValid,
         error: error,
         setError: setError,
         deleteResults: deleteResults,

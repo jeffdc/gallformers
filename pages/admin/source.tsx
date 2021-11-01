@@ -94,6 +94,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
         selected,
         showRenameModal: showModal,
         setShowRenameModal: setShowModal,
+        isValid,
         error,
         setError,
         deleteResults,
@@ -150,13 +151,25 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        Author:
-                        <input {...form.register('author')} type="text" placeholder="Author(s)" className="form-control" />
+                        Author (required):
+                        <input
+                            {...form.register('author')}
+                            type="text"
+                            placeholder="Author(s)"
+                            className="form-control"
+                            disabled={!selected}
+                        />
                         {form.formState.errors.author && <span className="text-danger">You must provide an author.</span>}
                     </Col>
                     <Col>
-                        Publication Year:
-                        <input {...form.register('pubyear')} type="text" placeholder="Pub Year" className="form-control" />
+                        Publication Year (required):
+                        <input
+                            {...form.register('pubyear')}
+                            type="text"
+                            placeholder="Pub Year"
+                            className="form-control"
+                            disabled={!selected}
+                        />
                         {form.formState.errors.pubyear && (
                             <span className="text-danger">You must provide a valid 4 digit year.</span>
                         )}
@@ -164,14 +177,20 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        Reference Link:
-                        <input {...form.register('link')} type="text" placeholder="Link" className="form-control" />
+                        Reference Link (required):
+                        <input
+                            {...form.register('link')}
+                            type="text"
+                            placeholder="Link"
+                            className="form-control"
+                            disabled={!selected}
+                        />
                     </Col>
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        License:
-                        <select {...form.register('license')} className="form-control">
+                        License (required):
+                        <select {...form.register('license')} className="form-control" disabled={!selected}>
                             <option>{CC0}</option>
                             <option>{CCBY}</option>
                             <option>{ALLRIGHTS}</option>
@@ -189,6 +208,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                             type="text"
                             placeholder="License Link"
                             className="form-control"
+                            disabled={!selected}
                         />
                         {form.formState.errors.licenselink && (
                             <span className="text-danger">{form.formState.errors.licenselink.message}</span>
@@ -198,13 +218,19 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                 <Row className="form-group">
                     <Col>
                         <p>
-                            Citation (
+                            Citation (required) (
                             <a href="https://www.mybib.com/tools/mla-citation-generator" target="_blank" rel="noreferrer">
                                 MLA Form
                             </a>
                             ):
                         </p>
-                        <textarea {...form.register('citation')} placeholder="Citation" className="form-control" rows={8} />
+                        <textarea
+                            {...form.register('citation')}
+                            placeholder="Citation"
+                            className="form-control"
+                            rows={8}
+                            disabled={!selected}
+                        />
                         {form.formState.errors.citation && (
                             <span className="text-danger">You must provide a citation in MLA form.</span>
                         )}
@@ -212,14 +238,19 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col className="mr-auto">
-                        <input {...form.register('datacomplete')} type="checkbox" className="form-input-checkbox" /> All
-                        information from this Source has been input into the database?
+                        <input
+                            {...form.register('datacomplete')}
+                            type="checkbox"
+                            className="form-input-checkbox"
+                            disabled={!selected}
+                        />{' '}
+                        All information from this Source has been input into the database?
                     </Col>
                 </Row>
 
                 <Row className="formGroup">
                     <Col>
-                        <input type="submit" className="button" value="Submit" disabled={!selected} />
+                        <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
                     </Col>
                     <Col>{deleteButton('Caution. All data associated with this Source will be deleted.')}</Col>
                 </Row>
