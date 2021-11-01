@@ -195,6 +195,7 @@ const Gall = ({
         showRenameModal,
         setShowRenameModal,
         error,
+        isValid,
         setError,
         deleteResults,
         setDeleteResults,
@@ -344,10 +345,11 @@ const Gall = ({
                         />
                     </Col>
                     <Col>
-                        Family:
+                        Family (required):
                         <Typeahead
                             name="family"
                             control={form.control}
+                            rules={{ required: true }}
                             placeholder="Family"
                             options={families}
                             labelKey="name"
@@ -413,7 +415,7 @@ const Gall = ({
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        Hosts:
+                        Hosts (required):
                         <Typeahead
                             name="hosts"
                             control={form.control}
@@ -669,6 +671,7 @@ const Gall = ({
                                     type="checkbox"
                                     className="form-input-checkbox"
                                     checked={selected ? selected.datacomplete : false}
+                                    disabled={!selected}
                                     onChange={(e) => {
                                         if (selected) {
                                             selected.datacomplete = e.currentTarget.checked;
@@ -693,6 +696,7 @@ const Gall = ({
                                     type="checkbox"
                                     className="form-input-checkbox"
                                     checked={selected ? selected.gall.undescribed : false}
+                                    disabled={!selected}
                                     onChange={(e) => {
                                         if (selected) {
                                             selected.gall.undescribed = e.currentTarget.checked;
@@ -707,7 +711,7 @@ const Gall = ({
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col>
-                        <input type="submit" className="button" value="Submit" disabled={!selected} />
+                        <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
                     </Col>
                     <Col>{deleteButton('Caution. All data associated with this Gall will be deleted.')}</Col>
                 </Row>

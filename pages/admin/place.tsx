@@ -70,6 +70,7 @@ const PlaceAdmin = ({ id, places }: Props): JSX.Element => {
         selected,
         showRenameModal: showModal,
         setShowRenameModal: setShowModal,
+        isValid,
         error,
         setError,
         deleteResults,
@@ -133,7 +134,7 @@ const PlaceAdmin = ({ id, places }: Props): JSX.Element => {
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        Code:
+                        Code (required):
                         <input
                             {...form.register('code')}
                             type="text"
@@ -144,7 +145,7 @@ const PlaceAdmin = ({ id, places }: Props): JSX.Element => {
                         {form.formState.errors.code && <span className="text-danger">You must provide the code.</span>}
                     </Col>
                     <Col>
-                        Type:
+                        Type (required):
                         <select {...form.register('type')} placeholder="Type" className="form-control" disabled={!selected}>
                             {PLACE_TYPES.map((t) => (
                                 <option key={t}>{t}</option>
@@ -157,7 +158,7 @@ const PlaceAdmin = ({ id, places }: Props): JSX.Element => {
                 </Row>
                 <Row className="form-input">
                     <Col>
-                        <input type="submit" className="button" value="Submit" disabled={!selected} />
+                        <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
                     </Col>
                     <Col>{deleteButton('Caution. The Place will be deleted.')}</Col>
                 </Row>

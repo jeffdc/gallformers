@@ -15,13 +15,13 @@ const Admin = (): JSX.Element => {
                     <title>Administration</title>
                 </Head>
                 <Row>
-                    <Col>Things that you can do as an Admin:</Col>
+                    <Col className="font-weight-bold">Things that you can do as an Admin:</Col>
                 </Row>
                 <Row>
                     <Col>
                         <ListGroup className="pt-3">
                             <ListGroupItem>
-                                Create/modify the <Link href="./admin/taxonomy">Taxonomy</Link>
+                                Create/modify <Link href="./admin/family">Families</Link>
                             </ListGroupItem>
                             <ListGroupItem>
                                 Create/modify <Link href="./admin/section">Sections</Link>
@@ -52,14 +52,25 @@ const Admin = (): JSX.Element => {
                                 <Link href="./admin/browse/hosts">hosts</Link>, or{' '}
                                 <Link href="./admin/browse/sources">sources</Link>.
                             </ListGroupItem>
-                            {session?.user?.name && superAdmins.includes(session.user.name) && (
-                                <ListGroupItem>
-                                    Create/modify <Link href="./admin/filterterms">Filter Terms</Link>
-                                </ListGroupItem>
-                            )}
                         </ListGroup>
                     </Col>
                 </Row>
+                {session?.user?.name && superAdmins.includes(session.user.name) && (
+                    <>
+                        <Row className="mt-2 mb-2 font-weight-bold">
+                            <Col>Super Admin Functions</Col>
+                        </Row>
+                        <Row>
+                            <Col>
+                                <ListGroup>
+                                    <ListGroupItem>
+                                        Create/modify <Link href="./admin/filterterms">Filter Terms</Link>
+                                    </ListGroupItem>
+                                </ListGroup>
+                            </Col>
+                        </Row>
+                    </>
+                )}
                 <Row className="pt-5">
                     <Col>
                         If you experience any issues with the Adminstration tools (or anything else on the site).{' '}

@@ -75,6 +75,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
         selected,
         showRenameModal,
         setShowRenameModal,
+        isValid,
         error,
         setError,
         deleteResults,
@@ -132,7 +133,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
                 <Row className="form-group">
                     <Col>
                         Description:
-                        <select {...form.register('description')} className="form-control">
+                        <select {...form.register('description')} className="form-control" disabled={!selected}>
                             {genOptions(ALL_FAMILY_TYPES)}
                         </select>
                         {form.formState.errors.description && (
@@ -142,7 +143,7 @@ const Family = ({ id, fs }: Props): JSX.Element => {
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        <input type="submit" className="button" value="Submit" disabled={!selected} />
+                        <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
                     </Col>
                     <Col>
                         {deleteButton(
