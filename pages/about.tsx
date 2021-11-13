@@ -65,7 +65,7 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
                                 <Card.Title>Adam Kranz</Card.Title>
                                 <Card.Text>
                                     Adam is an independent ecologist focused on gall inducing organisms in North America. He
-                                    cofounded Gallformers.org as a community resource to help naturalists identify gall
+                                    co-founded Gallformers.org as a community resource to help naturalists identify gall
                                     observations and to collect information on undescribed galls. His primary focus is on adding
                                     literature and information to the Gallformers database.
                                 </Card.Text>
@@ -85,7 +85,7 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
                                 <Card.Text>
                                     Jeff is a Software Engineer who stumbled upon galls and became obsessed. So much so that he
                                     co-founded this site, wrote all the code for this site, and is responsible for keeping it
-                                    going, fixing it, and implementing new features (and is currently the sole finanical
+                                    going, fixing it, and implementing new features (and is currently the sole financial
                                     supporter). If the site is broken, it is most likely his fault.
                                 </Card.Text>
                             </Card.Body>
@@ -127,11 +127,11 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
                     As of <span className="font-italic">{genTime}</span> there are:
                     <ul>
                         <li>
-                            {statMap.get('galls')} gallformers across {statMap.get('gall-family')} familes and{' '}
+                            {statMap.get('galls')} gallformers across {statMap.get('gall-family')} families and{' '}
                             {statMap.get('gall-genera')} genera, of which {statMap.get('undescribed')} are undescribed
                         </li>
                         <li>
-                            {statMap.get('hosts')} hosts across {statMap.get('host-family')} familes and{' '}
+                            {statMap.get('hosts')} hosts across {statMap.get('host-family')} families and{' '}
                             {statMap.get('host-genera')} genera
                         </li>
                         <li>{statMap.get('sources')} sources</li>
