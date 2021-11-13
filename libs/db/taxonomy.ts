@@ -146,11 +146,7 @@ export const allFamiliesWithGenera = (): TaskEither<Error, FamilyWithGenera[]> =
     const families = () =>
         db.taxonomy.findMany({
             include: {
-                // children: true,
                 taxonomy: true,
-                // taxonomytaxonomy: {
-                //     include: { child: true },
-                // },
             },
             orderBy: { name: 'asc' },
             where: { type: { equals: 'family' } },
@@ -415,7 +411,7 @@ export const deleteTaxonomyEntry = (id: number): TaskEither<Error, DeleteResult>
     const doDelete = () => {
         // have to do raw calls since Prisma does not support cascade deletion.
         return db.$transaction([
-            db.$executeRaw(`
+            db.$executeRaw`
                 DELETE FROM species
                     WHERE id IN (
                     SELECT s.id
@@ -428,10 +424,10 @@ export const deleteTaxonomyEntry = (id: number): TaskEither<Error, DeleteResult>
                         species AS s ON s.id = st.species_id
                     WHERE f.id = ${id}
                 );
-            `),
-            db.$executeRaw(`
+            `,
+            db.$executeRaw`
                 DELETE FROM taxonomy WHERE id = ${id}
-        `),
+        `,
         ]);
     };
 
@@ -496,19 +492,62 @@ export const upsertTaxonomy = (f: TaxonomyUpsertFields): TaskEither<Error, Taxon
     );
 };
 
+const updateExistingGenera = (fam: FamilyUpsertFields) => {
+    const r = fam.genera
+        .filter((g) => g.id > 0) // if it is new then we do not need to worry about it
+        .map((g) =>
+            db.taxonomy.update({
+                where: { id: g.id },
+                data: {
+                    name: g.name,
+                    description: g.description,
+                },
+            }),
+        );
+    return r;
+};
+
 const familyUpdateSteps = (fam: FamilyUpsertFields): PrismaPromise<unknown>[] => {
     return [
+        // delete any genera that are not part of the update
+        db.taxonomy.deleteMany({
+            where: {
+                parent_id: fam.id,
+                id: { notIn: fam.genera.map((g) => g.id) },
+            },
+        }),
+
+        ...updateExistingGenera(fam),
+
+        // now we can setup relatoinships and create new genera
         db.taxonomy.update({
             where: { id: fam.id },
             data: {
                 name: fam.name,
                 description: fam.description,
                 taxonomytaxonomy: {
-                    // typical hack, delete them all and then add
-                    deleteMany: { taxonomy_id: fam.id },
-                    create: fam.genera.map((g) => ({
-                        //TODO here lies the issue - need to update the actual Genera Taxonomy records which this does not do.
-                        child: { create: { description: g.description, name: g.name, type: GENUS } },
+                    connectOrCreate: fam.genera.map((g) => ({
+                        where: {
+                            taxonomy_id_child_id: {
+                                child_id: g.id,
+                                taxonomy_id: fam.id,
+                            },
+                        },
+                        create: {
+                            child: {
+                                connectOrCreate: {
+                                    where: {
+                                        id: g.id,
+                                    },
+                                    create: {
+                                        name: g.name,
+                                        type: g.type,
+                                        description: g.description,
+                                        parent_id: fam.id,
+                                    },
+                                },
+                            },
+                        },
                     })),
                 },
             },
@@ -553,7 +592,6 @@ export const upsertFamily = (f: FamilyUpsertFields): TaskEither<Error, FamilyWit
         return familyByName(f.name);
     };
 
-    console.log(`JDC: upserting with: ${JSON.stringify(f, null, '  ')}`);
     return pipe(
         f.id < 0 ? createFamilyTx : updateFamilyTx,
         TE.chain(getFam),

@@ -106,8 +106,7 @@ const Gall = ({
 }: Props): JSX.Element => {
     const [showNewUndescribed, setShowNewUndescribed] = useState(false);
 
-    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields, aliasData, setAliasData } =
-        useSpecies<AT.GallApi>(genera);
+    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields } = useSpecies<AT.GallApi>(genera);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): AT.GallUpsertFields => {
         if (!selected) {
@@ -117,7 +116,6 @@ const Gall = ({
         return {
             ...toSpeciesUpsertFields(fields, name, id),
             gallid: hasProp(fields.mainField[0], 'gall') ? fields.mainField[0].gall.id : -1,
-            aliases: aliasData,
             alignments: fields.alignments.map((a) => a.id),
             cells: fields.cells.map((c) => c.id),
             colors: fields.colors.map((c) => c.id),
@@ -197,6 +195,7 @@ const Gall = ({
         showRenameModal,
         setShowRenameModal,
         error,
+        isValid,
         setError,
         deleteResults,
         setDeleteResults,
@@ -346,10 +345,11 @@ const Gall = ({
                         />
                     </Col>
                     <Col>
-                        Family:
+                        Family (required):
                         <Typeahead
                             name="family"
                             control={form.control}
+                            rules={{ required: true }}
                             placeholder="Family"
                             options={families}
                             labelKey="name"
@@ -415,7 +415,7 @@ const Gall = ({
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        Hosts:
+                        Hosts (required):
                         <Typeahead
                             name="hosts"
                             control={form.control}
@@ -643,7 +643,21 @@ const Gall = ({
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        <AliasTable data={aliasData} setData={setAliasData} />
+                        <Controller
+                            control={form.control}
+                            name="aliases"
+                            render={() => (
+                                <AliasTable
+                                    data={selected?.aliases ?? []}
+                                    setData={(aliases: AT.AliasApi[]) => {
+                                        if (selected) {
+                                            selected.aliases = aliases;
+                                            setSelected({ ...selected });
+                                        }
+                                    }}
+                                />
+                            )}
+                        ></Controller>
                     </Col>
                 </Row>
                 <Row className="formGroup pb-1">
@@ -657,6 +671,7 @@ const Gall = ({
                                     type="checkbox"
                                     className="form-input-checkbox"
                                     checked={selected ? selected.datacomplete : false}
+                                    disabled={!selected}
                                     onChange={(e) => {
                                         if (selected) {
                                             selected.datacomplete = e.currentTarget.checked;
@@ -681,6 +696,7 @@ const Gall = ({
                                     type="checkbox"
                                     className="form-input-checkbox"
                                     checked={selected ? selected.gall.undescribed : false}
+                                    disabled={!selected}
                                     onChange={(e) => {
                                         if (selected) {
                                             selected.gall.undescribed = e.currentTarget.checked;
@@ -695,7 +711,7 @@ const Gall = ({
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col>
-                        <input type="submit" className="button" value="Submit" disabled={!selected} />
+                        <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
                     </Col>
                     <Col>{deleteButton('Caution. All data associated with this Gall will be deleted.')}</Col>
                 </Row>

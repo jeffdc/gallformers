@@ -17,6 +17,7 @@ export type TypeaheadProps<T extends TypeaheadModel, FormFields> = Omit<RBTypeah
     name: Path<FormFields>;
     control: Control<FormFields>;
     newSelectionPrefix?: string;
+    rules?: Record<string, unknown>;
     onBlurT?: (e: FocusEvent<HTMLInputElement>) => void;
     onKeyDownT?: (e: KeyboardEvent<HTMLInputElement>) => void;
 };
@@ -31,12 +32,14 @@ const Typeahead = <T extends TypeaheadModel, FormFields>({
     name,
     control,
     newSelectionPrefix,
+    rules,
     ...taProps
 }: TypeaheadProps<T, FormFields>): JSX.Element => {
     return (
         <Controller
             control={control}
             name={name}
+            rules={rules}
             render={({ field: { ref } }) => (
                 <RBTypeahead
                     {...taProps}

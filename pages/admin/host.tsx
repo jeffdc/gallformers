@@ -14,6 +14,7 @@ import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '
 import { extractQueryParam } from '../../libs/api/apipage';
 import {
     AbundanceApi,
+    AliasApi,
     HostApi,
     HostTaxon,
     HOST_FAMILY_TYPES,
@@ -64,8 +65,7 @@ export const testables = {
 };
 
 const Host = ({ id, hs, genera, families, sections, abundances, places }: Props): JSX.Element => {
-    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields, aliasData, setAliasData } =
-        useSpecies<HostApi>(genera);
+    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields } = useSpecies<HostApi>(genera);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): SpeciesUpsertFields => {
         if (!selected) {
@@ -110,6 +110,7 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
         setSelected,
         showRenameModal,
         setShowRenameModal,
+        isValid,
         error,
         setError,
         deleteResults,
@@ -200,7 +201,7 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                         />
                     </Col>
                     <Col>
-                        Family:
+                        Family (required):
                         <Typeahead
                             name="family"
                             control={form.control}
@@ -208,7 +209,7 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                             options={families}
                             labelKey="name"
                             selected={selected?.fgs?.family && selected.fgs.family.id >= 0 ? [selected.fgs.family] : []}
-                            disabled={selected && selected.id > 0}
+                            disabled={!selected || (selected && selected.id > 0)}
                             onChange={(f) => {
                                 if (!selected) return;
 
@@ -327,7 +328,21 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        <AliasTable data={aliasData} setData={setAliasData} />
+                        <Controller
+                            control={form.control}
+                            name="aliases"
+                            render={() => (
+                                <AliasTable
+                                    data={selected?.aliases ?? []}
+                                    setData={(aliases: AliasApi[]) => {
+                                        if (selected) {
+                                            selected.aliases = aliases;
+                                            setSelected({ ...selected });
+                                        }
+                                    }}
+                                />
+                            )}
+                        ></Controller>
                     </Col>
                 </Row>
                 <Row className="formGroup pb-1">
@@ -341,6 +356,7 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                                     type="checkbox"
                                     className="form-input-checkbox"
                                     checked={selected ? selected.datacomplete : false}
+                                    disabled={!selected}
                                     onChange={(e) => {
                                         if (selected) {
                                             selected.datacomplete = e.currentTarget.checked;
@@ -357,7 +373,7 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                 </Row>
                 <Row className="formGroup">
                     <Col>
-                        <input type="submit" className="button" value="Submit" disabled={!selected} />
+                        <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
                     </Col>
                     <Col>{deleteButton('Caution. All data associated with this Host will be deleted.')}</Col>
                 </Row>

@@ -44,10 +44,11 @@ import {
     GallIDApi,
     GallTaxon,
     GallUpsertFields,
+    RandomGall,
     SimpleSpecies,
 } from '../api/apitypes';
-import { FGS, GENUS, SECTION } from '../api/taxonomy';
-import { deleteImagesBySpeciesId } from '../images/images';
+import { FAMILY, FGS, GENUS, SECTION } from '../api/taxonomy';
+import { deleteImagesBySpeciesId, makePath, SMALL } from '../images/images';
 import { defaultSource } from '../pages/renderhelpers';
 import { logger } from '../utils/logger';
 import { ExtractTFromPromise } from '../utils/types';
@@ -57,12 +58,12 @@ import {
     adaptAlignments,
     adaptCells,
     adaptColors,
+    adaptForm,
+    adaptLocations,
     adaptSeasons,
     adaptShapes,
-    adaptWalls,
-    adaptLocations,
     adaptTextures,
-    adaptForm,
+    adaptWalls,
 } from './filterfield';
 import { adaptImage, adaptImageNoSource } from './images';
 import {
@@ -309,7 +310,15 @@ const gallsByHostGenusForID = (whereClause: Prisma.gallspeciesWhereInput[]): Tas
                             },
                         },
                         image: true,
-                        speciestaxonomy: { include: { taxonomy: true } },
+                        speciestaxonomy: {
+                            include: {
+                                taxonomy: {
+                                    include: {
+                                        parent: true,
+                                    },
+                                },
+                            },
+                        },
                     },
                 },
                 gall: {
@@ -343,7 +352,6 @@ const gallsByHostGenusForID = (whereClause: Prisma.gallspeciesWhereInput[]): Tas
                 );
                 return []; // will resolve to nothing since we are in a flatMap
             }
-
             const newg: GallIDApi = {
                 id: g.species_id,
                 name: g.species.name,
@@ -369,6 +377,7 @@ const gallsByHostGenusForID = (whereClause: Prisma.gallspeciesWhereInput[]): Tas
                         .map((p) => p.place.name);
                 }),
                 images: g.species.image.map(adaptImageNoSource),
+                family: g.species.speciestaxonomy.find((t) => t.taxonomy.parent?.type === FAMILY)?.taxonomy.parent?.name ?? '',
             };
             return newg;
         });
@@ -455,7 +464,9 @@ export const getRelatedGalls = (gall: GallApi): TaskEither<Error, SimpleSpecies[
             },
             where: {
                 name: {
-                    startsWith: `${nameParts[0]} ${nameParts[1]}`,
+                    // Careful, the space at the end of this startsWith phrase is critical. We only want to match
+                    // on names that have the same couplet as the passed in gall then a space, then anything else.
+                    startsWith: `${nameParts[0]} ${nameParts[1]} `,
                 },
             },
         });
@@ -488,6 +499,37 @@ export const gallByIdAsO = (id: number): TaskEither<Error, O.Option<GallApi>> =>
  * @param name
  */
 export const gallByName = (name: string): TaskEither<Error, GallApi[]> => getGalls([{ species: { name: name } }]);
+
+export const randomGall = (): TaskEither<Error, RandomGall[]> => {
+    // It is possible that this is naive and sacnning the entire table to get one random row will eventually create
+    // perf issues. We shall see...
+    const gall = () =>
+        db.$queryRaw(`
+            SELECT s.id as id, g.undescribed, s.name, i.* FROM gall as g
+            INNER JOIN gallspecies as gs ON gs.gall_id = g.id
+            INNER JOIN species as s ON gs.species_id = s.id
+            INNER JOIN image as i ON i.species_id = s.id
+            WHERE i.\`default\` = true
+            ORDER BY RANDOM() LIMIT 1
+    `);
+
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        TE.tryCatch(gall, handleError),
+        TE.map((g) => [
+            {
+                id: g[0].species_id,
+                name: g[0].name,
+                undescribed: g[0].undescribed,
+                imagePath: makePath(g[0].path, SMALL),
+                creator: g[0].creator,
+                license: g[0].license,
+                sourceLink: g[0].sourcelink,
+                licenseLink: g[0].licenselink,
+            },
+        ]),
+    );
+};
 
 /**
  * Fetches all of the genera for all of the galls

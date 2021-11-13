@@ -16,6 +16,7 @@ import Images from '../../../components/images';
 import InfoTip from '../../../components/infotip';
 import SeeAlso from '../../../components/seealso';
 import SourceList from '../../../components/sourcelist';
+import SpeciesSynonymy from '../../../components/speciesSynonymy';
 import { GallSimple, HostApi } from '../../../libs/api/apitypes';
 import { FGS } from '../../../libs/api/taxonomy';
 import { allHostIds, hostById } from '../../../libs/db/host';
@@ -81,7 +82,15 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                 <Col sm={12} md={6} lg={8}>
                     <Row>
                         <Col className="">
-                            <h2 className="font-italic">{host.name}</h2>
+                            <h2 className="font-italic">
+                                <Link
+                                    href={`/id?hostOrTaxon=${encodeURI(
+                                        host.name,
+                                    )}&type=host&detachable=&alignment=&cells=&color=&locations=&season=&shape=&textures=&walls=&form=&undescribed=false`}
+                                >
+                                    <a>{host.name}</a>
+                                </Link>
+                            </h2>
                         </Col>
                         <Col xs={2} className="mr-1">
                             <span className="p-0 pr-1 my-auto">
@@ -99,11 +108,6 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                     <Button variant="outline-light">{host.datacomplete ? '💯' : '❓'}</Button>
                                 </OverlayTrigger>
                             </span>
-                        </Col>
-                    </Row>
-                    <Row>
-                        <Col>
-                            <p className="font-italic">{host.aliases.map((a) => a.name).join(', ')}</p>
                         </Col>
                     </Row>
                     <Row>
@@ -156,6 +160,12 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                             ))}
                         </Col>
                     </Row>
+                    <Row>
+                        <Col>
+                            <SpeciesSynonymy aliases={host.aliases} />
+                        </Col>
+                    </Row>
+
                     <Row className="pt-2">
                         <Col>
                             <DataTable

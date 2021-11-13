@@ -317,6 +317,10 @@ const hostDeleteSteps = (speciesids: number[]): PrismaPromise<Prisma.BatchPayloa
             where: { host_species_id: { in: speciesids } },
         }),
 
+        db.speciesplace.deleteMany({
+            where: { species_id: { in: speciesids } },
+        }),
+
         db.speciessource.deleteMany({
             where: { species_id: { in: speciesids } },
         }),
@@ -332,6 +336,7 @@ const hostDeleteSteps = (speciesids: number[]): PrismaPromise<Prisma.BatchPayloa
         db.species.deleteMany({
             where: { id: { in: speciesids } },
         }),
+
         // delete any orphaned genera since deleting a species may leave a genus behind
         db.$executeRaw(
             `

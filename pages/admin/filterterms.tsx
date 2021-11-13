@@ -1,4 +1,4 @@
-import { constant } from 'fp-ts/lib/function';
+import { constant, constFalse, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import React, { useState } from 'react';
@@ -21,7 +21,15 @@ import { mightFailWithArray } from '../../libs/utils/util';
 
 const schema = yup.object().shape({
     mainField: yup.mixed().required(),
-    description: yup.mixed().test('definition', 'must not be empty', (value) => O.isSome(value)),
+    description: yup.mixed().test('definition', 'must not be empty', (value: O.Option<string>) => {
+        return (
+            value &&
+            pipe(
+                value,
+                O.fold(constFalse, (d) => !!d && d.length > 0),
+            )
+        );
+    }),
 });
 
 type Props = {
@@ -126,6 +134,7 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
         setSelected,
         showRenameModal: showModal,
         setShowRenameModal: setShowModal,
+        isValid,
         error,
         setError,
         deleteResults,
@@ -202,15 +211,17 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
                     </Row>
                     <Row className="form-group">
                         <Col>
-                            Definition:
+                            Definition (required):
                             <Controller
                                 control={form.control}
                                 name="description"
+                                rules={{ required: true }}
                                 render={({ field: { ref } }) => (
                                     <textarea
                                         ref={ref}
                                         className="form-control"
                                         rows={4}
+                                        disabled={!selected}
                                         value={selected?.description ? O.getOrElse(constant(''))(selected.description) : ''}
                                         onChange={(e) => {
                                             if (selected) {
@@ -228,7 +239,7 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
                     </Row>
                     <Row className="form-input">
                         <Col>
-                            <input type="submit" className="button" value="Submit" disabled={!selected} />
+                            <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
                         </Col>
                         <Col>{deleteButton('Caution. The filter field will deleted.', doDelete)}</Col>
                     </Row>

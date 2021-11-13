@@ -4,11 +4,11 @@ import { useSession } from 'next-auth/client';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import Carousel from 'nuka-carousel';
 import React, { useState } from 'react';
 import { Button, ButtonGroup, ButtonToolbar, Col, Modal, OverlayTrigger, Popover, Row } from 'react-bootstrap';
 import useWindowDimensions from '../hooks/usewindowdimension';
 import { ImageApi, ImageNoSourceApi, SpeciesApi } from '../libs/api/apitypes';
-import Carousel from 'nuka-carousel';
 import { hasProp } from '../libs/utils/util';
 import NoImage from '../public/images/noimage.jpg';
 
@@ -29,8 +29,14 @@ type Props = {
 };
 
 const Images = ({ sp }: Props): JSX.Element => {
+    const species = {
+        ...sp,
+        // move the default image so it is 1st (never know what the caller is handing us)
+        // also do the type conversion to make sure we were not handed Sources with no Images
+        images: sp.images.sort((a, b) => (a.default ? -1 : 0)).map((i) => checkSource(i)),
+    };
     const [showModal, setShowModal] = useState(false);
-    const [currentImage, setCurrentImage] = useState(sp.images.length > 0 ? checkSource(sp.images[0]) : undefined);
+    const [currentImage, setCurrentImage] = useState(species.images.length > 0 ? species.images[0] : undefined);
     const [imgIndex, setImgIndex] = useState(0);
     const [showInfo, setShowInfo] = useState(false);
     const { width } = useWindowDimensions();
@@ -40,14 +46,6 @@ const Images = ({ sp }: Props): JSX.Element => {
 
     const pad = 25;
     const hwRatio = 2 / 3;
-
-    const species = {
-        ...sp,
-        images: sp.images.map((i) => checkSource(i)),
-    };
-
-    // sort so that the default image always is first
-    species.images.sort((a) => (a.default ? -1 : 1));
 
     return species.images.length < 1 ? (
         <div className="p-2">
@@ -126,13 +124,13 @@ const Images = ({ sp }: Props): JSX.Element => {
                 <Modal.Body>
                     <Row>
                         <Col className="p-0 m-0 border" xs={4}>
-                            <div className={'image-container'}>
-                                <Image
+                            <div className="image-container">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
                                     src={currentImage ? currentImage.small : ''}
                                     alt={`image of ${species.name}`}
-                                    layout="fill"
+                                    width={250}
                                     className={'image'}
-                                    unoptimized
                                 />
                             </div>
                         </Col>
@@ -209,9 +207,13 @@ const Images = ({ sp }: Props): JSX.Element => {
                     )}
                     className="p-1"
                     heightMode="first"
-                    beforeSlide={(c, e) => {
-                        setCurrentImage(species.images[e]);
-                        setImgIndex(e);
+                    // beforeSlide={(c, e) => {
+                    //     setCurrentImage(species.images[e]);
+                    //     setImgIndex(e);
+                    // }}
+                    afterSlide={(c) => {
+                        setCurrentImage(species.images[c]);
+                        setImgIndex(c);
                     }}
                     wrapAround={true}
                     transitionMode="fade"
@@ -254,7 +256,14 @@ const Images = ({ sp }: Props): JSX.Element => {
                                 ©
                             </Button>
                         </OverlayTrigger>
-                        <Button variant="secondary" style={{ fontWeight: 'bold' }} onClick={() => setShowInfo(true)}>
+                        <Button
+                            variant="secondary"
+                            style={{ fontWeight: 'bold' }}
+                            onClick={() => {
+                                console.log(`JDC: info click ${imgIndex} - ${currentImage?.medium}`);
+                                setShowInfo(true);
+                            }}
+                        >
                             ⓘ
                         </Button>
                         {session && (

@@ -125,6 +125,7 @@ const gallIdApiFromGallApi = (g: GallApi): Omit<GallIDApi, 'places' | 'images'> 
     textures: g.gall.galltexture.map((a) => a.field),
     undescribed: g.gall.undescribed,
     walls: g.gall.gallwalls.map((a) => a.field),
+    family: '',
 });
 
 export const createSummaryGall = (g: GallApi): string => createSummary(gallIdApiFromGallApi(g));

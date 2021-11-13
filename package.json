@@ -28,7 +28,7 @@
     "@aws-sdk/client-s3": "^3.3",
     "@aws-sdk/s3-request-presigner": "^3.3",
     "@hookform/resolvers": "^2.0",
-    "@prisma/client": "^2.20",
+    "@prisma/client": "^3.4",
     "axios": "^0.21",
     "bootstrap": "^4.6",
     "classnames": "^2.3",
@@ -91,7 +91,7 @@
     "identity-obj-proxy": "^3.0",
     "jest": "^26",
     "prettier": "^2",
-    "prisma": "^2.20",
+    "prisma": "^3.4",
     "type-coverage": "^2",
     "typescript": "^4.4",
     "why-is-node-running": "^2.2"

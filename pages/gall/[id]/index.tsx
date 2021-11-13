@@ -16,6 +16,7 @@ import Images from '../../../components/images';
 import InfoTip from '../../../components/infotip';
 import SeeAlso from '../../../components/seealso';
 import SourceList from '../../../components/sourcelist';
+import SpeciesSynonymy from '../../../components/speciesSynonymy';
 import { DetachableBoth, GallApi, GallHost, SimpleSpecies } from '../../../libs/api/apitypes';
 import { FGS } from '../../../libs/api/taxonomy';
 import { allGallIds, gallById, getRelatedGalls } from '../../../libs/db/gall';
@@ -114,11 +115,8 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                             </Row>
                             <Row hidden={!species.gall.undescribed}>
                                 <Col>
-                                    <span className="text-danger">This is an undescribed species.</span>
+                                    <span className="text-danger">The inducer of this gall is unknown or undescribed.</span>
                                 </Col>
-                            </Row>
-                            <Row>
-                                <Col className="font-italic"> {species.aliases.map((a) => a.name).join(', ')}</Col>
                             </Row>
                             <Row>
                                 <Col>
@@ -211,6 +209,11 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                 </Col>
                 {/* Description */}
                 <Col>
+                    <Row>
+                        <Col>
+                            <SpeciesSynonymy aliases={species.aliases} />
+                        </Col>
+                    </Row>
                     <Row>
                         <Col>
                             <hr />

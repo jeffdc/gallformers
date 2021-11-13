@@ -70,6 +70,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
         selected,
         showRenameModal: showModal,
         setShowRenameModal: setShowModal,
+        isValid,
         error,
         setError,
         deleteResults,
@@ -126,15 +127,15 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        Definition:
-                        <textarea {...form.register('definition')} className="form-control" rows={4} />
+                        Definition (required):
+                        <textarea {...form.register('definition')} className="form-control" rows={4} disabled={!selected} />
                         {form.formState.errors.definition && <span className="text-danger">You must provide the defintion.</span>}
                     </Col>
                 </Row>
                 <Row className="form-group">
                     <Col>
-                        URLs (separated by a newline [enter]):
-                        <textarea {...form.register('urls')} className="form-control" rows={3} />
+                        URLs (required) (separated by a newline [enter]):
+                        <textarea {...form.register('urls')} className="form-control" rows={3} disabled={!selected} />
                         {form.formState.errors.urls && (
                             <span className="text-danger">You must provide a URL for the source of the defintion.</span>
                         )}
@@ -142,7 +143,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                 </Row>
                 <Row className="form-input">
                     <Col>
-                        <input type="submit" className="button" value="Submit" disabled={!selected} />
+                        <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
                     </Col>
                     <Col>{deleteButton('Caution. The glossary entry will deleted.')}</Col>
                 </Row>

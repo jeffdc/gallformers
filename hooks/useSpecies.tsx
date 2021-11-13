@@ -1,21 +1,22 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
+import React from 'react';
+import { Badge, OverlayTrigger, Popover } from 'react-bootstrap';
 import { ConfirmationOptions } from '../components/confirmationdialog';
 import { RenameEvent } from '../components/editname';
-import { AdminFormFields } from './useAPIs';
 import {
     AbundanceApi,
-    SpeciesApi,
+    AliasApi,
+    EmptyAbundance,
     GallTaxon,
     HostTaxon,
-    EmptyAbundance,
-    AliasApi,
+    SCIENTIFIC_NAME,
+    SpeciesApi,
     SpeciesUpsertFields,
 } from '../libs/api/apitypes';
 import { FAMILY, FGS, GENUS, TaxonomyEntry, TaxonomyEntryNoParent } from '../libs/api/taxonomy';
 import { extractGenus } from '../libs/utils/util';
-import React, { Dispatch, SetStateAction, useEffect, useState } from 'react';
-import { Badge, OverlayTrigger, Popover } from 'react-bootstrap';
+import { AdminFormFields } from './useAPIs';
 
 export const SpeciesNamingHelp = (): JSX.Element => (
     <OverlayTrigger
@@ -102,6 +103,7 @@ export type SpeciesFormFields<T> = AdminFormFields<T> & {
     family: TaxonomyEntryNoParent[];
     abundance: AbundanceApi[];
     datacomplete: boolean;
+    aliases: AliasApi[];
 };
 
 export type UseSpecies<T extends SpeciesApi> = {
@@ -109,17 +111,9 @@ export type UseSpecies<T extends SpeciesApi> = {
     createNewSpecies: (name: string, taxon: typeof HostTaxon | typeof GallTaxon) => SpeciesApi;
     updatedSpeciesFormFields: (s: T | undefined) => SpeciesFormFields<T>;
     toSpeciesUpsertFields: (fields: SpeciesFormFields<T>, name: string, id: number) => SpeciesUpsertFields;
-    aliasData: AliasApi[];
-    setAliasData: Dispatch<SetStateAction<AliasApi[]>>;
 };
 
 const useSpecies = <T extends SpeciesApi>(genera: TaxonomyEntry[]): UseSpecies<T> => {
-    const [aliasData, setAliasData] = useState<AliasApi[]>([]);
-
-    // useEffect(() => {
-    //     console.log(`JDC: useSpecies alias data change: ${JSON.stringify(aliasData, null, '  ')}`);
-    // }, [aliasData]);
-
     const fgsFromName = (name: string): FGS => {
         const genusName = extractGenus(name);
         const genus = genera.find((g) => g.name.localeCompare(genusName) == 0);
@@ -171,7 +165,7 @@ const useSpecies = <T extends SpeciesApi>(genera: TaxonomyEntry[]): UseSpecies<T
                             s.aliases.push({
                                 id: -1,
                                 name: e.old,
-                                type: 'scientific',
+                                type: SCIENTIFIC_NAME,
                                 description: 'Previous name',
                             });
                         }
@@ -191,7 +185,7 @@ const useSpecies = <T extends SpeciesApi>(genera: TaxonomyEntry[]): UseSpecies<T
             s.aliases.push({
                 id: -1,
                 name: e.old,
-                type: 'scientific',
+                type: SCIENTIFIC_NAME,
                 description: 'Previous name',
             });
         }
@@ -201,7 +195,6 @@ const useSpecies = <T extends SpeciesApi>(genera: TaxonomyEntry[]): UseSpecies<T
 
     const updatedSpeciesFormFields = (s: T | undefined): SpeciesFormFields<T> => {
         if (s != undefined) {
-            setAliasData(s.aliases ? s.aliases : []);
             return {
                 mainField: [s],
                 genus: [s.fgs?.genus],
@@ -209,10 +202,10 @@ const useSpecies = <T extends SpeciesApi>(genera: TaxonomyEntry[]): UseSpecies<T
                 datacomplete: s.datacomplete,
                 abundance: [pipe(s.abundance, O.getOrElse(constant(EmptyAbundance)))],
                 del: false,
+                aliases: s.aliases,
             };
         }
 
-        setAliasData([]);
         return {
             mainField: [],
             genus: [],
@@ -220,6 +213,7 @@ const useSpecies = <T extends SpeciesApi>(genera: TaxonomyEntry[]): UseSpecies<T
             datacomplete: false,
             abundance: [EmptyAbundance],
             del: false,
+            aliases: [],
         };
     };
 
@@ -229,7 +223,7 @@ const useSpecies = <T extends SpeciesApi>(genera: TaxonomyEntry[]): UseSpecies<T
 
         return {
             abundance: fields.abundance.length > 0 ? fields.abundance[0].abundance : undefined,
-            aliases: aliasData,
+            aliases: fields.aliases,
             datacomplete: fields.datacomplete,
             fgs: {
                 family: family,
@@ -248,8 +242,6 @@ const useSpecies = <T extends SpeciesApi>(genera: TaxonomyEntry[]): UseSpecies<T
         createNewSpecies: createNewSpecies,
         updatedSpeciesFormFields: updatedSpeciesFormFields,
         toSpeciesUpsertFields: toSpeciesUpsertFields,
-        aliasData: aliasData,
-        setAliasData: setAliasData,
     };
 };
 

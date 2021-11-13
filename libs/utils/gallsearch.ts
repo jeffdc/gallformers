@@ -60,6 +60,7 @@ export const checkGall = (g: GallIDApi, q: SearchQuery): boolean => {
     }
     const undescribed = !q.undescribed || g.undescribed;
     const place = dontCare(q.place) || (!!g.places && checkArray(g.places, q.place));
+    const family = dontCare(q.family) || (!!g.family && checkArray([g.family], q.family));
 
     return (
         alignment &&
@@ -73,6 +74,7 @@ export const checkGall = (g: GallIDApi, q: SearchQuery): boolean => {
         texture &&
         form &&
         undescribed &&
-        place
+        place &&
+        family
     );
 };

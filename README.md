@@ -60,7 +60,7 @@ There is a very simple [down detector](lambdas/gallformers_downdetector.js) impl
 
 There are also several alarms configured on the DO Droplet that hosts the server. These are all resource utilization alarms and will send messages to the [site-monitoring](https://gallformerdat-m1g8137.slack.com/archives/C01DGA0E9EX) Slack channel if triggered.
 
-#### Database Schema Upates (Migrations)
+#### Database Schema Updates (Migrations)
 Changes to the schema must involve the following steps:
 
 1. Create a new migration script in [migrations](migrations). It must be named such that it is one larger than the latest.
@@ -70,7 +70,7 @@ Changes to the schema must involve the following steps:
 1. Run `yarn migrate` to execute a migration.
 1. Run `yarn generate` to generate a new Prisma client.
 
-Because [yarn is a PITA](https://github.com/yarnpkg/yarn/issues/3630) you will have to temporarily add the folling to your dev dependencies for migration to work:
+Because [yarn is a PITA](https://github.com/yarnpkg/yarn/issues/3630) you will have to temporarily add the following to your dev dependencies for migration to work:
 ```
     "better-sqlite3": "^7.1.1",
     "better-sqlite3-helper": "^3.1.1",
@@ -88,4 +88,4 @@ The front-end is mostly static pages as we expect most of this data to not chang
 ### Production and Staging (non-dev) Deployments
 The site is deployed on a Digital Ocean droplet with a mounted volume that contains the database. Details of how to access this etc. are not appropriate for this README.
 
-Currently user management is handled via Auth0. They have a reasonable free-tier that gives us whta we need for our current minimal needs. All user management happens via the Auth0 management console. The site is generally meant to be accessed without authentication. Authentication and authorization is only needed for data management/curation features.
+Currently user management is handled via Auth0. They have a reasonable free-tier that gives us what we need for our current minimal needs. All user management happens via the Auth0 management console. The site is generally meant to be accessed without authentication. Authentication and authorization is only needed for data management/curation features.

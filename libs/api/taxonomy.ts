@@ -36,6 +36,8 @@ export const EMPTY_TAXONOMYENTRY: TaxonomyEntry = {
     parent: O.none,
 };
 
+export const EMPTY_GENUS: TaxonomyEntry = { ...EMPTY_TAXONOMYENTRY, type: 'genus' };
+
 export type DBTaxonomyWithParent =
     | (taxonomy & {
           parent?: taxonomy | null;

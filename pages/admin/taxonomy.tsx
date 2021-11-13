@@ -12,7 +12,7 @@ import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { ALL_FAMILY_TYPES } from '../../libs/api/apitypes';
-import { EMPTY_TAXONOMYENTRY, FAMILY, FamilyUpsertFields, FamilyWithGenera, Genus } from '../../libs/api/taxonomy';
+import { EMPTY_GENUS, FAMILY, FamilyUpsertFields, FamilyWithGenera, Genus } from '../../libs/api/taxonomy';
 import { allFamiliesWithGenera } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
 import { TABLE_CUSTOM_STYLES } from '../../libs/utils/DataTableConstants';
@@ -59,7 +59,6 @@ const updatedFormFields = async (fam: TaxFamily | undefined): Promise<FormFields
 };
 
 const toUpsertFields = (fields: FormFields, name: string, id: number): FamilyUpsertFields => {
-    console.log(`JDC: update fields ${JSON.stringify(fields, null, '  ')}`);
     return {
         ...fields,
         name: name,
@@ -103,6 +102,7 @@ const TaxonomyAdmin = ({ id, fs }: Props): JSX.Element => {
         setSelected,
         showRenameModal,
         setShowRenameModal,
+        isValid,
         error,
         setError,
         deleteResults,
@@ -178,7 +178,7 @@ const TaxonomyAdmin = ({ id, fs }: Props): JSX.Element => {
                     responsive={false}
                     defaultSortFieldId={'name'}
                     customStyles={TABLE_CUSTOM_STYLES}
-                    createEmpty={() => EMPTY_TAXONOMYENTRY}
+                    createEmpty={() => EMPTY_GENUS}
                     update={updateGenera}
                     customActions={[{ name: 'Move', onUpdate: moveSelected }]}
                 />
