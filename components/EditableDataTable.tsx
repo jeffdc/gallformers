@@ -186,7 +186,7 @@ const EditableTable = <T extends WithID>(props: EditableTableProps<T>): JSX.Elem
             onSelectedRowsChange={onSelectionChange}
             clearSelectedRows={toggleCleared}
             actions={
-                <Button onClick={add} variant="primary" className="btn-sm">
+                <Button onClick={add} variant="primary" className="btn-sm" disabled={props.disabled}>
                     Add New
                 </Button>
             }

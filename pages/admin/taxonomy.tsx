@@ -209,7 +209,7 @@ const TaxonomyAdmin = ({ id, fs }: Props): JSX.Element => {
                         </FormGroup>
                         <FormGroup as={Col}>
                             <Form.Label>Description:</Form.Label>
-                            <select {...form.register('description')} className="form-control">
+                            <select {...form.register('description')} className="form-control" disabled={!selected}>
                                 {genOptions(ALL_FAMILY_TYPES)}
                             </select>
                             {form.formState.errors.description && (
@@ -233,6 +233,7 @@ const TaxonomyAdmin = ({ id, fs }: Props): JSX.Element => {
                         createEmpty={() => EMPTY_GENUS}
                         update={updateGenera}
                         customActions={[{ name: 'Move', onUpdate: moveSelected }]}
+                        disabled={!selected}
                     />
                     <hr />
                     <Form.Row>

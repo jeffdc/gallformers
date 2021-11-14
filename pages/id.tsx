@@ -43,7 +43,7 @@ import {
 import { allHostsSimple } from '../libs/db/host';
 import { getPlaces } from '../libs/db/place';
 import { allGenera, allSections } from '../libs/db/taxonomy';
-import { createSummary, defaultImage } from '../libs/pages/renderhelpers';
+import { createSummary, defaultImage, formatWithDescription } from '../libs/pages/renderhelpers';
 import { checkGall, GALL_FORM, LEAF_ANYWHERE } from '../libs/utils/gallsearch';
 import { capitalizeFirstLetter, hasProp, mightFailWithArray } from '../libs/utils/util';
 
@@ -357,7 +357,7 @@ const IDGall = (props: Props): JSX.Element => {
                                     options={props.sectionsAndGenera}
                                     labelKey={(tax: TaxonomyEntryNoParent) => {
                                         if (tax) {
-                                            return `${tax.name}${tax.description ? ` - ${tax.description}` : ''}`;
+                                            return formatWithDescription(tax.name, tax.description);
                                         } else {
                                             return '';
                                         }

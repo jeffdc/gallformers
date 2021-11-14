@@ -73,8 +73,8 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
                 return `/host/${props.selected?.id}`;
             case 'Section':
                 return `/section/${props.selected?.id}`;
-            // case 'Family':
-            //     return `/family/${props.selected?.id}`;
+            case 'Taxonomy':
+                return `/family/${props.selected?.id}`;
             case 'Glossary':
                 return `/glossary/${props.selected?.id}`;
             case 'Source':
