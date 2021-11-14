@@ -8,20 +8,17 @@ import { handleError } from '../utils/util';
 import db from './db';
 import { connectIfNotNull } from './utils';
 
-export const updateAbundance = (id: number, abundance: string | undefined | null): PrismaPromise<number> =>
-    db.$executeRaw(
-        abundance == undefined || abundance == null
-            ? `
-            UPDATE species
+export const updateAbundance = (id: number, abundance: string | undefined | null): PrismaPromise<number> => {
+    if (abundance == undefined || abundance == null) {
+        return db.$executeRaw`UPDATE species
             SET abundance_id = NULL
-            WHERE id = ${id}
-          `
-            : `
-            UPDATE species 
+            WHERE id = ${id}`;
+    } else {
+        return db.$executeRaw`UPDATE species 
             SET abundance_id = (SELECT id FROM abundance WHERE abundance = '${abundance}')
-            WHERE id = ${id}
-          `,
-    );
+            WHERE id = ${id}`;
+    }
+};
 
 export const adaptAbundance = (a: abundance): AbundanceApi => ({
     id: a.id,

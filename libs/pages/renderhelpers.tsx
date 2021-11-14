@@ -143,3 +143,19 @@ export const createSummary = (g: Omit<GallIDApi, 'places' | 'images'>): string =
     if (['a', 'e', 'i', 'o', 'u', 'y'].find((l) => l === s[0])) return `An ${s}`;
     else return `A ${s}`;
 };
+
+/**
+ *
+ * @param name
+ * @param description
+ * @returns
+ */
+export const formatWithDescription = (name: string, description: string | string[] | null | undefined, dash = false): string => {
+    if (!description || description.length === 0) {
+        return name;
+    } else if (Array.isArray(description)) {
+        return `${name}${dash ? ' - ' : ' '}(${description.sort().join(', ')})`;
+    } else {
+        return `${name}${dash ? ' - ' : ' '}(${description})`;
+    }
+};

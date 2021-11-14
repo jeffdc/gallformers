@@ -23,7 +23,7 @@ import { allHostIds, hostById } from '../../../libs/db/host';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkSourceToGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { formatLicense, sourceToDisplay } from '../../../libs/pages/renderhelpers';
+import { formatLicense, formatWithDescription, sourceToDisplay } from '../../../libs/pages/renderhelpers';
 import { TABLE_CUSTOM_STYLES } from '../../../libs/utils/DataTableConstants';
 
 type Props = {
@@ -135,7 +135,10 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                 {' | '}
                                 <strong>Genus: </strong>
                                 <Link key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
-                                    <a className="font-italic"> {taxonomy.genus.name}</a>
+                                    <a className="font-italic">
+                                        {' '}
+                                        {formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}
+                                    </a>
                                 </Link>
                             </p>
                         </Col>

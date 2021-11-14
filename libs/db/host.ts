@@ -338,8 +338,7 @@ const hostDeleteSteps = (speciesids: number[]): PrismaPromise<Prisma.BatchPayloa
         }),
 
         // delete any orphaned genera since deleting a species may leave a genus behind
-        db.$executeRaw(
-            `
+        db.$executeRaw`
                 DELETE FROM taxonomy
                 WHERE id IN (
                     SELECT id
@@ -351,7 +350,6 @@ const hostDeleteSteps = (speciesids: number[]): PrismaPromise<Prisma.BatchPayloa
                         )
                 );
         `,
-        ),
     ];
 };
 

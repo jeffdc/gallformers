@@ -12,6 +12,7 @@ import { PlaceNoTreeApi } from '../libs/api/apitypes';
 import { TaxonomyEntryNoParent } from '../libs/api/taxonomy';
 import { globalSearch, GlobalSearchResults, TinySource, TinySpecies } from '../libs/db/search';
 import { EntryLinked } from '../libs/pages/glossary';
+import { formatWithDescription } from '../libs/pages/renderhelpers';
 import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
 import { logger } from '../libs/utils/logger';
 import { capitalizeFirstLetter, mightFail } from '../libs/utils/util';
@@ -20,6 +21,7 @@ type SearchResultItem = {
     id: string;
     type: string;
     name: string;
+    aliases: string[];
 };
 
 type Props = {
@@ -55,13 +57,13 @@ const linkItem = (i: SearchResultItem) => {
         case 'gall':
             return (
                 <Link href={`/gall/${i.id}`}>
-                    <a>{i.name}</a>
+                    <a className="font-italic">{formatWithDescription(i.name, i.aliases, true)}</a>
                 </Link>
             );
         case 'plant':
             return (
                 <Link href={`/host/${i.id}`}>
-                    <a>{i.name}</a>
+                    <a className="font-italic">{formatWithDescription(i.name, i.aliases, true)}</a>
                 </Link>
             );
         case 'entry':
@@ -79,13 +81,13 @@ const linkItem = (i: SearchResultItem) => {
         case 'genus':
             return (
                 <Link href={`/genus/${i.id}`}>
-                    <a>{`Genus ${i.name}`}</a>
+                    <a className="font-italic">{`Genus ${formatWithDescription(i.name, i.aliases, true)}`}</a>
                 </Link>
             );
         case 'section':
             return (
                 <Link href={`/section/${i.id}`}>
-                    <a>{`Section ${i.name}`}</a>
+                    <a className="font-italic">{`Section ${formatWithDescription(i.name, i.aliases, true)}`}</a>
                 </Link>
             );
         case 'family':
@@ -183,11 +185,13 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     // an experiment - lets mash them all together and show them in a single table
 
     const r: SearchResultItem[] = species
-        .map((s) => ({ id: s.id.toString(), type: s.taxoncode, name: s.name }))
-        .concat(glossary.map((g) => ({ id: g.word, type: 'entry', name: capitalizeFirstLetter(g.word) })))
-        .concat(sources.map((s) => ({ id: s.id.toString(), type: 'source', name: s.source })))
-        .concat(places.map((p) => ({ id: p.id.toString(), type: 'place', name: `${p.name} - ${p.code}` })))
-        .concat(taxa.map((t) => ({ id: t.id.toString(), type: t.type, name: t.name })));
+        .map((s) => ({ id: s.id.toString(), type: s.taxoncode, name: s.name, aliases: s.aliases }))
+        .concat(glossary.map((g) => ({ id: g.word, type: 'entry', name: capitalizeFirstLetter(g.word), aliases: [] })))
+        .concat(sources.map((s) => ({ id: s.id.toString(), type: 'source', name: s.source, aliases: [] })))
+        .concat(places.map((p) => ({ id: p.id.toString(), type: 'place', name: `${p.name} - ${p.code}`, aliases: [] })))
+        .concat(
+            taxa.map((t) => ({ id: t.id.toString(), type: t.type, name: t.name, aliases: t.description ? [t.description] : [] })),
+        );
 
     return {
         props: {

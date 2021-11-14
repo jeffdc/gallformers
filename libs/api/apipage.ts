@@ -103,7 +103,7 @@ export async function apiUpsertEndpoint<T, R>(
 
 /**
  * Function that is meant to be partially applied and passed to apiUpsertEndpoint or similar.
- * Redirects (200) to the conputed path.
+ * Redirects (200) to the computed path.
  * @param path the path to redirect to. The id that is later fetched will be appended
  * (N.B. no slash so you must provide it or some other separator, e.g. #).
  */

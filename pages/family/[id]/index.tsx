@@ -13,6 +13,7 @@ import { GallTaxon } from '../../../libs/api/apitypes';
 import { TaxonomyEntry, TaxonomyTree } from '../../../libs/api/taxonomy';
 import { allFamilyIds, taxonomyEntryById, taxonomyTreeForId } from '../../../libs/db/taxonomy';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
+import { formatWithDescription } from '../../../libs/pages/renderhelpers';
 import { hasProp } from '../../../libs/utils/util';
 
 type Props = {
@@ -71,7 +72,7 @@ const toTreeNodeInArray = (tree: TaxonomyTree): TreeNodeInArray[] => [
             .sort((a, b) => a.name.localeCompare(b.name))
             .map((tt) => ({
                 key: tt.id.toString(),
-                label: tt.name,
+                label: formatWithDescription(tt.name, tt.description),
                 nodes: tt.speciestaxonomy
                     .sort((a, b) => a.species.name.localeCompare(b.species.name))
                     .map((st) => ({

@@ -1,4 +1,4 @@
-import { glossary } from '@prisma/client';
+import { glossary, Prisma } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
@@ -19,7 +19,7 @@ export const allGlossaryEntries = (): TaskEither<Error, Entry[]> => {
     const glossary = () =>
         // prisma does not handle sort order by collate nocase
         // https://github.com/prisma/prisma/issues/5068
-        db.$queryRaw<glossary[]>(`
+        db.$queryRaw<glossary[]>(Prisma.sql`
             SELECT * from glossary
             ORDER BY word COLLATE NOCASE ASC;
         `);

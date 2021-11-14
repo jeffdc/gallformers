@@ -20,6 +20,7 @@ import {
     FamilyUpsertFields,
     FamilyWithGenera,
     FGS,
+    GeneraMoveFields,
     GENUS,
     SECTION,
     SectionApi,
@@ -607,5 +608,37 @@ export const upsertFamily = (f: FamilyUpsertFields): TaskEither<Error, FamilyWit
                 ),
         ),
         TE.map((x) => x),
+    );
+};
+
+export const moveGenera = (f: GeneraMoveFields): TaskEither<Error, FamilyWithGenera[]> => {
+    const doMove = () =>
+        db.$transaction([
+            // reassign the parent to the new family for all of the passed in genera
+            db.taxonomy.updateMany({
+                where: { id: { in: f.genera } },
+                data: {
+                    parent_id: f.newFamilyId,
+                },
+            }),
+            // delete all mappings between the old family and the genera
+            db.taxonomytaxonomy.deleteMany({
+                where: { child_id: { in: f.genera }, taxonomy_id: f.oldFamilyId },
+            }),
+            // add mappings between the new family and the genera
+            ...f.genera.map((g) =>
+                db.taxonomytaxonomy.create({
+                    data: {
+                        taxonomy_id: f.newFamilyId,
+                        child_id: g,
+                    },
+                }),
+            ),
+        ]);
+
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        TE.tryCatch(doMove, handleError),
+        TE.chain(allFamiliesWithGenera),
     );
 };

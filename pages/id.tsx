@@ -357,10 +357,7 @@ const IDGall = (props: Props): JSX.Element => {
                                     options={props.sectionsAndGenera}
                                     labelKey={(tax: TaxonomyEntryNoParent) => {
                                         if (tax) {
-                                            if (tax.type === SECTION) {
-                                                return `${tax.name} - ${tax.description}`;
-                                            }
-                                            return tax.name;
+                                            return `${tax.name}${tax.description ? ` - ${tax.description}` : ''}`;
                                         } else {
                                             return '';
                                         }

@@ -102,11 +102,7 @@ export type TaxonomyTree = taxonomy & {
 export type Genus = Omit<TaxonomyEntry, 'parent'>;
 
 export type FamilyWithGenera = TaxonomyEntry & {
-    // children: taxonomytaxonomy[];
     genera: Genus[];
-    // taxonomytaxonomy: (taxonomytaxonomy & {
-    //     child: taxonomy;
-    // })[];
 };
 
 /**
@@ -131,4 +127,10 @@ export type SectionApi = {
     description: string;
     species: SimpleSpecies[];
     aliases: AliasApi[];
+};
+
+export type GeneraMoveFields = {
+    oldFamilyId: number;
+    newFamilyId: number;
+    genera: number[];
 };

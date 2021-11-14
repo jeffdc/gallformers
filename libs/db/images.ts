@@ -105,12 +105,9 @@ export const updateImage = (theImage: ImageApi): TaskEither<Error, readonly Imag
         );
 
     const updateSourceRel = (image: ImageApi) =>
-        db.$executeRaw(
-            `UPDATE image 
+        db.$executeRaw`UPDATE image 
              SET source_id = ${sourceid(image)}
-             WHERE image.id = ${image.id}`,
-        );
-
+             WHERE image.id = ${image.id}`;
     // if this one is the new default, then make sure all of the other ones are not default
     const setAsNewDefault = (image: ImageApi) => {
         const spId = image.default ? image.speciesid : -999;

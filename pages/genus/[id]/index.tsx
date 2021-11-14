@@ -13,6 +13,7 @@ import { SimpleSpecies } from '../../../libs/api/apitypes';
 import { TaxonomyEntry } from '../../../libs/api/taxonomy';
 import { allGenusIds, getAllSpeciesForSectionOrGenus, taxonomyEntryById } from '../../../libs/db/taxonomy';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
+import { formatWithDescription } from '../../../libs/pages/renderhelpers';
 
 type Props = {
     genus: O.Option<TaxonomyEntry>;
@@ -32,17 +33,19 @@ const Genus = ({ genus, species }: Props): JSX.Element => {
     const gen = pipe(genus, O.getOrElse(constant({} as TaxonomyEntry)));
     const fam = pipe(gen.parent, O.getOrElse(constant({} as TaxonomyEntry)));
 
+    const fullName = formatWithDescription(gen.name, gen.description);
+
     return (
         <Container className="pt-2" fluid>
             <Head>
-                <title>{gen.name}</title>
+                <title>{fullName}</title>
                 <meta name="description" content={`Genus ${gen.name}`} />
             </Head>
 
             <Row>
                 <Col>
                     <h1>
-                        Genus <i>{gen.name}</i>
+                        Genus <i>{fullName}</i>
                     </h1>
                 </Col>
             </Row>

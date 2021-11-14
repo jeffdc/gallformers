@@ -23,7 +23,13 @@ import { allGallIds, gallById, getRelatedGalls } from '../../../libs/db/gall';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkSourceToGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWith, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { createSummaryGall, defaultSource, formatLicense, sourceToDisplay } from '../../../libs/pages/renderhelpers';
+import {
+    createSummaryGall,
+    defaultSource,
+    formatLicense,
+    formatWithDescription,
+    sourceToDisplay,
+} from '../../../libs/pages/renderhelpers';
 
 type Props = {
     species: GallApi;
@@ -46,28 +52,6 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
     const router = useRouter();
     const defSource = defaultSource(species?.speciessource, router.query.source);
     const [selectedSource, setSelectedSource] = useState(defSource);
-
-    // useEffect(() => {
-    //     // console.log(`JDC: In useEffect with: ${JSON.stringify(selectedSource?.source_id, null, '  ')}`);
-    //     if (selectedSource && selectedSource.source_id !== defSource?.source_id) {
-    //         router.replace(
-    //             {
-    //                 query: { id: species.id, source: selectedSource.source_id },
-    //             },
-    //             undefined,
-    //             { shallow: true },
-    //         );
-    //     } else {
-    //         router.replace(
-    //             {
-    //                 query: { id: species.id },
-    //             },
-    //             undefined,
-    //             { shallow: true },
-    //         );
-    //     }
-    //     // eslint-disable-next-line react-hooks/exhaustive-deps
-    // }, [selectedSource]);
 
     // If the page is not yet generated, this will be displayed initially until getStaticProps() finishes running
     if (router.isFallback) {
@@ -127,7 +111,10 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                     {' | '}
                                     <strong>Genus:</strong>
                                     <Link key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
-                                        <a className="font-italic"> {taxonomy.genus.name}</a>
+                                        <a className="font-italic">
+                                            {' '}
+                                            {formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}
+                                        </a>
                                     </Link>
                                 </Col>
                             </Row>

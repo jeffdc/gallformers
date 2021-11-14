@@ -503,20 +503,31 @@ export const gallByName = (name: string): TaskEither<Error, GallApi[]> => getGal
 export const randomGall = (): TaskEither<Error, RandomGall[]> => {
     // It is possible that this is naive and sacnning the entire table to get one random row will eventually create
     // perf issues. We shall see...
-    const gall = () =>
-        db.$queryRaw(`
+    const gall = (): Promise<GallRet[]> =>
+        db.$queryRaw`
             SELECT s.id as id, g.undescribed, s.name, i.* FROM gall as g
             INNER JOIN gallspecies as gs ON gs.gall_id = g.id
             INNER JOIN species as s ON gs.species_id = s.id
             INNER JOIN image as i ON i.species_id = s.id
             WHERE i.\`default\` = true
             ORDER BY RANDOM() LIMIT 1
-    `);
+    `;
+
+    type GallRet = {
+        species_id: number;
+        undescribed: boolean;
+        name: string;
+        path: string;
+        creator: string;
+        license: string;
+        sourcelink: string;
+        licenselink: string;
+    };
 
     // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(gall, handleError),
-        TE.map((g) => [
+        TE.map((g: GallRet[]) => [
             {
                 id: g[0].species_id,
                 name: g[0].name,
@@ -705,7 +716,7 @@ export const deleteGall = (speciesid: number): TaskEither<Error, DeleteResult> =
     const deleteImages = () => TE.tryCatch(() => deleteImagesBySpeciesId(speciesid), handleError);
 
     // Prisma can not do cascade deletes. See: https://github.com/prisma/prisma/issues/2057
-    const gallDelete = () => TE.tryCatch(() => db.$executeRaw(`DELETE FROM species WHERE id = ${speciesid}`), handleError);
+    const gallDelete = () => TE.tryCatch(() => db.$executeRaw`DELETE FROM species WHERE id = ${speciesid}`, handleError);
 
     const toDeleteResult = (count: number): DeleteResult => {
         return {
