@@ -167,17 +167,30 @@ export const allFamiliesWithGenera = (): TaskEither<Error, FamilyWithGenera[]> =
 /**
  * Fetch all genera for the given taxon.
  * @param taxon
+ * @param includeEmpty defaults to false, if true then any genera that are not assigned to some species will
+ * also be returned. It is generally useful to not show empty genera in the main (non-Admin) UI but in the admin
+ * UI it is necessary so that new species can be assigned to them.
  */
-export const allGenera = (taxon: typeof GallTaxon | typeof HostTaxon): TaskEither<Error, TaxonomyEntry[]> => {
+export const allGenera = (
+    taxon: typeof GallTaxon | typeof HostTaxon,
+    includeEmpty = false,
+): TaskEither<Error, TaxonomyEntry[]> => {
     const genera = () =>
         db.taxonomy.findMany({
             include: { parent: true },
             orderBy: { name: 'asc' },
             where: {
-                OR: [
-                    { AND: [{ type: GENUS }, { speciestaxonomy: { some: { species: { taxoncode: taxon } } } }] },
-                    { AND: [{ type: GENUS }, { name: 'Unknown' }] },
-                ],
+                OR: includeEmpty
+                    ? [
+                          { AND: [{ type: GENUS }, { speciestaxonomy: { some: { species: { taxoncode: taxon } } } }] },
+                          { AND: [{ type: GENUS }, { name: 'Unknown' }] },
+                          // this clause will pull in all genera that are not yet assigned to any species.
+                          { AND: [{ type: GENUS }, { speciestaxonomy: { none: {} } }] },
+                      ]
+                    : [
+                          { AND: [{ type: GENUS }, { speciestaxonomy: { some: { species: { taxoncode: taxon } } } }] },
+                          { AND: [{ type: GENUS }, { name: 'Unknown' }] },
+                      ],
             },
         });
 

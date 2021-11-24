@@ -734,7 +734,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             gs: await mightFailWithArray<AT.GallApi>()(allGalls()),
             hosts: await mightFailWithArray<AT.HostSimple>()(allHostsSimple()),
             families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(AT.GALL_FAMILY_TYPES)),
-            genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(AT.GallTaxon)),
+            genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(AT.GallTaxon, true)),
             locations: await mightFailWithArray<AT.FilterField>()(getLocations()),
             colors: await mightFailWithArray<AT.FilterField>()(getColors()),
             seasons: await mightFailWithArray<AT.FilterField>()(getSeasons()),

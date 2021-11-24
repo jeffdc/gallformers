@@ -91,7 +91,7 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
     const taxaSearch = () =>
         db.taxonomy.findMany({
             where: {
-                name: { contains: q },
+                OR: [{ name: { contains: q } }, { description: { contains: q } }],
             },
             select: {
                 id: true,
