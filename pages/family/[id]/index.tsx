@@ -49,7 +49,7 @@ const Family = ({ family, tree }: Props): JSX.Element => {
                 <Col xs={12}>
                     <Card>
                         <Card.Header>
-                            <Edit id={fam.id} type="family" />
+                            <Edit id={fam.id} type="taxonomy" />
                             <h1>
                                 {fam.name} - {fam.description}
                             </h1>

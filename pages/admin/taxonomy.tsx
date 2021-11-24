@@ -96,6 +96,10 @@ const columns: EditableTableColumn<Genus>[] = [
     },
 ];
 
+const DELETE_CONFIRMATION_MSG = `The selected genera, ALL of the species in the genera, and all related data will 
+    be deleted. Are you sure you want to do this? The change will not be made and saved until you Submit the 
+    changes on the main page.`;
+
 const TaxonomyAdmin = ({ id, fs }: Props): JSX.Element => {
     const {
         data,
@@ -234,6 +238,7 @@ const TaxonomyAdmin = ({ id, fs }: Props): JSX.Element => {
                         update={updateGenera}
                         customActions={[{ name: 'Move', onUpdate: moveSelected }]}
                         disabled={!selected}
+                        deleteConfirmation={DELETE_CONFIRMATION_MSG}
                     />
                     <hr />
                     <Form.Row>

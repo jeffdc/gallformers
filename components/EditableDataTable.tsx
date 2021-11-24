@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Button } from 'react-bootstrap';
 import DataTable, { TableColumn, TableProps } from 'react-data-table-component';
+import { useConfirmation } from '../hooks/useconfirmation';
 import { WithID } from '../libs/utils/types';
 
 export type SelectEditorOptions = {
@@ -109,6 +110,7 @@ export type EditableTableProps<T extends WithID> = Omit<TableProps<T>, 'columns'
     columns: EditableTableColumn<T>[];
     update: (ts: T[]) => void;
     customActions?: Array<CustomAction<T>>;
+    deleteConfirmation?: string;
 };
 
 const EditableTable = <T extends WithID>(props: EditableTableProps<T>): JSX.Element => {
@@ -116,11 +118,23 @@ const EditableTable = <T extends WithID>(props: EditableTableProps<T>): JSX.Elem
     const [toggleCleared, setToggleCleared] = useState(false);
     const newId = useRef(-1);
 
+    const confirm = useConfirmation();
+
     const deleteSelected = () => {
-        const d = props.data.filter((a) => !selected.has(a.id));
-        setSelected(new Set());
-        setToggleCleared(!toggleCleared);
-        props.update(d);
+        return confirm({
+            variant: 'danger',
+            catchOnCancel: true,
+            title: 'Are you sure want to delete?',
+            message:
+                props.deleteConfirmation ?? `This will delete the current row and all associated data. Do you want to continue?`,
+        })
+            .then(() => {
+                const d = props.data.filter((a) => !selected.has(a.id));
+                setSelected(new Set());
+                setToggleCleared(!toggleCleared);
+                props.update(d);
+            })
+            .catch(() => Promise.resolve());
     };
 
     const add = () => {

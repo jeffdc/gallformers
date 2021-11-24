@@ -18,6 +18,10 @@ import { logger } from '../libs/utils/logger';
 import { capitalizeFirstLetter, mightFail } from '../libs/utils/util';
 
 type SearchResultItem = {
+    // we need a unique ID for the data table and to keep React happy. we can not just use the ID of the
+    // item since we are mixing items of different type in the results and the likelihood of an ID clash
+    // is quite likely.
+    uid: string;
     id: string;
     type: string;
     name: string;
@@ -149,7 +153,7 @@ const GlobalSearch = ({ results, search }: Props): JSX.Element => {
             <Row>
                 <Col xs={12}>
                     <DataTable
-                        keyField={'id'}
+                        keyField="uid"
                         data={results}
                         columns={columns}
                         striped
@@ -185,12 +189,34 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     // an experiment - lets mash them all together and show them in a single table
 
     const r: SearchResultItem[] = species
-        .map((s) => ({ id: s.id.toString(), type: s.taxoncode, name: s.name, aliases: s.aliases }))
-        .concat(glossary.map((g) => ({ id: g.word, type: 'entry', name: capitalizeFirstLetter(g.word), aliases: [] })))
-        .concat(sources.map((s) => ({ id: s.id.toString(), type: 'source', name: s.source, aliases: [] })))
-        .concat(places.map((p) => ({ id: p.id.toString(), type: 'place', name: `${p.name} - ${p.code}`, aliases: [] })))
+        .map((s) => ({ uid: `${s.id}-${s.taxoncode}`, id: s.id.toString(), type: s.taxoncode, name: s.name, aliases: s.aliases }))
         .concat(
-            taxa.map((t) => ({ id: t.id.toString(), type: t.type, name: t.name, aliases: t.description ? [t.description] : [] })),
+            glossary.map((g) => ({
+                uid: `${g.id}-entry`,
+                id: g.word,
+                type: 'entry',
+                name: capitalizeFirstLetter(g.word),
+                aliases: [],
+            })),
+        )
+        .concat(sources.map((s) => ({ uid: `${s.id}-source`, id: s.id.toString(), type: 'source', name: s.source, aliases: [] })))
+        .concat(
+            places.map((p) => ({
+                uid: `${p.id}-place`,
+                id: p.id.toString(),
+                type: 'place',
+                name: `${p.name} - ${p.code}`,
+                aliases: [],
+            })),
+        )
+        .concat(
+            taxa.map((t) => ({
+                uid: `${t.id}-${t.type}`,
+                id: t.id.toString(),
+                type: t.type,
+                name: t.name,
+                aliases: t.description ? [t.description] : [],
+            })),
         );
 
     return {

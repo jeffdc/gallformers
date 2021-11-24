@@ -15,14 +15,14 @@ if (process.env.NODE_ENV === 'production') {
     // Ensure the prisma instance is re-used during hot-reloading
     // Otherwise, a new client will be created on every reload
     // @ts-ignore
-    globalThis['db'] = globalThis['db'] || new PrismaClient();
-    // globalThis['db'] = globalThis['db'] || new PrismaClient({ log: [{ emit: 'event', level: 'query' }] });
+    // globalThis['db'] = globalThis['db'] || new PrismaClient();
+    globalThis['db'] = globalThis['db'] || new PrismaClient({ log: [{ emit: 'event', level: 'query' }] });
     // @ts-ignore
     db = globalThis['db'];
 
-    // db.$on('query', (e) => {
-    //     console.log(`${e.query} // ${e.params}`);
-    // });
+    db.$on('query', (e) => {
+        console.log(`${e.query} // ${e.params}`);
+    });
     // console.log('Development: Created DB connection.');
     // console.log(new Error().stack);
 }

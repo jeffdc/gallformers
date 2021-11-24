@@ -1,4 +1,4 @@
-import { PrismaPromise } from '@prisma/client';
+import { Prisma, PrismaPromise } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
@@ -508,77 +508,140 @@ const updateExistingGenera = (fam: FamilyUpsertFields) => {
     return r;
 };
 
-const familyUpdateSteps = (fam: FamilyUpsertFields): PrismaPromise<unknown>[] => {
-    return [
-        // delete any genera that are not part of the update
-        db.taxonomy.deleteMany({
-            where: {
-                parent_id: fam.id,
-                id: { notIn: fam.genera.map((g) => g.id) },
-            },
-        }),
+const updateExistingSpecies = (fam: FamilyUpsertFields) => {
+    // I tried to do this with prisma but could not figure it out...
+    return fam.genera.map(
+        (g) => db.$executeRaw`UPDATE species
+                SET name = [REPLACE](name, SUBSTRING(name, 1, INSTR(name, ' ') - 1), ${g.name}) 
+            WHERE id IN (
+                SELECT st.species_id
+                    FROM taxonomy AS t
+                        INNER JOIN
+                        speciestaxonomy AS st ON t.id = st.taxonomy_id
+                    WHERE t.id = ${g.id} 
+            );`,
+    );
+};
 
-        ...updateExistingGenera(fam),
+const createGenera = (fam: FamilyUpsertFields) => {
+    if (fam.genera.length <= 0) {
+        // this is dumb but Prisma requires a custom type PrismaPromise that is impossible to construct
+        // from the outside - not sure why I keep bothering with Prisma...
+        return db.taxonomy.count({ where: { id: 1 } });
+    }
 
-        // now we can setup relatoinships and create new genera
-        db.taxonomy.update({
-            where: { id: fam.id },
-            data: {
-                name: fam.name,
-                description: fam.description,
-                taxonomytaxonomy: {
-                    connectOrCreate: fam.genera.map((g) => ({
-                        where: {
-                            taxonomy_id_child_id: {
-                                child_id: g.id,
-                                taxonomy_id: fam.id,
-                            },
+    return db.taxonomy.update({
+        where: { id: fam.id },
+        data: {
+            name: fam.name,
+            description: fam.description,
+            taxonomytaxonomy: {
+                connectOrCreate: fam.genera.map((g) => ({
+                    where: {
+                        taxonomy_id_child_id: {
+                            child_id: g.id,
+                            taxonomy_id: fam.id,
                         },
-                        create: {
-                            child: {
-                                connectOrCreate: {
-                                    where: {
-                                        id: g.id,
-                                    },
-                                    create: {
-                                        name: g.name,
-                                        type: g.type,
-                                        description: g.description,
-                                        parent_id: fam.id,
-                                    },
+                    },
+                    create: {
+                        child: {
+                            connectOrCreate: {
+                                where: {
+                                    id: g.id,
+                                },
+                                create: {
+                                    name: g.name,
+                                    type: g.type,
+                                    description: g.description,
+                                    parent_id: fam.id,
                                 },
                             },
                         },
-                    })),
-                },
+                    },
+                })),
             },
-        }),
+        },
+    });
+};
+
+const familyUpdateSteps = (fam: FamilyUpsertFields): PrismaPromise<unknown>[] => {
+    const deltax = `DELETE FROM taxonomy
+        WHERE parent_id = ${fam.id} AND 
+            id NOT IN (${fam.genera.map((g) => g.id).join(',')});`;
+
+    const delsp = `DELETE FROM species
+        WHERE id IN (
+        SELECT species_id
+        FROM speciestaxonomy AS st
+            INNER JOIN
+            taxonomy AS t ON t.id = st.taxonomy_id
+        WHERE t.parent_id = ${fam.id} AND 
+            id NOT IN (${fam.genera.map((g) => g.id).join(',')}) 
+    );`;
+
+    return [
+        // delete any genera that are not part of the update
+        db.$executeRaw(Prisma.sql([delsp])),
+        db.$executeRaw(Prisma.sql([deltax])),
+
+        // update any species names that are part of the updated genera
+        ...updateExistingSpecies(fam),
+
+        // update the actual genera entries in the taxonomy
+        ...updateExistingGenera(fam),
+
+        // now we can setup relationships and create new genera
+        createGenera(fam),
     ];
 };
 
-const familyCreate = (f: FamilyUpsertFields): PrismaPromise<unknown>[] => {
-    return [
-        db.taxonomy.create({
-            data: {
-                name: f.name,
-                description: f.description,
-                type: f.type,
-                parent: {},
-                taxonomytaxonomy: {
-                    create: f.genera.map((g) => ({
-                        child: {
-                            create: {
-                                name: g.name,
-                                description: g.description,
-                                type: GENUS,
+const familyCreate = async (f: FamilyUpsertFields): Promise<number> => {
+    // I do not think it is possible to create the Family AND the related Genera is a single transaction
+    // using Prisma and the current DB schema. The parent relationship on taxonomy seems to make this
+    // impossible. So we will have to do this as multiple steps without a transaction. :(
+
+    // insert the family and return its ID
+    const famid = await db.taxonomy.create({
+        data: {
+            name: f.name,
+            description: f.description,
+            type: f.type,
+        },
+        select: { id: true },
+    });
+
+    return famid.id;
+};
+
+const generaCreate =
+    (f: FamilyUpsertFields) =>
+    (fid: number): TE.TaskEither<Error, unknown> => {
+        // add the genera and relationships
+        const doCreate = () =>
+            db.$transaction(
+                f.genera.map((g) =>
+                    db.taxonomytaxonomy.create({
+                        data: {
+                            child: {
+                                create: {
+                                    name: g.name,
+                                    description: g.description,
+                                    type: GENUS,
+                                    parent_id: fid,
+                                },
+                            },
+                            taxonomy: {
+                                connect: {
+                                    id: fid,
+                                },
                             },
                         },
-                    })),
-                },
-            },
-        }),
-    ];
-};
+                    }),
+                ),
+            );
+
+        return TE.tryCatch(doCreate, handleError);
+    };
 
 /**
  * Update or insert a Family Taxonomy entry.
@@ -587,14 +650,19 @@ const familyCreate = (f: FamilyUpsertFields): PrismaPromise<unknown>[] => {
  */
 export const upsertFamily = (f: FamilyUpsertFields): TaskEither<Error, FamilyWithGenera> => {
     const updateFamilyTx = TE.tryCatch(() => db.$transaction(familyUpdateSteps(f)), handleError);
-    const createFamilyTx = TE.tryCatch(() => db.$transaction(familyCreate(f)), handleError);
+    // const createFamilyTx = TE.tryCatch(() => db.$transaction(familyCreate(f)), handleError);
+    // eslint-disable-next-line prettier/prettier
+    const createFamily = pipe(
+        TE.tryCatch(() => familyCreate(f), handleError),
+        TE.chain(generaCreate(f)),
+    );
 
     const getFam = () => {
         return familyByName(f.name);
     };
 
     return pipe(
-        f.id < 0 ? createFamilyTx : updateFamilyTx,
+        f.id < 0 ? createFamily : updateFamilyTx,
         TE.chain(getFam),
         TE.fold(
             (e) => TE.left(e),
