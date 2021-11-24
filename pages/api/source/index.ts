@@ -8,7 +8,7 @@ import { sourcesWithSpeciesSourceBySpeciesId } from '../../../libs/db/source';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     const errMsg = (): TE.TaskEither<Err, SourceWithSpeciesSourceApi[]> => {
-        return TE.left({ status: 400, msg: 'Failed to provide the sourceid as a query param.' });
+        return TE.left({ status: 400, msg: 'Failed to provide the speciesid as a query param.' });
     };
 
     await pipe(

@@ -2433,31 +2433,31 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@prisma/client@npm:^2.20":
-  version: 2.30.2
-  resolution: "@prisma/client@npm:2.30.2"
+"@prisma/client@npm:^3.4":
+  version: 3.4.2
+  resolution: "@prisma/client@npm:3.4.2"
   dependencies:
-    "@prisma/engines-version": 2.30.1-2.b8c35d44de987a9691890b3ddf3e2e7effb9bf20
+    "@prisma/engines-version": 3.4.1-2.57771c0558568c7d08bd34c7248af5244ae16bd9
   peerDependencies:
     prisma: "*"
   peerDependenciesMeta:
     prisma:
       optional: true
-  checksum: 9ad4c4036b39002d0fec44be59d1f4652cd7c3e99a0b4afa0c993b683f3a53c87baae7455ec7b8470c2f177425f737a84b48d73a905fc091a0e6357804b3831c
+  checksum: d41c89d2f5a15ed3ae05f28a078a40c82032934de6921abda7bd1173616aeee983a2792305b1128f49ecc30939b2282874b8b65a50e00d84dab92f81e2ce96f1
   languageName: node
   linkType: hard
 
-"@prisma/engines-version@npm:2.30.1-2.b8c35d44de987a9691890b3ddf3e2e7effb9bf20":
-  version: 2.30.1-2.b8c35d44de987a9691890b3ddf3e2e7effb9bf20
-  resolution: "@prisma/engines-version@npm:2.30.1-2.b8c35d44de987a9691890b3ddf3e2e7effb9bf20"
-  checksum: c277efe84d9bc7f14886038c47e3f754e1d12404ba2575a141a00e5830b47f44337e5f7743f1eff9315df88da07189807c5d48247f33e904450103e5e302b5a1
+"@prisma/engines-version@npm:3.4.1-2.57771c0558568c7d08bd34c7248af5244ae16bd9":
+  version: 3.4.1-2.57771c0558568c7d08bd34c7248af5244ae16bd9
+  resolution: "@prisma/engines-version@npm:3.4.1-2.57771c0558568c7d08bd34c7248af5244ae16bd9"
+  checksum: 1216e7fcbdf49bdd7a6ec8d2a0c32df7b572120e7392953df451520c463b9cc9c0347f1417b546002a4beb77babb0ac0327978a9af2d8b22367f27d256f6308f
   languageName: node
   linkType: hard
 
-"@prisma/engines@npm:2.30.1-2.b8c35d44de987a9691890b3ddf3e2e7effb9bf20":
-  version: 2.30.1-2.b8c35d44de987a9691890b3ddf3e2e7effb9bf20
-  resolution: "@prisma/engines@npm:2.30.1-2.b8c35d44de987a9691890b3ddf3e2e7effb9bf20"
-  checksum: 9ced0e4d381267b49b6efbaed6ea4fbb269efc033a10af30657967e5682cdbaf63b1bf0168c2d52a9febf5e1377ac38d506f7b1a21ce026144835b5f24439419
+"@prisma/engines@npm:3.4.1-2.57771c0558568c7d08bd34c7248af5244ae16bd9":
+  version: 3.4.1-2.57771c0558568c7d08bd34c7248af5244ae16bd9
+  resolution: "@prisma/engines@npm:3.4.1-2.57771c0558568c7d08bd34c7248af5244ae16bd9"
+  checksum: 416821b6560dfb24f78e76ff34465c499b87cb1a212f2a80e7304d818dc9fb3fe905b12227ef664b316dbda84b3d5775e7dbaac9e68b39a5712767aa2ec75844
   languageName: node
   linkType: hard
 
@@ -4186,7 +4186,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"classnames@npm:^2.2.0, classnames@npm:^2.2.6, classnames@npm:^2.3.1":
+"classnames@npm:^2.2.0, classnames@npm:^2.2.6, classnames@npm:^2.3, classnames@npm:^2.3.1":
   version: 2.3.1
   resolution: "classnames@npm:2.3.1"
   checksum: 14db8889d56c267a591f08b0834989fe542d47fac659af5a539e110cc4266694e8de86e4e3bbd271157dbd831361310a8293e0167141e80b0f03a0f175c80960
@@ -5789,7 +5789,7 @@ __metadata:
     "@aws-sdk/s3-request-presigner": ^3.3
     "@hookform/resolvers": ^2.0
     "@next/eslint-plugin-next": ^11.1
-    "@prisma/client": ^2.20
+    "@prisma/client": ^3.4
     "@simbathesailor/use-what-changed": ^1.0
     "@testing-library/jest-dom": ^5.11
     "@testing-library/react": ^11
@@ -5806,6 +5806,7 @@ __metadata:
     "@typescript-eslint/parser": ^4
     axios: ^0.21
     bootstrap: ^4.6
+    classnames: ^2.3
     eslint: ^7
     eslint-config-prettier: ^8.3
     eslint-plugin-prettier: ^3
@@ -5826,7 +5827,7 @@ __metadata:
     pino: ^6
     popper.js: ^1.16.1
     prettier: ^2
-    prisma: ^2.20
+    prisma: ^3.4
     react: ^17
     react-bootstrap: ^1.6
     react-bootstrap-typeahead: ^5
@@ -9823,15 +9824,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"prisma@npm:^2.20":
-  version: 2.30.2
-  resolution: "prisma@npm:2.30.2"
+"prisma@npm:^3.4":
+  version: 3.4.2
+  resolution: "prisma@npm:3.4.2"
   dependencies:
-    "@prisma/engines": 2.30.1-2.b8c35d44de987a9691890b3ddf3e2e7effb9bf20
+    "@prisma/engines": 3.4.1-2.57771c0558568c7d08bd34c7248af5244ae16bd9
   bin:
     prisma: build/index.js
     prisma2: build/index.js
-  checksum: 65f4b99d773beefbf9dce9433b54dbcd0bf5a68100e240a15f83de71c4af29f5e063eaecb28a64c9ca240fb07dfaf430a8593e736ed09194247819a33a2a6e8a
+  checksum: b11a21c0d2394f187aa9dc8b780174cd5bd1619c1784842438ec5b207146d437e92f4de8ad9096af8ea0acf7dabc65399186818dbdb890fba9da80a00f4d4d3e
   languageName: node
   linkType: hard
 

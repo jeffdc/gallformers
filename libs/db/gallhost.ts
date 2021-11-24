@@ -12,11 +12,11 @@ import { extractId } from './utils';
 const toValues = (gallid: number, hostids: number[]) => hostids.map((h) => `(NULL, ${gallid}, ${h})`).join(',');
 
 const toInsertStatement = (gallid: number, hostids: number[]): PrismaPromise<number> =>
-    db.$executeRaw(`INSERT INTO host (id, gall_species_id, host_species_id) VALUES ${toValues(gallid, hostids)};`);
+    db.$executeRaw`INSERT INTO host (id, gall_species_id, host_species_id) VALUES ${toValues(gallid, hostids)};`;
 
 export const updateGallHosts = (gallhost: GallHostUpdateFields): TE.TaskEither<Error, GallApi> => {
     const doTx = (genusHosts: number[]) => () => {
-        const deletes = db.$executeRaw(`DELETE FROM host WHERE gall_species_id = ${gallhost.gall};`);
+        const deletes = db.$executeRaw`DELETE FROM host WHERE gall_species_id = ${gallhost.gall};`;
         const hosts = [...new Set([...gallhost.hosts, ...genusHosts])];
 
         const steps = [deletes];

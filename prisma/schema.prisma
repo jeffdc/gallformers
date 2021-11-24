@@ -1,6 +1,6 @@
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["orderByRelation"]
+  provider = "prisma-client-js"
+  // previewFeatures = []
 }
 
 datasource db {
@@ -352,7 +352,7 @@ model walls {
 }
 
 model gallseason {
-  id        Int     @id @default(autoincrement())
+  id        Int    @id @default(autoincrement())
   gall_id   Int
   season_id Int
   gall      gall   @relation(fields: [gall_id], references: [id])

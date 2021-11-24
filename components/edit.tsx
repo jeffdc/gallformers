@@ -4,7 +4,7 @@ import React from 'react';
 
 type Props = {
     id: string | number;
-    type: 'family' | 'gall' | 'gallhost' | 'glossary' | 'host' | 'images' | 'source' | 'speciessource' | 'section' | 'place';
+    type: 'taxonomy' | 'gall' | 'gallhost' | 'glossary' | 'host' | 'images' | 'source' | 'speciessource' | 'section' | 'place';
 };
 
 const Edit = ({ id, type }: Props): JSX.Element => {

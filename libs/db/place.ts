@@ -101,9 +101,7 @@ export const placeById = (id: number): TaskEither<Error, PlaceWithHostsApi[]> =>
 export const deletePlace = (id: number): TaskEither<Error, DeleteResult> => {
     const results = () =>
         // since Prisma does not yet handle cascade deletion
-        db.$executeRaw(`
-            DELETE FROM place WHERE id = ${id}
-        `);
+        db.$executeRaw`DELETE FROM place WHERE id = ${id}`;
 
     const toDeleteResult = (result: number): DeleteResult => {
         return {

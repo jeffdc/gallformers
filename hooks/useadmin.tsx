@@ -17,6 +17,7 @@ import { AdminFormFields, useAPIs } from './useAPIs';
 import { useConfirmation } from './useconfirmation';
 
 type AdminData<T, FormFields> = {
+    data: T[];
     setData: (ts: T[]) => void;
     selected?: T;
     setSelected: (t: T | undefined) => void;
@@ -216,6 +217,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     }, [selected, onDataChange]);
 
     return {
+        data: data,
         setData: setData,
         selected: selected,
         setSelected: setSelected,

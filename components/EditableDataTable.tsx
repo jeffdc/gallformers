@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Button } from 'react-bootstrap';
 import DataTable, { TableColumn, TableProps } from 'react-data-table-component';
+import { useConfirmation } from '../hooks/useconfirmation';
 import { WithID } from '../libs/utils/types';
 
 export type SelectEditorOptions = {
@@ -99,10 +100,17 @@ const EditableCell = <T extends WithID>({ row, rowIndex, col, onChange, columnKe
     );
 };
 
+export type CustomAction<T extends WithID> = {
+    name: string;
+    onUpdate: (ts: T[]) => void;
+};
+
 export type EditableTableProps<T extends WithID> = Omit<TableProps<T>, 'columns'> & {
     createEmpty: () => T;
     columns: EditableTableColumn<T>[];
     update: (ts: T[]) => void;
+    customActions?: Array<CustomAction<T>>;
+    deleteConfirmation?: string;
 };
 
 const EditableTable = <T extends WithID>(props: EditableTableProps<T>): JSX.Element => {
@@ -110,11 +118,23 @@ const EditableTable = <T extends WithID>(props: EditableTableProps<T>): JSX.Elem
     const [toggleCleared, setToggleCleared] = useState(false);
     const newId = useRef(-1);
 
+    const confirm = useConfirmation();
+
     const deleteSelected = () => {
-        const d = props.data.filter((a) => !selected.has(a.id));
-        setSelected(new Set());
-        setToggleCleared(!toggleCleared);
-        props.update(d);
+        return confirm({
+            variant: 'danger',
+            catchOnCancel: true,
+            title: 'Are you sure want to delete?',
+            message:
+                props.deleteConfirmation ?? `This will delete the current row and all associated data. Do you want to continue?`,
+        })
+            .then(() => {
+                const d = props.data.filter((a) => !selected.has(a.id));
+                setSelected(new Set());
+                setToggleCleared(!toggleCleared);
+                props.update(d);
+            })
+            .catch(() => Promise.resolve());
     };
 
     const add = () => {
@@ -140,6 +160,19 @@ const EditableTable = <T extends WithID>(props: EditableTableProps<T>): JSX.Elem
 
     const contextActions = (
         <>
+            {props.customActions?.map((ca) => (
+                <Button
+                    key={ca.name}
+                    variant="secondary"
+                    className="btn-sm mr-1"
+                    onClick={() => {
+                        ca.onUpdate(props.data.filter((a) => selected.has(a.id)));
+                        setToggleCleared(!toggleCleared);
+                    }}
+                >
+                    {ca.name}
+                </Button>
+            ))}
             <Button key="delete" variant="danger" className="btn-sm" onClick={deleteSelected}>
                 Delete
             </Button>
@@ -167,7 +200,7 @@ const EditableTable = <T extends WithID>(props: EditableTableProps<T>): JSX.Elem
             onSelectedRowsChange={onSelectionChange}
             clearSelectedRows={toggleCleared}
             actions={
-                <Button onClick={add} variant="primary" className="btn-sm">
+                <Button onClick={add} variant="primary" className="btn-sm" disabled={props.disabled}>
                     Add New
                 </Button>
             }

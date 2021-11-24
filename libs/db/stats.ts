@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { handleError } from '../utils/util';
@@ -10,7 +11,7 @@ export type Stat = {
 
 export const getCurrentStats = (): TaskEither<Error, Stat[]> => {
     const stats = () =>
-        db.$queryRaw<Stat[]>(`
+        db.$queryRaw<Stat[]>(Prisma.sql`
             SELECT 'hosts' AS type,
                 count( * ) AS count
             FROM species

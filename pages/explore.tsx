@@ -9,6 +9,7 @@ import { GallTaxon } from '../libs/api/apitypes';
 import { FamilyTaxonomy } from '../libs/api/taxonomy';
 import { getFamiliesWithSpecies } from '../libs/db/taxonomy';
 import { getStaticPropsWith } from '../libs/pages/nextPageHelpers';
+import { formatWithDescription } from '../libs/pages/renderhelpers';
 import { hasProp } from '../libs/utils/util';
 
 type Props = {
@@ -80,12 +81,12 @@ export const getStaticProps: GetStaticProps = async () => {
 const toTree = (fgs: readonly FamilyTaxonomy[]): TreeNodeInArray[] =>
     fgs.map((f) => ({
         key: f.id.toString(),
-        label: `${f.name} - ${f.description}`,
+        label: formatWithDescription(f.name, f.description),
         nodes: f.taxonomytaxonomy
             .sort((a, b) => a.child.name.localeCompare(b.child.name))
             .map((tt) => ({
                 key: tt.child.id.toString(),
-                label: tt.child.name,
+                label: formatWithDescription(tt.child.name, tt.child.description),
                 nodes: tt.child.speciestaxonomy
                     .sort((a, b) => a.species.name.localeCompare(b.species.name))
                     .map((st) => ({

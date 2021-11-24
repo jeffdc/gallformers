@@ -47,25 +47,23 @@ const Section = ({ section }: Props): JSX.Element => {
         return <div>Loading...</div>;
     }
 
+    const fullName = section.description ? `${section.name} (${section.description})` : section.name;
+
     return (
         <Container className="pt-2" fluid>
             <Head>
-                <title>{section.name}</title>
-                <meta name="description" content={`Section ${section.name}`} />
+                <title>{fullName}</title>
+                <meta name="description" content={`Section ${fullName}`} />
             </Head>
             <Row>
                 <Col>
-                    <h2>{section.name}</h2>
+                    <h2>{fullName}</h2>
                 </Col>
                 <Col xs={2} className="mr-1">
                     <span className="p-0 pr-1 my-auto">
                         <Edit id={section.id} type="section" />
                     </span>
                 </Col>
-            </Row>
-            <Row>
-                <Col>{section.description}</Col>
-                <Col> {section.aliases.map((a) => a.name).join(', ')}</Col>
             </Row>
             <Row className="pt-2">
                 <Col>

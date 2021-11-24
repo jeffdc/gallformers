@@ -36,6 +36,8 @@ export const EMPTY_TAXONOMYENTRY: TaxonomyEntry = {
     parent: O.none,
 };
 
+export const EMPTY_GENUS: TaxonomyEntry = { ...EMPTY_TAXONOMYENTRY, type: 'genus' };
+
 export type DBTaxonomyWithParent =
     | (taxonomy & {
           parent?: taxonomy | null;
@@ -97,6 +99,12 @@ export type TaxonomyTree = taxonomy & {
     taxonomyalias: taxonomyalias[];
 };
 
+export type Genus = Omit<TaxonomyEntry, 'parent'>;
+
+export type FamilyWithGenera = TaxonomyEntry & {
+    genera: Genus[];
+};
+
 /**
  * The id should be set to any number less than 0 to indicate a new record.
  */
@@ -109,10 +117,20 @@ export type TaxonomyUpsertFields = {
     parent: O.Option<TaxonomyEntry>;
 };
 
+export type FamilyUpsertFields = Omit<TaxonomyUpsertFields, 'species' | 'parent'> & {
+    genera: Genus[];
+};
+
 export type SectionApi = {
     id: number;
     name: string;
     description: string;
     species: SimpleSpecies[];
     aliases: AliasApi[];
+};
+
+export type GeneraMoveFields = {
+    oldFamilyId: number;
+    newFamilyId: number;
+    genera: number[];
 };

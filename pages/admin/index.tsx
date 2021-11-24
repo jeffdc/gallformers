@@ -21,7 +21,7 @@ const Admin = (): JSX.Element => {
                     <Col>
                         <ListGroup className="pt-3">
                             <ListGroupItem>
-                                Create/modify <Link href="./admin/family">Families</Link>
+                                Create/modify <Link href="./admin/taxonomy">Taxonomy</Link>
                             </ListGroupItem>
                             <ListGroupItem>
                                 Create/modify <Link href="./admin/section">Sections</Link>

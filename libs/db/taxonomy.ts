@@ -1,3 +1,4 @@
+import { Prisma, PrismaPromise } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
@@ -16,7 +17,10 @@ import {
 import {
     FAMILY,
     FamilyTaxonomy,
+    FamilyUpsertFields,
+    FamilyWithGenera,
     FGS,
+    GeneraMoveFields,
     GENUS,
     SECTION,
     SectionApi,
@@ -53,6 +57,29 @@ export const taxonomyByName = (name: string): TaskEither<Error, O.Option<Taxonom
     return pipe(
         TE.tryCatch(() => db.taxonomy.findFirst({ where: { name: { equals: name } } }), handleError),
         TE.map((t) => pipe(t, O.fromNullable, O.map(toTaxonomyEntry))),
+    );
+};
+
+export const familyByName = (name: string): TaskEither<Error, O.Option<FamilyWithGenera>> => {
+    return pipe(
+        TE.tryCatch(
+            () =>
+                db.taxonomy.findFirst({
+                    include: { taxonomy: true },
+                    where: { AND: [{ name: { equals: name } }, { type: { equals: FAMILY } }] },
+                }),
+            handleError,
+        ),
+        TE.map((t) =>
+            pipe(
+                t,
+                O.fromNullable,
+                O.map((t) => ({
+                    ...toTaxonomyEntry(t),
+                    genera: t.taxonomy.map(toTaxonomyEntry),
+                })),
+            ),
+        ),
     );
 };
 
@@ -116,20 +143,54 @@ export const allFamilies = (
     );
 };
 
+export const allFamiliesWithGenera = (): TaskEither<Error, FamilyWithGenera[]> => {
+    const families = () =>
+        db.taxonomy.findMany({
+            include: {
+                taxonomy: true,
+            },
+            orderBy: { name: 'asc' },
+            where: { type: { equals: 'family' } },
+        });
+
+    return pipe(
+        TE.tryCatch(families, handleError),
+        TE.map((taxs) =>
+            taxs.map((tax) => ({
+                ...toTaxonomyEntry(tax),
+                genera: tax.taxonomy.map(toTaxonomyEntry),
+            })),
+        ),
+    );
+};
+
 /**
  * Fetch all genera for the given taxon.
  * @param taxon
+ * @param includeEmpty defaults to false, if true then any genera that are not assigned to some species will
+ * also be returned. It is generally useful to not show empty genera in the main (non-Admin) UI but in the admin
+ * UI it is necessary so that new species can be assigned to them.
  */
-export const allGenera = (taxon: typeof GallTaxon | typeof HostTaxon): TaskEither<Error, TaxonomyEntry[]> => {
+export const allGenera = (
+    taxon: typeof GallTaxon | typeof HostTaxon,
+    includeEmpty = false,
+): TaskEither<Error, TaxonomyEntry[]> => {
     const genera = () =>
         db.taxonomy.findMany({
             include: { parent: true },
             orderBy: { name: 'asc' },
             where: {
-                OR: [
-                    { AND: [{ type: GENUS }, { speciestaxonomy: { some: { species: { taxoncode: taxon } } } }] },
-                    { AND: [{ type: GENUS }, { name: 'Unknown' }] },
-                ],
+                OR: includeEmpty
+                    ? [
+                          { AND: [{ type: GENUS }, { speciestaxonomy: { some: { species: { taxoncode: taxon } } } }] },
+                          { AND: [{ type: GENUS }, { name: 'Unknown' }] },
+                          // this clause will pull in all genera that are not yet assigned to any species.
+                          { AND: [{ type: GENUS }, { speciestaxonomy: { none: {} } }] },
+                      ]
+                    : [
+                          { AND: [{ type: GENUS }, { speciestaxonomy: { some: { species: { taxoncode: taxon } } } }] },
+                          { AND: [{ type: GENUS }, { name: 'Unknown' }] },
+                      ],
             },
         });
 
@@ -364,7 +425,7 @@ export const deleteTaxonomyEntry = (id: number): TaskEither<Error, DeleteResult>
     const doDelete = () => {
         // have to do raw calls since Prisma does not support cascade deletion.
         return db.$transaction([
-            db.$executeRaw(`
+            db.$executeRaw`
                 DELETE FROM species
                     WHERE id IN (
                     SELECT s.id
@@ -377,10 +438,10 @@ export const deleteTaxonomyEntry = (id: number): TaskEither<Error, DeleteResult>
                         species AS s ON s.id = st.species_id
                     WHERE f.id = ${id}
                 );
-            `),
-            db.$executeRaw(`
+            `,
+            db.$executeRaw`
                 DELETE FROM taxonomy WHERE id = ${id}
-        `),
+        `,
         ]);
     };
 
@@ -442,5 +503,223 @@ export const upsertTaxonomy = (f: TaxonomyUpsertFields): TaskEither<Error, Taxon
     return pipe(
         TE.tryCatch(upsert, handleError),
         TE.map(toTaxonomyEntry),
+    );
+};
+
+const updateExistingGenera = (fam: FamilyUpsertFields) => {
+    const r = fam.genera
+        .filter((g) => g.id > 0) // if it is new then we do not need to worry about it
+        .map((g) =>
+            db.taxonomy.update({
+                where: { id: g.id },
+                data: {
+                    name: g.name,
+                    description: g.description,
+                },
+            }),
+        );
+    return r;
+};
+
+const updateExistingSpecies = (fam: FamilyUpsertFields) => {
+    // I tried to do this with prisma but could not figure it out...
+    return fam.genera.map(
+        (g) => db.$executeRaw`UPDATE species
+                SET name = [REPLACE](name, SUBSTRING(name, 1, INSTR(name, ' ') - 1), ${g.name}) 
+            WHERE id IN (
+                SELECT st.species_id
+                    FROM taxonomy AS t
+                        INNER JOIN
+                        speciestaxonomy AS st ON t.id = st.taxonomy_id
+                    WHERE t.id = ${g.id} 
+            );`,
+    );
+};
+
+const createGenera = (fam: FamilyUpsertFields) => {
+    if (fam.genera.length <= 0) {
+        // this is dumb but Prisma requires a custom type PrismaPromise that is impossible to construct
+        // from the outside - not sure why I keep bothering with Prisma...
+        return db.taxonomy.count({ where: { id: 1 } });
+    }
+
+    return db.taxonomy.update({
+        where: { id: fam.id },
+        data: {
+            name: fam.name,
+            description: fam.description,
+            taxonomytaxonomy: {
+                connectOrCreate: fam.genera.map((g) => ({
+                    where: {
+                        taxonomy_id_child_id: {
+                            child_id: g.id,
+                            taxonomy_id: fam.id,
+                        },
+                    },
+                    create: {
+                        child: {
+                            connectOrCreate: {
+                                where: {
+                                    id: g.id,
+                                },
+                                create: {
+                                    name: g.name,
+                                    type: g.type,
+                                    description: g.description,
+                                    parent_id: fam.id,
+                                },
+                            },
+                        },
+                    },
+                })),
+            },
+        },
+    });
+};
+
+const familyUpdateSteps = (fam: FamilyUpsertFields): PrismaPromise<unknown>[] => {
+    const deltax = `DELETE FROM taxonomy
+        WHERE parent_id = ${fam.id} AND 
+            id NOT IN (${fam.genera.map((g) => g.id).join(',')});`;
+
+    const delsp = `DELETE FROM species
+        WHERE id IN (
+        SELECT species_id
+        FROM speciestaxonomy AS st
+            INNER JOIN
+            taxonomy AS t ON t.id = st.taxonomy_id
+        WHERE t.parent_id = ${fam.id} AND 
+            id NOT IN (${fam.genera.map((g) => g.id).join(',')}) 
+    );`;
+
+    return [
+        // delete any genera that are not part of the update
+        db.$executeRaw(Prisma.sql([delsp])),
+        db.$executeRaw(Prisma.sql([deltax])),
+
+        // update any species names that are part of the updated genera
+        ...updateExistingSpecies(fam),
+
+        // update the actual genera entries in the taxonomy
+        ...updateExistingGenera(fam),
+
+        // now we can setup relationships and create new genera
+        createGenera(fam),
+    ];
+};
+
+const familyCreate = async (f: FamilyUpsertFields): Promise<number> => {
+    // I do not think it is possible to create the Family AND the related Genera is a single transaction
+    // using Prisma and the current DB schema. The parent relationship on taxonomy seems to make this
+    // impossible. So we will have to do this as multiple steps without a transaction. :(
+
+    // insert the family and return its ID
+    const famid = await db.taxonomy.create({
+        data: {
+            name: f.name,
+            description: f.description,
+            type: f.type,
+        },
+        select: { id: true },
+    });
+
+    return famid.id;
+};
+
+const generaCreate =
+    (f: FamilyUpsertFields) =>
+    (fid: number): TE.TaskEither<Error, unknown> => {
+        // add the genera and relationships
+        const doCreate = () =>
+            db.$transaction(
+                f.genera.map((g) =>
+                    db.taxonomytaxonomy.create({
+                        data: {
+                            child: {
+                                create: {
+                                    name: g.name,
+                                    description: g.description,
+                                    type: GENUS,
+                                    parent_id: fid,
+                                },
+                            },
+                            taxonomy: {
+                                connect: {
+                                    id: fid,
+                                },
+                            },
+                        },
+                    }),
+                ),
+            );
+
+        return TE.tryCatch(doCreate, handleError);
+    };
+
+/**
+ * Update or insert a Family Taxonomy entry.
+ * @param f
+ * @returns the count of the number of records added, will be 1 for success and 0 for a failure
+ */
+export const upsertFamily = (f: FamilyUpsertFields): TaskEither<Error, FamilyWithGenera> => {
+    const updateFamilyTx = TE.tryCatch(() => db.$transaction(familyUpdateSteps(f)), handleError);
+    // const createFamilyTx = TE.tryCatch(() => db.$transaction(familyCreate(f)), handleError);
+    // eslint-disable-next-line prettier/prettier
+    const createFamily = pipe(
+        TE.tryCatch(() => familyCreate(f), handleError),
+        TE.chain(generaCreate(f)),
+    );
+
+    const getFam = () => {
+        return familyByName(f.name);
+    };
+
+    return pipe(
+        f.id < 0 ? createFamily : updateFamilyTx,
+        TE.chain(getFam),
+        TE.fold(
+            (e) => TE.left(e),
+            (s) =>
+                pipe(
+                    s,
+                    O.fold(
+                        () => TE.left(new Error('Failed to get upserted data.')),
+                        (te) => TE.right(te),
+                    ),
+                ),
+        ),
+        TE.map((x) => x),
+    );
+};
+
+export const moveGenera = (f: GeneraMoveFields): TaskEither<Error, FamilyWithGenera[]> => {
+    const doMove = () =>
+        db.$transaction([
+            // reassign the parent to the new family for all of the passed in genera
+            db.taxonomy.updateMany({
+                where: { id: { in: f.genera } },
+                data: {
+                    parent_id: f.newFamilyId,
+                },
+            }),
+            // delete all mappings between the old family and the genera
+            db.taxonomytaxonomy.deleteMany({
+                where: { child_id: { in: f.genera }, taxonomy_id: f.oldFamilyId },
+            }),
+            // add mappings between the new family and the genera
+            ...f.genera.map((g) =>
+                db.taxonomytaxonomy.create({
+                    data: {
+                        taxonomy_id: f.newFamilyId,
+                        child_id: g,
+                    },
+                }),
+            ),
+        ]);
+
+    // eslint-disable-next-line prettier/prettier
+    return pipe(
+        TE.tryCatch(doMove, handleError),
+        TE.chain(allFamiliesWithGenera),
     );
 };

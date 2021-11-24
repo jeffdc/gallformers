@@ -395,7 +395,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             id: id,
             hs: await mightFailWithArray<HostApi>()(allHosts()),
             families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(HOST_FAMILY_TYPES)),
-            genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon)),
+            genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon, true)),
             sections: await mightFailWithArray<TaxonomyEntry>()(allSections()),
             abundances: await mightFailWithArray<AbundanceApi>()(getAbundances()),
             places: await mightFailWithArray<PlaceNoTreeApi>()(getPlaces()),

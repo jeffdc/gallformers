@@ -1,4 +1,4 @@
-import { source, species } from '@prisma/client';
+import { source } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { PlaceNoTreeApi } from '../api/apitypes';
@@ -13,6 +13,7 @@ export type TinySpecies = {
     id: number;
     name: string;
     taxoncode: string;
+    aliases: string[];
 };
 
 export type TinySource = {
@@ -36,7 +37,16 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
             where: {
                 OR: { name: { contains: q } },
             },
+            include: {
+                aliasspecies: {
+                    include: {
+                        alias: true,
+                    },
+                },
+            },
         });
+
+    type SpeciesSearch = ExtractTFromPromise<ReturnType<typeof speciesSearch>>;
 
     const aliasSearch = () =>
         db.alias.findMany({
@@ -45,13 +55,29 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
         });
 
     const mergeSpeciesAndAliases =
-        (s: species[]) =>
-        (a: ExtractTFromPromise<ReturnType<typeof aliasSearch>>): species[] => {
-            const other = a.map((aa) => aa.aliasspecies.map((as) => as.species)).flat();
+        (species: SpeciesSearch) =>
+        (aliases: ExtractTFromPromise<ReturnType<typeof aliasSearch>>): SpeciesSearch => {
+            // transpose the alias->species into species->alias
+            const other = aliases
+                .map((alias) =>
+                    alias.aliasspecies.map((as) => ({
+                        ...as.species,
+                        aliasspecies: [
+                            {
+                                alias_id: as.alias_id,
+                                species_id: as.species_id,
+                                alias: { name: alias.name, description: alias.description, id: alias.id, type: alias.type },
+                            },
+                        ],
+                    })),
+                )
+                .flat();
+
+            // merge with existing species
             other.forEach((o) => {
-                if (!s.find((s) => s.id === o.id)) s.push(o);
+                if (!species.find((s) => s.id === o.id)) species.push(o);
             });
-            return s.sort((a, b) => a.name.localeCompare(b.name));
+            return species.sort((a, b) => a.name.localeCompare(b.name));
         };
 
     const sourceSearch = () =>
@@ -65,7 +91,7 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
     const taxaSearch = () =>
         db.taxonomy.findMany({
             where: {
-                name: { contains: q },
+                OR: [{ name: { contains: q } }, { description: { contains: q } }],
             },
             select: {
                 id: true,
@@ -90,11 +116,12 @@ export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchR
             type: t.type as TaxonomyType,
         }));
 
-    const winnowSpecies = (sp: species[]): TinySpecies[] =>
+    const winnowSpecies = (sp: SpeciesSearch): TinySpecies[] =>
         sp.map((s) => ({
             id: s.id,
             name: s.name,
             taxoncode: s.taxoncode == null ? 'plant' : s.taxoncode,
+            aliases: s.aliasspecies.map((a) => a.alias.name),
         }));
 
     const winnowSource = (source: source[]): TinySource[] =>

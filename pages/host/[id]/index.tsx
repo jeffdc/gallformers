@@ -7,13 +7,8 @@ import { useRouter } from 'next/router';
 import React, { useMemo, useState } from 'react';
 import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
 import DataTable from 'react-data-table-component';
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
-import remarkBreaks from 'remark-breaks';
-import externalLinks from 'remark-external-links';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
-import InfoTip from '../../../components/infotip';
 import SeeAlso from '../../../components/seealso';
 import SourceList from '../../../components/sourcelist';
 import SpeciesSynonymy from '../../../components/speciesSynonymy';
@@ -23,7 +18,7 @@ import { allHostIds, hostById } from '../../../libs/db/host';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkSourceToGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { formatLicense, sourceToDisplay } from '../../../libs/pages/renderhelpers';
+import { formatWithDescription } from '../../../libs/pages/renderhelpers';
 import { TABLE_CUSTOM_STYLES } from '../../../libs/utils/DataTableConstants';
 
 type Props = {
@@ -135,7 +130,10 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                 {' | '}
                                 <strong>Genus: </strong>
                                 <Link key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
-                                    <a className="font-italic"> {taxonomy.genus.name}</a>
+                                    <a className="font-italic">
+                                        {' '}
+                                        {formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}
+                                    </a>
                                 </Link>
                             </p>
                         </Col>
@@ -190,50 +188,10 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
             </Row>
             <hr />
             <Row>
-                <Col id="description" className="lead p-3">
-                    {selectedSource && selectedSource.description && (
-                        <span>
-                            <span className="source-quotemark">&ldquo;</span>
-                            <ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[externalLinks, remarkBreaks]}>
-                                {selectedSource.description}
-                            </ReactMarkdown>
-                            <span className="source-quotemark">&rdquo;</span>
-                            <p>
-                                <i>- {sourceToDisplay(selectedSource.source)}</i>
-                                <InfoTip
-                                    id="copyright"
-                                    text={`Source entries are edited for relevance, brevity, and formatting. All text is quoted from the selected source except where noted by [brackets].\nThis source: ${formatLicense(
-                                        selectedSource.source,
-                                    )}.`}
-                                    tip="©"
-                                />
-                            </p>
-                            <p className="description-text">
-                                {selectedSource.externallink && (
-                                    <span>
-                                        Reference:{' '}
-                                        <a href={selectedSource.externallink} target="_blank" rel="noreferrer">
-                                            {selectedSource.externallink}
-                                        </a>
-                                    </span>
-                                )}
-                            </p>
-                        </span>
-                    )}
-                </Col>
-            </Row>
-            <hr />
-            <Row>
-                <Col>
-                    <Edit id={host.id} type="speciessource" />
-                    <strong>Further Information:</strong>
-                </Col>
-            </Row>
-            <Row>
                 <Col>
                     <SourceList
                         data={host.speciessource}
-                        defaultSelection={selectedSource?.source}
+                        defaultSelection={selectedSource}
                         onSelectionChange={(s) => setSelectedSource(host.speciessource.find((spso) => spso.source_id == s?.id))}
                     />
                     <hr />
