@@ -6,9 +6,10 @@ import EditableDataTable, { EditableTableColumn } from './EditableDataTable';
 export type AliasTableProps = {
     data: AliasApi[];
     setData: (d: AliasApi[]) => void;
+    disabled?: boolean;
 };
 
-const AliasTable = ({ data, setData }: AliasTableProps): JSX.Element => {
+const AliasTable = ({ data, setData, disabled }: AliasTableProps): JSX.Element => {
     const columns: EditableTableColumn<AliasApi>[] = [
         {
             name: 'Alias Name',
@@ -52,6 +53,7 @@ const AliasTable = ({ data, setData }: AliasTableProps): JSX.Element => {
                 customStyles={TABLE_CUSTOM_STYLES}
                 createEmpty={() => EmptyAlias}
                 update={setData}
+                disabled={disabled}
             />
             <p className="font-italic small">
                 Changes to the aliases will not be saved until you save the whole form by clicking &lsquo;Submit&rsquo; below.
