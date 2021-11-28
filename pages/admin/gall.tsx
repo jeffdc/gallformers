@@ -218,6 +218,10 @@ const Gall = ({
         createNewGall,
     );
 
+    const areRequiredFieldsFilled = () => {
+        return !(selected && selected.fgs.family.id >= 0 && selected.hosts.length > 0);
+    };
+
     const newUndescribedDone = (data: UndescribedData | undefined) => {
         setShowNewUndescribed(false);
         if (data != undefined) {
@@ -387,31 +391,6 @@ const Gall = ({
                             </span>
                         )}
                     </Col>
-                    <Col>
-                        Abundance:
-                        <Typeahead
-                            name="abundance"
-                            control={form.control}
-                            options={abundances}
-                            labelKey="abundance"
-                            disabled={!selected}
-                            selected={
-                                selected?.abundance
-                                    ? pipe(
-                                          selected.abundance,
-                                          O.fold(constant([]), (a) => [a]),
-                                      )
-                                    : []
-                            }
-                            onChange={(g) => {
-                                if (selected) {
-                                    selected.abundance = O.fromNullable(g[0]);
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                            clearButton
-                        />
-                    </Col>
                 </Row>
                 <Row className="form-group">
                     <Col>
@@ -456,7 +435,7 @@ const Gall = ({
                                     }}
                                     placeholder="Detachable"
                                     className="form-control"
-                                    disabled={!selected}
+                                    disabled={areRequiredFieldsFilled()}
                                 >
                                     {AT.Detachables.map((d) => (
                                         <option key={d.id}>{d.value}</option>
@@ -474,7 +453,7 @@ const Gall = ({
                             labelKey="field"
                             multiple
                             clearButton
-                            disabled={!selected}
+                            disabled={areRequiredFieldsFilled()}
                             selected={selected ? selected.gall.gallwalls : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -493,7 +472,7 @@ const Gall = ({
                             labelKey="field"
                             multiple
                             clearButton
-                            disabled={!selected}
+                            disabled={areRequiredFieldsFilled()}
                             selected={selected ? selected.gall.gallcells : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -512,7 +491,7 @@ const Gall = ({
                             labelKey="field"
                             multiple
                             clearButton
-                            disabled={!selected}
+                            disabled={areRequiredFieldsFilled()}
                             selected={selected ? selected.gall.gallalignment : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -533,7 +512,7 @@ const Gall = ({
                             labelKey="field"
                             multiple
                             clearButton
-                            disabled={!selected}
+                            disabled={areRequiredFieldsFilled()}
                             selected={selected ? selected.gall.gallcolor : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -552,7 +531,7 @@ const Gall = ({
                             labelKey="field"
                             multiple
                             clearButton
-                            disabled={!selected}
+                            disabled={areRequiredFieldsFilled()}
                             selected={selected ? selected.gall.gallshape : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -571,7 +550,7 @@ const Gall = ({
                             labelKey="field"
                             multiple
                             clearButton
-                            disabled={!selected}
+                            disabled={areRequiredFieldsFilled()}
                             selected={selected ? selected.gall.gallseason : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -590,7 +569,7 @@ const Gall = ({
                             labelKey="field"
                             multiple
                             clearButton
-                            disabled={!selected}
+                            disabled={areRequiredFieldsFilled()}
                             selected={selected ? selected.gall.gallform : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -611,7 +590,7 @@ const Gall = ({
                             labelKey="field"
                             multiple
                             clearButton
-                            disabled={!selected}
+                            disabled={areRequiredFieldsFilled()}
                             selected={selected ? selected.gall.galllocation : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -630,7 +609,7 @@ const Gall = ({
                             labelKey="field"
                             multiple
                             clearButton
-                            disabled={!selected}
+                            disabled={areRequiredFieldsFilled()}
                             selected={selected ? selected.gall.galltexture : []}
                             onChange={(w) => {
                                 if (selected) {
@@ -638,6 +617,31 @@ const Gall = ({
                                     setSelected({ ...selected });
                                 }
                             }}
+                        />
+                    </Col>
+                    <Col>
+                        Abundance:
+                        <Typeahead
+                            name="abundance"
+                            control={form.control}
+                            options={abundances}
+                            labelKey="abundance"
+                            disabled={areRequiredFieldsFilled()}
+                            selected={
+                                selected?.abundance
+                                    ? pipe(
+                                          selected.abundance,
+                                          O.fold(constant([]), (a) => [a]),
+                                      )
+                                    : []
+                            }
+                            onChange={(g) => {
+                                if (selected) {
+                                    selected.abundance = O.fromNullable(g[0]);
+                                    setSelected({ ...selected });
+                                }
+                            }}
+                            clearButton
                         />
                     </Col>
                 </Row>
@@ -655,6 +659,7 @@ const Gall = ({
                                             setSelected({ ...selected });
                                         }
                                     }}
+                                    disabled={areRequiredFieldsFilled()}
                                 />
                             )}
                         ></Controller>
@@ -671,7 +676,7 @@ const Gall = ({
                                     type="checkbox"
                                     className="form-input-checkbox"
                                     checked={selected ? selected.datacomplete : false}
-                                    disabled={!selected}
+                                    disabled={areRequiredFieldsFilled()}
                                     onChange={(e) => {
                                         if (selected) {
                                             selected.datacomplete = e.currentTarget.checked;
@@ -696,7 +701,7 @@ const Gall = ({
                                     type="checkbox"
                                     className="form-input-checkbox"
                                     checked={selected ? selected.gall.undescribed : false}
-                                    disabled={!selected}
+                                    disabled={areRequiredFieldsFilled()}
                                     onChange={(e) => {
                                         if (selected) {
                                             selected.gall.undescribed = e.currentTarget.checked;

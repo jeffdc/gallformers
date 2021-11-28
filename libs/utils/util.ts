@@ -51,7 +51,7 @@ export const mightFailWithStringArray = mightFailWithArray<string>();
 export const mightFailWithMap = <K, V>(): (<S extends TE.TaskEither<Error, Map<K, V>>>(s: S) => Promise<Map<K, V>>) =>
     mightFail(constant(new Map<K, V>()));
 /**
- * Cute litte hacky function to handle an error. It always throws. Being a function with a generic return type it allows
+ * Cute little hacky function to handle an error. It always throws. Being a function with a generic return type it allows
  * us to throw from within a pipe (not what one would normally want but if you want to stop the error propagation this
  * is how you do it).
  * @param e an error
@@ -169,3 +169,12 @@ export const sessionUserOrUnknown = (user: string | null | undefined): string =>
  *
  */
 export const SPECIES_NAME_REGEX = /(^[A-Z][a-z]+ (x|X)?\s?[a-z-]+\s?(\(.+\)\s*)*$)/;
+
+const speciesRegEx = new RegExp(SPECIES_NAME_REGEX);
+
+/**
+ *
+ * @param s Convenience function to test for a valid species name.
+ * @returns
+ */
+export const isValidSpeciesName = (s: string): boolean => speciesRegEx.test(s);

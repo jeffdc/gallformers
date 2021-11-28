@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Button, Modal } from 'react-bootstrap';
 import toast, { Toaster } from 'react-hot-toast';
-import { capitalizeFirstLetter } from '../libs/utils/util';
+import { SpeciesNamingHelp } from '../hooks/useSpecies';
+import { capitalizeFirstLetter, isValidSpeciesName, SPECIES_NAME_REGEX } from '../libs/utils/util';
 
 export type RenameEvent = {
     old: string | undefined;
@@ -21,6 +22,7 @@ type Props = {
 const EditName = ({ type, keyField, defaultValue, showModal, setShowModal, renameCallback }: Props): JSX.Element => {
     const [value, setValue] = useState(defaultValue);
     const [addAlias, setAddAlias] = useState(false);
+    const isGallOrHost = type === 'Gall' || type === 'Host';
 
     return (
         <>
@@ -30,6 +32,7 @@ const EditName = ({ type, keyField, defaultValue, showModal, setShowModal, renam
             <Modal show={showModal} onHide={() => setShowModal(false)} size="lg">
                 <Modal.Header closeButton>
                     <Modal.Title>{`Edit ${type} ${capitalizeFirstLetter(keyField)}`}</Modal.Title>
+                    {isGallOrHost && <SpeciesNamingHelp />}
                 </Modal.Header>
                 <Modal.Body>
                     <input
@@ -38,7 +41,7 @@ const EditName = ({ type, keyField, defaultValue, showModal, setShowModal, renam
                         defaultValue={defaultValue}
                         onChange={(e) => setValue(e.currentTarget.value)}
                     />
-                    {(type === 'Gall' || type === 'Host') && (
+                    {isGallOrHost && (
                         <>
                             <br />
                             <input type="checkbox" onChange={(e) => setAddAlias(e.currentTarget.checked)} /> Add Alias for old
@@ -63,6 +66,8 @@ const EditName = ({ type, keyField, defaultValue, showModal, setShowModal, renam
                         onClick={() => {
                             if (value == undefined || value === '') {
                                 toast.error(`The name must not be empty.`);
+                            } else if (isGallOrHost && !isValidSpeciesName(value)) {
+                                toast.error('The name must be a valid species name construction.');
                             } else {
                                 renameCallback({
                                     old: defaultValue,
