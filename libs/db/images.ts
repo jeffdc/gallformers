@@ -104,10 +104,12 @@ export const updateImage = (theImage: ImageApi): TaskEither<Error, readonly Imag
             O.fold(constant('NULL'), (s) => s.id.toString()),
         );
 
-    const updateSourceRel = (image: ImageApi) =>
-        db.$executeRaw`UPDATE image 
+    const updateSourceRel = (image: ImageApi) => {
+        const sql = `UPDATE image 
              SET source_id = ${sourceid(image)}
              WHERE image.id = ${image.id}`;
+        return db.$executeRaw(Prisma.sql([sql]));
+    };
     // if this one is the new default, then make sure all of the other ones are not default
     const setAsNewDefault = (image: ImageApi) => {
         const spId = image.default ? image.speciesid : -999;

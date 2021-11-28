@@ -1,4 +1,4 @@
-import { PrismaPromise } from '@prisma/client';
+import { Prisma, PrismaPromise } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { GallApi, GallHostUpdateFields, SimpleSpecies } from '../api/apitypes';
@@ -11,12 +11,15 @@ import { extractId } from './utils';
 
 const toValues = (gallid: number, hostids: number[]) => hostids.map((h) => `(NULL, ${gallid}, ${h})`).join(',');
 
-const toInsertStatement = (gallid: number, hostids: number[]): PrismaPromise<number> =>
-    db.$executeRaw`INSERT INTO host (id, gall_species_id, host_species_id) VALUES ${toValues(gallid, hostids)};`;
+const toInsertStatement = (gallid: number, hostids: number[]): PrismaPromise<number> => {
+    const sql = `INSERT INTO host (id, gall_species_id, host_species_id) VALUES ${toValues(gallid, hostids)};`;
+    return db.$executeRaw(Prisma.sql([sql]));
+};
 
 export const updateGallHosts = (gallhost: GallHostUpdateFields): TE.TaskEither<Error, GallApi> => {
     const doTx = (genusHosts: number[]) => () => {
-        const deletes = db.$executeRaw`DELETE FROM host WHERE gall_species_id = ${gallhost.gall};`;
+        const sql = `DELETE FROM host WHERE gall_species_id = ${gallhost.gall};`;
+        const deletes = db.$executeRaw(Prisma.sql([sql]));
         const hosts = [...new Set([...gallhost.hosts, ...genusHosts])];
 
         const steps = [deletes];

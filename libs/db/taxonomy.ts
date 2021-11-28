@@ -424,8 +424,7 @@ export const getSection = (id: number): TaskEither<Error, O.Option<SectionApi>> 
 export const deleteTaxonomyEntry = (id: number): TaskEither<Error, DeleteResult> => {
     const doDelete = () => {
         // have to do raw calls since Prisma does not support cascade deletion.
-        return db.$transaction([
-            db.$executeRaw`
+        const delSpeciesSql = `
                 DELETE FROM species
                     WHERE id IN (
                     SELECT s.id
@@ -438,11 +437,9 @@ export const deleteTaxonomyEntry = (id: number): TaskEither<Error, DeleteResult>
                         species AS s ON s.id = st.species_id
                     WHERE f.id = ${id}
                 );
-            `,
-            db.$executeRaw`
-                DELETE FROM taxonomy WHERE id = ${id}
-        `,
-        ]);
+            `;
+        const delTaxSql = `DELETE FROM taxonomy WHERE id = ${id}`;
+        return db.$transaction([db.$executeRaw(Prisma.sql([delSpeciesSql])), db.$executeRaw(Prisma.sql([delTaxSql]))]);
     };
 
     const toDeleteResult = (t: number[]): DeleteResult => {
@@ -523,8 +520,8 @@ const updateExistingGenera = (fam: FamilyUpsertFields) => {
 
 const updateExistingSpecies = (fam: FamilyUpsertFields) => {
     // I tried to do this with prisma but could not figure it out...
-    return fam.genera.map(
-        (g) => db.$executeRaw`UPDATE species
+    return fam.genera.map((g) => {
+        const sql = `UPDATE species
                 SET name = [REPLACE](name, SUBSTRING(name, 1, INSTR(name, ' ') - 1), ${g.name}) 
             WHERE id IN (
                 SELECT st.species_id
@@ -532,8 +529,9 @@ const updateExistingSpecies = (fam: FamilyUpsertFields) => {
                         INNER JOIN
                         speciestaxonomy AS st ON t.id = st.taxonomy_id
                     WHERE t.id = ${g.id} 
-            );`,
-    );
+            );`;
+        return db.$executeRaw(Prisma.sql([sql]));
+    });
 };
 
 const createGenera = (fam: FamilyUpsertFields) => {

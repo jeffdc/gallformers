@@ -716,7 +716,8 @@ export const deleteGall = (speciesid: number): TaskEither<Error, DeleteResult> =
     const deleteImages = () => TE.tryCatch(() => deleteImagesBySpeciesId(speciesid), handleError);
 
     // Prisma can not do cascade deletes. See: https://github.com/prisma/prisma/issues/2057
-    const gallDelete = () => TE.tryCatch(() => db.$executeRaw`DELETE FROM species WHERE id = ${speciesid}`, handleError);
+    const sql = `DELETE FROM species WHERE id = ${speciesid}`;
+    const gallDelete = () => TE.tryCatch(() => db.$executeRaw(Prisma.sql([sql])), handleError);
 
     const toDeleteResult = (count: number): DeleteResult => {
         return {
