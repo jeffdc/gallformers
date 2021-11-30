@@ -8,6 +8,7 @@ import externalLinks from 'remark-external-links';
 import { ALLRIGHTS, CC0, CCBY, SpeciesSourceApi } from '../libs/api/apitypes';
 import { formatLicense, sourceToDisplay } from '../libs/pages/renderhelpers';
 import { SELECTED_ROW_STYLE, TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
+import Edit from './edit';
 import InfoTip from './infotip';
 
 export type SourceListProps = {
@@ -137,7 +138,10 @@ const SourceList = ({ data, defaultSelection, onSelectionChange }: SourceListPro
             </Alert>
             <Row className="">
                 <Col sm={10} xs={12}>
-                    <div className="font-italic">{selectedSource?.source.title}</div>
+                    <div className="font-italic">
+                        {selectedSource?.source.title}
+                        {selectedSource && <Edit id={selectedSource?.source.id} type="source" />}
+                    </div>
                 </Col>
                 <Col className="text-right">
                     <Button

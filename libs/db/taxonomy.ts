@@ -522,7 +522,7 @@ const updateExistingSpecies = (fam: FamilyUpsertFields) => {
     // I tried to do this with prisma but could not figure it out...
     return fam.genera.map((g) => {
         const sql = `UPDATE species
-                SET name = [REPLACE](name, SUBSTRING(name, 1, INSTR(name, ' ') - 1), ${g.name}) 
+                SET name = [REPLACE](name, SUBSTRING(name, 1, INSTR(name, ' ') - 1), '${g.name}') 
             WHERE id IN (
                 SELECT st.species_id
                     FROM taxonomy AS t
@@ -661,7 +661,7 @@ const generaCreate =
  */
 export const upsertFamily = (f: FamilyUpsertFields): TaskEither<Error, FamilyWithGenera> => {
     const updateFamilyTx = TE.tryCatch(() => db.$transaction(familyUpdateSteps(f)), handleError);
-    // const createFamilyTx = TE.tryCatch(() => db.$transaction(familyCreate(f)), handleError);
+
     // eslint-disable-next-line prettier/prettier
     const createFamily = pipe(
         TE.tryCatch(() => familyCreate(f), handleError),
