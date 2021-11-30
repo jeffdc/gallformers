@@ -9,7 +9,7 @@ import { AnyObject, AssertsShape, ObjectShape, TypeOfShape } from 'yup/lib/objec
 import { Maybe } from 'yup/lib/types';
 import { ConfirmationOptions } from '../components/confirmationdialog';
 import { RenameEvent } from '../components/editname';
-import Typeahead, { TypeaheadLabelKey } from '../components/Typeahead';
+import Typeahead, { AsyncTypeahead, TypeaheadLabelKey } from '../components/Typeahead';
 import { DeleteResult } from '../libs/api/apitypes';
 import { WithID } from '../libs/utils/types';
 import { hasProp } from '../libs/utils/util';
@@ -36,6 +36,26 @@ type AdminData<T, FormFields> = {
     postDelete: (id: number | string, result: DeleteResult) => void;
     mainField: (key: TypeaheadLabelKey<T>, placeholder: string) => JSX.Element;
     deleteButton: (warning: string, customDeleteHandler?: (fields: FormFields) => Promise<void>) => JSX.Element;
+};
+
+export type AsyncMainFieldProps = {
+    /* Delay, in milliseconds, before performing search. */
+    delay?: number;
+
+    /* Whether or not a request is currently pending. Necessary for the component to know when new results are available. */
+    isLoading: boolean;
+
+    /* Callback to perform when the search is executed. */
+    onSearch: (query: string) => void;
+
+    /* Message displayed in the menu when there is no user input. */
+    promptText?: React.ReactNode;
+
+    /* Message to display in the menu while the request is pending. */
+    searchText?: React.ReactNode;
+
+    /* Whether or not the component should cache query results. */
+    useCache?: boolean;
 };
 
 /**
@@ -85,8 +105,42 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
 
     const confirm = useConfirmation();
 
-    const theMainField = (labelKey: TypeaheadLabelKey<T>, placeholder: string) => {
-        return (
+    const theMainField = (labelKey: TypeaheadLabelKey<T>, placeholder: string, asyncProps?: AsyncMainFieldProps) => {
+        return asyncProps ? (
+            <>
+                <AsyncTypeahead
+                    name={'mainField' as Path<FormFields>}
+                    control={form.control}
+                    options={data}
+                    labelKey={labelKey}
+                    selected={selected ? [selected] : []}
+                    placeholder={placeholder}
+                    clearButton
+                    isInvalid={!!form.formState.errors.mainField}
+                    newSelectionPrefix={`Add a new ${placeholder}: `}
+                    allowNew={!!createNew}
+                    onChange={(s) => {
+                        if (s.length <= 0) {
+                            setSelected(undefined);
+                            router.replace(``, undefined, { shallow: true });
+                        } else {
+                            if (hasProp(s[0], 'customOption') && hasProp(s[0], 'name')) {
+                                if (createNew) {
+                                    const x = createNew(s[0].name as string);
+                                    setSelected(x);
+                                }
+                                router.replace(``, undefined, { shallow: true });
+                            } else {
+                                setSelected(s[0]);
+                                router.replace(`?id=${s[0].id}`, undefined, { shallow: true });
+                            }
+                        }
+                    }}
+                    {...asyncProps}
+                />
+                {form.formState.errors.mainField && <span className="text-danger">{`The ${placeholder} is required.`}</span>}
+            </>
+        ) : (
             <>
                 <Typeahead
                     name={'mainField' as Path<FormFields>}

@@ -495,6 +495,12 @@ export const gallByIdAsO = (id: number): TaskEither<Error, O.Option<GallApi>> =>
     );
 
 /**
+ * Fetches galls that start witht the passed in string.
+ * @param q the string to search on
+ */
+export const searchGalls = (q: string): TaskEither<Error, GallApi[]> => getGalls([{ species: { name: { startsWith: q } } }]);
+
+/**
  * Fetch a gall by its name.
  * @param name
  */

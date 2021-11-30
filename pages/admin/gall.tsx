@@ -3,14 +3,14 @@ import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Controller } from 'react-hook-form';
 import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
 import Typeahead from '../../components/Typeahead';
 import UndescribedFlow, { UndescribedData } from '../../components/UndescribedFlow';
-import useAdmin from '../../hooks/useadmin';
+import useAdmin, { AsyncMainFieldProps } from '../../hooks/useadmin';
 import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '../../hooks/useSpecies';
 import { extractQueryParam } from '../../libs/api/apipage';
 import * as AT from '../../libs/api/apitypes';
@@ -105,6 +105,8 @@ const Gall = ({
     forms,
 }: Props): JSX.Element => {
     const [showNewUndescribed, setShowNewUndescribed] = useState(false);
+    const [isFetching, setIsFetching] = useState(false);
+    const [gallSearch, setGallSearch] = useState('');
 
     const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields } = useSpecies<AT.GallApi>(genera);
 
@@ -267,6 +269,33 @@ const Gall = ({
         formSubmit(fields);
     };
 
+    useEffect(() => {
+        setIsFetching(true);
+        const search = async () => {
+            const res = await fetch(`../api/gall?query=${gallSearch}`);
+            if (res.status === 200) {
+                const results = await res.json();
+                setSelected(results);
+            } else {
+                throw new Error(await res.text());
+            }
+            setIsFetching(false);
+        };
+        if (gallSearch) {
+            search();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [gallSearch]);
+
+    const asyncProps: AsyncMainFieldProps = {
+        isLoading: isFetching,
+        onSearch: setGallSearch,
+        delay: 200,
+        promptText: 'Gall',
+        searchText: 'Searching for Galls...',
+        useCache: true,
+    };
+
     return (
         <Admin
             type="Gall"
@@ -316,7 +345,7 @@ const Gall = ({
                             </Col>
                         </Row>
                         <Row>
-                            <Col>{mainField('name', 'Gall')}</Col>
+                            <Col>{mainField('name', 'Gall', asyncProps)}</Col>
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowRenameModal(true)}>

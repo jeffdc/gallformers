@@ -1,5 +1,7 @@
 import React, { FocusEvent, KeyboardEvent } from 'react';
 import {
+    AsyncTypeaheadProps as RBAsyncTypeaheadProps,
+    AsyncTypeahead as RBAsyncTypeahead,
     StringPropertyNames,
     Typeahead as RBTypeahead,
     TypeaheadModel,
@@ -22,6 +24,9 @@ export type TypeaheadProps<T extends TypeaheadModel, FormFields> = Omit<RBTypeah
     onKeyDownT?: (e: KeyboardEvent<HTMLInputElement>) => void;
 };
 
+export type AsyncTypeaheadProps<T extends TypeaheadModel, FormFields> = TypeaheadProps<T, FormFields> &
+    Pick<RBAsyncTypeaheadProps<T>, 'delay' | 'isLoading' | 'onSearch' | 'promptText' | 'searchText' | 'useCache'>;
+
 // eslint-disable-next-line @typescript-eslint/ban-types
 export type TypeaheadLabelKey<T> = T extends object ? StringPropertyNames<T> | ((option: T) => string) : never;
 
@@ -42,6 +47,32 @@ const Typeahead = <T extends TypeaheadModel, FormFields>({
             rules={rules}
             render={({ field: { ref } }) => (
                 <RBTypeahead
+                    {...taProps}
+                    ref={ref}
+                    id={name}
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                    //@ts-ignore -- the typings for the component have a bug! Adding it here so all callers can avoid it.
+                    newSelectionPrefix={newSelectionPrefix}
+                />
+            )}
+        />
+    );
+};
+
+export const AsyncTypeahead = <T extends TypeaheadModel, FormFields>({
+    name,
+    control,
+    newSelectionPrefix,
+    rules,
+    ...taProps
+}: AsyncTypeaheadProps<T, FormFields>): JSX.Element => {
+    return (
+        <Controller
+            control={control}
+            name={name}
+            rules={rules}
+            render={({ field: { ref } }) => (
+                <RBAsyncTypeahead
                     {...taProps}
                     ref={ref}
                     id={name}
