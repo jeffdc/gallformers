@@ -2277,10 +2277,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@next/env@npm:11.1.2":
-  version: 11.1.2
-  resolution: "@next/env@npm:11.1.2"
-  checksum: df7a95e840af351b1c37fa6490b2c6330b8f8c587ff8b2212687d7557e99ae5642495095a9a3a15fe4ac2e6fb5b1cdb24ab8fb14e95ad363a5b7b1146ec62d15
+"@next/env@npm:11.1.3":
+  version: 11.1.3
+  resolution: "@next/env@npm:11.1.3"
+  checksum: 0a26ff935e68ad2d355218bc9b9fcda1100005efdfb84697f51167bd7ecc93535fa8aea978bf17827a8e2019653eb7738fe8e036daed0b2436fd8927f9a0208e
   languageName: node
   linkType: hard
 
@@ -2293,16 +2293,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@next/polyfill-module@npm:11.1.2":
-  version: 11.1.2
-  resolution: "@next/polyfill-module@npm:11.1.2"
-  checksum: f739b999b740ed55e5b5e45ba22127e4abba10ef3816df41277f13b23764005d88dfa4e914d06b6a4b321ba9c6b3df21d5b680d36c12f5db304128000130dc4d
+"@next/polyfill-module@npm:11.1.3":
+  version: 11.1.3
+  resolution: "@next/polyfill-module@npm:11.1.3"
+  checksum: 61a4c5c9c9d5cbf64de5b2eb2e11189081672d1c6a388cfb0a405a7c3ff3a6ab893d8096bdb29f10082762d2c60c249712ef7c69e640da78411bbb9d064e8d98
   languageName: node
   linkType: hard
 
-"@next/react-dev-overlay@npm:11.1.2":
-  version: 11.1.2
-  resolution: "@next/react-dev-overlay@npm:11.1.2"
+"@next/react-dev-overlay@npm:11.1.3":
+  version: 11.1.3
+  resolution: "@next/react-dev-overlay@npm:11.1.3"
   dependencies:
     "@babel/code-frame": 7.12.11
     anser: 1.4.9
@@ -2318,48 +2318,48 @@ __metadata:
   peerDependencies:
     react: ^17.0.2
     react-dom: ^17.0.2
-  checksum: 6b2215c90c6df5f7b96eec9235e7a0a0ea71d7c7501e25aa6a7004c064ca74a6eaf15b2661fe3cbe8aff417ebebb705df2dbbf252aec4a92b408f2c02891a983
+  checksum: 9a284e2f8c910613550017e104abaa04abc2fb89348fddc8de9f568aab06548860eb7ec608f29eacd1f174be354d3686a59961cff23e0e799d30b27150205c16
   languageName: node
   linkType: hard
 
-"@next/react-refresh-utils@npm:11.1.2":
-  version: 11.1.2
-  resolution: "@next/react-refresh-utils@npm:11.1.2"
+"@next/react-refresh-utils@npm:11.1.3":
+  version: 11.1.3
+  resolution: "@next/react-refresh-utils@npm:11.1.3"
   peerDependencies:
     react-refresh: 0.8.3
     webpack: ^4 || ^5
   peerDependenciesMeta:
     webpack:
       optional: true
-  checksum: 443e2376279437d85b991175b8cd86fc1d0f3908ad23a523e7ede5dc9fb22f63d083a904502f6aef77af4769c96f165740fe196d54684136b1f3443561575fc1
+  checksum: 49559069857c53392f21754ef81682d4ab898f14907d91c56b482423a9163c91f92ab5018d0669326583a4888bd264b1de44698f8c6c0d2aa5fc7e1e311f6197
   languageName: node
   linkType: hard
 
-"@next/swc-darwin-arm64@npm:11.1.2":
-  version: 11.1.2
-  resolution: "@next/swc-darwin-arm64@npm:11.1.2"
-  checksum: e87481c2d1436e947f1101d4d3e45bc9486f3dc312d120a6042b4a2333f16150b3881f322103ef52431e09178093775b02d725b843a7dde441f3ee319495ec95
+"@next/swc-darwin-arm64@npm:11.1.3":
+  version: 11.1.3
+  resolution: "@next/swc-darwin-arm64@npm:11.1.3"
+  checksum: aa385d3dffea1178968d3941cac8d5ce99284edd505141289b5aa7deb9b0abe7908f12926f6917ccbeac9e13878cc2e0de5a482cb5965f5f233ad7fe5221020c
   languageName: node
   linkType: hard
 
-"@next/swc-darwin-x64@npm:11.1.2":
-  version: 11.1.2
-  resolution: "@next/swc-darwin-x64@npm:11.1.2"
-  checksum: 74717c27d2dd8e16ed6221ebc1fd0e212ffe467cc77dcd70f61b5ed9763b64dff36e6b3745791bc01771a2df9b60e609393d8ef848d894464cc15d45641a34f8
+"@next/swc-darwin-x64@npm:11.1.3":
+  version: 11.1.3
+  resolution: "@next/swc-darwin-x64@npm:11.1.3"
+  checksum: e5f18e7c73dc471df8fd9d55f9e76f3f5771d969177b1f18c750f6646a40102168b8a17d7a021a7f161522735c33338a0d2b84af26f8a929fbc77342212f5e93
   languageName: node
   linkType: hard
 
-"@next/swc-linux-x64-gnu@npm:11.1.2":
-  version: 11.1.2
-  resolution: "@next/swc-linux-x64-gnu@npm:11.1.2"
-  checksum: 7cf8cf47cf007f7f1101fddb9850c03297950f84acc25b2b6ae2bce9f8ee860671adebde6c61df3cf721a50ec985304a98ea2ba7a5b594fd22032ae5f5cade02
+"@next/swc-linux-x64-gnu@npm:11.1.3":
+  version: 11.1.3
+  resolution: "@next/swc-linux-x64-gnu@npm:11.1.3"
+  checksum: 178e467b6d77682c39c4010e4ea08f1bd6cc910b59c26f86c97c1dad9a499a3a09b89a07cf976cea1ff5ee8a2af7fc23982f7afe839c37647b0271668491618f
   languageName: node
   linkType: hard
 
-"@next/swc-win32-x64-msvc@npm:11.1.2":
-  version: 11.1.2
-  resolution: "@next/swc-win32-x64-msvc@npm:11.1.2"
-  checksum: dec45ee30bf9edc8d46a59fa9c1c9fcf00352ab02f5e9ff3cfde3d83cc47aa2be2615ac47142495e63419bd6764a25d2f5a73190d261293dc959fe94de14e9e5
+"@next/swc-win32-x64-msvc@npm:11.1.3":
+  version: 11.1.3
+  resolution: "@next/swc-win32-x64-msvc@npm:11.1.3"
+  checksum: ec66706e74e8366bc1e541d84a3c344a490bf873a49c71f6a4b0cae84e0fba9f0eed99d3cb5e9b877d595355640dfe846b9df0d50dfd27cb152f4530db4479dd
   languageName: node
   linkType: hard
 
@@ -3471,12 +3471,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"axios@npm:^0.21":
-  version: 0.21.1
-  resolution: "axios@npm:0.21.1"
+"axios@npm:^0.21.2":
+  version: 0.21.4
+  resolution: "axios@npm:0.21.4"
   dependencies:
-    follow-redirects: ^1.10.0
-  checksum: c87915fa0b18c15c63350112b6b3563a3e2ae524d7707de0a73d2e065e0d30c5d3da8563037bc29d4cc1b7424b5a350cb7274fa52525c6c04a615fe561c6ab11
+    follow-redirects: ^1.14.0
+  checksum: 44245f24ac971e7458f3120c92f9d66d1fc695e8b97019139de5b0cc65d9b8104647db01e5f46917728edfc0cfd88eb30fc4c55e6053eef4ace76768ce95ff3c
   languageName: node
   linkType: hard
 
@@ -3990,9 +3990,9 @@ __metadata:
   linkType: hard
 
 "caniuse-lite@npm:^1.0.30001202, caniuse-lite@npm:^1.0.30001219, caniuse-lite@npm:^1.0.30001228":
-  version: 1.0.30001236
-  resolution: "caniuse-lite@npm:1.0.30001236"
-  checksum: e1f38df1d37d3f628d84f38487e7edad2c8c57b9ea934e06455a2c3e4d8f283fa3e5b420a61f29539e38abd64942ea201de76195659c0aabfa34a3775ac21cc2
+  version: 1.0.30001283
+  resolution: "caniuse-lite@npm:1.0.30001283"
+  checksum: a13916f1b5ea0d75fe34d1ac8b8b841f88da69f98b1fd5178fd350291fdc1794daebcaaf57c3d3bc60f33aa27ecdf8e0909dc1a013475754c5416515f9bc32c2
   languageName: node
   linkType: hard
 
@@ -5668,13 +5668,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"follow-redirects@npm:^1.10.0":
-  version: 1.14.1
-  resolution: "follow-redirects@npm:1.14.1"
+"follow-redirects@npm:^1.14.0":
+  version: 1.14.5
+  resolution: "follow-redirects@npm:1.14.5"
   peerDependenciesMeta:
     debug:
       optional: true
-  checksum: 7381a55bdc6951c5c1ab73a8da99d9fa4c0496ce72dba92cd2ac2babe0e3ebde9b81c5bca889498ad95984bc773d713284ca2bb17f1b1e1416e5f6531e39a488
+  checksum: f004a76b2ee3a849772c2816e30928253bf47537b0f00184d89f4966413add96a228a4d96ca8c702bc045a683c52c2ba41545c915cc1a5e33bf8fd9d07b59aee
   languageName: node
   linkType: hard
 
@@ -5804,7 +5804,7 @@ __metadata:
     "@types/yup": ^0
     "@typescript-eslint/eslint-plugin": ^4
     "@typescript-eslint/parser": ^4
-    axios: ^0.21
+    axios: ^0.21.2
     bootstrap: ^4.6
     classnames: ^2.3
     eslint: ^7
@@ -5821,7 +5821,7 @@ __metadata:
     jquery: ^3.6.0
     logging-ts: ^0
     natural: ^5
-    next: ^11.1.2
+    next: ^11
     next-auth: ^3
     nuka-carousel: ^4
     pino: ^6
@@ -8862,20 +8862,20 @@ __metadata:
   languageName: node
   linkType: hard
 
-"next@npm:^11.1.2":
-  version: 11.1.2
-  resolution: "next@npm:11.1.2"
+"next@npm:^11":
+  version: 11.1.3
+  resolution: "next@npm:11.1.3"
   dependencies:
     "@babel/runtime": 7.15.3
     "@hapi/accept": 5.0.2
-    "@next/env": 11.1.2
-    "@next/polyfill-module": 11.1.2
-    "@next/react-dev-overlay": 11.1.2
-    "@next/react-refresh-utils": 11.1.2
-    "@next/swc-darwin-arm64": 11.1.2
-    "@next/swc-darwin-x64": 11.1.2
-    "@next/swc-linux-x64-gnu": 11.1.2
-    "@next/swc-win32-x64-msvc": 11.1.2
+    "@next/env": 11.1.3
+    "@next/polyfill-module": 11.1.3
+    "@next/react-dev-overlay": 11.1.3
+    "@next/react-refresh-utils": 11.1.3
+    "@next/swc-darwin-arm64": 11.1.3
+    "@next/swc-darwin-x64": 11.1.3
+    "@next/swc-linux-x64-gnu": 11.1.3
+    "@next/swc-win32-x64-msvc": 11.1.3
     "@node-rs/helper": 1.2.1
     assert: 2.0.0
     ast-types: 0.13.2
@@ -8944,7 +8944,7 @@ __metadata:
       optional: true
   bin:
     next: dist/bin/next
-  checksum: c5a6d01b6d60de6e94bed11b199b8adb656521fed4abe0e816bec7991e8ff435006ef226ded40a0aecd277aa79e7d520e047c24bfb01521a12905b246ddd9177
+  checksum: 23832963e01cd49d0a80368261d3922636185adeab6f578d456a86f609651165160cca56f28d15139f595e106cc35ab5994cec80ba878abac678718cf1adfeef
   languageName: node
   linkType: hard
 
