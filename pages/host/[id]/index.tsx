@@ -9,10 +9,11 @@ import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-boot
 import DataTable from 'react-data-table-component';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
+import RangeMap from '../../../components/rangemap';
 import SeeAlso from '../../../components/seealso';
 import SourceList from '../../../components/sourcelist';
 import SpeciesSynonymy from '../../../components/speciesSynonymy';
-import { GallSimple, HostApi } from '../../../libs/api/apitypes';
+import { GallSimple, HostApi, HostTaxon } from '../../../libs/api/apitypes';
 import { FGS } from '../../../libs/api/taxonomy';
 import { allHostIds, hostById } from '../../../libs/db/host';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
@@ -42,6 +43,8 @@ const linkGall = (g: GallSimple) => {
 const Host = ({ host, taxonomy }: Props): JSX.Element => {
     const source = host ? host.speciessource.find((s) => s.useasdefault !== 0) : undefined;
     const [selectedSource, setSelectedSource] = useState(source);
+
+    const range = new Set(host?.places ? host.places.map((p) => p.code) : []);
 
     const columns = useMemo(
         () => [
@@ -150,16 +153,6 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                     </Row>
                     <Row>
                         <Col>
-                            <strong>Range:</strong>{' '}
-                            {host.places.map((p) => (
-                                <Link key={p.id} href={`/place/${p.id}`}>
-                                    <a>{p.code} </a>
-                                </Link>
-                            ))}
-                        </Col>
-                    </Row>
-                    <Row>
-                        <Col>
                             <SpeciesSynonymy aliases={host.aliases} />
                         </Col>
                     </Row>
@@ -182,8 +175,18 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                     </Row>
                 </Col>
 
-                <Col sm={12} md={6} lg={4} className="border rounded p-1">
-                    <Images sp={host} type="host" />
+                <Col sm={12} md={6} lg={4} className="border rounded p-1 container-fluid d-flex flex-column">
+                    <Row>
+                        <Col>
+                            <Images sp={host} type="host" />
+                        </Col>
+                    </Row>
+                    <Row className="flex-grow-1">
+                        <Col className="mt-auto">
+                            <div>Range:</div>
+                            <RangeMap range={range} />
+                        </Col>
+                    </Row>
                 </Col>
             </Row>
             <hr />
@@ -193,6 +196,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                         data={host.speciessource}
                         defaultSelection={selectedSource}
                         onSelectionChange={(s) => setSelectedSource(host.speciessource.find((spso) => spso.source_id == s?.id))}
+                        taxonType={HostTaxon}
                     />
                     <hr />
                     <Row>

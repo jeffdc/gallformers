@@ -187,6 +187,7 @@ const Gall = ({
             id: -1,
         },
         hosts: [],
+        excludedPlaces: [],
     });
 
     const {
@@ -226,7 +227,7 @@ const Gall = ({
         setShowNewUndescribed(false);
         if (data != undefined) {
             const newG = createNewGall(data.name);
-            newG.hosts = [data.host];
+            newG.hosts = [{ ...data.host, places: [] }];
             newG.fgs.genus = data.genus;
             newG.fgs.family = data.family;
             newG.gall.undescribed = true;

@@ -213,6 +213,7 @@ export type SpeciesSourceApi = {
 export type GallHost = {
     id: number;
     name: string;
+    places: PlaceNoTreeApi[];
 };
 
 export type AbundanceApi = {
@@ -399,6 +400,7 @@ export type GallApi = SpeciesApi & {
         undescribed: boolean;
     };
     hosts: GallHost[];
+    excludedPlaces: PlaceNoTreeApi[];
 };
 
 export type HostSimple = {
@@ -406,6 +408,7 @@ export type HostSimple = {
     name: string;
     aliases: alias[];
     datacomplete: boolean;
+    places: PlaceNoTreeApi[];
 };
 
 export type GallSimple = {
@@ -442,7 +445,6 @@ export type SpeciesSourceInsertFields = Deletable & {
 export type GallHostUpdateFields = {
     gall: number;
     hosts: number[];
-    genus: string;
     rangeExclusions: PlaceNoTreeApi[];
 };
 

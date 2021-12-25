@@ -92,7 +92,8 @@ export const placeById = (id: number): TaskEither<Error, PlaceWithHostsApi[]> =>
                 parent: [],
                 children: [],
             })),
-            hosts: p.species.map((s) => ({ ...s.species, aliases: s.species.aliasspecies.map((a) => a.alias) })),
+            // no need to assign the places to the host since we are fetching a place with hosts
+            hosts: p.species.map((s) => ({ ...s.species, aliases: s.species.aliasspecies.map((a) => a.alias), places: [] })),
         }));
 
     return pipe(TE.tryCatch(places, handleError), TE.map(adaptor));

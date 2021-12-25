@@ -3,7 +3,7 @@ import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { ComposableMap, Geographies, Geography, ProjectionConfig, ZoomableGroup } from 'react-simple-maps';
 import ReactTooltip from 'react-tooltip';
@@ -19,26 +19,19 @@ import {
     GallApi,
     GallHost,
     GallHostUpdateFields,
-    HostTaxon,
     PlaceNoTreeApi,
     SimpleSpecies,
     SpeciesWithPlaces,
 } from '../../libs/api/apitypes';
-import { TaxonomyEntry } from '../../libs/api/taxonomy';
 import { allGalls } from '../../libs/db/gall';
-import { allHosts } from '../../libs/db/host';
-import { getPlaces } from '../../libs/db/place';
-import { allGenera, allSections } from '../../libs/db/taxonomy';
+import { allHostsWithPlaces } from '../../libs/db/host';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
     id: string;
     galls: GallApi[];
-    genera: string[];
-    hosts: SimpleSpecies[];
-    sections: string[];
-    places: PlaceNoTreeApi[];
+    hosts: SpeciesWithPlaces[];
 };
 
 const schema = yup.object().shape({
@@ -46,9 +39,7 @@ const schema = yup.object().shape({
 });
 
 type FormFields = AdminFormFields<GallApi> & {
-    genus: string;
     hosts: GallHost[];
-    section: string;
     places: PlaceNoTreeApi[];
 };
 
@@ -76,8 +67,7 @@ const projConfig: ProjectionConfig = {
     scale: 750,
 };
 
-const GallHostMapper = ({ id, galls, genera, hosts, sections, places }: Props): JSX.Element => {
-    const [genus, setGenus] = useState<string>();
+const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
     const [gallHosts, setGallHosts] = useState<Array<SpeciesWithPlaces>>([]);
     const [inRange, setInRange] = useState<Map<string, PlaceNoTreeApi>>(new Map());
     const [outRange, setOutRange] = useState<Map<string, PlaceNoTreeApi>>(new Map());
@@ -88,9 +78,8 @@ const GallHostMapper = ({ id, galls, genera, hosts, sections, places }: Props): 
         return {
             gall: id,
             hosts: gallHosts.map((h) => h.id),
-            genus: genus ? genus : '',
             // just grab the ones that have been excluded
-            rangeExclusions: [...inRange.entries()].filter((i) => !i[1]).map((i) => i[0]),
+            rangeExclusions: [...outRange.values()],
         };
     };
 
@@ -98,12 +87,16 @@ const GallHostMapper = ({ id, galls, genera, hosts, sections, places }: Props): 
         if (gall != undefined) {
             const hosts = gallHosts.length <= 0 ? await fetchGallHosts(gall.id) : gallHosts;
             setGallHosts(hosts);
+            const m = new Map<string, PlaceNoTreeApi>();
+            hosts.flatMap((gh) => gh.places).forEach((p) => m.set(p.code, p));
+            setInRange(m);
+            const mo = new Map<string, PlaceNoTreeApi>();
+            gall.excludedPlaces.map((p) => mo.set(p.code, p));
+            setOutRange(mo);
 
             return {
                 mainField: [gall],
                 hosts: hosts,
-                genus: '',
-                section: '',
                 places: [],
                 del: false,
             };
@@ -114,8 +107,6 @@ const GallHostMapper = ({ id, galls, genera, hosts, sections, places }: Props): 
         return {
             mainField: [],
             hosts: [],
-            genus: '',
-            section: '',
             places: [],
             del: false,
         };
@@ -143,11 +134,6 @@ const GallHostMapper = ({ id, galls, genera, hosts, sections, places }: Props): 
         updatedFormFields,
     );
 
-    useEffect(() => {
-        setGenus(undefined);
-        setGallHosts([]);
-    }, [selected]);
-
     const selectAll = () => {
         const m = new Map<string, PlaceNoTreeApi>();
         gallHosts.flatMap((gh) => gh.places).forEach((p) => m.set(p.code, p));
@@ -161,10 +147,6 @@ const GallHostMapper = ({ id, galls, genera, hosts, sections, places }: Props): 
         setOutRange(m);
         setInRange(new Map());
     };
-
-    useEffect(() => {
-        selectAll();
-    }, [gallHosts]);
 
     return (
         <Auth>
@@ -325,16 +307,12 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
         extractQueryParam(context.query, queryParam),
         O.getOrElse(constant('')),
     );
-    const genera = (await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon))).map((g) => g.name);
 
     return {
         props: {
             id: id,
             galls: await mightFailWithArray<GallApi>()(allGalls()),
-            genera: genera,
-            hosts: await mightFailWithArray<SimpleSpecies>()(allHosts()),
-            sections: (await mightFailWithArray<TaxonomyEntry>()(allSections())).map((s) => s.name),
-            places: await mightFailWithArray<PlaceNoTreeApi>()(getPlaces()),
+            hosts: await mightFailWithArray<SimpleSpecies>()(allHostsWithPlaces()),
         },
     };
 };
