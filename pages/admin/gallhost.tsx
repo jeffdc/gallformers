@@ -3,10 +3,9 @@ import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { ComposableMap, Geographies, Geography, ProjectionConfig, ZoomableGroup } from 'react-simple-maps';
-import ReactTooltip from 'react-tooltip';
 import * as yup from 'yup';
 import Auth from '../../components/auth';
 import { RenameEvent } from '../../components/editname';
@@ -27,6 +26,12 @@ import { allGalls } from '../../libs/db/gall';
 import { allHostsWithPlaces } from '../../libs/db/host';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
+// needed as ReactTooltip does not play nicely with SSR. See: https://github.com/wwayne/react-tooltip/issues/675
+import dynamic from 'next/dynamic';
+
+const ReactTooltip = dynamic(() => import('react-tooltip'), {
+    ssr: false,
+});
 
 type Props = {
     id: string;
@@ -87,12 +92,6 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
         if (gall != undefined) {
             const hosts = gallHosts.length <= 0 ? await fetchGallHosts(gall.id) : gallHosts;
             setGallHosts(hosts);
-            const m = new Map<string, PlaceNoTreeApi>();
-            hosts.flatMap((gh) => gh.places).forEach((p) => m.set(p.code, p));
-            setInRange(m);
-            const mo = new Map<string, PlaceNoTreeApi>();
-            gall.excludedPlaces.map((p) => mo.set(p.code, p));
-            setOutRange(mo);
 
             return {
                 mainField: [gall],
@@ -148,6 +147,33 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
         setInRange(new Map());
     };
 
+    useEffect(() => {
+        if (selected && gallHosts.length > 0) {
+            const possibleRange = new Map<string, PlaceNoTreeApi>();
+            gallHosts.flatMap((gh) => gh.places).forEach((p) => possibleRange.set(p.code, p));
+
+            // create the set of excluded places
+            const outOfRange = new Map<string, PlaceNoTreeApi>();
+            // handle when a host is removed and the possible range has shrunk
+            selected.excludedPlaces = selected.excludedPlaces.filter((p) => possibleRange.has(p.code));
+            selected.excludedPlaces.forEach((p) => outOfRange.set(p.code, p));
+            setOutRange(outOfRange);
+
+            const inTheRange = new Map<string, PlaceNoTreeApi>();
+            gallHosts
+                .flatMap((gh) => gh.places)
+                .forEach((p) => {
+                    if (!outOfRange.has(p.code)) {
+                        inTheRange.set(p.code, p);
+                    }
+                });
+            setInRange(inTheRange);
+        } else {
+            setInRange(new Map());
+            setOutRange(new Map());
+        }
+    }, [gallHosts, selected]);
+
     return (
         <Auth>
             <Admin
@@ -200,6 +226,9 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
                                     setGallHosts(s);
                                 }}
                             />
+                            {form.formState.errors.hosts && (
+                                <span className="text-danger">You must map at least one host to this gall.</span>
+                            )}
                         </Col>
                     </Row>
                     <Row className="form-group">
@@ -220,7 +249,7 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
                                 projectionConfig={projConfig}
                                 data-tip=""
                             >
-                                <ZoomableGroup zoom={1} minZoom={0}>
+                                <ZoomableGroup zoom={1} minZoom={0.75}>
                                     <Geographies geography="../usa-can-topo.json">
                                         {({ geographies }) =>
                                             geographies.map((geo) => {
@@ -291,7 +320,7 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
                     </Row>
                     <Row className="form-group">
                         <Col>
-                            <input type="submit" className="button" value="Submit" disabled={!selected} />
+                            <input type="submit" className="button" value="Submit" disabled={!selected || gallHosts.length < 1} />
                         </Col>
                     </Row>
                 </form>

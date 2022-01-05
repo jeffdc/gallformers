@@ -24,7 +24,7 @@ const RangeMap = ({ range }: Props): JSX.Element => {
     return (
         <>
             <ComposableMap className="border" projection="geoConicEqualArea" projectionConfig={projConfig} data-tip="">
-                <ZoomableGroup zoom={1} minZoom={0}>
+                <ZoomableGroup zoom={1} minZoom={0.5}>
                     <Geographies geography="../usa-can-topo.json">
                         {({ geographies }) =>
                             geographies.map((geo) => {

@@ -465,10 +465,7 @@ const IDGall = (props: Props): JSX.Element => {
                             <Col sm={12} md={6} lg={3}>
                                 <label className="col-form-label">
                                     Place:
-                                    <InfoTip
-                                        id="placetip"
-                                        text="Where did you see the Gall? (US states or CAN provinces). This is only active if you are searching by Genus or Section since individual species are already range constrained."
-                                    />
+                                    <InfoTip id="placetip" text="Where did you see the Gall? (US states or CAN provinces)." />
                                     <Typeahead
                                         name="place"
                                         control={filterControl}
@@ -480,7 +477,7 @@ const IDGall = (props: Props): JSX.Element => {
                                             });
                                         }}
                                         options={props.places.map((p) => p.name)}
-                                        disabled={disableFilter() || isHost(hostOrTaxon)}
+                                        disabled={disableFilter()}
                                         clearButton={true}
                                     />
                                 </label>

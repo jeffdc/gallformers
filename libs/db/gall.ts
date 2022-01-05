@@ -320,6 +320,7 @@ const gallsByHostGenusForID = (whereClause: Prisma.gallspeciesWhereInput[]): Tas
                                 },
                             },
                         },
+                        places: { include: { place: { select: { name: true, type: true } } } },
                         image: true,
                         speciestaxonomy: {
                             include: {
@@ -384,7 +385,12 @@ const gallsByHostGenusForID = (whereClause: Prisma.gallspeciesWhereInput[]): Tas
                         return [];
                     }
                     return h.hostspecies.places
-                        .filter((p) => p.place.type == 'state' || p.place.type == 'province')
+                        .filter(
+                            (p) =>
+                                // remove any places that are assigned to the gall as these are removed from the range
+                                g.species.places.find((gp) => gp.place.name === p.place.name) == undefined &&
+                                (p.place.type == 'state' || p.place.type == 'province'),
+                        )
                         .map((p) => p.place.name);
                 }),
                 images: g.species.image.map(adaptImageNoSource),
