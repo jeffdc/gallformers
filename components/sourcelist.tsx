@@ -210,7 +210,7 @@ const SourceList = ({ data, defaultSelection, onSelectionChange, taxonType }: So
             </Row>
             <Row>
                 <Col>
-                    {/* <Edit id={species.id} type="speciessource" /> */}
+                    {selectedSource && <Edit id={selectedSource?.species_id} type="speciessource" />}
                     <strong>Further Information:</strong>
                 </Col>
             </Row>
