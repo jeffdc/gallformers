@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
 import externalLinks from 'remark-external-links';
-import { ALLRIGHTS, CC0, CCBY, SpeciesSourceApi } from '../libs/api/apitypes';
+import { ALLRIGHTS, CC0, CCBY, GallTaxon, HostTaxon, SpeciesSourceApi } from '../libs/api/apitypes';
 import { formatLicense, sourceToDisplay } from '../libs/pages/renderhelpers';
 import { SELECTED_ROW_STYLE, TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
 import Edit from './edit';
@@ -15,6 +15,7 @@ export type SourceListProps = {
     data: SpeciesSourceApi[];
     defaultSelection: SpeciesSourceApi | undefined;
     onSelectionChange: (selected: SpeciesSourceApi | undefined) => void;
+    taxonType: typeof GallTaxon | typeof HostTaxon;
 };
 
 const linkTitle = (row: SpeciesSourceApi) => {
@@ -49,7 +50,7 @@ const linkLicense = (row: SpeciesSourceApi) => {
     );
 };
 
-const SourceList = ({ data, defaultSelection, onSelectionChange }: SourceListProps): JSX.Element => {
+const SourceList = ({ data, defaultSelection, onSelectionChange, taxonType }: SourceListProps): JSX.Element => {
     const [selectedSource, setSelectedSource] = useState(defaultSelection);
     const [notesAlertShown, setNotesAlertShown] = useState(true);
     const sources = data.sort((a, b) => parseInt(a.source.pubyear) - parseInt(b.source.pubyear));
@@ -128,7 +129,11 @@ const SourceList = ({ data, defaultSelection, onSelectionChange }: SourceListPro
                 variant="info"
                 dismissible
                 onClose={() => setNotesAlertShown(false)}
-                hidden={!notesAlertShown || !(gallformersNotes && gallformersNotes.id !== selectedSource?.source.id)}
+                hidden={
+                    taxonType === HostTaxon ||
+                    !notesAlertShown ||
+                    !(gallformersNotes && gallformersNotes.id !== selectedSource?.source.id)
+                }
             >
                 Our ID Notes may contain important tips necessary for distinguishing this gall from similar galls and/or important
                 information about the taxonomic status of this gall inducer.

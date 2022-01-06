@@ -4,6 +4,7 @@
  */
 import { alias } from '@prisma/client';
 import * as O from 'fp-ts/lib/Option';
+import * as Eq from 'fp-ts/lib/Eq';
 import { Option } from 'fp-ts/lib/Option';
 import { FGS } from './taxonomy';
 
@@ -212,6 +213,7 @@ export type SpeciesSourceApi = {
 export type GallHost = {
     id: number;
     name: string;
+    places: PlaceNoTreeApi[];
 };
 
 export type AbundanceApi = {
@@ -232,6 +234,11 @@ export type SimpleSpecies = {
     taxoncode: string;
     name: string;
 };
+
+export type SpeciesWithPlaces = SimpleSpecies & {
+    places: PlaceNoTreeApi[];
+};
+
 export type WithImages = {
     images: ImageApi[] | ImageNoSourceApi[];
 };
@@ -324,6 +331,10 @@ export type FilterFieldWithType = FilterField & {
 // For now only these two until we support the Place hierarchy.
 export const PLACE_TYPES = ['state', 'province'];
 
+export const placeNoTreeApiEq: Eq.Eq<PlaceNoTreeApi> = {
+    equals: (a, b) => a.code === b.code,
+};
+
 export type PlaceNoTreeApi = {
     id: number;
     name: string;
@@ -389,6 +400,7 @@ export type GallApi = SpeciesApi & {
         undescribed: boolean;
     };
     hosts: GallHost[];
+    excludedPlaces: PlaceNoTreeApi[];
 };
 
 export type HostSimple = {
@@ -396,6 +408,7 @@ export type HostSimple = {
     name: string;
     aliases: alias[];
     datacomplete: boolean;
+    places: PlaceNoTreeApi[];
 };
 
 export type GallSimple = {
@@ -432,7 +445,7 @@ export type SpeciesSourceInsertFields = Deletable & {
 export type GallHostUpdateFields = {
     gall: number;
     hosts: number[];
-    genus: string;
+    rangeExclusions: PlaceNoTreeApi[];
 };
 
 export type DeleteResult = {

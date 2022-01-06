@@ -10,10 +10,11 @@ import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-boot
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import InfoTip from '../../../components/infotip';
+import RangeMap from '../../../components/rangemap';
 import SeeAlso from '../../../components/seealso';
 import SourceList from '../../../components/sourcelist';
 import SpeciesSynonymy from '../../../components/speciesSynonymy';
-import { DetachableBoth, GallApi, GallHost, SimpleSpecies } from '../../../libs/api/apitypes';
+import { DetachableBoth, GallApi, GallHost, GallTaxon, SimpleSpecies } from '../../../libs/api/apitypes';
 import { FGS } from '../../../libs/api/taxonomy';
 import { allGallIds, gallById, getRelatedGalls } from '../../../libs/db/gall';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
@@ -42,6 +43,10 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
     const router = useRouter();
     const defSource = defaultSource(species?.speciessource, router.query.source);
     const [selectedSource, setSelectedSource] = useState(defSource);
+
+    const range = new Set<string>();
+    species?.hosts.flatMap((gh) => gh.places.forEach((p) => range.add(p.code)));
+    species?.excludedPlaces.forEach((p) => range.delete(p.code));
 
     // If the page is not yet generated, this will be displayed initially until getStaticProps() finishes running
     if (router.isFallback) {
@@ -179,18 +184,28 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                             </Row>
                         </Col>
                     </Row>
-                </Col>
-                {/* Images */}
-                <Col sm={{ span: 12 }} md={4}>
-                    <Images sp={species} type="gall" />
-                </Col>
-                {/* Description */}
-                <Col>
                     <Row>
                         <Col>
                             <SpeciesSynonymy aliases={species.aliases} />
                         </Col>
                     </Row>
+                </Col>
+                {/* Images */}
+                <Col sm={{ span: 12 }} md={4}>
+                    <Row>
+                        <Col>
+                            <Images sp={species} type="gall" />
+                        </Col>
+                    </Row>
+                    <Row className="flex-grow-1">
+                        <Col className="mt-auto">
+                            <div>Range:</div>
+                            <RangeMap range={range} />
+                        </Col>
+                    </Row>
+                </Col>
+                {/* Description */}
+                <Col>
                     <Row>
                         <Col>
                             <hr />
@@ -206,6 +221,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                         onSelectionChange={(s) =>
                             setSelectedSource(species.speciessource.find((spso) => spso.source_id == s?.id))
                         }
+                        taxonType={GallTaxon}
                     />
                     <hr />
                     <Row>

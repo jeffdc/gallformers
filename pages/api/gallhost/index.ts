@@ -3,11 +3,11 @@ import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Err, getQueryParam, sendErrResponse, sendSuccResponse, toErr } from '../../../libs/api/apipage';
-import { SimpleSpecies } from '../../../libs/api/apitypes';
+import { SpeciesWithPlaces } from '../../../libs/api/apitypes';
 import { hostsByGallId } from '../../../libs/db/gallhost';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
-    const errMsg = (): TE.TaskEither<Err, SimpleSpecies[]> => {
+    const errMsg = (): TE.TaskEither<Err, SpeciesWithPlaces[]> => {
         return TE.left({ status: 400, msg: 'Failed to provide the gall as a query param.' });
     };
 
