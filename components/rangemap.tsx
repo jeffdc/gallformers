@@ -23,8 +23,15 @@ const RangeMap = ({ range }: Props): JSX.Element => {
 
     return (
         <>
-            <ComposableMap className="border" projection="geoConicEqualArea" projectionConfig={projConfig} data-tip="">
-                <ZoomableGroup zoom={1} minZoom={0.5}>
+            <ComposableMap className="border rounded" projection="geoConicEqualArea" projectionConfig={projConfig} data-tip="">
+                <ZoomableGroup
+                    zoom={1}
+                    minZoom={0.5}
+                    translateExtent={[
+                        [-1000, -1000],
+                        [1000, 1000],
+                    ]}
+                >
                     <Geographies geography="../usa-can-topo.json">
                         {({ geographies }) =>
                             geographies.map((geo) => {
@@ -40,7 +47,7 @@ const RangeMap = ({ range }: Props): JSX.Element => {
                                             hover: { outline: 'none' },
                                             pressed: { outline: 'none' },
                                         }}
-                                        onMouseEnter={() => setTooltipContent(code)}
+                                        onMouseEnter={() => setTooltipContent(`${code} - ${geo.properties.name}`)}
                                         onMouseLeave={() => setTooltipContent('')}
                                     />
                                 );

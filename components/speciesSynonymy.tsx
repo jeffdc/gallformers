@@ -6,11 +6,12 @@ import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
 
 export type SpeciesSynonymyProps = {
     aliases: AliasApi[];
+    showAll: boolean;
 };
 
-const SpeciesSynonymy = ({ aliases }: SpeciesSynonymyProps): JSX.Element => {
+const SpeciesSynonymy = ({ aliases, showAll }: SpeciesSynonymyProps): JSX.Element => {
     const juniorSynonyms = aliases.filter((a) => a.type === SCIENTIFIC_NAME);
-    const [showJuniors, setShowJuniors] = useState(false);
+    const [showJuniors, setShowJuniors] = useState(showAll);
 
     const columns = useMemo(
         () => [
@@ -43,6 +44,7 @@ const SpeciesSynonymy = ({ aliases }: SpeciesSynonymyProps): JSX.Element => {
                 </span>
             </div>
             <span>
+                <strong>Synonymy: </strong>{' '}
                 <span
                     style={{
                         display: 'block',
@@ -50,8 +52,8 @@ const SpeciesSynonymy = ({ aliases }: SpeciesSynonymyProps): JSX.Element => {
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                     }}
+                    hidden={showAll}
                 >
-                    <strong>Synonymy: </strong>{' '}
                     {juniorSynonyms
                         .map((s) => s.name)
                         .sort()
@@ -64,10 +66,11 @@ const SpeciesSynonymy = ({ aliases }: SpeciesSynonymyProps): JSX.Element => {
                             size="sm"
                             className="mb-1"
                             onClick={() => setShowJuniors(!showJuniors)}
+                            hidden={showAll}
                         >
                             {showJuniors ? <span>Hide</span> : <span>Click to see all synonym details.</span>}
                         </Button>
-                        <div hidden={!showJuniors}>
+                        <div hidden={!showAll || !showJuniors}>
                             <DataTable
                                 keyField={'id'}
                                 data={juniorSynonyms}

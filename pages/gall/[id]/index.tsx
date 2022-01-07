@@ -120,73 +120,104 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                 </Col>
                             </Row>
                             <Row>
-                                <Col xs={6} sm={4}>
-                                    <strong>Detachable:</strong> {species.gall.detachable.value}
-                                    {species.gall.detachable.value === DetachableBoth.value && (
-                                        <InfoTip
-                                            id="detachable"
-                                            text="This gall can be both detachable and integral depending on what stage of its lifecycle it is in."
-                                        />
-                                    )}
+                                <Col xs={12} md={6} lg={4}>
+                                    <Row>
+                                        <Col>
+                                            <strong>Detachable:</strong> {species.gall.detachable.value}
+                                            {species.gall.detachable.value === DetachableBoth.value && (
+                                                <InfoTip
+                                                    id="detachable"
+                                                    text="This gall can be both detachable and integral depending on what stage of its lifecycle it is in."
+                                                />
+                                            )}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Color:</strong> {species.gall.gallcolor.map((c) => c.field).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.field).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Abdundance:</strong>{' '}
+                                            {pipe(
+                                                species.abundance,
+                                                O.fold(constant(''), (a) => a.abundance),
+                                            )}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Shape:</strong> {species.gall.gallshape.map((s) => s.field).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Season:</strong> {species.gall.gallseason.map((s) => s.field).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Related: </strong>
+                                            {relatedGalls.map((g, i) => (
+                                                <span key={g.id}>
+                                                    {' '}
+                                                    <Link key={g.id} href={`/gall/${g.id}`}>
+                                                        <a>{g.name}</a>
+                                                    </Link>
+                                                    {i < relatedGalls.length - 1 ? ', ' : ''}
+                                                </span>
+                                            ))}
+                                        </Col>
+                                    </Row>
                                 </Col>
-                                <Col xs={6} sm={4}>
-                                    <strong>Color:</strong> {species.gall.gallcolor.map((c) => c.field).join(', ')}
+                                <Col xs={12} md={6} lg={4}>
+                                    <Row>
+                                        <Col>
+                                            <strong>Alignment:</strong>{' '}
+                                            {species.gall.gallalignment.map((a) => a.field).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Walls:</strong> {species.gall.gallwalls.map((w) => w.field).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Location:</strong> {species.gall.galllocation.map((l) => l.field).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Form:</strong> {species.gall.gallform.map((s) => s.field).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Cells:</strong> {species.gall.gallcells.map((s) => s.field).join(', ')}
+                                        </Col>
+                                    </Row>
                                 </Col>
-                                <Col xs={6} sm={4}>
-                                    <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.field).join(', ')}
-                                </Col>
-                            </Row>
-                            <Row>
-                                <Col xs={6} sm={4}>
-                                    <strong>Alignment:</strong> {species.gall.gallalignment.map((a) => a.field).join(', ')}
-                                </Col>
-                                <Col xs={6} sm={4}>
-                                    <strong>Walls:</strong> {species.gall.gallwalls.map((w) => w.field).join(', ')}
-                                </Col>
-                                <Col xs={6} sm={4}>
-                                    <strong>Location:</strong> {species.gall.galllocation.map((l) => l.field).join(', ')}
-                                </Col>
-                            </Row>
-                            <Row>
-                                <Col xs={6} sm={4}>
-                                    <strong>Abdundance:</strong>{' '}
-                                    {pipe(
-                                        species.abundance,
-                                        O.fold(constant(''), (a) => a.abundance),
-                                    )}
-                                </Col>
-                                <Col xs={6} sm={4}>
-                                    <strong>Shape:</strong> {species.gall.gallshape.map((s) => s.field).join(', ')}
-                                </Col>
-                                <Col xs={6} sm={4}>
-                                    <strong>Season:</strong> {species.gall.gallseason.map((s) => s.field).join(', ')}
-                                </Col>
-                            </Row>
-                            <Row>
-                                <Col xs={6} sm={4}>
-                                    <strong>Form:</strong> {species.gall.gallform.map((s) => s.field).join(', ')}
-                                </Col>
-                                <Col xs={6} sm={4}>
-                                    <strong>Cells:</strong> {species.gall.gallcells.map((s) => s.field).join(', ')}
-                                </Col>
-                                <Col>
-                                    <strong>Related: </strong>
-                                    {relatedGalls.map((g, i) => (
-                                        <span key={g.id}>
-                                            {' '}
-                                            <Link key={g.id} href={`/gall/${g.id}`}>
-                                                <a>{g.name}</a>
-                                            </Link>
-                                            {i < relatedGalls.length - 1 ? ', ' : ''}
-                                        </span>
-                                    ))}
+                                <Col xs={12} lg={4} className="p-0 m-0">
+                                    <strong>Possible Range:</strong>
+                                    <InfoTip
+                                        id="rangetip"
+                                        text="The gall's range is computed from the range of all hosts that the gall occurs on. In some cases we have evidence that the gall does not occur across the full range of the hosts and we will remove these places from the range. For undescribed species we will show the expected range based on hosts plus where the galls have been observed. All of this said, the exact ranges for most galls is uncertain."
+                                    />
+                                    <RangeMap range={range} />
                                 </Col>
                             </Row>
                         </Col>
                     </Row>
                     <Row>
                         <Col>
-                            <SpeciesSynonymy aliases={species.aliases} />
+                            <SpeciesSynonymy aliases={species.aliases} showAll={true} />
                         </Col>
                     </Row>
                 </Col>
@@ -195,12 +226,6 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                     <Row>
                         <Col>
                             <Images sp={species} type="gall" />
-                        </Col>
-                    </Row>
-                    <Row className="flex-grow-1">
-                        <Col className="mt-auto">
-                            <div>Range:</div>
-                            <RangeMap range={range} />
                         </Col>
                     </Row>
                 </Col>
