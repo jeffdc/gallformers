@@ -285,7 +285,7 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
                                                                 setOutRange(new Map(outRange));
                                                             }
                                                         }}
-                                                        onMouseEnter={() => setTooltipContent(code)}
+                                                        onMouseEnter={() => setTooltipContent(`${code} - ${geo.properties.name}`)}
                                                         onMouseLeave={() => setTooltipContent('')}
                                                     />
                                                 );
