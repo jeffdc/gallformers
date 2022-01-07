@@ -153,7 +153,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                     </Row>
                     <Row>
                         <Col>
-                            <SpeciesSynonymy aliases={host.aliases} />
+                            <SpeciesSynonymy aliases={host.aliases} showAll={true} />
                         </Col>
                     </Row>
 

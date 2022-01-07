@@ -1,11 +1,14 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
+// needed as ReactTooltip does not play nicely with SSR. See: https://github.com/wwayne/react-tooltip/issues/675
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
-import React from 'react';
+import React, { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Controller } from 'react-hook-form';
+import { ComposableMap, Geographies, Geography, ProjectionConfig, ZoomableGroup } from 'react-simple-maps';
 import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
 import Typeahead from '../../components/Typeahead';
@@ -28,6 +31,17 @@ import { getAbundances } from '../../libs/db/species';
 import { allFamilies, allGenera, allSections } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray, SPECIES_NAME_REGEX } from '../../libs/utils/util';
+
+const ReactTooltip = dynamic(() => import('react-tooltip'), {
+    ssr: false,
+});
+
+const projConfig: ProjectionConfig = {
+    center: [-4, 48],
+    parallels: [29.5, 45.5],
+    rotate: [96, 0, 0],
+    scale: 750,
+};
 
 type Props = SpeciesProps & {
     hs: HostApi[];
@@ -66,6 +80,7 @@ export const testables = {
 
 const Host = ({ id, hs, genera, families, sections, abundances, places }: Props): JSX.Element => {
     const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields } = useSpecies<HostApi>(genera);
+    const [tooltipContent, setTooltipContent] = useState('');
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): SpeciesUpsertFields => {
         if (!selected) {
@@ -136,6 +151,22 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
     const onSubmit = async (fields: FormFields) => {
         formSubmit(fields);
     };
+
+    const selectAll = () => {
+        if (selected) {
+            selected.places = places;
+            setSelected({ ...selected });
+        }
+    };
+
+    const deselectAll = () => {
+        if (selected) {
+            selected.places = [];
+            setSelected({ ...selected });
+        }
+    };
+
+    const isInRange = (code: string): boolean => !!selected?.places.find((p) => p.code === code);
 
     return (
         <Admin
@@ -300,30 +331,64 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                 <Row className="formGroup pb-1">
                     <Col>
                         Range:
-                        <Typeahead
-                            name="places"
-                            control={form.control}
-                            placeholder=""
-                            options={places.sort((a, b) => a.name.localeCompare(b.name))}
-                            renderMenuItemChildren={(option) => (
-                                <>
-                                    {option.name} - <b>{option.code}</b>
-                                </>
-                            )}
-                            labelKey="code"
-                            multiple
-                            disabled={!selected}
-                            selected={selected ? selected.places.sort((a, b) => a.code.localeCompare(b.code)) : []}
-                            onChange={(p) => {
-                                if (selected) {
-                                    selected.places = p;
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                            clearButton
-                            // need to look into why this is needed. the component should be handling this already
-                            filterBy={(o) => (selected ? !selected.places.find((p) => p.code === o.code) : false)}
-                        />
+                        <ComposableMap
+                            className="border"
+                            projection="geoConicEqualArea"
+                            projectionConfig={projConfig}
+                            data-tip=""
+                        >
+                            <ZoomableGroup zoom={1} minZoom={0.75}>
+                                <Geographies geography="../usa-can-topo.json">
+                                    {({ geographies }) =>
+                                        geographies.map((geo) => {
+                                            const code = geo.properties.postal;
+                                            return (
+                                                <Geography
+                                                    key={geo.rsmKey}
+                                                    geography={geo}
+                                                    stroke={'DarkSlateGray'}
+                                                    // fill={inRange.has(code) ? 'ForestGreen' : 'White'}
+                                                    fill={isInRange(code) ? 'ForestGreen' : 'White'}
+                                                    style={{
+                                                        default: { outline: 'none' },
+                                                        hover: { outline: 'none' },
+                                                        pressed: { outline: 'none' },
+                                                    }}
+                                                    onClick={() => {
+                                                        if (selected && isInRange(code)) {
+                                                            selected.places = selected.places.filter((p) => p.code !== code);
+                                                            setSelected({ ...selected });
+                                                        } else if (selected) {
+                                                            const p = places.find((p) => p.code === code);
+                                                            if (p) {
+                                                                selected?.places.push(p);
+                                                                setSelected({ ...selected });
+                                                            }
+                                                        }
+                                                    }}
+                                                    onMouseEnter={() => setTooltipContent(`${code} - ${geo.properties.name}`)}
+                                                    onMouseLeave={() => setTooltipContent('')}
+                                                />
+                                            );
+                                        })
+                                    }
+                                </Geographies>
+                            </ZoomableGroup>
+                        </ComposableMap>
+                        <ReactTooltip>{tooltipContent}</ReactTooltip>
+                    </Col>
+                </Row>
+                <Row>
+                    <Col>
+                        {' '}
+                        <Col>
+                            <Button variant="outline-secondary" size="sm" className="mr-2" onClick={selectAll}>
+                                Select All
+                            </Button>
+                            <Button variant="outline-secondary" size="sm" onClick={deselectAll}>
+                                De-select All
+                            </Button>
+                        </Col>
                     </Col>
                 </Row>
                 <Row className="form-group">
