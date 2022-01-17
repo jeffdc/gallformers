@@ -644,7 +644,7 @@ const gallUpdateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
         db.species.update({
             where: { id: gall.id },
             data: {
-                ...speciesUpdateData(gall),
+                ...speciesUpdateData(gall, false),
                 gallspecies: {
                     update: {
                         where: { species_id_gall_id: { gall_id: gall.gallid, species_id: gall.id } },

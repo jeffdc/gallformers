@@ -107,9 +107,16 @@ const Images = ({ sp }: Props): JSX.Element => {
                                 />
                                 <p>{image.caption}</p>
                                 {image.sourcelink != undefined && image.sourcelink !== '' && (
-                                    <a href={image.sourcelink} target="_blank" rel="noreferrer">
-                                        Link to Original
-                                    </a>
+                                    <span>
+                                        <b>License:</b>{' '}
+                                        <a href={currentImage?.licenselink} target="_blank" rel="noreferrer">
+                                            {currentImage?.license}
+                                        </a>
+                                        {' - '}
+                                        <a href={image.sourcelink} target="_blank" rel="noreferrer">
+                                            Link to Original
+                                        </a>
+                                    </span>
                                 )}
                             </div>
                         ))}
