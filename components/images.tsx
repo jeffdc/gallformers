@@ -8,7 +8,7 @@ import Carousel from 'nuka-carousel';
 import React, { useState } from 'react';
 import { Button, ButtonGroup, ButtonToolbar, Col, Modal, OverlayTrigger, Popover, Row } from 'react-bootstrap';
 import useWindowDimensions from '../hooks/usewindowdimension';
-import { ImageApi, ImageNoSourceApi, SpeciesApi } from '../libs/api/apitypes';
+import { ALLRIGHTS, ImageApi, ImageNoSourceApi, SpeciesApi } from '../libs/api/apitypes';
 import { hasProp } from '../libs/utils/util';
 import NoImage from '../public/images/noimage.jpg';
 
@@ -108,14 +108,18 @@ const Images = ({ sp }: Props): JSX.Element => {
                                 <p>{image.caption}</p>
                                 {image.sourcelink != undefined && image.sourcelink !== '' && (
                                     <span>
-                                        <b>License:</b>{' '}
-                                        <a href={currentImage?.licenselink} target="_blank" rel="noreferrer">
-                                            {currentImage?.license}
-                                        </a>
-                                        {' - '}
                                         <a href={image.sourcelink} target="_blank" rel="noreferrer">
-                                            Link to Original
-                                        </a>
+                                            Image
+                                        </a>{' '}
+                                        by {image.creator}
+                                        {' © '}
+                                        {image.license === ALLRIGHTS ? (
+                                            image.license
+                                        ) : (
+                                            <a href={image.licenselink} target="_blank" rel="noreferrer">
+                                                {image.license}
+                                            </a>
+                                        )}
                                     </span>
                                 )}
                             </div>
