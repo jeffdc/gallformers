@@ -144,7 +144,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                     </Row>
                                     <Row>
                                         <Col>
-                                            <strong>Abdundance:</strong>{' '}
+                                            <strong>Abundance:</strong>{' '}
                                             {pipe(
                                                 species.abundance,
                                                 O.fold(constant(''), (a) => a.abundance),

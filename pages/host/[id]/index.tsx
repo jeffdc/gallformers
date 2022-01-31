@@ -143,7 +143,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                     </Row>
                     <Row>
                         <Col>
-                            <strong>Abdundance:</strong>{' '}
+                            <strong>Abundance:</strong>{' '}
                             {pipe(
                                 host.abundance,
                                 O.map((a) => a.abundance),
