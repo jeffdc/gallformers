@@ -38,7 +38,7 @@
     "jquery": "^3.6.0",
     "logging-ts": "^0",
     "natural": "^5",
-    "next": "^11",
+    "next": "^12",
     "next-auth": "^3",
     "nuka-carousel": "^4",
     "pino": "^6",
