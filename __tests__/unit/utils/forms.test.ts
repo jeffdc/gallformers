@@ -1,5 +1,6 @@
 import * as fc from 'fast-check';
 import { render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import { genOptions } from '../../../libs/utils/forms';
 
 describe('The Forms Util genOptions()', () => {
