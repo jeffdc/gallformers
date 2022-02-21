@@ -4,7 +4,7 @@ import * as O from 'fp-ts/lib/Option';
 import * as TA from 'fp-ts/lib/Task';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/client';
+import { getSession } from 'next-auth/react';
 import { ParsedUrlQuery } from 'querystring';
 import { logger } from '../utils/logger';
 import { DeleteResult } from './apitypes';

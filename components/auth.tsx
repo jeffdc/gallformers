@@ -1,10 +1,10 @@
-import { signIn, useSession } from 'next-auth/client';
+import { signIn, useSession } from 'next-auth/react';
 import React from 'react';
 
 export const superAdmins = ['jeff', 'adamjameskranz'];
 
 const Auth = ({ superAdmin, children }: { superAdmin?: boolean; children: JSX.Element }): JSX.Element => {
-    const [session, loading] = useSession();
+    const { data: session, status } = useSession();
 
     if (!session) {
         return (
@@ -27,7 +27,7 @@ const Auth = ({ superAdmin, children }: { superAdmin?: boolean; children: JSX.El
         );
     }
 
-    if (loading) {
+    if (status === 'loading') {
         return <p className="m-3 p-3">Hold tight. Working on vetting you...</p>;
     }
 

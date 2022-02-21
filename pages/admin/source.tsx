@@ -130,9 +130,9 @@ const Source = ({ id, sources }: Props): JSX.Element => {
             deleteResults={deleteResults}
             selected={selected}
         >
-            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
+            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                 <h4>Add/Edit Sources</h4>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         <Row>
                             <Col>Title:</Col>
@@ -149,7 +149,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                         </Row>
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Author (required):
                         <input
@@ -175,7 +175,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                         )}
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Reference Link (required):
                         <input
@@ -187,7 +187,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                         />
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         License (required):
                         <select {...form.register('license')} className="form-control" disabled={!selected}>
@@ -200,7 +200,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                         )}
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         License Link:
                         <input
@@ -215,7 +215,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                         )}
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         <p>
                             Citation (required) (
@@ -237,7 +237,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                     </Col>
                 </Row>
                 <Row className="formGroup pb-1">
-                    <Col className="mr-auto">
+                    <Col className="me-auto">
                         <input
                             {...form.register('datacomplete')}
                             type="checkbox"

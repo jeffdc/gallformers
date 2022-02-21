@@ -1,7 +1,8 @@
 import Head from 'next/head';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
 import React, { KeyboardEvent, SyntheticEvent, useState } from 'react';
-import { Button, Dropdown, Form, FormControl, Nav, Navbar } from 'react-bootstrap';
+import { Button, Container, Form, FormControl, Nav, Navbar, NavDropdown } from 'react-bootstrap';
 
 const Header = (): JSX.Element => {
     const [searchText, setSearchText] = useState('');
@@ -35,57 +36,55 @@ const Header = (): JSX.Element => {
                 <title>Gallformers</title>
                 <link rel="icon" href="/favicon.ico" />
             </Head>
-            <Navbar fixed="top" collapseOnSelect expand="md" bg="dark" variant="dark">
-                <Navbar.Brand href="/">
-                    <img src="/images/fly.svg" width="25px" height="25px" alt="The gallformers logo, an abstract insect." />{' '}
-                    Gallformers
-                </Navbar.Brand>
-                <Navbar.Toggle aria-controls="responsive-navbar-nav" />
-                <Navbar.Collapse id="responsive-navbar-nav">
-                    <Nav className="ml-auto">
-                        <Nav.Link href="/id" className="ml-auto">
-                            Id
-                        </Nav.Link>
-                        <Nav.Link href="/explore" className="ml-auto">
-                            Explore
-                        </Nav.Link>
-                        <Form
-                            inline
-                            onSubmit={(e) => {
-                                submitSearch(e);
-                            }}
-                            className="ml-auto"
-                        >
-                            <FormControl
-                                onChange={(e) => {
-                                    setSearchText(e.target.value);
+            <Navbar fixed="top" collapseOnSelect expand="md" className="navbar-custom" variant="dark">
+                <Container fluid>
+                    <Navbar.Brand href="/">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src="/images/leaf-logo.svg"
+                            width="40px"
+                            height="40px"
+                            className="d-inline-block"
+                            alt="The gallformers logo, an orange oak leaf."
+                        />
+                        <span className="ps-2" style={{ fontSize: 'larger' }}>
+                            gallformers
+                        </span>
+                    </Navbar.Brand>
+                    <Navbar.Toggle aria-controls="responsive-navbar-nav" />
+                    <Navbar.Collapse id="responsive-navbar-nav">
+                        <Nav className="ms-auto my-2 my-lg-0">
+                            <Nav.Link href="/id">Id</Nav.Link>
+                            <Nav.Link href="/explore">Explore</Nav.Link>
+                            <Form
+                                onSubmit={(e) => {
+                                    submitSearch(e);
                                 }}
-                                value={searchText}
-                                onKeyUp={handleSearchKeyUp}
-                                type="text"
-                                placeholder="Search"
-                                className="mr-sm-2"
-                            />
-                            <Button type="submit" variant="outline-success" className="ml-auto">
-                                Search
-                            </Button>
-                        </Form>
-                        <Dropdown className="ml-auto">
-                            <Dropdown.Toggle
-                                className="border border-success rounded m-1"
-                                id="resources-button"
-                                variant="outline-success"
+                                className="d-flex"
                             >
-                                Resources
-                            </Dropdown.Toggle>
-                            <Dropdown.Menu align="right">
-                                <Dropdown.Item href="/guide">ID Guide</Dropdown.Item>
-                                <Dropdown.Item href="/filterguide">Filter Terms</Dropdown.Item>
-                                <Dropdown.Item href="/glossary">Plant and Insect Glossary</Dropdown.Item>
-                            </Dropdown.Menu>
-                        </Dropdown>
-                    </Nav>
-                </Navbar.Collapse>
+                                <FormControl
+                                    onChange={(e) => {
+                                        setSearchText(e.target.value);
+                                    }}
+                                    value={searchText}
+                                    onKeyUp={handleSearchKeyUp}
+                                    type="search"
+                                    placeholder="Search"
+                                    className="me-2"
+                                    aria-label="Search"
+                                />
+                                <Button type="submit" variant="outline-light">
+                                    Search
+                                </Button>
+                            </Form>
+                            <NavDropdown title="Resources">
+                                <NavDropdown.Item href="/guide">ID Guide</NavDropdown.Item>
+                                <NavDropdown.Item href="/filterguide">Filter Terms</NavDropdown.Item>
+                                <NavDropdown.Item href="/glossary">Glossary</NavDropdown.Item>
+                            </NavDropdown>
+                        </Nav>
+                    </Navbar.Collapse>
+                </Container>
             </Navbar>
         </div>
     );

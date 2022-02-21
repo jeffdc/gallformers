@@ -181,16 +181,16 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
             deleteResults={deleteResults}
             selected={selected}
         >
-            <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pr-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pe-4">
                 <h4>Add/Edit Hosts</h4>
                 <p>
                     This is for all of the details about a Host. To add a description (which must be referenced to a source) go
                     add <Link href="/admin/source">Sources</Link>, if they do not already exist, then go{' '}
                     <Link href="/admin/speciessource">map species to sources with description</Link>. If you want to assign a{' '}
-                    <Link href="/admin/family">Family</Link> or <Link href="/admin/section">Section</Link> then you will need to
+                    <Link href="/admin/taxonomy">Family</Link> or <Link href="/admin/section">Section</Link> then you will need to
                     have created them first if they do not exist.
                 </p>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         <Row>
                             <Col xs={8}>
@@ -210,7 +210,7 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                         </Row>
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Genus (filled automatically):
                         <Typeahead
@@ -274,7 +274,7 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                         )}
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Section:
                         <Typeahead
@@ -382,7 +382,7 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                     <Col>
                         {' '}
                         <Col>
-                            <Button variant="outline-secondary" size="sm" className="mr-2" onClick={selectAll}>
+                            <Button variant="outline-secondary" size="sm" className="me-2" onClick={selectAll}>
                                 Select All
                             </Button>
                             <Button variant="outline-secondary" size="sm" onClick={deselectAll}>
@@ -391,7 +391,7 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                         </Col>
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         <Controller
                             control={form.control}
@@ -411,7 +411,7 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                     </Col>
                 </Row>
                 <Row className="formGroup pb-1">
-                    <Col className="mr-auto">
+                    <Col className="me-auto">
                         <Controller
                             control={form.control}
                             name="datacomplete"

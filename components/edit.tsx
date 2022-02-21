@@ -1,4 +1,4 @@
-import { useSession } from 'next-auth/client';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import React from 'react';
 
@@ -8,7 +8,7 @@ type Props = {
 };
 
 const Edit = ({ id, type }: Props): JSX.Element => {
-    const [session] = useSession();
+    const { data: session } = useSession();
 
     return (
         <>

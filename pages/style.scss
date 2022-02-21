@@ -1,10 +1,10 @@
-@import 'node_modules/bootstrap/scss/bootstrap';
+@import '../node_modules/bootstrap/scss/bootstrap';
 
 // super useful for debugging CSS layout issues (visualizing layout and whitespace)
 // * {
-//   background: #000 !important;
-//   color: #0f0 !important;
-//   outline: solid #f00 1px !important;
+//     background: #000 !important;
+//     color: #0f0 !important;
+//     outline: solid #f00 1px !important;
 // }
 
 // palette
@@ -13,6 +13,7 @@ $canary: #f8f991;
 $independence: #585563;
 $new-york-pink: #ce796b;
 $persian-orange: #c18c5d;
+$logo-blue: #303e88;
 
 $table-header-background: $cadet-blue;
 $table-selected-row: $canary;
@@ -21,6 +22,40 @@ $table-selected-row: $canary;
 :export {
     tableheaderbackground: $table-header-background;
     tableselectedrow: $table-selected-row;
+}
+
+body {
+    // font-family: Helvetica, Arial, sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+a {
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.logotext {
+    font-family: Futura, Helvetiva, Arial, sans-serif;
+    color: white;
+}
+
+.darklogotext {
+    font-family: Futura, Helvetiva, Arial, sans-serif;
+    color: $logo-blue;
+}
+
+.navbar-custom {
+    background-color: $logo-blue;
+    font-family: Futura, Helvetiva, Arial, sans-serif;
+}
+
+.navbar-custom .navbar-brand,
+.navbar-custom .navbar-text,
+.navbar-custom .navbar-link {
+    color: white;
 }
 
 .description-text {
@@ -114,23 +149,23 @@ blockquote {
     pointer-events: none;
 }
 
-.card-columns {
-    @include media-breakpoint-only(xs) {
-        column-count: 1;
-    }
-    @include media-breakpoint-only(sm) {
-        column-count: 2;
-    }
-    @include media-breakpoint-only(med) {
-        column-count: 3;
-    }
-    @include media-breakpoint-only(lg) {
-        column-count: 4;
-    }
-    @include media-breakpoint-only(xl) {
-        column-count: 5;
-    }
-}
+// .card-columns {
+//     @include media-breakpoint-only(xs) {
+//         column-count: 1;
+//     }
+//     @include media-breakpoint-only(sm) {
+//         column-count: 2;
+//     }
+//     @include media-breakpoint-only(med) {
+//         column-count: 3;
+//     }
+//     @include media-breakpoint-only(lg) {
+//         column-count: 4;
+//     }
+//     @include media-breakpoint-only(xl) {
+//         column-count: 5;
+//     }
+// }
 
 // expand clickable area of editable cell to fill the entire cell of the table
 .editable-table-cell {
@@ -164,3 +199,56 @@ blockquote {
         height: unset !important;
     }
 }
+
+///////////////////////////////////////
+// Once we upgrade to ReactBootstrapTypeahead 6 remove all of this
+.rbt-close {
+    font-size: 1rem;
+    border: none;
+    background: transparent;
+
+    &-sm {
+        font-size: 0.75rem;
+    }
+
+    &-content {
+        display: none;
+    }
+}
+
+.rbt-aux {
+    width: 2.5rem;
+
+    &-lg {
+        width: 3rem;
+    }
+
+    & .rbt-close {
+        // Overrides `margin-top: -4px` in BS4 styles
+        margin-top: 0;
+    }
+}
+
+.rbt .form-floating {
+    flex: 1;
+}
+
+.form-floating > .rbt-input-multi {
+    &:not(:placeholder-shown) ~ label {
+        opacity: inherit;
+        transform: inherit;
+    }
+
+    // Hide the placeholder
+    .rbt-input-main::placeholder {
+        color: transparent;
+    }
+
+    // Shrink the label when multi-selector is focused or there are selections.
+    &.focus ~ label {
+        opacity: 0.65;
+        transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
+    }
+}
+/////////////////////////////////////////////
+// end RBTA 6

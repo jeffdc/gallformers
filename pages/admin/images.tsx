@@ -4,12 +4,12 @@ import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Image from 'next/image';
-import { useSession } from 'next-auth/client';
+import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Col, Modal, Row } from 'react-bootstrap';
-import DataTable from 'react-data-table-component';
+import DataTable, { TableColumn } from 'react-data-table-component';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import AddImage from '../../components/addimage';
@@ -91,11 +91,11 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
         },
     });
 
-    const [session] = useSession();
+    const { data: session } = useSession();
     const router = useRouter();
     const confirm = useConfirmation();
 
-    const columns = useMemo(
+    const columns = useMemo<TableColumn<ImageApi>[]>(
         () => [
             {
                 id: 'small',
@@ -114,9 +114,12 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
             },
             {
                 id: 'source',
+                // this is needed because the ReactDataTable component changed the contract and is tryign to be overly clever with its types
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
                 selector: (g: ImageApi) => g.source,
                 name: 'Source',
-                sort: true,
+                sortable: true,
                 wrap: true,
                 format: sourceFormatter,
             },
@@ -124,7 +127,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                 id: 'sourcelink',
                 selector: (g: ImageApi) => g.sourcelink,
                 name: 'Source Link',
-                sort: true,
+                sortable: true,
                 maxWidth: '200px',
                 wrap: true,
                 format: (img: ImageApi) => linkFormatter(img.sourcelink),
@@ -135,7 +138,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                 name: 'Creator',
                 maxWidth: '100px',
                 wrap: true,
-                sort: true,
+                sortable: true,
             },
             {
                 id: 'license',
@@ -143,7 +146,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                 maxWidth: '100px',
                 wrap: true,
                 name: 'License',
-                sort: true,
+                sortable: true,
             },
             {
                 id: 'licenselink',
@@ -151,7 +154,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                 name: 'License Link',
                 maxWidth: '200px',
                 wrap: true,
-                sort: true,
+                sortable: true,
                 format: (img: ImageApi) => linkFormatter(img.licenselink),
             },
             {
@@ -159,14 +162,14 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                 selector: (g: ImageApi) => g.attribution,
                 name: 'Attribution',
                 wrap: true,
-                sort: true,
+                sortable: true,
             },
             {
                 id: 'caption',
                 selector: (g: ImageApi) => g.caption,
                 name: 'Caption',
                 wrap: true,
-                sort: true,
+                sortable: true,
             },
         ],
         [],
@@ -391,14 +394,14 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                         <Button variant="primary" className="mt-4" onClick={doCopy}>
                             Copy
                         </Button>
-                        <Button variant="secondary" className="mt-4 ml-2" onClick={() => setShowCopy(false)}>
+                        <Button variant="secondary" className="mt-4 ms-2" onClick={() => setShowCopy(false)}>
                             Cancel
                         </Button>
                     </Modal.Body>
                 </Modal>
-                <form className="m-4 pr-4">
+                <form className="m-4 pe-4">
                     <h4>Add/Edit Species Images</h4>
-                    <Row className="form-group" xs={3}>
+                    <Row className="my-1" xs={3}>
                         <Col xs={1} style={{ paddingTop: '5px' }}>
                             Species:
                         </Col>
@@ -432,7 +435,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                             )}
                         </Col>
                     </Row>
-                    <Row className="form-group">
+                    <Row className="my-1">
                         <Col>
                             <DataTable
                                 keyField={'id'}

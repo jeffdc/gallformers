@@ -1,5 +1,5 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { Provider } from 'next-auth/client';
+import { SessionProvider } from 'next-auth/react';
 import { AppProps } from 'next/app';
 import Head from 'next/head';
 import React from 'react';
@@ -12,13 +12,13 @@ import './style.scss';
 
 function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
     return (
-        <Provider session={pageProps.session}>
+        <SessionProvider session={pageProps.session}>
             <Container fluid className="pt-4">
                 <Head>
-                    <script type="text/javascript">
-                        {/* Fix for Firefox autofocus CSS bug See:
+                    {/* <script type="text/javascript"> */}
+                    {/* Fix for Firefox autofocus CSS bug See:
                         http://stackoverflow.com/questions/18943276/html-5-autofocus-messes-up-css-loading/18945951#18945951 */}
-                    </script>
+                    {/* </script> */}
 
                     <title>Gallformers</title>
                     <link rel="icon" href="/favicon.ico" />
@@ -37,7 +37,7 @@ function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
                 </Row>
                 <Footer />
             </Container>
-        </Provider>
+        </SessionProvider>
     );
 }
 

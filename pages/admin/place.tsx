@@ -106,7 +106,7 @@ const PlaceAdmin = ({ id, places }: Props): JSX.Element => {
             deleteResults={deleteResults}
             selected={selected}
         >
-            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
+            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                 <h4>Add/Edit Places</h4>
                 <Alert variant="info">
                     This is really just a stub page for now. Much work still needs to be done to support Place hierachies as well
@@ -115,7 +115,7 @@ const PlaceAdmin = ({ id, places }: Props): JSX.Element => {
                     this will ever be used in its current form. If you are looking to add Range information go to the Host admin
                     and add it there.
                 </Alert>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         <Row>
                             <Col>Name:</Col>
@@ -132,7 +132,7 @@ const PlaceAdmin = ({ id, places }: Props): JSX.Element => {
                         </Row>
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Code (required):
                         <input

@@ -19,7 +19,7 @@ const InfoTip = ({ id, text, children, tip }: Props): JSX.Element => {
             }
         >
             <sup>
-                <Badge pill variant="info" className="m-1">
+                <Badge pill bg="secondary" className="m-1" style={{ fontFamily: 'monospace' }}>
                     {tip ? tip : 'i'}
                 </Badge>
             </sup>

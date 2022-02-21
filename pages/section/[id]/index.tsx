@@ -59,8 +59,8 @@ const Section = ({ section }: Props): JSX.Element => {
                 <Col>
                     <h2>{fullName}</h2>
                 </Col>
-                <Col xs={2} className="mr-1">
-                    <span className="p-0 pr-1 my-auto">
+                <Col xs={2} className="me-1">
+                    <span className="p-0 pe-1 my-auto">
                         <Edit id={section.id} type="section" />
                     </span>
                 </Col>

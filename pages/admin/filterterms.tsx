@@ -172,9 +172,9 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
             superAdmin={true}
         >
             <>
-                <form className="m-4 pr-4">
+                <form className="m-4 pe-4">
                     <h4>Add/Edit Filter Fields</h4>
-                    <Row className="form-group">
+                    <Row className="my-1">
                         <Col>
                             <select
                                 className="form-control"
@@ -191,8 +191,8 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
                         </Col>
                     </Row>
                 </form>
-                <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
-                    <Row className="form-group">
+                <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
+                    <Row className="my-1">
                         <Col>
                             <Row>
                                 <Col>Word:</Col>
@@ -209,7 +209,7 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
                             </Row>
                         </Col>
                     </Row>
-                    <Row className="form-group">
+                    <Row className="my-1">
                         <Col>
                             Definition (required):
                             <Controller

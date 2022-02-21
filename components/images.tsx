@@ -1,6 +1,6 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
-import { useSession } from 'next-auth/client';
+import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -8,9 +8,10 @@ import Carousel from 'nuka-carousel';
 import React, { useState } from 'react';
 import { Button, ButtonGroup, ButtonToolbar, Col, Modal, OverlayTrigger, Popover, Row } from 'react-bootstrap';
 import useWindowDimensions from '../hooks/usewindowdimension';
-import { ALLRIGHTS, ImageApi, ImageNoSourceApi, SpeciesApi } from '../libs/api/apitypes';
+import { ALLRIGHTS, GallTaxon, ImageApi, ImageNoSourceApi, SpeciesApi } from '../libs/api/apitypes';
 import { hasProp } from '../libs/utils/util';
 import NoImage from '../public/images/noimage.jpg';
+import NoImageHost from '../public/images/noimagehost.jpg';
 
 // type guard for dealing with possible Images without Source data. If this happens there is an upstream
 // programming error so we will fail fast and hard.
@@ -49,7 +50,11 @@ const Images = ({ sp }: Props): JSX.Element => {
 
     return species.images.length < 1 ? (
         <div className="p-2">
-            <Image src={NoImage} alt={`missing image of ${species.name}`} className="img-fluid d-block" />
+            <Image
+                src={species.taxoncode === GallTaxon ? NoImage : NoImageHost}
+                alt={`missing image of ${species.name}`}
+                className="img-fluid d-block"
+            />
             {session && (
                 <ButtonToolbar className="row d-flex justify-content-center">
                     <ButtonGroup size="sm">
@@ -207,12 +212,12 @@ const Images = ({ sp }: Props): JSX.Element => {
             <div className="border rounded pb-1">
                 <Carousel
                     renderCenterLeftControls={({ previousSlide }) => (
-                        <Button variant="secondary" size="sm" onClick={previousSlide} className="ml-1">
+                        <Button variant="secondary" size="sm" onClick={previousSlide} className="ms-1">
                             {'<'}
                         </Button>
                     )}
                     renderCenterRightControls={({ nextSlide }) => (
-                        <Button variant="secondary" size="sm" onClick={nextSlide} className="mr-1">
+                        <Button variant="secondary" size="sm" onClick={nextSlide} className="me-1">
                             {'>'}
                         </Button>
                     )}
@@ -250,16 +255,16 @@ const Images = ({ sp }: Props): JSX.Element => {
                         </div>
                     ))}
                 </Carousel>
-                <ButtonToolbar className="row d-flex justify-content-center">
+                <ButtonToolbar className="d-flex justify-content-center">
                     <ButtonGroup size="sm">
                         <OverlayTrigger
                             trigger="focus"
                             placement="bottom"
                             overlay={
                                 <Popover id="copyright-popover">
-                                    <Popover.Content>{`${
+                                    <Popover.Body>{`${
                                         currentImage?.license ? currentImage.license : 'No License'
-                                    }`}</Popover.Content>
+                                    }`}</Popover.Body>
                                 </Popover>
                             }
                         >
@@ -271,7 +276,6 @@ const Images = ({ sp }: Props): JSX.Element => {
                             variant="secondary"
                             style={{ fontWeight: 'bold' }}
                             onClick={() => {
-                                console.log(`JDC: info click ${imgIndex} - ${currentImage?.medium}`);
                                 setShowInfo(true);
                             }}
                         >

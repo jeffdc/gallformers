@@ -55,8 +55,10 @@ const AliasTable = ({ data, setData, disabled }: AliasTableProps): JSX.Element =
                 update={setData}
                 disabled={disabled}
             />
-            <p className="font-italic small">
-                Changes to the aliases will not be saved until you save the whole form by clicking &lsquo;Submit&rsquo; below.
+            <p className="small">
+                <em>
+                    Changes to the aliases will not be saved until you save the whole form by clicking &lsquo;Submit&rsquo; below.
+                </em>
             </p>
         </>
     );
