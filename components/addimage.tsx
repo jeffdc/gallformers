@@ -1,4 +1,4 @@
-import { useSession } from 'next-auth/client';
+import { useSession } from 'next-auth/react';
 import React, { ChangeEvent, useState } from 'react';
 import { Col, ProgressBar, Row } from 'react-bootstrap';
 import axios from 'axios';
@@ -16,7 +16,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState(0);
 
-    const [session] = useSession();
+    const { data: session } = useSession();
     if (!session) return <></>;
 
     const selectFiles = async (e: ChangeEvent<HTMLInputElement>) => {

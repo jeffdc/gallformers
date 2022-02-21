@@ -204,9 +204,9 @@ const TaxonomyAdmin = ({ id, fs }: Props): JSX.Element => {
                 deleteResults={deleteResults}
                 selected={selected}
             >
-                <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
+                <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                     <h4>Manage Taxonomy</h4>
-                    <Form.Row>
+                    <Row>
                         <FormGroup as={Col}>
                             <Form.Label>Family Name:</Form.Label>
                             {mainField('name', 'Family')}
@@ -220,7 +220,7 @@ const TaxonomyAdmin = ({ id, fs }: Props): JSX.Element => {
                                 <span className="text-danger">You must provide the description.</span>
                             )}
                         </FormGroup>
-                    </Form.Row>
+                    </Row>
                     <Row>
                         <Col>
                             <Form.Label>Genera:</Form.Label>
@@ -241,8 +241,8 @@ const TaxonomyAdmin = ({ id, fs }: Props): JSX.Element => {
                         deleteConfirmation={DELETE_CONFIRMATION_MSG}
                     />
                     <hr />
-                    <Form.Row>
-                        <Col xs={2} className="mr-3">
+                    <Row>
+                        <Col xs={2} className="me-3">
                             <Button variant="primary" type="submit" value="Submit" disabled={!selected}>
                                 Submit
                             </Button>
@@ -259,7 +259,7 @@ const TaxonomyAdmin = ({ id, fs }: Props): JSX.Element => {
                                 'Caution. If there are any species (galls or hosts) assigned to this Family they too will be deleted.',
                             )}
                         </Col>
-                    </Form.Row>
+                    </Row>
                 </form>
             </Admin>
         </>

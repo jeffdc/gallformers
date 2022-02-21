@@ -61,13 +61,17 @@ const linkItem = (i: SearchResultItem) => {
         case 'gall':
             return (
                 <Link href={`/gall/${i.id}`}>
-                    <a className="font-italic">{formatWithDescription(i.name, i.aliases, true)}</a>
+                    <a>
+                        <em>{formatWithDescription(i.name, i.aliases, true)}</em>
+                    </a>
                 </Link>
             );
         case 'plant':
             return (
                 <Link href={`/host/${i.id}`}>
-                    <a className="font-italic">{formatWithDescription(i.name, i.aliases, true)}</a>
+                    <a>
+                        <em>{formatWithDescription(i.name, i.aliases, true)}</em>
+                    </a>
                 </Link>
             );
         case 'entry':
@@ -85,13 +89,17 @@ const linkItem = (i: SearchResultItem) => {
         case 'genus':
             return (
                 <Link href={`/genus/${i.id}`}>
-                    <a className="font-italic">{`Genus ${formatWithDescription(i.name, i.aliases, true)}`}</a>
+                    <a>
+                        <em>{`Genus ${formatWithDescription(i.name, i.aliases, true)}`}</em>
+                    </a>
                 </Link>
             );
         case 'section':
             return (
                 <Link href={`/section/${i.id}`}>
-                    <a className="font-italic">{`Section ${formatWithDescription(i.name, i.aliases, true)}`}</a>
+                    <a>
+                        <em>{`Section ${formatWithDescription(i.name, i.aliases, true)}`}</em>
+                    </a>
                 </Link>
             );
         case 'family':

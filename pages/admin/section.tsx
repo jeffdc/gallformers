@@ -156,10 +156,10 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
             deleteResults={deleteResults}
             selected={selected}
         >
-            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
+            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                 <h4>Add or Edit a Section</h4>
                 <p>This is only for host sections. Currently we do not support sections for gallmakers.</p>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         <Row>
                             <Col xs={8}>Name:</Col>
@@ -176,7 +176,7 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
                         </Row>
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Description (required):
                         <textarea
@@ -191,7 +191,7 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
                         )}
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Species (required):
                         <Typeahead

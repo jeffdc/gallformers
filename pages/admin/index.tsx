@@ -1,4 +1,4 @@
-import { useSession } from 'next-auth/client';
+import { useSession } from 'next-auth/react';
 import Head from 'next/head';
 import Link from 'next/link';
 import React from 'react';
@@ -6,7 +6,7 @@ import { Col, ListGroup, ListGroupItem, Row } from 'react-bootstrap';
 import Auth, { superAdmins } from '../../components/auth';
 
 const Admin = (): JSX.Element => {
-    const [session] = useSession();
+    const { data: session } = useSession();
 
     return (
         <Auth>

@@ -3,7 +3,7 @@ import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/client';
+import { getSession } from 'next-auth/react';
 import { Err, extractQueryParam, sendErrResponse, sendSuccResponse, toErr } from '../../../libs/api/apipage';
 import { ENDPOINT, getPresignedUrl } from '../../../libs/images/images';
 import { handleError } from '../../../libs/utils/util';

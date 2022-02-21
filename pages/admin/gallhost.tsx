@@ -185,7 +185,7 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
                 deleteResults={deleteResults}
                 selected={selected}
             >
-                <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
+                <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                     <h4>Gall - Host Mappings</h4>
                     <p>
                         First select a gall. If any mappings to hosts already exist they will show up in the Host field. Then you
@@ -198,7 +198,7 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
                         </Link>{' '}
                         now if you need to.
                     </p>
-                    <Row className="form-group">
+                    <Row className="my-1">
                         <Col>
                             Gall:
                             {mainField('name', 'Gall')}
@@ -209,7 +209,7 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
                             <h2>⇅</h2>
                         </Col>
                     </Row>
-                    <Row className="form-group">
+                    <Row className="my-1">
                         <Col>
                             Hosts:
                             <Typeahead
@@ -231,7 +231,7 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
                             )}
                         </Col>
                     </Row>
-                    <Row className="form-group">
+                    <Row className="my-1">
                         <Col>
                             Range:
                             <InfoTip
@@ -297,9 +297,9 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
                             <ReactTooltip>{tooltipContent}</ReactTooltip>
                         </Col>
                     </Row>
-                    <Row className="form-group">
+                    <Row className="my-1">
                         <Col>
-                            <Button variant="outline-secondary" size="sm" className="mr-2" onClick={selectAll}>
+                            <Button variant="outline-secondary" size="sm" className="me-2" onClick={selectAll}>
                                 Select All
                             </Button>
                             <Button variant="outline-secondary" size="sm" onClick={deselectAll}>
@@ -318,7 +318,7 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
                             </span>
                         </Col>
                     </Row>
-                    <Row className="form-group">
+                    <Row className="my-1">
                         <Col>
                             <input type="submit" className="button" value="Submit" disabled={!selected || gallHosts.length < 1} />
                         </Col>

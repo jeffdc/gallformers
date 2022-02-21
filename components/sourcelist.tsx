@@ -137,24 +137,26 @@ const SourceList = ({ data, defaultSelection, onSelectionChange, taxonType }: So
             >
                 Our ID Notes may contain important tips necessary for distinguishing this gall from similar galls and/or important
                 information about the taxonomic status of this gall inducer.
-                <Button className="ml-3" variant="outline-info" size="sm" onClick={() => selectRow(gallformersNotes)}>
+                <Button className="ms-3" variant="outline-info" size="sm" onClick={() => selectRow(gallformersNotes)}>
                     Show notes
                 </Button>
             </Alert>
-            <Row className="">
+            <Row>
                 <Col sm={10} xs={12}>
-                    <div className="font-italic">
-                        {selectedSource?.source.title}
-                        {selectedSource && <Edit id={selectedSource?.source.id} type="source" />}
+                    <div>
+                        <em>
+                            {selectedSource?.source.title}
+                            {selectedSource && <Edit id={selectedSource?.source.id} type="source" />}
+                        </em>
                     </div>
                 </Col>
-                <Col className="text-right">
+                <Col className="d-flex justify-content-end">
                     <Button
                         variant="secondary"
                         size="sm"
                         onClick={changeSource(-1)}
                         disabled={data.length <= 1}
-                        className="mr-1"
+                        className="me-1"
                         aria-label="select previous source"
                     >
                         {'<'}

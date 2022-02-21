@@ -281,7 +281,7 @@ const Gall = ({
             deleteResults={deleteResults}
             selected={selected}
         >
-            <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pr-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pe-4">
                 <UndescribedFlow
                     show={showNewUndescribed}
                     onClose={newUndescribedDone}
@@ -301,7 +301,7 @@ const Gall = ({
                     </Link>
                     .
                 </p>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         <Row hidden={!!selected} className="formGroup">
                             <Col>
@@ -328,7 +328,7 @@ const Gall = ({
                         </Row>
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Genus (filled automatically):
                         <Typeahead
@@ -393,7 +393,7 @@ const Gall = ({
                         )}
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Hosts (required):
                         <Typeahead
@@ -418,7 +418,7 @@ const Gall = ({
                         )}
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Detachable:
                         <Controller
@@ -503,7 +503,7 @@ const Gall = ({
                         />
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Color(s):
                         <Typeahead
@@ -581,7 +581,7 @@ const Gall = ({
                         />
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Location(s):
                         <Typeahead
@@ -646,7 +646,7 @@ const Gall = ({
                         />
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         <Controller
                             control={form.control}
@@ -667,7 +667,7 @@ const Gall = ({
                     </Col>
                 </Row>
                 <Row className="formGroup pb-1">
-                    <Col className="mr-auto">
+                    <Col className="me-auto">
                         <Controller
                             control={form.control}
                             name="datacomplete"
@@ -692,7 +692,7 @@ const Gall = ({
                     </Col>
                 </Row>
                 <Row className="formGroup pb-1">
-                    <Col className="mr-auto">
+                    <Col className="me-auto">
                         <Controller
                             control={form.control}
                             name="undescribed"

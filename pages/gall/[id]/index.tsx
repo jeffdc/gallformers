@@ -72,10 +72,12 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                         <Col>
                             <Row>
                                 <Col>
-                                    <h2 className="font-italic">{species.name}</h2>
+                                    <h2>
+                                        <em>{species.name}</em>
+                                    </h2>
                                 </Col>
                                 <Col xs={2}>
-                                    <span className="p-0 pr-1 my-auto">
+                                    <span className="p-0 pe-1 my-auto">
                                         <Edit id={species.id} type="gall" />
                                         <OverlayTrigger
                                             placement="right"
@@ -106,10 +108,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                     {' | '}
                                     <strong>Genus:</strong>
                                     <Link key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
-                                        <a className="font-italic">
-                                            {' '}
-                                            {formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}
-                                        </a>
+                                        <a> {formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}</a>
                                     </Link>
                                 </Col>
                             </Row>

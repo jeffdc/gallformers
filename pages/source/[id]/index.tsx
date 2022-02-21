@@ -35,7 +35,7 @@ const Source = ({ source }: Props): JSX.Element => {
                     </span>
                 </Col>
                 <Col xs={2}>
-                    <span className="p-0 pr-1 my-auto">
+                    <span className="p-0 pe-1 my-auto">
                         <Edit id={source.id} type="source" />
                         <OverlayTrigger
                             placement="left"

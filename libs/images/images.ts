@@ -159,7 +159,7 @@ const uploadImage = async (key: string, buffer: Buffer, mime: string) => {
             (t) => t.$metadata.httpStatusCode !== 503,
         );
     } catch (e) {
-        logger.log(`Err in uploadImage: ${JSON.stringify(e)}`);
+        logger.error(`Err in uploadImage: ${JSON.stringify(e)}`);
     }
 };
 

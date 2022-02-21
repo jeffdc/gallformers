@@ -106,9 +106,9 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
             deleteResults={deleteResults}
             selected={selected}
         >
-            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
+            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                 <h4>Add/Edit Glossary Entries</h4>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         <Row>
                             <Col>Word:</Col>
@@ -125,14 +125,14 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                         </Row>
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Definition (required):
                         <textarea {...form.register('definition')} className="form-control" rows={4} disabled={!selected} />
                         {form.formState.errors.definition && <span className="text-danger">You must provide the defintion.</span>}
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         URLs (required) (separated by a newline [enter]):
                         <textarea {...form.register('urls')} className="form-control" rows={3} disabled={!selected} />
@@ -141,7 +141,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                         )}
                     </Col>
                 </Row>
-                <Row className="form-input">
+                <Row className="my-1">
                     <Col>
                         <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
                     </Col>

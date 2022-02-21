@@ -1,5 +1,5 @@
 import NextAuth from 'next-auth';
-import Providers from 'next-auth/providers';
+import Auth0Provider from 'next-auth/providers/auth0';
 
 if (!process.env.AUTH0_CLIENT_ID || !process.env.AUTH0_SECRET || !process.env.AUTH0_DOMAIN || !process.env.SECRET) {
     const msg = 'The ENV is not configured properly for authentication to work.';
@@ -9,19 +9,18 @@ if (!process.env.AUTH0_CLIENT_ID || !process.env.AUTH0_SECRET || !process.env.AU
 
 export default NextAuth({
     providers: [
-        Providers.Auth0({
+        Auth0Provider({
             clientId: process.env.AUTH0_CLIENT_ID,
             clientSecret: process.env.AUTH0_SECRET,
-            domain: process.env.AUTH0_DOMAIN,
+            issuer: process.env.AUTH0_DOMAIN,
         }),
     ],
     session: {
-        jwt: true,
+        strategy: 'jwt',
     },
     jwt: {
         secret: process.env.SECRET,
-        encryption: true,
     },
     events: {},
-    debug: true,
+    debug: false,
 });

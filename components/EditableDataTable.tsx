@@ -164,7 +164,7 @@ const EditableTable = <T extends WithID>(props: EditableTableProps<T>): JSX.Elem
                 <Button
                     key={ca.name}
                     variant="secondary"
-                    className="btn-sm mr-1"
+                    className="btn-sm me-1"
                     onClick={() => {
                         ca.onUpdate(props.data.filter((a) => selected.has(a.id)));
                         setToggleCleared(!toggleCleared);

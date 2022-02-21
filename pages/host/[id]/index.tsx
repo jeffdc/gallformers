@@ -80,18 +80,20 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                 <Col sm={12} md={6} lg={8}>
                     <Row>
                         <Col className="">
-                            <h2 className="font-italic">
+                            <h2>
                                 <Link
                                     href={`/id?hostOrTaxon=${encodeURI(
                                         host.name,
                                     )}&type=host&detachable=&alignment=&cells=&color=&locations=&season=&shape=&textures=&walls=&form=&undescribed=false`}
                                 >
-                                    <a>{host.name}</a>
+                                    <a>
+                                        <em>{host.name}</em>
+                                    </a>
                                 </Link>
                             </h2>
                         </Col>
-                        <Col xs={2} className="mr-1">
-                            <span className="p-0 pr-1 my-auto">
+                        <Col xs={2} className="me-1">
+                            <span className="p-0 pe-1 my-auto">
                                 <Edit id={host.id} type="host" />
                                 <OverlayTrigger
                                     placement="right"
@@ -123,7 +125,9 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                             {' | '}
                                             <strong> Section: </strong>{' '}
                                             <Link key={s.id} href={`/section/${s.id}`}>
-                                                <a className="font-italic">{`${s.name} (${s.description})`}</a>
+                                                <a>
+                                                    <em>{`${s.name} (${s.description})`}</em>
+                                                </a>
                                             </Link>
                                         </span>
                                     )),
@@ -133,9 +137,9 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                 {' | '}
                                 <strong>Genus: </strong>
                                 <Link key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
-                                    <a className="font-italic">
+                                    <a>
                                         {' '}
-                                        {formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}
+                                        <em>{formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}</em>
                                     </a>
                                 </Link>
                             </p>

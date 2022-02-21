@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import React, { useMemo } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
-import DataTable from 'react-data-table-component';
+import DataTable, { TableColumn } from 'react-data-table-component';
 import Edit from '../../../components/edit';
 import { HostSimple, PlaceWithHostsApi } from '../../../libs/api/apitypes';
 import { allPlaceIds, placeById } from '../../../libs/db/place';
@@ -25,7 +25,7 @@ const linkPlant = (row: HostSimple) => {
 };
 
 const PlacePage = ({ place }: Props): JSX.Element => {
-    const columns = useMemo(
+    const columns = useMemo<TableColumn<HostSimple>[]>(
         () => [
             {
                 id: 'name',
@@ -36,6 +36,9 @@ const PlacePage = ({ place }: Props): JSX.Element => {
             },
             {
                 id: 'hosts',
+                // UGGH
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                //@ts-ignore
                 selector: (row: HostSimple) => row.aliases,
                 name: 'Aliases',
                 sortable: true,
@@ -61,8 +64,8 @@ const PlacePage = ({ place }: Props): JSX.Element => {
                 <Col>
                     <h2>{`${place.name} - ${place.code}`}</h2>
                 </Col>
-                <Col xs={2} className="mr-1">
-                    <span className="p-0 pr-1 my-auto">
+                <Col xs={2} className="me-1">
+                    <span className="p-0 pe-1 my-auto">
                         <Edit id={place.id} type="place" />
                     </span>
                 </Col>
