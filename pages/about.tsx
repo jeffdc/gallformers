@@ -15,7 +15,7 @@ type Props = {
 const About = ({ stats, genTime }: Props): JSX.Element => {
     const statMap = new Map(stats.map((s) => [s.type, s.count] as [string, number]));
     return (
-        <div className="p-5">
+        <div className="p-4">
             <Head>
                 <title>About Gallformers</title>
                 <meta name="description" content="About the creators of gallformers and why we built the site." />
@@ -40,7 +40,8 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
                     </p>
                     <p>
                         This site is open source and you can view the all of the code/data and if so inclined even open a pull
-                        request on <a href="https://github.com/jeffdc/gallformers">GitHub</a>.
+                        request on <a href="https://github.com/jeffdc/gallformers">GitHub</a>. Any and all help is greatly
+                        appreciated!
                     </p>
                 </Col>
             </Row>
@@ -86,9 +87,8 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
                             <Card.Text>
                                 Jeff is a Software Engineer who stumbled upon galls and became obsessed. So much so that he
                                 co-founded this site, wrote all the code for this site, and is responsible for keeping it going,
-                                fixing it, and implementing new features (and is currently the sole financial supporter). If the
-                                site is broken, it is most likely his fault. He is also way too into Oaks and will soon start
-                                building an ID tool for them.
+                                fixing it, and implementing new features, and paying the bills. If the site is broken, it is most
+                                likely his fault. He is also way too into Oaks and will soon start building an ID tool for them.
                             </Card.Text>
                         </Card.Body>
                         <Card.Footer>
@@ -102,7 +102,14 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
                     </Card>
                 </Col>
             </Row>
-            <Row className="pb-2">We also have an ever growing list of people that help us out as site adminstrators:</Row>
+            <Row className="pb-2">
+                <h4>Administrators</h4>
+                <Col>
+                    We also have an ever growing list of people that help us out as site adminstrators, without who the site would
+                    be far poorer. If you are interested in becoming an administrator{' '}
+                    <a href="mailto:gallformers@gmail.com">reach out</a>:
+                </Col>
+            </Row>
             <Row className="pb-2">
                 <Col>
                     <ul>
