@@ -81,6 +81,7 @@ const Header = (): JSX.Element => {
                                 <NavDropdown.Item href="/guide">ID Guide</NavDropdown.Item>
                                 <NavDropdown.Item href="/filterguide">Filter Terms</NavDropdown.Item>
                                 <NavDropdown.Item href="/glossary">Glossary</NavDropdown.Item>
+                                <NavDropdown.Item href="/refindex">Reference</NavDropdown.Item>
                             </NavDropdown>
                         </Nav>
                     </Navbar.Collapse>

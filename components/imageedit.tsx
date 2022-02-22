@@ -134,13 +134,13 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                     <Modal.Title>Edit Image Details</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                    <Row>
-                        <Col xs={3} className="ms-2">
-                            <Image src={selected.small} layout="fill" objectFit="contain" objectPosition="top" />
+                    <Row className="">
+                        <Col xs={4} className="">
+                            <img src={selected.small} width="200px" />
                         </Col>
-                        <Col className="my-1">
+                        <Col xs={7} className="my-1">
                             <Row>
-                                <Col xs={3}>
+                                <Col>
                                     Default:
                                     <InfoTip
                                         id="default"
