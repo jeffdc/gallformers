@@ -117,12 +117,15 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
                             <a href="https://www.inaturalist.org/people/joshuacde">Joshua C&apos;deBaca</a>
                         </li>
                         <li>
-                            <a href="https://www.inaturalist.org/people/kemper">Yann Kemper</a>
+                            <a href="https://www.inaturalist.org/people/calconey">Tim Frey</a>
                         </li>
                     </ul>
                 </Col>
                 <Col>
                     <ul>
+                        <li>
+                            <a href="https://www.inaturalist.org/people/kemper">Yann Kemper</a>
+                        </li>
                         <li>
                             <a href="https://www.inaturalist.org/people/kimberlietx">Kimberlie Sasan</a>
                         </li>
