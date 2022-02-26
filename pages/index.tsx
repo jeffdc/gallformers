@@ -33,7 +33,7 @@ function Home({ randomGall }: Props): JSX.Element {
                         <Card>
                             <Card.Header>
                                 <Link href="/id">
-                                    <a>
+                                    <a style={{ textDecoration: 'none' }}>
                                         <h2>ID a Gall &rarr;</h2>
                                     </a>
                                 </Link>
@@ -45,7 +45,7 @@ function Home({ randomGall }: Props): JSX.Element {
                         <Card>
                             <Card.Header>
                                 <Link href="/explore">
-                                    <a>
+                                    <a style={{ textDecoration: 'none' }}>
                                         <h2>Explore &rarr;</h2>
                                     </a>
                                 </Link>
@@ -93,7 +93,7 @@ function Home({ randomGall }: Props): JSX.Element {
                                         <Card.Title>Resources</Card.Title>
                                         <ul>
                                             <li>
-                                                <Link href="/guide">Our guide to gall identification.</Link>
+                                                <Link href="/ref/IDGuide">Our guide to gall identification.</Link>
                                             </li>
                                             <li>
                                                 <Link href="/filterguide">Detailed descriptions for our key filters.</Link>

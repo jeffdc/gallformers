@@ -19,11 +19,21 @@ const Index = ({ allPosts }: Props) => {
                 {allPosts
                     .sort((a, b) => a.title.localeCompare(b.title))
                     .map((p) => (
-                        <div key={p.slug} className="my-2">
-                            <Link href={`/ref/${p.slug}`}>
-                                <a>{p.title}</a>
-                            </Link>
-                        </div>
+                        <article key={p.slug}>
+                            <header className="">
+                                <Link href={`/ref/${p.slug}`}>
+                                    <a>
+                                        <h5 className="">{p.title}</h5>
+                                    </a>
+                                </Link>
+                                <span className="small">
+                                    <em>{`${p.author.name} - ${p.date}`}</em>
+                                </span>
+                            </header>
+                            <section>
+                                <p className="small">{p.description}</p>
+                            </section>
+                        </article>
                     ))}
             </Container>
         </>
@@ -33,9 +43,10 @@ const Index = ({ allPosts }: Props) => {
 export default Index;
 
 export const getStaticProps = async () => {
-    const allPosts = getAllPosts(['title', 'date', 'slug', 'author']);
+    const allPosts = getAllPosts(['title', 'date', 'slug', 'author', 'description']);
 
     return {
         props: { allPosts },
+        revalidate: 60 * 60, // republish hourly
     };
 };

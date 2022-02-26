@@ -114,7 +114,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                             </Row>
                             <Row className="">
                                 <Col>
-                                    <strong>Hosts:</strong> {species.hosts.map(hostLinker)}
+                                    <strong>Hosts:</strong> <em>{species.hosts.map(hostLinker)}</em>
                                     <Edit id={species.id} type="gallhost" />
                                 </Col>
                             </Row>

@@ -1,6 +1,7 @@
 ---
 title: 'Populus Midge Gall Key'
-date: '2022-02-22T05:35:07.322Z'
+date: '2022-02-22'
+description: 'A key to the midge galls on Populus in North America'
 author:
     name: Adam Kranz
 ---

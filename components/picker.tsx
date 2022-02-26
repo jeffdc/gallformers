@@ -17,6 +17,7 @@ const Picker = <T extends TypeaheadModel>({ size, title, data, toLabel, show, on
 
     const done = () => {
         onClose(selected);
+        setSelected(undefined);
     };
 
     return (

@@ -1,8 +1,10 @@
 import fs from 'fs'
 import { join } from 'path'
 import matter from 'gray-matter'
+import { logger } from '../utils/logger'
 
 const postsDirectory = join(process.cwd(), 'ref')
+logger.info(`Pulling ref articles from '${postsDirectory}'`);
 
 export function getPostSlugs() {
   return fs.readdirSync(postsDirectory)

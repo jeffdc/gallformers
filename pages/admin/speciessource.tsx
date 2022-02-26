@@ -322,7 +322,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                             </Row>
                             <Row className="my-1">
                                 <Col>
-                                    <Button onClick={() => setShowNewMapping(true)} disabled={!selected}>
+                                    <Button size="sm" onClick={() => setShowNewMapping(true)} disabled={!selected}>
                                         Add New Mapped Source
                                     </Button>
                                 </Col>
@@ -416,10 +416,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
     const queryParam = 'id';
     // eslint-disable-next-line prettier/prettier
-    const id = pipe(
-        extractQueryParam(context.query, queryParam),
-        O.getOrElse(constant('')),
-    );
+    const id = pipe(extractQueryParam(context.query, queryParam), O.getOrElse(constant('')));
 
     return {
         props: {

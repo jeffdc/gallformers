@@ -733,7 +733,7 @@ const IDGall = (props: Props): JSX.Element => {
                             <Alert variant="primary" className="small">
                                 There are no galls that match your filter. It’s possible there are no described species that fit
                                 this set of traits and your gall is undescribed. However, before giving up, try{' '}
-                                <Link href="/guide#troubleshooting">altering your filter choices</Link>.{' '}
+                                <Link href="ref/IDGuide#troubleshooting">altering your filter choices</Link>.{' '}
                                 {isHostComplete(hostOrTaxon) && (
                                     <span>
                                         To our knowledge, every gall that occurs on the host you have selected is included in the
@@ -747,7 +747,7 @@ const IDGall = (props: Props): JSX.Element => {
                         <Alert variant="primary" className="small">
                             If none of these results match your gall, you may have found an undescribed species. However, before
                             concluding that your gall is not in the database, try{' '}
-                            <Link href="/guide#troubleshooting">altering your filter choices</Link>.{' '}
+                            <Link href="ref/IDGuide#troubleshooting">altering your filter choices</Link>.{' '}
                             {isHostComplete(hostOrTaxon) && (
                                 <span>
                                     To our knowledge, every gall that occurs on the host you have selected is included in the
