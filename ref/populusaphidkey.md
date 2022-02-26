@@ -1,6 +1,7 @@
 ---
 title: 'Populus Aphid Gall Key'
-date: '2022-02-20T05:35:07.322Z'
+date: '2022-02-20'
+description: 'A key to the aphid galls on Populus in North America'
 author:
     name: Adam Kranz
 ---

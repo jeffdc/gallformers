@@ -78,7 +78,6 @@ const Header = (): JSX.Element => {
                                 </Button>
                             </Form>
                             <NavDropdown title="Resources">
-                                <NavDropdown.Item href="/guide">ID Guide</NavDropdown.Item>
                                 <NavDropdown.Item href="/filterguide">Filter Terms</NavDropdown.Item>
                                 <NavDropdown.Item href="/glossary">Glossary</NavDropdown.Item>
                                 <NavDropdown.Item href="/refindex">Reference</NavDropdown.Item>

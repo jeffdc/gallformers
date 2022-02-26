@@ -30,9 +30,9 @@ const Post = ({ post, morePosts, preview }: Props) => {
                             <title>{post.title}</title>
                         </Head>
                         <h1 className="my-2">{post.title}</h1>
-                        <strong>
+                        <em>
                             <DateFormatter dateString={post.date} /> - {post.author.name}
-                        </strong>
+                        </em>
                         <hr />
                         <PostBody content={post.content} />
                     </article>
@@ -61,6 +61,7 @@ export async function getStaticProps({ params }: Params) {
                 content,
             },
         },
+        revalidate: 60 * 60, // republish hourly
     };
 }
 
