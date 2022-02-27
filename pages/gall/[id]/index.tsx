@@ -31,11 +31,12 @@ type Props = {
 // eslint-disable-next-line react/display-name
 const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
     return (
-        <Link key={h.id} href={`/host/${h.id}`}>
-            <a>
-                {h.name} {idx < len - 1 ? ' / ' : ''}
-            </a>
-        </Link>
+        <>
+            <Link key={h.id} href={`/host/${h.id}`}>
+                <a>{h.name}</a>
+            </Link>
+            {idx < len - 1 ? ' / ' : ''}
+        </>
     );
 };
 
@@ -101,14 +102,14 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                             </Row>
                             <Row>
                                 <Col>
-                                    <strong>Family:</strong>
+                                    <strong>Family: </strong>
                                     <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
-                                        <a> {taxonomy.family.name}</a>
+                                        <a>{taxonomy.family.name}</a>
                                     </Link>
                                     {' | '}
-                                    <strong>Genus:</strong>
+                                    <strong>Genus: </strong>
                                     <Link key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
-                                        <a> {formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}</a>
+                                        <a>{formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}</a>
                                     </Link>
                                 </Col>
                             </Row>

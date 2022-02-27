@@ -113,9 +113,9 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                     <Row>
                         <Col>
                             <p>
-                                <strong>Family:</strong>
+                                <strong>Family: </strong>
                                 <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
-                                    <a> {taxonomy.family.name}</a>
+                                    <a>{taxonomy.family.name}</a>
                                 </Link>
                                 {pipe(
                                     taxonomy.section,
