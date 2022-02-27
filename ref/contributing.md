@@ -33,7 +33,7 @@ First you will need 2 things:
 
 ### Writing
 
-With these two things steps complete you are ready to write! Write your article in whatever editor you choose. It is helpful, but not necessary, to use an editor that is markdown aware. You can also write it in another format, like MS Word or Google Docs, and then use one of the many online tools that will covert that format to markdown. Generally it is a good idea to stick to simple markdown as some of the various extensions to markdown will likely not render properly. If you are looking for a basic template you can view [this article's markdown source](https://github.com/jeffdc/gallformers/blob/main/ref/contributing.md).
+With these two steps complete you are ready to write! Write your article in whatever editor you choose. It is helpful, but not necessary, to use an editor that is markdown aware. You can also write it in another format, like MS Word or Google Docs, and then use one of the many online tools that will covert that format to markdown. Generally it is a good idea to stick to simple markdown as some of the various extensions to markdown will likely not render properly. If you are looking for a basic template you can view [this article's markdown source](https://github.com/jeffdc/gallformers/blob/main/ref/contributing.md).
 
 #### Required Metadata
 
