@@ -14,13 +14,13 @@ COPY . .
 # COPY --from=deps /usr/src/app/.yarn ./.yarn
 # RUN ls -lA
 
-RUN yarn set version berry && yarn install 
+RUN yarn set version berry && yarn plugin import interactive-tools && yarn install 
 
 ENV NEXT_TELEMETRY_DISABLED 1
 # node modules will be r/o which can cause issues with React and the way it renames stuff at build time so...
 # RUN 
 # mv ./node_modules ./node_modules.tmp \
-	# && mv ./node_modules.tmp ./node_modules \
+# && mv ./node_modules.tmp ./node_modules \
 RUN	yarn generate \
 	&& yarn add --dev typescript @types/node \
 	&& yarn build \
