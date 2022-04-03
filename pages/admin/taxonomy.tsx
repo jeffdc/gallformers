@@ -21,6 +21,7 @@ import { genOptions } from '../../libs/utils/forms';
 import { mightFailWithArray } from '../../libs/utils/util';
 
 const schema = yup.object().shape({
+    // type-coverage:ignore-next-line
     mainField: yup.mixed().required(),
     description: yup.string().required(),
 });
@@ -269,10 +270,7 @@ const TaxonomyAdmin = ({ id, fs }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
     const queryParam = 'id';
     // eslint-disable-next-line prettier/prettier
-    const id = pipe(
-        extractQueryParam(context.query, queryParam),
-        O.getOrElse(constant('')),
-    );
+    const id = pipe(extractQueryParam(context.query, queryParam), O.getOrElse(constant('')));
 
     return {
         props: {

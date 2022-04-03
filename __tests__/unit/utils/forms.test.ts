@@ -17,7 +17,7 @@ describe('The Forms Util genOptions()', () => {
 
     it('should render valid options given valid options input', () => {
         fc.assert(
-            fc.property(fc.set(fc.unicodeString({ minLength: 1 })), (values) => {
+            fc.property(fc.uniqueArray(fc.unicodeString({ minLength: 1 })), (values) => {
                 render(genOptions(values));
                 values.forEach((v) => {
                     screen.queryAllByText(v).forEach((d) => expect(d).toBeInTheDocument());

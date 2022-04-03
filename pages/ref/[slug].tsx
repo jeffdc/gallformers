@@ -14,7 +14,7 @@ type Props = {
     preview?: boolean;
 };
 
-const Post = ({ post, morePosts, preview }: Props) => {
+const Post = ({ post }: Props) => {
     const router = useRouter();
     if (!router.isFallback && !post?.slug) {
         return <ErrorPage statusCode={404} />;

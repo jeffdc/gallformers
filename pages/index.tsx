@@ -90,6 +90,34 @@ function Home({ randomGall }: Props): JSX.Element {
                             <Col>
                                 <Card>
                                     <Card.Body>
+                                        <Card.Title>Help Us Out</Card.Title>
+                                        If you find gallformers.org useful and you are interested in helping us out there are a
+                                        few ways you can do so:
+                                        <ul>
+                                            <li>
+                                                <Link href="https://www.patreon.com/gallformers">
+                                                    Help cover operational costs via donations to our Patreon
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link href="/about#administrators">
+                                                    Help add and maintain our data as an Administrator
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link href="https://github.com/jeffdc/gallformers">
+                                                    Help fix bugs and add new features
+                                                </Link>
+                                            </li>
+                                        </ul>
+                                    </Card.Body>
+                                </Card>
+                            </Col>
+                        </Row>
+                        <Row className="pb-4">
+                            <Col>
+                                <Card>
+                                    <Card.Body>
                                         <Card.Title>Resources</Card.Title>
                                         <ul>
                                             <li>

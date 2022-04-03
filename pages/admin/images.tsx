@@ -3,7 +3,6 @@ import { species } from '@prisma/client';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
-import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
@@ -369,12 +368,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
             <>
                 {currentImage && (
                     // eslint-disable-next-line prettier/prettier
-                    <ImageEdit 
-                        image={currentImage}
-                        onSave={saveImage}
-                        show={edit}
-                        onClose={handleClose}
-                    />
+                    <ImageEdit image={currentImage} onSave={saveImage} show={edit} onClose={handleClose} />
                 )}
 
                 <Modal show={showCopy} onHide={() => setShowCopy(false)} size="lg">
@@ -464,10 +458,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
     const queryParam = 'speciesid';
     // eslint-disable-next-line prettier/prettier
-    const speciesid = pipe(
-        extractQueryParam(context.query, queryParam),
-        O.getOrElse(constant('')),
-    );
+    const speciesid = pipe(extractQueryParam(context.query, queryParam), O.getOrElse(constant('')));
 
     return {
         props: {

@@ -6,6 +6,10 @@ export const superAdmins = ['jeff', 'adamjameskranz'];
 const Auth = ({ superAdmin, children }: { superAdmin?: boolean; children: JSX.Element }): JSX.Element => {
     const { data: session, status } = useSession();
 
+    if (status === 'loading') {
+        return <p className="m-3 p-3">Hold tight. Working on vetting you...</p>;
+    }
+
     if (!session) {
         return (
             <div className="m-3 p-3">
@@ -25,10 +29,6 @@ const Auth = ({ superAdmin, children }: { superAdmin?: boolean; children: JSX.El
                 <p>Hmmm. You should probably not be here.</p>
             </div>
         );
-    }
-
-    if (status === 'loading') {
-        return <p className="m-3 p-3">Hold tight. Working on vetting you...</p>;
     }
 
     return children;
