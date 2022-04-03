@@ -14,7 +14,7 @@ COPY . .
 # COPY --from=deps /usr/src/app/.yarn ./.yarn
 # RUN ls -lA
 
-RUN yarn set version berry && yarn plugin import interactive-tools && yarn install 
+RUN yarn set version berry && yarn install 
 
 ENV NEXT_TELEMETRY_DISABLED 1
 # node modules will be r/o which can cause issues with React and the way it renames stuff at build time so...
