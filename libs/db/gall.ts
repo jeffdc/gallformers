@@ -612,7 +612,7 @@ const gallCreateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                 ...speciesCreateData(gall),
                 taxontype: { connect: { taxoncode: GallTaxon } },
                 hosts: {
-                    create: connectWithIds('hostspecies', gall.hosts),
+                    create: connectWithIds<Prisma.hostCreateWithoutGallspeciesInput>('hostspecies', gall.hosts),
                 },
                 gallspecies: {
                     create: {
@@ -696,7 +696,7 @@ const gallUpdateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                 },
                 hosts: {
                     deleteMany: { id: { notIn: [] } },
-                    create: connectWithIds('hostspecies', gall.hosts),
+                    create: connectWithIds<Prisma.hostCreateWithoutGallspeciesInput>('hostspecies', gall.hosts),
                 },
             },
         }),
