@@ -23,6 +23,7 @@ const Explore = ({ gallmakers, undescribed, hosts }: Props): JSX.Element => {
 
     const handleClick = (item: Item) => {
         if (hasProp(item, 'url')) {
+            // type-coverage:ignore-next-line
             router.push(item.url as string);
         }
     };

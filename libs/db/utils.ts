@@ -51,19 +51,19 @@ export const mapToIdFieldForPrisma = <T extends ConnectTypes>(idField: MapFieldN
     });
 };
 
-export function connectWithIds<T extends ConnectTypes>(fieldName: InsertFieldName, ids: readonly number[]): T[] {
-    const key = fieldName as keyof T;
+export function connectWithIds<T extends ConnectTypes>(fieldName: keyof T, ids: readonly number[]): T[] {
     return ids.map((l) => {
         // ugly casting due to what seems to be a TS bug. See: https://github.com/Microsoft/TypeScript/issues/13948
-        return { [key]: { connect: { id: l } } } as unknown as T;
+        // type-coverage:ignore-next-line
+        return { [fieldName]: { connect: { id: l } } } as unknown as T;
     });
 }
 
-export function createWithIds<T extends ConnectTypes>(fieldName: InsertFieldName, ids: readonly number[]): T[] {
-    const key = fieldName as keyof T;
+export function createWithIds<T extends ConnectTypes>(fieldName: keyof T, ids: readonly number[]): T[] {
     return ids.map((l) => {
         // ugly casting due to what seems to be a TS bug. See: https://github.com/Microsoft/TypeScript/issues/13948
-        return { [key]: { create: { id: l } } } as unknown as T;
+        // type-coverage:ignore-next-line
+        return { [fieldName]: { create: { id: l } } } as unknown as T;
     });
 }
 

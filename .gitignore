@@ -13,7 +13,7 @@ gallformers-docker.tar
 .coverage
 
 # yarn 2 related
-.yarn/*
+.yarn/**
 !.yarn/patches
 !.yarn/releases
 !.yarn/plugins

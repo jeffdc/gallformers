@@ -34,6 +34,9 @@ const Footer = (): JSX.Element => {
                     <Nav.Link href="/admin">Admin</Nav.Link>
                 </Navbar.Collapse>
             )}
+            <Nav.Link href="https://www.patreon.com/gallformers" target="__blank" rel="noreferrer">
+                Donate
+            </Nav.Link>
             <Nav.Link href="/about" className="justify-content-end">
                 About
             </Nav.Link>

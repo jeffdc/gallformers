@@ -10,7 +10,7 @@ import TreeMenu, { Item, TreeNodeInArray } from 'react-simple-tree-menu';
 import 'react-simple-tree-menu/dist/main.css';
 import Edit from '../../../components/edit';
 import { GallTaxon } from '../../../libs/api/apitypes';
-import { TaxonomyEntry, TaxonomyTree } from '../../../libs/api/taxonomy';
+import { EMPTY_TAXONOMYENTRY, TaxonomyEntry, TaxonomyTree } from '../../../libs/api/taxonomy';
 import { allFamilyIds, taxonomyEntryById, taxonomyTreeForId } from '../../../libs/db/taxonomy';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { formatWithDescription } from '../../../libs/pages/renderhelpers';
@@ -31,10 +31,11 @@ const Family = ({ family, tree }: Props): JSX.Element => {
     if (O.isNone(family)) {
         return <ErrorPage statusCode={404} />;
     }
-    const fam = pipe(family, O.getOrElse(constant({} as TaxonomyEntry)));
+    const fam = pipe(family, O.getOrElse(constant(EMPTY_TAXONOMYENTRY)));
 
     const handleClick = (item: Item) => {
         if (hasProp(item, 'url')) {
+            // type-coverage:ignore-next-line
             router.push(item.url as string);
         }
     };

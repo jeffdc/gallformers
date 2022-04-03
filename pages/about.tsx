@@ -2,7 +2,7 @@ import { GetStaticProps } from 'next';
 import Head from 'next/head';
 import Image from 'next/image';
 import React from 'react';
-import { Accordion, Button, Card, Col, Row } from 'react-bootstrap';
+import { Accordion, Card, Col, Row } from 'react-bootstrap';
 import { getCurrentStats, Stat } from '../libs/db/stats';
 import { mightFailWithArray } from '../libs/utils/util';
 import GallMeMaybe from '../public/images/gallmemaybe.jpg';
@@ -42,6 +42,13 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
                         This site is open source and you can view the all of the code/data and if so inclined even open a pull
                         request on <a href="https://github.com/jeffdc/gallformers">GitHub</a>. Any and all help is greatly
                         appreciated!
+                    </p>
+                    <p>
+                        We have a{' '}
+                        <a href="https://www.patreon.com/gallformers" target="__blank" rel="noreferrer">
+                            Patreon
+                        </a>{' '}
+                        account where you can donate to help cover the costs of building and operating the site.
                     </p>
                 </Col>
             </Row>
@@ -103,10 +110,12 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
                 </Col>
             </Row>
             <Row className="pb-2">
-                <h4>Administrators</h4>
+                <a id="administrators">
+                    <h4>Administrators</h4>
+                </a>
                 <Col>
-                    We also have an ever growing list of people that help us out as site adminstrators, without who the site would
-                    be far poorer. If you are interested in becoming an administrator{' '}
+                    We also have an ever growing list of people that help us out as site administrators, without who the site
+                    would be far poorer. If you are interested in becoming an administrator{' '}
                     <a href="mailto:gallformers@gmail.com">reach out</a>:
                 </Col>
             </Row>

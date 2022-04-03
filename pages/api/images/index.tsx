@@ -24,7 +24,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
     }
     const errMsg =
         (msg: string) =>
-        <T extends unknown>(): TE.TaskEither<Error, T> => {
+        <T,>(): TE.TaskEither<Error, T> => {
             return TE.left(new Error(msg));
         };
 
@@ -50,21 +50,11 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             getQueryParam(req),
             O.map(parseInt),
             // eslint-disable-next-line prettier/prettier
-            O.map((spid) =>
-                pipe(
-                    'imageids',
-                    getQueryParam(req),
-                    O.map(csvAsNumberArr),
-                    O.map(deleteImages(spid)),
-                ),
-            ),
+            O.map((spid) => pipe('imageids', getQueryParam(req), O.map(csvAsNumberArr), O.map(deleteImages(spid)))),
             O.flatten,
             O.map(TE.mapLeft(toErr)),
             // eslint-disable-next-line prettier/prettier
-            O.fold(
-                () => E.left<Err, TE.TaskEither<Err, number>>(invalidQueryErr), 
-                E.right
-            ),
+            O.fold(() => E.left<Err, TE.TaskEither<Err, number>>(invalidQueryErr), E.right),
             TE.fromEither,
             TE.flatten,
             TE.fold(sendErrResponse(res), sendSuccResponse(res)),

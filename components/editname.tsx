@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button, Modal } from 'react-bootstrap';
 import toast, { Toaster } from 'react-hot-toast';
 import { SpeciesNamingHelp } from '../hooks/useSpecies';
-import { capitalizeFirstLetter, isValidSpeciesName, SPECIES_NAME_REGEX } from '../libs/utils/util';
+import { capitalizeFirstLetter, isValidSpeciesName } from '../libs/utils/util';
 
 export type RenameEvent = {
     old: string | undefined;

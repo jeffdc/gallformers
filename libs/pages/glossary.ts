@@ -93,11 +93,7 @@ export const testables = {
     linkHtml: linkHtml,
 };
 
-const internalLinker = async <T extends unknown>(
-    data: T[],
-    update: (d: string, t: T) => T,
-    getVal: (t: T) => string | undefined,
-) => {
+const internalLinker = async <T>(data: T[], update: (d: string, t: T) => T, getVal: (t: T) => string | undefined) => {
     const toContext = (glossary: Entry[]): Context => ({ stems: stemText(glossary), glossary: glossary });
 
     const linkText =

@@ -34,7 +34,9 @@ type Props = {
 };
 
 const schema = yup.object().shape({
+    // type-coverage:ignore-next-line
     mainField: yup.array().required(),
+    // type-coverage:ignore-next-line
     sources: yup.array().required(),
 });
 

@@ -4,7 +4,7 @@ import { GetStaticProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
 import React from 'react';
-import { Accordion, Button, Container, ListGroup } from 'react-bootstrap';
+import { Accordion, Container, ListGroup } from 'react-bootstrap';
 import { FilterField } from '../libs/api/apitypes';
 import { getAlignments, getCells, getForms, getLocations, getShapes, getTextures, getWalls } from '../libs/db/filterfield';
 import { mightFailWithArray } from '../libs/utils/util';

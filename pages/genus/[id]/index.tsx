@@ -10,7 +10,7 @@ import { Col, Container, Row } from 'react-bootstrap';
 import 'react-simple-tree-menu/dist/main.css';
 import SpeciesTable from '../../../components/speciesTable';
 import { SimpleSpecies } from '../../../libs/api/apitypes';
-import { TaxonomyEntry } from '../../../libs/api/taxonomy';
+import { EMPTY_TAXONOMYENTRY, TaxonomyEntry } from '../../../libs/api/taxonomy';
 import { allGenusIds, getAllSpeciesForSectionOrGenus, taxonomyEntryById } from '../../../libs/db/taxonomy';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { formatWithDescription } from '../../../libs/pages/renderhelpers';
@@ -30,8 +30,8 @@ const Genus = ({ genus, species }: Props): JSX.Element => {
     if (O.isNone(genus)) {
         return <ErrorPage statusCode={404} />;
     }
-    const gen = pipe(genus, O.getOrElse(constant({} as TaxonomyEntry)));
-    const fam = pipe(gen.parent, O.getOrElse(constant({} as TaxonomyEntry)));
+    const gen = pipe(genus, O.getOrElse(constant(EMPTY_TAXONOMYENTRY)));
+    const fam = pipe(gen.parent, O.getOrElse(constant(EMPTY_TAXONOMYENTRY)));
 
     const fullName = formatWithDescription(gen.name, gen.description);
 

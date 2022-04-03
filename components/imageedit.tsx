@@ -8,7 +8,6 @@ import * as yup from 'yup';
 import { ALLRIGHTS, asLicenseType, CC0, CCBY, ImageApi, LicenseType, SourceWithSpeciesSourceApi } from '../libs/api/apitypes';
 import InfoTip from './infotip';
 import Typeahead from './Typeahead';
-import Image from 'next/image';
 
 type Props = {
     image: ImageApi;
