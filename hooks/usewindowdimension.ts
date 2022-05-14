@@ -1,20 +1,16 @@
 import { useEffect, useState } from 'react';
 
-const getDims = () => {
-    // check if this being invoked from the server side.
-    if (typeof window == 'undefined') {
-        return { width: 0, height: 0 };
-    }
-    const { innerWidth: width, innerHeight: height } = window;
-    return { width, height };
+type WindowDimentions = {
+    width: number;
+    height: number;
 };
 
-const useWindowDimensions = (): { width: number; height: number } => {
-    const [dims, setDims] = useState(getDims());
-
-    const handle = () => setDims(getDims);
+const useWindowDimensions = (): WindowDimentions => {
+    const [dims, setDims] = useState<WindowDimentions>({ width: 0, height: 0 });
 
     useEffect(() => {
+        const handle = () => setDims({ width: window.innerWidth, height: window.innerHeight });
+        handle();
         window.addEventListener('resize', handle);
         return () => window.removeEventListener('resize', handle);
     }, []);

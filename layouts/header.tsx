@@ -54,7 +54,7 @@ const Header = (): JSX.Element => {
                     <Navbar.Toggle aria-controls="responsive-navbar-nav" />
                     <Navbar.Collapse id="responsive-navbar-nav">
                         <Nav className="ms-auto my-2 my-lg-0">
-                            <Nav.Link href="/id">Id</Nav.Link>
+                            <Nav.Link href="/id">Identify</Nav.Link>
                             <Nav.Link href="/explore">Explore</Nav.Link>
                             <Form
                                 onSubmit={(e) => {

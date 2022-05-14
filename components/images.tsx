@@ -93,10 +93,11 @@ const Images = ({ sp }: Props): JSX.Element => {
                             </Button>
                         )}
                         className="p-1"
-                        heightMode="max"
+                        adaptiveHeight={false}
                         slideIndex={imgIndex}
                         wrapAround={true}
-                        transitionMode="fade"
+                        animation="fade"
+                        enableKeyboardControls={true}
                     >
                         {species.images.map((image) => (
                             <div key={image.id}>
@@ -222,19 +223,16 @@ const Images = ({ sp }: Props): JSX.Element => {
                         </Button>
                     )}
                     className="p-1"
-                    heightMode="first"
-                    // beforeSlide={(c, e) => {
-                    //     setCurrentImage(species.images[e]);
-                    //     setImgIndex(e);
-                    // }}
+                    adaptiveHeight={true}
                     afterSlide={(c) => {
                         setCurrentImage(species.images[c]);
                         setImgIndex(c);
                     }}
                     wrapAround={true}
-                    transitionMode="fade"
+                    animation="fade"
+                    enableKeyboardControls={true}
                     // t, r, b, l
-                    framePadding="0px 10px 0px 10px"
+                    // framePadding="0px 10px 0px 10px"
                 >
                     {species.images.map((image) => (
                         <div

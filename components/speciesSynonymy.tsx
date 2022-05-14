@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Button } from 'react-bootstrap';
-import DataTable from 'react-data-table-component';
+import DataTable from './DataTable';
 import { AliasApi, COMMON_NAME, SCIENTIFIC_NAME } from '../libs/api/apitypes';
 import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
 

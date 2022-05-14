@@ -34,7 +34,7 @@ type AdminData<T, FormFields> = {
     formSubmit: (fields: FormFields) => Promise<void>;
     postUpdate: (res: Response) => void;
     postDelete: (id: number | string, result: DeleteResult) => void;
-    mainField: (key: TypeaheadLabelKey<T>, placeholder: string) => JSX.Element;
+    mainField: (key: TypeaheadLabelKey, placeholder: string) => JSX.Element;
     deleteButton: (warning: string, customDeleteHandler?: (fields: FormFields) => Promise<void>) => JSX.Element;
 };
 
@@ -85,7 +85,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
 
     const confirm = useConfirmation();
 
-    const theMainField = (labelKey: TypeaheadLabelKey<T>, placeholder: string) => {
+    const theMainField = (labelKey: TypeaheadLabelKey, placeholder: string) => {
         return (
             <>
                 <Typeahead
@@ -111,8 +111,9 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                                 }
                                 router.replace(``, undefined, { shallow: true });
                             } else {
-                                setSelected(s[0]);
-                                router.replace(`?id=${s[0].id}`, undefined, { shallow: true });
+                                const t = s[0];
+                                setSelected(t);
+                                router.replace(`?id=${t.id}`, undefined, { shallow: true });
                             }
                         }
                     }}

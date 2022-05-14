@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, Button, Col, Row } from 'react-bootstrap';
-import DataTable from 'react-data-table-component';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
@@ -8,6 +7,7 @@ import externalLinks from 'remark-external-links';
 import { ALLRIGHTS, CC0, CCBY, GallTaxon, HostTaxon, SpeciesSourceApi } from '../libs/api/apitypes';
 import { formatLicense, sourceToDisplay } from '../libs/pages/renderhelpers';
 import { SELECTED_ROW_STYLE, TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
+import DataTable from './DataTable';
 import Edit from './edit';
 import InfoTip from './infotip';
 

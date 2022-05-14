@@ -111,7 +111,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                 <Row className="my-1">
                     <Col>
                         <Row>
-                            <Col>Word:</Col>
+                            <Col>Word (unless it is a proper name, use lower case):</Col>
                         </Row>
                         <Row>
                             <Col>{mainField('word', 'Word')}</Col>
@@ -155,10 +155,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
     const queryParam = 'id';
     // eslint-disable-next-line prettier/prettier
-    const id = pipe(
-        extractQueryParam(context.query, queryParam),
-        O.getOrElse(constant('')),
-    );
+    const id = pipe(extractQueryParam(context.query, queryParam), O.getOrElse(constant('')));
     return {
         props: {
             id: id,

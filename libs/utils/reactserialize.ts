@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/ban-types */
 import React, { ReactNode } from 'react';
+import * as ReactIs from 'react-is';
 import { hasProp } from './util';
 
 // lifted from: https://github.com/Scimonster/React-Serialize/tree/fragments-custom-components
@@ -24,7 +24,7 @@ export function serialize(element: ReactNode): string {
                 if (typeof value === 'string') {
                     return value;
                 }
-                if (value === React.Fragment) {
+                if (ReactIs.isFragment(value)) {
                     return '<>';
                 }
                 if (value != undefined || value != null) {

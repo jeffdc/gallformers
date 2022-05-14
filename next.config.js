@@ -26,6 +26,7 @@ module.exports = (phase) => {
             //TODO convert this to the latest git hash
             return buildid;
         },
+        strictMode: true,
         // this causes failures on Linux. Not sure why but for now disabling it.
         // i18n: {
         //     locales: ['en'],

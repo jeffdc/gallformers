@@ -1,6 +1,7 @@
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import React from 'react';
+import useIsMounted from '../hooks/useIsMounted';
 
 type Props = {
     id: string | number;
@@ -9,10 +10,11 @@ type Props = {
 
 const Edit = ({ id, type }: Props): JSX.Element => {
     const { data: session } = useSession();
+    const mounted = useIsMounted();
 
     return (
         <>
-            {session && (
+            {mounted && session && (
                 <Link href={`/admin/${type}?id=${id}`}>
                     <a className="p-1">✎</a>
                 </Link>

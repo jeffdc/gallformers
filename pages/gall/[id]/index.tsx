@@ -31,12 +31,12 @@ type Props = {
 // eslint-disable-next-line react/display-name
 const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
     return (
-        <>
-            <Link key={h.id} href={`/host/${h.id}`}>
+        <span key={h.id}>
+            <Link href={`/host/${h.id}`}>
                 <a>{h.name}</a>
             </Link>
             {idx < len - 1 ? ' / ' : ''}
-        </>
+        </span>
     );
 };
 
