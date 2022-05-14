@@ -7,6 +7,7 @@ import { useRouter } from 'next/router';
 import Carousel from 'nuka-carousel';
 import React, { useState } from 'react';
 import { Button, ButtonGroup, ButtonToolbar, Col, Modal, OverlayTrigger, Popover, Row } from 'react-bootstrap';
+import useIsMounted from '../hooks/useIsMounted';
 import useWindowDimensions from '../hooks/usewindowdimension';
 import { ALLRIGHTS, GallTaxon, ImageApi, ImageNoSourceApi, SpeciesApi } from '../libs/api/apitypes';
 import { hasProp } from '../libs/utils/util';
@@ -41,7 +42,7 @@ const Images = ({ sp }: Props): JSX.Element => {
     const [imgIndex, setImgIndex] = useState(0);
     const [showInfo, setShowInfo] = useState(false);
     const { width } = useWindowDimensions();
-
+    const mounted = useIsMounted();
     const router = useRouter();
     const session = useSession();
 
@@ -94,9 +95,10 @@ const Images = ({ sp }: Props): JSX.Element => {
                         )}
                         className="p-1"
                         adaptiveHeight={false}
+                        cellAlign="center"
                         slideIndex={imgIndex}
                         wrapAround={true}
-                        animation="fade"
+                        animation="zoom"
                         enableKeyboardControls={true}
                     >
                         {species.images.map((image) => (
@@ -223,22 +225,20 @@ const Images = ({ sp }: Props): JSX.Element => {
                         </Button>
                     )}
                     className="p-1"
-                    adaptiveHeight={true}
+                    adaptiveHeight={false}
                     afterSlide={(c) => {
                         setCurrentImage(species.images[c]);
                         setImgIndex(c);
                     }}
                     wrapAround={true}
-                    animation="fade"
+                    animation="zoom"
                     enableKeyboardControls={true}
-                    // t, r, b, l
-                    // framePadding="0px 10px 0px 10px"
                 >
                     {species.images.map((image) => (
                         <div
                             key={image.id}
                             style={{ display: 'flex', alignItems: 'center', height: '100%' }}
-                            className="align-items-center"
+                            className="align-items-center p-1"
                         >
                             {/* the Carousel and next.js Image do not play well together and layout becomes an issue */}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -253,7 +253,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                         </div>
                     ))}
                 </Carousel>
-                <ButtonToolbar className="d-flex justify-content-center">
+                <ButtonToolbar className="pt-1 d-flex justify-content-center">
                     <ButtonGroup size="sm">
                         <OverlayTrigger
                             trigger="focus"
@@ -279,7 +279,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                         >
                             ⓘ
                         </Button>
-                        {session && (
+                        {mounted && session && (
                             <Button
                                 variant="secondary"
                                 style={{ fontSize: '1.0em' }}
