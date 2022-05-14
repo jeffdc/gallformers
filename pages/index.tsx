@@ -24,7 +24,7 @@ function Home({ randomGall }: Props): JSX.Element {
                     </Col>
                 </Row>
                 <Row>
-                    <Col>The place to ID and learn about galls on plants in the US and Canada.</Col>
+                    <Col>The place to identify and learn about galls on plants in the US and Canada.</Col>
                 </Row>
             </Container>
             <Container>
@@ -34,11 +34,11 @@ function Home({ randomGall }: Props): JSX.Element {
                             <Card.Header>
                                 <Link href="/id">
                                     <a style={{ textDecoration: 'none' }}>
-                                        <h2>ID a Gall &rarr;</h2>
+                                        <h2>Identify a Gall &rarr;</h2>
                                     </a>
                                 </Link>
                             </Card.Header>
-                            <Card.Body>Try and get an ID for a gall by providing known information.</Card.Body>
+                            <Card.Body>Try and get an Identity for a gall by providing known information.</Card.Body>
                         </Card>
                     </Col>
                     <Col>

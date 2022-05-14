@@ -1,10 +1,12 @@
 import { signOut, useSession } from 'next-auth/react';
 import React from 'react';
 import { Button, Nav, Navbar } from 'react-bootstrap';
+import useIsMounted from '../hooks/useIsMounted';
 import { sessionUserOrUnknown } from '../libs/utils/util';
 
 const Footer = (): JSX.Element => {
     const { data: session } = useSession();
+    const mounted = useIsMounted();
 
     const logoff = () => {
         return (
@@ -18,7 +20,7 @@ const Footer = (): JSX.Element => {
     return (
         <Navbar expand="md" bg="light" variant="light" fixed="bottom" className="darklogotext">
             <Navbar.Toggle aria-controls="navbarScroll" />
-            {session && (
+            {mounted && session && (
                 <Navbar.Collapse>
                     <Nav.Item className="px-2">
                         {/* eslint-disable-next-line @next/next/no-img-element */}

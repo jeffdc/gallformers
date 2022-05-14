@@ -294,7 +294,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
             });
     };
 
-    const handleRowSelected = useCallback((state) => {
+    const handleRowSelected = useCallback((state: { allSelected: boolean; selectedCount: number; selectedRows: ImageApi[] }) => {
         setSelectedImages(state.selectedRows);
     }, []);
 

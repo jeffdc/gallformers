@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { useMemo, useState } from 'react';
 import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
-import DataTable from 'react-data-table-component';
+import DataTable from '../../../components/DataTable';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import RangeMap from '../../../components/rangemap';

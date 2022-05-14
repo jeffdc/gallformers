@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useMemo } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
-import DataTable from 'react-data-table-component';
+import DataTable from '../components/DataTable';
 import { extractQueryParam } from '../libs/api/apipage';
 import { PlaceNoTreeApi } from '../libs/api/apitypes';
 import { TaxonomyEntryNoParent } from '../libs/api/taxonomy';

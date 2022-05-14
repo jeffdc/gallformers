@@ -5,7 +5,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import React, { useMemo } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
-import DataTable from 'react-data-table-component';
+import DataTable from '../../../components/DataTable';
 import Edit from '../../../components/edit';
 import { SimpleSpecies } from '../../../libs/api/apitypes';
 import { SectionApi } from '../../../libs/api/taxonomy';
