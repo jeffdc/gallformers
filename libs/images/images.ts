@@ -16,8 +16,6 @@ import db from '../db/db';
 import { logger } from '../utils/logger';
 import { tryBackoff } from '../utils/network';
 
-export const ENDPOINT = 'https://gallformers.s3.us-east-2.amazonaws.com';
-
 const checkCred = (cred: string | undefined): string => {
     if (process.env.NODE_ENV === 'production') {
         if (cred == undefined) logger.error('AWS credentials are not configured!');
@@ -106,7 +104,8 @@ export const getPresignedUrl = async (path: string, mime: string): Promise<strin
     });
     const request = await createRequest(client, new PutObjectCommand({ Key: path, Bucket: BUCKET, ContentType: mime }));
 
-    return formatUrl(await signer.presign(request, { expiresIn: EXPIRE_SECONDS }));
+    const url = formatUrl(await signer.presign(request, { expiresIn: EXPIRE_SECONDS }));
+    return url;
 };
 
 const sizes = new Map([

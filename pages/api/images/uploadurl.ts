@@ -5,7 +5,8 @@ import * as TE from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from 'next-auth/react';
 import { Err, extractQueryParam, sendErrResponse, sendSuccResponse, toErr } from '../../../libs/api/apipage';
-import { ENDPOINT, getPresignedUrl } from '../../../libs/images/images';
+import { IMAGES_ENDPOINT } from '../../../libs/constants';
+import { getPresignedUrl } from '../../../libs/images/images';
 import { handleError } from '../../../libs/utils/util';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
@@ -20,7 +21,8 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             msg: `You must provide the path (bucket key) to upload to and the mime type as query params. The params you passed are: ${req.query}`,
         };
 
-        res.setHeader('Access-Control-Allow-Origin', ENDPOINT);
+        res.setHeader('Access-Control-Allow-Origin', IMAGES_ENDPOINT);
+        res.setHeader('Content-Type', 'text/plain');
 
         await pipe(
             extractQueryParam(req.query, 'path'),
