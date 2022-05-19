@@ -57,6 +57,8 @@ The domains (gallformers.org and gallformers.com) are registered using namecheap
 
 The SSL certs are generated and auto-renewed via Let's Encrypt. There is a daemon process on the server that runs the auto-renewal process every 3 months.
 
+HI!
+
 ### Monitoring
 There is a very simple [down detector](lambdas/gallformers_downdetector.js) implemented as an AWS Lambda. The lambda checks the site every 2 minutes to see if it responds with an HTTP 200 response. If the site responds negatively more than once in the span of 5 minutes then an alert is sent out via a message sent from the lambda to AWS SQS to AWS SNS/CloudWatch. The CloudWatch alarm triggers [another lambda](lambdas/snsToSlack.js) that posts a message to the [site-monitoring](https://gallformerdat-m1g8137.slack.com/archives/C01DGA0E9EX) Slack channel and then SNS is used to send an email to Jeff.
 
