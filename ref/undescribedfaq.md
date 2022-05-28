@@ -5,6 +5,8 @@ description: 'What to do if you find an undescribed gall.'
 author:
     name: Adam Kranz
 ---
+# Preface
+
 At the time of writing, of the 2806 galls listed on the Gallformers database, 963 are undescribed. That ratio has not changed significantly since the early days of the site and isn't likely to change much in the future. 
 You might reasonably wonder, if a gall can be distinctly identified by its morphology and host plant, such that we can represent it with its own Gallformers entry and consistently apply a Gallformers Code to observations, in what sense is it "undescribed", and what would it take to change that?
 A gall is part of the extended phenotype of the inducing organism, and in many cases the traits of the gall are sufficient to identify the species that induced it. The traits of the gall can often even be used to make an educated guess about what other species the inducer is related to. 
