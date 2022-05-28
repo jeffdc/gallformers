@@ -50,5 +50,5 @@ The answer varies significantly depending on the taxon of the inducer.
    Unfortunately, it's as likely as not that you've gone through this whole process and ended up with something that isn't the inducer specimen needed to describe the gall. Depending on the gall, the adult arthropod emerging from your gall may be vastly more likely to be another species that displaced the inducer. Luckily these are also of scientific interest and can be preserved the same way. This is another reason rearing an inducer often takes many attempts.
    
   ## 6. Mail your specimens to a taxonomist
-    [Contact the Gallformers team](mailto:gallformers@gmail.com) and we will do our best to help you network with someone who can describe your specimen. We have contacts working on most groups, with the conspicuous exception of eriophyid mites, which seem to be underserved taxonomically right now. 
+   [Contact the Gallformers team](mailto:gallformers@gmail.com) and we will do our best to help you network with someone who can describe your specimen. We have contacts working on most groups, with the conspicuous exception of eriophyid mites, which seem to be underserved taxonomically right now. 
   
