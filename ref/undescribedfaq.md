@@ -15,6 +15,8 @@ One of our main goals at Gallformers is to facilitate you, an amateur or academi
 
 A note to preface: Raising an inducer is not hard, but each individual attempt has low odds of success. The biggest reason experts are more likely to succeed is not any particular technique but because they search harder and collect galls in larger numbers than any individual amateur. As a community, we can distribute that effort across many observers. So while you might not be successful yourself, you are still contributing to the process that builds the knowledge we need for someone to eventually succeed. 
 
+# So, You Have an Unknown Gall, Now What?
+
 So if you find a gall you determine to be undescribed (or perhaps a described gall that is of interest for other reasons), what should you do?
 The answer varies significantly depending on the taxon of the inducer. 
 
