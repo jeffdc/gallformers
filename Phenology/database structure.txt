@@ -1,0 +1,61 @@
+library(DBI)
+library(RSQLite)
+wd <- "C:/Users/adam/Documents/GitHub/gallformers/Phenology"
+setwd(wd)
+
+gallphen <- dbConnect(RSQLite::SQLite(), "gallphen.sqlite")
+# dbDisconnect(mydb)
+
+dbExecute(gallphen, "
+CREATE TABLE species
+(
+  species_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, 
+  gf_id INTEGER,
+  genus TEXT,
+  species TEXT,
+  inatcode INTEGER
+)")     
+
+dbExecute(gallphen, "
+CREATE TABLE galls
+(
+  gall_id INTEGER NOT NULL,
+  generation TEXT CHECK (generation IN ('Agamic','Sexgen','NA')),
+  described CHAR(1) CHECK (described IN ('y','n')),
+  FOREIGN KEY(gall_id) REFERENCES species(species_id)
+)")
+        
+dbExecute(gallphen, "
+CREATE TABLE observations
+(
+  obs_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, 
+  gall_id INTEGER,
+  host_id INTEGER,
+  sourceURL TEXT,
+  pageURL TEXT,
+  phenophase TEXT NOT NULL,
+  lifestage TEXT,
+  viability TEXT,
+  date TEXT NOT NULL,
+  doy INTEGER NOT NULL,
+  Latitude FLOAT NOT NULL,
+  Longitude FLOAT NOT NULL,
+  AGDD32 FLOAT,
+  AGDD50 FLOAT,
+  FOREIGN KEY(gall_id) REFERENCES galls(gall_id),
+  FOREIGN KEY(host_id) REFERENCES species(species_id)
+)")
+
+dbExecute(gallphen, "
+CREATE table specieshistory (
+  species_id INTEGER NOT NULL,
+  update_date TEXT NOT NULL,
+  FOREIGN KEY(species_id) REFERENCES species(species_id)
+)")          
+                    
+dbListTables(gallphen)
+# dbExecute(gallphen, "DROP TABLE specieshistory")
+# dbExecute(gallphen, "DROP TABLE species")
+# dbExecute(gallphen, "DROP TABLE galls")
+# dbExecute(gallphen, "DROP TABLE observations")
+

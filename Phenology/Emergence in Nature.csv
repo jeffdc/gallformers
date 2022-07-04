@@ -1,0 +1,85 @@
+observed_on,Monitoring.interval,Site,Host.Plant,Caught
+3/6/2017,1,Archbold,Quercus geminata,0
+3/9/2017,2,Archbold,Quercus geminata,0
+3/11/2017,3,Archbold,Quercus geminata,0
+3/13/2017,4,Archbold,Quercus geminata,0
+3/17/2017,5,Archbold,Quercus geminata,0
+3/20/2017,6,Archbold,Quercus geminata,0
+3/25/2017,7,Archbold,Quercus geminata,2
+3/28/2017,8,Archbold,Quercus geminata,2
+4/1/2017,9,Archbold,Quercus geminata,2
+4/6/2018,10,Archbold,Quercus geminata,7
+4/10/2017,11,Archbold,Quercus geminata,2
+4/13/2017,12,Archbold,Quercus geminata,5
+4/16/2017,13,Archbold,Quercus geminata,2
+4/24/2017,14,Archbold,Quercus geminata,17
+3/6/2017,1,Alva,Quercus virginiana,1570
+3/8/2017,2,Alva,Quercus virginiana,1570
+3/10/2017,3,Alva,Quercus virginiana,1570
+3/13/2017,4,Alva,Quercus virginiana,1089
+3/16/2017,5,Alva,Quercus virginiana,430
+3/20/2017,6,Alva,Quercus virginiana,362
+3/24/2017,7,Alva,Quercus virginiana,95
+3/28/2017,8,Alva,Quercus virginiana,424
+4/1/2017,9,Alva,Quercus virginiana,159
+4/5/2017,10,Alva,Quercus virginiana,42
+4/8/2017,11,Alva,Quercus virginiana,12
+4/11/2017,12,Alva,Quercus virginiana,1
+4/14/2017,13,Alva,Quercus virginiana,5
+4/19/2017,14,Alva,Quercus virginiana,4
+3/7/2017,1,Dickinson,Quercus geminata,0
+3/9/2017,2,Dickinson,Quercus geminata,0
+3/12/2017,3,Dickinson,Quercus geminata,0
+3/14/2017,4,Dickinson,Quercus geminata,0
+3/16/2017,5,Dickinson,Quercus geminata,0
+3/19/2017,6,Dickinson,Quercus geminata,55
+3/22/2017,7,Dickinson,Quercus geminata,38.5
+3/25/2017,8,Dickinson,Quercus geminata,38.5
+3/30/2017,9,Dickinson,Quercus geminata,28
+4/3/2017,10,Dickinson,Quercus geminata,9
+4/8/2017,11,Dickinson,Quercus geminata,0
+4/14/2017,12,Dickinson,Quercus geminata,0
+4/18/2017,13,Dickinson,Quercus geminata,0
+4/22/2017,14,Dickinson,Quercus geminata,1
+3/6/2017,1,Kissimmee ,Quercus virginiana,6
+3/8/2017,2,Kissimmee ,Quercus virginiana,2704
+3/11/2017,3,Kissimmee ,Quercus virginiana,2119
+3/13/2017,4,Kissimmee ,Quercus virginiana,199
+3/17/2017,5,Kissimmee ,Quercus virginiana,848
+3/20/2017,6,Kissimmee ,Quercus virginiana,569
+3/23/2017,7,Kissimmee ,Quercus virginiana,309
+3/28/2017,8,Kissimmee ,Quercus virginiana,282
+4/1/2017,9,Kissimmee ,Quercus virginiana,39
+4/5/2017,10,Kissimmee ,Quercus virginiana,1
+4/8/2017,11,Kissimmee ,Quercus virginiana,5
+4/12/2017,12,Kissimmee ,Quercus virginiana,9
+4/15/2017,13,Kissimmee ,Quercus virginiana,1
+4/19/2017,14,Kissimmee ,Quercus virginiana,1
+3/7/2017,1,Lake Lizzie,Quercus geminata,0
+3/9/2017,2,Lake Lizzie,Quercus geminata,0
+3/11/2017,3,Lake Lizzie,Quercus geminata,0
+3/13/2017,4,Lake Lizzie,Quercus geminata,0
+3/17/2017,5,Lake Lizzie,Quercus geminata,5
+3/21/2017,6,Lake Lizzie,Quercus geminata,11
+3/26/2017,7,Lake Lizzie,Quercus geminata,26
+3/30/2017,8,Lake Lizzie,Quercus geminata,20
+4/3/2017,9,Lake Lizzie,Quercus geminata,28
+4/6/2017,10,Lake Lizzie,Quercus geminata,4
+4/9/2017,11,Lake Lizzie,Quercus geminata,6
+4/12/2017,12,Lake Lizzie,Quercus geminata,5
+4/15/2017,13,Lake Lizzie,Quercus geminata,3
+4/22/2017,14,Lake Lizzie,Quercus geminata,3
+3/7/2017,1,Okeechobee,Quercus virginiana,152.5
+3/10/2017,2,Okeechobee,Quercus virginiana,152.5
+3/12/2017,3,Okeechobee,Quercus virginiana,124
+3/16/2017,4,Okeechobee,Quercus virginiana,40
+3/17/2017,5,Okeechobee,Quercus virginiana,2
+3/19/2018,6,Okeechobee,Quercus virginiana,5
+3/23/2017,7,Okeechobee,Quercus virginiana,9
+3/28/3017,8,Okeechobee,Quercus virginiana,1
+4/1/2017,9,Okeechobee,Quercus virginiana,3
+4/5/2017,10,Okeechobee,Quercus virginiana,12
+4/8/2017,11,Okeechobee,Quercus virginiana,4
+4/12/2017,12,Okeechobee,Quercus virginiana,2
+4/15/2017,13,Okeechobee,Quercus virginiana,0
+4/19/2017,14,Okeechobee,Quercus virginiana,0
