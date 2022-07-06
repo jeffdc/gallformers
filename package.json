@@ -43,7 +43,7 @@
     "logging-ts": "^0.3.4",
     "natural": "^5.2.2",
     "next": "^12.1.6",
-    "next-auth": "^4.3.4",
+    "next-auth": "^4.9.0",
     "nuka-carousel": "^5.0.16",
     "pino": "^7.11.0",
     "popper.js": "^1.16.1",
