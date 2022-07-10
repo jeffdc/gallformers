@@ -51,18 +51,24 @@ type Params = {
 };
 
 export async function getStaticProps({ params }: Params) {
-    const post = getPostBySlug(params.slug, ['title', 'date', 'slug', 'author', 'content']);
-    const content = await markdownToHtml(post.content || '');
+    try {
+        const post = getPostBySlug(params.slug, ['title', 'date', 'slug', 'author', 'content']);
+        const content = await markdownToHtml(post.content || '');
+        if (!post || !content) throw '404';
 
-    return {
-        props: {
-            post: {
-                ...post,
-                content,
+        return {
+            props: {
+                key: params.slug,
+                post: {
+                    ...post,
+                    content,
+                },
             },
-        },
-        revalidate: 60 * 60, // republish hourly
-    };
+            revalidate: 60 * 60, // republish hourly
+        };
+    } catch (e) {
+        return { notFound: true };
+    }
 }
 
 export const getStaticPaths: GetStaticPaths = async () => {

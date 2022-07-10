@@ -241,13 +241,12 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
             } else {
                 throw new Error(await res.text());
             }
-
-            setCurrentImage(undefined);
         } catch (e) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const err: any = e;
-            console.error(err);
-            setError(err.toString());
+            const msg = `Error while trying to update image.\n${JSON.stringify(img)}\n${err}`;
+            console.error(msg);
+            setError(msg);
         }
     };
 
@@ -261,7 +260,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
             variant: 'danger',
             catchOnCancel: true,
             title: 'Are you sure want to copy?',
-            message: `This will copy all of the metadata (source, source link, license, license link, creator, and attribution) from the original selected image to ${
+            message: `This will copy all of the metadata (source, source link, license, license link, creator, attribution, and caption) from the original selected image to ${
                 selectedForCopy.size > 1 ? `ALL ${selectedForCopy.size} of the other selected images` : `the other selected image`
             }. Do you want to continue?`,
         })
@@ -281,7 +280,9 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                             attribution: copySource.attribution,
                             caption: copySource.caption,
                         }))
-                        .map((i) => saveImage(i)),
+                        .map((i) => {
+                            saveImage(i);
+                        }),
                 ).catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
             })
             .catch(() => {
@@ -289,6 +290,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                 Promise.resolve();
             })
             .finally(() => {
+                setCurrentImage(undefined);
                 setSelectedForCopy(new Set<number>());
                 setToggleCleared(!toggleCleared);
             });

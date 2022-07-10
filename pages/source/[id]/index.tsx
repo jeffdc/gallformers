@@ -89,14 +89,21 @@ const Source = ({ source }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    const source = getStaticPropsWithContext(context, sourceById, 'source');
+    try {
+        const source = await getStaticPropsWithContext(context, sourceById, 'source');
+        if (!source[0]) throw '404';
 
-    return {
-        props: {
-            source: (await source)[0],
-        },
-        revalidate: 1,
-    };
+        return {
+            props: {
+                // must add a key so that a navigation from the same route will re-render properly
+                key: source[0]?.id,
+                source: source[0],
+            },
+            revalidate: 1,
+        };
+    } catch (e) {
+        return { notFound: true };
+    }
 };
 
 export const getStaticPaths: GetStaticPaths = async () => getStaticPathsFromIds(allSourceIds);
