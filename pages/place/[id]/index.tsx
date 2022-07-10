@@ -104,14 +104,21 @@ const PlacePage = ({ place }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    const place = await getStaticPropsWithContext(context, placeById, 'place');
+    try {
+        const place = await getStaticPropsWithContext(context, placeById, 'place');
+        if (!place[0]) throw '404';
 
-    return {
-        props: {
-            place: place[0],
-        },
-        revalidate: 1,
-    };
+        return {
+            props: {
+                // must add a key so that a navigation from the same route will re-render properly
+                key: place[0]?.id,
+                place: place[0],
+            },
+            revalidate: 1,
+        };
+    } catch (e) {
+        return { notFound: true };
+    }
 };
 
 export const getStaticPaths: GetStaticPaths = async () => getStaticPathsFromIds(allPlaceIds);

@@ -62,7 +62,7 @@ test('handleFailure should convert to an Error', () => {
 });
 
 test('truncateAtWord should handle varying input', () => {
-    fc.property(fc.set(fc.unicodeString()), (values) => {
+    fc.property(fc.uniqueArray(fc.unicodeString()), (values) => {
         const s = values.join(' ');
         const t = U.truncateAtWord(2)(s);
         expect(t.length).toBeLessThanOrEqual(s.length);

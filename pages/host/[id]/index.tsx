@@ -217,18 +217,25 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    const h = await getStaticPropsWithContext(context, hostById, 'host');
-    const host = h[0];
-    const sources = host ? await linkSourceToGlossary(host.speciessource) : null;
-    const taxonomy = await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy');
+    try {
+        const h = await getStaticPropsWithContext(context, hostById, 'host');
+        if (!h[0]) throw '404';
+        const host = h[0];
+        const sources = host ? await linkSourceToGlossary(host.speciessource) : null;
+        const taxonomy = await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy');
 
-    return {
-        props: {
-            host: { ...host, speciessource: sources },
-            taxonomy: taxonomy,
-        },
-        revalidate: 1,
-    };
+        return {
+            props: {
+                // must add a key so that a navigation from the same route will re-render properly
+                key: host.id,
+                host: { ...host, speciessource: sources },
+                taxonomy: taxonomy,
+            },
+            revalidate: 1,
+        };
+    } catch (e) {
+        return { notFound: true };
+    }
 };
 
 export const getStaticPaths: GetStaticPaths = async () => getStaticPathsFromIds(allHostIds);

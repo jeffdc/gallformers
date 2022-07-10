@@ -263,20 +263,28 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    const g = await getStaticPropsWithContext(context, gallById, 'gall');
-    const gall = g[0];
-    const sources = gall ? await linkSourceToGlossary(gall.speciessource) : null;
-    const fgs = gall ? await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy') : null;
-    const relatedGalls = gall ? await getStaticPropsWith<SimpleSpecies>(() => getRelatedGalls(gall), 'related galls') : null;
+    try {
+        const g = await getStaticPropsWithContext(context, gallById, 'gall');
+        if (!g[0]) throw '404';
 
-    return {
-        props: {
-            species: gall ? { ...gall, speciessource: sources } : null,
-            taxonomy: fgs,
-            relatedGalls: relatedGalls,
-        },
-        revalidate: 1,
-    };
+        const gall = g[0];
+        const sources = gall ? await linkSourceToGlossary(gall.speciessource) : null;
+        const fgs = gall ? await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy') : null;
+        const relatedGalls = gall ? await getStaticPropsWith<SimpleSpecies>(() => getRelatedGalls(gall), 'related galls') : null;
+
+        return {
+            props: {
+                // must add a key so that a navigation from the same route will re-render properly
+                key: gall.id,
+                species: gall ? { ...gall, speciessource: sources } : null,
+                taxonomy: fgs,
+                relatedGalls: relatedGalls,
+            },
+            revalidate: 1,
+        };
+    } catch (e) {
+        return { notFound: true };
+    }
 };
 
 export const getStaticPaths: GetStaticPaths = async () => getStaticPathsFromIds(allGallIds);

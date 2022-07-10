@@ -71,9 +71,17 @@ const Genus = ({ genus, species }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
+    const genus = await getStaticPropsWithContext(context, taxonomyEntryById, 'genus');
+
     return {
         props: {
-            genus: await getStaticPropsWithContext(context, taxonomyEntryById, 'genus'),
+            // must add a key so that a navigation from the same route will re-render properly
+            key: pipe(
+                genus,
+                O.map((g) => g.id),
+                O.getOrElse(constant(-1)),
+            ),
+            genus: genus,
             species: await getStaticPropsWithContext(context, getAllSpeciesForSectionOrGenus, 'species for genus', false, true),
         },
         revalidate: 1,

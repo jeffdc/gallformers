@@ -91,6 +91,12 @@ export const getStaticProps: GetStaticProps = async (context) => {
 
     return {
         props: {
+            // must add a key so that a navigation from the same route will re-render properly
+            key: pipe(
+                section,
+                O.map((s) => s.id),
+                O.getOrElse(constant(-1)),
+            ),
             section: pipe(section, O.getOrElseW(constant(null))),
         },
         revalidate: 1,

@@ -2,7 +2,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import router from 'next/router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
-import { DeepPartial, Path, UnpackNestedValue, useForm, UseFormReturn } from 'react-hook-form';
+import { DeepPartial, Path, useForm, UseFormReturn } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import * as yup from 'yup';
 import { AnyObject, AssertsShape, ObjectShape, TypeOfShape } from 'yup/lib/object';
@@ -209,7 +209,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
 
     const onDataChange = useCallback(async (t: T | undefined) => {
         const ff = await updatedFormFields(t);
-        form.reset(ff as UnpackNestedValue<DeepPartial<FormFields>>);
+        form.reset(ff as DeepPartial<FormFields>);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

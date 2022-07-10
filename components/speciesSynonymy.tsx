@@ -82,6 +82,7 @@ const SpeciesSynonymy = ({ aliases, showAll }: SpeciesSynonymyProps): JSX.Elemen
                                 responsive={false}
                                 defaultSortFieldId="name"
                                 customStyles={TABLE_CUSTOM_STYLES}
+                                pagination={true}
                             />
                         </div>
                     </div>
