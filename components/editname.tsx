@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button, Modal } from 'react-bootstrap';
 import toast, { Toaster } from 'react-hot-toast';
 import { SpeciesNamingHelp } from '../hooks/useSpecies';
-import { capitalizeFirstLetter, isValidSpeciesName, SPECIES_NAME_REGEX } from '../libs/utils/util';
+import { AdminTypes } from '../libs/pages/admin';
+import { capitalizeFirstLetter, isValidSpeciesName } from '../libs/utils/util';
 
 export type RenameEvent = {
     old: string | undefined;
@@ -11,16 +12,26 @@ export type RenameEvent = {
 };
 
 type Props = {
-    type: string;
+    type: AdminTypes;
     keyField: string;
     defaultValue: string | undefined;
     showModal: boolean;
     setShowModal: (showModal: boolean) => void;
+    nameExistsCallback: (name: string) => Promise<boolean>;
     renameCallback: (e: RenameEvent) => void;
 };
 
-const EditName = ({ type, keyField, defaultValue, showModal, setShowModal, renameCallback }: Props): JSX.Element => {
+const EditName = ({
+    type,
+    keyField,
+    defaultValue,
+    showModal,
+    setShowModal,
+    renameCallback,
+    nameExistsCallback,
+}: Props): JSX.Element => {
     const [value, setValue] = useState(defaultValue);
+    const [dirty, setDirty] = useState(false);
     const [addAlias, setAddAlias] = useState(false);
     const isGallOrHost = type === 'Gall' || type === 'Host';
 
@@ -39,7 +50,10 @@ const EditName = ({ type, keyField, defaultValue, showModal, setShowModal, renam
                         className="form-control"
                         type="text"
                         defaultValue={defaultValue}
-                        onChange={(e) => setValue(e.currentTarget.value)}
+                        onChange={(e) => {
+                            setDirty(true);
+                            setValue(e.currentTarget.value);
+                        }}
                     />
                     {isGallOrHost && (
                         <>
@@ -63,18 +77,25 @@ const EditName = ({ type, keyField, defaultValue, showModal, setShowModal, renam
                     <Button
                         variant="primary"
                         type="submit"
+                        disabled={!dirty || value == undefined || value === ''}
                         onClick={() => {
                             if (value == undefined || value === '') {
                                 toast.error(`The name must not be empty.`);
                             } else if (isGallOrHost && !isValidSpeciesName(value)) {
                                 toast.error('The name must be a valid species name construction.');
                             } else {
-                                renameCallback({
-                                    old: defaultValue,
-                                    new: value,
-                                    addAlias: addAlias,
+                                nameExistsCallback(value).then((b) => {
+                                    if (b) {
+                                        toast.error('That name is already in use.');
+                                    } else {
+                                        renameCallback({
+                                            old: defaultValue,
+                                            new: value,
+                                            addAlias: addAlias,
+                                        });
+                                        setShowModal(false);
+                                    }
                                 });
-                                setShowModal(false);
                             }
                         }}
                     >

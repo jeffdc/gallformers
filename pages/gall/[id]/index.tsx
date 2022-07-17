@@ -10,10 +10,11 @@ import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-boot
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
 import InfoTip from '../../../components/infotip';
+import RangeMap from '../../../components/rangemap';
 import SeeAlso from '../../../components/seealso';
 import SourceList from '../../../components/sourcelist';
 import SpeciesSynonymy from '../../../components/speciesSynonymy';
-import { DetachableBoth, GallApi, GallHost, SimpleSpecies } from '../../../libs/api/apitypes';
+import { DetachableBoth, GallApi, GallHost, GallTaxon, SimpleSpecies } from '../../../libs/api/apitypes';
 import { FGS } from '../../../libs/api/taxonomy';
 import { allGallIds, gallById, getRelatedGalls } from '../../../libs/db/gall';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
@@ -30,11 +31,12 @@ type Props = {
 // eslint-disable-next-line react/display-name
 const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
     return (
-        <Link key={h.id} href={`/host/${h.id}`}>
-            <a>
-                {h.name} {idx < len - 1 ? ' / ' : ''}
-            </a>
-        </Link>
+        <span key={h.id}>
+            <Link href={`/host/${h.id}`}>
+                <a>{h.name}</a>
+            </Link>
+            {idx < len - 1 ? ' / ' : ''}
+        </span>
     );
 };
 
@@ -42,6 +44,10 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
     const router = useRouter();
     const defSource = defaultSource(species?.speciessource, router.query.source);
     const [selectedSource, setSelectedSource] = useState(defSource);
+
+    const range = new Set<string>();
+    species?.hosts.flatMap((gh) => gh.places.forEach((p) => range.add(p.code)));
+    species?.excludedPlaces.forEach((p) => range.delete(p.code));
 
     // If the page is not yet generated, this will be displayed initially until getStaticProps() finishes running
     if (router.isFallback) {
@@ -67,10 +73,12 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                         <Col>
                             <Row>
                                 <Col>
-                                    <h2 className="font-italic">{species.name}</h2>
+                                    <h2>
+                                        <em>{species.name}</em>
+                                    </h2>
                                 </Col>
                                 <Col xs={2}>
-                                    <span className="p-0 pr-1 my-auto">
+                                    <span className="p-0 pe-1 my-auto">
                                         <Edit id={species.id} type="gall" />
                                         <OverlayTrigger
                                             placement="right"
@@ -94,103 +102,135 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                             </Row>
                             <Row>
                                 <Col>
-                                    <strong>Family:</strong>
+                                    <strong>Family: </strong>
                                     <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
-                                        <a> {taxonomy.family.name}</a>
+                                        <a>{taxonomy.family.name}</a>
                                     </Link>
                                     {' | '}
-                                    <strong>Genus:</strong>
+                                    <strong>Genus: </strong>
                                     <Link key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
-                                        <a className="font-italic">
-                                            {' '}
-                                            {formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}
-                                        </a>
+                                        <a>{formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}</a>
                                     </Link>
                                 </Col>
                             </Row>
                             <Row className="">
                                 <Col>
-                                    <strong>Hosts:</strong> {species.hosts.map(hostLinker)}
+                                    <strong>Hosts:</strong> <em>{species.hosts.map(hostLinker)}</em>
                                     <Edit id={species.id} type="gallhost" />
                                 </Col>
                             </Row>
                             <Row>
-                                <Col xs={6} sm={4}>
-                                    <strong>Detachable:</strong> {species.gall.detachable.value}
-                                    {species.gall.detachable.value === DetachableBoth.value && (
-                                        <InfoTip
-                                            id="detachable"
-                                            text="This gall can be both detachable and integral depending on what stage of its lifecycle it is in."
-                                        />
-                                    )}
+                                <Col xs={12} md={6} lg={4}>
+                                    <Row>
+                                        <Col>
+                                            <strong>Detachable:</strong> {species.gall.detachable.value}
+                                            {species.gall.detachable.value === DetachableBoth.value && (
+                                                <InfoTip
+                                                    id="detachable"
+                                                    text="This gall can be both detachable and integral depending on what stage of its lifecycle it is in."
+                                                />
+                                            )}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Color:</strong> {species.gall.gallcolor.map((c) => c.field).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.field).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Abundance:</strong>{' '}
+                                            {pipe(
+                                                species.abundance,
+                                                O.fold(constant(''), (a) => a.abundance),
+                                            )}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Shape:</strong> {species.gall.gallshape.map((s) => s.field).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Season:</strong> {species.gall.gallseason.map((s) => s.field).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Related: </strong>
+                                            {relatedGalls.map((g, i) => (
+                                                <span key={g.id}>
+                                                    {' '}
+                                                    <Link key={g.id} href={`/gall/${g.id}`}>
+                                                        <a>{g.name}</a>
+                                                    </Link>
+                                                    {i < relatedGalls.length - 1 ? ', ' : ''}
+                                                </span>
+                                            ))}
+                                        </Col>
+                                    </Row>
                                 </Col>
-                                <Col xs={6} sm={4}>
-                                    <strong>Color:</strong> {species.gall.gallcolor.map((c) => c.field).join(', ')}
+                                <Col xs={12} md={6} lg={4}>
+                                    <Row>
+                                        <Col>
+                                            <strong>Alignment:</strong>{' '}
+                                            {species.gall.gallalignment.map((a) => a.field).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Walls:</strong> {species.gall.gallwalls.map((w) => w.field).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Location:</strong> {species.gall.galllocation.map((l) => l.field).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Form:</strong> {species.gall.gallform.map((s) => s.field).join(', ')}
+                                        </Col>
+                                    </Row>
+                                    <Row>
+                                        <Col>
+                                            <strong>Cells:</strong> {species.gall.gallcells.map((s) => s.field).join(', ')}
+                                        </Col>
+                                    </Row>
                                 </Col>
-                                <Col xs={6} sm={4}>
-                                    <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.field).join(', ')}
+                                <Col xs={12} lg={4} className="p-0 m-0">
+                                    <strong>Possible Range:</strong>
+                                    <InfoTip
+                                        id="rangetip"
+                                        text="The gall's range is computed from the range of all hosts that the gall occurs on. In some cases we have evidence that the gall does not occur across the full range of the hosts and we will remove these places from the range. For undescribed species we will show the expected range based on hosts plus where the galls have been observed. All of this said, the exact ranges for most galls is uncertain."
+                                    />
+                                    <RangeMap range={range} />
                                 </Col>
                             </Row>
-                            <Row>
-                                <Col xs={6} sm={4}>
-                                    <strong>Alignment:</strong> {species.gall.gallalignment.map((a) => a.field).join(', ')}
-                                </Col>
-                                <Col xs={6} sm={4}>
-                                    <strong>Walls:</strong> {species.gall.gallwalls.map((w) => w.field).join(', ')}
-                                </Col>
-                                <Col xs={6} sm={4}>
-                                    <strong>Location:</strong> {species.gall.galllocation.map((l) => l.field).join(', ')}
-                                </Col>
-                            </Row>
-                            <Row>
-                                <Col xs={6} sm={4}>
-                                    <strong>Abdundance:</strong>{' '}
-                                    {pipe(
-                                        species.abundance,
-                                        O.fold(constant(''), (a) => a.abundance),
-                                    )}
-                                </Col>
-                                <Col xs={6} sm={4}>
-                                    <strong>Shape:</strong> {species.gall.gallshape.map((s) => s.field).join(', ')}
-                                </Col>
-                                <Col xs={6} sm={4}>
-                                    <strong>Season:</strong> {species.gall.gallseason.map((s) => s.field).join(', ')}
-                                </Col>
-                            </Row>
-                            <Row>
-                                <Col xs={6} sm={4}>
-                                    <strong>Form:</strong> {species.gall.gallform.map((s) => s.field).join(', ')}
-                                </Col>
-                                <Col xs={6} sm={4}>
-                                    <strong>Cells:</strong> {species.gall.gallcells.map((s) => s.field).join(', ')}
-                                </Col>
-                                <Col>
-                                    <strong>Related: </strong>
-                                    {relatedGalls.map((g, i) => (
-                                        <span key={g.id}>
-                                            {' '}
-                                            <Link key={g.id} href={`/gall/${g.id}`}>
-                                                <a>{g.name}</a>
-                                            </Link>
-                                            {i < relatedGalls.length - 1 ? ', ' : ''}
-                                        </span>
-                                    ))}
-                                </Col>
-                            </Row>
+                        </Col>
+                    </Row>
+                    <Row>
+                        <Col>
+                            <SpeciesSynonymy aliases={species.aliases} showAll={true} />
                         </Col>
                     </Row>
                 </Col>
                 {/* Images */}
                 <Col sm={{ span: 12 }} md={4}>
-                    <Images sp={species} type="gall" />
+                    <Row>
+                        <Col>
+                            <Images sp={species} type="gall" />
+                        </Col>
+                    </Row>
                 </Col>
                 {/* Description */}
                 <Col>
-                    <Row>
-                        <Col>
-                            <SpeciesSynonymy aliases={species.aliases} />
-                        </Col>
-                    </Row>
                     <Row>
                         <Col>
                             <hr />
@@ -206,6 +246,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                         onSelectionChange={(s) =>
                             setSelectedSource(species.speciessource.find((spso) => spso.source_id == s?.id))
                         }
+                        taxonType={GallTaxon}
                     />
                     <hr />
                     <Row>
@@ -222,20 +263,28 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    const g = await getStaticPropsWithContext(context, gallById, 'gall');
-    const gall = g[0];
-    const sources = gall ? await linkSourceToGlossary(gall.speciessource) : null;
-    const fgs = gall ? await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy') : null;
-    const relatedGalls = gall ? await getStaticPropsWith<SimpleSpecies>(() => getRelatedGalls(gall), 'related galls') : null;
+    try {
+        const g = await getStaticPropsWithContext(context, gallById, 'gall');
+        if (!g[0]) throw '404';
 
-    return {
-        props: {
-            species: gall ? { ...gall, speciessource: sources } : null,
-            taxonomy: fgs,
-            relatedGalls: relatedGalls,
-        },
-        revalidate: 1,
-    };
+        const gall = g[0];
+        const sources = gall ? await linkSourceToGlossary(gall.speciessource) : null;
+        const fgs = gall ? await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy') : null;
+        const relatedGalls = gall ? await getStaticPropsWith<SimpleSpecies>(() => getRelatedGalls(gall), 'related galls') : null;
+
+        return {
+            props: {
+                // must add a key so that a navigation from the same route will re-render properly
+                key: gall.id,
+                species: gall ? { ...gall, speciessource: sources } : null,
+                taxonomy: fgs,
+                relatedGalls: relatedGalls,
+            },
+            revalidate: 1,
+        };
+    } catch (e) {
+        return { notFound: true };
+    }
 };
 
 export const getStaticPaths: GetStaticPaths = async () => getStaticPathsFromIds(allGallIds);

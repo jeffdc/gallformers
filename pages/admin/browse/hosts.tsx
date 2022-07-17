@@ -5,7 +5,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import React, { useMemo } from 'react';
 import { Card } from 'react-bootstrap';
-import DataTable from 'react-data-table-component';
+import DataTable from '../../../components/DataTable';
 import Edit from '../../../components/edit';
 import { HostApi } from '../../../libs/api/apitypes';
 import { allHosts } from '../../../libs/db/host';

@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { constant, constFalse, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
@@ -10,6 +11,7 @@ import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import {
     asFilterFieldType,
+    DeleteResult,
     FilterField,
     FilterFieldWithType,
     FILTER_FIELD_ALIGNMENTS,
@@ -105,26 +107,17 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
     };
 
     const doDelete = async (fields: FormFields) => {
-        try {
-            if (fields.del) {
-                const res = await fetch(`../api/filterfield?id=${fields.mainField[0].id}&fieldType=${fieldType}`, {
-                    method: 'DELETE',
-                });
-
-                if (res.status === 200) {
+        if (fields.del) {
+            axios
+                .delete<DeleteResult>(`/api/filterfield/${fieldType}/${fields.mainField[0].id}`)
+                .then((res) => {
                     setSelected(undefined);
-                    const dr = await res.json();
-                    setDeleteResults(dr);
-                    return;
-                } else {
-                    throw new Error(await res.text());
-                }
-            }
-        } catch (e) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const err: any = e;
-            console.error(err);
-            setError(err.toString());
+                    setDeleteResults(res.data);
+                })
+                .catch((e) => {
+                    console.error(e.toString());
+                    setError(e.toString());
+                });
         }
     };
 
@@ -140,6 +133,7 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
         deleteResults,
         setDeleteResults,
         renameCallback,
+        nameExists,
         form,
         formSubmit,
         mainField,
@@ -147,21 +141,26 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
     } = useAdmin(
         'Filter Fields',
         '',
-        alignments,
         renameField,
         toUpsertFields,
-        { keyProp: 'field', delEndpoint: '../api/filterfield/', upsertEndpoint: '../api/filterfield/upsert' },
+        {
+            keyProp: 'field',
+            delEndpoint: `/api/filterfield/${fieldType}`,
+            upsertEndpoint: '/api/filterfield/upsert',
+            nameExistsEndpoint: (s: string) => `/api/filterfield/${fieldType}?name=${s}`,
+        },
         schema,
         updatedFormFields,
         false,
         createNewFilterField,
+        alignments,
     );
 
     return (
         <Admin
-            type="Place"
+            type="FilterTerms"
             keyField="word"
-            editName={{ getDefault: () => selected?.field, renameCallback: renameCallback }}
+            editName={{ getDefault: () => selected?.field, renameCallback: renameCallback, nameExistsCallback: nameExists }}
             setShowModal={setShowModal}
             showModal={showModal}
             setError={setError}
@@ -172,9 +171,9 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
             superAdmin={true}
         >
             <>
-                <form className="m-4 pr-4">
+                <form className="m-4 pe-4">
                     <h4>Add/Edit Filter Fields</h4>
-                    <Row className="form-group">
+                    <Row className="my-1">
                         <Col>
                             <select
                                 className="form-control"
@@ -191,8 +190,8 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
                         </Col>
                     </Row>
                 </form>
-                <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
-                    <Row className="form-group">
+                <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
+                    <Row className="my-1">
                         <Col>
                             <Row>
                                 <Col>Word:</Col>
@@ -209,7 +208,7 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
                             </Row>
                         </Col>
                     </Row>
-                    <Row className="form-group">
+                    <Row className="my-1">
                         <Col>
                             Definition (required):
                             <Controller

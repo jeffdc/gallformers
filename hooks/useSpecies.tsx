@@ -1,6 +1,5 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
-import React from 'react';
 import { Badge, OverlayTrigger, Popover } from 'react-bootstrap';
 import { ConfirmationOptions } from '../components/confirmationdialog';
 import { RenameEvent } from '../components/editname';
@@ -25,8 +24,8 @@ export const SpeciesNamingHelp = (): JSX.Element => (
         rootClose
         overlay={
             <Popover id="help">
-                <Popover.Title>Naming Species</Popover.Title>
-                <Popover.Content>
+                <Popover.Header>Naming Species</Popover.Header>
+                <Popover.Body>
                     <p>
                         All species must have a name that is in the standard binomial form{' '}
                         <mark>
@@ -81,11 +80,11 @@ export const SpeciesNamingHelp = (): JSX.Element => (
                             </li>
                         </ul>
                     </i>
-                </Popover.Content>
+                </Popover.Body>
             </Popover>
         }
     >
-        <Badge variant="info" className="m-1 larger">
+        <Badge bg="info" className="m-1 larger">
             ?
         </Badge>
     </OverlayTrigger>

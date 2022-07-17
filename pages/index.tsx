@@ -1,7 +1,6 @@
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
-import Image from 'next/image';
 import React from 'react';
 import { Card, Col, Container, Row } from 'react-bootstrap';
 import { RandomGall } from '../libs/api/apitypes';
@@ -25,40 +24,44 @@ function Home({ randomGall }: Props): JSX.Element {
                     </Col>
                 </Row>
                 <Row>
-                    <Col>The place to ID and learn about galls on plants in the US and Canada.</Col>
+                    <Col>The place to identify and learn about galls on plants in the US and Canada.</Col>
                 </Row>
             </Container>
             <Container>
                 <Row>
                     <Col>
                         <Card>
-                            <Card.Body>
+                            <Card.Header>
                                 <Link href="/id">
-                                    <a>
-                                        <h2>ID a Gall &rarr;</h2>
-                                        <p>Try and get an ID for a gall by providing known information.</p>
+                                    <a style={{ textDecoration: 'none' }}>
+                                        <h2>Identify a Gall &rarr;</h2>
                                     </a>
                                 </Link>
-                            </Card.Body>
+                            </Card.Header>
+                            <Card.Body>Try and get an Identity for a gall by providing known information.</Card.Body>
                         </Card>
                     </Col>
                     <Col>
                         <Card>
-                            <Card.Body>
+                            <Card.Header>
                                 <Link href="/explore">
-                                    <a>
+                                    <a style={{ textDecoration: 'none' }}>
                                         <h2>Explore &rarr;</h2>
-                                        <p>Explore Galls (including Undescribed species) and Hosts.</p>
                                     </a>
                                 </Link>
-                            </Card.Body>
+                            </Card.Header>
+                            <Card.Body>Explore Galls (including Undescribed species) and Host Plants.</Card.Body>
                         </Card>
                     </Col>
                 </Row>
                 <Row className="pb-4 pt-4">
                     <Col md="12" lg="6">
                         <Card>
-                            <Card.Img variant="top" src={randomGall.imagePath} width="300" />
+                            <Link href={`/gall/${randomGall.id}`}>
+                                <a>
+                                    <Card.Img variant="top" src={randomGall.imagePath} width="300" />
+                                </a>
+                            </Link>{' '}
                             <Card.Body>
                                 Here is a random gall from our database. This one is{' '}
                                 {randomGall.undescribed ? 'an undescribed species' : ''} called{' '}
@@ -87,10 +90,38 @@ function Home({ randomGall }: Props): JSX.Element {
                             <Col>
                                 <Card>
                                     <Card.Body>
+                                        <Card.Title>Help Us Out</Card.Title>
+                                        If you find gallformers.org useful and you are interested in helping us out there are a
+                                        few ways you can do so:
+                                        <ul>
+                                            <li>
+                                                <Link href="https://www.patreon.com/gallformers">
+                                                    Help cover operational costs via donations to our Patreon
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link href="/about#administrators">
+                                                    Help add and maintain our data as an Administrator
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link href="https://github.com/jeffdc/gallformers">
+                                                    Help fix bugs and add new features
+                                                </Link>
+                                            </li>
+                                        </ul>
+                                    </Card.Body>
+                                </Card>
+                            </Col>
+                        </Row>
+                        <Row className="pb-4">
+                            <Col>
+                                <Card>
+                                    <Card.Body>
                                         <Card.Title>Resources</Card.Title>
                                         <ul>
                                             <li>
-                                                <Link href="/guide">Our guide to gall identification.</Link>
+                                                <Link href="/ref/IDGuide">Our guide to gall identification.</Link>
                                             </li>
                                             <li>
                                                 <Link href="/filterguide">Detailed descriptions for our key filters.</Link>

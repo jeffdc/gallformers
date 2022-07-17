@@ -2,7 +2,6 @@ import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
-import React from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
 import { RenameEvent } from '../../components/editname';
@@ -76,6 +75,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
         deleteResults,
         setDeleteResults,
         renameCallback,
+        nameExists,
         form,
         formSubmit,
         mainField,
@@ -83,21 +83,26 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
     } = useAdmin(
         'Glossary Entry',
         id,
-        glossary,
         renameEntry,
         toUpsertFields,
-        { keyProp: 'word', delEndpoint: '../api/glossary/', upsertEndpoint: '../api/glossary/upsert' },
+        {
+            keyProp: 'word',
+            delEndpoint: '../api/glossary/',
+            upsertEndpoint: '../api/glossary/upsert',
+            nameExistsEndpoint: (s: string) => `/api/glossary?name=${s}`,
+        },
         schema,
         updatedFormFields,
         false,
         createNewEntry,
+        glossary,
     );
 
     return (
         <Admin
             type="Glossary"
             keyField="word"
-            editName={{ getDefault: () => selected?.word, renameCallback: renameCallback }}
+            editName={{ getDefault: () => selected?.word, renameCallback: renameCallback, nameExistsCallback: nameExists }}
             setShowModal={setShowModal}
             showModal={showModal}
             setError={setError}
@@ -106,12 +111,12 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
             deleteResults={deleteResults}
             selected={selected}
         >
-            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
+            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                 <h4>Add/Edit Glossary Entries</h4>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         <Row>
-                            <Col>Word:</Col>
+                            <Col>Word (unless it is a proper name, use lower case):</Col>
                         </Row>
                         <Row>
                             <Col>{mainField('word', 'Word')}</Col>
@@ -125,14 +130,14 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                         </Row>
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Definition (required):
                         <textarea {...form.register('definition')} className="form-control" rows={4} disabled={!selected} />
                         {form.formState.errors.definition && <span className="text-danger">You must provide the defintion.</span>}
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         URLs (required) (separated by a newline [enter]):
                         <textarea {...form.register('urls')} className="form-control" rows={3} disabled={!selected} />
@@ -141,7 +146,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                         )}
                     </Col>
                 </Row>
-                <Row className="form-input">
+                <Row className="my-1">
                     <Col>
                         <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
                     </Col>
@@ -155,10 +160,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
     const queryParam = 'id';
     // eslint-disable-next-line prettier/prettier
-    const id = pipe(
-        extractQueryParam(context.query, queryParam),
-        O.getOrElse(constant('')),
-    );
+    const id = pipe(extractQueryParam(context.query, queryParam), O.getOrElse(constant('')));
     return {
         props: {
             id: id,

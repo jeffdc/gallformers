@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import React, { useMemo } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
-import DataTable from 'react-data-table-component';
+import DataTable, { TableColumn } from 'react-data-table-component';
 import Edit from '../../../components/edit';
 import { HostSimple, PlaceWithHostsApi } from '../../../libs/api/apitypes';
 import { allPlaceIds, placeById } from '../../../libs/db/place';
@@ -25,7 +25,7 @@ const linkPlant = (row: HostSimple) => {
 };
 
 const PlacePage = ({ place }: Props): JSX.Element => {
-    const columns = useMemo(
+    const columns = useMemo<TableColumn<HostSimple>[]>(
         () => [
             {
                 id: 'name',
@@ -36,6 +36,9 @@ const PlacePage = ({ place }: Props): JSX.Element => {
             },
             {
                 id: 'hosts',
+                // UGGH
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                //@ts-ignore
                 selector: (row: HostSimple) => row.aliases,
                 name: 'Aliases',
                 sortable: true,
@@ -61,8 +64,8 @@ const PlacePage = ({ place }: Props): JSX.Element => {
                 <Col>
                     <h2>{`${place.name} - ${place.code}`}</h2>
                 </Col>
-                <Col xs={2} className="mr-1">
-                    <span className="p-0 pr-1 my-auto">
+                <Col xs={2} className="me-1">
+                    <span className="p-0 pe-1 my-auto">
                         <Edit id={place.id} type="place" />
                     </span>
                 </Col>
@@ -101,14 +104,21 @@ const PlacePage = ({ place }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    const place = await getStaticPropsWithContext(context, placeById, 'place');
+    try {
+        const place = await getStaticPropsWithContext(context, placeById, 'place');
+        if (!place[0]) throw '404';
 
-    return {
-        props: {
-            place: place[0],
-        },
-        revalidate: 1,
-    };
+        return {
+            props: {
+                // must add a key so that a navigation from the same route will re-render properly
+                key: place[0]?.id,
+                place: place[0],
+            },
+            revalidate: 1,
+        };
+    } catch (e) {
+        return { notFound: true };
+    }
 };
 
 export const getStaticPaths: GetStaticPaths = async () => getStaticPathsFromIds(allPlaceIds);

@@ -1,11 +1,14 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
+// needed as ReactTooltip does not play nicely with SSR. See: https://github.com/wwayne/react-tooltip/issues/675
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
-import React from 'react';
+import { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Controller } from 'react-hook-form';
+import { ComposableMap, Geographies, Geography, ProjectionConfig, ZoomableGroup } from 'react-simple-maps';
 import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
 import Typeahead from '../../components/Typeahead';
@@ -22,15 +25,26 @@ import {
     SpeciesUpsertFields,
 } from '../../libs/api/apitypes';
 import { FAMILY, TaxonomyEntry, TaxonomyEntryNoParent } from '../../libs/api/taxonomy';
-import { allHosts } from '../../libs/db/host';
+import { hostById } from '../../libs/db/host';
 import { getPlaces } from '../../libs/db/place';
 import { getAbundances } from '../../libs/db/species';
 import { allFamilies, allGenera, allSections } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray, SPECIES_NAME_REGEX } from '../../libs/utils/util';
 
+const ReactTooltip = dynamic(() => import('react-tooltip'), {
+    ssr: false,
+});
+
+const projConfig: ProjectionConfig = {
+    center: [-4, 48],
+    parallels: [29.5, 45.5],
+    rotate: [96, 0, 0],
+    scale: 750,
+};
+
 type Props = SpeciesProps & {
-    hs: HostApi[];
+    host: HostApi[];
     sections: TaxonomyEntry[];
     places: PlaceNoTreeApi[];
 };
@@ -64,7 +78,8 @@ export const testables = {
     Schema: schema,
 };
 
-const Host = ({ id, hs, genera, families, sections, abundances, places }: Props): JSX.Element => {
+const Host = ({ id, host, genera, families, sections, abundances, places }: Props): JSX.Element => {
+    const [tooltipContent, setTooltipContent] = useState('');
     const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields } = useSpecies<HostApi>(genera);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): SpeciesUpsertFields => {
@@ -116,6 +131,7 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
         deleteResults,
         setDeleteResults,
         renameCallback,
+        nameExists,
         form,
         formSubmit,
         mainField,
@@ -123,25 +139,46 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
     } = useAdmin(
         'Host',
         id,
-        hs,
         renameSpecies,
         toUpsertFields,
-        { keyProp: 'name', delEndpoint: '../api/host/', upsertEndpoint: '../api/host/upsert' },
+        {
+            keyProp: 'name',
+            delEndpoint: '../api/host/',
+            upsertEndpoint: '../api/host/upsert',
+            nameExistsEndpoint: (s: string) => `/api/species?name=${s}`,
+        },
         schema,
         updatedFormFields,
         true,
         createNewHost,
+        host,
     );
 
     const onSubmit = async (fields: FormFields) => {
         formSubmit(fields);
     };
 
+    const selectAll = () => {
+        if (selected) {
+            selected.places = places;
+            setSelected({ ...selected });
+        }
+    };
+
+    const deselectAll = () => {
+        if (selected) {
+            selected.places = [];
+            setSelected({ ...selected });
+        }
+    };
+
+    const isInRange = (code: string): boolean => !!selected?.places.find((p) => p.code === code);
+
     return (
         <Admin
             type="Host"
             keyField="name"
-            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback }}
+            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback, nameExistsCallback: nameExists }}
             setShowModal={setShowRenameModal}
             showModal={showRenameModal}
             setError={setError}
@@ -150,16 +187,16 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
             deleteResults={deleteResults}
             selected={selected}
         >
-            <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pr-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pe-4">
                 <h4>Add/Edit Hosts</h4>
                 <p>
                     This is for all of the details about a Host. To add a description (which must be referenced to a source) go
                     add <Link href="/admin/source">Sources</Link>, if they do not already exist, then go{' '}
                     <Link href="/admin/speciessource">map species to sources with description</Link>. If you want to assign a{' '}
-                    <Link href="/admin/family">Family</Link> or <Link href="/admin/section">Section</Link> then you will need to
+                    <Link href="/admin/taxonomy">Family</Link> or <Link href="/admin/section">Section</Link> then you will need to
                     have created them first if they do not exist.
                 </p>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         <Row>
                             <Col xs={8}>
@@ -168,7 +205,13 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                             </Col>
                         </Row>
                         <Row>
-                            <Col>{mainField('name', 'Host')}</Col>
+                            <Col>
+                                {mainField('name', 'Host', {
+                                    searchEndpoint: (s) => `../api/host?q=${s}`,
+                                    promptText: 'Type in a Host name.',
+                                    searchText: 'Searching for Hosts...',
+                                })}
+                            </Col>
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowRenameModal(true)}>
@@ -179,7 +222,7 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                         </Row>
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Genus (filled automatically):
                         <Typeahead
@@ -243,7 +286,7 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                         )}
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Section:
                         <Typeahead
@@ -297,36 +340,91 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                         />
                     </Col>
                 </Row>
-                <Row className="formGroup pb-1">
+                <Row className="m-1 border">
+                    <Col xs={2}>
+                        <Row className="my-2">
+                            <Col>Legend:</Col>
+                        </Row>
+                        <Row className="p-1">
+                            <Col
+                                className="border d-flex justify-content-center"
+                                style={{ fontWeight: 'bold', borderRadius: '5px', backgroundColor: 'ForestGreen' }}
+                            >
+                                In Range
+                            </Col>
+                        </Row>
+                        <Row className="p-1">
+                            <Col
+                                className="border d-flex justify-content-center"
+                                style={{ fontWeight: 'bold', borderRadius: '5px', backgroundColor: 'White' }}
+                            >
+                                Out of Range
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col className="my-2">Map Actions:</Col>
+                        </Row>
+                        <Row className="my-2">
+                            <Col>
+                                <Button variant="outline-secondary" size="sm" className="me-2" onClick={selectAll}>
+                                    Select All
+                                </Button>
+                                <Button variant="outline-secondary" size="sm" onClick={deselectAll}>
+                                    De-select All
+                                </Button>
+                            </Col>
+                        </Row>
+                    </Col>
                     <Col>
                         Range:
-                        <Typeahead
-                            name="places"
-                            control={form.control}
-                            placeholder=""
-                            options={places.sort((a, b) => a.name.localeCompare(b.name))}
-                            renderMenuItemChildren={(option) => (
-                                <>
-                                    {option.name} - <b>{option.code}</b>
-                                </>
-                            )}
-                            labelKey="code"
-                            multiple
-                            disabled={!selected}
-                            selected={selected ? selected.places.sort((a, b) => a.code.localeCompare(b.code)) : []}
-                            onChange={(p) => {
-                                if (selected) {
-                                    selected.places = p;
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                            clearButton
-                            // need to look into why this is needed. the component should be handling this already
-                            filterBy={(o) => (selected ? !selected.places.find((p) => p.code === o.code) : false)}
-                        />
+                        <ComposableMap
+                            className="border"
+                            projection="geoConicEqualArea"
+                            projectionConfig={projConfig}
+                            data-tip=""
+                        >
+                            <ZoomableGroup zoom={1} minZoom={0.75}>
+                                <Geographies geography="../usa-can-topo.json">
+                                    {({ geographies }) =>
+                                        geographies.map((geo) => {
+                                            const code = geo.properties.postal;
+                                            return (
+                                                <Geography
+                                                    key={geo.rsmKey}
+                                                    geography={geo}
+                                                    stroke={'DarkSlateGray'}
+                                                    // fill={inRange.has(code) ? 'ForestGreen' : 'White'}
+                                                    fill={isInRange(code) ? 'ForestGreen' : 'White'}
+                                                    style={{
+                                                        default: { outline: 'none' },
+                                                        hover: { outline: 'none' },
+                                                        pressed: { outline: 'none' },
+                                                    }}
+                                                    onClick={() => {
+                                                        if (selected && isInRange(code)) {
+                                                            selected.places = selected.places.filter((p) => p.code !== code);
+                                                            setSelected({ ...selected });
+                                                        } else if (selected) {
+                                                            const p = places.find((p) => p.code === code);
+                                                            if (p) {
+                                                                selected?.places.push(p);
+                                                                setSelected({ ...selected });
+                                                            }
+                                                        }
+                                                    }}
+                                                    onMouseEnter={() => setTooltipContent(`${code} - ${geo.properties.name}`)}
+                                                    onMouseLeave={() => setTooltipContent('')}
+                                                />
+                                            );
+                                        })
+                                    }
+                                </Geographies>
+                            </ZoomableGroup>
+                        </ComposableMap>
+                        <ReactTooltip>{tooltipContent}</ReactTooltip>
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         <Controller
                             control={form.control}
@@ -346,7 +444,7 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                     </Col>
                 </Row>
                 <Row className="formGroup pb-1">
-                    <Col className="mr-auto">
+                    <Col className="me-auto">
                         <Controller
                             control={form.control}
                             name="datacomplete"
@@ -383,17 +481,18 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
 };
 
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
-    const queryParam = 'id';
-    // eslint-disable-next-line prettier/prettier
-    const id = pipe(
-        extractQueryParam(context.query, queryParam),
-        O.getOrElse(constant('')),
+    const id = extractQueryParam(context.query, 'id');
+    const host = pipe(
+        id,
+        O.map(parseInt),
+        O.map((id) => mightFailWithArray<HostApi>()(hostById(id))),
+        O.getOrElse(constant(Promise.resolve(Array<HostApi>()))),
     );
 
     return {
         props: {
-            id: id,
-            hs: await mightFailWithArray<HostApi>()(allHosts()),
+            id: pipe(extractQueryParam(context.query, 'id'), O.getOrElse(constant(''))),
+            host: await host,
             families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(HOST_FAMILY_TYPES)),
             genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon, true)),
             sections: await mightFailWithArray<TaxonomyEntry>()(allSections()),

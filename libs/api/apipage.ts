@@ -4,7 +4,7 @@ import * as O from 'fp-ts/lib/Option';
 import * as TA from 'fp-ts/lib/Task';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/client';
+import { getSession } from 'next-auth/react';
 import { ParsedUrlQuery } from 'querystring';
 import { logger } from '../utils/logger';
 import { DeleteResult } from './apitypes';
@@ -98,6 +98,25 @@ export async function apiUpsertEndpoint<T, R>(
             return e;
         }),
         TE.fold(sendErrResponse(res), onComplete(res)),
+    )();
+}
+
+export async function apiSearchEndpoint<T>(
+    req: NextApiRequest,
+    res: NextApiResponse,
+    dbSearch: (s: string) => TE.TaskEither<Error, T[]>,
+) {
+    const errMsg = (q: string) => (): TE.TaskEither<Err, unknown> => {
+        return TE.left({ status: 400, msg: `Failed to provide the ${q} d as a query param.` });
+    };
+
+    await pipe(
+        'q',
+        getQueryParam(req),
+        O.map(dbSearch),
+        O.map(TE.mapLeft(toErr)),
+        O.getOrElse(errMsg('q')),
+        TE.fold(sendErrResponse(res), sendSuccResponse(res)),
     )();
 }
 

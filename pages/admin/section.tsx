@@ -1,8 +1,9 @@
+import axios from 'axios';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Path } from 'react-hook-form';
 import * as yup from 'yup';
@@ -54,12 +55,7 @@ const renameSection = async (s: TaxSection, e: RenameEvent) => ({
     name: e.new,
 });
 
-const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): JSX.Element => {
-    const sections: TaxSection[] = unconvertedSections.map((s) => ({
-        ...s,
-        species: [],
-    }));
-
+const Section = ({ id, sections, genera, hosts }: Props): JSX.Element => {
     const [species, setSpecies] = useState<Array<SimpleSpecies>>([]);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): TaxonomyUpsertFields => {
@@ -71,20 +67,6 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
             species: fields.species.map((s) => s.id),
             parent: O.fromNullable(genera.find((g) => g.name.localeCompare(extractGenus(fields.species[0].name)) == 0)),
         };
-    };
-
-    const fetchSectionSpecies = async (sec: TaxSection): Promise<SimpleSpecies[]> => {
-        if (!sections.find((s) => s.id == sec.id)) {
-            return [];
-        }
-
-        const res = await fetch(`../api/taxonomy/section/${sec.id}`);
-        if (res.status === 200) {
-            return (await res.json()) as SimpleSpecies[];
-        } else {
-            console.error(await res.text());
-            throw new Error('Failed to fetch species for the selected section. Check console.');
-        }
     };
 
     const updatedFormFields = async (sec: TaxSection | undefined): Promise<FormFields> => {
@@ -117,6 +99,7 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
     });
 
     const {
+        data,
         selected,
         showRenameModal,
         setShowRenameModal,
@@ -126,6 +109,7 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
         deleteResults,
         setDeleteResults,
         renameCallback,
+        nameExists,
         form,
         formSubmit,
         mainField,
@@ -133,21 +117,53 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
     } = useAdmin(
         'Section',
         id,
-        sections,
         renameSection,
         toUpsertFields,
-        { keyProp: 'name', delEndpoint: '../api/taxonomy/', upsertEndpoint: '../api/taxonomy/upsert' },
+        {
+            keyProp: 'name',
+            delEndpoint: '/api/taxonomy/',
+            upsertEndpoint: '/api/taxonomy/upsert',
+            nameExistsEndpoint: (s: string) => `/api/taxonomy/section?name=${s}`,
+        },
         schema,
         updatedFormFields,
         false,
         createNewSection,
+        // hack for now until I figure out how to switch away from the TaxSection type.
+        sections as unknown as unknown as TaxSection[],
     );
+
+    const fetchSectionSpecies = useCallback(
+        async (sec: TaxSection): Promise<SimpleSpecies[]> => {
+            if (!data.find((s) => s.id == sec.id)) {
+                return [];
+            }
+
+            return axios
+                .get<SimpleSpecies[]>(`/api/taxonomy/section/${sec.id}`)
+                .then((res) => res.data)
+                .catch((e) => {
+                    console.error(e);
+                    throw new Error('Failed to fetch species for the selected section. Check console.', e);
+                });
+        },
+        [data],
+    );
+
+    useEffect(() => {
+        const updateSpecies = async () => {
+            if (selected) {
+                setSpecies(await fetchSectionSpecies(selected));
+            }
+        };
+        updateSpecies();
+    }, [fetchSectionSpecies, selected]);
 
     return (
         <Admin
             type="Section"
             keyField="name"
-            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback }}
+            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback, nameExistsCallback: nameExists }}
             setShowModal={setShowRenameModal}
             showModal={showRenameModal}
             setError={setError}
@@ -156,16 +172,16 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
             deleteResults={deleteResults}
             selected={selected}
         >
-            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
+            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                 <h4>Add or Edit a Section</h4>
                 <p>This is only for host sections. Currently we do not support sections for gallmakers.</p>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         <Row>
                             <Col xs={8}>Name:</Col>
                         </Row>
                         <Row>
-                            <Col>{mainField('name', 'Section')}</Col>
+                            <Col>{mainField('name', 'Section', { searchEndpoint: (s) => `../api/taxonomy/section?q=${s}` })}</Col>
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowRenameModal(true)}>
@@ -176,7 +192,7 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
                         </Row>
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Description (required):
                         <textarea
@@ -191,7 +207,7 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
                         )}
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Species (required):
                         <Typeahead
@@ -235,10 +251,7 @@ const Section = ({ id, sections: unconvertedSections, genera, hosts }: Props): J
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
     const queryParam = 'id';
     // eslint-disable-next-line prettier/prettier
-    const id = pipe(
-        extractQueryParam(context.query, queryParam),
-        O.getOrElse(constant('')),
-    );
+    const id = pipe(extractQueryParam(context.query, queryParam), O.getOrElse(constant('')));
 
     return {
         props: {

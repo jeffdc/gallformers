@@ -2,11 +2,12 @@ import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
+import Image from 'next/image';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import React, { useMemo } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
-import DataTable from 'react-data-table-component';
+import DataTable from '../components/DataTable';
 import { extractQueryParam } from '../libs/api/apipage';
 import { PlaceNoTreeApi } from '../libs/api/apitypes';
 import { TaxonomyEntryNoParent } from '../libs/api/taxonomy';
@@ -36,21 +37,21 @@ type Props = {
 const imageForType = (i: SearchResultItem) => {
     switch (i.type) {
         case 'gall':
-            return <img src="/images/gall.svg" alt="gallformer" aria-label="gallformer" width="25px" height="25px" />;
+            return <Image src="/images/gall.svg" alt="gallformer" aria-label="gallformer" width="25px" height="25px" />;
         case 'plant':
-            return <img src="/images/host.svg" alt="plant" aria-label="plant" width="25px" height="25px" />;
+            return <Image src="/images/host.svg" alt="plant" aria-label="plant" width="25px" height="25px" />;
         case 'entry':
-            return <img src="/images/entry.svg" alt="glossary entry" aria-label="glossary entry" width="25px" height="25px" />;
+            return <Image src="/images/entry.svg" alt="glossary entry" aria-label="glossary entry" width="25px" height="25px" />;
         case 'source':
-            return <img src="/images/source.svg" alt="source" aria-label="source" width="25px" height="25px" />;
+            return <Image src="/images/source.svg" alt="source" aria-label="source" width="25px" height="25px" />;
         case 'genus':
-            return <img src="/images/taxon.svg" alt="genus" aria-label="genus" width="25px" height="25px" />;
+            return <Image src="/images/taxon.svg" alt="genus" aria-label="genus" width="25px" height="25px" />;
         case 'section':
-            return <img src="/images/taxon.svg" alt="section" aria-label="section" width="25px" height="25px" />;
+            return <Image src="/images/taxon.svg" alt="section" aria-label="section" width="25px" height="25px" />;
         case 'family':
-            return <img src="/images/taxon.svg" alt="family" aria-label="family" width="25px" height="25px" />;
+            return <Image src="/images/taxon.svg" alt="family" aria-label="family" width="25px" height="25px" />;
         case 'place':
-            return <img src="/images/place.svg" alt="place" aria-label="place" width="25px" height="25px" />;
+            return <Image src="/images/place.svg" alt="place" aria-label="place" width="25px" height="25px" />;
         default:
             return <></>;
     }
@@ -61,13 +62,17 @@ const linkItem = (i: SearchResultItem) => {
         case 'gall':
             return (
                 <Link href={`/gall/${i.id}`}>
-                    <a className="font-italic">{formatWithDescription(i.name, i.aliases, true)}</a>
+                    <a>
+                        <em>{formatWithDescription(i.name, i.aliases, true)}</em>
+                    </a>
                 </Link>
             );
         case 'plant':
             return (
                 <Link href={`/host/${i.id}`}>
-                    <a className="font-italic">{formatWithDescription(i.name, i.aliases, true)}</a>
+                    <a>
+                        <em>{formatWithDescription(i.name, i.aliases, true)}</em>
+                    </a>
                 </Link>
             );
         case 'entry':
@@ -85,13 +90,17 @@ const linkItem = (i: SearchResultItem) => {
         case 'genus':
             return (
                 <Link href={`/genus/${i.id}`}>
-                    <a className="font-italic">{`Genus ${formatWithDescription(i.name, i.aliases, true)}`}</a>
+                    <a>
+                        <em>{`Genus ${formatWithDescription(i.name, i.aliases, true)}`}</em>
+                    </a>
                 </Link>
             );
         case 'section':
             return (
                 <Link href={`/section/${i.id}`}>
-                    <a className="font-italic">{`Section ${formatWithDescription(i.name, i.aliases, true)}`}</a>
+                    <a>
+                        <em>{`Section ${formatWithDescription(i.name, i.aliases, true)}`}</em>
+                    </a>
                 </Link>
             );
         case 'family':

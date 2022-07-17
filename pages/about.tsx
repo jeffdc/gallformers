@@ -2,7 +2,7 @@ import { GetStaticProps } from 'next';
 import Head from 'next/head';
 import Image from 'next/image';
 import React from 'react';
-import { Accordion, Button, Card, CardDeck, Col, Row } from 'react-bootstrap';
+import { Accordion, Card, Col, Row } from 'react-bootstrap';
 import { getCurrentStats, Stat } from '../libs/db/stats';
 import { mightFailWithArray } from '../libs/utils/util';
 import GallMeMaybe from '../public/images/gallmemaybe.jpg';
@@ -15,7 +15,7 @@ type Props = {
 const About = ({ stats, genTime }: Props): JSX.Element => {
     const statMap = new Map(stats.map((s) => [s.type, s.count] as [string, number]));
     return (
-        <div className="p-5">
+        <div className="p-4">
             <Head>
                 <title>About Gallformers</title>
                 <meta name="description" content="About the creators of gallformers and why we built the site." />
@@ -40,7 +40,15 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
                     </p>
                     <p>
                         This site is open source and you can view the all of the code/data and if so inclined even open a pull
-                        request on <a href="https://github.com/jeffdc/gallformers">GitHub</a>.
+                        request on <a href="https://github.com/jeffdc/gallformers">GitHub</a>. Any and all help is greatly
+                        appreciated!
+                    </p>
+                    <p>
+                        We have a{' '}
+                        <a href="https://www.patreon.com/gallformers" target="__blank" rel="noreferrer">
+                            Patreon
+                        </a>{' '}
+                        account where you can donate to help cover the costs of building and operating the site.
                     </p>
                 </Col>
             </Row>
@@ -57,74 +65,86 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
                 </Col>
             </Row>
             <Row>
+                <h4>Our Co-founders</h4>
                 <Col className="pb-3">
-                    <h4>Who We Are</h4>
-                    <CardDeck>
-                        <Card>
-                            <Card.Body className="small">
-                                <Card.Title>Adam Kranz</Card.Title>
-                                <Card.Text>
-                                    Adam is an independent ecologist focused on gall inducing organisms in North America. He
-                                    co-founded Gallformers.org as a community resource to help naturalists identify gall
-                                    observations and to collect information on undescribed galls. His primary focus is on adding
-                                    literature and information to the Gallformers database.
-                                </Card.Text>
-                            </Card.Body>
-                            <Card.Footer>
-                                <Card.Link href="https://www.inaturalist.org/people/megachile" target="_blank" rel="noreferrer">
-                                    iNaturalist
-                                </Card.Link>
-                                <Card.Link href="https://twitter.com/adam_kranz" target="_blank" rel="noreferrer">
-                                    Twitter
-                                </Card.Link>
-                            </Card.Footer>
-                        </Card>
-                        <Card>
-                            <Card.Body className="small">
-                                <Card.Title>Jeff Clark</Card.Title>
-                                <Card.Text>
-                                    Jeff is a Software Engineer who stumbled upon galls and became obsessed. So much so that he
-                                    co-founded this site, wrote all the code for this site, and is responsible for keeping it
-                                    going, fixing it, and implementing new features (and is currently the sole financial
-                                    supporter). If the site is broken, it is most likely his fault.
-                                </Card.Text>
-                            </Card.Body>
-                            <Card.Footer>
-                                <Card.Link href="https://www.inaturalist.org/people/jeffdc" target="_blank" rel="noreferrer">
-                                    iNaturalist
-                                </Card.Link>
-                                <Card.Link href="https://twitter.com/jeffc666" target="_blank" rel="noreferrer">
-                                    Twitter
-                                </Card.Link>
-                            </Card.Footer>
-                        </Card>
-                        <Card>
-                            <Card.Body className="small">
-                                <Card.Title>Yann Kemper</Card.Title>
-                                <Card.Text>
-                                    Yann is a 17 year old student from Cincinnati, Ohio. For the past three years he has been an
-                                    active contributor on iNaturalist, developing a recent interest in galls in the process.
-                                </Card.Text>
-                            </Card.Body>
-                            <Card.Footer>
-                                <Card.Link href="https://www.inaturalist.org/people/kemper" target="_blank" rel="noreferrer">
-                                    iNaturalist
-                                </Card.Link>
-                            </Card.Footer>
-                        </Card>
-                    </CardDeck>
+                    <Card>
+                        <Card.Body className="small">
+                            <Card.Title>Adam Kranz</Card.Title>
+                            <Card.Text>
+                                Adam is an independent ecologist focused on gall inducing organisms in North America. He
+                                co-founded Gallformers.org as a community resource to help naturalists identify gall observations
+                                and to collect information on undescribed galls. His primary focus is on adding literature and
+                                information to the Gallformers database.
+                            </Card.Text>
+                        </Card.Body>
+                        <Card.Footer>
+                            <Card.Link href="https://www.inaturalist.org/people/megachile" target="_blank" rel="noreferrer">
+                                iNaturalist
+                            </Card.Link>
+                            <Card.Link href="https://twitter.com/adam_kranz" target="_blank" rel="noreferrer">
+                                Twitter
+                            </Card.Link>
+                        </Card.Footer>
+                    </Card>
+                </Col>
+                <Col>
+                    <Card>
+                        <Card.Body className="small">
+                            <Card.Title>Jeff Clark</Card.Title>
+                            <Card.Text>
+                                Jeff is a Software Engineer who stumbled upon galls and became obsessed. So much so that he
+                                co-founded this site, wrote all the code for this site, and is responsible for keeping it going,
+                                fixing it, and implementing new features, and paying the bills. If the site is broken, it is most
+                                likely his fault. He is also way too into Oaks and will soon start building an ID tool for them.
+                            </Card.Text>
+                        </Card.Body>
+                        <Card.Footer>
+                            <Card.Link href="https://www.inaturalist.org/people/jeffdc" target="_blank" rel="noreferrer">
+                                iNaturalist
+                            </Card.Link>
+                            <Card.Link href="https://twitter.com/jeffc666" target="_blank" rel="noreferrer">
+                                Twitter
+                            </Card.Link>
+                        </Card.Footer>
+                    </Card>
+                </Col>
+            </Row>
+            <Row className="pb-2">
+                <a id="administrators">
+                    <h4>Administrators</h4>
+                </a>
+                <Col>
+                    We also have an ever growing list of people that help us out as site administrators, without who the site
+                    would be far poorer. If you are interested in becoming an administrator{' '}
+                    <a href="mailto:gallformers@gmail.com">reach out</a>:
                 </Col>
             </Row>
             <Row className="pb-2">
                 <Col>
-                    Besides the folks profiled above, others help out by contributing code, data, and feedback to help us improve
-                    the site.
+                    <ul>
+                        <li>
+                            <a href="https://www.inaturalist.org/people/joshuacde">Joshua C&apos;deBaca</a>
+                        </li>
+                        <li>
+                            <a href="https://www.inaturalist.org/people/calconey">Tim Frey</a>
+                        </li>
+                    </ul>
+                </Col>
+                <Col>
+                    <ul>
+                        <li>
+                            <a href="https://www.inaturalist.org/people/kemper">Yann Kemper</a>
+                        </li>
+                        <li>
+                            <a href="https://www.inaturalist.org/people/kimberlietx">Kimberlie Sasan</a>
+                        </li>
+                    </ul>
                 </Col>
             </Row>
             <Row>
                 <Col>
                     <h4>Current Site Stats:</h4>
-                    As of <span className="font-italic">{genTime}</span> there are:
+                    As of <em>{genTime}</em> there are:
                     <ul>
                         <li>
                             {statMap.get('galls')} gallformers across {statMap.get('gall-family')} families and{' '}
@@ -183,16 +203,14 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
             <Row>
                 <Col>
                     <Accordion>
-                        <Card.Header>
-                            <Accordion.Toggle as={Button} variant="link" eventKey="0">
-                                Dare You Click?
-                            </Accordion.Toggle>
-                        </Card.Header>
-                        <Accordion.Collapse eventKey="0">
-                            <Card.Body className="d-flex justify-content-center">
-                                <Image src={GallMeMaybe} alt="Gall Me Maybe" width="300" height="532" layout="fixed" />
-                            </Card.Body>
-                        </Accordion.Collapse>
+                        <Accordion.Item eventKey="0">
+                            <Accordion.Header>Dare You Click?</Accordion.Header>
+                            <Accordion.Body>
+                                <Card.Body className="d-flex justify-content-center">
+                                    <Image src={GallMeMaybe} alt="Gall Me Maybe" width="300" height="532" layout="fixed" />
+                                </Card.Body>
+                            </Accordion.Body>
+                        </Accordion.Item>
                     </Accordion>
                 </Col>
             </Row>

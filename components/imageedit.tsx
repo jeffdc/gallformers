@@ -8,7 +8,6 @@ import * as yup from 'yup';
 import { ALLRIGHTS, asLicenseType, CC0, CCBY, ImageApi, LicenseType, SourceWithSpeciesSourceApi } from '../libs/api/apitypes';
 import InfoTip from './infotip';
 import Typeahead from './Typeahead';
-import Image from 'next/image';
 
 type Props = {
     image: ImageApi;
@@ -134,13 +133,13 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                     <Modal.Title>Edit Image Details</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                    <Row>
-                        <Col xs={3} className="ml-2">
-                            <Image src={selected.small} layout="fill" objectFit="contain" objectPosition="top" />
+                    <Row className="">
+                        <Col xs={4} className="">
+                            <img src={selected.small} width="200px" />
                         </Col>
-                        <Col className="form-group">
+                        <Col xs={7} className="my-1">
                             <Row>
-                                <Col xs={3}>
+                                <Col>
                                     Default:
                                     <InfoTip
                                         id="default"
@@ -152,10 +151,10 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                 </Col>
                             </Row>
                             <hr />
-                            <Row className="form-group">
+                            <Row className="my-1">
                                 <Col>If the image is from a publication start with this field:</Col>
                             </Row>
-                            <Row className="form-group">
+                            <Row className="my-1">
                                 <Col xs={3}>
                                     Source:
                                     <InfoTip
@@ -183,7 +182,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                     />
                                 </Col>
                             </Row>
-                            <Row className="form-group">
+                            <Row className="my-1">
                                 <Col>
                                     <hr />
                                     {O.some(selected.source)
@@ -191,7 +190,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                         : `If the image is from an observation on a site like iNat/Bugguide/etc. then start here:`}
                                 </Col>
                             </Row>
-                            <Row className="form-group">
+                            <Row className="my-1">
                                 <Col xs={3}>
                                     {O.some(selected.source)
                                         ? `Direct Link to Image in Publication or Website:`
@@ -203,14 +202,14 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                     {errors.sourcelink && <span className="text-danger">{errors.sourcelink.message}</span>}
                                 </Col>
                             </Row>
-                            <Row className="form-group">
+                            <Row className="my-1">
                                 <Col>
                                     <hr />
                                     These fields should be filled out regardless of the source type. If you select a Source the
                                     License info from the Source will pre-populate if it exists.
                                 </Col>
                             </Row>
-                            <Row className="form-group">
+                            <Row className="my-1">
                                 <Col xs={3}>
                                     License:
                                     <InfoTip
@@ -227,7 +226,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                     {errors.license && <span className="text-danger">{errors.license.message}</span>}
                                 </Col>
                             </Row>
-                            <Row className="form-group">
+                            <Row className="my-1">
                                 <Col xs={3}>
                                     License Link:
                                     <InfoTip id="licenselink" text="The link to the license. Mandatory if CC-BY is chosen." />
@@ -238,7 +237,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                 </Col>
                             </Row>
 
-                            <Row className="form-group">
+                            <Row className="my-1">
                                 <Col xs={3}>
                                     Creator:
                                     <InfoTip
@@ -251,7 +250,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                     {errors.creator && <span className="text-danger">{errors.creator.message}</span>}
                                 </Col>
                             </Row>
-                            <Row className="form-group">
+                            <Row className="my-1">
                                 <Col xs={3}>
                                     Attribution Notes:
                                     <InfoTip id="attrib" text="Any additional attribution information." />
@@ -261,7 +260,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                     {errors.attribution && <span className="text-danger">{errors.attribution.message}</span>}
                                 </Col>
                             </Row>
-                            <Row className="form-group">
+                            <Row className="my-1">
                                 <Col xs={3}>
                                     Caption:
                                     <InfoTip id="caption" text="An optional caption to be displayed with the image." />
@@ -270,7 +269,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                     <textarea {...register('caption')} className="form-control" />
                                 </Col>
                             </Row>
-                            <Row className="form-group">
+                            <Row className="my-1">
                                 <Col>Uploader: {selected.uploader}</Col>
                                 <Col>Last Changed: {selected.lastchangedby}</Col>
                             </Row>

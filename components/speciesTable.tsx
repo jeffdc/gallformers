@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import React, { useMemo } from 'react';
-import DataTable from 'react-data-table-component';
+import DataTable from './DataTable';
 import { GallTaxon, SimpleSpecies } from '../libs/api/apitypes';
 import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
 

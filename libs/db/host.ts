@@ -17,7 +17,15 @@ import { constant, flow, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, HostApi, HostSimple, HostTaxon, SpeciesApi, SpeciesUpsertFields } from '../api/apitypes';
+import {
+    DeleteResult,
+    HostApi,
+    HostSimple,
+    HostTaxon,
+    SpeciesApi,
+    SpeciesUpsertFields,
+    SpeciesWithPlaces,
+} from '../api/apitypes';
 import { FGS, GENUS, SECTION } from '../api/taxonomy';
 import { deleteImagesBySpeciesId } from '../images/images';
 import { ExtractTFromPromise } from '../utils/types';
@@ -100,6 +108,31 @@ const adaptor = (hosts: readonly DBHost[]): HostApi[] =>
  */
 export const allHosts = (): TaskEither<Error, HostApi[]> => getHosts();
 
+export const allHostsWithPlaces = (): TaskEither<Error, SpeciesWithPlaces[]> => {
+    const getHostsWithPlaces = () =>
+        db.species.findMany({
+            where: { taxoncode: { equals: HostTaxon } },
+            select: {
+                id: true,
+                name: true,
+                places: {
+                    include: { place: true },
+                },
+            },
+        });
+
+    const simplify = (hosts: ExtractTFromPromise<ReturnType<typeof getHostsWithPlaces>>): SpeciesWithPlaces[] =>
+        hosts.map((h) => {
+            return {
+                ...h,
+                taxoncode: HostTaxon,
+                places: h.places.map((p) => p.place),
+            };
+        });
+
+    return pipe(TE.tryCatch(getHostsWithPlaces, handleError), TE.map(simplify));
+};
+
 /**
  * Fetch all hosts into a HostSimple format.
  */
@@ -113,6 +146,7 @@ export const allHostsSimple = (): TaskEither<Error, HostSimple[]> => {
                 name: true,
                 aliasspecies: { include: { alias: true } },
                 datacomplete: true,
+                places: { include: { place: true } },
             },
         });
 
@@ -121,6 +155,7 @@ export const allHostsSimple = (): TaskEither<Error, HostSimple[]> => {
             return {
                 ...h,
                 aliases: h.aliasspecies.map((a) => a.alias),
+                places: h.places.map((p) => p.place),
             };
         });
 
@@ -378,3 +413,19 @@ export const deleteHost = (speciesid: number): TaskEither<Error, DeleteResult> =
         TE.map(toDeleteResult)
     );
 };
+
+export const hostsSearch = (s: string): TaskEither<Error, HostApi[]> => getHosts([{ name: { contains: s } }]);
+
+export const hostsSearchSimple = (s: string): TaskEither<Error, HostSimple[]> =>
+    pipe(
+        getHosts([{ name: { contains: s } }]),
+        TE.map((hs) =>
+            hs.map((h) => ({
+                id: h.id,
+                name: h.name,
+                aliases: h.aliases,
+                datacomplete: h.datacomplete,
+                places: h.places,
+            })),
+        ),
+    );

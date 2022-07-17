@@ -2,11 +2,7 @@ import { GetStaticProps } from 'next';
 import Head from 'next/head';
 import React, { useMemo } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
-import DataTable from 'react-data-table-component';
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
-import remarkBreaks from 'remark-breaks';
-import externalLinks from 'remark-external-links';
+import DataTable from '../components/DataTable';
 import Edit from '../components/edit';
 import { allGlossaryEntries, Entry } from '../libs/db/glossary';
 import { EntryLinked, linkDefintionToGlossary } from '../libs/pages/glossary';
@@ -25,10 +21,12 @@ const formatRefs = (e: EntryLinked) => {
 
     const refs = urls.map((url, i) => {
         return (
-            <a href={url} key={i} target="_blank" rel="noreferrer">
-                {i + 1}
+            <span key={i}>
+                <a href={url} target="_blank" rel="noreferrer">
+                    {i + 1}
+                </a>
                 {i < urls.length - 1 ? ', ' : ''}
-            </a>
+            </span>
         );
     });
 
@@ -95,7 +93,7 @@ const Glossary = ({ es }: Props): JSX.Element => {
                 <title>Glossary</title>
                 <meta name="description" content="A Glossary of Gall Related Terminology" />
             </Head>
-            <h1 className="ml-3 pt-3">A Glossary of Gall Related Terminology</h1>
+            <h1 className="ms-3 pt-3">A Glossary of Gall Related Terminology</h1>
             <Row className="p-3">
                 <Col>
                     <DataTable

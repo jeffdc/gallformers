@@ -19,12 +19,14 @@ import {
     host,
     image,
     location,
+    place,
     Prisma,
     PrismaPromise,
     season,
     shape,
     source,
     species,
+    speciesplace,
     speciessource,
     speciestaxonomy,
     taxonomy,
@@ -96,7 +98,7 @@ export const getGalls = (
                         abundance: true,
                         hosts: {
                             include: {
-                                hostspecies: { select: { id: true, name: true } },
+                                hostspecies: { select: { id: true, name: true, places: { include: { place: true } } } },
                             },
                         },
                         speciessource: {
@@ -107,6 +109,7 @@ export const getGalls = (
                         image: { include: { source: true /*{ include: { speciessource: true } }*/ } },
                         speciestaxonomy: { include: { taxonomy: true } },
                         aliasspecies: { include: { alias: true } },
+                        places: { include: { place: true } },
                     },
                 },
                 gall: {
@@ -172,6 +175,9 @@ export const getGalls = (
                 hostspecies: {
                     id: number;
                     name: string;
+                    places: (speciesplace & {
+                        place: place;
+                    })[];
                 } | null;
             })[];
             image: (image & {
@@ -188,6 +194,9 @@ export const getGalls = (
                 taxonomy: taxonomy;
             })[];
             fgs: FGS;
+            places: (speciesplace & {
+                place: place;
+            })[];
         };
     };
 
@@ -231,11 +240,13 @@ export const getGalls = (
                     return {
                         id: h.hostspecies?.id ? h.hostspecies.id : -1,
                         name: h.hostspecies?.name ? h.hostspecies.name : 'MISSING HOST',
+                        places: h.hostspecies?.places ? h.hostspecies.places.map((p) => p.place) : [],
                     };
                 }),
                 images: g.species.image.map(adaptImage),
                 aliases: g.species.aliasspecies.map((a) => a.alias),
                 fgs: g.species.fgs,
+                excludedPlaces: g.species.places.map((p) => p.place),
             };
             return newg;
         });
@@ -309,6 +320,7 @@ const gallsByHostGenusForID = (whereClause: Prisma.gallspeciesWhereInput[]): Tas
                                 },
                             },
                         },
+                        places: { include: { place: { select: { name: true, type: true } } } },
                         image: true,
                         speciestaxonomy: {
                             include: {
@@ -373,7 +385,12 @@ const gallsByHostGenusForID = (whereClause: Prisma.gallspeciesWhereInput[]): Tas
                         return [];
                     }
                     return h.hostspecies.places
-                        .filter((p) => p.place.type == 'state' || p.place.type == 'province')
+                        .filter(
+                            (p) =>
+                                // remove any places that are assigned to the gall as these are removed from the range
+                                g.species.places.find((gp) => gp.place.name === p.place.name) == undefined &&
+                                (p.place.type == 'state' || p.place.type == 'province'),
+                        )
                         .map((p) => p.place.name);
                 }),
                 images: g.species.image.map(adaptImageNoSource),
@@ -495,10 +512,10 @@ export const gallByIdAsO = (id: number): TaskEither<Error, O.Option<GallApi>> =>
     );
 
 /**
- * Fetches galls that start witht the passed in string.
+ * Fetches galls that start with the passed in string.
  * @param q the string to search on
  */
-export const searchGalls = (q: string): TaskEither<Error, GallApi[]> => getGalls([{ species: { name: { startsWith: q } } }]);
+export const searchGalls = (q: string): TaskEither<Error, GallApi[]> => getGalls([{ species: { name: { contains: q } } }]);
 
 /**
  * Fetch a gall by its name.
@@ -601,7 +618,7 @@ const gallCreateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                 ...speciesCreateData(gall),
                 taxontype: { connect: { taxoncode: GallTaxon } },
                 hosts: {
-                    create: connectWithIds('hostspecies', gall.hosts),
+                    create: connectWithIds<Prisma.hostCreateWithoutGallspeciesInput>('hostspecies', gall.hosts),
                 },
                 gallspecies: {
                     create: {
@@ -633,7 +650,7 @@ const gallUpdateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
         db.species.update({
             where: { id: gall.id },
             data: {
-                ...speciesUpdateData(gall),
+                ...speciesUpdateData(gall, false),
                 gallspecies: {
                     update: {
                         where: { species_id_gall_id: { gall_id: gall.gallid, species_id: gall.id } },
@@ -685,7 +702,7 @@ const gallUpdateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                 },
                 hosts: {
                     deleteMany: { id: { notIn: [] } },
-                    create: connectWithIds('hostspecies', gall.hosts),
+                    create: connectWithIds<Prisma.hostCreateWithoutGallspeciesInput>('hostspecies', gall.hosts),
                 },
             },
         }),

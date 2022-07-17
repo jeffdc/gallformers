@@ -74,6 +74,11 @@ export const addImages = (images: ImageApi[]): TaskEither<Error, ImageApi[]> => 
 };
 
 export const updateImage = (theImage: ImageApi): TaskEither<Error, readonly ImageApi[]> => {
+    const connectSource = pipe(
+        theImage.source,
+        O.fold(constant({}), (s) => ({ connect: { id: s.id } })),
+    );
+
     const update = (image: ImageApi) =>
         db.image.update({
             where: { id: image.id },
@@ -86,31 +91,10 @@ export const updateImage = (theImage: ImageApi): TaskEither<Error, readonly Imag
                 licenselink: image.licenselink,
                 sourcelink: image.sourcelink,
                 caption: image.caption,
-                // source: connectSource, // See below for why we can not do this here.
+                source: connectSource,
             },
         });
 
-    // more Prisma bugs causing more hacks: https://github.com/prisma/prisma/issues/3069
-    // TL;DR - prisma throws if trying to disconnect a record that is not connected even though the outcome
-    // is as intended and not really an error at all. This means that we either have to track state around the
-    // Source relationship being removed or we have to query before update. To keep it simple we will
-    // do the update of all but the relationship with a regular Prisma update, then raw SQL to update the Source.
-    // The intent here is that in teh near future Prisma will fix this and we can get rid of the transaction and
-    // the executeRaw call. If it were not on the immediate horizon it would be simpler to just have one raw
-    // update call.
-    const sourceid = (image: ImageApi) =>
-        pipe(
-            image.source,
-            O.fold(constant('NULL'), (s) => s.id.toString()),
-        );
-
-    const updateSourceRel = (image: ImageApi) => {
-        const sql = `UPDATE image 
-             SET source_id = ${sourceid(image)}
-             WHERE image.id = ${image.id}`;
-        return db.$executeRaw(Prisma.sql([sql]));
-    };
-    // if this one is the new default, then make sure all of the other ones are not default
     const setAsNewDefault = (image: ImageApi) => {
         const spId = image.default ? image.speciesid : -999;
         return db.image.updateMany({
@@ -127,7 +111,6 @@ export const updateImage = (theImage: ImageApi): TaskEither<Error, readonly Imag
         return db.$transaction([
             update(image),
             setAsNewDefault(image),
-            updateSourceRel(image),
             // refetch all of the images since some may have been updated by resetting defaults
             db.image.findMany({
                 where: {
@@ -146,22 +129,9 @@ export const updateImage = (theImage: ImageApi): TaskEither<Error, readonly Imag
 
     type TxRetType = ExtractTFromPromise<ReturnType<typeof doTx>>;
 
-    // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch<Error, TxRetType>(() => doTx(theImage), handleError),
-        TE.map<TxRetType, ImageApi[]>(([, , , images]) =>
-            images.map((i) => ({
-                ...i,
-                speciesid: i.species_id,
-                small: makePath(i.path, SMALL),
-                medium: makePath(i.path, MEDIUM),
-                large: makePath(i.path, LARGE),
-                xlarge: makePath(i.path, XLARGE),
-                original: makePath(i.path, ORIGINAL),
-                source: O.fromNullable(i.source),
-                license: asLicenseType(i.license),
-            })),
-        ),
+        TE.map<TxRetType, ImageApi[]>(([, , images]) => images.map(adaptImage)),
     );
 };
 

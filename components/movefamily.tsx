@@ -39,7 +39,8 @@ const MoveFamily = ({ genera, families, showModal, setShowModal, moveCallback }:
                         labelKey="name"
                         selected={value ? [value] : []}
                         onChange={(g) => {
-                            setValue(g[0]);
+                            // TODO hopefully Option in the control will be parameterized in the future
+                            setValue(g[0] as TaxFamily);
                         }}
                         clearButton
                     />

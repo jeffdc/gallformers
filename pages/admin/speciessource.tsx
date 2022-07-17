@@ -34,7 +34,9 @@ type Props = {
 };
 
 const schema = yup.object().shape({
+    // type-coverage:ignore-next-line
     mainField: yup.array().required(),
+    // type-coverage:ignore-next-line
     sources: yup.array().required(),
 });
 
@@ -148,17 +150,19 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
     } = useAdmin<species, FormFields, SpeciesSourceInsertFields>(
         'Species-Source Mapping',
         speciesid,
-        allSpecies,
         update,
         toUpsertFields,
         {
             keyProp: 'name',
-            delEndpoint: '../api/speciessource/',
-            upsertEndpoint: '../api/speciessource/insert',
+            delEndpoint: '/api/speciessource/',
+            upsertEndpoint: '/api/speciessource/insert',
             delQueryString: buildDelQueryString,
         },
         schema,
         updatedFormFields,
+        false,
+        undefined,
+        allSpecies,
     );
 
     const router = useRouter();
@@ -199,7 +203,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
         try {
             // DELETE
             if (fields.del) {
-                const res = await fetch(`../api/speciessource?speciesid=${selected.id}&sourceid=${selectedSource[0].source_id}`, {
+                const res = await fetch(`/api/speciessource?speciesid=${selected.id}&sourceid=${selectedSource[0].source_id}`, {
                     method: 'DELETE',
                 });
 
@@ -230,7 +234,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                 externallink: fields.externallink,
             };
 
-            const res = await fetch('../api/speciessource/upsert', {
+            const res = await fetch('/api/speciessource/upsert', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -263,7 +267,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                 deleteResults={deleteResults}
                 selected={selected}
             >
-                <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pr-4">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pe-4">
                     <h4>Map Species & Sources</h4>
                     <p>
                         First select a species. This will load any existing source mappings. You can then select one and edit the
@@ -284,7 +288,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                         show={showNewMapping}
                     />
 
-                    <Row className="form-group">
+                    <Row className="my-1">
                         <Col>
                             Species:
                             {mainField('name', 'Species')}
@@ -295,9 +299,9 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                             <h2>⇅</h2>
                         </Col>
                     </Row>
-                    <Row className="form-group">
+                    <Row className="my-1">
                         <Col>
-                            <Row className="form-group">
+                            <Row className="my-1">
                                 <Col>
                                     Mapped Source:
                                     <Typeahead
@@ -320,16 +324,16 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                                     )}
                                 </Col>
                             </Row>
-                            <Row className="form-group">
+                            <Row className="my-1">
                                 <Col>
-                                    <Button onClick={() => setShowNewMapping(true)} disabled={!selected}>
+                                    <Button size="sm" onClick={() => setShowNewMapping(true)} disabled={!selected}>
                                         Add New Mapped Source
                                     </Button>
                                 </Col>
                             </Row>
                         </Col>
                     </Row>
-                    <Row className="form-group">
+                    <Row className="my-1">
                         <Col>
                             Description (this is the relevant info from the selected Source about the selected Species):
                             <Tabs defaultActiveKey="edit" className="pt-1">
@@ -363,14 +367,14 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                             </Tabs>
                         </Col>
                     </Row>
-                    <Row className="form-group">
+                    <Row className="my-1">
                         <Col>
                             Direct Link to Description Page (if available, eg at BHL or HathiTrust. Do not duplicate main
                             source-level link or link to a pdf):
                             <input {...form.register('externallink')} type="text" disabled={!selected} className="form-control" />
                         </Col>
                     </Row>
-                    <Row className="form-group">
+                    <Row className="my-1">
                         <Col>
                             <input
                                 {...form.register('useasdefault')}
@@ -416,10 +420,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
     const queryParam = 'id';
     // eslint-disable-next-line prettier/prettier
-    const id = pipe(
-        extractQueryParam(context.query, queryParam),
-        O.getOrElse(constant('')),
-    );
+    const id = pipe(extractQueryParam(context.query, queryParam), O.getOrElse(constant('')));
 
     return {
         props: {

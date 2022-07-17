@@ -62,7 +62,7 @@ test('handleFailure should convert to an Error', () => {
 });
 
 test('truncateAtWord should handle varying input', () => {
-    fc.property(fc.set(fc.unicodeString()), (values) => {
+    fc.property(fc.uniqueArray(fc.unicodeString()), (values) => {
         const s = values.join(' ');
         const t = U.truncateAtWord(2)(s);
         expect(t.length).toBeLessThanOrEqual(s.length);
@@ -92,5 +92,15 @@ describe('extractGenus tests', () => {
 
     test('it must extract the genus when passed a conformant string', () => {
         expect(U.extractGenus('Foo bar')).toBe('Foo');
+    });
+});
+
+describe('pluralize tests', () => {
+    test('it must change y to ies', () => {
+        expect(U.pluralize('Family')).toBe('Families');
+    });
+
+    test('it must change not y  to s', () => {
+        expect(U.pluralize('Gall')).toBe('Galls');
     });
 });

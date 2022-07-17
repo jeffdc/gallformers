@@ -1,7 +1,11 @@
 SERVICE_NAME := gallformers
 LOCAL_SRC := ${PWD}/prisma
+# these next two define how we want to map the database into the container
 SERVER_SRC := /mnt/gallformers_data/prisma
 DST := /usr/src/app/prisma
+# these define how we map the ref (articles) directory 
+REF_SRC := /home/jeff/dev/gallformers/ref
+REF_DST := /usr/src/app/ref
 
 env:
 ifeq (,$(wildcard .env-local))
@@ -35,9 +39,10 @@ save-image:
 .PHONY: redeploy-and-run
 redeploy-and-run: load-image run
 
+# bind 2 volumes: 1 for prisma so it can frind the DB and one for ref stuff (articles). 
 .PHONY: run
 run:
-	docker run --restart=always -v $(SERVER_SRC):$(DST) --env-file .env.local --env-file .env.production --name $(SERVICE_NAME) -p 3000:3000 -d $(SERVICE_NAME):latest
+	docker run --restart=always -v $(SERVER_SRC):$(DST) -v $(REF_SRC):$(REF_DST) --env-file .env.local --env-file .env.production --name $(SERVICE_NAME) -p 3000:3000 -d $(SERVICE_NAME):latest
 	docker start $(SERVICE_NAME)
 
 .PHONY: restart

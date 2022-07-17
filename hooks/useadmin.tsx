@@ -1,18 +1,21 @@
 import { yupResolver } from '@hookform/resolvers/yup';
+import axios from 'axios';
+import { useSession } from 'next-auth/react';
 import router from 'next/router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
-import { DeepPartial, Path, UnpackNestedValue, useForm, UseFormReturn } from 'react-hook-form';
+import { DeepPartial, Path, useForm, UseFormReturn } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import * as yup from 'yup';
 import { AnyObject, AssertsShape, ObjectShape, TypeOfShape } from 'yup/lib/object';
 import { Maybe } from 'yup/lib/types';
+import { superAdmins } from '../components/auth';
 import { ConfirmationOptions } from '../components/confirmationdialog';
 import { RenameEvent } from '../components/editname';
 import Typeahead, { AsyncTypeahead, TypeaheadLabelKey } from '../components/Typeahead';
 import { DeleteResult } from '../libs/api/apitypes';
 import { WithID } from '../libs/utils/types';
-import { hasProp } from '../libs/utils/util';
+import { hasProp, pluralize } from '../libs/utils/util';
 import { AdminFormFields, useAPIs } from './useAPIs';
 import { useConfirmation } from './useconfirmation';
 
@@ -29,24 +32,20 @@ type AdminData<T, FormFields> = {
     deleteResults?: DeleteResult;
     setDeleteResults: (dr: DeleteResult) => void;
     renameCallback: (e: RenameEvent) => void;
+    nameExists: (name: string) => Promise<boolean>;
     form: UseFormReturn<FormFields>;
     confirm: (options: ConfirmationOptions) => Promise<void>;
     formSubmit: (fields: FormFields) => Promise<void>;
     postUpdate: (res: Response) => void;
     postDelete: (id: number | string, result: DeleteResult) => void;
-    mainField: (key: TypeaheadLabelKey<T>, placeholder: string) => JSX.Element;
+    mainField: (key: TypeaheadLabelKey, placeholder: string, asyncProps?: AsyncMainFieldProps) => JSX.Element;
     deleteButton: (warning: string, customDeleteHandler?: (fields: FormFields) => Promise<void>) => JSX.Element;
+    isSuperAdmin: boolean;
 };
 
 export type AsyncMainFieldProps = {
-    /* Delay, in milliseconds, before performing search. */
-    delay?: number;
-
-    /* Whether or not a request is currently pending. Necessary for the component to know when new results are available. */
-    isLoading: boolean;
-
-    /* Callback to perform when the search is executed. */
-    onSearch: (query: string) => void;
+    /* Constructs the URL for the search endpoint provided the search query string. */
+    searchEndpoint: (s: string) => string;
 
     /* Message displayed in the menu when there is no user input. */
     promptText?: React.ReactNode;
@@ -56,14 +55,16 @@ export type AsyncMainFieldProps = {
 
     /* Whether or not the component should cache query results. */
     useCache?: boolean;
+
+    /* The debounce delay in ms. */
+    delay?: number;
 };
 
 /**
- *  * A hook to handle universal adminstration data and logic. Works in conjunction with @Admin
+ *  * A hook to handle universal administration data and logic. Works in conjunction with @Admin
 
- * @param type a string representing the type of data being Adminstered.
+ * @param type a string representing the type of data being Administered.
  * @param id the initial id that is selected, could be undefined
- * @param ts an array of the data type
  * @param rename a function to create a new T from a given T and a new value for its "name" aka the key
  * @param toUpsertFields a function that converts FormFields to UpsertFields
  * @param apiConfig the configuration for the API endpoints
@@ -74,17 +75,29 @@ export type AsyncMainFieldProps = {
 const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, UpsertFields>(
     type: string,
     id: string | undefined,
-    ts: T[],
     rename: (t: T, e: RenameEvent, confirm: (options: ConfirmationOptions) => Promise<void>) => Promise<T>,
     toUpsertFields: (fields: FormFields, keyField: string, id: number) => UpsertFields,
-    apiConfig: { keyProp: keyof T; delEndpoint: string; upsertEndpoint: string; delQueryString?: () => string },
+    apiConfig: {
+        keyProp: keyof T;
+        delEndpoint: string;
+        upsertEndpoint: string;
+        delQueryString?: () => string;
+        nameExistsEndpoint?: (name: string) => string;
+    },
     schema: yup.ObjectSchema<ObjectShape, AnyObject, Maybe<TypeOfShape<ObjectShape>>, Maybe<AssertsShape<ObjectShape>>>,
     updatedFormFields: (t: T | undefined) => Promise<FormFields>,
     reloadOnUpdate = false,
     createNew?: (v: string) => T,
+    initialData?: T[],
 ): AdminData<T, FormFields> => {
-    const [data, setData] = useState(ts);
-    const [selected, setSelected] = useState<T | undefined>(id ? data.find((d) => d.id === parseInt(id)) : undefined);
+    const session = useSession();
+    const isSuperAdmin = !!(session?.data?.user?.name && superAdmins.includes(session.data.user.name));
+
+    const [data, setData] = useState<T[]>(initialData ?? []);
+    const [isLoading, setIsLoading] = useState(false);
+    const [selected, setSelected] = useState<T | undefined>(
+        id && initialData ? initialData.find((d) => d.id === parseInt(id)) : undefined,
+    );
     const [showModal, setShowModal] = useState(false);
     const [error, setError] = useState('');
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
@@ -105,75 +118,103 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
 
     const confirm = useConfirmation();
 
-    const theMainField = (labelKey: TypeaheadLabelKey<T>, placeholder: string, asyncProps?: AsyncMainFieldProps) => {
-        return asyncProps ? (
-            <>
-                <AsyncTypeahead
-                    name={'mainField' as Path<FormFields>}
-                    control={form.control}
-                    options={data}
-                    labelKey={labelKey}
-                    selected={selected ? [selected] : []}
-                    placeholder={placeholder}
-                    clearButton
-                    isInvalid={!!form.formState.errors.mainField}
-                    newSelectionPrefix={`Add a new ${placeholder}: `}
-                    allowNew={!!createNew}
-                    onChange={(s) => {
-                        if (s.length <= 0) {
-                            setSelected(undefined);
-                            router.replace(``, undefined, { shallow: true });
-                        } else {
-                            if (hasProp(s[0], 'customOption') && hasProp(s[0], 'name')) {
-                                if (createNew) {
-                                    const x = createNew(s[0].name as string);
-                                    setSelected(x);
-                                }
+    const theMainField = (labelKey: TypeaheadLabelKey, placeholder: string, asyncProps?: AsyncMainFieldProps) => {
+        if (asyncProps) {
+            const handleSearch = (s: string) => {
+                setIsLoading(true);
+
+                axios
+                    .get<T[]>(asyncProps.searchEndpoint(s))
+                    .then((resp) => {
+                        setData(resp.data);
+                        setIsLoading(false);
+                    })
+                    .catch((e) => {
+                        console.error(e);
+                    });
+            };
+
+            return (
+                <>
+                    <AsyncTypeahead
+                        name={'mainField' as Path<FormFields>}
+                        control={form.control}
+                        options={data}
+                        labelKey={labelKey}
+                        selected={selected ? [selected] : []}
+                        placeholder={`Start typing a ${placeholder} name to begin`}
+                        clearButton
+                        isInvalid={!!form.formState.errors.mainField}
+                        newSelectionPrefix={`Add a new ${placeholder}: `}
+                        allowNew={!!createNew}
+                        onChange={(s) => {
+                            if (s.length <= 0) {
+                                setSelected(undefined);
                                 router.replace(``, undefined, { shallow: true });
                             } else {
-                                setSelected(s[0]);
-                                router.replace(`?id=${s[0].id}`, undefined, { shallow: true });
-                            }
-                        }
-                    }}
-                    {...asyncProps}
-                />
-                {form.formState.errors.mainField && <span className="text-danger">{`The ${placeholder} is required.`}</span>}
-            </>
-        ) : (
-            <>
-                <Typeahead
-                    name={'mainField' as Path<FormFields>}
-                    control={form.control}
-                    options={data}
-                    labelKey={labelKey}
-                    selected={selected ? [selected] : []}
-                    placeholder={placeholder}
-                    clearButton
-                    isInvalid={!!form.formState.errors.mainField}
-                    newSelectionPrefix={`Add a new ${placeholder}: `}
-                    allowNew={!!createNew}
-                    onChange={(s) => {
-                        if (s.length <= 0) {
-                            setSelected(undefined);
-                            router.replace(``, undefined, { shallow: true });
-                        } else {
-                            if (hasProp(s[0], 'customOption') && hasProp(s[0], 'name')) {
-                                if (createNew) {
-                                    const x = createNew(s[0].name as string);
-                                    setSelected(x);
+                                if (hasProp(s[0], 'customOption') && hasProp(s[0], 'name')) {
+                                    if (createNew) {
+                                        const x = createNew(s[0].name as string);
+                                        setSelected(x);
+                                    }
+                                    router.replace(``, undefined, { shallow: true });
+                                } else {
+                                    setSelected(s[0]);
+                                    router.replace(`?id=${s[0].id}`, undefined, { shallow: true });
                                 }
+                            }
+                        }}
+                        onSearch={handleSearch}
+                        minLength={1}
+                        delay={200}
+                        useCache={false}
+                        isLoading={isLoading}
+                        // results are already filtered by the search
+                        filterBy={() => true}
+                        promptText={`Type in a ${type} name.`}
+                        searchText={`Searching for ${pluralize(type)}...`}
+                        {...asyncProps}
+                    />
+                    {form.formState.errors.mainField && <span className="text-danger">{`The ${placeholder} is required.`}</span>}
+                </>
+            );
+        } else {
+            return (
+                <>
+                    <Typeahead
+                        name={'mainField' as Path<FormFields>}
+                        control={form.control}
+                        options={data}
+                        labelKey={labelKey}
+                        selected={selected ? [selected] : []}
+                        placeholder={placeholder}
+                        clearButton
+                        isInvalid={!!form.formState.errors.mainField}
+                        newSelectionPrefix={`Add a new ${placeholder}: `}
+                        allowNew={!!createNew}
+                        onChange={(s) => {
+                            if (s.length <= 0) {
+                                setSelected(undefined);
                                 router.replace(``, undefined, { shallow: true });
                             } else {
-                                setSelected(s[0]);
-                                router.replace(`?id=${s[0].id}`, undefined, { shallow: true });
+                                if (hasProp(s[0], 'customOption') && hasProp(s[0], 'name')) {
+                                    if (createNew) {
+                                        const x = createNew(s[0].name as string);
+                                        setSelected(x);
+                                    }
+                                    router.replace(``, undefined, { shallow: true });
+                                } else {
+                                    const t = s[0];
+                                    setSelected(t);
+                                    router.replace(`?id=${t.id}`, undefined, { shallow: true });
+                                }
                             }
-                        }
-                    }}
-                />
-                {form.formState.errors.mainField && <span className="text-danger">{`The ${placeholder} is required.`}</span>}
-            </>
-        );
+                        }}
+                    />
+                    {form.formState.errors.mainField && <span className="text-danger">{`The ${placeholder} is required.`}</span>}
+                </>
+            );
+        }
     };
 
     const doDelete = async (deleteHandler?: (fields: FormFields) => Promise<void>) => {
@@ -249,26 +290,47 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
             .catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
     };
 
-    const renameCallback = async (e: RenameEvent) => {
+    const renameCallback = async (e: RenameEvent): Promise<void> => {
         if (selected == undefined) {
             const msg = `You encountered a bug. The current selection is invalid in the middle of a rename operation.`;
             console.error(msg);
             setError(msg);
             return;
         }
-        const updated = await rename(selected, e, confirm);
-        formSubmit(await updatedFormFields(updated));
+
+        rename(selected, e, confirm)
+            .then(async (u) => {
+                try {
+                    const f = await updatedFormFields(u);
+                    formSubmit(f);
+                } catch (e) {
+                    console.error(e);
+                }
+            })
+            .catch((e) => {
+                console.error(e);
+            });
+    };
+
+    const nameExists = async <T,>(name: string): Promise<boolean> => {
+        if (apiConfig.nameExistsEndpoint) {
+            return axios.get<T[]>(apiConfig.nameExistsEndpoint(name)).then((res) => {
+                return res.data.length > 0;
+            });
+        } else {
+            return Promise.resolve(false);
+        }
     };
 
     const onDataChange = useCallback(async (t: T | undefined) => {
         const ff = await updatedFormFields(t);
-        form.reset(ff as UnpackNestedValue<DeepPartial<FormFields>>);
+        form.reset(ff as DeepPartial<FormFields>);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
         onDataChange(selected);
-    }, [selected, onDataChange]);
+    }, [onDataChange, selected]);
 
     return {
         data: data,
@@ -283,6 +345,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         deleteResults: deleteResults,
         setDeleteResults: setDeleteResults,
         renameCallback: renameCallback,
+        nameExists: nameExists,
         form: form,
         confirm: confirm,
         formSubmit: formSubmit,
@@ -290,6 +353,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         postDelete: postDelete,
         mainField: theMainField,
         deleteButton: deleteButton,
+        isSuperAdmin: isSuperAdmin,
     };
 };
 

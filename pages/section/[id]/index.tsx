@@ -5,7 +5,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import React, { useMemo } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
-import DataTable from 'react-data-table-component';
+import DataTable from '../../../components/DataTable';
 import Edit from '../../../components/edit';
 import { SimpleSpecies } from '../../../libs/api/apitypes';
 import { SectionApi } from '../../../libs/api/taxonomy';
@@ -59,8 +59,8 @@ const Section = ({ section }: Props): JSX.Element => {
                 <Col>
                     <h2>{fullName}</h2>
                 </Col>
-                <Col xs={2} className="mr-1">
-                    <span className="p-0 pr-1 my-auto">
+                <Col xs={2} className="me-1">
+                    <span className="p-0 pe-1 my-auto">
                         <Edit id={section.id} type="section" />
                     </span>
                 </Col>
@@ -91,6 +91,12 @@ export const getStaticProps: GetStaticProps = async (context) => {
 
     return {
         props: {
+            // must add a key so that a navigation from the same route will re-render properly
+            key: pipe(
+                section,
+                O.map((s) => s.id),
+                O.getOrElse(constant(-1)),
+            ),
             section: pipe(section, O.getOrElseW(constant(null))),
         },
         revalidate: 1,

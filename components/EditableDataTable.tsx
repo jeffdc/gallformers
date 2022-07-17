@@ -29,7 +29,7 @@ type EditableCellProps<T extends WithID> = {
     columnKey: keyof T;
 };
 
-const getDataFromSelector = <T extends unknown>(row: T, rowIndex: number, col: TableColumn<T>): string => {
+const getDataFromSelector = <T,>(row: T, rowIndex: number, col: TableColumn<T>): string => {
     if (!col.selector) {
         return '';
     } else if (typeof col.selector !== 'function') {
@@ -164,7 +164,7 @@ const EditableTable = <T extends WithID>(props: EditableTableProps<T>): JSX.Elem
                 <Button
                     key={ca.name}
                     variant="secondary"
-                    className="btn-sm mr-1"
+                    className="btn-sm me-1"
                     onClick={() => {
                         ca.onUpdate(props.data.filter((a) => selected.has(a.id)));
                         setToggleCleared(!toggleCleared);

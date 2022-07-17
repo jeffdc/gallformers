@@ -1,22 +1,24 @@
 import React, { useState } from 'react';
 import { Button, Col, Modal, Row } from 'react-bootstrap';
-import { Typeahead, TypeaheadLabelKey, TypeaheadModel } from 'react-bootstrap-typeahead';
+import { Typeahead } from 'react-bootstrap-typeahead';
+import { Option } from 'react-bootstrap-typeahead/types/types';
 
-type Props<T extends TypeaheadModel> = {
+type Props<T> = {
     size?: 'sm' | 'lg' | 'xl';
     title: string;
     data: T[];
-    toLabel: TypeaheadLabelKey<T> | undefined;
+    toLabel: string | ((t: T) => string);
     show: boolean;
     onClose: (t: T | undefined) => void;
     placeholder?: string;
 };
 
-const Picker = <T extends TypeaheadModel>({ size, title, data, toLabel, show, onClose, placeholder }: Props<T>): JSX.Element => {
+const Picker = <T,>({ size, title, data, toLabel, show, onClose, placeholder }: Props<T>): JSX.Element => {
     const [selected, setSelected] = useState<T | undefined>(undefined);
 
     const done = () => {
         onClose(selected);
+        setSelected(undefined);
     };
 
     return (
@@ -28,8 +30,8 @@ const Picker = <T extends TypeaheadModel>({ size, title, data, toLabel, show, on
                 <Typeahead
                     id="select-data"
                     options={data}
-                    labelKey={toLabel}
-                    onChange={(s) => setSelected(s[0])}
+                    labelKey={(o: Option) => (typeof toLabel === 'string' ? toLabel : toLabel(o as T))}
+                    onChange={(s) => setSelected(s[0] as T)}
                     selected={selected ? [selected] : []}
                     placeholder={placeholder}
                     clearButton

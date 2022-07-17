@@ -1,16 +1,18 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
-import { useSession } from 'next-auth/client';
+import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Carousel from 'nuka-carousel';
 import React, { useState } from 'react';
 import { Button, ButtonGroup, ButtonToolbar, Col, Modal, OverlayTrigger, Popover, Row } from 'react-bootstrap';
+import useIsMounted from '../hooks/useIsMounted';
 import useWindowDimensions from '../hooks/usewindowdimension';
-import { ImageApi, ImageNoSourceApi, SpeciesApi } from '../libs/api/apitypes';
+import { ALLRIGHTS, GallTaxon, ImageApi, ImageNoSourceApi, SpeciesApi } from '../libs/api/apitypes';
 import { hasProp } from '../libs/utils/util';
 import NoImage from '../public/images/noimage.jpg';
+import NoImageHost from '../public/images/noimagehost.jpg';
 
 // type guard for dealing with possible Images without Source data. If this happens there is an upstream
 // programming error so we will fail fast and hard.
@@ -40,7 +42,7 @@ const Images = ({ sp }: Props): JSX.Element => {
     const [imgIndex, setImgIndex] = useState(0);
     const [showInfo, setShowInfo] = useState(false);
     const { width } = useWindowDimensions();
-
+    const mounted = useIsMounted();
     const router = useRouter();
     const session = useSession();
 
@@ -49,7 +51,11 @@ const Images = ({ sp }: Props): JSX.Element => {
 
     return species.images.length < 1 ? (
         <div className="p-2">
-            <Image src={NoImage} alt={`missing image of ${species.name}`} className="img-fluid d-block" />
+            <Image
+                src={species.taxoncode === GallTaxon ? NoImage : NoImageHost}
+                alt={`missing image of ${species.name}`}
+                className="img-fluid d-block"
+            />
             {session && (
                 <ButtonToolbar className="row d-flex justify-content-center">
                     <ButtonGroup size="sm">
@@ -88,10 +94,12 @@ const Images = ({ sp }: Props): JSX.Element => {
                             </Button>
                         )}
                         className="p-1"
-                        heightMode="max"
+                        adaptiveHeight={false}
+                        cellAlign="center"
                         slideIndex={imgIndex}
                         wrapAround={true}
-                        transitionMode="fade"
+                        animation="zoom"
+                        enableKeyboardControls={true}
                     >
                         {species.images.map((image) => (
                             <div key={image.id}>
@@ -107,9 +115,20 @@ const Images = ({ sp }: Props): JSX.Element => {
                                 />
                                 <p>{image.caption}</p>
                                 {image.sourcelink != undefined && image.sourcelink !== '' && (
-                                    <a href={image.sourcelink} target="_blank" rel="noreferrer">
-                                        Link to Original
-                                    </a>
+                                    <span>
+                                        <a href={image.sourcelink} target="_blank" rel="noreferrer">
+                                            Image
+                                        </a>{' '}
+                                        by {image.creator}
+                                        {' © '}
+                                        {image.license === ALLRIGHTS ? (
+                                            image.license
+                                        ) : (
+                                            <a href={image.licenselink} target="_blank" rel="noreferrer">
+                                                {image.license}
+                                            </a>
+                                        )}
+                                    </span>
                                 )}
                             </div>
                         ))}
@@ -196,35 +215,30 @@ const Images = ({ sp }: Props): JSX.Element => {
             <div className="border rounded pb-1">
                 <Carousel
                     renderCenterLeftControls={({ previousSlide }) => (
-                        <Button variant="secondary" size="sm" onClick={previousSlide} className="ml-1">
+                        <Button variant="secondary" size="sm" onClick={previousSlide} className="ms-1">
                             {'<'}
                         </Button>
                     )}
                     renderCenterRightControls={({ nextSlide }) => (
-                        <Button variant="secondary" size="sm" onClick={nextSlide} className="mr-1">
+                        <Button variant="secondary" size="sm" onClick={nextSlide} className="me-1">
                             {'>'}
                         </Button>
                     )}
                     className="p-1"
-                    heightMode="first"
-                    // beforeSlide={(c, e) => {
-                    //     setCurrentImage(species.images[e]);
-                    //     setImgIndex(e);
-                    // }}
+                    adaptiveHeight={false}
                     afterSlide={(c) => {
                         setCurrentImage(species.images[c]);
                         setImgIndex(c);
                     }}
                     wrapAround={true}
-                    transitionMode="fade"
-                    // t, r, b, l
-                    framePadding="0px 10px 0px 10px"
+                    animation="zoom"
+                    enableKeyboardControls={true}
                 >
                     {species.images.map((image) => (
                         <div
                             key={image.id}
                             style={{ display: 'flex', alignItems: 'center', height: '100%' }}
-                            className="align-items-center"
+                            className="align-items-center p-1"
                         >
                             {/* the Carousel and next.js Image do not play well together and layout becomes an issue */}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -239,16 +253,16 @@ const Images = ({ sp }: Props): JSX.Element => {
                         </div>
                     ))}
                 </Carousel>
-                <ButtonToolbar className="row d-flex justify-content-center">
+                <ButtonToolbar className="pt-1 d-flex justify-content-center">
                     <ButtonGroup size="sm">
                         <OverlayTrigger
                             trigger="focus"
                             placement="bottom"
                             overlay={
                                 <Popover id="copyright-popover">
-                                    <Popover.Content>{`${
+                                    <Popover.Body>{`${
                                         currentImage?.license ? currentImage.license : 'No License'
-                                    }`}</Popover.Content>
+                                    }`}</Popover.Body>
                                 </Popover>
                             }
                         >
@@ -260,13 +274,12 @@ const Images = ({ sp }: Props): JSX.Element => {
                             variant="secondary"
                             style={{ fontWeight: 'bold' }}
                             onClick={() => {
-                                console.log(`JDC: info click ${imgIndex} - ${currentImage?.medium}`);
                                 setShowInfo(true);
                             }}
                         >
                             ⓘ
                         </Button>
-                        {session && (
+                        {mounted && session && (
                             <Button
                                 variant="secondary"
                                 style={{ fontSize: '1.0em' }}

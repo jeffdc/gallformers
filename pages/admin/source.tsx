@@ -100,28 +100,35 @@ const Source = ({ id, sources }: Props): JSX.Element => {
         deleteResults,
         setDeleteResults,
         renameCallback,
+        nameExists,
         form,
         formSubmit,
         mainField,
         deleteButton,
+        isSuperAdmin,
     } = useAdmin(
         'Source',
         id,
-        sources,
         renameSource,
         toUpsertFields,
-        { keyProp: 'title', delEndpoint: '../api/source/', upsertEndpoint: '../api/source/upsert' },
+        {
+            keyProp: 'title',
+            delEndpoint: '../api/source/',
+            upsertEndpoint: '../api/source/upsert',
+            nameExistsEndpoint: (s: string) => `/api/source?title=${s}`,
+        },
         schema,
         updatedFormFields,
         false,
         createNewSource,
+        sources,
     );
 
     return (
         <Admin
             type="Source"
             keyField="title"
-            editName={{ getDefault: () => selected?.title, renameCallback: renameCallback }}
+            editName={{ getDefault: () => selected?.title, renameCallback: renameCallback, nameExistsCallback: nameExists }}
             setShowModal={setShowModal}
             showModal={showModal}
             setError={setError}
@@ -130,15 +137,15 @@ const Source = ({ id, sources }: Props): JSX.Element => {
             deleteResults={deleteResults}
             selected={selected}
         >
-            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pr-4">
+            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                 <h4>Add/Edit Sources</h4>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         <Row>
                             <Col>Title:</Col>
                         </Row>
                         <Row>
-                            <Col>{mainField('title', 'Source')}</Col>
+                            <Col>{mainField('title', 'Source', { searchEndpoint: (s) => `../api/source?q=${s}` })}</Col>
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowModal(true)}>
@@ -149,7 +156,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                         </Row>
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Author (required):
                         <input
@@ -175,7 +182,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                         )}
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         Reference Link (required):
                         <input
@@ -187,7 +194,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                         />
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         License (required):
                         <select {...form.register('license')} className="form-control" disabled={!selected}>
@@ -200,7 +207,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                         )}
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         License Link:
                         <input
@@ -215,7 +222,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                         )}
                     </Col>
                 </Row>
-                <Row className="form-group">
+                <Row className="my-1">
                     <Col>
                         <p>
                             Citation (required) (
@@ -237,7 +244,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                     </Col>
                 </Row>
                 <Row className="formGroup pb-1">
-                    <Col className="mr-auto">
+                    <Col className="me-auto">
                         <input
                             {...form.register('datacomplete')}
                             type="checkbox"
@@ -252,7 +259,11 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                     <Col>
                         <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
                     </Col>
-                    <Col>{deleteButton('Caution. All data associated with this Source will be deleted.')}</Col>
+                    <Col>
+                        {isSuperAdmin
+                            ? deleteButton('Caution. All data associated with this Source will be deleted.')
+                            : 'If you need to delete a Source please contact Adam or Jeff on Slack.'}
+                    </Col>
                 </Row>
             </form>
         </Admin>
@@ -262,10 +273,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
     const queryParam = 'id';
     // eslint-disable-next-line prettier/prettier
-    const id = pipe(
-        extractQueryParam(context.query, queryParam),
-        O.getOrElse(constant('')),
-    );
+    const id = pipe(extractQueryParam(context.query, queryParam), O.getOrElse(constant('')));
     return {
         props: {
             id: id,

@@ -6,13 +6,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { useMemo, useState } from 'react';
 import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
-import DataTable from 'react-data-table-component';
+import DataTable from '../../../components/DataTable';
 import Edit from '../../../components/edit';
 import Images from '../../../components/images';
+import RangeMap from '../../../components/rangemap';
 import SeeAlso from '../../../components/seealso';
 import SourceList from '../../../components/sourcelist';
 import SpeciesSynonymy from '../../../components/speciesSynonymy';
-import { GallSimple, HostApi } from '../../../libs/api/apitypes';
+import { GallSimple, HostApi, HostTaxon } from '../../../libs/api/apitypes';
 import { FGS } from '../../../libs/api/taxonomy';
 import { allHostIds, hostById } from '../../../libs/db/host';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
@@ -42,6 +43,8 @@ const linkGall = (g: GallSimple) => {
 const Host = ({ host, taxonomy }: Props): JSX.Element => {
     const source = host ? host.speciessource.find((s) => s.useasdefault !== 0) : undefined;
     const [selectedSource, setSelectedSource] = useState(source);
+
+    const range = new Set(host?.places ? host.places.map((p) => p.code) : []);
 
     const columns = useMemo(
         () => [
@@ -77,18 +80,20 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                 <Col sm={12} md={6} lg={8}>
                     <Row>
                         <Col className="">
-                            <h2 className="font-italic">
+                            <h2>
                                 <Link
                                     href={`/id?hostOrTaxon=${encodeURI(
                                         host.name,
                                     )}&type=host&detachable=&alignment=&cells=&color=&locations=&season=&shape=&textures=&walls=&form=&undescribed=false`}
                                 >
-                                    <a>{host.name}</a>
+                                    <a>
+                                        <em>{host.name}</em>
+                                    </a>
                                 </Link>
                             </h2>
                         </Col>
-                        <Col xs={2} className="mr-1">
-                            <span className="p-0 pr-1 my-auto">
+                        <Col xs={2} className="me-1">
+                            <span className="p-0 pe-1 my-auto">
                                 <Edit id={host.id} type="host" />
                                 <OverlayTrigger
                                     placement="right"
@@ -108,9 +113,9 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                     <Row>
                         <Col>
                             <p>
-                                <strong>Family:</strong>
+                                <strong>Family: </strong>
                                 <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
-                                    <a> {taxonomy.family.name}</a>
+                                    <a>{taxonomy.family.name}</a>
                                 </Link>
                                 {pipe(
                                     taxonomy.section,
@@ -120,7 +125,9 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                             {' | '}
                                             <strong> Section: </strong>{' '}
                                             <Link key={s.id} href={`/section/${s.id}`}>
-                                                <a className="font-italic">{`${s.name} (${s.description})`}</a>
+                                                <a>
+                                                    <em>{`${s.name} (${s.description})`}</em>
+                                                </a>
                                             </Link>
                                         </span>
                                     )),
@@ -130,9 +137,9 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                 {' | '}
                                 <strong>Genus: </strong>
                                 <Link key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
-                                    <a className="font-italic">
+                                    <a>
                                         {' '}
-                                        {formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}
+                                        <em>{formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}</em>
                                     </a>
                                 </Link>
                             </p>
@@ -140,7 +147,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                     </Row>
                     <Row>
                         <Col>
-                            <strong>Abdundance:</strong>{' '}
+                            <strong>Abundance:</strong>{' '}
                             {pipe(
                                 host.abundance,
                                 O.map((a) => a.abundance),
@@ -150,17 +157,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                     </Row>
                     <Row>
                         <Col>
-                            <strong>Range:</strong>{' '}
-                            {host.places.map((p) => (
-                                <Link key={p.id} href={`/place/${p.id}`}>
-                                    <a>{p.code} </a>
-                                </Link>
-                            ))}
-                        </Col>
-                    </Row>
-                    <Row>
-                        <Col>
-                            <SpeciesSynonymy aliases={host.aliases} />
+                            <SpeciesSynonymy aliases={host.aliases} showAll={true} />
                         </Col>
                     </Row>
 
@@ -182,8 +179,18 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                     </Row>
                 </Col>
 
-                <Col sm={12} md={6} lg={4} className="border rounded p-1">
-                    <Images sp={host} type="host" />
+                <Col sm={12} md={6} lg={4} className="border rounded p-1 container-fluid d-flex flex-column">
+                    <Row>
+                        <Col>
+                            <Images sp={host} type="host" />
+                        </Col>
+                    </Row>
+                    <Row className="flex-grow-1">
+                        <Col className="mt-auto">
+                            <div>Range:</div>
+                            <RangeMap range={range} />
+                        </Col>
+                    </Row>
                 </Col>
             </Row>
             <hr />
@@ -193,6 +200,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                         data={host.speciessource}
                         defaultSelection={selectedSource}
                         onSelectionChange={(s) => setSelectedSource(host.speciessource.find((spso) => spso.source_id == s?.id))}
+                        taxonType={HostTaxon}
                     />
                     <hr />
                     <Row>
@@ -209,18 +217,25 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    const h = await getStaticPropsWithContext(context, hostById, 'host');
-    const host = h[0];
-    const sources = host ? await linkSourceToGlossary(host.speciessource) : null;
-    const taxonomy = await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy');
+    try {
+        const h = await getStaticPropsWithContext(context, hostById, 'host');
+        if (!h[0]) throw '404';
+        const host = h[0];
+        const sources = host ? await linkSourceToGlossary(host.speciessource) : null;
+        const taxonomy = await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy');
 
-    return {
-        props: {
-            host: { ...host, speciessource: sources },
-            taxonomy: taxonomy,
-        },
-        revalidate: 1,
-    };
+        return {
+            props: {
+                // must add a key so that a navigation from the same route will re-render properly
+                key: host.id,
+                host: { ...host, speciessource: sources },
+                taxonomy: taxonomy,
+            },
+            revalidate: 1,
+        };
+    } catch (e) {
+        return { notFound: true };
+    }
 };
 
 export const getStaticPaths: GetStaticPaths = async () => getStaticPathsFromIds(allHostIds);

@@ -1,4 +1,4 @@
 // Used by jest only.
 {
-    "presets": ["next/babel"]
+    "presets": ["next/babel", "@babel/preset-typescript"]
 }

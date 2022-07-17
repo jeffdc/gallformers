@@ -1,4 +1,4 @@
-import { alignment, cells as cs, color, form, location, season, shape, texture, walls as ws } from '@prisma/client';
+import { alignment, cells as cs, color, form, location, Prisma, season, shape, texture, walls as ws } from '@prisma/client';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
@@ -434,4 +434,100 @@ export const upsertFilterField = (field: FilterFieldWithType): TaskEither<Error,
     return pipe(
         TE.tryCatch(upsert, handleError),
     );
+};
+
+type Wheres =
+    | Prisma.alignmentWhereInput
+    | Prisma.cellsWhereInput
+    | Prisma.colorWhereInput
+    | Prisma.formWhereInput
+    | Prisma.locationWhereInput
+    | Prisma.seasonWhereInput
+    | Prisma.shapeWhereInput
+    | Prisma.textureWhereInput
+    | Prisma.wallsWhereInput;
+
+const getFilterFields = (where: Wheres, fieldType: FilterFieldType): TaskEither<Error, FilterField[]> => {
+    switch (fieldType) {
+        case 'alignments':
+            return pipe(
+                TE.tryCatch(() => db.alignment.findMany({ where: where }), handleError),
+                TE.map(adaptAlignments),
+            );
+        case 'cells':
+            return pipe(
+                TE.tryCatch(() => db.cells.findMany({ where: where }), handleError),
+                TE.map(adaptCells),
+            );
+        case 'colors':
+            return pipe(
+                TE.tryCatch(() => db.color.findMany({ where: where }), handleError),
+                TE.map(adaptColors),
+            );
+        case 'forms':
+            return pipe(
+                TE.tryCatch(() => db.form.findMany({ where: where }), handleError),
+                TE.map(adaptForm),
+            );
+        case 'locations':
+            return pipe(
+                TE.tryCatch(() => db.location.findMany({ where: where }), handleError),
+                TE.map(adaptLocations),
+            );
+        case 'seasons':
+            return pipe(
+                TE.tryCatch(() => db.season.findMany({ where: where }), handleError),
+                TE.map(adaptSeasons),
+            );
+        case 'shapes':
+            return pipe(
+                TE.tryCatch(() => db.shape.findMany({ where: where }), handleError),
+                TE.map(adaptShapes),
+            );
+        case 'textures':
+            return pipe(
+                TE.tryCatch(() => db.texture.findMany({ where: where }), handleError),
+                TE.map(adaptTextures),
+            );
+        case 'walls':
+            return pipe(
+                TE.tryCatch(() => db.walls.findMany({ where: where }), handleError),
+                TE.map(adaptWalls),
+            );
+        default:
+            return Promise.reject;
+    }
+};
+
+export const getFilterFieldByIdAndType = (id: number, fieldType: FilterFieldType): TaskEither<Error, FilterField[]> => {
+    return getFilterFields({ id: id }, fieldType);
+};
+
+export const getFilterFieldByNameAndType = (name: string, fieldType: FilterFieldType): TaskEither<Error, FilterField[]> => {
+    switch (fieldType) {
+        case 'alignments':
+            return getFilterFields({ alignment: name }, fieldType);
+        case 'cells':
+            return getFilterFields({ cells: name }, fieldType);
+        case 'colors':
+            return getFilterFields({ color: name }, fieldType);
+        case 'forms':
+            return getFilterFields({ form: name }, fieldType);
+        case 'locations':
+            return getFilterFields({ location: name }, fieldType);
+        case 'seasons':
+            return getFilterFields({ season: name }, fieldType);
+        case 'shapes':
+            return getFilterFields({ shape: name }, fieldType);
+        case 'textures':
+            return getFilterFields({ texture: name }, fieldType);
+        case 'walls':
+            return getFilterFields({ walls: name }, fieldType);
+        default:
+            return Promise.reject;
+    }
+};
+
+export const getFilterFieldsByType = (fieldType: FilterFieldType): TaskEither<Error, FilterField[]> => {
+    return getFilterFields({}, fieldType);
 };

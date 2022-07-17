@@ -1,13 +1,13 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, Button, Col, Row } from 'react-bootstrap';
-import DataTable from 'react-data-table-component';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
 import externalLinks from 'remark-external-links';
-import { ALLRIGHTS, CC0, CCBY, SpeciesSourceApi } from '../libs/api/apitypes';
+import { ALLRIGHTS, CC0, CCBY, GallTaxon, HostTaxon, SpeciesSourceApi } from '../libs/api/apitypes';
 import { formatLicense, sourceToDisplay } from '../libs/pages/renderhelpers';
 import { SELECTED_ROW_STYLE, TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
+import DataTable from './DataTable';
 import Edit from './edit';
 import InfoTip from './infotip';
 
@@ -15,6 +15,7 @@ export type SourceListProps = {
     data: SpeciesSourceApi[];
     defaultSelection: SpeciesSourceApi | undefined;
     onSelectionChange: (selected: SpeciesSourceApi | undefined) => void;
+    taxonType: typeof GallTaxon | typeof HostTaxon;
 };
 
 const linkTitle = (row: SpeciesSourceApi) => {
@@ -49,7 +50,7 @@ const linkLicense = (row: SpeciesSourceApi) => {
     );
 };
 
-const SourceList = ({ data, defaultSelection, onSelectionChange }: SourceListProps): JSX.Element => {
+const SourceList = ({ data, defaultSelection, onSelectionChange, taxonType }: SourceListProps): JSX.Element => {
     const [selectedSource, setSelectedSource] = useState(defaultSelection);
     const [notesAlertShown, setNotesAlertShown] = useState(true);
     const sources = data.sort((a, b) => parseInt(a.source.pubyear) - parseInt(b.source.pubyear));
@@ -128,28 +129,34 @@ const SourceList = ({ data, defaultSelection, onSelectionChange }: SourceListPro
                 variant="info"
                 dismissible
                 onClose={() => setNotesAlertShown(false)}
-                hidden={!notesAlertShown || !(gallformersNotes && gallformersNotes.id !== selectedSource?.source.id)}
+                hidden={
+                    taxonType === HostTaxon ||
+                    !notesAlertShown ||
+                    !(gallformersNotes && gallformersNotes.id !== selectedSource?.source.id)
+                }
             >
                 Our ID Notes may contain important tips necessary for distinguishing this gall from similar galls and/or important
                 information about the taxonomic status of this gall inducer.
-                <Button className="ml-3" variant="outline-info" size="sm" onClick={() => selectRow(gallformersNotes)}>
+                <Button className="ms-3" variant="outline-info" size="sm" onClick={() => selectRow(gallformersNotes)}>
                     Show notes
                 </Button>
             </Alert>
-            <Row className="">
+            <Row>
                 <Col sm={10} xs={12}>
-                    <div className="font-italic">
-                        {selectedSource?.source.title}
-                        {selectedSource && <Edit id={selectedSource?.source.id} type="source" />}
+                    <div>
+                        <em>
+                            {selectedSource?.source.title}
+                            {selectedSource && <Edit id={selectedSource?.source.id} type="source" />}
+                        </em>
                     </div>
                 </Col>
-                <Col className="text-right">
+                <Col className="d-flex justify-content-end">
                     <Button
                         variant="secondary"
                         size="sm"
                         onClick={changeSource(-1)}
                         disabled={data.length <= 1}
-                        className="mr-1"
+                        className="me-1"
                         aria-label="select previous source"
                     >
                         {'<'}
@@ -205,7 +212,7 @@ const SourceList = ({ data, defaultSelection, onSelectionChange }: SourceListPro
             </Row>
             <Row>
                 <Col>
-                    {/* <Edit id={species.id} type="speciessource" /> */}
+                    {selectedSource && <Edit id={selectedSource?.species_id} type="speciessource" />}
                     <strong>Further Information:</strong>
                 </Col>
             </Row>
