@@ -426,9 +426,9 @@ export const getGeneraForFamily = (id: number): TaskEither<Error, Genus[]> => {
     );
 };
 
-export const getSection = (id: number): TaskEither<Error, O.Option<SectionApi>> => {
+export const sectionById = (id: number): TaskEither<Error, SectionApi[]> => {
     const section = () =>
-        db.taxonomy.findFirst({
+        db.taxonomy.findMany({
             select: {
                 id: true,
                 name: true,
@@ -436,28 +436,48 @@ export const getSection = (id: number): TaskEither<Error, O.Option<SectionApi>> 
                 speciestaxonomy: { include: { species: true } },
                 taxonomyalias: { include: { alias: true } },
             },
-            where: { id: { equals: id } },
+            where: { AND: [{ id: { equals: id } }, { type: { equals: SECTION } }] },
         });
 
     return pipe(
         TE.tryCatch(section, handleError),
-        TE.map((t) =>
-            pipe(
-                t,
-                O.fromNullable,
-                O.map(
-                    (s) =>
-                        ({
-                            ...t,
-                            species: s?.speciestaxonomy.map((sp) => ({ ...sp.species } as SimpleSpecies)),
-                            aliases: s.taxonomyalias.map((a) => ({ ...a.alias } as AliasApi)),
-                        } as SectionApi),
-                ),
-            ),
+        TE.map((ts) =>
+            ts.map((t) => ({
+                ...t,
+                description: t.description ?? '',
+                species: t?.speciestaxonomy.map((sp) => ({ ...sp.species } as SimpleSpecies)),
+                aliases: t.taxonomyalias.map((a) => ({ ...a.alias } as AliasApi)),
+            })),
         ),
     );
 };
 
+export const sectionByName = (name: string): TaskEither<Error, SectionApi[]> => {
+    return pipe(
+        TE.tryCatch(
+            () =>
+                db.taxonomy.findMany({
+                    select: {
+                        id: true,
+                        name: true,
+                        description: true,
+                        speciestaxonomy: { include: { species: true } },
+                        taxonomyalias: { include: { alias: true } },
+                    },
+                    where: { AND: [{ name: { equals: name } }, { type: { equals: SECTION } }] },
+                }),
+            handleError,
+        ),
+        TE.map((ts) =>
+            ts.map((t) => ({
+                ...t,
+                description: t.description ?? '',
+                species: t?.speciestaxonomy.map((sp) => ({ ...sp.species } as SimpleSpecies)),
+                aliases: t.taxonomyalias.map((a) => ({ ...a.alias } as AliasApi)),
+            })),
+        ),
+    );
+};
 /**
  * Delete the given taxonomy entry. If the taxoomy entry is a Family, then the delete will cascade to species and
  * delete species that are assigned to that family. So be careful!

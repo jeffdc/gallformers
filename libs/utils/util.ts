@@ -104,7 +104,7 @@ export const lowercaseFirstLetter = (s: string): string => doToFirstLetter(s, fa
 
 export const pluralize = (s: string): string => {
     if (s.endsWith('y')) {
-        return `${s.slice(0, s.length - 2)}ies`;
+        return `${s.slice(0, s.length - 1)}ies`;
     } else {
         return `${s}s`;
     }

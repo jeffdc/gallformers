@@ -22,6 +22,7 @@ import {
     HostApi,
     HostSimple,
     HostTaxon,
+    SimpleSpecies,
     SpeciesApi,
     SpeciesUpsertFields,
     SpeciesWithPlaces,
@@ -416,7 +417,7 @@ export const deleteHost = (speciesid: number): TaskEither<Error, DeleteResult> =
 
 export const hostsSearch = (s: string): TaskEither<Error, HostApi[]> => getHosts([{ name: { contains: s } }]);
 
-export const hostsSearchSimple = (s: string): TaskEither<Error, HostSimple[]> =>
+export const hostsSearchSimple = (s: string): TaskEither<Error, SimpleSpecies[]> =>
     pipe(
         getHosts([{ name: { contains: s } }]),
         TE.map((hs) =>
@@ -426,6 +427,7 @@ export const hostsSearchSimple = (s: string): TaskEither<Error, HostSimple[]> =>
                 aliases: h.aliases,
                 datacomplete: h.datacomplete,
                 places: h.places,
+                taxoncode: h.taxoncode,
             })),
         ),
     );

@@ -169,8 +169,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                         delay={200}
                         useCache={false}
                         isLoading={isLoading}
-                        // results are already filtered by the search
-                        filterBy={() => true}
+                        // filterBy={  }
                         promptText={`Type in a ${type} name.`}
                         searchText={`Searching for ${pluralize(type)}...`}
                         {...asyncProps}

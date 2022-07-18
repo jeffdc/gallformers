@@ -335,7 +335,7 @@ const Gall = ({
                         <Row>
                             <Col>
                                 {mainField('name', 'Gall', {
-                                    searchEndpoint: (s) => `../api/gall?q=${s}`,
+                                    searchEndpoint: (s: string) => `../api/gall?q=${s}`,
                                     promptText: 'Gall',
                                     searchText: 'Searching for Galls...',
                                 })}

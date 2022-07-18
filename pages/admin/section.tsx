@@ -3,18 +3,17 @@ import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Path } from 'react-hook-form';
 import * as yup from 'yup';
 import { RenameEvent } from '../../components/editname';
-import Typeahead from '../../components/Typeahead';
+import { AsyncTypeahead } from '../../components/Typeahead';
 import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { HostApi, HostTaxon, SimpleSpecies } from '../../libs/api/apitypes';
+import { HostTaxon, SimpleSpecies } from '../../libs/api/apitypes';
 import { SECTION, TaxonomyEntry, TaxonomyUpsertFields } from '../../libs/api/taxonomy';
-import { allHosts } from '../../libs/db/host';
 import { allGenera, allSections } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
 import { extractGenus, hasProp, mightFailWithArray } from '../../libs/utils/util';
@@ -45,7 +44,7 @@ type Props = {
     id: string;
     sections: TaxonomyEntry[];
     genera: TaxonomyEntry[];
-    hosts: HostApi[];
+    // hosts: HostApi[];
 };
 
 type FormFields = AdminFormFields<TaxSection> & Omit<TaxSection, 'id' | 'name' | 'type'>;
@@ -55,8 +54,10 @@ const renameSection = async (s: TaxSection, e: RenameEvent) => ({
     name: e.new,
 });
 
-const Section = ({ id, sections, genera, hosts }: Props): JSX.Element => {
-    const [species, setSpecies] = useState<Array<SimpleSpecies>>([]);
+const Section = ({ id, sections, genera }: Props): JSX.Element => {
+    const [species, setSpecies] = useState<SimpleSpecies[]>([]);
+    const [hosts, setHosts] = useState<SimpleSpecies[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): TaxonomyUpsertFields => {
         return {
@@ -159,6 +160,22 @@ const Section = ({ id, sections, genera, hosts }: Props): JSX.Element => {
         updateSpecies();
     }, [fetchSectionSpecies, selected]);
 
+    const handleSearch = (s: string) => {
+        setIsLoading(true);
+
+        axios
+            .get<SimpleSpecies[]>(`/api/host?q=${s}&simple`)
+            .then((resp) => {
+                // filter out ones that are already selected since this is multi-select
+                const d = resp.data.filter((s) => !species.find((sp) => sp.id === s.id));
+                setHosts(d);
+                setIsLoading(false);
+            })
+            .catch((e) => {
+                console.error(e);
+            });
+    };
+
     return (
         <Admin
             type="Section"
@@ -210,7 +227,7 @@ const Section = ({ id, sections, genera, hosts }: Props): JSX.Element => {
                 <Row className="my-1">
                     <Col>
                         Species (required):
-                        <Typeahead
+                        <AsyncTypeahead
                             name="species"
                             control={form.control}
                             options={hosts}
@@ -226,6 +243,8 @@ const Section = ({ id, sections, genera, hosts }: Props): JSX.Element => {
                                 form.setValue('species' as Path<FormFields>, s);
                             }}
                             disabled={!selected}
+                            isLoading={isLoading}
+                            onSearch={handleSearch}
                         />
                         {form.formState.errors.species && hasProp(form.formState.errors.species, 'message') && (
                             <span className="text-danger">{form.formState.errors.species.message as string}</span>
@@ -258,7 +277,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             id: id,
             sections: await mightFailWithArray<TaxonomyEntry>()(allSections()),
             genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon)),
-            hosts: await mightFailWithArray<HostApi>()(allHosts()),
+            // hosts: await mightFailWithArray<HostApi>()(allHosts()),
         },
     };
 };

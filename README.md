@@ -4,11 +4,7 @@ The gallformers site
 [![type-coverage](https://img.shields.io/badge/dynamic/json.svg?label=type-coverage&prefix=%E2%89%A5&suffix=%&query=$.typeCoverage.atLeast&uri=https%3A%2F%2Fraw.githubusercontent.com%2Fplantain-00%2Ftype-coverage%2Fmaster%2Fpackage.json)](https://github.com/jeffdc/gallformers)
 
 ## Getting Started
-You must have [npm](https://www.npmjs.com/get-npm) and yarn installed for any of this to work. Go do that. I highly recommend using a node version manager of some kind.
-Installing yarn is easy once you have npm:
-```bash
-npm install -g yarn
-```
+You must have [npm](https://www.npmjs.com/get-npm) and yarn installed for any of this to work. Go do that. I highly recommend using a node version manager of some kind. Or you can download node and yarn from [here](https://nodejs.org/en/download/)
 
 Get setup:
 ```bash
