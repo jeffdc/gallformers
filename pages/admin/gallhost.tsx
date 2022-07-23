@@ -3,7 +3,7 @@ import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { ComposableMap, Geographies, Geography, ProjectionConfig, ZoomableGroup } from 'react-simple-maps';
 import * as yup from 'yup';
@@ -22,20 +22,21 @@ import {
     SimpleSpecies,
     SpeciesWithPlaces,
 } from '../../libs/api/apitypes';
-import { allGalls } from '../../libs/db/gall';
 import { allHostsWithPlaces } from '../../libs/db/host';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
 // needed as ReactTooltip does not play nicely with SSR. See: https://github.com/wwayne/react-tooltip/issues/675
 import dynamic from 'next/dynamic';
+import { gallById } from '../../libs/db/gall';
+import axios from 'axios';
 
 const ReactTooltip = dynamic(() => import('react-tooltip'), {
     ssr: false,
 });
 
 type Props = {
-    id: string;
-    galls: GallApi[];
+    id: string | null;
+    sp: GallApi[];
     hosts: SpeciesWithPlaces[];
 };
 
@@ -56,13 +57,13 @@ const update = async (s: GallApi, e: RenameEvent) => ({
 const fetchGallHosts = async (id: number | undefined): Promise<SpeciesWithPlaces[]> => {
     if (id == undefined) return [];
 
-    const res = await fetch(`../api/gallhost?gallid=${id}`);
-    if (res.status === 200) {
-        return (await res.json()) as SpeciesWithPlaces[];
-    } else {
-        console.error(await res.text());
-        throw new Error('Failed to fetch host for the selected gall. Check console.');
-    }
+    return axios
+        .get<SpeciesWithPlaces[]>(`/api/gallhost?gallid=${id}`)
+        .then((res) => res.data)
+        .catch((e) => {
+            console.error(e.toString());
+            throw new Error('Failed to fetch host for the selected gall. Check console.', e);
+        });
 };
 
 const projConfig: ProjectionConfig = {
@@ -72,7 +73,7 @@ const projConfig: ProjectionConfig = {
     scale: 750,
 };
 
-const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
+const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
     const [gallHosts, setGallHosts] = useState<Array<SpeciesWithPlaces>>([]);
     const [inRange, setInRange] = useState<Map<string, PlaceNoTreeApi>>(new Map());
     const [outRange, setOutRange] = useState<Map<string, PlaceNoTreeApi>>(new Map());
@@ -112,25 +113,21 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
     };
 
     // eslint-disable-next-line prettier/prettier
-    const {
-        selected,
-        setSelected,
-        error,
-        setError,
-        deleteResults,
-        setDeleteResults,
-        form,
-        formSubmit,
-        mainField,
-    } = useAdmin<GallApi, FormFields, GallHostUpdateFields>(
+    const { selected, setSelected, error, setError, deleteResults, setDeleteResults, form, formSubmit, mainField } = useAdmin<
+        GallApi,
+        FormFields,
+        GallHostUpdateFields
+    >(
         'Gall-Host',
-        id,
-        galls,
+        id ?? undefined,
         update,
         toUpsertFields,
-        { keyProp: 'name', delEndpoint: '../api/gallhost/', upsertEndpoint: '../api/gallhost/insert' },
+        { keyProp: 'name', delEndpoint: '/api/gallhost/', upsertEndpoint: '/api/gallhost/insert' },
         schema,
         updatedFormFields,
+        false,
+        undefined,
+        sp,
     );
 
     const selectAll = () => {
@@ -201,7 +198,7 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
                     <Row className="my-1">
                         <Col>
                             Gall:
-                            {mainField('name', 'Gall')}
+                            {mainField('name', 'Gall', { searchEndpoint: (s) => `../api/gall?q=${s}` })}
                         </Col>
                     </Row>
                     <Row>
@@ -231,7 +228,7 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
                             )}
                         </Col>
                     </Row>
-                    <Row className="my-1">
+                    <Row className="my-2">
                         <Col>
                             Range:
                             <InfoTip
@@ -243,6 +240,52 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
                             on members of that taxon in other areas (eg eastern NA), or when a clear and unambiguous geographic pattern 
                             exists for a species of which observations are numerous. When in doubt, leave every place where a host occurs."
                             />
+                        </Col>
+                    </Row>
+                    <Row className="m-1 border">
+                        <Col xs={2}>
+                            <Row className="my-2">
+                                <Col>Legend:</Col>
+                            </Row>
+                            <Row className="p-1">
+                                <Col
+                                    className="border d-flex justify-content-center"
+                                    style={{ fontWeight: 'bold', borderRadius: '5px', backgroundColor: 'ForestGreen' }}
+                                >
+                                    Gall & Host
+                                </Col>
+                            </Row>
+                            <Row className="p-1">
+                                <Col
+                                    className="border d-flex justify-content-center"
+                                    style={{ fontWeight: 'bold', borderRadius: '5px', backgroundColor: 'LightCoral' }}
+                                >
+                                    Host Only
+                                </Col>
+                            </Row>
+                            <Row className="p-1">
+                                <Col
+                                    className="border d-flex justify-content-center"
+                                    style={{ fontWeight: 'bold', borderRadius: '5px', backgroundColor: 'White' }}
+                                >
+                                    Neither
+                                </Col>
+                            </Row>
+                            <Row>
+                                <Col className="my-2">Map Actions:</Col>
+                            </Row>
+                            <Row className="my-2">
+                                <Col>
+                                    <Button variant="outline-secondary" size="sm" className="me-2" onClick={selectAll}>
+                                        Select All
+                                    </Button>
+                                    <Button variant="outline-secondary" size="sm" onClick={deselectAll}>
+                                        De-select All
+                                    </Button>
+                                </Col>
+                            </Row>
+                        </Col>
+                        <Col>
                             <ComposableMap
                                 className="border"
                                 projection="geoConicEqualArea"
@@ -299,27 +342,6 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
                     </Row>
                     <Row className="my-1">
                         <Col>
-                            <Button variant="outline-secondary" size="sm" className="me-2" onClick={selectAll}>
-                                Select All
-                            </Button>
-                            <Button variant="outline-secondary" size="sm" onClick={deselectAll}>
-                                De-select All
-                            </Button>
-                        </Col>
-                        <Col className="text-right">
-                            <span className="border p-2 m-1" style={{ borderRadius: '5px', backgroundColor: 'ForestGreen' }}>
-                                Gall & Host
-                            </span>
-                            <span className="border p-2 m-1" style={{ borderRadius: '5px', backgroundColor: 'LightCoral' }}>
-                                Host Only
-                            </span>
-                            <span className="border p-2 m-1" style={{ borderRadius: '5px', backgroundColor: 'White' }}>
-                                Neither
-                            </span>
-                        </Col>
-                    </Row>
-                    <Row className="my-1">
-                        <Col>
                             <input type="submit" className="button" value="Submit" disabled={!selected || gallHosts.length < 1} />
                         </Col>
                     </Row>
@@ -330,17 +352,18 @@ const GallHostMapper = ({ id, galls, hosts }: Props): JSX.Element => {
 };
 
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
-    const queryParam = 'id';
-    // eslint-disable-next-line prettier/prettier
-    const id = pipe(
-        extractQueryParam(context.query, queryParam),
-        O.getOrElse(constant('')),
+    const id = extractQueryParam(context.query, 'id');
+    const sp = pipe(
+        id,
+        O.map(parseInt),
+        O.map((id) => mightFailWithArray<GallApi>()(gallById(id))),
+        O.getOrElse(constant(Promise.resolve(Array<GallApi>()))),
     );
 
     return {
         props: {
-            id: id,
-            galls: await mightFailWithArray<GallApi>()(allGalls()),
+            id: O.getOrElseW(constant(null))(id),
+            sp: await sp,
             hosts: await mightFailWithArray<SimpleSpecies>()(allHostsWithPlaces()),
         },
     };

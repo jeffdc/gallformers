@@ -165,3 +165,16 @@ export const upsertSource = (source: SourceUpsertFields): TaskEither<Error, Sour
         TE.map(adaptor),
     );
 };
+
+export const searchSources = (s: string): TaskEither<Error, SourceApi[]> => {
+    return pipe(
+        TE.tryCatch(
+            () =>
+                db.source.findMany({
+                    where: { title: { contains: s } },
+                    orderBy: { title: 'asc' },
+                }),
+            handleError,
+        ),
+    );
+};

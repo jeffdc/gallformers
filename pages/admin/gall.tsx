@@ -1,14 +1,15 @@
+import axios from 'axios';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Controller } from 'react-hook-form';
 import * as yup from 'yup';
 import AliasTable from '../../components/aliastable';
-import Typeahead from '../../components/Typeahead';
+import Typeahead, { AsyncTypeahead } from '../../components/Typeahead';
 import UndescribedFlow, { UndescribedData } from '../../components/UndescribedFlow';
 import useAdmin from '../../hooks/useadmin';
 import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '../../hooks/useSpecies';
@@ -26,16 +27,14 @@ import {
     getTextures,
     getWalls,
 } from '../../libs/db/filterfield';
-import { allGalls } from '../../libs/db/gall';
-import { allHostsSimple } from '../../libs/db/host';
+import { gallById } from '../../libs/db/gall';
 import { getAbundances } from '../../libs/db/species';
 import { allFamilies, allGenera } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
 import { hasProp, mightFailWithArray, SPECIES_NAME_REGEX } from '../../libs/utils/util';
 
 type Props = SpeciesProps & {
-    gs: AT.GallApi[];
-    hosts: AT.HostSimple[];
+    gall: AT.GallApi[];
     locations: AT.FilterField[];
     colors: AT.FilterField[];
     seasons: AT.FilterField[];
@@ -89,8 +88,7 @@ export type FormFields = SpeciesFormFields<AT.GallApi> & {
 
 const Gall = ({
     id,
-    gs,
-    hosts,
+    gall,
     locations,
     colors,
     seasons,
@@ -105,8 +103,9 @@ const Gall = ({
     forms,
 }: Props): JSX.Element => {
     const [showNewUndescribed, setShowNewUndescribed] = useState(false);
-
     const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields } = useSpecies<AT.GallApi>(genera);
+    const [hosts, setHosts] = useState<AT.HostSimple[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): AT.GallUpsertFields => {
         if (!selected) {
@@ -201,6 +200,7 @@ const Gall = ({
         deleteResults,
         setDeleteResults,
         renameCallback,
+        nameExists,
         confirm,
         form,
         formSubmit,
@@ -209,14 +209,19 @@ const Gall = ({
     } = useAdmin(
         'Gall',
         id,
-        gs,
         renameSpecies,
         toUpsertFields,
-        { keyProp: 'name', delEndpoint: '../api/gall/', upsertEndpoint: '../api/gall/upsert' },
+        {
+            keyProp: 'name',
+            delEndpoint: '../api/gall/',
+            upsertEndpoint: '../api/gall/upsert',
+            nameExistsEndpoint: (s: string) => `/api/species?name=${s}`,
+        },
         schema,
         updatedFormFields,
         true,
         createNewGall,
+        gall,
     );
 
     const areRequiredFieldsFilled = () => {
@@ -268,11 +273,29 @@ const Gall = ({
         formSubmit(fields);
     };
 
+    const handleSearch = (s: string) => {
+        setIsLoading(true);
+
+        axios
+            .get<AT.HostSimple[]>(`../api/host?q=${s}&simple`)
+            .then((resp) => {
+                setHosts(resp.data);
+                setIsLoading(false);
+            })
+            .catch((e) => {
+                console.error(e);
+            });
+    };
+
     return (
         <Admin
             type="Gall"
             keyField="name"
-            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback }}
+            editName={{
+                getDefault: () => selected?.name,
+                renameCallback: renameCallback,
+                nameExistsCallback: nameExists,
+            }}
             setShowModal={setShowRenameModal}
             showModal={showRenameModal}
             setError={setError}
@@ -282,14 +305,7 @@ const Gall = ({
             selected={selected}
         >
             <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pe-4">
-                <UndescribedFlow
-                    show={showNewUndescribed}
-                    onClose={newUndescribedDone}
-                    hosts={hosts}
-                    genera={genera}
-                    families={families}
-                    galls={gs}
-                />
+                <UndescribedFlow show={showNewUndescribed} onClose={newUndescribedDone} genera={genera} families={families} />
                 <h4>Add/Edit Gallformers</h4>
                 <p>
                     This is for all of the details about a Gall. To add a description (which must be referenced to a source) go
@@ -317,7 +333,13 @@ const Gall = ({
                             </Col>
                         </Row>
                         <Row>
-                            <Col>{mainField('name', 'Gall')}</Col>
+                            <Col>
+                                {mainField('name', 'Gall', {
+                                    searchEndpoint: (s: string) => `../api/gall?q=${s}`,
+                                    promptText: 'Gall',
+                                    searchText: 'Searching for Galls...',
+                                })}
+                            </Col>
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowRenameModal(true)}>
@@ -396,7 +418,7 @@ const Gall = ({
                 <Row className="my-1">
                     <Col>
                         Hosts (required):
-                        <Typeahead
+                        <AsyncTypeahead
                             name="hosts"
                             control={form.control}
                             placeholder="Hosts"
@@ -412,6 +434,8 @@ const Gall = ({
                                 }
                             }}
                             clearButton
+                            isLoading={isLoading}
+                            onSearch={handleSearch}
                         />
                         {form.formState.errors.hosts && (
                             <span className="text-danger">You must map this gall to at least one host.</span>
@@ -727,18 +751,17 @@ const Gall = ({
 };
 
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
-    const queryParam = 'id';
-    // eslint-disable-next-line prettier/prettier
-    const id = pipe(
-        extractQueryParam(context.query, queryParam),
-        O.getOrElse(constant('')),
+    const id = extractQueryParam(context.query, 'id');
+    const gall = pipe(
+        id,
+        O.map(parseInt),
+        O.map((id) => mightFailWithArray<AT.GallApi>()(gallById(id))),
+        O.getOrElse(constant(Promise.resolve(Array<AT.GallApi>()))),
     );
-
     return {
         props: {
-            id: id,
-            gs: await mightFailWithArray<AT.GallApi>()(allGalls()),
-            hosts: await mightFailWithArray<AT.HostSimple>()(allHostsSimple()),
+            id: O.getOrElseW(constant(null))(id),
+            gall: await gall,
             families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(AT.GALL_FAMILY_TYPES)),
             genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(AT.GallTaxon, true)),
             locations: await mightFailWithArray<AT.FilterField>()(getLocations()),

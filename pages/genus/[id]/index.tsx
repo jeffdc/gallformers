@@ -5,7 +5,6 @@ import ErrorPage from 'next/error';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import React from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
 import 'react-simple-tree-menu/dist/main.css';
 import SpeciesTable from '../../../components/speciesTable';
@@ -16,7 +15,7 @@ import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/
 import { formatWithDescription } from '../../../libs/pages/renderhelpers';
 
 type Props = {
-    genus: O.Option<TaxonomyEntry>;
+    genus: TaxonomyEntry[];
     species: SimpleSpecies[];
 };
 
@@ -27,10 +26,10 @@ const Genus = ({ genus, species }: Props): JSX.Element => {
         return <div>Loading...</div>;
     }
 
-    if (O.isNone(genus)) {
+    if (genus.length <= 0) {
         return <ErrorPage statusCode={404} />;
     }
-    const gen = pipe(genus, O.getOrElse(constant(EMPTY_TAXONOMYENTRY)));
+    const gen = genus[0];
     const fam = pipe(gen.parent, O.getOrElse(constant(EMPTY_TAXONOMYENTRY)));
 
     const fullName = formatWithDescription(gen.name, gen.description);
@@ -76,11 +75,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
     return {
         props: {
             // must add a key so that a navigation from the same route will re-render properly
-            key: pipe(
-                genus,
-                O.map((g) => g.id),
-                O.getOrElse(constant(-1)),
-            ),
+            key: genus[0].id ?? -1,
             genus: genus,
             species: await getStaticPropsWithContext(context, getAllSpeciesForSectionOrGenus, 'species for genus', false, true),
         },

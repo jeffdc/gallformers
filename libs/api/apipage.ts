@@ -101,6 +101,25 @@ export async function apiUpsertEndpoint<T, R>(
     )();
 }
 
+export async function apiSearchEndpoint<T>(
+    req: NextApiRequest,
+    res: NextApiResponse,
+    dbSearch: (s: string) => TE.TaskEither<Error, T[]>,
+) {
+    const errMsg = (q: string) => (): TE.TaskEither<Err, unknown> => {
+        return TE.left({ status: 400, msg: `Failed to provide the ${q} d as a query param.` });
+    };
+
+    await pipe(
+        'q',
+        getQueryParam(req),
+        O.map(dbSearch),
+        O.map(TE.mapLeft(toErr)),
+        O.getOrElse(errMsg('q')),
+        TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+    )();
+}
+
 /**
  * Function that is meant to be partially applied and passed to apiUpsertEndpoint or similar.
  * Redirects (200) to the computed path.

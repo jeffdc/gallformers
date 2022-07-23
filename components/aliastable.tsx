@@ -43,6 +43,7 @@ const AliasTable = ({ data, setData, disabled }: AliasTableProps): JSX.Element =
 
     return (
         <>
+            Aliases:
             <EditableDataTable
                 keyField={'id'}
                 data={data}

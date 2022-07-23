@@ -5,7 +5,7 @@ import { GetServerSideProps } from 'next';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Controller } from 'react-hook-form';
 import { ComposableMap, Geographies, Geography, ProjectionConfig, ZoomableGroup } from 'react-simple-maps';
@@ -25,7 +25,7 @@ import {
     SpeciesUpsertFields,
 } from '../../libs/api/apitypes';
 import { FAMILY, TaxonomyEntry, TaxonomyEntryNoParent } from '../../libs/api/taxonomy';
-import { allHosts } from '../../libs/db/host';
+import { hostById } from '../../libs/db/host';
 import { getPlaces } from '../../libs/db/place';
 import { getAbundances } from '../../libs/db/species';
 import { allFamilies, allGenera, allSections } from '../../libs/db/taxonomy';
@@ -44,7 +44,7 @@ const projConfig: ProjectionConfig = {
 };
 
 type Props = SpeciesProps & {
-    hs: HostApi[];
+    host: HostApi[];
     sections: TaxonomyEntry[];
     places: PlaceNoTreeApi[];
 };
@@ -78,9 +78,9 @@ export const testables = {
     Schema: schema,
 };
 
-const Host = ({ id, hs, genera, families, sections, abundances, places }: Props): JSX.Element => {
-    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields } = useSpecies<HostApi>(genera);
+const Host = ({ id, host, genera, families, sections, abundances, places }: Props): JSX.Element => {
     const [tooltipContent, setTooltipContent] = useState('');
+    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields } = useSpecies<HostApi>(genera);
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): SpeciesUpsertFields => {
         if (!selected) {
@@ -131,6 +131,7 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
         deleteResults,
         setDeleteResults,
         renameCallback,
+        nameExists,
         form,
         formSubmit,
         mainField,
@@ -138,14 +139,19 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
     } = useAdmin(
         'Host',
         id,
-        hs,
         renameSpecies,
         toUpsertFields,
-        { keyProp: 'name', delEndpoint: '../api/host/', upsertEndpoint: '../api/host/upsert' },
+        {
+            keyProp: 'name',
+            delEndpoint: '../api/host/',
+            upsertEndpoint: '../api/host/upsert',
+            nameExistsEndpoint: (s: string) => `/api/species?name=${s}`,
+        },
         schema,
         updatedFormFields,
         true,
         createNewHost,
+        host,
     );
 
     const onSubmit = async (fields: FormFields) => {
@@ -172,7 +178,7 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
         <Admin
             type="Host"
             keyField="name"
-            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback }}
+            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback, nameExistsCallback: nameExists }}
             setShowModal={setShowRenameModal}
             showModal={showRenameModal}
             setError={setError}
@@ -199,7 +205,13 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                             </Col>
                         </Row>
                         <Row>
-                            <Col>{mainField('name', 'Host')}</Col>
+                            <Col>
+                                {mainField('name', 'Host', {
+                                    searchEndpoint: (s) => `../api/host?q=${s}`,
+                                    promptText: 'Type in a Host name.',
+                                    searchText: 'Searching for Hosts...',
+                                })}
+                            </Col>
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowRenameModal(true)}>
@@ -328,7 +340,41 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                         />
                     </Col>
                 </Row>
-                <Row className="formGroup pb-1">
+                <Row className="m-1 border">
+                    <Col xs={2}>
+                        <Row className="my-2">
+                            <Col>Legend:</Col>
+                        </Row>
+                        <Row className="p-1">
+                            <Col
+                                className="border d-flex justify-content-center"
+                                style={{ fontWeight: 'bold', borderRadius: '5px', backgroundColor: 'ForestGreen' }}
+                            >
+                                In Range
+                            </Col>
+                        </Row>
+                        <Row className="p-1">
+                            <Col
+                                className="border d-flex justify-content-center"
+                                style={{ fontWeight: 'bold', borderRadius: '5px', backgroundColor: 'White' }}
+                            >
+                                Out of Range
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col className="my-2">Map Actions:</Col>
+                        </Row>
+                        <Row className="my-2">
+                            <Col>
+                                <Button variant="outline-secondary" size="sm" className="me-2" onClick={selectAll}>
+                                    Select All
+                                </Button>
+                                <Button variant="outline-secondary" size="sm" onClick={deselectAll}>
+                                    De-select All
+                                </Button>
+                            </Col>
+                        </Row>
+                    </Col>
                     <Col>
                         Range:
                         <ComposableMap
@@ -376,19 +422,6 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
                             </ZoomableGroup>
                         </ComposableMap>
                         <ReactTooltip>{tooltipContent}</ReactTooltip>
-                    </Col>
-                </Row>
-                <Row>
-                    <Col>
-                        {' '}
-                        <Col>
-                            <Button variant="outline-secondary" size="sm" className="me-2" onClick={selectAll}>
-                                Select All
-                            </Button>
-                            <Button variant="outline-secondary" size="sm" onClick={deselectAll}>
-                                De-select All
-                            </Button>
-                        </Col>
                     </Col>
                 </Row>
                 <Row className="my-1">
@@ -448,14 +481,18 @@ const Host = ({ id, hs, genera, families, sections, abundances, places }: Props)
 };
 
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
-    const queryParam = 'id';
-    // eslint-disable-next-line prettier/prettier
-    const id = pipe(extractQueryParam(context.query, queryParam), O.getOrElse(constant('')));
+    const id = extractQueryParam(context.query, 'id');
+    const host = pipe(
+        id,
+        O.map(parseInt),
+        O.map((id) => mightFailWithArray<HostApi>()(hostById(id))),
+        O.getOrElse(constant(Promise.resolve(Array<HostApi>()))),
+    );
 
     return {
         props: {
-            id: id,
-            hs: await mightFailWithArray<HostApi>()(allHosts()),
+            id: pipe(extractQueryParam(context.query, 'id'), O.getOrElse(constant(''))),
+            host: await host,
             families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(HOST_FAMILY_TYPES)),
             genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon, true)),
             sections: await mightFailWithArray<TaxonomyEntry>()(allSections()),

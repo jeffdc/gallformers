@@ -2,7 +2,6 @@ import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
-import React from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
 import { RenameEvent } from '../../components/editname';
@@ -76,6 +75,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
         deleteResults,
         setDeleteResults,
         renameCallback,
+        nameExists,
         form,
         formSubmit,
         mainField,
@@ -83,21 +83,26 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
     } = useAdmin(
         'Glossary Entry',
         id,
-        glossary,
         renameEntry,
         toUpsertFields,
-        { keyProp: 'word', delEndpoint: '../api/glossary/', upsertEndpoint: '../api/glossary/upsert' },
+        {
+            keyProp: 'word',
+            delEndpoint: '../api/glossary/',
+            upsertEndpoint: '../api/glossary/upsert',
+            nameExistsEndpoint: (s: string) => `/api/glossary?name=${s}`,
+        },
         schema,
         updatedFormFields,
         false,
         createNewEntry,
+        glossary,
     );
 
     return (
         <Admin
             type="Glossary"
             keyField="word"
-            editName={{ getDefault: () => selected?.word, renameCallback: renameCallback }}
+            editName={{ getDefault: () => selected?.word, renameCallback: renameCallback, nameExistsCallback: nameExists }}
             setShowModal={setShowModal}
             showModal={showModal}
             setError={setError}

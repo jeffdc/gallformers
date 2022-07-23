@@ -66,6 +66,9 @@ const Admin = (): JSX.Element => {
                                     <ListGroupItem>
                                         Create/modify <Link href="./admin/filterterms">Filter Terms</Link>
                                     </ListGroupItem>
+                                    <ListGroupItem>
+                                        Create/modify <Link href="./admin/place">Places</Link>
+                                    </ListGroupItem>
                                 </ListGroup>
                             </Col>
                         </Row>

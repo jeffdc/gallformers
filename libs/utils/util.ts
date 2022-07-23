@@ -43,6 +43,9 @@ export const mightFail =
         )();
     };
 
+export const mightFailWithOptional = <T>(): (<S extends TE.TaskEither<Error, O.Option<T>>>(s: S) => Promise<O.Option<T>>) =>
+    mightFail(constant(O.none as O.Option<T>));
+
 export const mightFailWithArray = <T>(): (<S extends TE.TaskEither<Error, Array<T>>>(s: S) => Promise<Array<T>>) =>
     mightFail(constant(new Array<T>()));
 
@@ -98,6 +101,14 @@ const doToFirstLetter = (s: string | undefined, capitalize: boolean): string => 
 export const capitalizeFirstLetter = (s: string): string => doToFirstLetter(s, true);
 
 export const lowercaseFirstLetter = (s: string): string => doToFirstLetter(s, false);
+
+export const pluralize = (s: string): string => {
+    if (s.endsWith('y')) {
+        return `${s.slice(0, s.length - 1)}ies`;
+    } else {
+        return `${s}s`;
+    }
+};
 
 /**
  *

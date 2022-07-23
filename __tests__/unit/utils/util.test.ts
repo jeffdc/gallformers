@@ -94,3 +94,13 @@ describe('extractGenus tests', () => {
         expect(U.extractGenus('Foo bar')).toBe('Foo');
     });
 });
+
+describe('pluralize tests', () => {
+    test('it must change y to ies', () => {
+        expect(U.pluralize('Family')).toBe('Families');
+    });
+
+    test('it must change not y  to s', () => {
+        expect(U.pluralize('Gall')).toBe('Galls');
+    });
+});

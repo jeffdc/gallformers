@@ -45,7 +45,7 @@ export const getPlaces = (
     type DBPlace = ExtractTFromPromise<ReturnType<typeof places>>;
 
     // this is a mess and confusing. the way Prisma handles these relationships is baffling.
-    const adaptor = (places: DBPlace): PlaceApi[] =>
+    const localAdaptor = (places: DBPlace): PlaceApi[] =>
         places.map((p) => ({
             ...p,
             children: p.parent.map((pp) => ({
@@ -60,7 +60,14 @@ export const getPlaces = (
             })),
         }));
 
-    return pipe(TE.tryCatch(places, handleError), TE.map(adaptor));
+    return pipe(TE.tryCatch(places, handleError), TE.map(localAdaptor));
+};
+
+export const searchPlaces = (s: string): TaskEither<Error, PlaceNoTreeApi[]> => {
+    return pipe(
+        getPlaces({ name: { contains: s } }),
+        TE.map((p) => p.map((pp) => ({ ...pp }))),
+    );
 };
 
 export const placeById = (id: number): TaskEither<Error, PlaceWithHostsApi[]> => {
@@ -121,6 +128,10 @@ export const deletePlace = (id: number): TaskEither<Error, DeleteResult> => {
 };
 
 export const upsertPlace = (place: PlaceNoTreeUpsertFields): TaskEither<Error, PlaceNoTreeApi> => {
+    const adaptorPlaceNoTreeApi = (p: place): PlaceNoTreeApi => ({
+        ...p,
+    });
+
     const upsert = () =>
         db.place.upsert({
             where: { id: place.id },
@@ -136,13 +147,9 @@ export const upsertPlace = (place: PlaceNoTreeUpsertFields): TaskEither<Error, P
             },
         });
 
-    const adaptor = (p: place): PlaceNoTreeApi => ({
-        ...p,
-    });
-
     // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(upsert, handleError),
-        TE.map(adaptor),
+        TE.map(adaptorPlaceNoTreeApi),
     );
 };

@@ -1,6 +1,5 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
-import React from 'react';
 import { Badge, OverlayTrigger, Popover } from 'react-bootstrap';
 import { ConfirmationOptions } from '../components/confirmationdialog';
 import { RenameEvent } from '../components/editname';

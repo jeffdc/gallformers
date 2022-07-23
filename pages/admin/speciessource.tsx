@@ -150,17 +150,19 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
     } = useAdmin<species, FormFields, SpeciesSourceInsertFields>(
         'Species-Source Mapping',
         speciesid,
-        allSpecies,
         update,
         toUpsertFields,
         {
             keyProp: 'name',
-            delEndpoint: '../api/speciessource/',
-            upsertEndpoint: '../api/speciessource/insert',
+            delEndpoint: '/api/speciessource/',
+            upsertEndpoint: '/api/speciessource/insert',
             delQueryString: buildDelQueryString,
         },
         schema,
         updatedFormFields,
+        false,
+        undefined,
+        allSpecies,
     );
 
     const router = useRouter();
@@ -201,7 +203,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
         try {
             // DELETE
             if (fields.del) {
-                const res = await fetch(`../api/speciessource?speciesid=${selected.id}&sourceid=${selectedSource[0].source_id}`, {
+                const res = await fetch(`/api/speciessource?speciesid=${selected.id}&sourceid=${selectedSource[0].source_id}`, {
                     method: 'DELETE',
                 });
 
@@ -232,7 +234,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                 externallink: fields.externallink,
             };
 
-            const res = await fetch('../api/speciessource/upsert', {
+            const res = await fetch('/api/speciessource/upsert', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

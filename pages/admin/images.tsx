@@ -1,12 +1,13 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import { species } from '@prisma/client';
+import axios from 'axios';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Col, Modal, Row } from 'react-bootstrap';
 import DataTable, { TableColumn } from 'react-data-table-component';
 import { useForm } from 'react-hook-form';
@@ -14,11 +15,11 @@ import * as yup from 'yup';
 import AddImage from '../../components/addimage';
 import ImageEdit from '../../components/imageedit';
 import ImageGrid from '../../components/imagegrid';
-import Typeahead from '../../components/Typeahead';
+import { AsyncTypeahead } from '../../components/Typeahead';
 import { useConfirmation } from '../../hooks/useconfirmation';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { ImageApi } from '../../libs/api/apitypes';
-import { allSpecies } from '../../libs/db/species';
+import { speciesById } from '../../libs/db/species';
 import Admin from '../../libs/pages/admin';
 import { TABLE_CUSTOM_STYLES } from '../../libs/utils/DataTableConstants';
 import { mightFailWithArray, sessionUserOrUnknown } from '../../libs/utils/util';
@@ -26,8 +27,7 @@ import { mightFailWithArray, sessionUserOrUnknown } from '../../libs/utils/util'
 const Schema = yup.object().shape({});
 
 type Props = {
-    speciesid: string;
-    species: species[];
+    sp: species[];
 };
 
 type FormFields = {
@@ -69,9 +69,8 @@ const defaultFieldFormatter = (img: ImageApi) => {
     return <span>{img.default ? '✓' : ''}</span>;
 };
 
-const Images = ({ speciesid, species }: Props): JSX.Element => {
-    const sp = species.find((s) => s.id === parseInt(speciesid));
-    const [selected, setSelected] = useState(species.find((s) => s.id === parseInt(speciesid)));
+const Images = ({ sp }: Props): JSX.Element => {
+    const [selected, setSelected] = useState(sp && sp.length > 0 ? sp[0] : undefined);
     const [selectedImages, setSelectedImages] = useState(new Array<ImageApi>());
     const [toggleCleared, setToggleCleared] = useState(false);
     const [images, setImages] = useState<ImageApi[]>();
@@ -81,12 +80,14 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
     const [error, setError] = useState('');
     const [selectedForCopy, setSelectedForCopy] = useState(new Set<number>());
     const [copySource, setCopySource] = useState<ImageApi>();
+    const [isLoading, setIsLoading] = useState(false);
+    const [species, setSpecies] = useState<species[]>(sp ?? []);
 
     const { control, reset } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: yupResolver(Schema),
         defaultValues: {
-            species: sp?.name,
+            species: sp[0]?.name,
         },
     });
 
@@ -176,28 +177,18 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
 
     useEffect(() => {
         const fetchNewSelection = async (id: number | undefined) => {
-            try {
-                if (!id) {
-                    setImages(undefined);
-                    return;
-                }
-
-                const res = await fetch(`../api/images?speciesid=${id}`, {
-                    method: 'GET',
-                });
-
-                if (res.status === 200) {
-                    const imgs = (await res.json()) as ImageApi[];
-                    setImages(imgs);
-                } else {
-                    throw new Error(await res.text());
-                }
-            } catch (e) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const err: any = e;
-                console.error(err);
-                setError(err.toString());
+            if (!id) {
+                setImages(undefined);
+                return;
             }
+
+            axios
+                .get<ImageApi[]>(`/api/images?speciesid=${id}`)
+                .then((res) => setImages(res.data))
+                .catch((e) => {
+                    console.error(e);
+                    setError(e.toString());
+                });
         };
 
         // clear out any selections from previous work
@@ -224,30 +215,19 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
     };
 
     const saveImage = async (img: ImageApi) => {
-        try {
-            const res = await fetch(`../api/images`, {
-                method: 'POST',
+        axios
+            .post<ImageApi[]>(`/api/images`, {
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ ...img, lastchangedby: sessionUserOrUnknown(session?.user?.name) }),
+            })
+            .then((res) => setImages(res.data))
+            .catch((e) => {
+                const msg = `Error while trying to update image.\n${JSON.stringify(img)}\n${e}`;
+                console.error(msg);
+                setError(msg);
             });
-
-            if (res.status == 200) {
-                const imgs = (await res.json()) as ImageApi[];
-                if (imgs) {
-                    setImages(imgs);
-                }
-            } else {
-                throw new Error(await res.text());
-            }
-        } catch (e) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const err: any = e;
-            const msg = `Error while trying to update image.\n${JSON.stringify(img)}\n${err}`;
-            console.error(msg);
-            setError(msg);
-        }
     };
 
     const doCopy = async () => {
@@ -311,22 +291,15 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                         message: `This will delete ALL ${selectedImages.length} currently selected images. Do you want to continue?`,
                     })
                         .then(async () => {
-                            const res = await fetch(
-                                `../api/images?speciesid=${selected.id}&imageids=${[
-                                    ...selectedImages.map((img) => img.id).values(),
-                                ]}`,
-                                {
-                                    method: 'DELETE',
-                                },
-                            );
+                            axios
+                                .delete(
+                                    `/api/images?speciesid=${selected.id}&imageids=${[
+                                        ...selectedImages.map((img) => img.id).values(),
+                                    ]}`,
+                                )
+                                .then(() => setImages(images?.filter((i) => !selectedImages.find((oi) => oi.id === i.id))));
 
-                            if (res.status === 200) {
-                                setImages(images?.filter((i) => !selectedImages.find((oi) => oi.id === i.id)));
-                            } else {
-                                throw new Error(await res.text());
-                            }
-
-                            reset({ delete: [], species: sp?.name });
+                            reset({ delete: [], species: selected.name });
                             setToggleCleared(!toggleCleared);
                         })
                         .catch(() => Promise.resolve());
@@ -365,13 +338,24 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedImages, toggleCleared]);
 
+    const handleSearch = (s: string) => {
+        setIsLoading(true);
+
+        axios
+            .get<species[]>(`/api/species?q=${s}`)
+            .then((resp) => {
+                setSpecies(resp.data);
+                setIsLoading(false);
+            })
+            .catch((e) => {
+                console.error(e);
+            });
+    };
+
     return (
         <Admin type="Images" keyField="name" setError={setError} error={error} selected={selected}>
             <>
-                {currentImage && (
-                    // eslint-disable-next-line prettier/prettier
-                    <ImageEdit image={currentImage} onSave={saveImage} show={edit} onClose={handleClose} />
-                )}
+                {currentImage && <ImageEdit image={currentImage} onSave={saveImage} show={edit} onClose={handleClose} />}
 
                 <Modal show={showCopy} onHide={() => setShowCopy(false)} size="lg">
                     <Modal.Header closeButton>
@@ -402,7 +386,7 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                             Species:
                         </Col>
                         <Col>
-                            <Typeahead
+                            <AsyncTypeahead
                                 name="species"
                                 control={control}
                                 options={species}
@@ -418,6 +402,10 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
                                         router.push(``, undefined, { shallow: true });
                                     }
                                 }}
+                                isLoading={isLoading}
+                                onSearch={handleSearch}
+                                filterBy={() => true}
+                                minLength={1}
                             />
                         </Col>
                         <Col xs={7}>
@@ -458,14 +446,16 @@ const Images = ({ speciesid, species }: Props): JSX.Element => {
 };
 
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
-    const queryParam = 'speciesid';
-    // eslint-disable-next-line prettier/prettier
-    const speciesid = pipe(extractQueryParam(context.query, queryParam), O.getOrElse(constant('')));
+    const sp = pipe(
+        extractQueryParam(context.query, 'speciesid'),
+        O.map(parseInt),
+        O.map((id) => mightFailWithArray<species>()(speciesById(id))),
+        O.getOrElse(constant(Promise.resolve(new Array<species>()))),
+    );
 
     return {
         props: {
-            speciesid: speciesid,
-            species: await mightFailWithArray<species>()(allSpecies()),
+            sp: await sp,
         },
     };
 };

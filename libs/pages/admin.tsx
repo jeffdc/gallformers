@@ -1,19 +1,33 @@
+import { useSession } from 'next-auth/react';
 import Head from 'next/head';
-import React from 'react';
 import { Alert, Col, Nav, Navbar, Row } from 'react-bootstrap';
 import { Toaster } from 'react-hot-toast';
-import Auth from '../../components/auth';
+import Auth, { superAdmins } from '../../components/auth';
 import EditName, { RenameEvent } from '../../components/editname';
 import { DeleteResult, GallTaxon, HostTaxon } from '../api/apitypes';
 import { WithID } from '../utils/types';
 
+export type AdminTypes =
+    | 'Taxonomy'
+    | 'Section'
+    | 'Gall'
+    | 'Gallhost'
+    | 'Glossary'
+    | 'Host'
+    | 'Images'
+    | 'Source'
+    | 'Speciessource'
+    | 'Place'
+    | 'FilterTerms';
+
 export type AdminProps<T> = {
-    type: 'Taxonomy' | 'Section' | 'Gall' | 'Gallhost' | 'Glossary' | 'Host' | 'Images' | 'Source' | 'Speciessource' | 'Place';
+    type: AdminTypes;
     keyField: string;
     children: JSX.Element;
     editName?: {
         getDefault: () => string | undefined;
         renameCallback: (e: RenameEvent) => void;
+        nameExistsCallback: (name: string) => Promise<boolean>;
     };
     showModal?: boolean;
     setShowModal?: (show: boolean) => void;
@@ -90,6 +104,10 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
                 return `/place/${props.selected?.id}`;
         }
     };
+
+    const session = useSession();
+    const isSuperAdmin = session?.data?.user?.name && superAdmins.includes(session.data.user.name);
+
     return (
         <Auth superAdmin={!!props.superAdmin}>
             <>
@@ -107,6 +125,7 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
                         showModal={props.showModal}
                         setShowModal={props.setShowModal}
                         renameCallback={props.editName.renameCallback}
+                        nameExistsCallback={props.editName.nameExistsCallback}
                     />
                 )}
 
@@ -154,7 +173,8 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
                         <Nav.Link eventKey="Taxonomy" href={`./taxonomy`}>{`Taxonomy`}</Nav.Link>
                         <Nav.Link eventKey="Section" href={`./section`}>{`Sections`}</Nav.Link>
                         <Nav.Link eventKey="Glossary" href={`./glossary`}>{`Glossary`}</Nav.Link>
-                        <Nav.Link eventKey="Place" href={`./place`}>{`Place`}</Nav.Link>
+                        {isSuperAdmin && <Nav.Link eventKey="Place" href={`./place`}>{`Place`}</Nav.Link>}
+                        {isSuperAdmin && <Nav.Link eventKey="FilterTerms" href={`./filterterms`}>{`Filter Terms`}</Nav.Link>}
                     </Nav>
                 </Navbar>
 

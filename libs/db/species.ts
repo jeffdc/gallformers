@@ -58,15 +58,26 @@ export const allSpeciesSimple = (): TE.TaskEither<Error, SimpleSpecies[]> =>
         TE.map((s) => s.map((sp) => ({ ...sp } as SimpleSpecies))),
     );
 
-export const speciesByName = (name: string): TE.TaskEither<Error, O.Option<species>> => {
+export const speciesByName = (name: string): TE.TaskEither<Error, species[]> => {
     const species = () =>
-        db.species.findFirst({
+        db.species.findMany({
             where: {
                 name: name,
             },
         });
 
-    return pipe(TE.tryCatch(species, handleError), TE.map(O.fromNullable));
+    return TE.tryCatch(species, handleError);
+};
+
+export const speciesById = (id: number): TE.TaskEither<Error, species[]> => {
+    const species = () =>
+        db.species.findMany({
+            where: {
+                id: id,
+            },
+        });
+
+    return TE.tryCatch(species, handleError);
 };
 
 export const connectOrCreateGenus = (sp: SpeciesUpsertFields): Prisma.taxonomyCreateNestedOneWithoutTaxonomyInput => ({
@@ -199,3 +210,16 @@ export const speciesTaxonomyAdditionalUpdateSteps = (sp: SpeciesUpsertFields): P
         },
     }),
 ];
+
+export const speciesSearch = (s: string): TE.TaskEither<Error, species[]> => {
+    return pipe(
+        TE.tryCatch(
+            () =>
+                db.species.findMany({
+                    where: { name: { contains: s } },
+                    orderBy: { name: 'asc' },
+                }),
+            handleError,
+        ),
+    );
+};

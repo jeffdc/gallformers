@@ -2,7 +2,6 @@ import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
-import React from 'react';
 import { Alert, Button, Col, Row } from 'react-bootstrap';
 import * as yup from 'yup';
 import { RenameEvent } from '../../components/editname';
@@ -10,9 +9,7 @@ import useAdmin from '../../hooks/useadmin';
 import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { PlaceNoTreeApi, PlaceNoTreeUpsertFields, PLACE_TYPES } from '../../libs/api/apitypes';
-import { getPlaces } from '../../libs/db/place';
 import Admin from '../../libs/pages/admin';
-import { mightFailWithArray } from '../../libs/utils/util';
 
 const schema = yup.object().shape({
     mainField: yup.mixed().required(),
@@ -22,7 +19,6 @@ const schema = yup.object().shape({
 
 type Props = {
     id: string;
-    places: PlaceNoTreeApi[];
 };
 
 type FormFields = AdminFormFields<PlaceNoTreeApi> & Pick<PlaceNoTreeApi, 'code' | 'type'>;
@@ -65,7 +61,7 @@ const createNewPlace = (name: string): PlaceNoTreeApi => ({
     type: 'state',
 });
 
-const PlaceAdmin = ({ id, places }: Props): JSX.Element => {
+const PlaceAdmin = ({ id }: Props): JSX.Element => {
     const {
         selected,
         showRenameModal: showModal,
@@ -76,6 +72,7 @@ const PlaceAdmin = ({ id, places }: Props): JSX.Element => {
         deleteResults,
         setDeleteResults,
         renameCallback,
+        nameExists,
         form,
         formSubmit,
         mainField,
@@ -83,10 +80,14 @@ const PlaceAdmin = ({ id, places }: Props): JSX.Element => {
     } = useAdmin(
         'Place',
         id,
-        places,
         renamePlace,
         toUpsertFields,
-        { keyProp: 'name', delEndpoint: '../api/place/', upsertEndpoint: '../api/place/upsert' },
+        {
+            keyProp: 'name',
+            delEndpoint: '../api/place/',
+            upsertEndpoint: '../api/place/upsert',
+            nameExistsEndpoint: (s: string) => `/api/place?name=${s}`,
+        },
         schema,
         updatedFormFields,
         false,
@@ -97,7 +98,7 @@ const PlaceAdmin = ({ id, places }: Props): JSX.Element => {
         <Admin
             type="Place"
             keyField="name"
-            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback }}
+            editName={{ getDefault: () => selected?.name, renameCallback: renameCallback, nameExistsCallback: nameExists }}
             setShowModal={setShowModal}
             showModal={showModal}
             setError={setError}
@@ -105,11 +106,12 @@ const PlaceAdmin = ({ id, places }: Props): JSX.Element => {
             setDeleteResults={setDeleteResults}
             deleteResults={deleteResults}
             selected={selected}
+            superAdmin={true}
         >
             <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                 <h4>Add/Edit Places</h4>
                 <Alert variant="info">
-                    This is really just a stub page for now. Much work still needs to be done to support Place hierachies as well
+                    This is really just a stub page for now. Much work still needs to be done to support Place hierarchies as well
                     as Place aggregations. You can do basic creation and editing but it is not currently possible to manage
                     anything other than US States or Canadian Provinces. Since these are all already in here it is doubtful that
                     this will ever be used in its current form. If you are looking to add Range information go to the Host admin
@@ -121,7 +123,7 @@ const PlaceAdmin = ({ id, places }: Props): JSX.Element => {
                             <Col>Name:</Col>
                         </Row>
                         <Row>
-                            <Col>{mainField('name', 'Name')}</Col>
+                            <Col>{mainField('name', 'Place', { searchEndpoint: (s) => `../api/place?q=${s}` })}</Col>
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowModal(true)}>
@@ -168,16 +170,9 @@ const PlaceAdmin = ({ id, places }: Props): JSX.Element => {
 };
 
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
-    const queryParam = 'id';
-    // eslint-disable-next-line prettier/prettier
-    const id = pipe(
-        extractQueryParam(context.query, queryParam),
-        O.getOrElse(constant('')),
-    );
     return {
         props: {
-            id: id,
-            places: await mightFailWithArray<PlaceNoTreeApi>()(getPlaces()),
+            id: pipe(extractQueryParam(context.query, 'id'), O.getOrElse(constant(''))),
         },
     };
 };

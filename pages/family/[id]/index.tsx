@@ -4,20 +4,19 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import ErrorPage from 'next/error';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import React from 'react';
 import { Card, Col, Container, Row } from 'react-bootstrap';
 import TreeMenu, { Item, TreeNodeInArray } from 'react-simple-tree-menu';
 import 'react-simple-tree-menu/dist/main.css';
 import Edit from '../../../components/edit';
 import { GallTaxon } from '../../../libs/api/apitypes';
-import { EMPTY_TAXONOMYENTRY, TaxonomyEntry, TaxonomyTree } from '../../../libs/api/taxonomy';
+import { TaxonomyEntry, TaxonomyTree } from '../../../libs/api/taxonomy';
 import { allFamilyIds, taxonomyEntryById, taxonomyTreeForId } from '../../../libs/db/taxonomy';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { formatWithDescription } from '../../../libs/pages/renderhelpers';
 import { hasProp } from '../../../libs/utils/util';
 
 type Props = {
-    family: O.Option<TaxonomyEntry>;
+    family: TaxonomyEntry[];
     tree: TreeNodeInArray[];
 };
 
@@ -28,10 +27,11 @@ const Family = ({ family, tree }: Props): JSX.Element => {
         return <div>Loading...</div>;
     }
 
-    if (O.isNone(family)) {
+    if (family.length <= 0) {
         return <ErrorPage statusCode={404} />;
     }
-    const fam = pipe(family, O.getOrElse(constant(EMPTY_TAXONOMYENTRY)));
+
+    const fam = family[0];
 
     const handleClick = (item: Item) => {
         if (hasProp(item, 'url')) {
@@ -96,11 +96,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
     return {
         props: {
             // must add a key so that a navigation from the same route will re-render properly
-            key: pipe(
-                family,
-                O.map((f) => f.id),
-                O.getOrElse(constant(-1)),
-            ),
+            key: family[0].id ?? -1,
             family: family,
             tree: tree,
         },

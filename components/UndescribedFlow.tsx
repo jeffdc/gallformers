@@ -1,11 +1,12 @@
+import axios from 'axios';
 import { constant, constFalse, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Button, Col, Form, Modal, Row } from 'react-bootstrap';
 import { Controller, useForm } from 'react-hook-form';
-import { GallApi, HostSimple } from '../libs/api/apitypes';
+import { GallSimple, HostSimple } from '../libs/api/apitypes';
 import { GENUS, TaxonomyEntry, TaxonomyEntryNoParent } from '../libs/api/taxonomy';
-import Typeahead from './Typeahead';
+import Typeahead, { AsyncTypeahead } from './Typeahead';
 
 export type UndescribedData = {
     family: TaxonomyEntry;
@@ -17,10 +18,8 @@ export type UndescribedData = {
 type Props = {
     show: boolean;
     onClose: (data: UndescribedData | undefined) => void;
-    hosts: HostSimple[];
     genera: TaxonomyEntry[];
     families: TaxonomyEntry[];
-    galls: GallApi[];
 };
 
 type FormFields = {
@@ -32,7 +31,7 @@ type FormFields = {
     name: string;
 };
 
-const UndescribedFlow = ({ show, onClose, hosts, genera, families, galls }: Props): JSX.Element => {
+const UndescribedFlow = ({ show, onClose, genera, families }: Props): JSX.Element => {
     const [genusKnown, setGenusKnown] = useState(false);
     const [genus, setGenus] = useState<TaxonomyEntryNoParent>();
     const [family, setFamily] = useState<TaxonomyEntryNoParent>();
@@ -40,6 +39,8 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families, galls }: Prop
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [errMessage, setErrMessage] = useState('');
+    const [hosts, setHosts] = useState<HostSimple[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
 
     const { register, getValues, control, watch } = useForm<FormFields>({
         mode: 'onBlur',
@@ -73,21 +74,22 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families, galls }: Prop
             );
         }
 
-        if (galls.find((g) => g.name.localeCompare(name) == 0)) {
-            setErrMessage(
-                `The name you have chosen, (${name}), already exists in the database. Either chose a new name or Cancel out of this and edit the existing gall.`,
-            );
-            return;
-        }
-
-        const fam = { ...family, parent: O.none };
-        onClose({
-            family: fam,
-            genus: { ...genus, parent: O.of(fam) },
-            host: host,
-            name: name,
+        axios.get<GallSimple[]>(`/api/gall?name=${name}`).then((res) => {
+            if (res.data.filter((g) => g.name === name).length > 0) {
+                setErrMessage(
+                    `The name you have chosen, (${name}), already exists in the database. Either chose a new name or Cancel out of this and edit the existing gall.`,
+                );
+            } else {
+                const fam = { ...family, parent: O.none };
+                onClose({
+                    family: fam,
+                    genus: { ...genus, parent: O.of(fam) },
+                    host: host,
+                    name: name,
+                });
+                resetState();
+            }
         });
-        resetState();
     };
 
     const lookupFamily = (genus: TaxonomyEntryNoParent) => {
@@ -114,6 +116,20 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families, galls }: Prop
         }
     }, [genus, family, description, host, getValues]);
 
+    const handleHostSearch = (s: string) => {
+        setIsLoading(true);
+
+        axios
+            .get<HostSimple[]>(`/api/host?q=${s}&simple`)
+            .then((resp) => {
+                setHosts(resp.data);
+                setIsLoading(false);
+            })
+            .catch((e) => {
+                console.error(e);
+            });
+    };
+
     return (
         <Modal size="lg" show={show} onHide={() => done(true)}>
             <Modal.Header id="create-new-undescribed-gall" closeButton>
@@ -121,155 +137,178 @@ const UndescribedFlow = ({ show, onClose, hosts, genera, families, galls }: Prop
             </Modal.Header>
             <Modal.Body>
                 <Form>
-                    <Form.Group>
-                        <Controller
-                            name="genusKnown"
-                            control={control}
-                            render={({ field }) => (
-                                <Form.Check
-                                    {...register('genusKnown')}
-                                    type="checkbox"
-                                    label="Is this undescribed species part of a known Genus?"
-                                    checked={genusKnown}
-                                    onChange={(e) => {
-                                        setGenusKnown(e.currentTarget.checked);
-                                        setGenus(undefined);
-                                        setFamily(undefined);
-                                        field.onChange(e);
-                                    }}
-                                ></Form.Check>
-                            )}
-                        />
-                        <Form.Label>Genus</Form.Label>
-                        <Typeahead
-                            name="genus"
-                            control={control}
-                            selected={genus ? [genus] : []}
-                            onChange={(g) => {
-                                setGenus(g[0]);
-                                setFamily(lookupFamily(g[0]));
-                            }}
-                            disabled={!watchGenusKnown}
-                            clearButton
-                            options={genera.filter((g) => g.name.localeCompare('Unknown'))}
-                            labelKey="name"
-                        />
-                        <Form.Text id="genusHelp" muted>
-                            The genus, if it is known. Required if known.
-                        </Form.Text>
+                    <Row>
+                        <Col>
+                            <Controller
+                                name="genusKnown"
+                                control={control}
+                                render={({ field }) => (
+                                    <Form.Check
+                                        {...register('genusKnown')}
+                                        type="checkbox"
+                                        label="Is this undescribed species part of a known Genus?"
+                                        checked={genusKnown}
+                                        onChange={(e) => {
+                                            setGenusKnown(e.currentTarget.checked);
+                                            setGenus(undefined);
+                                            setFamily(undefined);
+                                            field.onChange(e);
+                                        }}
+                                    ></Form.Check>
+                                )}
+                            />
+                        </Col>
+                    </Row>
+                    <Row>
+                        <Col>
+                            <Form.Label>Genus</Form.Label>
+                            <Typeahead
+                                name="genus"
+                                control={control}
+                                selected={genus ? [genus] : []}
+                                onChange={(g) => {
+                                    setGenus(g[0]);
+                                    setFamily(lookupFamily(g[0]));
+                                }}
+                                disabled={!watchGenusKnown}
+                                clearButton
+                                options={genera.filter((g) => g.name.localeCompare('Unknown'))}
+                                labelKey="name"
+                            />
+                            <Form.Text id="genusHelp" muted>
+                                The genus, if it is known. Required if known.
+                            </Form.Text>
+                        </Col>
+                    </Row>
 
-                        <Form.Label>Family</Form.Label>
-                        <Typeahead
-                            name="family"
-                            control={control}
-                            selected={family ? [family] : []}
-                            onChange={(f) => {
-                                setFamily(f[0]);
-                                const fam = families.find((fa) => fa.id === f[0]?.id);
-                                const genus = fam
-                                    ? genera.find((g) =>
-                                          pipe(
-                                              g.parent,
-                                              O.map((p) => p.id === fam.id && g.name.localeCompare('Unknown') == 0),
-                                              O.getOrElse(constFalse),
-                                          ),
-                                      )
-                                    : undefined;
-                                if (genus == undefined) {
-                                    // need a new Unknown Genus attached to this Family
-                                    setGenus({
-                                        id: -1,
-                                        description: '',
-                                        name: 'Unknown',
-                                        type: GENUS,
-                                    });
-                                } else {
-                                    setGenus(genus);
-                                }
-                            }}
-                            disabled={watchGenusKnown}
-                            clearButton
-                            options={families}
-                            labelKey="name"
-                        />
-                        <Form.Text id="familyHelp" muted>
-                            The family. If it is Unknown, select the Family Unknown from the list. Required.
-                        </Form.Text>
-                        <Form.Label>Type Host</Form.Label>
-                        <Typeahead
-                            name="host"
-                            control={control}
-                            selected={host ? [host] : []}
-                            onChange={(h) => {
-                                setHost(h[0]);
-                            }}
-                            clearButton
-                            options={hosts}
-                            labelKey="name"
-                        />
-                        <Form.Text id="hostHelp" muted>
-                            The host that is the Type for this undecribed gall. Required.
-                        </Form.Text>
-                        <Form.Label>Description</Form.Label>
-                        <Controller
-                            name="description"
-                            control={control}
-                            render={({ field }) => (
-                                <Form.Control
-                                    value={description}
-                                    onChange={(e) => {
-                                        setDescription(e.currentTarget.value);
-                                        field.onChange(e);
-                                    }}
-                                ></Form.Control>
-                            )}
-                        />
-                        <Form.Text id="descriptionHelp" muted>
-                            2 or 3 adjectives separated by dashes, e.g. red-bead-gall.
-                        </Form.Text>
-                        <Form.Label>Name</Form.Label>
-                        <Controller
-                            name="name"
-                            control={control}
-                            render={({ field }) => (
-                                <Form.Control
-                                    value={name}
-                                    onChange={(e) => {
-                                        setName(e.currentTarget.value);
-                                        field.onChange(e);
-                                    }}
-                                ></Form.Control>
-                            )}
-                        />
-                        <Form.Text id="nameHelp" muted>
-                            You can edit this but it is suggested that you accept the computed value.
-                        </Form.Text>
-                    </Form.Group>
+                    <Row>
+                        <Col>
+                            <Form.Label>Family</Form.Label>
+                            <Typeahead
+                                name="family"
+                                control={control}
+                                selected={family ? [family] : []}
+                                onChange={(f) => {
+                                    setFamily(f[0]);
+                                    const fam = families.find((fa) => fa.id === f[0]?.id);
+                                    const genus = fam
+                                        ? genera.find((g) =>
+                                              pipe(
+                                                  g.parent,
+                                                  O.map((p) => p.id === fam.id && g.name.localeCompare('Unknown') == 0),
+                                                  O.getOrElse(constFalse),
+                                              ),
+                                          )
+                                        : undefined;
+                                    if (genus == undefined) {
+                                        // need a new Unknown Genus attached to this Family
+                                        setGenus({
+                                            id: -1,
+                                            description: '',
+                                            name: 'Unknown',
+                                            type: GENUS,
+                                        });
+                                    } else {
+                                        setGenus(genus);
+                                    }
+                                }}
+                                disabled={watchGenusKnown}
+                                clearButton
+                                options={families}
+                                labelKey="name"
+                            />
+                            <Form.Text id="familyHelp" muted>
+                                The family. If it is Unknown, select the Family Unknown from the list. Required.
+                            </Form.Text>
+                        </Col>
+                    </Row>
+
+                    <Row>
+                        <Col>
+                            <Form.Label>Type Host</Form.Label>
+                            <AsyncTypeahead
+                                name="host"
+                                control={control}
+                                selected={host ? [host] : []}
+                                onChange={(h) => {
+                                    setHost(h[0]);
+                                }}
+                                clearButton
+                                options={hosts}
+                                labelKey="name"
+                                isLoading={isLoading}
+                                onSearch={handleHostSearch}
+                            />
+                            <Form.Text id="hostHelp" muted>
+                                The host that is the Type for this undescribed gall. Required.
+                            </Form.Text>
+                        </Col>
+                    </Row>
+
+                    <Row>
+                        <Col>
+                            <Form.Label>Description</Form.Label>
+                            <Controller
+                                name="description"
+                                control={control}
+                                render={({ field }) => (
+                                    <Form.Control
+                                        value={description}
+                                        onChange={(e) => {
+                                            setDescription(e.currentTarget.value);
+                                            field.onChange(e);
+                                        }}
+                                    ></Form.Control>
+                                )}
+                            />
+                            <Form.Text id="descriptionHelp" muted>
+                                2 or 3 adjectives separated by dashes, e.g. red-bead-gall.
+                            </Form.Text>
+                        </Col>
+                    </Row>
+
+                    <Row>
+                        <Col>
+                            <Form.Label>Name</Form.Label>
+                            <Controller
+                                name="name"
+                                control={control}
+                                render={({ field }) => (
+                                    <Form.Control
+                                        value={name}
+                                        onChange={(e) => {
+                                            setName(e.currentTarget.value);
+                                            field.onChange(e);
+                                        }}
+                                    ></Form.Control>
+                                )}
+                            />
+                            <Form.Text id="nameHelp" muted>
+                                You can edit this but it is suggested that you accept the computed value.
+                            </Form.Text>
+                        </Col>
+                    </Row>
                 </Form>
                 <Alert hidden={!errMessage} key="errAlert" variant="danger">
                     {errMessage}
                 </Alert>
             </Modal.Body>
             <Modal.Footer>
-                <div className="d-flex justify-content-end">
-                    <Row>
-                        <Col xs={4}>
-                            <Button variant="primary" disabled={!name || !genus || !family || !host} onClick={() => done(false)}>
-                                Done
-                            </Button>
-                        </Col>
-                        <Col>
-                            <Button
-                                variant="secondary"
-                                onClick={() => {
-                                    return done(true);
-                                }}
-                            >
-                                Cancel
-                            </Button>
-                        </Col>
-                    </Row>
-                </div>
+                <Row className="d-flex justify-content-end">
+                    <Col>
+                        <Button variant="primary" disabled={!name || !genus || !family || !host} onClick={() => done(false)}>
+                            Done
+                        </Button>{' '}
+                        <Button
+                            variant="secondary"
+                            onClick={() => {
+                                return done(true);
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                    </Col>
+                </Row>
             </Modal.Footer>
         </Modal>
     );

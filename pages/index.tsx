@@ -1,5 +1,6 @@
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
+import Image from 'next/image';
 import Link from 'next/link';
 import React from 'react';
 import { Card, Col, Container, Row } from 'react-bootstrap';
@@ -17,40 +18,75 @@ function Home({ randomGall }: Props): JSX.Element {
             <Head>
                 <meta name="description" content="The place to ID and learn about galls on plants in the US and Canada." />
             </Head>
-            <Container className="text-center p-5 ">
-                <Row>
-                    <Col>
+            <Container className="">
+                <Row className="d-flex pb-0">
+                    <Col xs={3} className="text-end p-0 m-0">
+                        <Image src="/images/cynipid_L.svg" width="100" height="100" />
+                    </Col>
+                    <Col xs={6} className="text-center p-0 m-0">
                         <h1>Welcome to Gallformers</h1>
+                        <div>The place to identify and learn about galls on plants in the US and Canada.</div>
+                    </Col>
+                    <Col xs={3} className="text-start p-0 m-0">
+                        <Image src="/images/cynipid_R.svg" width="100" height="100" />
                     </Col>
                 </Row>
-                <Row>
-                    <Col>The place to identify and learn about galls on plants in the US and Canada.</Col>
-                </Row>
-            </Container>
-            <Container>
+                <Row className="text-center pb-3"></Row>
                 <Row>
                     <Col>
                         <Card>
                             <Card.Header>
-                                <Link href="/id">
-                                    <a style={{ textDecoration: 'none' }}>
-                                        <h2>Identify a Gall &rarr;</h2>
-                                    </a>
-                                </Link>
+                                <h2>Things To Do</h2>
                             </Card.Header>
-                            <Card.Body>Try and get an Identity for a gall by providing known information.</Card.Body>
+                            <Card.Body>
+                                <Row>
+                                    <Col>
+                                        <Link href="/id">
+                                            <a style={{ textDecoration: 'none' }}>
+                                                <h3>Identify a Gall &rarr;</h3>
+                                            </a>
+                                        </Link>
+                                    </Col>
+                                    <Col>
+                                        <Link href="/explore">
+                                            <a style={{ textDecoration: 'none' }}>
+                                                <h3>Explore &rarr;</h3>
+                                            </a>
+                                        </Link>
+                                    </Col>
+                                </Row>
+                                <Row>
+                                    <Col>
+                                        <Link href="/resources">
+                                            <a style={{ textDecoration: 'none' }}>
+                                                <h3>Resources &rarr;</h3>
+                                            </a>
+                                        </Link>
+                                    </Col>
+                                    <Col>
+                                        <Link href="/glossary">
+                                            <a style={{ textDecoration: 'none' }}>
+                                                <h3>Glossary &rarr;</h3>
+                                            </a>
+                                        </Link>
+                                    </Col>
+                                </Row>
+                            </Card.Body>
                         </Card>
                     </Col>
                     <Col>
                         <Card>
                             <Card.Header>
-                                <Link href="/explore">
-                                    <a style={{ textDecoration: 'none' }}>
-                                        <h2>Explore &rarr;</h2>
-                                    </a>
-                                </Link>
+                                <h2>What the heck is a gall?!</h2>
                             </Card.Header>
-                            <Card.Body>Explore Galls (including Undescribed species) and Host Plants.</Card.Body>
+                            <Card.Body>
+                                Plant galls are abnormal growths of plant tissues, similar to tumors or warts in animals, that
+                                have an external cause--such as an insect, mite, nematode, virus, fungus, bacterium, or even
+                                another plant species. Growths caused by genetic mutations are not galls. Nor are lerps and other
+                                constructions on a plant that do not contain plant tissue. Plant galls are often complex
+                                structures that allow the insect or mite that caused the gall to be identified even if that insect
+                                or mite is not visible.
+                            </Card.Body>
                         </Card>
                     </Col>
                 </Row>
@@ -90,7 +126,9 @@ function Home({ randomGall }: Props): JSX.Element {
                             <Col>
                                 <Card>
                                     <Card.Body>
-                                        <Card.Title>Help Us Out</Card.Title>
+                                        <Card.Title>
+                                            <h2>Help Us Out</h2>
+                                        </Card.Title>
                                         If you find gallformers.org useful and you are interested in helping us out there are a
                                         few ways you can do so:
                                         <ul>
@@ -108,67 +146,6 @@ function Home({ randomGall }: Props): JSX.Element {
                                                 <Link href="https://github.com/jeffdc/gallformers">
                                                     Help fix bugs and add new features
                                                 </Link>
-                                            </li>
-                                        </ul>
-                                    </Card.Body>
-                                </Card>
-                            </Col>
-                        </Row>
-                        <Row className="pb-4">
-                            <Col>
-                                <Card>
-                                    <Card.Body>
-                                        <Card.Title>Resources</Card.Title>
-                                        <ul>
-                                            <li>
-                                                <Link href="/ref/IDGuide">Our guide to gall identification.</Link>
-                                            </li>
-                                            <li>
-                                                <Link href="/filterguide">Detailed descriptions for our key filters.</Link>
-                                            </li>
-                                            <li>
-                                                <Link href="/glossary">Glossary for plant and insect terms.</Link>
-                                            </li>
-                                            <li>
-                                                To ID galls and other plant symptoms in Europe, visit{' '}
-                                                <a href="https://bladmineerders.nl/" target="_blank" rel="noreferrer">
-                                                    bladmineerders.nl
-                                                </a>
-                                            </li>
-                                        </ul>
-                                    </Card.Body>
-                                </Card>
-                            </Col>
-                        </Row>
-                        <Row>
-                            <Col>
-                                <Card>
-                                    <Card.Body>
-                                        <Card.Title>Interesting Reading</Card.Title>
-                                        <ul>
-                                            <li>
-                                                If you are new to galls <a href="http://charleyeiseman.com/">Charley Eiseman</a>{' '}
-                                                and Noah Charney&apos;s{' '}
-                                                <a href="https://bookshop.org/books/tracks-sign-of-insects-other-invertebrates-a-guide-to-north-american-species/9780811736244">
-                                                    Tracks & Signs of Insects & Other Invertebrates: A Guide to North American
-                                                    Species
-                                                </a>{' '}
-                                                is a good place to start learning. It covers a lot more than just galls and is an
-                                                excellent resource.
-                                            </li>
-                                            <li>
-                                                A long-anticipated update to{' '}
-                                                <a href="https://press.princeton.edu/books/paperback/9780691205762/plant-galls-of-the-western-united-states">
-                                                    Russo&apos;s guide to galls of the Western US
-                                                </a>{' '}
-                                                was recently released by Princeton University Press.
-                                            </li>
-                                            <li>
-                                                Some{' '}
-                                                <a href="https://www.inaturalist.org/posts/47564-tips-for-gall-hunting">
-                                                    advice on finding galls
-                                                </a>
-                                                .
                                             </li>
                                         </ul>
                                     </Card.Body>
