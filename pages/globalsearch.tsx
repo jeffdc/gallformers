@@ -37,7 +37,7 @@ type Props = {
 const imageForType = (i: SearchResultItem) => {
     switch (i.type) {
         case 'gall':
-            return <Image src="/images/gall.svg" alt="gallformer" aria-label="gallformer" width="25px" height="25px" />;
+            return <Image src="/images/cynipid_R.svg" alt="gallformer" aria-label="gallformer" width="45px" height="45px" />;
         case 'plant':
             return <Image src="/images/host.svg" alt="plant" aria-label="plant" width="25px" height="25px" />;
         case 'entry':

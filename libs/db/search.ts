@@ -30,7 +30,8 @@ export type GlobalSearchResults = {
 };
 
 export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchResults> => {
-    const q = `%${search}%`;
+    // const q = `%${search}%`;
+    const q = `${search.replaceAll(' ', '%')}`;
 
     const speciesSearch = () =>
         db.species.findMany({

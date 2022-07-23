@@ -524,7 +524,7 @@ export const searchGalls = (q: string): TaskEither<Error, GallApi[]> => getGalls
 export const gallByName = (name: string): TaskEither<Error, GallApi[]> => getGalls([{ species: { name: name } }]);
 
 export const randomGall = (): TaskEither<Error, RandomGall[]> => {
-    // It is possible that this is naive and sacnning the entire table to get one random row will eventually create
+    // It is possible that this is naive and scanning the entire table to get one random row will eventually create
     // perf issues. We shall see...
     const gall = (): Promise<GallRet[]> =>
         db.$queryRaw`
