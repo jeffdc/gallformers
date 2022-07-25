@@ -18,7 +18,7 @@ import ImageGrid from '../../components/imagegrid';
 import { AsyncTypeahead } from '../../components/Typeahead';
 import { useConfirmation } from '../../hooks/useconfirmation';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { ImageApi } from '../../libs/api/apitypes';
+import { ImageApi, SourceWithSpeciesSourceApi } from '../../libs/api/apitypes';
 import { speciesById } from '../../libs/db/species';
 import Admin from '../../libs/pages/admin';
 import { TABLE_CUSTOM_STYLES } from '../../libs/utils/DataTableConstants';
@@ -216,16 +216,20 @@ const Images = ({ sp }: Props): JSX.Element => {
 
     const saveImage = async (img: ImageApi) => {
         axios
-            .post<ImageApi[]>(`/api/images`, {
-                headers: {
-                    'Content-Type': 'application/json',
+            .post<ImageApi[]>(
+                `/api/images`,
+                JSON.stringify({ ...img, lastchangedby: sessionUserOrUnknown(session?.user?.name) }),
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
                 },
-                body: JSON.stringify({ ...img, lastchangedby: sessionUserOrUnknown(session?.user?.name) }),
-            })
+            )
             .then((res) => setImages(res.data))
             .catch((e) => {
-                const msg = `Error while trying to update image.\n${JSON.stringify(img)}\n${e}`;
+                const msg = `Error while trying to update image with ID: '${JSON.stringify(img.id)}'\n${e}`;
                 console.error(msg);
+                console.error(img);
                 setError(msg);
             });
     };

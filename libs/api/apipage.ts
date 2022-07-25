@@ -72,10 +72,6 @@ export async function apiUpsertEndpoint<T, R>(
         msg: 'Can not upsert. No valid item provided in request body.',
     };
 
-    //JDC: added this to try and help figure out what is causing the weird crash that Chris triggers
-    logger.info(req, 'Upsert request');
-    logger.info(req.body, 'Upsert request body');
-
     //TODO - figure out how to make this type safe. Maybe need to have caller pass conversion f?
     const t = !req.body ? O.none : O.of(req.body as T);
 

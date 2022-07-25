@@ -102,13 +102,16 @@ export const sourcesWithSpeciesSourceBySpeciesId = (speciesId: number): TaskEith
     const sources = () =>
         db.source.findMany({
             include: { speciessource: true },
-            where: { speciessource: { some: { species_id: speciesId } } },
+            where: { speciessource: { some: { species_id: { equals: speciesId } } } },
         });
 
     // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(sources, handleError),
-        TE.map(adaptMany),
+        TE.map((d) => {
+            return d;
+        }),
+        TE.map((t) => adaptMany(t)),
         TE.map((t) => t as SourceWithSpeciesSourceApi[]), // kludge... :(
     );
 };

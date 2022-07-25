@@ -84,7 +84,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const res = await fetch(`../api/source?speciesid=${selected.speciesid}`, {
+                const res = await fetch(`/api/source?speciesid=${selected.speciesid}`, {
                     method: 'GET',
                 });
 
@@ -108,9 +108,9 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
         setValue('caption', selected.caption);
     }, [selected, setValue]);
 
-    useEffect(() => {
-        setSelected(image);
-    }, [image]);
+    // useEffect(() => {
+    //     setSelected(image);
+    // }, [image]);
 
     const onSubmit = async (fields: FormFields) => {
         const newImg: ImageApi = {
@@ -135,6 +135,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                 <Modal.Body>
                     <Row className="">
                         <Col xs={4} className="">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={selected.small} width="200px" />
                         </Col>
                         <Col xs={7} className="my-1">

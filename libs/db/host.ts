@@ -263,7 +263,7 @@ export const hostByName = (name: string): TaskEither<Error, HostApi[]> => getHos
  * @returns
  */
 export const hostsByGenus = (genus: string): TaskEither<Error, HostApi[]> => {
-    if (!genus || genus.length === 0) return TE.taskEither.of([]);
+    if (!genus || genus.length === 0) return TE.of([]);
 
     return getHosts([
         {
