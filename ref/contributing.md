@@ -56,7 +56,7 @@ Currently it is not possible to add hosted images to the article. You can link t
 
 To get your article published you will open a Pull Request against the gallformers repository on Github. To do this, follow these steps:
 
-1. Navigate to the [gallformers repository](https://github.com/jeffdc/gallformers/ref) on Github
+1. Navigate to the [gallformers repository](https://github.com/jeffdc/gallformers) on Github
 1. Make sure that you are logged in to Github
 1. Click on the "Add File" button
 1. Select "Create a New File"
