@@ -8,26 +8,30 @@ author:
 
 Thank you to all our Patrons!
 
-Oak tier:
-Madeleine Doney
+# Oak tier:
 
-Cecidomyiid tier:
-Timothy Frey
+- Madeleine Doney
 
-Cynipid tier:
-Andrew Deans
-Ellen Martinson
+# Cecidomyiid tier:
 
-Eriophyid tier:
-Lisa Appelbaum
-Duncan Brown
-Andrew Forbes
-Jennifer Flynn
-G Froelich
-Chris Friesen
-Michael Gates
-Robert Riedl
-cassi saari
-Carrie Seltzer
-Linyi Zhang
-Miles Zhang
+- Timothy Frey
+
+# Cynipid tier:
+
+- Andrew Deans
+- Ellen Martinson
+
+# Eriophyid tier:
+
+- Lisa Appelbaum
+- Duncan Brown
+- Andrew Forbes
+- Jennifer Flynn
+- G Froelich
+- Chris Friesen
+- Michael Gates
+- Robert Riedl
+- cassi saari
+- Carrie Seltzer
+- Linyi Zhang
+- Miles Zhang
