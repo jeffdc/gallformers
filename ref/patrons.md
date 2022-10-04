@@ -24,7 +24,6 @@ Thank you to all our Patrons!
 # Eriophyid tier:
 
 - Lisa Appelbaum
-- Duncan Brown
 - Andrew Forbes
 - Jennifer Flynn
 - G Froelich
@@ -33,5 +32,6 @@ Thank you to all our Patrons!
 - Robert Riedl
 - cassi saari
 - Carrie Seltzer
+- Scott Ulian
 - Linyi Zhang
 - Miles Zhang
