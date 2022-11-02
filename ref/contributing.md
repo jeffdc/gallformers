@@ -65,7 +65,7 @@ To get your article published you will open a Pull Request against the gallforme
 1. Copy the source of your article and paste it into the "Edit New File" box
 1. Click "Propose New File" at the bottom of the page
 1. On the next screen click on "Create pull request"
-1. In the comment section write any details that you want. These will seen by th reviewer and might be useful to describe why you think the article should be published on Gallformers
+1. In the comment section write any details that you want. These will seen by the reviewer and might be useful to describe why you think the article should be published on Gallformers
 1. Click on "Create pull request"
 
 At this point a Pull Request has been created. One of our reviewers will review the article. We may request changes to the article. We will do this via Github's review mechanism. You will be notified by email so make sure you have added Github to your address book so the messages do not end up lost in your spam folder.
@@ -76,7 +76,7 @@ Once the review process is done the article will go live on the site within a co
 
 If for whatever reason in the future you want to update the article the process is straight-forward. 
 
-1. Navigate to the article on Github. They are all in the [`ref`](https://github.com/jeffdc/gallformers/tree/main/ref)) directory 1. Once you have clicked on the article you want to edit, find the pencil icon in the toolbar above the article content and click on it
+1. Navigate to the article on Github. They are all in the [`ref`](https://github.com/jeffdc/gallformers/tree/main/ref) directory 1. Once you have clicked on the article you want to edit, find the pencil icon in the toolbar above the article content and click on it
 1. This will take you into an editor where you can make the changes
 1. Once the changes are complete fill in a comment as to the nature of the changes that you made
 1. Click on "Propose Changes"
