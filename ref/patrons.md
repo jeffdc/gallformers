@@ -24,6 +24,7 @@ Thank you to all our Patrons!
 # Eriophyid tier:
 
 - Lisa Appelbaum
+- Ruta Daugavietis
 - Andrew Forbes
 - Jennifer Flynn
 - G Froelich
