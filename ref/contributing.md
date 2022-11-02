@@ -76,7 +76,7 @@ Once the review process is done the article will go live on the site within a co
 
 If for whatever reason in the future you want to update the article the process is straight-forward. 
 
-1. Navigate to the article on Github. They are all in the [`ref`](https://github.com/jeffdc/gallformers/ref) directory 1. Once you have clicked on the article you want to edit, find the pencil icon in the toolbar above the article content and click on it
+1. Navigate to the article on Github. They are all in the [`ref`](https://github.com/jeffdc/gallformers/tree/main/ref)) directory 1. Once you have clicked on the article you want to edit, find the pencil icon in the toolbar above the article content and click on it
 1. This will take you into an editor where you can make the changes
 1. Once the changes are complete fill in a comment as to the nature of the changes that you made
 1. Click on "Propose Changes"
