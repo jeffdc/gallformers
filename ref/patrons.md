@@ -30,6 +30,7 @@ Thank you to all our Patrons!
 - G Froelich
 - Chris Friesen
 - Michael Gates
+- Noriko Ito
 - Henrik Kibak
 - Robert Riedl
 - cassi saari
