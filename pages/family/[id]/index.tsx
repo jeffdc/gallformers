@@ -87,21 +87,26 @@ const toTreeNodeInArray = (tree: TaxonomyTree): TreeNodeInArray[] => [
 
 // Use static so that this stuff can be built once on the server-side and then cached.
 export const getStaticProps: GetStaticProps = async (context) => {
-    const family = await getStaticPropsWithContext(context, taxonomyEntryById, 'family');
-    const tree = pipe(
-        await getStaticPropsWithContext(context, taxonomyTreeForId, 'species', false, true),
-        O.fold(constant([]), toTreeNodeInArray),
-    );
+    try {
+        const family = await getStaticPropsWithContext(context, taxonomyEntryById, 'family');
+        if (!family[0]) throw '404';
+        const tree = pipe(
+            await getStaticPropsWithContext(context, taxonomyTreeForId, 'species', false, true),
+            O.fold(constant([]), toTreeNodeInArray),
+        );
 
-    return {
-        props: {
-            // must add a key so that a navigation from the same route will re-render properly
-            key: family[0].id ?? -1,
-            family: family,
-            tree: tree,
-        },
-        revalidate: 1,
-    };
+        return {
+            props: {
+                // must add a key so that a navigation from the same route will re-render properly
+                key: family[0].id ?? -1,
+                family: family,
+                tree: tree,
+            },
+            revalidate: 1,
+        };
+    } catch (e) {
+        return { notFound: true };
+    }
 };
 
 export const getStaticPaths: GetStaticPaths = async () => getStaticPathsFromIds(allFamilyIds);
