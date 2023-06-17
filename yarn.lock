@@ -7479,9 +7479,9 @@ __metadata:
   linkType: hard
 
 "jose@npm:^4.1.4, jose@npm:^4.3.7":
-  version: 4.5.0
-  resolution: "jose@npm:4.5.0"
-  checksum: 51142150a9f571ca318842d34ac0daec49fb70bfb6034c68fd46d8c804a8325065876067202310c8ff3cbfc5ca8e44d4712467b4da0d3cadf1e47c96989ca4ca
+  version: 4.14.4
+  resolution: "jose@npm:4.14.4"
+  checksum: 2d820a91a8fd97c05d8bc8eedc373b944a0cd7f5fe41063086da233d0473c73fb523912a9f026ea870782bd221f4a515f441a2d3af4de48c6f2c76dac5082377
   languageName: node
   linkType: hard
 
