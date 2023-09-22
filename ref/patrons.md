@@ -11,10 +11,12 @@ Thank you to all our Patrons!
 # Oak tier:
 
 - Madeleine Doney
+- Joshua Newbend
 
 # Cecidomyiid tier:
 
 - Timothy Frey
+- Kathleen Sweetman
 
 # Cynipid tier:
 
