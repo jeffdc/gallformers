@@ -167,8 +167,9 @@ const UndescribedFlow = ({ show, onClose, genera, families }: Props): JSX.Elemen
                                 control={control}
                                 selected={genus ? [genus] : []}
                                 onChange={(g) => {
-                                    setGenus(g[0]);
-                                    setFamily(lookupFamily(g[0]));
+                                    const genus = g[0] as TaxonomyEntryNoParent;
+                                    setGenus(genus);
+                                    setFamily(lookupFamily(genus));
                                 }}
                                 disabled={!watchGenusKnown}
                                 clearButton
@@ -189,8 +190,9 @@ const UndescribedFlow = ({ show, onClose, genera, families }: Props): JSX.Elemen
                                 control={control}
                                 selected={family ? [family] : []}
                                 onChange={(f) => {
-                                    setFamily(f[0]);
-                                    const fam = families.find((fa) => fa.id === f[0]?.id);
+                                    const family = f[0] as TaxonomyEntryNoParent;
+                                    setFamily(family);
+                                    const fam = families.find((fa) => fa.id === family?.id);
                                     const genus = fam
                                         ? genera.find((g) =>
                                               pipe(

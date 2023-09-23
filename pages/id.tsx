@@ -320,14 +320,15 @@ const IDGall = (props: Props): JSX.Element => {
                                     control={control}
                                     selected={hostOrTaxon && isHost(hostOrTaxon) ? [hostOrTaxon] : []}
                                     onChange={(h) => {
-                                        setHostOrTaxon(h[0]);
+                                        setHostOrTaxon(h[0] as HostSimple);
                                         // clear the Place if any
                                         if (query) query.place = [];
                                     }}
                                     placeholder="Host"
                                     clearButton
                                     options={props.hosts}
-                                    labelKey={(host: HostSimple) => {
+                                    labelKey={(h) => {
+                                        const host = h as HostSimple;
                                         if (host) {
                                             const aliases = host.aliases
                                                 .map((a) => a.name)
@@ -350,12 +351,13 @@ const IDGall = (props: Props): JSX.Element => {
                                     control={control}
                                     selected={hostOrTaxon && isTaxonomy(hostOrTaxon) ? [hostOrTaxon] : []}
                                     onChange={(g) => {
-                                        setHostOrTaxon(g[0]);
+                                        setHostOrTaxon(g[0] as TaxonomyEntryNoParent);
                                     }}
                                     placeholder="Genus"
                                     clearButton
                                     options={props.sectionsAndGenera}
-                                    labelKey={(tax: TaxonomyEntryNoParent) => {
+                                    labelKey={(t) => {
+                                        const tax = t as TaxonomyEntryNoParent;
                                         if (tax) {
                                             return formatWithDescription(tax.name, tax.description);
                                         } else {
@@ -429,7 +431,8 @@ const IDGall = (props: Props): JSX.Element => {
                                     name="locations"
                                     control={filterControl}
                                     selected={query ? query.locations : []}
-                                    onChange={(selected) => {
+                                    onChange={(s) => {
+                                        const selected = s as string[];
                                         setQuery({
                                             ...(query ? query : EMPTYSEARCHQUERY),
                                             locations: selected,
@@ -454,7 +457,8 @@ const IDGall = (props: Props): JSX.Element => {
                                     name="detachable"
                                     control={filterControl}
                                     selected={query ? query.detachable : []}
-                                    onChange={(selected) => {
+                                    onChange={(s) => {
+                                        const selected = s as DetachableApi[];
                                         setQuery({
                                             ...(query ? query : EMPTYSEARCHQUERY),
                                             detachable: selected.length > 0 ? selected : [DetachableNone],
@@ -475,7 +479,8 @@ const IDGall = (props: Props): JSX.Element => {
                                     name="place"
                                     control={filterControl}
                                     selected={query ? query.place : []}
-                                    onChange={(selected) => {
+                                    onChange={(s) => {
+                                        const selected = s as string[];
                                         setQuery({
                                             ...(query ? query : EMPTYSEARCHQUERY),
                                             place: selected.length > 0 ? selected : [],
@@ -495,7 +500,8 @@ const IDGall = (props: Props): JSX.Element => {
                                     name="family"
                                     control={filterControl}
                                     selected={query ? query.family : []}
-                                    onChange={(selected) => {
+                                    onChange={(s) => {
+                                        const selected = s as string[];
                                         setQuery({
                                             ...(query ? query : EMPTYSEARCHQUERY),
                                             family: selected.length > 0 ? selected : [],

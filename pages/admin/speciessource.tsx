@@ -309,14 +309,15 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                                         control={form.control}
                                         clearButton
                                         options={sourcesForSpecies}
-                                        labelKey={(s) => sourceToDisplay(s.source)}
+                                        labelKey={(s) => sourceToDisplay((s as SpeciesSourceApi).source)}
                                         disabled={!selected}
                                         selected={selectedSource}
                                         onChange={(s) => {
-                                            setSelectedSource(s);
-                                            setDescription(s[0]?.description ?? '');
-                                            form.setValue('externallink', s[0] ? s[0].externallink : '');
-                                            form.setValue('useasdefault', s[0] ? s[0].useasdefault > 0 : false);
+                                            const source = s[0] as SpeciesSourceApi;
+                                            setSelectedSource([source]);
+                                            setDescription(source?.description ?? '');
+                                            form.setValue('externallink', source ? source.externallink : '');
+                                            form.setValue('useasdefault', source ? source.useasdefault > 0 : false);
                                         }}
                                     />
                                     {form.formState.errors.sources && (

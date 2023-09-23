@@ -15,7 +15,7 @@ import useAdmin from '../../hooks/useadmin';
 import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '../../hooks/useSpecies';
 import { extractQueryParam } from '../../libs/api/apipage';
 import * as AT from '../../libs/api/apitypes';
-import { FAMILY, GENUS, TaxonomyEntry } from '../../libs/api/taxonomy';
+import { FAMILY, GENUS, TaxonomyEntry, TaxonomyEntryNoParent } from '../../libs/api/taxonomy';
 import {
     getAlignments,
     getCells,
@@ -363,7 +363,7 @@ const Gall = ({
                             disabled={true}
                             onChange={(g) => {
                                 if (selected) {
-                                    selected.fgs.genus = g[0];
+                                    selected.fgs.genus = g[0] as TaxonomyEntryNoParent;
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -388,13 +388,14 @@ const Gall = ({
                                 if (f && f.length > 0) {
                                     // handle the case when a new species is created
                                     // either the genus is new or is not
+                                    const fam = f[0] as TaxonomyEntryNoParent;
                                     const genus = genera.find((gg) => gg.id === selected.fgs.genus.id);
                                     if (genus && O.isNone(genus.parent)) {
-                                        genus.parent = O.some({ ...f[0], parent: O.none });
+                                        genus.parent = O.some({ ...fam, parent: O.none });
                                         selected.fgs = { ...selected.fgs, genus: genus };
-                                        setSelected({ ...selected, fgs: { ...selected.fgs, family: f[0] } });
+                                        setSelected({ ...selected, fgs: { ...selected.fgs, family: fam } });
                                     } else {
-                                        selected.fgs = { ...selected.fgs, family: f[0] };
+                                        selected.fgs = { ...selected.fgs, family: fam };
                                         setSelected({ ...selected });
                                     }
                                 } else {
@@ -482,7 +483,7 @@ const Gall = ({
                             selected={selected ? selected.gall.gallwalls : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.gallwalls = w;
+                                    selected.gall.gallwalls = w as AT.FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -501,7 +502,7 @@ const Gall = ({
                             selected={selected ? selected.gall.gallcells : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.gallcells = w;
+                                    selected.gall.gallcells = w as AT.FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -520,7 +521,7 @@ const Gall = ({
                             selected={selected ? selected.gall.gallalignment : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.gallalignment = w;
+                                    selected.gall.gallalignment = w as AT.FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -541,7 +542,7 @@ const Gall = ({
                             selected={selected ? selected.gall.gallcolor : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.gallcolor = w;
+                                    selected.gall.gallcolor = w as AT.FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -560,7 +561,7 @@ const Gall = ({
                             selected={selected ? selected.gall.gallshape : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.gallshape = w;
+                                    selected.gall.gallshape = w as AT.FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -579,7 +580,7 @@ const Gall = ({
                             selected={selected ? selected.gall.gallseason : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.gallseason = w;
+                                    selected.gall.gallseason = w as AT.FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -598,7 +599,7 @@ const Gall = ({
                             selected={selected ? selected.gall.gallform : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.gallform = w;
+                                    selected.gall.gallform = w as AT.FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -619,7 +620,7 @@ const Gall = ({
                             selected={selected ? selected.gall.galllocation : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.galllocation = w;
+                                    selected.gall.galllocation = w as AT.FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -638,7 +639,7 @@ const Gall = ({
                             selected={selected ? selected.gall.galltexture : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.galltexture = w;
+                                    selected.gall.galltexture = w as AT.FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -662,7 +663,7 @@ const Gall = ({
                             }
                             onChange={(g) => {
                                 if (selected) {
-                                    selected.abundance = O.fromNullable(g[0]);
+                                    selected.abundance = O.fromNullable(g[0] as AT.AbundanceApi);
                                     setSelected({ ...selected });
                                 }
                             }}

@@ -2,7 +2,7 @@ import React, { FocusEvent, KeyboardEvent } from 'react';
 import { Typeahead as RBTypeahead, AsyncTypeahead as RBAsyncTypeahead, UseAsyncProps } from 'react-bootstrap-typeahead';
 import { TypeaheadComponentProps } from 'react-bootstrap-typeahead/types/components/Typeahead';
 import { LabelKey, Option } from 'react-bootstrap-typeahead/types/types';
-import { Control, Controller, Path } from 'react-hook-form';
+import { Control, Controller, FieldValues, Path } from 'react-hook-form';
 
 export type TypeaheadCustomOption = {
     customOption: boolean;
@@ -10,17 +10,20 @@ export type TypeaheadCustomOption = {
     id: string;
 };
 
-export type TypeaheadProps<T, FormFields> = Omit<TypeaheadComponentProps, 'labelKey' | 'options' | 'onChange' | 'selected'> & {
+export type TypeaheadProps<T, FormFields extends FieldValues> = Omit<
+    TypeaheadComponentProps,
+    'labelKey' | 'options' | 'onChange' | 'selected'
+> & {
     name: Path<FormFields>;
     control: Control<FormFields>;
     newSelectionPrefix?: string;
     rules?: Record<string, unknown>;
     onBlurT?: (e: FocusEvent<HTMLInputElement>) => void;
     onKeyDownT?: (e: KeyboardEvent<HTMLInputElement>) => void;
-    options: T[];
-    onChange: (t: T[]) => void;
-    selected: T[];
-    labelKey?: string | ((t: T) => string);
+    options: Option[];
+    onChange: (t: Option[]) => void;
+    selected: Option[];
+    labelKey?: string | ((t: Option) => string);
 };
 
 export type TypeaheadLabelKey = LabelKey; //T extends object ? Option | ((option: T) => string) : never;
@@ -28,7 +31,7 @@ export type TypeaheadLabelKey = LabelKey; //T extends object ? Option | ((option
 /**
  * A wrapped version of react-bootstrap-typeahead that handles new items and other misc stuff.
  */
-const Typeahead = <T, FormFields>({
+const Typeahead = <T, FormFields extends FieldValues>({
     name,
     control,
     rules,
@@ -38,13 +41,7 @@ const Typeahead = <T, FormFields>({
     labelKey,
     ...taProps
 }: TypeaheadProps<T, FormFields>): JSX.Element => {
-    const theLK = !labelKey
-        ? undefined
-        : typeof labelKey === 'string'
-        ? labelKey
-        : (o: Option) => {
-              return labelKey(o as T);
-          };
+    const theLK = !labelKey ? undefined : typeof labelKey === 'string' ? labelKey : (o: Option) => labelKey(o as T);
     return (
         <Controller
             control={control}
@@ -57,7 +54,7 @@ const Typeahead = <T, FormFields>({
                     options={options}
                     selected={selected}
                     onChange={(s: Option[]) => {
-                        onChange(s as T[]);
+                        onChange(s);
                     }}
                     ref={ref}
                     id={name}

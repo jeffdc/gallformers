@@ -167,16 +167,17 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                         name="source"
                                         control={control}
                                         options={sources}
-                                        labelKey={(s: SourceWithSpeciesSourceApi) => s.title}
+                                        labelKey={(s) => (s as SourceWithSpeciesSourceApi).title}
                                         clearButton
                                         selected={sourceFromOption(selected.source)}
-                                        onChange={(s) => {
+                                        onChange={(o) => {
+                                            const s = o[0] as SourceWithSpeciesSourceApi;
                                             setSelected({
                                                 ...selected,
-                                                source: O.fromNullable(s[0]),
-                                                license: s[0] ? asLicenseType(s[0].license) : '',
-                                                licenselink: s[0] ? s[0].licenselink : '',
-                                                creator: s[0] ? s[0].author : '',
+                                                source: O.fromNullable(s),
+                                                license: s ? asLicenseType(s.license) : '',
+                                                licenselink: s ? s.licenselink : '',
+                                                creator: s ? s.author : '',
                                             });
                                         }}
                                     />
