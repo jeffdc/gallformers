@@ -5888,8 +5888,8 @@ __metadata:
     prop-types: ^15.8.1
     react: ^18.2.0
     react-bootstrap: ^2.4.0
-    react-bootstrap-typeahead: ^6.0.0-rc.3
-    react-data-table-component: ^7.5.2
+    react-bootstrap-typeahead: ^6.2.3
+    react-data-table-component: ^7.5.3
     react-dom: ^18.2.0
     react-hook-form: ^7.33.1
     react-hot-toast: ^2.2.0
@@ -9316,9 +9316,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-bootstrap-typeahead@npm:^6.0.0-rc.3":
-  version: 6.0.0-rc.3
-  resolution: "react-bootstrap-typeahead@npm:6.0.0-rc.3"
+"react-bootstrap-typeahead@npm:^6.2.3":
+  version: 6.2.3
+  resolution: "react-bootstrap-typeahead@npm:6.2.3"
   dependencies:
     "@babel/runtime": ^7.14.6
     "@popperjs/core": ^2.10.2
@@ -9335,7 +9335,7 @@ __metadata:
   peerDependencies:
     react: ">=16.8.0"
     react-dom: ">=16.8.0"
-  checksum: 7decb143572f9d905d5bf7cc84de2267b119e51e5c03693b013e185d13501b73d1aa09977e15b64f4ec161ae42d41d8b478c6d24c934fd28652f380f75948150
+  checksum: 21dfe10d292d146eac5fd13dc4e15515b2e676e56243c495fda8ed733c6ee7dc09d1e71ec81a68fdbe8b8c737add53749ab6687cbb98dccece6144c404ad3230
   languageName: node
   linkType: hard
 
@@ -9366,15 +9366,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-data-table-component@npm:^7.5.2":
-  version: 7.5.2
-  resolution: "react-data-table-component@npm:7.5.2"
+"react-data-table-component@npm:^7.5.3":
+  version: 7.5.3
+  resolution: "react-data-table-component@npm:7.5.3"
   dependencies:
     deepmerge: ^4.2.2
   peerDependencies:
     react: ">= 16.8.3"
     styled-components: ">= 4"
-  checksum: 20cf64054e4dd29f4ca721a8e99689f87d1e885dded312102d18cbf1ebac7a4bf0838ea06630f3c5637753d355b2bdc60ee8b00a420415d5679ffc47b17d3f39
+  checksum: d17a85ad13b152d9c3fd0425a311bc3158985e428d500ad8c3625c88713fba4436abbb4fa3ae3628973b8770b9c15657b91958a49e4a49f1420b7ac9daad4ad2
   languageName: node
   linkType: hard
 

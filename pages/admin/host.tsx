@@ -235,7 +235,7 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                             disabled={true}
                             onChange={(g) => {
                                 if (selected) {
-                                    selected.fgs.genus = g[0];
+                                    selected.fgs.genus = g[0] as TaxonomyEntryNoParent;
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -260,12 +260,13 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                                     // handle the case when a new species is created
                                     // either the genus is new or is not
                                     const genus = genera.find((gg) => gg.id === selected.fgs.genus.id);
+                                    const fam = f[0] as TaxonomyEntry;
                                     if (genus && O.isNone(genus.parent)) {
-                                        genus.parent = O.some({ ...f[0], parent: O.none });
+                                        genus.parent = O.some({ ...fam, parent: O.none });
                                         selected.fgs = { ...selected.fgs, genus: genus };
-                                        setSelected({ ...selected, fgs: { ...selected.fgs, family: f[0] } });
+                                        setSelected({ ...selected, fgs: { ...selected.fgs, family: fam } });
                                     } else {
-                                        selected.fgs = { ...selected.fgs, family: f[0] };
+                                        selected.fgs = { ...selected.fgs, family: fam };
                                         setSelected({ ...selected });
                                     }
                                 } else {
@@ -305,7 +306,7 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                             }
                             onChange={(g) => {
                                 if (selected) {
-                                    selected.fgs.section = O.fromNullable(g[0]);
+                                    selected.fgs.section = O.fromNullable(g[0] as TaxonomyEntryNoParent);
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -332,7 +333,7 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                             }
                             onChange={(g) => {
                                 if (selected) {
-                                    selected.abundance = O.fromNullable(g[0]);
+                                    selected.abundance = O.fromNullable(g[0] as AbundanceApi);
                                     setSelected({ ...selected });
                                 }
                             }}

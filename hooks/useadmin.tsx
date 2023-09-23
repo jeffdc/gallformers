@@ -204,7 +204,9 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                                     }
                                     router.replace(``, undefined, { shallow: true });
                                 } else {
-                                    const t = s[0];
+                                    // should? be ok since we know it is not a string at this point. need to really look
+                                    // into rethinking the way this Typeahead is used/implemented.
+                                    const t = s[0] as unknown as T;
                                     setSelected(t);
                                     router.replace(`?id=${t.id}`, undefined, { shallow: true });
                                 }

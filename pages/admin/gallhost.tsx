@@ -220,7 +220,7 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
                                 disabled={!selected}
                                 selected={gallHosts ? gallHosts : []}
                                 onChange={(s) => {
-                                    setGallHosts(s);
+                                    setGallHosts(s as SpeciesWithPlaces[]);
                                 }}
                             />
                             {form.formState.errors.hosts && (

@@ -1,7 +1,7 @@
 ---
 title: 'FAQ About Undescribed Galls'
 date: '2022-05-23' 
-updated: '2023-03-15
+updated: '2023-03-15'
 description: 'What to do if you find an undescribed gall.'
 author:
     name: Adam Kranz
