@@ -1,4 +1,6 @@
 @import '../node_modules/bootstrap/scss/bootstrap';
+@import "../public/fa/scss/fontawesome.scss";
+@import "../public/fa/scss/solid.scss";
 
 // super useful for debugging CSS layout issues (visualizing layout and whitespace)
 // * {
@@ -8,15 +10,27 @@
 // }
 
 // palette
+$gf-sky-blue: #c1e0f3;
+$gf-autumn: #bc6428;
+$gf-maroon: #661419;
+
 $cadet-blue: #96adc8;
 $canary: #f8f991;
 $independence: #585563;
 $new-york-pink: #ce796b;
 $persian-orange: #c18c5d;
-$logo-blue: #303e88;
+$logo-blue: $gf-sky-blue;
 
 $table-header-background: $cadet-blue;
 $table-selected-row: $canary;
+
+// font awesome
+$fa-font-path: "/fa/webfonts";
+
+.hamburger {
+  @include fa-icon-solid($fa-var-bars);
+  color: $gf-maroon;
+}
 
 // range maps
 :export {
@@ -24,8 +38,14 @@ $table-selected-row: $canary;
     tableselectedrow: $table-selected-row;
 }
 
+@font-face {
+  font-family: "League Spartan";
+  src: url('/branding/Font/LeagueSpartan-VF.ttf') format('truetype');
+}
+
 body {
-    font-family: Helvetica, Arial, sans-serif;
+    font-family: "League Spartan", Helvetica, Arial, sans-serif;
+    color: gf-autumn;
 }
 
 a {
@@ -36,25 +56,58 @@ a:hover {
     text-decoration: underline;
 }
 
-.logotext {
-    font-family: Futura, Helvetica, Arial, sans-serif;
-    color: white;
-}
-
-.darklogotext {
-    font-family: Futura, Helvetica, Arial, sans-serif;
-    color: $logo-blue;
-}
-
 .navbar-custom {
-    background-color: $logo-blue;
-    font-family: Futura, Helvetica, Arial, sans-serif;
+    background-color: $gf-sky-blue;
+    font-family: "League Spartan", Futura, Helvetica, Arial, sans-serif;
 }
 
 .navbar-custom .navbar-brand,
 .navbar-custom .navbar-text,
-.navbar-custom .navbar-link {
-    color: white;
+.navbar-custom .navbar-nav .nav-link,
+.navbar-custom .nav-item.active .nav-link,
+.navbar-custom .nav-item:hover .nav-link {
+    color:$gf-maroon;
+    font-weight: 500;
+}
+
+.navbar-footer {
+    background-color: #f8f8f8;
+    font-family: "League Spartan", Futura, Helvetica, Arial, sans-serif;
+}
+
+// .navbar-footer .navbar-brand,
+.navbar-footer .navbar-text,
+.navbar-footer .navbar-link,
+.navbar-footer .nav-link {
+    color:$gf-maroon;
+    font-weight: 500;
+}
+
+.navbar-brand {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.search-button {
+    color: $gf-maroon;
+    border-color: $gf-maroon;
+}
+
+.title {
+    color: $gf-maroon;
+}
+
+.sub-title {
+    color: $gf-autumn;
+}
+
+.card {
+    border-color: #FFF;
+}
+
+.card-header {
+    color: $gf-maroon;
+    background-color: #FFF;
 }
 
 .description-text {

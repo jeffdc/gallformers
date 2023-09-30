@@ -18,30 +18,33 @@ const Footer = (): JSX.Element => {
     };
 
     return (
-        <Navbar expand="md" bg="light" variant="light" fixed="bottom" className="darklogotext">
-            <Navbar.Toggle aria-controls="navbarScroll" />
-            {mounted && session && (
-                <Navbar.Collapse>
-                    <Nav.Item className="px-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                            src={session?.user?.image == null ? undefined : session.user.image}
-                            alt={sessionUserOrUnknown(session?.user?.name)}
-                            width="25px"
-                            height="25px"
-                        />
-                    </Nav.Item>
-                    <Navbar.Text className="px-0">{sessionUserOrUnknown(session?.user?.name)}</Navbar.Text>
-                    <Nav.Item className="ps-2">{logoff()}</Nav.Item>
-                    <Nav.Link href="/admin">Admin</Nav.Link>
-                </Navbar.Collapse>
-            )}
-            <Nav.Link href="https://www.patreon.com/gallformers" target="__blank" rel="noreferrer">
-                Donate
-            </Nav.Link>
-            <Nav.Link href="/about" className="justify-content-end">
-                About
-            </Nav.Link>
+        <Navbar expand="sm" variant="dark" collapseOnSelect className="navbar-footer container-fluid">
+            <Navbar.Toggle aria-controls="responsive-navbar-nav">
+                <i className="hamburger" />
+            </Navbar.Toggle>
+            <Navbar.Collapse>
+                {mounted && session && (
+                    <>
+                        <Nav.Item className="px-2">
+                            <img
+                                src={session?.user?.image == null ? undefined : session.user.image}
+                                alt={sessionUserOrUnknown(session?.user?.name)}
+                                width="25px"
+                                height="25px"
+                            />
+                        </Nav.Item>
+                        <Navbar.Text className="px-2">{sessionUserOrUnknown(session?.user?.name)}</Navbar.Text>
+                        <Nav.Item className="ps-2">{logoff()}</Nav.Item>
+                        <Nav.Link href="/admin">Admin</Nav.Link>
+                    </>
+                )}
+                <Nav.Link href="https://www.patreon.com/gallformers" target="__blank" rel="noreferrer" className="ms-auto">
+                    Donate
+                </Nav.Link>
+                <Nav.Link href="/about" className="justify-content-end">
+                    About
+                </Nav.Link>
+            </Navbar.Collapse>
         </Navbar>
     );
 };

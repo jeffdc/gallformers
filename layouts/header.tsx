@@ -1,5 +1,4 @@
 import Head from 'next/head';
-import Image from 'next/image';
 import { useRouter } from 'next/router';
 import React, { KeyboardEvent, SyntheticEvent, useState } from 'react';
 import { Button, Container, Form, FormControl, Nav, Navbar, NavDropdown } from 'react-bootstrap';
@@ -27,33 +26,27 @@ const Header = (): JSX.Element => {
     };
 
     return (
-        <div
-            style={{
-                marginBottom: '5%',
-            }}
-        >
+        <>
             <Head>
                 <title>Gallformers</title>
                 <link rel="icon" href="/favicon.ico" />
             </Head>
-            <Navbar fixed="top" collapseOnSelect expand="md" className="navbar-custom" variant="dark">
+            <Navbar sticky="top" collapseOnSelect expand="md" className="navbar-custom" variant="dark" p-0 m-0>
                 <Container fluid>
                     <Navbar.Brand href="/">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                            src="/images/leaf-logo.svg"
-                            width="40px"
-                            height="40px"
-                            className="d-inline-block"
-                            alt="The gallformers logo, an orange oak leaf."
+                            src="/branding/Wide Logo Versions/gallformers_logo_wide_color.png"
+                            height="70px"
+                            // className="d-inline-block"
+                            alt="The gallformers logo: an oak gall wasp with a spherical oak gall and a white oak leaf."
                         />
-                        <span className="ps-2" style={{ fontSize: 'larger' }}>
-                            gallformers
-                        </span>
                     </Navbar.Brand>
-                    <Navbar.Toggle aria-controls="responsive-navbar-nav" />
+                    <Navbar.Toggle aria-controls="responsive-navbar-nav">
+                        <i className="hamburger" />
+                    </Navbar.Toggle>
                     <Navbar.Collapse id="responsive-navbar-nav">
-                        <Nav className="ms-auto my-2 my-lg-0">
+                        <Nav className="ms-auto my-0 my-lg-0">
                             <Nav.Link href="/id">Identify</Nav.Link>
                             <Nav.Link href="/explore">Explore</Nav.Link>
                             <Form
@@ -73,7 +66,7 @@ const Header = (): JSX.Element => {
                                     className="me-2"
                                     aria-label="Search"
                                 />
-                                <Button type="submit" variant="outline-light">
+                                <Button type="submit" variant="outline-light" className="search-button">
                                     Search
                                 </Button>
                             </Form>
@@ -86,7 +79,7 @@ const Header = (): JSX.Element => {
                     </Navbar.Collapse>
                 </Container>
             </Navbar>
-        </div>
+        </>
     );
 };
 
