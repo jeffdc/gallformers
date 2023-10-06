@@ -35,7 +35,7 @@ function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
                         </Col>
                     </Row>
                     <Row>
-                        <Col classNme="m-0 p-0">
+                        <Col className="m-2 p-2">
                             <ConfirmationServiceProvider>
                                 <Component {...pageProps} />
                             </ConfirmationServiceProvider>

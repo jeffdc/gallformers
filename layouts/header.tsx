@@ -31,14 +31,12 @@ const Header = (): JSX.Element => {
                 <title>Gallformers</title>
                 <link rel="icon" href="/favicon.ico" />
             </Head>
-            <Navbar sticky="top" collapseOnSelect expand="md" className="navbar-custom" variant="dark" p-0 m-0>
+            <Navbar sticky="top" collapseOnSelect expand="md" className="navbar-custom p-0 m-0" variant="dark">
                 <Container fluid>
                     <Navbar.Brand href="/">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                             src="/branding/Wide Logo Versions/gallformers_logo_wide_color.png"
                             height="70px"
-                            // className="d-inline-block"
                             alt="The gallformers logo: an oak gall wasp with a spherical oak gall and a white oak leaf."
                         />
                     </Navbar.Brand>

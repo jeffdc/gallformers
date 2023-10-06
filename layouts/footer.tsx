@@ -19,9 +19,6 @@ const Footer = (): JSX.Element => {
 
     return (
         <Navbar expand="sm" variant="dark" collapseOnSelect className="navbar-footer container-fluid">
-            <Navbar.Toggle aria-controls="responsive-navbar-nav">
-                <i className="hamburger" />
-            </Navbar.Toggle>
             <Navbar.Collapse>
                 {mounted && session && (
                     <>
@@ -45,6 +42,9 @@ const Footer = (): JSX.Element => {
                     About
                 </Nav.Link>
             </Navbar.Collapse>
+            <Navbar.Toggle aria-controls="responsive-navbar-nav">
+                <i className="hamburger" />
+            </Navbar.Toggle>
         </Navbar>
     );
 };

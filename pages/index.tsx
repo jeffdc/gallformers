@@ -21,7 +21,7 @@ function Home({ randomGall }: Props): JSX.Element {
             </Row>
             <Row className="text-center pb-3"></Row>
             <Row>
-                <Col>
+                <Col sm="12" md="7">
                     <Card>
                         <Card.Header>
                             <h2>What the heck is a gall?!</h2>
@@ -32,6 +32,32 @@ function Home({ randomGall }: Props): JSX.Element {
                             species. Growths caused by genetic mutations are not galls. Nor are lerps and other constructions on a
                             plant that do not contain plant tissue. Plant galls are often complex structures that allow the insect
                             or mite that caused the gall to be identified even if that insect or mite is not visible.
+                        </Card.Body>
+                    </Card>
+                </Col>
+                <Col>
+                    <Card>
+                        <Card.Header>
+                            <h2>Stuff you can do.</h2>
+                        </Card.Header>
+                        <Card.Body>
+                            <ul>
+                                <li>
+                                    <Link href="/id">
+                                        <a>Identify Galls</a>
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/refindex">
+                                        <a>Learn More About Galls</a>
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/explore">
+                                        <a>Explore the Data</a>
+                                    </Link>
+                                </li>
+                            </ul>
                         </Card.Body>
                     </Card>
                 </Col>
