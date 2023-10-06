@@ -403,7 +403,7 @@ export const deleteHost = (speciesid: number): TaskEither<Error, DeleteResult> =
             type: 'host',
             name: 'host',
             // Thanks Prisma: https://github.com/prisma/prisma/discussions/7284
-            count: batch.map((v) => (hasProp(v, 'count') ? v.count : v)).reduce((acc, v) => acc + v, 0),
+            count: batch.map((v) => (hasProp(v, 'count') ? (v.count as number) : v)).reduce((acc, v) => acc + v, 0),
         };
     };
 
