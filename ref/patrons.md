@@ -1,6 +1,6 @@
 ---
 title: 'Gallformers Patrons'
-date: '2022-09-19'
+date: '2023-10-01'
 description: 'A list of all past and current Gallformers patrons through Patreon.'
 author:
     name: Adam Kranz
@@ -40,6 +40,7 @@ Thank you to all our Patrons!
 - Robert Riedl
 - cassi saari
 - Carrie Seltzer
+- Ramsey Sullivan
 - Scott Ulian
 - Linyi Zhang
 - Miles Zhang
