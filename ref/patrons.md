@@ -1,6 +1,6 @@
 ---
 title: 'Gallformers Patrons'
-date: '2023-10-01'
+date: '2023-10-15'
 description: 'A list of all past and current Gallformers patrons through Patreon.'
 author:
     name: Adam Kranz
@@ -38,6 +38,7 @@ Thank you to all our Patrons!
 - Henrik Kibak
 - Maureen Murphy
 - Robert Riedl
+- ribbon
 - cassi saari
 - Carrie Seltzer
 - Ramsey Sullivan
