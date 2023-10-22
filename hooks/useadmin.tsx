@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import router from 'next/router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
-import { DeepPartial, Path, useForm, UseFormReturn } from 'react-hook-form';
+import { DeepPartial, FieldValues, Path, useForm, UseFormReturn } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import * as yup from 'yup';
 import { AnyObject, AssertsShape, ObjectShape, TypeOfShape } from 'yup/lib/object';
@@ -19,7 +19,7 @@ import { hasProp, pluralize } from '../libs/utils/util';
 import { AdminFormFields, useAPIs } from './useAPIs';
 import { useConfirmation } from './useconfirmation';
 
-type AdminData<T, FormFields> = {
+type AdminData<T, FormFields extends FieldValues> = {
     data: T[];
     setData: (ts: T[]) => void;
     selected?: T;

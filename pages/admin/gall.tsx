@@ -114,7 +114,7 @@ const Gall = ({
 
         return {
             ...toSpeciesUpsertFields(fields, name, id),
-            gallid: hasProp(fields.mainField[0], 'gall') ? fields.mainField[0].gall.id : -1,
+            gallid: hasProp(fields.mainField[0], 'gall') ? (fields.mainField[0] as AT.GallApi).gall.id : -1,
             alignments: fields.alignments.map((a) => a.id),
             cells: fields.cells.map((c) => c.id),
             colors: fields.colors.map((c) => c.id),
