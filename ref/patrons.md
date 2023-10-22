@@ -1,6 +1,6 @@
 ---
 title: 'Gallformers Patrons'
-date: '2023-10-01'
+date: '2023-10-08'
 description: 'A list of all past and current Gallformers patrons through Patreon.'
 author:
     name: Adam Kranz
@@ -27,6 +27,7 @@ Thank you to all our Patrons!
 
 - Lisa Appelbaum
 - Deborah Barber
+- Tricia Bippus
 - Ruta Daugavietis
 - Andrew Forbes
 - Jennifer Flynn
