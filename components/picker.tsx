@@ -13,7 +13,7 @@ type Props<T> = {
     placeholder?: string;
 };
 
-const Picker = <T,>({ size, title, data, toLabel, show, onClose, placeholder }: Props<T>): JSX.Element => {
+const Picker = <T extends Option>({ size, title, data, toLabel, show, onClose, placeholder }: Props<T>): JSX.Element => {
     const [selected, setSelected] = useState<T | undefined>(undefined);
 
     const done = () => {

@@ -35,7 +35,7 @@ const Images = ({ sp }: Props): JSX.Element => {
         ...sp,
         // move the default image so it is 1st (never know what the caller is handing us)
         // also do the type conversion to make sure we were not handed Sources with no Images
-        images: sp.images.sort((a, b) => (a.default ? -1 : 0)).map((i) => checkSource(i)),
+        images: sp.images.sort((a) => (a.default ? -1 : 0)).map((i) => checkSource(i)),
     };
     const [showModal, setShowModal] = useState(false);
     const [currentImage, setCurrentImage] = useState(species.images.length > 0 ? species.images[0] : undefined);

@@ -10,7 +10,7 @@ export type TypeaheadCustomOption = {
     id: string;
 };
 
-export type TypeaheadProps<T, FormFields extends FieldValues> = Omit<
+export type TypeaheadProps<FormFields extends FieldValues> = Omit<
     TypeaheadComponentProps,
     'labelKey' | 'options' | 'onChange' | 'selected'
 > & {
@@ -31,7 +31,7 @@ export type TypeaheadLabelKey = LabelKey; //T extends object ? Option | ((option
 /**
  * A wrapped version of react-bootstrap-typeahead that handles new items and other misc stuff.
  */
-const Typeahead = <T, FormFields extends FieldValues>({
+const Typeahead = <T extends Option, FormFields extends FieldValues>({
     name,
     control,
     rules,
@@ -40,7 +40,7 @@ const Typeahead = <T, FormFields extends FieldValues>({
     selected,
     labelKey,
     ...taProps
-}: TypeaheadProps<T, FormFields>): JSX.Element => {
+}: TypeaheadProps<FormFields>): JSX.Element => {
     const theLK = !labelKey ? undefined : typeof labelKey === 'string' ? labelKey : (o: Option) => labelKey(o as T);
     return (
         <Controller
@@ -64,7 +64,10 @@ const Typeahead = <T, FormFields extends FieldValues>({
     );
 };
 
-export type AsyncTypeaheadProps<T, FormFields> = Omit<UseAsyncProps, 'labelKey' | 'options' | 'onChange' | 'selected'> & {
+export type AsyncTypeaheadProps<T, FormFields extends FieldValues> = Omit<
+    UseAsyncProps,
+    'labelKey' | 'options' | 'onChange' | 'selected'
+> & {
     name: Path<FormFields>;
     control: Control<FormFields>;
     rules?: Record<string, unknown>;
@@ -76,7 +79,7 @@ export type AsyncTypeaheadProps<T, FormFields> = Omit<UseAsyncProps, 'labelKey' 
     labelKey?: string | ((t: T) => string);
 };
 
-export const AsyncTypeahead = <T, FormFields>({
+export const AsyncTypeahead = <T, FormFields extends FieldValues>({
     name,
     control,
     rules,
@@ -104,8 +107,8 @@ export const AsyncTypeahead = <T, FormFields>({
                     ref={ref}
                     id={name}
                     labelKey={theLK}
-                    options={options}
-                    selected={selected}
+                    options={options as Option[]}
+                    selected={selected as Option[]}
                     onChange={(s: Option[]) => {
                         onChange(s as T[]);
                     }}

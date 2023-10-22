@@ -15,7 +15,7 @@ function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
     return (
         <SSRProvider>
             <SessionProvider session={pageProps.session}>
-                <Container fluid className="pt-4">
+                <Container fluid className="p-0 m-0">
                     <Head>
                         {/* <script type="text/javascript"> */}
                         {/* Fix for Firefox autofocus CSS bug See:
@@ -24,20 +24,28 @@ function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
 
                         <title>Gallformers</title>
                         <link rel="icon" href="/favicon.ico" />
+                        <meta
+                            name="description"
+                            content="The place to ID and learn about galls on plants in the US and Canada."
+                        />
                     </Head>
                     <Row>
-                        <Col>
+                        <Col className="m-0 p-0">
                             <Header />
                         </Col>
                     </Row>
-                    <Row className="pb-5 mb-5">
-                        <Col>
+                    <Row>
+                        <Col className="m-2 p-2">
                             <ConfirmationServiceProvider>
                                 <Component {...pageProps} />
                             </ConfirmationServiceProvider>
                         </Col>
                     </Row>
-                    <Footer />
+                    <Row>
+                        <Col className="m-0 p-0">
+                            <Footer />
+                        </Col>
+                    </Row>
                 </Container>
             </SessionProvider>
         </SSRProvider>

@@ -70,10 +70,11 @@ export const useAPIs = <T extends WithID, U>(
             } else {
                 let updated: U;
                 if (hasProp(value, 'customOption')) {
+                    const v = value as TypeaheadCustomOption;
                     // extract the "key" form value from the object (the typeahead component forces the name of the key
                     // to match the 'labelKey' that is used to extract the options. but there is no way to bind this
                     // until runtime so we can not do this in a type safe way.)
-                    const keyFieldVal = value[keyProp as unknown as keyof TypeaheadCustomOption] as unknown as string;
+                    const keyFieldVal = v[keyProp as keyof TypeaheadCustomOption] as string;
                     updated = convertFieldsToUpsert(data, keyFieldVal.trim(), -1);
                 } else {
                     const keyFieldVal = value[keyProp] as unknown as string;
