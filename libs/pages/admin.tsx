@@ -149,15 +149,7 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
                 )}
 
                 <Navbar bg="" variant="light">
-                    <Nav.Link
-                        // disabled={!validLinkableTypes.includes(props.type) || !props.selected}
-                        disabled={!props.selected}
-                        href={link()}
-                        // validLinkableTypes.includes(props.type) || !props.selected
-                        //     ? `/${props.type.toLowerCase()}/${props.selected?.id}`
-                        //     : ''
-                        // }
-                    >
+                    <Nav.Link disabled={!props.selected} href={link()}>
                         🔗
                     </Nav.Link>
                     <Nav variant="tabs" defaultActiveKey={props.type}>

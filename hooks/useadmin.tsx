@@ -166,8 +166,8 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                         }}
                         onSearch={handleSearch}
                         minLength={1}
-                        delay={200}
-                        useCache={false}
+                        delay={500}
+                        useCache={true}
                         isLoading={isLoading}
                         // needed when using async
                         filterBy={() => true}

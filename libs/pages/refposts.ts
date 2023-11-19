@@ -5,7 +5,7 @@ import { logger } from '../utils/logger';
 import sanitize from 'sanitize-filename';
 
 const postsDirectory = join(process.cwd(), 'ref');
-logger.info(`Pulling ref articles from '${postsDirectory}'`);
+// logger.info(`Pulling ref articles from '${postsDirectory}'`);
 
 export function getPostSlugs() {
     return fs.readdirSync(postsDirectory);

@@ -73,8 +73,8 @@ export async function apiUpsertEndpoint<T, R>(
     };
 
     //JDC: added this to try and help figure out what is causing the weird crash that Chris triggers
-    logger.info(req, 'Upsert request');
-    logger.info(req.body, 'Upsert request body');
+    // logger.info(req, 'Upsert request');
+    // logger.info(req.body, 'Upsert request body');
 
     //TODO - figure out how to make this type safe. Maybe need to have caller pass conversion f?
     const t = !req.body ? O.none : O.of(req.body as T);
@@ -110,7 +110,7 @@ export async function apiSearchEndpoint<T>(
         return TE.left({ status: 400, msg: `Failed to provide the ${q} d as a query param.` });
     };
 
-    await pipe(
+    return await pipe(
         'q',
         getQueryParam(req),
         O.map(dbSearch),
@@ -182,7 +182,7 @@ export const getQueryParam =
         extractQueryParam(req.query, prop);
 
 /**
- * Send a 200 success repsonse as JSON.
+ * Send a 200 success response as JSON.
  * @param res
  * @returns we only have a return value to make it easier to compose in pipes. This function sends the requests without delay.
  */
