@@ -6,8 +6,16 @@ The gallformers site
 ## Getting Started
 You must have [npm](https://www.npmjs.com/get-npm) and yarn installed for any of this to work. Go do that. I highly recommend using a node version manager of some kind. Or you can download node and yarn from [here](https://nodejs.org/en/download/)
 
-Get setup:
+The Easy Way™:
+Assumes you are on a Mac and have [homebrew](https://brew.sh/) installed.
+
 ```bash
+brew install nvm
+nvm install 20
+cd [wherever you cloned the repo]/gallformers
+nvm use 20
+corepack enable
+yarn set version berry
 yarn install
 npx prisma generate
 ```
