@@ -3,7 +3,7 @@ import { Alert, Button, Col, Row } from 'react-bootstrap';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
-import externalLinks from 'remark-external-links';
+import rehypeExternalLinks from 'rehype-external-links';
 import { ALLRIGHTS, CC0, CCBY, GallTaxon, HostTaxon, SpeciesSourceApi } from '../libs/api/apitypes';
 import { formatLicense, sourceToDisplay } from '../libs/pages/renderhelpers';
 import { SELECTED_ROW_STYLE, TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
@@ -38,10 +38,10 @@ const linkLicense = (row: SpeciesSourceApi) => {
                         row.source.license === CC0
                             ? '/images/CC0.png'
                             : row.source.license === CCBY
-                            ? '/images/CCBY.png'
-                            : row.source.license === ALLRIGHTS
-                            ? '/images/allrights.svg'
-                            : ''
+                              ? '/images/CCBY.png'
+                              : row.source.license === ALLRIGHTS
+                                ? '/images/allrights.svg'
+                                : ''
                     }
                     height="20"
                 />
@@ -177,7 +177,7 @@ const SourceList = ({ data, defaultSelection, onSelectionChange, taxonType }: So
                     {selectedSource && selectedSource.description && (
                         <span>
                             <span className="source-quotemark">&ldquo;</span>
-                            <ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[externalLinks, remarkBreaks]}>
+                            <ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[rehypeExternalLinks, remarkBreaks]}>
                                 {selectedSource.description}
                             </ReactMarkdown>
                             <span className="source-quotemark">&rdquo;</span>

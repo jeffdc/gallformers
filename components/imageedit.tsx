@@ -17,29 +17,34 @@ type Props = {
 };
 
 const Schema = yup.object().shape({
-    source: yup.array(),
+    default: yup.boolean().required(),
+    creator: yup.string().required('You must provide a reference to the creator.'),
+    attribution: yup.string().when('license', {
+        is: (l: string) => l === ALLRIGHTS,
+        then: () =>
+            yup
+                .string()
+                .required(
+                    'You must document proof that we are allowed to use the image when using an All Rights Reserved license.',
+                ),
+    }),
     sourcelink: yup
         .string()
         .url()
         .when('source', {
             is: (s: []) => s.length === 0,
-            then: yup.string().required('You must provide a link to the source.'),
+            then: () => yup.string().required('You must provide a link to the source.'),
         }),
-    license: yup.string().required('You must select a license.'),
-    creator: yup.string().required('You must provide a reference to the creator.'),
+    source: yup.array<SourceWithSpeciesSourceApi>().required(),
+    license: yup.string<LicenseType>().required('You must select a license.'),
     licenselink: yup
         .string()
         .url()
         .when('license', {
             is: (l: string) => l === CCBY,
-            then: yup.string().url().required('The CC-BY license requires that you provide a link to the license.'),
+            then: () => yup.string().url().required('The CC-BY license requires that you provide a link to the license.'),
         }),
-    attribution: yup.string().when('license', {
-        is: (l: string) => l === ALLRIGHTS,
-        then: yup
-            .string()
-            .required('You must document proof that we are allowed to use the image when using an All Rights Reserved license.'),
-    }),
+    caption: yup.string().required(),
 });
 
 type FormFields = {
@@ -77,6 +82,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
         control,
     } = useForm<FormFields>({
         mode: 'onBlur',
+        // @ts-expect-error no idea why but with updates to hook-forms and yup the types no longer align ...
         resolver: yupResolver(Schema),
         defaultValues: formFromImage(image),
     });

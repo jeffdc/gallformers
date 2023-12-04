@@ -52,9 +52,7 @@ const Genus = ({ genus, species }: Props): JSX.Element => {
                 <Col>
                     <strong>Family:</strong>{' '}
                     <Link key={fam.id} href={`/family/${fam.id}`}>
-                        <a>
-                            <i>{fam.name}</i>
-                        </a>
+                        <i>{fam.name}</i>
                     </Link>
                     {` (${fam.description})`}
                 </Col>

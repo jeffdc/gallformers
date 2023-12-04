@@ -49,7 +49,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                 const ext = file.name.split('.').pop();
                 const path = `gall/${id}/${id}_${t}_original.${ext}`;
                 const res = await fetch(`../api/images/uploadurl?path=${path}&mime=${file.type}`);
-                // this is a hack and something changed to put double quotes around the reponse
+                // this is a hack and something changed to put double quotes around the response
                 // i have no idea what and I am out of time trying to figure it out :(
                 const url = (await res.text()).split('"').join('');
                 console.log(`JDC: url: ${url}`);
@@ -61,7 +61,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                             'Content-Type': file.type,
                         },
                         onUploadProgress: (e) =>
-                            setProgress(Math.round((100 * e.loaded) / e.total / filesRemaining) * uploadMaxPercent),
+                            setProgress(Math.round((100 * e.loaded) / (e.total ?? 4) / filesRemaining) * uploadMaxPercent),
                     })
                     .catch((e) => {
                         if (axios.isAxiosError(e)) {

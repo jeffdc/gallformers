@@ -13,18 +13,19 @@ import { allGlossaryEntries, Entry } from '../../libs/db/glossary';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
 
-const schema = yup.object().shape({
+type FormFields = AdminFormFields<Entry> & Pick<Entry, 'definition' | 'urls'>;
+
+const schema = yup.object<FormFields>({
     mainField: yup.mixed().required(),
     definition: yup.string().required(),
     urls: yup.string().required(),
+    del: yup.boolean().required(),
 });
 
 type Props = {
     id: string;
     glossary: Entry[];
 };
-
-type FormFields = AdminFormFields<Entry> & Pick<Entry, 'definition' | 'urls'>;
 
 const renameEntry = async (s: Entry, e: RenameEvent): Promise<Entry> => ({
     ...s,

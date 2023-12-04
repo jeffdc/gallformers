@@ -12,9 +12,7 @@ const linkSpecies = (s: SimpleSpecies) => {
     const hostOrGall = s.taxoncode === GallTaxon ? 'gall' : 'host';
     return (
         <Link key={s.id} href={`/${hostOrGall}/${s.id}`}>
-            <a>
-                <i>{s.name}</i>
-            </a>
+            <i>{s.name}</i>
         </Link>
     );
 };

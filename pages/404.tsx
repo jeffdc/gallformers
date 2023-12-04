@@ -26,9 +26,7 @@ export default function FourOhFour(): JSX.Element {
                         </Row>
                         <Row className="p-3">
                             <p>
-                                <Link href="/">
-                                    <a>Go back home</a>
-                                </Link>
+                                <Link href="/">Go back home</Link>
                             </p>
                         </Row>
                     </div>

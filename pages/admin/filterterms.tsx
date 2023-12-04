@@ -21,9 +21,11 @@ import { getAlignments, getCells, getForms, getLocations, getShapes, getTextures
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
 
-const schema = yup.object().shape({
-    mainField: yup.mixed().required(),
-    description: yup.mixed().test('definition', 'must not be empty', (value: O.Option<string>) => {
+type FormFields = AdminFormFields<FilterField> & Pick<FilterField, 'description'>;
+
+const schema = yup.object({
+    mainField: yup.array().required(),
+    description: yup.object<O.Option<string>>().test('definition', 'must not be empty', (value: O.Option<string>) => {
         return (
             value &&
             pipe(
@@ -32,6 +34,7 @@ const schema = yup.object().shape({
             )
         );
     }),
+    del: yup.boolean().required(),
 });
 
 type Props = {
@@ -43,8 +46,6 @@ type Props = {
     textures: FilterField[];
     walls: FilterField[];
 };
-
-type FormFields = AdminFormFields<FilterField> & Pick<FilterField, 'description'>;
 
 const renameField = async (s: FilterField, e: RenameEvent): Promise<FilterField> => ({
     ...s,

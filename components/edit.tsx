@@ -15,8 +15,8 @@ const Edit = ({ id, type }: Props): JSX.Element => {
     return (
         <>
             {mounted && session && (
-                <Link href={`/admin/${type}?id=${id}`}>
-                    <a className="p-1">✎</a>
+                <Link href={`/admin/${type}?id=${id}`} className="p-1">
+                    ✎
                 </Link>
             )}
         </>

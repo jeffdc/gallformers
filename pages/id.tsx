@@ -696,18 +696,16 @@ const IDGall = (props: Props): JSX.Element => {
                                 <Col key={g.id.toString() + 'col'} xs={6} md={3} className="pb-2">
                                     <Card key={g.id} border="secondary">
                                         <Link href={`gall/${g.id}`}>
-                                            <a>
-                                                <Card.Img
-                                                    variant="top"
-                                                    src={defaultImage(g)?.small ? defaultImage(g)?.small : '/images/noimage.jpg'}
-                                                    alt={`${g.name} - ${summary}`}
-                                                />
-                                            </a>
+                                            <Card.Img
+                                                variant="top"
+                                                src={defaultImage(g)?.small ? defaultImage(g)?.small : '/images/noimage.jpg'}
+                                                alt={`${g.name} - ${summary}`}
+                                            />
                                         </Link>
                                         <Card.Body>
                                             <Card.Title>
-                                                <Link href={`gall/${g.id}`}>
-                                                    <a className="small">{g.name}</a>
+                                                <Link href={`gall/${g.id}`} className="small">
+                                                    {g.name}
                                                 </Link>
                                             </Card.Title>
                                             <Card.Text className="small">

@@ -7,8 +7,6 @@ import { Button, Col, Row } from 'react-bootstrap';
 import { DeepPartial, FieldValues, Path, useForm, UseFormReturn } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import * as yup from 'yup';
-import { AnyObject, AssertsShape, ObjectShape, TypeOfShape } from 'yup/lib/object';
-import { Maybe } from 'yup/lib/types';
 import { superAdmins } from '../components/auth';
 import { ConfirmationOptions } from '../components/confirmationdialog';
 import { RenameEvent } from '../components/editname';
@@ -84,7 +82,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         delQueryString?: () => string;
         nameExistsEndpoint?: (name: string) => string;
     },
-    schema: yup.ObjectSchema<ObjectShape, AnyObject, Maybe<TypeOfShape<ObjectShape>>, Maybe<AssertsShape<ObjectShape>>>,
+    schema: yup.ObjectSchema<yup.ObjectShape>,
     updatedFormFields: (t: T | undefined) => Promise<FormFields>,
     reloadOnUpdate = false,
     createNew?: (v: string) => T,

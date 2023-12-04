@@ -32,9 +32,7 @@ type Props = {
 const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
     return (
         <span key={h.id}>
-            <Link href={`/host/${h.id}`}>
-                <a>{h.name}</a>
-            </Link>
+            <Link href={`/host/${h.id}`}>{h.name}</Link>
             {idx < len - 1 ? ' / ' : ''}
         </span>
     );
@@ -104,12 +102,12 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                 <Col>
                                     <strong>Family: </strong>
                                     <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
-                                        <a>{taxonomy.family.name}</a>
+                                        {taxonomy.family.name}
                                     </Link>
                                     {' | '}
                                     <strong>Genus: </strong>
                                     <Link key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
-                                        <a>{formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}</a>
+                                        {formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}
                                     </Link>
                                 </Col>
                             </Row>
@@ -168,7 +166,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                                 <span key={g.id}>
                                                     {' '}
                                                     <Link key={g.id} href={`/gall/${g.id}`}>
-                                                        <a>{g.name}</a>
+                                                        {g.name}
                                                     </Link>
                                                     {i < relatedGalls.length - 1 ? ', ' : ''}
                                                 </span>

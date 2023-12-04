@@ -92,10 +92,10 @@ export const AsyncTypeahead = <T, FormFields extends FieldValues>({
     const theLK = !labelKey
         ? undefined
         : typeof labelKey === 'string'
-        ? labelKey
-        : (o: Option) => {
-              return labelKey(o as T);
-          };
+          ? labelKey
+          : (o: Option) => {
+                return labelKey(o as T);
+            };
     return (
         <Controller
             control={control}

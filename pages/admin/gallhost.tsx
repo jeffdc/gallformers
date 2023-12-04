@@ -189,11 +189,8 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
                         can edit these mappings (add or delete).
                     </p>
                     <p>
-                        At least one host species must exist before mapping.{' '}
-                        <Link href="./host">
-                            <a>Go add one</a>
-                        </Link>{' '}
-                        now if you need to.
+                        At least one host species must exist before mapping. <Link href="./host">Go add one</Link> now if you need
+                        to.
                     </p>
                     <Row className="my-1">
                         <Col>
@@ -306,8 +303,8 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
                                                             outRange.has(code)
                                                                 ? 'LightCoral'
                                                                 : inRange.has(code)
-                                                                ? 'ForestGreen'
-                                                                : 'White'
+                                                                  ? 'ForestGreen'
+                                                                  : 'White'
                                                         }
                                                         style={{
                                                             default: { outline: 'none' },

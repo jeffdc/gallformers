@@ -408,7 +408,10 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                                 )}
                             </div>
                             <div>
-                                <Link href={`./images?speciesid=${selected?.id}`}>{`Add/Edit Images for this Species`}</Link>
+                                <Link
+                                    href={`./images?speciesid=${selected?.id}`}
+                                    legacyBehavior
+                                >{`Add/Edit Images for this Species`}</Link>
                             </div>
                         </Col>
                     </Row>

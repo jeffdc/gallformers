@@ -31,9 +31,7 @@ const linkGall = (g: GallSimple) => {
     return (
         <>
             <Link key={g.id} href={`/gall/${g.id}`}>
-                <a>
-                    <i>{g.name}</i>
-                </a>
+                <i>{g.name}</i>
             </Link>
             <Edit id={g.id} type="gall" />
         </>
@@ -86,9 +84,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                         host.name,
                                     )}&type=host&detachable=&alignment=&cells=&color=&locations=&season=&shape=&textures=&walls=&form=&undescribed=false`}
                                 >
-                                    <a>
-                                        <em>{host.name}</em>
-                                    </a>
+                                    <em>{host.name}</em>
                                 </Link>
                             </h2>
                         </Col>
@@ -115,7 +111,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                             <p>
                                 <strong>Family: </strong>
                                 <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
-                                    <a>{taxonomy.family.name}</a>
+                                    {taxonomy.family.name}
                                 </Link>
                                 {pipe(
                                     taxonomy.section,
@@ -125,9 +121,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                             {' | '}
                                             <strong> Section: </strong>{' '}
                                             <Link key={s.id} href={`/section/${s.id}`}>
-                                                <a>
-                                                    <em>{`${s.name} (${s.description})`}</em>
-                                                </a>
+                                                <em>{`${s.name} (${s.description})`}</em>
                                             </Link>
                                         </span>
                                     )),
@@ -137,10 +131,8 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                 {' | '}
                                 <strong>Genus: </strong>
                                 <Link key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
-                                    <a>
-                                        {' '}
-                                        <em>{formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}</em>
-                                    </a>
+                                    {' '}
+                                    <em>{formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}</em>
                                 </Link>
                             </p>
                         </Col>

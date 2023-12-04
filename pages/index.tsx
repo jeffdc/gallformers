@@ -43,19 +43,13 @@ function Home({ randomGall }: Props): JSX.Element {
                         <Card.Body>
                             <ul>
                                 <li>
-                                    <Link href="/id">
-                                        <a>Identify Galls</a>
-                                    </Link>
+                                    <Link href="/id">Identify Galls</Link>
                                 </li>
                                 <li>
-                                    <Link href="/refindex">
-                                        <a>Learn More About Galls</a>
-                                    </Link>
+                                    <Link href="/refindex">Learn More About Galls</Link>
                                 </li>
                                 <li>
-                                    <Link href="/explore">
-                                        <a>Explore the Data</a>
-                                    </Link>
+                                    <Link href="/explore">Explore the Data</Link>
                                 </li>
                             </ul>
                         </Card.Body>
@@ -66,17 +60,13 @@ function Home({ randomGall }: Props): JSX.Element {
                 <Col sm="12" md="6">
                     <Card>
                         <Link href={`/gall/${randomGall.id}`}>
-                            <a>
-                                <Card.Img variant="top" src={randomGall.imagePath} width="300" />
-                            </a>
+                            <Card.Img variant="top" src={randomGall.imagePath} width="300" />
                         </Link>{' '}
                         <Card.Body>
                             Here is a random gall from our database. This one is{' '}
                             {randomGall.undescribed ? 'an undescribed species' : ''} called{' '}
                             <Link href={`/gall/${randomGall.id}`}>
-                                <a>
-                                    <i>{randomGall.name}</i>
-                                </a>
+                                <i>{randomGall.name}</i>
                             </Link>{' '}
                             and the photo was taken by{' '}
                             <a href={randomGall.sourceLink} target="_blank" rel="noreferrer">

@@ -67,7 +67,7 @@ const schema = yup.object().shape({
     // only force hosts to be present when adding, not deleting.
     hosts: yup.array().when('del', {
         is: false,
-        then: yup.array().min(1),
+        then: () => yup.array().min(1),
     }),
 });
 
@@ -311,11 +311,7 @@ const Gall = ({
                     This is for all of the details about a Gall. To add a description (which must be referenced to a source) go
                     add <Link href="/admin/source">Sources</Link>, if they do not already exist, then go{' '}
                     <Link href="/admin/speciessource">map species to sources with description</Link>. To associate a gall with all
-                    plants in a genus, add one species here first, then go to{' '}
-                    <Link href="./gallhost">
-                        <a>Gall-Host Mappings</a>
-                    </Link>
-                    .
+                    plants in a genus, add one species here first, then go to <Link href="./gallhost">Gall-Host Mappings</Link>.
                 </p>
                 <Row className="my-1">
                     <Col>

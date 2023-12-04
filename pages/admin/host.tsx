@@ -2,7 +2,8 @@ import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 // needed as ReactTooltip does not play nicely with SSR. See: https://github.com/wwayne/react-tooltip/issues/675
-import dynamic from 'next/dynamic';
+// import dynamic from 'next/dynamic';
+import { ReactTooltip } from 'react-tooltip';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import { useState } from 'react';
@@ -32,9 +33,9 @@ import { allFamilies, allGenera, allSections } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray, SPECIES_NAME_REGEX } from '../../libs/utils/util';
 
-const ReactTooltip = dynamic(() => import('react-tooltip'), {
-    ssr: false,
-});
+// const ReactTooltip = dynamic(() => import('react-tooltip'), {
+//     ssr: false,
+// });
 
 const projConfig: ProjectionConfig = {
     center: [-4, 48],

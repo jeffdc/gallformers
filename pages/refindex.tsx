@@ -22,9 +22,7 @@ const Index = ({ allPosts }: Props) => {
                         <article key={p.slug}>
                             <header className="">
                                 <Link href={`/ref/${p.slug}`}>
-                                    <a>
-                                        <h5 className="">{p.title}</h5>
-                                    </a>
+                                    <h5 className="">{p.title}</h5>
                                 </Link>
                                 <span className="small">
                                     <em>{`${p.author.name} - ${p.date}`}</em>

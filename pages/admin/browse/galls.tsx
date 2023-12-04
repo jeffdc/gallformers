@@ -20,7 +20,7 @@ const linkGall = (s: GallApi) => {
     return (
         <>
             <Link key={s.id} href={`/gall/${s.id}`}>
-                <a>{s.name}</a>
+                {s.name}
             </Link>
             <Edit id={s.id} type="gall" />
         </>

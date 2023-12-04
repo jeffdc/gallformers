@@ -166,10 +166,8 @@ const Images = ({ sp }: Props): JSX.Element => {
                                                 </a>,
                                             ),
                                             (s) => (
-                                                <Link href={`/source/${s.id}`}>
-                                                    <a target="_blank" rel="noreferrer">
-                                                        {s.title}
-                                                    </a>
+                                                <Link href={`/source/${s.id}`} target="_blank" rel="noreferrer">
+                                                    {s.title}
                                                 </Link>
                                             ),
                                         ),
