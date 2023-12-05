@@ -46,7 +46,22 @@ type Props = SpeciesProps & {
     forms: AT.FilterField[];
 };
 
-const schema = yup.object().shape({
+export type FormFields = SpeciesFormFields<AT.GallApi> & {
+    hosts: AT.GallHost[];
+    detachable: AT.DetachableValues;
+    walls: AT.FilterField[];
+    cells: AT.FilterField[];
+    alignments: AT.FilterField[];
+    shapes: AT.FilterField[];
+    colors: AT.FilterField[];
+    seasons: AT.FilterField[];
+    locations: AT.FilterField[];
+    textures: AT.FilterField[];
+    forms: AT.FilterField[];
+    undescribed: boolean;
+};
+
+const schema: yup.ObjectSchema<FormFields> = yup.object({
     mainField: yup
         .array()
         .of(
@@ -69,22 +84,23 @@ const schema = yup.object().shape({
         is: false,
         then: () => yup.array().min(1),
     }),
+    del: yup.boolean().required(),
+    detachable: yup.boolean(),
+    walls: yup.array(),
+    cells: yup.array(),
+    alignments: yup.array(),
+    shapes: yup.array(),
+    colors: yup.array(),
+    seasons: yup.array(),
+    locations: yup.array(),
+    textures: yup.array(),
+    forms: yup.array(),
+    undescribed: yup.boolean(),
+    genus: yup.mixed(),
+    datacomplete: yup.boolean(),
+    abundance: yup.mixed(),
+    aliases: yup.array(),
 });
-
-export type FormFields = SpeciesFormFields<AT.GallApi> & {
-    hosts: AT.GallHost[];
-    detachable: AT.DetachableValues;
-    walls: AT.FilterField[];
-    cells: AT.FilterField[];
-    alignments: AT.FilterField[];
-    shapes: AT.FilterField[];
-    colors: AT.FilterField[];
-    seasons: AT.FilterField[];
-    locations: AT.FilterField[];
-    textures: AT.FilterField[];
-    forms: AT.FilterField[];
-    undescribed: boolean;
-};
 
 const Gall = ({
     id,

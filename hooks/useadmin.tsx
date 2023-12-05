@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import router from 'next/router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
-import { DeepPartial, FieldValues, Path, useForm, UseFormReturn } from 'react-hook-form';
+import { DeepPartial, DefaultValues, FieldValues, Path, Resolver, useForm, UseFormReturn } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import * as yup from 'yup';
 import { superAdmins } from '../components/auth';
@@ -82,7 +82,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         delQueryString?: () => string;
         nameExistsEndpoint?: (name: string) => string;
     },
-    schema: yup.ObjectSchema<yup.ObjectShape>,
+    schema: yup.ObjectSchema<FormFields>,
     updatedFormFields: (t: T | undefined) => Promise<FormFields>,
     reloadOnUpdate = false,
     createNew?: (v: string) => T,
@@ -109,6 +109,8 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
 
     const form = useForm<FormFields>({
         mode: 'onBlur',
+        //TODO figure this out...
+        // @ts-expect-error
         resolver: yupResolver(schema),
     });
 
@@ -157,8 +159,9 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                                     }
                                     router.replace(``, undefined, { shallow: true });
                                 } else {
-                                    setSelected(s[0]);
-                                    router.replace(`?id=${s[0].id}`, undefined, { shallow: true });
+                                    const t = s[0] as T;
+                                    setSelected(t);
+                                    router.replace(`?id=${t.id}`, undefined, { shallow: true });
                                 }
                             }
                         }}
@@ -324,7 +327,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
 
     const onDataChange = useCallback(async (t: T | undefined) => {
         const ff = await updatedFormFields(t);
-        form.reset(ff as DeepPartial<FormFields>);
+        form.reset(ff as DefaultValues<FormFields>);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

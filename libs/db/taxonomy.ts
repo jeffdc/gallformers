@@ -310,7 +310,7 @@ export const getFamiliesWithSpecies =
                         ({
                             ...family,
                             taxonomytaxonomy: family.taxonomytaxonomy.filter((genus) => genus.child.speciestaxonomy.length > 0),
-                        } as FamilyTaxonomy),
+                        }) as FamilyTaxonomy,
                     // filter out famlies that have no genera in them after the above filter
                 )
                 .filter((f) => f.taxonomytaxonomy.length > 0);
@@ -397,7 +397,7 @@ export const getAllSpeciesForSectionOrGenus = (id: number): TaskEither<Error, Si
 
     return pipe(
         TE.tryCatch(sectionSpecies, handleError),
-        TE.map((s) => s.map((sp) => ({ ...sp.species } as SimpleSpecies))),
+        TE.map((s) => s.map((sp) => ({ ...sp.species }) as SimpleSpecies)),
     );
 };
 
@@ -445,8 +445,8 @@ export const sectionById = (id: number): TaskEither<Error, SectionApi[]> => {
             ts.map((t) => ({
                 ...t,
                 description: t.description ?? '',
-                species: t?.speciestaxonomy.map((sp) => ({ ...sp.species } as SimpleSpecies)),
-                aliases: t.taxonomyalias.map((a) => ({ ...a.alias } as AliasApi)),
+                species: t?.speciestaxonomy.map((sp) => ({ ...sp.species }) as SimpleSpecies),
+                aliases: t.taxonomyalias.map((a) => ({ ...a.alias }) as AliasApi),
             })),
         ),
     );
@@ -472,8 +472,8 @@ export const sectionByName = (name: string): TaskEither<Error, SectionApi[]> => 
             ts.map((t) => ({
                 ...t,
                 description: t.description ?? '',
-                species: t?.speciestaxonomy.map((sp) => ({ ...sp.species } as SimpleSpecies)),
-                aliases: t.taxonomyalias.map((a) => ({ ...a.alias } as AliasApi)),
+                species: t?.speciestaxonomy.map((sp) => ({ ...sp.species }) as SimpleSpecies),
+                aliases: t.taxonomyalias.map((a) => ({ ...a.alias }) as AliasApi),
             })),
         ),
     );

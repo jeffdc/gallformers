@@ -6,9 +6,9 @@ import { Prisma } from '@prisma/client';
 
 export type ConnectTypes =
     | Prisma.abundanceCreateNestedOneWithoutSpeciesInput
-    | Prisma.abundanceUpdateOneWithoutSpeciesInput
+    | Prisma.abundanceUpdateWithoutSpeciesInput
     | Prisma.taxontypeCreateNestedOneWithoutSpeciesInput
-    | Prisma.taxontypeUpdateOneWithoutSpeciesInput
+    | Prisma.taxontypeUpdateWithoutSpeciesInput
     | Prisma.hostCreateWithoutGallspeciesInput
     | Prisma.galllocationCreateWithoutGallInput
     | Prisma.galltextureCreateWithoutGallInput

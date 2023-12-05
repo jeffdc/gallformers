@@ -267,7 +267,7 @@ export const getGalls = (
                                         ...g.species,
                                         fgs: fgs,
                                     },
-                                } as DBGallWithFGS),
+                                }) as DBGallWithFGS,
                         ),
                     ),
                 ),
@@ -490,7 +490,7 @@ export const getRelatedGalls = (gall: GallApi): TaskEither<Error, SimpleSpecies[
 
     return pipe(
         TE.tryCatch(get, handleError),
-        TE.map((galls) => galls.filter((g) => g.id !== gall.id).map((g) => ({ ...g } as SimpleSpecies))),
+        TE.map((galls) => galls.filter((g) => g.id !== gall.id).map((g) => ({ ...g }) as SimpleSpecies)),
     );
 };
 

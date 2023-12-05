@@ -248,8 +248,8 @@ export const deleteFilterField = (fieldType: FilterFieldType, id: string): TaskE
     };
     // eslint-disable-next-line prettier/prettier
     return pipe(
+        // @ts-expect-error TODO fix this...
         TE.tryCatch(results, handleError),
-        TE.map((x) => x),
         TE.map(toDeleteResult),
     );
 };
@@ -436,16 +436,15 @@ export const upsertFilterField = (field: FilterFieldWithType): TaskEither<Error,
     );
 };
 
-type Wheres =
-    | Prisma.alignmentWhereInput
-    | Prisma.cellsWhereInput
-    | Prisma.colorWhereInput
-    | Prisma.formWhereInput
-    | Prisma.locationWhereInput
-    | Prisma.seasonWhereInput
-    | Prisma.shapeWhereInput
-    | Prisma.textureWhereInput
-    | Prisma.wallsWhereInput;
+type Wheres = Prisma.alignmentWhereInput &
+    Prisma.cellsWhereInput &
+    Prisma.colorWhereInput &
+    Prisma.formWhereInput &
+    Prisma.locationWhereInput &
+    Prisma.seasonWhereInput &
+    Prisma.shapeWhereInput &
+    Prisma.textureWhereInput &
+    Prisma.wallsWhereInput;
 
 const getFilterFields = (where: Wheres, fieldType: FilterFieldType): TaskEither<Error, FilterField[]> => {
     switch (fieldType) {

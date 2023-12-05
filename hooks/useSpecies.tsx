@@ -7,15 +7,18 @@ import {
     AbundanceApi,
     AliasApi,
     EmptyAbundance,
+    GallApi,
     GallTaxon,
+    HostApi,
     HostTaxon,
     SCIENTIFIC_NAME,
     SpeciesApi,
     SpeciesUpsertFields,
 } from '../libs/api/apitypes';
 import { FAMILY, FGS, GENUS, TaxonomyEntry, TaxonomyEntryNoParent } from '../libs/api/taxonomy';
-import { extractGenus } from '../libs/utils/util';
+import { SPECIES_NAME_REGEX, extractGenus } from '../libs/utils/util';
 import { AdminFormFields } from './useAPIs';
+import * as yup from 'yup';
 
 export const SpeciesNamingHelp = (): JSX.Element => (
     <OverlayTrigger
@@ -104,6 +107,36 @@ export type SpeciesFormFields<T> = AdminFormFields<T> & {
     datacomplete: boolean;
     aliases: AliasApi[];
 };
+
+const taxonomyEntryNoParentSchema = yup
+    .array()
+    .of(
+        yup.object({
+            name: yup.string().required(),
+        }),
+    )
+    .required();
+
+export const speciesFormFieldsSchema: yup.ObjectSchema<SpeciesFormFields<GallApi | HostApi>> = yup.object({
+    // AdminFormFields
+    mainField: yup
+        .array()
+        .of(
+            yup.object({
+                name: yup.string().matches(SPECIES_NAME_REGEX).required(),
+            }),
+        )
+        .min(1)
+        .max(1)
+        .required(),
+    del: yup.boolean().required(),
+    // SpeciesFormFields
+    genus: taxonomyEntryNoParentSchema,
+    family: taxonomyEntryNoParentSchema,
+    abundance: yup.object(),
+    datacomplete: yup.boolean(),
+    aliases: yup.array(),
+});
 
 export type UseSpecies<T extends SpeciesApi> = {
     renameSpecies: (s: T, e: RenameEvent, confirm: (options: ConfirmationOptions) => Promise<void>) => Promise<T>;

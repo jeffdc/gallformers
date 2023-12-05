@@ -41,7 +41,7 @@ const linkHtml =
         const els: string[] = [];
         let curr = 0;
         const tokens = new WordTokenizer().tokenize(text);
-        tokens.forEach((t, i) => {
+        tokens?.forEach((t, i) => {
             const stemmed = PorterStemmer.stem(t);
             const raw = tokens[i];
 
@@ -97,10 +97,9 @@ const internalLinker = async <T>(data: T[], update: (d: string, t: T) => T, getV
     const toContext = (glossary: Entry[]): Context => ({ stems: stemText(glossary), glossary: glossary });
 
     const linkText =
-        (context: Context) =>
-        (s: typeof data[0]): TE.TaskEither<Error, string> =>
-            // eslint-disable-next-line prettier/prettier
-        pipe(
+        () =>
+        (s: (typeof data)[0]): TE.TaskEither<Error, string> =>
+            pipe(
                 O.fromNullable(getVal(s)),
                 TE.fromOption(constant(new Error('Received invalid text.'))),
                 // for now turning this off while I work on a new solution.
@@ -111,10 +110,10 @@ const internalLinker = async <T>(data: T[], update: (d: string, t: T) => T, getV
     return await pipe(
         allGlossaryEntries(),
         TE.map(toContext),
-        TE.chain((context) =>
+        TE.chain(() =>
             pipe(
                 data,
-                A.map(linkText(context)),
+                A.map(linkText()),
                 TE.sequenceArray,
                 // sequence makes the array readonly, the rest of the fp-ts API does not use readonly, ...sigh.
                 TE.map((d) => A.zipWith(d as string[], data, update)),

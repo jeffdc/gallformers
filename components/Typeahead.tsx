@@ -10,19 +10,16 @@ export type TypeaheadCustomOption = {
     id: string;
 };
 
-export type TypeaheadProps<FormFields extends FieldValues> = Omit<
-    TypeaheadComponentProps,
-    'labelKey' | 'options' | 'onChange' | 'selected'
-> & {
+export type TypeaheadProps<FormFields extends FieldValues> = TypeaheadComponentProps & {
     name: Path<FormFields>;
     control: Control<FormFields>;
     newSelectionPrefix?: string;
     rules?: Record<string, unknown>;
     onBlurT?: (e: FocusEvent<HTMLInputElement>) => void;
     onKeyDownT?: (e: KeyboardEvent<HTMLInputElement>) => void;
-    options: Option[];
-    onChange: (t: Option[]) => void;
-    selected: Option[];
+    // options: Option[];
+    // onChange: (t: Option[]) => void;
+    // selected: Option[];
     labelKey?: string | ((t: Option) => string);
 };
 
@@ -54,7 +51,7 @@ const Typeahead = <T extends Option, FormFields extends FieldValues>({
                     options={options}
                     selected={selected}
                     onChange={(s: Option[]) => {
-                        onChange(s);
+                        onChange ? onChange(s) : () => {};
                     }}
                     ref={ref}
                     id={name}
@@ -64,10 +61,7 @@ const Typeahead = <T extends Option, FormFields extends FieldValues>({
     );
 };
 
-export type AsyncTypeaheadProps<T, FormFields extends FieldValues> = Omit<
-    UseAsyncProps,
-    'labelKey' | 'options' | 'onChange' | 'selected'
-> & {
+export type AsyncTypeaheadProps<T, FormFields extends FieldValues> = Omit<UseAsyncProps, 'labelKey' | 'onChange' | 'selected'> & {
     name: Path<FormFields>;
     control: Control<FormFields>;
     rules?: Record<string, unknown>;

@@ -49,7 +49,7 @@ export const getImagePaths = async (speciesId: number, imageids: number[] = []):
     try {
         const imageidsWhere = imageids.length > 0 ? { id: { in: imageids } } : {};
         const images = await db.image.findMany({
-            where: { AND: [{ species_id: { in: speciesId } }, imageidsWhere] },
+            where: { AND: [{ species_id: { in: [speciesId] } }, imageidsWhere] },
             orderBy: { id: 'asc' },
         });
 

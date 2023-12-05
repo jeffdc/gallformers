@@ -234,7 +234,7 @@ export const getHosts = (
                 A.map((h) =>
                     pipe(
                         taxonomyForSpecies(h.id),
-                        TE.map((fgs) => ({ ...h, fgs: fgs } as DBHost)),
+                        TE.map((fgs) => ({ ...h, fgs: fgs }) as DBHost),
                     ),
                 ),
             ),

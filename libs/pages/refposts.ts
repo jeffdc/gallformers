@@ -1,7 +1,6 @@
 import fs from 'fs';
 import { join } from 'path';
 import matter from 'gray-matter';
-import { logger } from '../utils/logger';
 import sanitize from 'sanitize-filename';
 
 const postsDirectory = join(process.cwd(), 'ref');

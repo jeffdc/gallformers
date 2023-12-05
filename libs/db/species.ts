@@ -55,7 +55,7 @@ export const allSpecies = (): TE.TaskEither<Error, species[]> => {
 export const allSpeciesSimple = (): TE.TaskEither<Error, SimpleSpecies[]> =>
     pipe(
         allSpecies(),
-        TE.map((s) => s.map((sp) => ({ ...sp } as SimpleSpecies))),
+        TE.map((s) => s.map((sp) => ({ ...sp }) as SimpleSpecies)),
     );
 
 export const speciesByName = (name: string): TE.TaskEither<Error, species[]> => {
