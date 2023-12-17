@@ -1,8 +1,9 @@
-import { yupResolver } from '@hookform/resolvers/yup';
+import { ioTsResolver } from '@hookform/resolvers/io-ts';
 import { species } from '@prisma/client';
 import axios from 'axios';
-import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
@@ -11,12 +12,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Col, Modal, Row } from 'react-bootstrap';
 import DataTable, { TableColumn } from 'react-data-table-component';
 import { useForm } from 'react-hook-form';
-import * as yup from 'yup';
-import AddImage from '../../components/addimage';
-import ImageEdit from '../../components/imageedit';
-import ImageGrid from '../../components/imagegrid';
 import { AsyncTypeahead } from '../../components/Typeahead';
-import { useConfirmation } from '../../hooks/useconfirmation';
+import AddImage from '../../components/addImage';
+import ImageEdit from '../../components/imageEdit';
+import ImageGrid from '../../components/imageGrid';
+import { useConfirmation } from '../../hooks/useConfirmation';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { ImageApi } from '../../libs/api/apitypes';
 import { speciesById } from '../../libs/db/species';
@@ -24,7 +24,10 @@ import Admin from '../../libs/pages/admin';
 import { TABLE_CUSTOM_STYLES } from '../../libs/utils/DataTableConstants';
 import { mightFailWithArray, sessionUserOrUnknown } from '../../libs/utils/util';
 
-const Schema = yup.object().shape({});
+const schema = t.type({
+    species: t.string,
+    delete: t.array(t.number),
+});
 
 type Props = {
     sp: species[];
@@ -85,7 +88,7 @@ const Images = ({ sp }: Props): JSX.Element => {
 
     const { control, reset } = useForm<FormFields>({
         mode: 'onBlur',
-        resolver: yupResolver(Schema),
+        resolver: ioTsResolver(schema),
         defaultValues: {
             species: sp[0]?.name,
         },
@@ -114,7 +117,7 @@ const Images = ({ sp }: Props): JSX.Element => {
             },
             {
                 id: 'source',
-                // this is needed because the ReactDataTable component changed the contract and is tryign to be overly clever with its types
+                // this is needed because the ReactDataTable component changed the contract and is trying to be overly clever with its types
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
                 selector: (g: ImageApi) => g.source,

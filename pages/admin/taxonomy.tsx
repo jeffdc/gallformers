@@ -1,48 +1,55 @@
 import axios from 'axios';
-import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as t from 'io-ts';
+import * as tt from 'io-ts-types';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { useEffect, useState } from 'react';
 import { Button, Col, Form, FormGroup, Row } from 'react-bootstrap';
 import 'react-simple-tree-menu/dist/main.css';
-import * as yup from 'yup';
 import EditableDataTable, { EditableTableColumn } from '../../components/EditableDataTable';
 import { RenameEvent } from '../../components/editname';
 import MoveFamily, { MoveEvent } from '../../components/movefamily';
+import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
 import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { ALL_FAMILY_TYPES } from '../../libs/api/apitypes';
-import { EMPTY_GENUS, FAMILY, FamilyUpsertFields, FamilyWithGenera, GeneraMoveFields, Genus } from '../../libs/api/taxonomy';
+import {
+    EMPTY_GENUS,
+    FamilyAPI,
+    FamilyAPISchema,
+    FamilyUpsertFields,
+    GeneraMoveFields,
+    Genus,
+    TaxonomyTypeValues,
+} from '../../libs/api/apitypes';
 import { familyById } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
 import { TABLE_CUSTOM_STYLES } from '../../libs/utils/DataTableConstants';
 import { genOptions } from '../../libs/utils/forms';
 import { mightFailWithArray } from '../../libs/utils/util';
 
-const schema = yup.object().shape({
-    // type-coverage:ignore-next-line
-    mainField: yup.mixed().required(),
-    description: yup.string().required(),
-});
+type FormFields = AdminFormFields<FamilyAPI> & Pick<FamilyAPI, 'description' | 'genera'>;
 
-// We have to remove the parent property as the Form library can not handle circular references in the data.
-type TaxFamily = Omit<FamilyWithGenera, 'parent'>;
-
-type FormFields = AdminFormFields<TaxFamily> & Pick<TaxFamily, 'description' | 'genera'>;
+const schema = t.intersection([
+    adminFormFieldsSchema(FamilyAPISchema),
+    t.type({
+        description: tt.NonEmptyString,
+    }),
+]);
 
 type Props = {
     id: string;
-    fs: FamilyWithGenera[];
+    fs: FamilyAPI[];
 };
 
-const renameFamily = async (s: TaxFamily, e: RenameEvent) => ({
+const renameFamily = async (s: FamilyAPI, e: RenameEvent) => ({
     ...s,
     name: e.new,
 });
 
-const updatedFormFields = async (fam: TaxFamily | undefined): Promise<FormFields> => {
+const updatedFormFields = async (fam: FamilyAPI | undefined): Promise<FormFields> => {
     if (fam != undefined) {
         return {
             mainField: [fam],
@@ -64,18 +71,18 @@ const toUpsertFields = (fields: FormFields, name: string, id: number): FamilyUps
     return {
         ...fields,
         name: name,
-        type: 'family',
+        type: TaxonomyTypeValues.FAMILY,
         id: id,
         description: fields.description ?? '',
         genera: fields.genera ?? [],
     };
 };
 
-const createNewFamily = (name: string): TaxFamily => ({
+const createNewFamily = (name: string): FamilyAPI => ({
     name: name,
     description: '',
     id: -1,
-    type: FAMILY,
+    type: TaxonomyTypeValues.FAMILY,
     genera: [],
 });
 
@@ -164,7 +171,7 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
         };
 
         axios
-            .post<FamilyWithGenera[]>('/api/taxonomy/genus/move', {
+            .post<FamilyAPI[]>('/api/taxonomy/genus/move', {
                 headers: {
                     'Content-Type': 'application/json',
                 },
@@ -304,8 +311,8 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     const fs = pipe(
         id,
         O.map(parseInt),
-        O.map((id) => mightFailWithArray<FamilyWithGenera>()(familyById(id))),
-        O.getOrElse(constant(Promise.resolve(Array<FamilyWithGenera>()))),
+        O.map((id) => mightFailWithArray<FamilyAPI>()(familyById(id))),
+        O.getOrElse(constant(Promise.resolve(Array<FamilyAPI>()))),
     );
 
     return {

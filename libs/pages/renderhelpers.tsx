@@ -1,15 +1,8 @@
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
-import {
-    CCBY,
-    DetachableDetachable,
-    GallApi,
-    GallIDApi,
-    ImageApi,
-    ImageNoSourceApi,
-    SourceApi,
-    WithImages,
-} from '../api/apitypes';
+import { GallIDApi, ImageApi, ImageLicenseValues, ImageNoSourceApi, SourceApi, WithImages } from '../api/apitypes';
+import { GallApi } from '../api/apitypes';
+import { DetachableDetachable } from '../api/apitypes';
 import { truncateAtWord } from '../utils/util';
 
 /**
@@ -60,7 +53,7 @@ export const defaultSource = <T extends { useasdefault: number; source: { id: nu
 };
 
 export const formatLicense = (source: SourceApi): string => {
-    if (source.license === CCBY) {
+    if (source.license === ImageLicenseValues.CC_BY) {
         return `${source.license}: ${source.author}`;
     } else {
         return source.license;
@@ -69,7 +62,7 @@ export const formatLicense = (source: SourceApi): string => {
 
 /**
  * Returns the default image for the species. If there is an image marked as default, that will be returned. If no
- * image is marked as default then an image will be returned but it is not necessarily determenisitc which one.
+ * image is marked as default then an image will be returned but it is not necessarily deterministic which one.
  * @param species
  */
 export const defaultImage = <T extends WithImages>(species: T): ImageApi | ImageNoSourceApi | undefined => {
@@ -86,11 +79,7 @@ export const defaultImage = <T extends WithImages>(species: T): ImageApi | Image
  */
 export const truncateOptionString = (description: O.Option<string>, truncateAfterWord = 40): string => {
     // eslint-disable-next-line prettier/prettier
-    return pipe(
-        description,
-        O.map(truncateAtWord(truncateAfterWord)),
-        O.getOrElse(constant('')),
-    )    
+    return pipe(description, O.map(truncateAtWord(truncateAfterWord)), O.getOrElse(constant('')));
 };
 
 /**
@@ -111,20 +100,20 @@ const pj = (vals: string[]): string => {
 const punctIf = (punct: string, predicate: () => boolean) => (predicate() ? punct : '');
 
 const gallIdApiFromGallApi = (g: GallApi): Omit<GallIDApi, 'places' | 'images'> => ({
-    alignments: g.gall.gallalignment.map((a) => a.field),
-    cells: g.gall.gallcells.map((a) => a.field),
-    colors: g.gall.gallcells.map((a) => a.field),
+    alignments: g.alignment.map((a) => a.field),
+    cells: g.cells.map((a) => a.field),
+    colors: g.cells.map((a) => a.field),
     datacomplete: g.datacomplete,
-    detachable: g.gall.detachable,
-    forms: g.gall.gallform.map((a) => a.field),
+    detachable: g.detachable,
+    forms: g.form.map((a) => a.field),
     id: g.id,
-    locations: g.gall.galllocation.map((a) => a.field),
+    locations: g.location.map((a) => a.field),
     name: g.name,
-    seasons: g.gall.gallseason.map((a) => a.field),
-    shapes: g.gall.gallshape.map((a) => a.field),
-    textures: g.gall.galltexture.map((a) => a.field),
-    undescribed: g.gall.undescribed,
-    walls: g.gall.gallwalls.map((a) => a.field),
+    seasons: g.season.map((a) => a.field),
+    shapes: g.shape.map((a) => a.field),
+    textures: g.texture.map((a) => a.field),
+    undescribed: g.undescribed,
+    walls: g.walls.map((a) => a.field),
     family: '',
 });
 

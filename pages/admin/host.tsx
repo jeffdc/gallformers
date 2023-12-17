@@ -1,41 +1,35 @@
-import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
-// needed as ReactTooltip does not play nicely with SSR. See: https://github.com/wwayne/react-tooltip/issues/675
-// import dynamic from 'next/dynamic';
-import { ReactTooltip } from 'react-tooltip';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Controller } from 'react-hook-form';
 import { ComposableMap, Geographies, Geography, ProjectionConfig, ZoomableGroup } from 'react-simple-maps';
-import * as yup from 'yup';
-import AliasTable from '../../components/aliastable';
+import { Tooltip } from 'react-tooltip';
 import Typeahead from '../../components/Typeahead';
+import AliasTable from '../../components/aliastable';
+import useSpecies, { SpeciesNamingHelp, SpeciesProps, speciesFormFieldsSchema } from '../../hooks/useSpecies';
 import useAdmin from '../../hooks/useadmin';
-import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '../../hooks/useSpecies';
 import { extractQueryParam } from '../../libs/api/apipage';
 import {
     AbundanceApi,
     AliasApi,
-    HostApi,
-    HostTaxon,
     HOST_FAMILY_TYPES,
     PlaceNoTreeApi,
+    PlaceNoTreeApiSchema,
     SpeciesUpsertFields,
 } from '../../libs/api/apitypes';
-import { FAMILY, TaxonomyEntry, TaxonomyEntryNoParent } from '../../libs/api/taxonomy';
+import { HostApi, HostApiSchema, TaxonCodeValues } from '../../libs/api/apitypes';
+import { TaxonomyEntry, TaxonomyEntryNoParentSchema, TaxonomyTypeValues } from '../../libs/api/apitypes';
 import { hostById } from '../../libs/db/host';
 import { getPlaces } from '../../libs/db/place';
 import { getAbundances } from '../../libs/db/species';
 import { allFamilies, allGenera, allSections } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
-import { mightFailWithArray, SPECIES_NAME_REGEX } from '../../libs/utils/util';
-
-// const ReactTooltip = dynamic(() => import('react-tooltip'), {
-//     ssr: false,
-// });
+import { mightFailWithArray } from '../../libs/utils/util';
 
 const projConfig: ProjectionConfig = {
     center: [-4, 48],
@@ -50,30 +44,35 @@ type Props = SpeciesProps & {
     places: PlaceNoTreeApi[];
 };
 
-const schema = yup.object().shape({
-    mainField: yup
-        .array()
-        .of(
-            yup.object({
-                name: yup.string().matches(SPECIES_NAME_REGEX).required(),
-            }),
-        )
-        .min(1)
-        .max(1),
-    family: yup
-        .array()
-        .of(
-            yup.object({
-                name: yup.string().required(),
-            }),
-        )
-        .required(),
-});
+// const schema = yup.object().shape({
+//     mainField: yup
+//         .array()
+//         .of(
+//             yup.object({
+//                 name: yup.string().matches(SPECIES_NAME_REGEX).required(),
+//             }),
+//         )
+//         .min(1)
+//         .max(1),
+//     family: yup
+//         .array()
+//         .of(
+//             yup.object({
+//                 name: yup.string().required(),
+//             }),
+//         )
+//         .required(),
+// });
 
-export type FormFields = SpeciesFormFields<HostApi> & {
-    section: TaxonomyEntryNoParent[];
-    places: PlaceNoTreeApi[];
-};
+const schema = t.intersection([
+    speciesFormFieldsSchema(HostApiSchema),
+    t.type({
+        section: t.array(TaxonomyEntryNoParentSchema),
+        places: t.array(PlaceNoTreeApiSchema),
+    }),
+]);
+
+export type FormFields = t.TypeOf<typeof schema>;
 
 export const testables = {
     Schema: schema,
@@ -81,7 +80,9 @@ export const testables = {
 
 const Host = ({ id, host, genera, families, sections, abundances, places }: Props): JSX.Element => {
     const [tooltipContent, setTooltipContent] = useState('');
-    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields } = useSpecies<HostApi>(genera);
+    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields } = useSpecies<HostApi, FormFields>(
+        genera,
+    );
 
     const toUpsertFields = (fields: FormFields, name: string, id: number): SpeciesUpsertFields => {
         if (!selected) {
@@ -116,7 +117,7 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
     };
 
     const createNewHost = (name: string): HostApi => ({
-        ...createNewSpecies(name, HostTaxon),
+        ...createNewSpecies(name, TaxonCodeValues.PLANT),
         galls: [],
         places: [],
     });
@@ -236,7 +237,7 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                             disabled={true}
                             onChange={(g) => {
                                 if (selected) {
-                                    selected.fgs.genus = g[0] as TaxonomyEntryNoParent;
+                                    selected.fgs.genus = g[0] as TaxonomyEntry;
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -273,7 +274,13 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                                 } else {
                                     selected.fgs = {
                                         ...selected.fgs,
-                                        family: { name: '', description: '', id: -1, type: FAMILY },
+                                        family: {
+                                            name: '',
+                                            description: '',
+                                            id: -1,
+                                            type: TaxonomyTypeValues.FAMILY,
+                                            parent: O.none,
+                                        },
                                     };
                                     setSelected({ ...selected });
                                 }
@@ -307,7 +314,7 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                             }
                             onChange={(g) => {
                                 if (selected) {
-                                    selected.fgs.section = O.fromNullable(g[0] as TaxonomyEntryNoParent);
+                                    selected.fgs.section = O.fromNullable(g[0] as TaxonomyEntry);
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -423,7 +430,7 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                                 </Geographies>
                             </ZoomableGroup>
                         </ComposableMap>
-                        <ReactTooltip>{tooltipContent}</ReactTooltip>
+                        <Tooltip>{tooltipContent}</Tooltip>
                     </Col>
                 </Row>
                 <Row className="my-1">
@@ -496,7 +503,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             id: pipe(extractQueryParam(context.query, 'id'), O.getOrElse(constant(''))),
             host: await host,
             families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(HOST_FAMILY_TYPES)),
-            genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon, true)),
+            genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(TaxonCodeValues.PLANT, true)),
             sections: await mightFailWithArray<TaxonomyEntry>()(allSections()),
             abundances: await mightFailWithArray<AbundanceApi>()(getAbundances()),
             places: await mightFailWithArray<PlaceNoTreeApi>()(getPlaces()),

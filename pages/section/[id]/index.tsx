@@ -7,7 +7,7 @@ import { Col, Container, Row } from 'react-bootstrap';
 import DataTable from '../../../components/DataTable';
 import Edit from '../../../components/edit';
 import { SimpleSpecies } from '../../../libs/api/apitypes';
-import { SectionApi } from '../../../libs/api/taxonomy';
+import { SectionApi } from '../../../libs/api/apitypes';
 import { allSectionIds, sectionById } from '../../../libs/db/taxonomy';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { TABLE_CUSTOM_STYLES } from '../../../libs/utils/DataTableConstants';

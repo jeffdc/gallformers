@@ -8,12 +8,12 @@ import { Card, Col, Container, Row } from 'react-bootstrap';
 import TreeMenu, { Item, TreeNodeInArray } from 'react-simple-tree-menu';
 import 'react-simple-tree-menu/dist/main.css';
 import Edit from '../../../components/edit';
-import { GallTaxon } from '../../../libs/api/apitypes';
-import { TaxonomyEntry, TaxonomyTree } from '../../../libs/api/taxonomy';
-import { allFamilyIds, taxonomyEntryById, taxonomyTreeForId } from '../../../libs/db/taxonomy';
+import { TaxonomyEntry } from '../../../libs/api/apitypes';
+import { TaxonomyTree, allFamilyIds, taxonomyEntryById, taxonomyTreeForId } from '../../../libs/db/taxonomy';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { formatWithDescription } from '../../../libs/pages/renderhelpers';
 import { hasProp } from '../../../libs/utils/util';
+import { TaxonCodeValues } from '../../../libs/api/apitypes';
 
 type Props = {
     family: TaxonomyEntry[];
@@ -79,7 +79,7 @@ const toTreeNodeInArray = (tree: TaxonomyTree): TreeNodeInArray[] => [
                     .map((st) => ({
                         key: st.species.id.toString(),
                         label: st.species.name,
-                        url: `/${st.species.taxoncode === GallTaxon ? 'gall' : 'host'}/${st.species.id}`,
+                        url: `/${st.species.taxoncode === TaxonCodeValues.GALL ? 'gall' : 'host'}/${st.species.id}`,
                     })),
             })),
     },

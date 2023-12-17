@@ -7,6 +7,7 @@ import { isOfType } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
 import { extractId } from './utils';
+import { TaxonCodeValues, taxonCodeAsStringToValue } from '../api/apitypes';
 
 const adaptor = <T extends source>(source: T): SourceApi | SourceWithSpeciesSourceApi =>
     isOfType(source, 'speciessource' as keyof SourceWithSpeciesSourceApi)
@@ -45,7 +46,10 @@ export const sourceById = (id: number): TaskEither<Error, SourceWithSpeciesApi[]
         TE.map((sources) =>
             sources.map((s) => ({
                 ...s,
-                species: s.speciessource.map((spsp) => ({ ...spsp.species, taxoncode: spsp.species.taxoncode ?? '' })),
+                species: s.speciessource.map((speciesSource) => ({
+                    ...speciesSource.species,
+                    taxoncode: taxonCodeAsStringToValue(speciesSource.species.taxoncode),
+                })),
             })),
         ),
     );
@@ -79,9 +83,9 @@ export const allSourcesWithSpecies = (): TaskEither<Error, SourceWithSpeciesApi[
         TE.map((sos) =>
             sos.map((s) => ({
                 ...s,
-                species: s.speciessource.map((spso) => ({
-                    ...spso.species,
-                    taxoncode: spso.species.taxoncode ? spso.species.taxoncode : '',
+                species: s.speciessource.map((speciesSource) => ({
+                    ...speciesSource.species,
+                    taxoncode: taxonCodeAsStringToValue(speciesSource.species.taxoncode),
                 })),
             })),
         ),

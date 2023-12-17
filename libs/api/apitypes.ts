@@ -2,104 +2,12 @@
  * Types for calling the APIs. These are to be used by browser code when it calls the APIs so all database stuff
  * must stay out of here.
  */
-import { alias } from '@prisma/client';
-import * as O from 'fp-ts/lib/Option';
 import * as Eq from 'fp-ts/lib/Eq';
+import * as O from 'fp-ts/lib/Option';
 import { Option } from 'fp-ts/lib/Option';
-import { FGS } from './taxonomy';
-
-export const GallTaxon = 'gall';
-export const HostTaxon = 'plant';
-
-export type DetachableApi = {
-    id: number;
-    value: DetachableValues;
-};
-
-export const DetachableNone: DetachableApi = {
-    id: 0,
-    value: '',
-};
-
-export const DetachableIntegral: DetachableApi = {
-    id: 1,
-    value: 'integral',
-};
-
-export const DetachableDetachable: DetachableApi = {
-    id: 2,
-    value: 'detachable',
-};
-
-export const DetachableBoth: DetachableApi = {
-    id: 3,
-    value: 'both',
-};
-
-export const Detachables = [DetachableNone, DetachableIntegral, DetachableDetachable, DetachableBoth];
-export type DetachableValues = '' | 'integral' | 'detachable' | 'both';
-
-// there has got to be a better way of doing this...
-export const detachableFromString = (s: string): DetachableApi => {
-    switch (s) {
-        case '':
-            return DetachableNone;
-        case 'integral':
-            return DetachableIntegral;
-        case 'detachable':
-            return DetachableDetachable;
-        case 'both':
-            return DetachableBoth;
-        default:
-            console.error(`Received invalid value '${s}' for Detachable.`);
-            return DetachableNone;
-    }
-};
-
-export const detachableFromId = (id: null | undefined | number): DetachableApi => {
-    if (id == undefined || id == null) return DetachableNone;
-
-    const d = Detachables.find((d) => d.id === id);
-    if (d == undefined) {
-        throw new Error(`Received invalid id '${id}' for Detachable.`);
-    }
-    return d;
-};
-
-/**
- *
- */
-export type SearchQuery = {
-    detachable: DetachableApi[];
-    alignment: string[];
-    walls: string[];
-    locations: string[];
-    textures: string[];
-    color: string[];
-    season: string[];
-    shape: string[];
-    cells: string[];
-    form: string[];
-    undescribed: boolean;
-    place: string[];
-    family: string[];
-};
-
-export const EMPTYSEARCHQUERY: SearchQuery = {
-    detachable: [DetachableNone],
-    alignment: [],
-    walls: [],
-    locations: [],
-    textures: [],
-    color: [],
-    shape: [],
-    cells: [],
-    season: [],
-    form: [],
-    undescribed: false,
-    place: [],
-    family: [],
-};
+import * as t from 'io-ts';
+import * as tt from 'io-ts-types';
+import { fromEnum } from '../utils/io-ts';
 
 export type Deletable = {
     delete?: boolean;
@@ -180,48 +88,19 @@ export type GallUpsertFields = SpeciesUpsertFields & {
     undescribed: boolean;
 };
 
-export type SourceApi = {
-    id: number;
-    title: string;
-    author: string;
-    pubyear: string;
-    link: string;
-    citation: string;
-    datacomplete: boolean;
-    license: string;
-    licenselink: string;
-};
-
-export type SourceWithSpeciesApi = SourceApi & {
-    species: SimpleSpecies[];
-};
-
-export type SourceWithSpeciesSourceApi = SourceApi & {
-    speciessource: Omit<SpeciesSourceApi, 'source'>[];
-};
-
-export type SpeciesSourceApi = {
-    id: number;
-    species_id: number;
-    source_id: number;
-    description: string;
-    useasdefault: number;
-    externallink: string;
-    source: SourceApi;
-};
-
-export type GallHost = {
-    id: number;
-    name: string;
-    places: PlaceNoTreeApi[];
-};
-
 export type AbundanceApi = {
     id: number;
     abundance: string;
     description: string;
     reference: Option<string>;
 };
+export const AbundanceApiSchema = t.type({
+    id: t.number,
+    abundance: t.string,
+    description: t.string,
+    reference: tt.option(t.string),
+});
+
 export const EmptyAbundance: AbundanceApi = {
     id: -1,
     abundance: '',
@@ -229,104 +108,8 @@ export const EmptyAbundance: AbundanceApi = {
     reference: O.none,
 };
 
-export type SimpleSpecies = {
-    id: number;
-    taxoncode: string;
-    name: string;
-};
-
-export type SpeciesWithPlaces = SimpleSpecies & {
-    places: PlaceNoTreeApi[];
-};
-
-export type WithImages = {
-    images: ImageApi[] | ImageNoSourceApi[];
-};
-
-export type SpeciesApi = SimpleSpecies &
-    WithImages & {
-        datacomplete: boolean;
-        abundance: Option<AbundanceApi>;
-        description: Option<string>; // to make the caller's life easier we will load the default if we can
-        speciessource: SpeciesSourceApi[];
-        aliases: AliasApi[];
-        fgs: FGS;
-    };
-
-export const COMMON_NAME = 'common';
-export const SCIENTIFIC_NAME = 'scientific';
-
-export type AliasApi = {
-    id: number;
-    name: string;
-    type: string;
-    description: string;
-};
-
-export const EmptyAlias: AliasApi = {
-    id: -1,
-    name: '',
-    type: SCIENTIFIC_NAME,
-    description: '',
-};
-
-export const FILTER_FIELD_ALIGNMENTS = 'alignments';
-export const FILTER_FIELD_CELLS = 'cells';
-export const FILTER_FIELD_COLORS = 'colors';
-export const FILTER_FIELD_FORMS = 'forms';
-export const FILTER_FIELD_LOCATIONS = 'locations';
-export const FILTER_FIELD_SEASONS = 'seasons';
-export const FILTER_FIELD_SHAPES = 'shapes';
-export const FILTER_FIELD_TEXTURES = 'textures';
-export const FILTER_FIELD_WALLS = 'walls';
-export const FILTER_FIELD_TYPES = [
-    FILTER_FIELD_ALIGNMENTS,
-    FILTER_FIELD_CELLS,
-    FILTER_FIELD_COLORS,
-    FILTER_FIELD_FORMS,
-    FILTER_FIELD_LOCATIONS,
-    FILTER_FIELD_SEASONS,
-    FILTER_FIELD_SHAPES,
-    FILTER_FIELD_TEXTURES,
-    FILTER_FIELD_WALLS,
-] as const;
-export type FilterFieldTypeTuple = typeof FILTER_FIELD_TYPES;
-export type FilterFieldType = FilterFieldTypeTuple[number];
-export const asFilterFieldType = (f: string): FilterFieldType => {
-    // Seems like there should be a better way to handle this and maintain types.
-    switch (f) {
-        case FILTER_FIELD_ALIGNMENTS:
-            return FILTER_FIELD_ALIGNMENTS;
-        case FILTER_FIELD_CELLS:
-            return FILTER_FIELD_CELLS;
-        case FILTER_FIELD_COLORS:
-            return FILTER_FIELD_COLORS;
-        case FILTER_FIELD_FORMS:
-            return FILTER_FIELD_FORMS;
-        case FILTER_FIELD_LOCATIONS:
-            return FILTER_FIELD_LOCATIONS;
-        case FILTER_FIELD_SEASONS:
-            return FILTER_FIELD_SEASONS;
-        case FILTER_FIELD_SHAPES:
-            return FILTER_FIELD_SHAPES;
-        case FILTER_FIELD_TEXTURES:
-            return FILTER_FIELD_TEXTURES;
-        case FILTER_FIELD_WALLS:
-            return FILTER_FIELD_WALLS;
-        default:
-            throw new Error(`Invalid filter field type: '${f}'.`);
-    }
-};
-
-export type FilterField = {
-    id: number;
-    field: string;
-    description: Option<string>;
-};
-
-export type FilterFieldWithType = FilterField & {
-    fieldType: FilterFieldType;
-};
+////////////////////////////////////////////////////////////////////
+// Place Schemas and Types
 
 // For now only these two until we support the Place hierarchy.
 export const PLACE_TYPES = ['state', 'province'];
@@ -335,12 +118,20 @@ export const placeNoTreeApiEq: Eq.Eq<PlaceNoTreeApi> = {
     equals: (a, b) => a.code === b.code,
 };
 
-export type PlaceNoTreeApi = {
-    id: number;
-    name: string;
-    code: string;
-    type: string;
-};
+export const PlaceNoTreeApiSchema = t.type({
+    id: t.number,
+    name: t.string,
+    code: t.string,
+    type: t.string,
+});
+
+export type PlaceNoTreeApi = t.TypeOf<typeof PlaceNoTreeApiSchema>;
+// export type PlaceNoTreeApi = {
+//     id: number;
+//     name: string;
+//     code: string;
+//     type: string;
+// };
 
 export type PlaceNoTreeUpsertFields = PlaceNoTreeApi & Deletable;
 
@@ -352,6 +143,430 @@ export type PlaceApi = PlaceNoTreeApi & {
 export type PlaceWithHostsApi = PlaceApi & {
     hosts: HostSimple[];
 };
+
+////////////////////////////////////////////////////////////////////
+// SimpleSpecies Schema and Type
+export enum TaxonCodeValues {
+    GALL = 'gall',
+    PLANT = 'plant',
+}
+export const TaxonCodeSchema = fromEnum<TaxonCodeValues>('TaxonCodeValues', TaxonCodeValues);
+/** Given a string value, look up the proper TaxonCode. If the value is not one of the valid values then an error will be thrown. */
+export const taxonCodeAsStringToValue = (tc?: string | null): TaxonCodeValues => {
+    if (tc === TaxonCodeValues.GALL) {
+        return TaxonCodeValues.GALL;
+    } else if (tc === TaxonCodeValues.PLANT) {
+        return TaxonCodeValues.PLANT;
+    } else {
+        throw new Error(`Invalid TaxonCode value detected: '${tc}'.`);
+    }
+};
+
+export const SimpleSpeciesSchema = t.type({
+    id: t.number,
+    taxoncode: TaxonCodeSchema,
+    name: t.string, //.matches(SPECIES_NAME_REGEX).required(),
+});
+export type SimpleSpecies = t.TypeOf<typeof SimpleSpeciesSchema>;
+
+////////////////////////////////////////////////////////////////////
+// Source Schemas and Types
+export const SourceApiSchema = t.type({
+    id: t.number,
+    title: t.string,
+    author: t.string,
+    pubyear: t.string,
+    link: t.string,
+    citation: t.string,
+    datacomplete: t.boolean,
+    license: t.string,
+    licenselink: t.string,
+});
+
+export type SourceApi = t.TypeOf<typeof SourceApiSchema>;
+
+// export type SourceApi = {
+//     id: number;
+//     title: string;
+//     author: string;
+//     pubyear: string;
+//     link: string;
+//     citation: string;
+//     datacomplete: boolean;
+//     license: string;
+//     licenselink: string;
+// };
+export const SpeciesSourceNoSourceApiSchema = t.type({
+    id: t.number,
+    species_id: t.number,
+    source_id: t.number,
+    description: t.string,
+    useasdefault: t.number,
+    externallink: t.string,
+});
+export type SpeciesSourceNoSourceApi = t.TypeOf<typeof SpeciesSourceNoSourceApiSchema>;
+
+export const SpeciesSourceApiSchema = t.intersection([SpeciesSourceNoSourceApiSchema, t.type({ source: SourceApiSchema })]);
+export type SpeciesSourceApi = t.TypeOf<typeof SpeciesSourceApiSchema>;
+
+export const SourceWithSpeciesApiSchema = t.intersection([SourceApiSchema, t.type({ species: t.array(SimpleSpeciesSchema) })]);
+export type SourceWithSpeciesApi = t.TypeOf<typeof SourceWithSpeciesApiSchema>;
+// export type SourceWithSpeciesApi = SourceApi & {
+//     species: SimpleSpecies[];
+// };
+
+export const SourceWithSpeciesSourceApiSchema = t.intersection([
+    SourceApiSchema,
+    t.type({ speciessource: t.array(SpeciesSourceNoSourceApiSchema) }),
+]);
+export type SourceWithSpeciesSourceApi = t.TypeOf<typeof SourceWithSpeciesSourceApiSchema>;
+// export type SourceWithSpeciesSourceApi = SourceApi & {
+//     speciessource: Omit<SpeciesSourceApi, 'source'>[];
+// };
+
+////////////////////////////////////////////////////////////////////
+// SpeciesSource Schemas and Types
+
+// export type SpeciesSourceApi = {
+//     id: number;
+//     species_id: number;
+//     source_id: number;
+//     description: string;
+//     useasdefault: number;
+//     externallink: string;
+//     source: SourceApi;
+// };
+
+export const SpeciesWithPlacesSchema = t.intersection([SimpleSpeciesSchema, t.type({ places: t.array(PlaceNoTreeApiSchema) })]);
+
+export type SpeciesWithPlaces = SimpleSpecies & {
+    places: PlaceNoTreeApi[];
+};
+
+// const Schema = yup.object().shape({
+//     default: yup.boolean().required(),
+//     creator: yup.string().required('You must provide a reference to the creator.'),
+//     attribution: yup.string().when('license', {
+//         is: (l: string) => l === ALLRIGHTS,
+//         then: () =>
+//             yup
+//                 .string()
+//                 .required(
+//                     'You must document proof that we are allowed to use the image when using an All Rights Reserved license.',
+//                 ),
+//     }),
+//     sourcelink: yup
+//         .string()
+//         .url()
+//         .when('source', {
+//             is: (s: []) => s.length === 0,
+//             then: () => yup.string().required('You must provide a link to the source.'),
+//         }),
+//     source: yup.array<SourceWithSpeciesSourceApi>().required(),
+//     license: yup.string<LicenseType>().required('You must select a license.'),
+//     licenselink: yup
+//         .string()
+//         .url()
+//         .when('license', {
+//             is: (l: string) => l === CCBY,
+//             then: () => yup.string().url().required('The CC-BY license requires that you provide a link to the license.'),
+//         }),
+//     caption: yup.string().required(),
+// });
+
+////////////////////////////////////////////////////////////////////////////////
+// Taxonomy Types
+/**
+ * There are three valid types in the taxonomy.
+ */
+export enum TaxonomyTypeValues {
+    FAMILY = 'family',
+    SECTION = 'section',
+    GENUS = 'genus',
+}
+export const TaxonomyTypeSchema = fromEnum<TaxonomyTypeValues>('TaxonomyTypeValues', TaxonomyTypeValues);
+export type TaxonomyType = t.TypeOf<typeof TaxonomyTypeSchema>;
+/**
+ * A general Taxonomy entry from the database. It can be recursive and this can lead to trouble with certain libraries etc.
+ * So look at @see {TaxonomyEntryNoParent} as well.
+ */
+export interface TaxonomyEntry {
+    id: number;
+    name: string;
+    type: TaxonomyType;
+    description: string;
+    parent: O.Option<TaxonomyEntry>;
+}
+export const TaxonomyEntrySchema: t.Type<TaxonomyEntry> = t.recursion('TaxonomyEntry', () =>
+    t.type({
+        id: t.number,
+        name: t.string,
+        type: TaxonomyTypeSchema,
+        description: t.string,
+        parent: tt.option(TaxonomyEntrySchema),
+    }),
+);
+
+export const TaxonomyEntryNoParentSchema = t.type({
+    id: t.number,
+    name: t.string,
+    type: TaxonomyTypeSchema,
+    description: t.string,
+});
+export type TaxonomyEntryNoParent = t.TypeOf<typeof TaxonomyEntryNoParentSchema>;
+
+export const EMPTY_TAXONOMYENTRY: TaxonomyEntry = {
+    description: '',
+    id: -1,
+    name: '',
+    type: TaxonomyTypeValues.FAMILY,
+    parent: O.none,
+};
+
+export const EMPTY_GENUS: TaxonomyEntry = { ...EMPTY_TAXONOMYENTRY, type: TaxonomyTypeValues.GENUS };
+
+export const FGSSchema = t.type({
+    family: TaxonomyEntrySchema,
+    genus: TaxonomyEntrySchema,
+    section: tt.option(TaxonomyEntrySchema),
+});
+export type FGS = t.TypeOf<typeof FGSSchema>;
+
+export const GenusSchema = TaxonomyEntryNoParentSchema;
+export type Genus = TaxonomyEntryNoParent;
+
+export const FamilyAPISchema = t.intersection([TaxonomyEntryNoParentSchema, t.type({ genera: t.array(GenusSchema) })]);
+export type FamilyAPI = TaxonomyEntryNoParent & {
+    genera: Genus[];
+};
+
+export type SectionApi = Omit<TaxonomyEntryNoParent, 'type'> & {
+    species: SimpleSpecies[];
+    aliases: AliasApi[];
+};
+/**
+ * The id should be set to any number less than 0 to indicate a new record.
+ */
+
+export type TaxonomyUpsertFields = TaxonomyEntry & {
+    species: number[];
+};
+
+export type FamilyUpsertFields = Omit<TaxonomyUpsertFields, 'species' | 'parent'> & {
+    genera: Genus[];
+};
+
+export type GeneraMoveFields = {
+    oldFamilyId: number;
+    newFamilyId: number;
+    genera: number[];
+};
+
+////////////////////////////////////////////////////////////////////////////////////
+// Image types
+export const ImageBaseSchema = t.type({
+    default: t.boolean,
+    creator: tt.withMessage(t.string, () => 'You must provide a reference to the creator.'),
+    attribution: t.string, // if license is ALLRIGHTS must fill in
+    caption: t.string,
+});
+export type ImageBase = t.TypeOf<typeof ImageBaseSchema>;
+
+export enum ImageLicenseValues {
+    NONE = '',
+    PUBLIC_DOMAIN = 'Public Domain / CC0',
+    CC_BY = 'CC-BY',
+    ALL_RIGHTS = 'All Rights Reserved',
+}
+export const ImageLicenseValuesSchema = fromEnum<ImageLicenseValues>('ImageLicenseValues', ImageLicenseValues);
+export type ImageLicenseValuesType = t.TypeOf<typeof ImageLicenseValuesSchema>;
+
+export const ImageSourceSchema = t.type({
+    license: tt.withMessage(ImageLicenseValuesSchema, () => 'You must select a license.'),
+    licenselink: t.string, // if license CCBY must provide a link to it
+    sourcelink: t.string, // if source selected then must provide a link to it
+    source: tt.option(SourceWithSpeciesSourceApiSchema),
+});
+export type ImageSource = t.TypeOf<typeof ImageSourceSchema>;
+
+export const ImageAdditionalSchema = t.type({
+    id: t.number,
+    path: t.string,
+    uploader: t.string,
+    lastchangedby: t.string,
+    speciesid: t.number,
+    small: t.string,
+    medium: t.string,
+    large: t.string,
+    xlarge: t.string,
+    original: t.string,
+});
+export type ImageAdditional = t.TypeOf<typeof ImageAdditionalSchema>;
+
+export const ImageNoSourceApiSchema = t.intersection([ImageBaseSchema, ImageAdditionalSchema]);
+export type ImageNoSourceApi = t.TypeOf<typeof ImageNoSourceApiSchema>;
+
+export const ImageApiSchema = t.intersection([ImageNoSourceApiSchema, ImageSourceSchema]);
+export type ImageApi = t.TypeOf<typeof ImageApiSchema>;
+
+export type ImagePaths = {
+    small: string[];
+    medium: string[];
+    large: string[];
+    xlarge: string[];
+    original: string[];
+};
+
+export const WithImagesSchema = t.type({
+    images: t.array(t.union([ImageApiSchema, ImageNoSourceApiSchema])),
+});
+export type WithImages = t.TypeOf<typeof WithImagesSchema>;
+// export type WithImages = {
+//     images: ImageApi[] | ImageNoSourceApi[];
+// };
+
+export const COMMON_NAME = 'common';
+export const SCIENTIFIC_NAME = 'scientific';
+
+export const AliasApiSchema = t.type({
+    id: t.number,
+    name: t.string,
+    type: t.string,
+    description: t.string,
+});
+
+export type AliasApi = t.TypeOf<typeof AliasApiSchema>;
+
+// export type AliasApi = {
+//     id: number;
+//     name: string;
+//     type: string;
+//     description: string;
+// };
+
+export const EmptyAlias: AliasApi = {
+    id: -1,
+    name: '',
+    type: SCIENTIFIC_NAME,
+    description: '',
+};
+
+export const SpeciesApiSchema = t.intersection([
+    SimpleSpeciesSchema,
+    WithImagesSchema,
+    t.type({
+        datacomplete: t.boolean,
+        abundance: tt.option(AbundanceApiSchema),
+        description: tt.option(t.string),
+        speciessource: t.array(SpeciesSourceApiSchema),
+        aliases: t.array(AliasApiSchema),
+        fgs: FGSSchema,
+    }),
+]);
+
+export type SpeciesApi = t.TypeOf<typeof SpeciesApiSchema>;
+// export type SpeciesApi = SimpleSpecies &
+//     WithImages & {
+//         datacomplete: boolean;
+//         abundance: Option<AbundanceApi>;
+//         description: Option<string>; // to make the caller's life easier we will load the default if we can
+//         speciessource: SpeciesSourceApi[];
+//         aliases: AliasApi[];
+//         fgs: FGS;
+//     };
+
+// export const FILTER_FIELD_ALIGNMENTS = 'alignments';
+// export const FILTER_FIELD_CELLS = 'cells';
+// export const FILTER_FIELD_COLORS = 'colors';
+// export const FILTER_FIELD_FORMS = 'forms';
+// export const FILTER_FIELD_LOCATIONS = 'locations';
+// export const FILTER_FIELD_SEASONS = 'seasons';
+// export const FILTER_FIELD_SHAPES = 'shapes';
+// export const FILTER_FIELD_TEXTURES = 'textures';
+// export const FILTER_FIELD_WALLS = 'walls';
+// export const FILTER_FIELD_TYPES = [
+//     FILTER_FIELD_ALIGNMENTS,
+//     FILTER_FIELD_CELLS,
+//     FILTER_FIELD_COLORS,
+//     FILTER_FIELD_FORMS,
+//     FILTER_FIELD_LOCATIONS,
+//     FILTER_FIELD_SEASONS,
+//     FILTER_FIELD_SHAPES,
+//     FILTER_FIELD_TEXTURES,
+//     FILTER_FIELD_WALLS,
+// ] as const;
+// export type FilterFieldTypeTuple = typeof FILTER_FIELD_TYPES;
+// export type FilterFieldType = FilterFieldTypeTuple[number];
+// export const asFilterFieldType = (f: string): FilterFieldType => {
+//     // Seems like there should be a better way to handle this and maintain types.
+//     switch (f) {
+//         case FILTER_FIELD_ALIGNMENTS:
+//             return FILTER_FIELD_ALIGNMENTS;
+//         case FILTER_FIELD_CELLS:
+//             return FILTER_FIELD_CELLS;
+//         case FILTER_FIELD_COLORS:
+//             return FILTER_FIELD_COLORS;
+//         case FILTER_FIELD_FORMS:
+//             return FILTER_FIELD_FORMS;
+//         case FILTER_FIELD_LOCATIONS:
+//             return FILTER_FIELD_LOCATIONS;
+//         case FILTER_FIELD_SEASONS:
+//             return FILTER_FIELD_SEASONS;
+//         case FILTER_FIELD_SHAPES:
+//             return FILTER_FIELD_SHAPES;
+//         case FILTER_FIELD_TEXTURES:
+//             return FILTER_FIELD_TEXTURES;
+//         case FILTER_FIELD_WALLS:
+//             return FILTER_FIELD_WALLS;
+//         default:
+//             throw new Error(`Invalid filter field type: '${f}'.`);
+//     }
+// };
+
+export const FilterFieldSchema = t.type({
+    id: t.number,
+    field: t.string,
+    description: tt.option(t.string),
+});
+
+export type FilterField = t.TypeOf<typeof FilterFieldSchema>;
+
+export enum FilterFieldTypeValue {
+    ALIGNMENTS = 'alignments',
+    CELLS = 'cells',
+    COLORS = 'colors',
+    FORMS = 'forms',
+    LOCATIONS = 'locations',
+    SEASONS = 'seasons',
+    SHAPES = 'shapes',
+    TEXTURES = 'textures',
+    WALLS = 'walls',
+}
+export const FilterFieldTypeSchema = fromEnum<FilterFieldTypeValue>('FilterFieldTypeValue', FilterFieldTypeValue);
+// export type FilterFieldType = t.TypeOf<typeof FilterFieldTypeSchema>;
+export const asFilterType = (possibleFilterType?: string | null): FilterFieldTypeValue =>
+    FilterFieldTypeValue[possibleFilterType as keyof typeof FilterFieldTypeValue];
+
+export const FilterFieldWithTypeSchema = t.intersection([FilterFieldSchema, t.type({ fieldType: FilterFieldTypeSchema })]);
+
+export type FilterFieldWithType = t.TypeOf<typeof FilterFieldWithTypeSchema>;
+
+// export type FilterFieldWithType = FilterField & {
+//     fieldType: FilterFieldType;
+// };
+
+export const GallHostSchema = t.type({
+    id: t.number,
+    name: t.string,
+    places: t.array(PlaceNoTreeApiSchema),
+});
+export type GallHost = t.TypeOf<typeof GallHostSchema>;
+
+// export type GallHost = {
+//     id: number;
+//     name: string;
+//     places: PlaceNoTreeApi[];
+// };
 
 export type RandomGall = {
     id: number;
@@ -382,43 +597,6 @@ export type GallIDApi = WithImages & {
     undescribed: boolean;
     walls: string[];
     family: string;
-};
-
-export type GallApi = SpeciesApi & {
-    gall: {
-        id: number;
-        gallalignment: FilterField[];
-        gallcells: FilterField[];
-        gallcolor: FilterField[];
-        gallseason: FilterField[];
-        detachable: DetachableApi;
-        gallshape: FilterField[];
-        gallwalls: FilterField[];
-        galltexture: FilterField[];
-        galllocation: FilterField[];
-        gallform: FilterField[];
-        undescribed: boolean;
-    };
-    hosts: GallHost[];
-    excludedPlaces: PlaceNoTreeApi[];
-};
-
-export type HostSimple = {
-    id: number;
-    name: string;
-    aliases: alias[];
-    datacomplete: boolean;
-    places: PlaceNoTreeApi[];
-};
-
-export type GallSimple = {
-    id: number;
-    name: string;
-};
-
-export type HostApi = SpeciesApi & {
-    galls: GallSimple[];
-    places: PlaceNoTreeApi[];
 };
 
 export type SourceUpsertFields = Deletable & {
@@ -461,57 +639,165 @@ export type GlossaryEntryUpsertFields = Deletable & {
     urls: string; // newline separated
 };
 
-export const NONE = '';
-export const CC0 = 'Public Domain / CC0';
-export const CCBY = 'CC-BY';
-export const ALLRIGHTS = 'All Rights Reserved';
+export enum DetachableValues {
+    NONE = '',
+    INTEGRAL = 'integral',
+    DETACHABLE = 'detachable',
+    BOTH = 'both',
+}
 
-export type LicenseType = typeof NONE | typeof CC0 | typeof CCBY | typeof ALLRIGHTS;
+export const DetachableValuesSchema = fromEnum<DetachableValues>('DetachableValues', DetachableValues);
 
-export const asLicenseType = (l: string): LicenseType => {
-    // Seems like there should be a better way to handle this and maintain types.
-    switch (l) {
-        case NONE:
-            return NONE;
-        case CC0:
-            return CC0;
-        case CCBY:
-            return CCBY;
-        case ALLRIGHTS:
-            return ALLRIGHTS;
+export const DetachableApiSchema = t.type({
+    id: t.number,
+    value: DetachableValuesSchema,
+});
+
+export type DetachableApi = t.TypeOf<typeof DetachableApiSchema>;
+
+export const DetachableNone: DetachableApi = {
+    id: 0,
+    value: DetachableValues.NONE,
+};
+
+export const DetachableIntegral: DetachableApi = {
+    id: 1,
+    value: DetachableValues.INTEGRAL,
+};
+
+export const DetachableDetachable: DetachableApi = {
+    id: 2,
+    value: DetachableValues.DETACHABLE,
+};
+
+export const DetachableBoth: DetachableApi = {
+    id: 3,
+    value: DetachableValues.BOTH,
+};
+
+export const Detachables = [DetachableNone, DetachableIntegral, DetachableDetachable, DetachableBoth];
+// there has got to be a better way of doing this...
+export const detachableFromString = (s: string): DetachableApi => {
+    switch (s) {
+        case DetachableValues.NONE:
+            return DetachableNone;
+        case DetachableValues.INTEGRAL:
+            return DetachableIntegral;
+        case DetachableValues.DETACHABLE:
+            return DetachableDetachable;
+        case DetachableValues.BOTH:
+            return DetachableBoth;
         default:
-            throw new Error(`Invalid license type: '${l}'.`);
+            console.error(`Received invalid value '${s}' for Detachable.`);
+            return DetachableNone;
     }
 };
 
-export type ImageNoSourceApi = {
-    id: number;
-    attribution: string;
-    creator: string;
-    path: string;
-    uploader: string;
-    lastchangedby: string;
-    caption: string;
-    speciesid: number;
-    default: boolean;
-    small: string;
-    medium: string;
-    large: string;
-    xlarge: string;
-    original: string;
+export const detachableFromId = (id: null | undefined | number): DetachableApi => {
+    if (id == undefined || id == null) return DetachableNone;
+
+    const d = Detachables.find((d) => d.id === id);
+    if (d == undefined) {
+        throw new Error(`Received invalid id '${id}' for Detachable.`);
+    }
+    return d;
 };
 
-export type ImageApi = ImageNoSourceApi & {
-    license: LicenseType;
-    licenselink: string;
-    sourcelink: string;
-    source: Option<SourceWithSpeciesSourceApi>;
+export const HostSimpleSchema = t.type({
+    id: t.number,
+    name: t.string,
+    aliases: t.array(AliasApiSchema),
+    datacomplete: t.boolean,
+    places: t.array(PlaceNoTreeApiSchema),
+});
+export type HostSimple = t.TypeOf<typeof HostSimpleSchema>;
+
+export const GallSimpleSchema = t.type({
+    id: t.number,
+    name: t.string,
+});
+export type GallSimple = t.TypeOf<typeof GallSimpleSchema>;
+
+export const HostApiSchema = t.intersection([
+    SpeciesApiSchema,
+    t.type({
+        galls: t.array(GallSimpleSchema),
+        places: t.array(PlaceNoTreeApiSchema),
+    }),
+]);
+export type HostApi = SpeciesApi & {
+    galls: GallSimple[];
+    places: PlaceNoTreeApi[];
+};
+export const GallPropertiesSchema = t.type({
+    alignment: t.array(FilterFieldSchema),
+    cells: t.array(FilterFieldSchema),
+    color: t.array(FilterFieldSchema),
+    form: t.array(FilterFieldSchema),
+    season: t.array(FilterFieldSchema),
+    shape: t.array(FilterFieldSchema),
+    walls: t.array(FilterFieldSchema),
+    texture: t.array(FilterFieldSchema),
+    location: t.array(FilterFieldSchema),
+    detachable: DetachableApiSchema,
+    undescribed: t.boolean,
+    hosts: t.array(GallHostSchema),
+});
+export type GallPropertiesType = t.TypeOf<typeof GallPropertiesSchema>;
+
+export const GallApiSchema = t.intersection([
+    SpeciesApiSchema,
+    GallPropertiesSchema,
+    t.type({
+        gall_id: t.number,
+        excludedPlaces: t.array(PlaceNoTreeApiSchema),
+    }),
+]);
+export type GallApi = t.TypeOf<typeof GallApiSchema>;
+
+export const TaxSectionSchema = t.intersection([TaxonomyEntryNoParentSchema, t.type({ species: t.array(SimpleSpeciesSchema) })]);
+export type TaxSection = t.TypeOf<typeof TaxSectionSchema>;
+
+/**
+ *
+ */
+export type SearchQuery = {
+    detachable: DetachableApi[];
+    alignment: string[];
+    walls: string[];
+    locations: string[];
+    textures: string[];
+    color: string[];
+    season: string[];
+    shape: string[];
+    cells: string[];
+    form: string[];
+    undescribed: boolean;
+    place: string[];
+    family: string[];
 };
 
-export type ImagePaths = {
-    small: string[];
-    medium: string[];
-    large: string[];
-    xlarge: string[];
-    original: string[];
+export const EMPTYSEARCHQUERY: SearchQuery = {
+    detachable: [DetachableNone],
+    alignment: [],
+    walls: [],
+    locations: [],
+    textures: [],
+    color: [],
+    shape: [],
+    cells: [],
+    season: [],
+    form: [],
+    undescribed: false,
+    place: [],
+    family: [],
 };
+
+export const EntrySchema = t.type({
+    id: t.number,
+    word: t.string,
+    definition: t.string,
+    urls: t.string, // /n separated
+});
+
+export type Entry = t.TypeOf<typeof EntrySchema>;

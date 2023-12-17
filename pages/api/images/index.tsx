@@ -9,8 +9,8 @@ import {
     Err,
     getQueryParam,
     onCompleteSendJson,
-    sendErrResponse,
-    sendSuccResponse,
+    sendErrorResponse,
+    sendSuccessResponse,
     toErr,
 } from '../../../libs/api/apipage';
 
@@ -35,7 +35,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             O.map(parseInt),
             O.fold(errMsg('Failed to provide the speciesid as a query param.'), getImages),
             TE.mapLeft(toErr),
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else if (req.method === 'POST') {
         await apiUpsertEndpoint(req, res, updateImage, onCompleteSendJson);
@@ -50,14 +50,14 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             getQueryParam(req),
             O.map(parseInt),
             // eslint-disable-next-line prettier/prettier
-            O.map((spid) => pipe('imageids', getQueryParam(req), O.map(csvAsNumberArr), O.map(deleteImages(spid)))),
+            O.map((spId) => pipe('imageids', getQueryParam(req), O.map(csvAsNumberArr), O.map(deleteImages(spId)))),
             O.flatten,
             O.map(TE.mapLeft(toErr)),
             // eslint-disable-next-line prettier/prettier
             O.fold(() => E.left<Err, TE.TaskEither<Err, number>>(invalidQueryErr), E.right),
             TE.fromEither,
             TE.flatten,
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else {
         res.status(405).end();

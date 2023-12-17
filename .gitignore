@@ -11,6 +11,8 @@ yarn-error.log
 gallformers-docker.tar
 .type-coverage
 .coverage
+cspell.json
+tsconfig.tsbuildinfo
 
 # yarn 2 related
 .yarn/**

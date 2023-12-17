@@ -1,11 +1,10 @@
+import { GallIDApi, SearchQuery } from '../../../libs/api/apitypes';
 import {
     DetachableApi,
     DetachableBoth,
     DetachableDetachable,
     DetachableIntegral,
     DetachableNone,
-    GallIDApi,
-    SearchQuery,
 } from '../../../libs/api/apitypes';
 import { checkGall, testables } from '../../../libs/utils/gallsearch';
 
@@ -37,6 +36,7 @@ describe('checkGall tests', () => {
         images: [],
         datacomplete: false,
         places: [],
+        family: '',
     };
 
     const q: SearchQuery = {
@@ -52,6 +52,7 @@ describe('checkGall tests', () => {
         form: [],
         undescribed: false,
         place: [],
+        family: [''],
     };
 
     // helper to create test galls in the tests.

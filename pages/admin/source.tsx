@@ -4,30 +4,32 @@ import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import React from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
-import * as yup from 'yup';
 import { RenameEvent } from '../../components/editname';
 import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields } from '../../hooks/useAPIs';
+import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { ALLRIGHTS, CC0, CCBY, SourceApi, SourceUpsertFields } from '../../libs/api/apitypes';
+import { ImageLicenseValues, SourceApi, SourceApiSchema, SourceUpsertFields } from '../../libs/api/apitypes';
 import { allSources } from '../../libs/db/source';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
+import * as t from 'io-ts';
 
-const schema = yup.object().shape({
-    mainField: yup.mixed().required(),
-    author: yup.string().required(),
-    pubyear: yup.string().matches(/([12][0-9]{3})/),
-    citation: yup.string().required(),
-    license: yup.string().required('You must select a license.'),
-    licenselink: yup
-        .string()
-        .url('The link must be a valid URL.')
-        .when('license', {
-            is: (l: string) => l === CCBY,
-            then: yup.string().url().required('The CC-BY license requires that you provide a link to the license.'),
-        }),
-});
+const schema = t.intersection([adminFormFieldsSchema(SourceApiSchema), SourceApiSchema]);
+
+// const schema = yup.object().shape({
+//     mainField: yup.mixed().required(),
+//     author: yup.string().required(),
+//     pubyear: yup.string().matches(/([12][0-9]{3})/),
+//     citation: yup.string().required(),
+//     license: yup.string().required('You must select a license.'),
+//     licenselink: yup
+//         .string()
+//         .url('The link must be a valid URL.')
+//         .when('license', {
+//             is: (l: string) => l === CCBY,
+//             then: yup.string().url().required('The CC-BY license requires that you provide a link to the license.'),
+//         }),
+// });
 
 type Props = {
     id: string;
@@ -198,9 +200,9 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                     <Col>
                         License (required):
                         <select {...form.register('license')} className="form-control" disabled={!selected}>
-                            <option>{CC0}</option>
-                            <option>{CCBY}</option>
-                            <option>{ALLRIGHTS}</option>
+                            <option>{ImageLicenseValues.PUBLIC_DOMAIN}</option>
+                            <option>{ImageLicenseValues.CC_BY}</option>
+                            <option>{ImageLicenseValues.ALL_RIGHTS}</option>
                         </select>{' '}
                         {form.formState.errors.license && (
                             <span className="text-danger">{form.formState.errors.license.message}</span>

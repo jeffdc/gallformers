@@ -4,7 +4,7 @@ import * as O from 'fp-ts/lib/Option';
 import * as R from 'fp-ts/lib/Record';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { Err, getQueryParam, sendErrResponse, sendSuccResponse, toErr } from '../../../libs/api/apipage';
+import { Err, getQueryParam, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage';
 import { SpeciesSourceApi } from '../../../libs/api/apitypes';
 import { deleteSpeciesSourceByIds, sourcesBySpecies, speciesSourceByIds } from '../../../libs/db/speciessource';
 import { logger } from '../../../libs/utils/logger';
@@ -22,7 +22,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             TE.fromOption(constant(new Error('Species Id changed to None! Impossible!!'))),
             TE.flatten,
             TE.mapLeft(toErr),
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else {
         type Query = { speciesId: string; sourceId: string };
@@ -59,7 +59,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
                 TE.fromEither,
                 TE.flatten,
                 TE.map(validate),
-                TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+                TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
             )();
         } else if (req.method === 'DELETE') {
             await pipe(
@@ -71,7 +71,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
                 )),
                 TE.fromEither,
                 TE.flatten,
-                TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+                TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
             )();
         }
     }

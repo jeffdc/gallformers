@@ -1,23 +1,9 @@
-import { alignment, cells as cs, color, form, location, Prisma, season, shape, texture, walls as ws } from '@prisma/client';
-import { constant, pipe } from 'fp-ts/lib/function';
+import { Prisma, alignment, color, cells as cs, form, location, season, shape, texture, walls as ws } from '@prisma/client';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import {
-    DeleteResult,
-    FilterField,
-    FilterFieldType,
-    FilterFieldWithType,
-    FILTER_FIELD_ALIGNMENTS,
-    FILTER_FIELD_CELLS,
-    FILTER_FIELD_COLORS,
-    FILTER_FIELD_FORMS,
-    FILTER_FIELD_LOCATIONS,
-    FILTER_FIELD_SEASONS,
-    FILTER_FIELD_SHAPES,
-    FILTER_FIELD_TEXTURES,
-    FILTER_FIELD_WALLS,
-} from '../api/apitypes';
+import { constant, pipe } from 'fp-ts/lib/function';
+import { DeleteResult, FilterField, FilterFieldTypeValue, FilterFieldWithType } from '../api/apitypes';
 import { handleError } from '../utils/util';
 import db from './db';
 
@@ -207,7 +193,7 @@ export const getForms = (): TaskEither<Error, FilterField[]> => {
     return pipe(TE.tryCatch(form, handleError), TE.map(adaptForm));
 };
 
-export const deleteFilterField = (fieldType: FilterFieldType, id: string): TaskEither<Error, DeleteResult> => {
+export const deleteFilterField = (fieldType: FilterFieldTypeValue, id: string): TaskEither<Error, DeleteResult> => {
     const numId = parseInt(id);
     const deleteConfig = (field: string) => ({
         where: { id: numId },
@@ -216,23 +202,23 @@ export const deleteFilterField = (fieldType: FilterFieldType, id: string): TaskE
 
     const results = () => {
         switch (fieldType) {
-            case FILTER_FIELD_ALIGNMENTS:
+            case FilterFieldTypeValue.ALIGNMENTS:
                 return db.alignment.delete(deleteConfig('alignment'));
-            case FILTER_FIELD_CELLS:
+            case FilterFieldTypeValue.CELLS:
                 return db.cells.delete(deleteConfig('cells'));
-            case FILTER_FIELD_COLORS:
+            case FilterFieldTypeValue.COLORS:
                 return db.color.delete(deleteConfig('color'));
-            case FILTER_FIELD_FORMS:
+            case FilterFieldTypeValue.FORMS:
                 return db.form.delete(deleteConfig('form'));
-            case FILTER_FIELD_LOCATIONS:
+            case FilterFieldTypeValue.LOCATIONS:
                 return db.location.delete(deleteConfig('location'));
-            case FILTER_FIELD_SEASONS:
+            case FilterFieldTypeValue.SEASONS:
                 return db.season.delete(deleteConfig('season'));
-            case FILTER_FIELD_SHAPES:
+            case FilterFieldTypeValue.SHAPES:
                 return db.shape.delete(deleteConfig('shape'));
-            case FILTER_FIELD_TEXTURES:
+            case FilterFieldTypeValue.TEXTURES:
                 return db.texture.delete(deleteConfig('texture'));
-            case FILTER_FIELD_WALLS:
+            case FilterFieldTypeValue.WALLS:
                 return db.walls.delete(deleteConfig('walls'));
             default:
                 return Promise.reject('Unknown type passed to deleteFilterField');
@@ -260,7 +246,7 @@ export const upsertFilterField = (field: FilterFieldWithType): TaskEither<Error,
     // of the real downsides of Prisma. So hold your hat as we go on the copy and paste ride.
     const upsert = (): Promise<FilterField> => {
         switch (field.fieldType) {
-            case FILTER_FIELD_ALIGNMENTS:
+            case FilterFieldTypeValue.ALIGNMENTS:
                 return db.alignment
                     .upsert({
                         where: { id: field.id },
@@ -278,7 +264,7 @@ export const upsertFilterField = (field: FilterFieldWithType): TaskEither<Error,
                         field: v.alignment,
                         description: O.fromNullable(v.description),
                     }));
-            case FILTER_FIELD_CELLS:
+            case FilterFieldTypeValue.CELLS:
                 return db.cells
                     .upsert({
                         where: { id: field.id },
@@ -296,7 +282,7 @@ export const upsertFilterField = (field: FilterFieldWithType): TaskEither<Error,
                         field: v.cells,
                         description: O.fromNullable(v.description),
                     }));
-            case FILTER_FIELD_COLORS:
+            case FilterFieldTypeValue.COLORS:
                 return db.color
                     .upsert({
                         where: { id: field.id },
@@ -313,7 +299,7 @@ export const upsertFilterField = (field: FilterFieldWithType): TaskEither<Error,
                         description: O.none,
                     }));
 
-            case FILTER_FIELD_FORMS:
+            case FilterFieldTypeValue.FORMS:
                 return db.form
                     .upsert({
                         where: { id: field.id },
@@ -332,7 +318,7 @@ export const upsertFilterField = (field: FilterFieldWithType): TaskEither<Error,
                         description: O.fromNullable(v.description),
                     }));
 
-            case FILTER_FIELD_LOCATIONS:
+            case FilterFieldTypeValue.LOCATIONS:
                 return db.location
                     .upsert({
                         where: { id: field.id },
@@ -351,7 +337,7 @@ export const upsertFilterField = (field: FilterFieldWithType): TaskEither<Error,
                         description: O.fromNullable(v.description),
                     }));
 
-            case FILTER_FIELD_SEASONS:
+            case FilterFieldTypeValue.SEASONS:
                 return db.season
                     .upsert({
                         where: { id: field.id },
@@ -368,7 +354,7 @@ export const upsertFilterField = (field: FilterFieldWithType): TaskEither<Error,
                         description: O.none,
                     }));
 
-            case FILTER_FIELD_SHAPES:
+            case FilterFieldTypeValue.SHAPES:
                 return db.shape
                     .upsert({
                         where: { id: field.id },
@@ -387,7 +373,7 @@ export const upsertFilterField = (field: FilterFieldWithType): TaskEither<Error,
                         description: O.fromNullable(v.description),
                     }));
 
-            case FILTER_FIELD_TEXTURES:
+            case FilterFieldTypeValue.TEXTURES:
                 return db.texture
                     .upsert({
                         where: { id: field.id },
@@ -406,7 +392,7 @@ export const upsertFilterField = (field: FilterFieldWithType): TaskEither<Error,
                         description: O.fromNullable(v.description),
                     }));
 
-            case FILTER_FIELD_WALLS:
+            case FilterFieldTypeValue.WALLS:
                 return db.walls
                     .upsert({
                         where: { id: field.id },
@@ -446,49 +432,49 @@ type Wheres = Prisma.alignmentWhereInput &
     Prisma.textureWhereInput &
     Prisma.wallsWhereInput;
 
-const getFilterFields = (where: Wheres, fieldType: FilterFieldType): TaskEither<Error, FilterField[]> => {
+const getFilterFields = (where: Wheres, fieldType: FilterFieldTypeValue): TaskEither<Error, FilterField[]> => {
     switch (fieldType) {
-        case 'alignments':
+        case FilterFieldTypeValue.ALIGNMENTS:
             return pipe(
                 TE.tryCatch(() => db.alignment.findMany({ where: where }), handleError),
                 TE.map(adaptAlignments),
             );
-        case 'cells':
+        case FilterFieldTypeValue.CELLS:
             return pipe(
                 TE.tryCatch(() => db.cells.findMany({ where: where }), handleError),
                 TE.map(adaptCells),
             );
-        case 'colors':
+        case FilterFieldTypeValue.COLORS:
             return pipe(
                 TE.tryCatch(() => db.color.findMany({ where: where }), handleError),
                 TE.map(adaptColors),
             );
-        case 'forms':
+        case FilterFieldTypeValue.FORMS:
             return pipe(
                 TE.tryCatch(() => db.form.findMany({ where: where }), handleError),
                 TE.map(adaptForm),
             );
-        case 'locations':
+        case FilterFieldTypeValue.LOCATIONS:
             return pipe(
                 TE.tryCatch(() => db.location.findMany({ where: where }), handleError),
                 TE.map(adaptLocations),
             );
-        case 'seasons':
+        case FilterFieldTypeValue.SEASONS:
             return pipe(
                 TE.tryCatch(() => db.season.findMany({ where: where }), handleError),
                 TE.map(adaptSeasons),
             );
-        case 'shapes':
+        case FilterFieldTypeValue.SHAPES:
             return pipe(
                 TE.tryCatch(() => db.shape.findMany({ where: where }), handleError),
                 TE.map(adaptShapes),
             );
-        case 'textures':
+        case FilterFieldTypeValue.TEXTURES:
             return pipe(
                 TE.tryCatch(() => db.texture.findMany({ where: where }), handleError),
                 TE.map(adaptTextures),
             );
-        case 'walls':
+        case FilterFieldTypeValue.WALLS:
             return pipe(
                 TE.tryCatch(() => db.walls.findMany({ where: where }), handleError),
                 TE.map(adaptWalls),
@@ -498,35 +484,35 @@ const getFilterFields = (where: Wheres, fieldType: FilterFieldType): TaskEither<
     }
 };
 
-export const getFilterFieldByIdAndType = (id: number, fieldType: FilterFieldType): TaskEither<Error, FilterField[]> => {
+export const getFilterFieldByIdAndType = (id: number, fieldType: FilterFieldTypeValue): TaskEither<Error, FilterField[]> => {
     return getFilterFields({ id: id }, fieldType);
 };
 
-export const getFilterFieldByNameAndType = (name: string, fieldType: FilterFieldType): TaskEither<Error, FilterField[]> => {
+export const getFilterFieldByNameAndType = (name: string, fieldType: FilterFieldTypeValue): TaskEither<Error, FilterField[]> => {
     switch (fieldType) {
-        case 'alignments':
+        case FilterFieldTypeValue.ALIGNMENTS:
             return getFilterFields({ alignment: name }, fieldType);
-        case 'cells':
+        case FilterFieldTypeValue.CELLS:
             return getFilterFields({ cells: name }, fieldType);
-        case 'colors':
+        case FilterFieldTypeValue.COLORS:
             return getFilterFields({ color: name }, fieldType);
-        case 'forms':
+        case FilterFieldTypeValue.FORMS:
             return getFilterFields({ form: name }, fieldType);
-        case 'locations':
+        case FilterFieldTypeValue.LOCATIONS:
             return getFilterFields({ location: name }, fieldType);
-        case 'seasons':
+        case FilterFieldTypeValue.SEASONS:
             return getFilterFields({ season: name }, fieldType);
-        case 'shapes':
+        case FilterFieldTypeValue.SHAPES:
             return getFilterFields({ shape: name }, fieldType);
-        case 'textures':
+        case FilterFieldTypeValue.TEXTURES:
             return getFilterFields({ texture: name }, fieldType);
-        case 'walls':
+        case FilterFieldTypeValue.WALLS:
             return getFilterFields({ walls: name }, fieldType);
         default:
             return Promise.reject;
     }
 };
 
-export const getFilterFieldsByType = (fieldType: FilterFieldType): TaskEither<Error, FilterField[]> => {
+export const getFilterFieldsByType = (fieldType: FilterFieldTypeValue): TaskEither<Error, FilterField[]> => {
     return getFilterFields({}, fieldType);
 };

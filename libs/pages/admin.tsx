@@ -4,8 +4,9 @@ import { Alert, Col, Nav, Navbar, Row } from 'react-bootstrap';
 import { Toaster } from 'react-hot-toast';
 import Auth, { superAdmins } from '../../components/auth';
 import EditName, { RenameEvent } from '../../components/editname';
-import { DeleteResult, GallTaxon, HostTaxon } from '../api/apitypes';
+import { DeleteResult } from '../api/apitypes';
 import { WithID } from '../utils/types';
+import { TaxonCodeValues } from '../api/apitypes';
 
 export type AdminTypes =
     | 'Taxonomy'
@@ -57,13 +58,13 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
             if (
                 ['Speciessource', 'Images', 'Host'].includes(props.type) &&
                 ['Speciessource', 'Images', 'Host'].includes(destination) &&
-                props.selected?.taxoncode === HostTaxon
+                props.selected?.taxoncode === TaxonCodeValues.PLANT
             ) {
                 return true;
             } else if (
                 ['Speciessource', 'Gallhost', 'Images', 'Gall'].includes(props.type) &&
                 ['Speciessource', 'Gallhost', 'Images', 'Gall'].includes(destination) &&
-                props.selected?.taxoncode === GallTaxon
+                props.selected?.taxoncode === TaxonCodeValues.GALL
             ) {
                 return true;
             } else {
@@ -95,7 +96,7 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
                 return `/source/${props.selected?.id}`;
             case 'Images':
             case 'Speciessource':
-                if (props.selected?.taxoncode == GallTaxon) {
+                if (props.selected?.taxoncode == TaxonCodeValues.GALL) {
                     return `/gall/${props.selected?.id}`;
                 } else {
                     return `/host/${props.selected?.id}`;

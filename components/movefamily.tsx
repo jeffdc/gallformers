@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { Button, Modal } from 'react-bootstrap';
 import { Typeahead } from 'react-bootstrap-typeahead';
 import toast, { Toaster } from 'react-hot-toast';
-import { FamilyWithGenera, Genus } from '../libs/api/taxonomy';
+import { FamilyAPI, Genus } from '../libs/api/apitypes';
 
-type TaxFamily = Omit<FamilyWithGenera, 'parent'>;
+type TaxFamily = Omit<FamilyAPI, 'parent'>;
 export type MoveEvent = {
     new: TaxFamily;
 };

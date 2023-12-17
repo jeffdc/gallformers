@@ -9,7 +9,7 @@ import { Col, Container, Row } from 'react-bootstrap';
 import 'react-simple-tree-menu/dist/main.css';
 import SpeciesTable from '../../../components/speciesTable';
 import { SimpleSpecies } from '../../../libs/api/apitypes';
-import { EMPTY_TAXONOMYENTRY, TaxonomyEntry } from '../../../libs/api/taxonomy';
+import { EMPTY_TAXONOMYENTRY, TaxonomyEntry } from '../../../libs/api/apitypes';
 import { allGenusIds, getAllSpeciesForSectionOrGenus, taxonomyEntryById } from '../../../libs/db/taxonomy';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { formatWithDescription } from '../../../libs/pages/renderhelpers';

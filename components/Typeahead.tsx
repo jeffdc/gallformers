@@ -4,12 +4,6 @@ import { TypeaheadComponentProps } from 'react-bootstrap-typeahead/types/compone
 import { LabelKey, Option } from 'react-bootstrap-typeahead/types/types';
 import { Control, Controller, FieldValues, Path } from 'react-hook-form';
 
-export type TypeaheadCustomOption = {
-    customOption: boolean;
-    name: string;
-    id: string;
-};
-
 export type TypeaheadProps<FormFields extends FieldValues> = TypeaheadComponentProps & {
     name: Path<FormFields>;
     control: Control<FormFields>;

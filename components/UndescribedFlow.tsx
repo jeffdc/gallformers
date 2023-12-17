@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Button, Col, Form, Modal, Row } from 'react-bootstrap';
 import { Controller, useForm } from 'react-hook-form';
 import { GallSimple, HostSimple } from '../libs/api/apitypes';
-import { GENUS, TaxonomyEntry, TaxonomyEntryNoParent } from '../libs/api/taxonomy';
+import { TaxonomyEntry, TaxonomyEntryNoParent, TaxonomyTypeValues } from '../libs/api/apitypes';
 import Typeahead, { AsyncTypeahead } from './Typeahead';
 
 export type UndescribedData = {
@@ -208,7 +208,7 @@ const UndescribedFlow = ({ show, onClose, genera, families }: Props): JSX.Elemen
                                             id: -1,
                                             description: '',
                                             name: 'Unknown',
-                                            type: GENUS,
+                                            type: TaxonomyTypeValues.GENUS,
                                         });
                                     } else {
                                         setGenus(genus);

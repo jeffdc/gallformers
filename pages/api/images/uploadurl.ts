@@ -4,7 +4,7 @@ import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from 'next-auth/react';
-import { Err, extractQueryParam, sendErrResponse, sendSuccResponse, toErr } from '../../../libs/api/apipage';
+import { Err, extractQueryParam, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage';
 import { IMAGES_ENDPOINT } from '../../../libs/constants';
 import { getPresignedUrl } from '../../../libs/images/images';
 import { handleError } from '../../../libs/utils/util';
@@ -41,7 +41,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             ),
             TE.fromEither,
             TE.flatten,
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else {
         res.status(405).end();

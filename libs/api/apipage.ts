@@ -44,7 +44,7 @@ export async function apiIdEndpoint<T>(
             ),
             TE.fromEither,
             TE.flatten,
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
 
     if (req.method === 'GET' && fGet != undefined) {
@@ -97,7 +97,7 @@ export async function apiUpsertEndpoint<T, R>(
             logger.error(e, 'Failed doing upsert.');
             return e;
         }),
-        TE.fold(sendErrResponse(res), onComplete(res)),
+        TE.fold(sendErrorResponse(res), onComplete(res)),
     )();
 }
 
@@ -116,7 +116,7 @@ export async function apiSearchEndpoint<T>(
         O.map(dbSearch),
         O.map(TE.mapLeft(toErr)),
         O.getOrElse(errMsg('q')),
-        TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+        TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
     )();
 }
 
@@ -186,7 +186,7 @@ export const getQueryParam =
  * @param res
  * @returns we only have a return value to make it easier to compose in pipes. This function sends the requests without delay.
  */
-export const sendSuccResponse =
+export const sendSuccessResponse =
     (res: NextApiResponse) =>
     <T>(t: T): TA.Task<never> => {
         res.status(200).json(t);
@@ -198,7 +198,7 @@ export const sendSuccResponse =
  * @param res
  * @returns we only have a return value to make it easier to compose in pipes. This function sends the requests without delay.
  */
-export const sendErrResponse =
+export const sendErrorResponse =
     (res: NextApiResponse) =>
     (e: Err): TA.Task<never> => {
         logger.error(e);

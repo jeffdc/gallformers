@@ -6,39 +6,31 @@ import { ParsedUrlQuery } from 'querystring';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Path } from 'react-hook-form';
-import * as yup from 'yup';
 import { RenameEvent } from '../../components/editname';
 import { AsyncTypeahead } from '../../components/Typeahead';
 import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields } from '../../hooks/useAPIs';
+import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { HostTaxon, SimpleSpecies } from '../../libs/api/apitypes';
-import { SECTION, TaxonomyEntry, TaxonomyUpsertFields } from '../../libs/api/taxonomy';
+import { SimpleSpecies, TaxonCodeValues } from '../../libs/api/apitypes';
+import { TaxSection, TaxSectionSchema, TaxonomyEntry, TaxonomyTypeValues, TaxonomyUpsertFields } from '../../libs/api/apitypes';
 import { allGenera, allSections } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
 import { extractGenus, hasProp, mightFailWithArray } from '../../libs/utils/util';
+import * as t from 'io-ts';
 
-const SpeciesSchema = yup.object({
-    id: yup.number(),
-    taxoncode: yup.string(),
-    name: yup.string(),
-});
+const schema = t.intersection([adminFormFieldsSchema(TaxSectionSchema), TaxSectionSchema]);
 
-const schema = yup.object().shape({
-    mainField: yup.array().required('A name is required.'),
-    description: yup.string().required('A description is required.'),
-    species: yup
-        .array()
-        .required('At least one species must be selected.')
-        .of(SpeciesSchema)
-        .test('same genus', 'You must select at least one species and all selected species must be of the same genus', (v) => {
-            return new Set(v?.map((s) => (s.name ? extractGenus(s?.name) : undefined))).size === 1;
-        }),
-});
-
-type TaxSection = Omit<TaxonomyEntry, 'parent'> & {
-    species: SimpleSpecies[];
-};
+// const schema = yup.object().shape({
+//     mainField: yup.array().required('A name is required.'),
+//     description: yup.string().required('A description is required.'),
+//     species: yup
+//         .array()
+//         .required('At least one species must be selected.')
+//         .of(SpeciesSchema)
+//         .test('same genus', 'You must select at least one species and all selected species must be of the same genus', (v) => {
+//             return new Set(v?.map((s) => (s.name ? extractGenus(s?.name) : undefined))).size === 1;
+//         }),
+// });
 
 type Props = {
     id: string;
@@ -63,7 +55,7 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
         return {
             name: name,
             description: fields.description,
-            type: 'section',
+            type: TaxonomyTypeValues.SECTION,
             id: id,
             species: fields.species.map((s) => s.id),
             parent: O.fromNullable(genera.find((g) => g.name.localeCompare(extractGenus(fields.species[0].name)) == 0)),
@@ -96,7 +88,7 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
         description: '',
         id: -1,
         species: [],
-        type: SECTION,
+        type: TaxonomyTypeValues.SECTION,
     });
 
     const {
@@ -191,7 +183,7 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
         >
             <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                 <h4>Add or Edit a Section</h4>
-                <p>This is only for host sections. Currently we do not support sections for gallmakers.</p>
+                <p>This is only for host sections. Currently we do not support sections for gallformers.</p>
                 <Row className="my-1">
                     <Col>
                         <Row>
@@ -276,7 +268,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
         props: {
             id: id,
             sections: await mightFailWithArray<TaxonomyEntry>()(allSections()),
-            genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon)),
+            genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(TaxonCodeValues.PLANT)),
             // hosts: await mightFailWithArray<HostApi>()(allHosts()),
         },
     };

@@ -4,10 +4,11 @@ import React, { useMemo } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
 import DataTable from '../components/DataTable';
 import Edit from '../components/edit';
-import { allGlossaryEntries, Entry } from '../libs/db/glossary';
-import { EntryLinked, linkDefintionToGlossary } from '../libs/pages/glossary';
+import { allGlossaryEntries } from '../libs/db/glossary';
+import { EntryLinked, linkDefinitionToGlossary } from '../libs/pages/glossary';
 import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
 import { mightFailWithArray } from '../libs/utils/util';
+import { Entry } from '../libs/api/glossary';
 
 type Props = {
     es: EntryLinked[];
@@ -64,9 +65,9 @@ const Glossary = ({ es }: Props): JSX.Element => {
                 maxWidth: '250px',
             },
             {
-                id: 'defintion',
+                id: 'definition',
                 selector: (row: EntryLinked) => row.definition,
-                name: 'Defintion',
+                name: 'Definition',
                 format: formatDef,
                 sortable: true,
                 wrap: true,
@@ -117,7 +118,7 @@ export const getStaticProps: GetStaticProps = async () => {
 
     return {
         props: {
-            es: await linkDefintionToGlossary(entries),
+            es: await linkDefinitionToGlossary(entries),
         },
         revalidate: 1,
     };

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import React, { useMemo } from 'react';
 import DataTable from './DataTable';
-import { GallTaxon, SimpleSpecies } from '../libs/api/apitypes';
+import { SimpleSpecies, TaxonCodeValues } from '../libs/api/apitypes';
 import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
 
 export type SourceListProps = {
@@ -9,7 +9,7 @@ export type SourceListProps = {
 };
 
 const linkSpecies = (s: SimpleSpecies) => {
-    const hostOrGall = s.taxoncode === GallTaxon ? 'gall' : 'host';
+    const hostOrGall = s.taxoncode === TaxonCodeValues.GALL ? 'gall' : 'host';
     return (
         <Link key={s.id} href={`/${hostOrGall}/${s.id}`}>
             <i>{s.name}</i>
@@ -18,7 +18,7 @@ const linkSpecies = (s: SimpleSpecies) => {
 };
 
 const taxonDisplay = (s: SimpleSpecies) => {
-    return s.taxoncode === GallTaxon ? 'Gall Former' : 'Host';
+    return s.taxoncode === TaxonCodeValues.GALL ? 'Gall Former' : 'Host';
 };
 
 const SpeciesTable = ({ species }: SourceListProps): JSX.Element => {

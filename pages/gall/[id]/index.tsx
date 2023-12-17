@@ -14,8 +14,11 @@ import RangeMap from '../../../components/rangemap';
 import SeeAlso from '../../../components/seealso';
 import SourceList from '../../../components/sourcelist';
 import SpeciesSynonymy from '../../../components/speciesSynonymy';
-import { DetachableBoth, GallApi, GallHost, GallTaxon, SimpleSpecies } from '../../../libs/api/apitypes';
-import { FGS } from '../../../libs/api/taxonomy';
+import { GallHost } from '../../../libs/api/apitypes';
+import { GallApi } from '../../../libs/api/apitypes';
+import { SimpleSpecies, TaxonCodeValues } from '../../../libs/api/apitypes';
+import { DetachableBoth } from '../../../libs/api/apitypes';
+import { FGS } from '../../../libs/api/apitypes';
 import { allGallIds, gallById, getRelatedGalls } from '../../../libs/db/gall';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkSourceToGlossary } from '../../../libs/pages/glossary';
@@ -93,7 +96,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                     </span>
                                 </Col>
                             </Row>
-                            <Row hidden={!species.gall.undescribed}>
+                            <Row hidden={!species.undescribed}>
                                 <Col>
                                     <span className="text-danger">The inducer of this gall is unknown or undescribed.</span>
                                 </Col>
@@ -121,8 +124,8 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                 <Col xs={12} md={6} lg={4}>
                                     <Row>
                                         <Col>
-                                            <strong>Detachable:</strong> {species.gall.detachable.value}
-                                            {species.gall.detachable.value === DetachableBoth.value && (
+                                            <strong>Detachable:</strong> {species.detachable.value}
+                                            {species.detachable.value === DetachableBoth.value && (
                                                 <InfoTip
                                                     id="detachable"
                                                     text="This gall can be both detachable and integral depending on what stage of its lifecycle it is in."
@@ -132,12 +135,12 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                     </Row>
                                     <Row>
                                         <Col>
-                                            <strong>Color:</strong> {species.gall.gallcolor.map((c) => c.field).join(', ')}
+                                            <strong>Color:</strong> {species.color.map((c) => c.field).join(', ')}
                                         </Col>
                                     </Row>
                                     <Row>
                                         <Col>
-                                            <strong>Texture:</strong> {species.gall.galltexture.map((t) => t.field).join(', ')}
+                                            <strong>Texture:</strong> {species.texture.map((t) => t.field).join(', ')}
                                         </Col>
                                     </Row>
                                     <Row>
@@ -151,12 +154,12 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                     </Row>
                                     <Row>
                                         <Col>
-                                            <strong>Shape:</strong> {species.gall.gallshape.map((s) => s.field).join(', ')}
+                                            <strong>Shape:</strong> {species.shape.map((s) => s.field).join(', ')}
                                         </Col>
                                     </Row>
                                     <Row>
                                         <Col>
-                                            <strong>Season:</strong> {species.gall.gallseason.map((s) => s.field).join(', ')}
+                                            <strong>Season:</strong> {species.season.map((s) => s.field).join(', ')}
                                         </Col>
                                     </Row>
                                     <Row>
@@ -177,28 +180,27 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                 <Col xs={12} md={6} lg={4}>
                                     <Row>
                                         <Col>
-                                            <strong>Alignment:</strong>{' '}
-                                            {species.gall.gallalignment.map((a) => a.field).join(', ')}
+                                            <strong>Alignment:</strong> {species.alignment.map((a) => a.field).join(', ')}
                                         </Col>
                                     </Row>
                                     <Row>
                                         <Col>
-                                            <strong>Walls:</strong> {species.gall.gallwalls.map((w) => w.field).join(', ')}
+                                            <strong>Walls:</strong> {species.walls.map((w) => w.field).join(', ')}
                                         </Col>
                                     </Row>
                                     <Row>
                                         <Col>
-                                            <strong>Location:</strong> {species.gall.galllocation.map((l) => l.field).join(', ')}
+                                            <strong>Location:</strong> {species.location.map((l) => l.field).join(', ')}
                                         </Col>
                                     </Row>
                                     <Row>
                                         <Col>
-                                            <strong>Form:</strong> {species.gall.gallform.map((s) => s.field).join(', ')}
+                                            <strong>Form:</strong> {species.form.map((s) => s.field).join(', ')}
                                         </Col>
                                     </Row>
                                     <Row>
                                         <Col>
-                                            <strong>Cells:</strong> {species.gall.gallcells.map((s) => s.field).join(', ')}
+                                            <strong>Cells:</strong> {species.cells.map((s) => s.field).join(', ')}
                                         </Col>
                                     </Row>
                                 </Col>
@@ -242,9 +244,9 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                         data={species.speciessource}
                         defaultSelection={selectedSource}
                         onSelectionChange={(s) =>
-                            setSelectedSource(species.speciessource.find((spso) => spso.source_id == s?.id))
+                            setSelectedSource(species.speciessource.find((speciesSource) => speciesSource.source_id == s?.id))
                         }
-                        taxonType={GallTaxon}
+                        taxonType={TaxonCodeValues.GALL}
                     />
                     <hr />
                     <Row>
@@ -252,7 +254,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                             <strong>See Also:</strong>
                         </Col>
                     </Row>
-                    <SeeAlso name={species.name} undescribed={species.gall.undescribed} />
+                    <SeeAlso name={species.name} undescribed={species.undescribed} />
                 </Col>
             </Row>
         </Container>

@@ -3,7 +3,7 @@ import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { apiSearchEndpoint, getQueryParams, sendErrResponse, sendSuccResponse, toErr } from '../../../libs/api/apipage';
+import { apiSearchEndpoint, getQueryParams, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage';
 import { speciesById, speciesByName, speciesSearch } from '../../../libs/db/species';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
@@ -21,7 +21,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             O.map(parseInt),
             O.fold(errMsg, speciesById),
             TE.mapLeft(toErr),
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else if (params && O.isSome(params['q'])) {
         apiSearchEndpoint(req, res, speciesSearch);
@@ -30,7 +30,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             params['name'],
             O.fold(errMsg, speciesByName),
             TE.mapLeft(toErr),
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else {
         res.status(400).end('No valid query params provided.');

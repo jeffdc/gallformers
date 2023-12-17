@@ -1,15 +1,16 @@
-import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Carousel from 'nuka-carousel';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button, ButtonGroup, ButtonToolbar, Col, Modal, OverlayTrigger, Popover, Row } from 'react-bootstrap';
 import useIsMounted from '../hooks/useIsMounted';
 import useWindowDimensions from '../hooks/usewindowdimension';
-import { ALLRIGHTS, GallTaxon, ImageApi, ImageNoSourceApi, SpeciesApi } from '../libs/api/apitypes';
+import { ImageApi, ImageLicenseValues, ImageNoSourceApi, SpeciesApi } from '../libs/api/apitypes';
+import { TaxonCodeValues } from '../libs/api/apitypes';
 import { hasProp } from '../libs/utils/util';
 import NoImage from '../public/images/noimage.jpg';
 import NoImageHost from '../public/images/noimagehost.jpg';
@@ -52,7 +53,7 @@ const Images = ({ sp }: Props): JSX.Element => {
     return species.images.length < 1 ? (
         <div className="p-2">
             <Image
-                src={species.taxoncode === GallTaxon ? NoImage : NoImageHost}
+                src={species.taxoncode === TaxonCodeValues.GALL ? NoImage : NoImageHost}
                 alt={`missing image of ${species.name}`}
                 className="img-fluid d-block"
             />
@@ -121,7 +122,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                                         </a>{' '}
                                         by {image.creator}
                                         {' © '}
-                                        {image.license === ALLRIGHTS ? (
+                                        {image.license === ImageLicenseValues.ALL_RIGHTS ? (
                                             image.license
                                         ) : (
                                             <a href={image.licenselink} target="_blank" rel="noreferrer">

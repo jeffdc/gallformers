@@ -1,21 +1,31 @@
 import axios from 'axios';
-import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Controller } from 'react-hook-form';
-import * as yup from 'yup';
-import AliasTable from '../../components/aliastable';
 import Typeahead, { AsyncTypeahead } from '../../components/Typeahead';
 import UndescribedFlow, { UndescribedData } from '../../components/UndescribedFlow';
+import AliasTable from '../../components/aliastable';
+import useSpecies, { SpeciesNamingHelp, SpeciesProps, speciesFormFieldsSchema } from '../../hooks/useSpecies';
 import useAdmin from '../../hooks/useadmin';
-import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '../../hooks/useSpecies';
 import { extractQueryParam } from '../../libs/api/apipage';
-import * as AT from '../../libs/api/apitypes';
-import { FAMILY, GENUS, TaxonomyEntry, TaxonomyEntryNoParent } from '../../libs/api/taxonomy';
+import { AbundanceApi, AliasApi, FilterField, GALL_FAMILY_TYPES, GallUpsertFields } from '../../libs/api/apitypes';
+import {
+    DetachableNone,
+    Detachables,
+    GallApi,
+    GallApiSchema,
+    GallPropertiesSchema,
+    HostSimple,
+    TaxonCodeValues,
+    detachableFromString,
+} from '../../libs/api/apitypes';
+import { TaxonomyEntry, TaxonomyTypeValues } from '../../libs/api/apitypes';
 import {
     getAlignments,
     getCells,
@@ -31,76 +41,65 @@ import { gallById } from '../../libs/db/gall';
 import { getAbundances } from '../../libs/db/species';
 import { allFamilies, allGenera } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
-import { hasProp, mightFailWithArray, SPECIES_NAME_REGEX } from '../../libs/utils/util';
+import { hasProp, mightFailWithArray } from '../../libs/utils/util';
 
 type Props = SpeciesProps & {
-    gall: AT.GallApi[];
-    locations: AT.FilterField[];
-    colors: AT.FilterField[];
-    seasons: AT.FilterField[];
-    shapes: AT.FilterField[];
-    textures: AT.FilterField[];
-    alignments: AT.FilterField[];
-    walls: AT.FilterField[];
-    cells: AT.FilterField[];
-    forms: AT.FilterField[];
+    gall: GallApi[];
+    locations: FilterField[];
+    colors: FilterField[];
+    seasons: FilterField[];
+    shapes: FilterField[];
+    textures: FilterField[];
+    alignments: FilterField[];
+    walls: FilterField[];
+    cells: FilterField[];
+    forms: FilterField[];
 };
 
-export type FormFields = SpeciesFormFields<AT.GallApi> & {
-    hosts: AT.GallHost[];
-    detachable: AT.DetachableValues;
-    walls: AT.FilterField[];
-    cells: AT.FilterField[];
-    alignments: AT.FilterField[];
-    shapes: AT.FilterField[];
-    colors: AT.FilterField[];
-    seasons: AT.FilterField[];
-    locations: AT.FilterField[];
-    textures: AT.FilterField[];
-    forms: AT.FilterField[];
-    undescribed: boolean;
-};
+const schema = t.intersection([speciesFormFieldsSchema(GallApiSchema), GallPropertiesSchema]);
 
-const schema: yup.ObjectSchema<FormFields> = yup.object({
-    mainField: yup
-        .array()
-        .of(
-            yup.object({
-                name: yup.string().matches(SPECIES_NAME_REGEX).required(),
-            }),
-        )
-        .min(1)
-        .max(1),
-    family: yup
-        .array()
-        .of(
-            yup.object({
-                name: yup.string().required(),
-            }),
-        )
-        .required(),
-    // only force hosts to be present when adding, not deleting.
-    hosts: yup.array().when('del', {
-        is: false,
-        then: () => yup.array().min(1),
-    }),
-    del: yup.boolean().required(),
-    detachable: yup.boolean(),
-    walls: yup.array(),
-    cells: yup.array(),
-    alignments: yup.array(),
-    shapes: yup.array(),
-    colors: yup.array(),
-    seasons: yup.array(),
-    locations: yup.array(),
-    textures: yup.array(),
-    forms: yup.array(),
-    undescribed: yup.boolean(),
-    genus: yup.mixed(),
-    datacomplete: yup.boolean(),
-    abundance: yup.mixed(),
-    aliases: yup.array(),
-});
+export type FormFields = t.TypeOf<typeof schema>;
+
+// const schema: yup.ObjectSchema<FormFields> = yup.object({
+//     mainField: yup
+//         .array()
+//         .of(
+//             yup.object({
+//                 name: yup.string().matches(SPECIES_NAME_REGEX).required(),
+//             }),
+//         )
+//         .min(1)
+//         .max(1),
+//     family: yup
+//         .array()
+//         .of(
+//             yup.object({
+//                 name: yup.string().required(),
+//             }),
+//         )
+//         .required(),
+//     // only force hosts to be present when adding, not deleting.
+//     hosts: yup.array().when('del', {
+//         is: false,
+//         then: () => yup.array().min(1),
+//     }),
+//     del: yup.boolean().required(),
+//     detachable: yup.boolean(),
+//     walls: yup.array(),
+//     cells: yup.array(),
+//     alignments: yup.array(),
+//     shapes: yup.array(),
+//     colors: yup.array(),
+//     seasons: yup.array(),
+//     locations: yup.array(),
+//     textures: yup.array(),
+//     forms: yup.array(),
+//     undescribed: yup.boolean(),
+//     genus: yup.mixed(),
+//     datacomplete: yup.boolean(),
+//     abundance: yup.mixed(),
+//     aliases: yup.array(),
+// });
 
 const Gall = ({
     id,
@@ -119,90 +118,91 @@ const Gall = ({
     forms,
 }: Props): JSX.Element => {
     const [showNewUndescribed, setShowNewUndescribed] = useState(false);
-    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields } = useSpecies<AT.GallApi>(genera);
-    const [hosts, setHosts] = useState<AT.HostSimple[]>([]);
+    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields } = useSpecies<GallApi, FormFields>(
+        genera,
+    );
+    const [hosts, setHosts] = useState<HostSimple[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
-    const toUpsertFields = (fields: FormFields, name: string, id: number): AT.GallUpsertFields => {
+    const toUpsertFields = (fields: FormFields, name: string, id: number): GallUpsertFields => {
         if (!selected) {
             throw new Error('Trying to submit with a null selection which seems impossible but here we are.');
         }
 
         return {
             ...toSpeciesUpsertFields(fields, name, id),
-            gallid: hasProp(fields.mainField[0], 'gall') ? (fields.mainField[0] as AT.GallApi).gall.id : -1,
-            alignments: fields.alignments.map((a) => a.id),
+            gallid: hasProp(fields.mainField[0], 'gall') ? (fields.mainField[0] as GallApi).gall_id : -1,
+            alignments: fields.alignment.map((a) => a.id),
             cells: fields.cells.map((c) => c.id),
-            colors: fields.colors.map((c) => c.id),
-            seasons: fields.seasons.map((c) => c.id),
-            detachable: fields.detachable,
+            colors: fields.color.map((c) => c.id),
+            seasons: fields.season.map((c) => c.id),
+            detachable: fields.detachable.value,
             fgs: selected.fgs,
             hosts: fields.hosts.map((h) => h.id),
-            locations: fields.locations.map((l) => l.id),
-            shapes: fields.shapes.map((s) => s.id),
-            textures: fields.textures.map((t) => t.id),
+            locations: fields.location.map((l) => l.id),
+            shapes: fields.shape.map((s) => s.id),
+            textures: fields.texture.map((t) => t.id),
             undescribed: fields.undescribed,
             walls: fields.walls.map((w) => w.id),
-            forms: fields.forms.map((f) => f.id),
+            forms: fields.form.map((f) => f.id),
         };
     };
 
-    const updatedFormFields = async (s: AT.GallApi | undefined): Promise<FormFields> => {
+    const updatedFormFields = async (s: GallApi | undefined): Promise<FormFields> => {
         const speciesFields = updatedSpeciesFormFields(s);
 
         if (s != undefined) {
             return {
                 ...speciesFields,
-                alignments: s.gall.gallalignment,
-                cells: s.gall.gallcells,
-                colors: s.gall.gallcolor,
-                detachable: s.gall.detachable.value,
+                alignment: s.alignment,
+                cells: s.cells,
+                color: s.color,
+                detachable: s.detachable,
                 hosts: s.hosts,
-                locations: s.gall.galllocation,
-                seasons: s.gall.gallseason,
-                shapes: s.gall.gallshape,
-                textures: s.gall.galltexture,
-                undescribed: s.gall.undescribed,
-                walls: s.gall.gallwalls,
-                forms: s.gall.gallform,
+                location: s.location,
+                season: s.season,
+                shape: s.shape,
+                texture: s.texture,
+                undescribed: s.undescribed,
+                walls: s.walls,
+                form: s.form,
             };
         }
 
         return {
             ...speciesFields,
-            alignments: [],
+            alignment: [],
             cells: [],
-            colors: [],
-            detachable: AT.DetachableNone.value,
+            color: [],
+            detachable: DetachableNone,
             hosts: [],
-            locations: [],
-            seasons: [],
-            shapes: [],
-            textures: [],
+            location: [],
+            season: [],
+            shape: [],
+            texture: [],
             undescribed: false,
             walls: [],
-            forms: [],
+            form: [],
         };
     };
 
-    const createNewGall = (name: string): AT.GallApi => ({
-        ...createNewSpecies(name, AT.GallTaxon),
-        gall: {
-            detachable: AT.DetachableNone,
-            gallalignment: [],
-            gallcells: [],
-            gallcolor: [],
-            galllocation: [],
-            gallseason: [],
-            gallshape: [],
-            galltexture: [],
-            gallwalls: [],
-            gallform: [],
-            undescribed: false,
-            id: -1,
-        },
+    const createNewGall = (name: string): GallApi => ({
+        ...createNewSpecies(name, TaxonCodeValues.GALL),
+        detachable: DetachableNone,
+        alignment: [],
+        cells: [],
+        color: [],
+        location: [],
+        season: [],
+        shape: [],
+        texture: [],
+        walls: [],
+        form: [],
+        undescribed: false,
+        id: -1,
         hosts: [],
         excludedPlaces: [],
+        gall_id: -1,
     });
 
     const {
@@ -251,7 +251,7 @@ const Gall = ({
             newG.hosts = [{ ...data.host, places: [] }];
             newG.fgs.genus = data.genus;
             newG.fgs.family = data.family;
-            newG.gall.undescribed = true;
+            newG.undescribed = true;
             setSelected(newG);
         }
     };
@@ -269,7 +269,7 @@ const Gall = ({
         );
 
         if (newGenusNeeded) {
-            fields.genus = [{ id: -1, description: '', name: 'Unknown', type: GENUS }];
+            fields.genus = [{ id: -1, description: '', name: 'Unknown', type: TaxonomyTypeValues.GENUS }];
         }
 
         // if either genus or family is Unknown and the undescribed box is not checked they are probably messing up
@@ -293,7 +293,7 @@ const Gall = ({
         setIsLoading(true);
 
         axios
-            .get<AT.HostSimple[]>(`../api/host?q=${s}&simple`)
+            .get<HostSimple[]>(`../api/host?q=${s}&simple`)
             .then((resp) => {
                 setHosts(resp.data);
                 setIsLoading(false);
@@ -375,7 +375,7 @@ const Gall = ({
                             disabled={true}
                             onChange={(g) => {
                                 if (selected) {
-                                    selected.fgs.genus = g[0] as TaxonomyEntryNoParent;
+                                    selected.fgs.genus = g[0] as TaxonomyEntry;
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -400,7 +400,7 @@ const Gall = ({
                                 if (f && f.length > 0) {
                                     // handle the case when a new species is created
                                     // either the genus is new or is not
-                                    const fam = f[0] as TaxonomyEntryNoParent;
+                                    const fam = f[0] as TaxonomyEntry;
                                     const genus = genera.find((gg) => gg.id === selected.fgs.genus.id);
                                     if (genus && O.isNone(genus.parent)) {
                                         genus.parent = O.some({ ...fam, parent: O.none });
@@ -413,7 +413,13 @@ const Gall = ({
                                 } else {
                                     selected.fgs = {
                                         ...selected.fgs,
-                                        family: { name: '', description: '', id: -1, type: FAMILY },
+                                        family: {
+                                            name: '',
+                                            description: '',
+                                            id: -1,
+                                            type: TaxonomyTypeValues.FAMILY,
+                                            parent: O.none,
+                                        },
                                     };
                                     setSelected({ ...selected });
                                 }
@@ -464,10 +470,10 @@ const Gall = ({
                             render={({ field: { ref } }) => (
                                 <select
                                     ref={ref}
-                                    value={selected ? selected.gall.detachable.value : AT.DetachableNone.value}
+                                    value={selected ? selected.detachable.value : DetachableNone.value}
                                     onChange={(e) => {
                                         if (selected) {
-                                            selected.gall.detachable = AT.detachableFromString(e.currentTarget.value);
+                                            selected.detachable = detachableFromString(e.currentTarget.value);
                                             setSelected({ ...selected });
                                         }
                                     }}
@@ -475,7 +481,7 @@ const Gall = ({
                                     className="form-control"
                                     disabled={areRequiredFieldsFilled()}
                                 >
-                                    {AT.Detachables.map((d) => (
+                                    {Detachables.map((d) => (
                                         <option key={d.id}>{d.value}</option>
                                     ))}
                                 </select>
@@ -492,10 +498,10 @@ const Gall = ({
                             multiple
                             clearButton
                             disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.gallwalls : []}
+                            selected={selected ? selected.walls : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.gallwalls = w as AT.FilterField[];
+                                    selected.walls = w as FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -511,10 +517,10 @@ const Gall = ({
                             multiple
                             clearButton
                             disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.gallcells : []}
+                            selected={selected ? selected.cells : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.gallcells = w as AT.FilterField[];
+                                    selected.cells = w as FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -523,17 +529,17 @@ const Gall = ({
                     <Col>
                         Alignment(s):
                         <Typeahead
-                            name="alignments"
+                            name="alignment"
                             control={form.control}
                             options={alignments}
                             labelKey="field"
                             multiple
                             clearButton
                             disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.gallalignment : []}
+                            selected={selected ? selected.alignment : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.gallalignment = w as AT.FilterField[];
+                                    selected.alignment = w as FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -544,17 +550,17 @@ const Gall = ({
                     <Col>
                         Color(s):
                         <Typeahead
-                            name="colors"
+                            name="color"
                             control={form.control}
                             options={colors}
                             labelKey="field"
                             multiple
                             clearButton
                             disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.gallcolor : []}
+                            selected={selected ? selected.color : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.gallcolor = w as AT.FilterField[];
+                                    selected.color = w as FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -563,17 +569,17 @@ const Gall = ({
                     <Col>
                         Shape(s):
                         <Typeahead
-                            name="shapes"
+                            name="shape"
                             control={form.control}
                             options={shapes}
                             labelKey="field"
                             multiple
                             clearButton
                             disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.gallshape : []}
+                            selected={selected ? selected.shape : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.gallshape = w as AT.FilterField[];
+                                    selected.shape = w as FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -582,17 +588,17 @@ const Gall = ({
                     <Col>
                         Season(s):
                         <Typeahead
-                            name="seasons"
+                            name="season"
                             control={form.control}
                             options={seasons}
                             labelKey="field"
                             multiple
                             clearButton
                             disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.gallseason : []}
+                            selected={selected ? selected.season : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.gallseason = w as AT.FilterField[];
+                                    selected.season = w as FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -601,17 +607,17 @@ const Gall = ({
                     <Col>
                         Form(s):
                         <Typeahead
-                            name="forms"
+                            name="form"
                             control={form.control}
                             options={forms}
                             labelKey="field"
                             multiple
                             clearButton
                             disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.gallform : []}
+                            selected={selected ? selected.form : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.gallform = w as AT.FilterField[];
+                                    selected.form = w as FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -622,17 +628,17 @@ const Gall = ({
                     <Col>
                         Location(s):
                         <Typeahead
-                            name="locations"
+                            name="location"
                             control={form.control}
                             options={locations}
                             labelKey="field"
                             multiple
                             clearButton
                             disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.galllocation : []}
+                            selected={selected ? selected.location : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.galllocation = w as AT.FilterField[];
+                                    selected.location = w as FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -641,17 +647,17 @@ const Gall = ({
                     <Col>
                         Texture(s):
                         <Typeahead
-                            name="textures"
+                            name="texture"
                             control={form.control}
                             options={textures}
                             labelKey="field"
                             multiple
                             clearButton
                             disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.galltexture : []}
+                            selected={selected ? selected.texture : []}
                             onChange={(w) => {
                                 if (selected) {
-                                    selected.gall.galltexture = w as AT.FilterField[];
+                                    selected.texture = w as FilterField[];
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -675,7 +681,7 @@ const Gall = ({
                             }
                             onChange={(g) => {
                                 if (selected) {
-                                    selected.abundance = O.fromNullable(g[0] as AT.AbundanceApi);
+                                    selected.abundance = O.fromNullable(g[0] as AbundanceApi);
                                     setSelected({ ...selected });
                                 }
                             }}
@@ -691,7 +697,7 @@ const Gall = ({
                             render={() => (
                                 <AliasTable
                                     data={selected?.aliases ?? []}
-                                    setData={(aliases: AT.AliasApi[]) => {
+                                    setData={(aliases: AliasApi[]) => {
                                         if (selected) {
                                             selected.aliases = aliases;
                                             setSelected({ ...selected });
@@ -738,11 +744,11 @@ const Gall = ({
                                     ref={ref}
                                     type="checkbox"
                                     className="form-input-checkbox"
-                                    checked={selected ? selected.gall.undescribed : false}
+                                    checked={selected ? selected.undescribed : false}
                                     disabled={areRequiredFieldsFilled()}
                                     onChange={(e) => {
                                         if (selected) {
-                                            selected.gall.undescribed = e.currentTarget.checked;
+                                            selected.undescribed = e.currentTarget.checked;
                                             setSelected({ ...selected });
                                         }
                                     }}
@@ -768,25 +774,25 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     const gall = pipe(
         id,
         O.map(parseInt),
-        O.map((id) => mightFailWithArray<AT.GallApi>()(gallById(id))),
-        O.getOrElse(constant(Promise.resolve(Array<AT.GallApi>()))),
+        O.map((id) => mightFailWithArray<GallApi>()(gallById(id))),
+        O.getOrElse(constant(Promise.resolve(Array<GallApi>()))),
     );
     return {
         props: {
             id: O.getOrElseW(constant(null))(id),
             gall: await gall,
-            families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(AT.GALL_FAMILY_TYPES)),
-            genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(AT.GallTaxon, true)),
-            locations: await mightFailWithArray<AT.FilterField>()(getLocations()),
-            colors: await mightFailWithArray<AT.FilterField>()(getColors()),
-            seasons: await mightFailWithArray<AT.FilterField>()(getSeasons()),
-            shapes: await mightFailWithArray<AT.FilterField>()(getShapes()),
-            textures: await mightFailWithArray<AT.FilterField>()(getTextures()),
-            alignments: await mightFailWithArray<AT.FilterField>()(getAlignments()),
-            walls: await mightFailWithArray<AT.FilterField>()(getWalls()),
-            cells: await mightFailWithArray<AT.FilterField>()(getCells()),
-            abundances: await mightFailWithArray<AT.AbundanceApi>()(getAbundances()),
-            forms: await mightFailWithArray<AT.FilterField>()(getForms()),
+            families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(GALL_FAMILY_TYPES)),
+            genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(TaxonCodeValues.GALL, true)),
+            locations: await mightFailWithArray<FilterField>()(getLocations()),
+            colors: await mightFailWithArray<FilterField>()(getColors()),
+            seasons: await mightFailWithArray<FilterField>()(getSeasons()),
+            shapes: await mightFailWithArray<FilterField>()(getShapes()),
+            textures: await mightFailWithArray<FilterField>()(getTextures()),
+            alignments: await mightFailWithArray<FilterField>()(getAlignments()),
+            walls: await mightFailWithArray<FilterField>()(getWalls()),
+            cells: await mightFailWithArray<FilterField>()(getCells()),
+            abundances: await mightFailWithArray<AbundanceApi>()(getAbundances()),
+            forms: await mightFailWithArray<FilterField>()(getForms()),
         },
     };
 };

@@ -1,27 +1,23 @@
-import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { Alert, Button, Col, Row } from 'react-bootstrap';
-import * as yup from 'yup';
 import { RenameEvent } from '../../components/editname';
+import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
 import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { PlaceNoTreeApi, PlaceNoTreeUpsertFields, PLACE_TYPES } from '../../libs/api/apitypes';
+import { PLACE_TYPES, PlaceNoTreeApi, PlaceNoTreeApiSchema, PlaceNoTreeUpsertFields } from '../../libs/api/apitypes';
 import Admin from '../../libs/pages/admin';
-
-const schema = yup.object().shape({
-    mainField: yup.mixed().required(),
-    code: yup.string().required(),
-    type: yup.string().required(),
-});
 
 type Props = {
     id: string;
 };
 
-type FormFields = AdminFormFields<PlaceNoTreeApi> & Pick<PlaceNoTreeApi, 'code' | 'type'>;
+const schema = t.intersection([adminFormFieldsSchema(PlaceNoTreeApiSchema), PlaceNoTreeApiSchema]);
+
+type FormFields = AdminFormFields<PlaceNoTreeApi> & Omit<PlaceNoTreeApi, 'id' | 'name'>;
 
 const renamePlace = async (s: PlaceNoTreeApi, e: RenameEvent): Promise<PlaceNoTreeApi> => ({
     ...s,

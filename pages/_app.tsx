@@ -6,7 +6,7 @@ import React from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
 import 'react-bootstrap-typeahead/css/Typeahead.css';
 import 'react-bootstrap-typeahead/css/Typeahead.bs5.css';
-import { ConfirmationServiceProvider } from '../hooks/useconfirmation';
+import { ConfirmationServiceProvider } from '../hooks/useConfirmation';
 import Footer from '../layouts/footer';
 import Header from '../layouts/header';
 import './style.scss';

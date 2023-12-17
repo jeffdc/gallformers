@@ -10,25 +10,14 @@ import { ParsedUrlQuery } from 'querystring';
 import React, { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, Col, Container, Form, OverlayTrigger, Popover, Row } from 'react-bootstrap';
 import { Controller, useForm } from 'react-hook-form';
-import * as yup from 'yup';
 import Edit from '../components/edit';
 import InfoTip from '../components/infotip';
 import Typeahead from '../components/Typeahead';
 import { getQueryParams } from '../libs/api/apipage';
-import {
-    DetachableApi,
-    detachableFromString,
-    DetachableNone,
-    Detachables,
-    EMPTYSEARCHQUERY,
-    FilterField,
-    GallIDApi,
-    HostSimple,
-    HostTaxon,
-    PlaceApi,
-    SearchQuery,
-} from '../libs/api/apitypes';
-import { SECTION, TaxonomyEntry, TaxonomyEntryNoParent } from '../libs/api/taxonomy';
+import { EMPTYSEARCHQUERY, FilterField, GallIDApi, PlaceApi, SearchQuery } from '../libs/api/apitypes';
+import { HostSimple, HostSimpleSchema } from '../libs/api/apitypes';
+import { DetachableApi, detachableFromString, DetachableNone, Detachables, TaxonCodeValues } from '../libs/api/apitypes';
+import { TaxonomyEntry, TaxonomyEntryNoParent, TaxonomyEntryNoParentSchema, TaxonomyTypeValues } from '../libs/api/apitypes';
 import {
     getAlignments,
     getCells,
@@ -46,6 +35,7 @@ import { allGenera, allSections } from '../libs/db/taxonomy';
 import { createSummary, defaultImage, formatWithDescription } from '../libs/pages/renderhelpers';
 import { checkGall, GALL_FORM, LEAF_ANYWHERE } from '../libs/utils/gallsearch';
 import { capitalizeFirstLetter, hasProp, mightFailWithArray } from '../libs/utils/util';
+import * as t from 'io-ts';
 
 type SearchFormHostField = {
     host: HostSimple[];
@@ -75,28 +65,37 @@ type FilterFormFields = {
     family: string;
 };
 
-const invalidArraySelection = (arr: unknown[]) => {
-    return arr?.length === 0;
-};
+// const invalidArraySelection = (arr: unknown[]) => {
+//     return arr?.length === 0;
+// };
 
 const isTaxonomy = (o: unknown): o is TaxonomyEntryNoParent => hasProp(o, 'type');
 const isHost = (o: unknown): o is HostSimple => hasProp(o, 'datacomplete') && hasProp(o, 'aliases');
 
-const Schema = yup.object().shape(
-    {
-        host: yup.array().when('genus', {
-            is: invalidArraySelection,
-            then: yup.array().required('You must provide a search,'),
-            otherwise: yup.array(),
-        }),
-        genus: yup.array().when('host', {
-            is: invalidArraySelection,
-            then: yup.array().required('You must provide a search,'),
-            otherwise: yup.array(),
-        }),
-    },
-    [['host', 'genus']],
-);
+const Schema = t.union([
+    t.type({
+        host: t.array(TaxonomyEntryNoParentSchema),
+    }),
+    t.type({
+        genus: t.array(HostSimpleSchema),
+    }),
+]);
+
+// const Schema = yup.object().shape(
+//     {
+//         host: yup.array().when('genus', {
+//             is: invalidArraySelection,
+//             then: yup.array().required('You must provide a search,'),
+//             otherwise: yup.array(),
+//         }),
+//         genus: yup.array().when('host', {
+//             is: invalidArraySelection,
+//             then: yup.array().required('You must provide a search,'),
+//             otherwise: yup.array(),
+//         }),
+//     },
+//     [['host', 'genus']],
+// );
 
 type Props = {
     hostOrTaxon: TaxonomyEntryNoParent | HostSimple | undefined | null;
@@ -213,7 +212,7 @@ const IDGall = (props: Props): JSX.Element => {
             try {
                 let queryString = '';
                 if (isTaxonomy(hostOrTaxon)) {
-                    if (hostOrTaxon.type === SECTION) {
+                    if (hostOrTaxon.type === TaxonomyTypeValues.SECTION) {
                         queryString = `?section=${hostOrTaxon.name}`;
                     } else {
                         queryString = `?genus=${hostOrTaxon.name}`;
@@ -788,14 +787,14 @@ const queryUrlParams = [
 // Ideally we would generate this page and serve it statically via getStaticProps and use Incremental Static Regeneration.
 // See: https://nextjs.org/docs/basic-features/data-fetching#incremental-static-regeneration
 // However, as it stands right now next.js can not support query parameters for static content. This sucks given
-// that the query parameters that we have only fiter data on the client side.
+// that the query parameters that we have only filter data on the client side.
 // It seems like it might be possible to "solve" this by implementing a convoluted approach using URL paths rather than
 // query parameters but I think that would introduce a ton of complexity.
 // This will likely end up the most frequently accessed page on the site AND the most resource intensive on the server
 // (other than Admin pages which will never have a lot of traffic). My guess is that we will revisiting this issue.
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
     const hosts = await mightFailWithArray<HostSimple>()(allHostsSimple());
-    const genera = await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon));
+    const genera = await mightFailWithArray<TaxonomyEntry>()(allGenera(TaxonCodeValues.PLANT));
     const sections = await mightFailWithArray<TaxonomyEntry>()(allSections());
     const sectionsAndGenera = [...genera, ...sections].sort((a, b) => a.name.localeCompare(b.name));
 

@@ -2,8 +2,9 @@ import { abundance, Prisma, PrismaPromise, species } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
-import { AbundanceApi, SimpleSpecies, SpeciesUpsertFields } from '../api/apitypes';
-import { GENUS } from '../api/taxonomy';
+import { AbundanceApi, SpeciesUpsertFields } from '../api/apitypes';
+import { SimpleSpecies } from '../api/apitypes';
+import { TaxonomyTypeValues } from '../api/apitypes';
 import { handleError } from '../utils/util';
 import db from './db';
 import { connectIfNotNull } from './utils';
@@ -86,7 +87,7 @@ export const connectOrCreateGenus = (sp: SpeciesUpsertFields): Prisma.taxonomyCr
         create: {
             description: sp.fgs.genus.description,
             name: sp.fgs.genus.name,
-            type: GENUS,
+            type: TaxonomyTypeValues.GENUS,
             parent: { connect: { id: sp.fgs.family.id } },
         },
     },
@@ -132,7 +133,7 @@ export const speciesCreateData = (sp: SpeciesUpsertFields) => {
                 create: {
                     description: sp.fgs.genus.description,
                     name: sp.fgs.genus.name,
-                    type: GENUS,
+                    type: TaxonomyTypeValues.GENUS,
                     parent: {
                         connect: {
                             id: sp.fgs.family.id,
@@ -179,11 +180,15 @@ export const speciesTaxonomyAdditionalUpdateSteps = (sp: SpeciesUpsertFields): P
     // delete any records that map this species to a genus that are not the same as what is inbound
     db.speciestaxonomy.deleteMany({
         where: {
-            AND: [{ species_id: sp.id }, { taxonomy: { type: GENUS } }, { taxonomy: { name: { not: sp.fgs.genus.name } } }],
+            AND: [
+                { species_id: sp.id },
+                { taxonomy: { type: TaxonomyTypeValues.GENUS } },
+                { taxonomy: { name: { not: sp.fgs.genus.name } } },
+            ],
         },
     }),
     // now upsert a new species-taxonomy mapping and possibly create
-    // a new Genus Taxonomy record assinging it to the known Family
+    // a new Genus Taxonomy record assigning it to the known Family
     db.speciestaxonomy.upsert({
         where: { species_id_taxonomy_id: { species_id: sp.id, taxonomy_id: sp.fgs.genus.id } },
         create: {
@@ -194,7 +199,7 @@ export const speciesTaxonomyAdditionalUpdateSteps = (sp: SpeciesUpsertFields): P
                     create: {
                         description: sp.fgs.genus.description,
                         name: sp.fgs.genus.name,
-                        type: GENUS,
+                        type: TaxonomyTypeValues.GENUS,
                         parent: { connect: { id: sp.fgs.family.id } },
                         children: {
                             create: {

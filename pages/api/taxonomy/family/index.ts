@@ -1,9 +1,9 @@
-import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { apiSearchEndpoint, getQueryParams, sendErrResponse, sendSuccResponse, toErr } from '../../../../libs/api/apipage';
-import { TaxonomyEntry } from '../../../../libs/api/taxonomy';
+import { apiSearchEndpoint, getQueryParams, sendErrorResponse, sendSuccessResponse, toErr } from '../../../../libs/api/apipage';
+import { TaxonomyEntry } from '../../../../libs/api/apitypes';
 import { allFamilies, familyByName, familySearch, taxonomyEntryById } from '../../../../libs/db/taxonomy';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
@@ -22,7 +22,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             O.map(parseInt),
             O.fold(errMsg, taxonomyEntryById),
             TE.mapLeft(toErr),
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else if (params && O.isSome(params['q'])) {
         apiSearchEndpoint(req, res, familySearch);
@@ -31,9 +31,9 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             params['name'],
             O.fold(errMsg, familyByName),
             TE.mapLeft(toErr),
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else {
-        await pipe(allFamilies(), TE.mapLeft(toErr), TE.fold(sendErrResponse(res), sendSuccResponse(res)))();
+        await pipe(allFamilies(), TE.mapLeft(toErr), TE.fold(sendErrorResponse(res), sendSuccessResponse(res)))();
     }
 };

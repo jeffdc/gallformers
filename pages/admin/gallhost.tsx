@@ -1,38 +1,35 @@
-import { constant, pipe } from 'fp-ts/lib/function';
+import axios from 'axios';
 import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import { useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { ComposableMap, Geographies, Geography, ProjectionConfig, ZoomableGroup } from 'react-simple-maps';
-import * as yup from 'yup';
+import { Tooltip } from 'react-tooltip';
+import Typeahead from '../../components/Typeahead';
 import Auth from '../../components/auth';
 import { RenameEvent } from '../../components/editname';
 import InfoTip from '../../components/infotip';
-import Typeahead from '../../components/Typeahead';
+import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
 import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
 import {
-    GallApi,
     GallHost,
+    GallHostSchema,
     GallHostUpdateFields,
     PlaceNoTreeApi,
-    SimpleSpecies,
+    PlaceNoTreeApiSchema,
     SpeciesWithPlaces,
 } from '../../libs/api/apitypes';
+import { GallApi, GallApiSchema } from '../../libs/api/apitypes';
+import { SimpleSpecies } from '../../libs/api/apitypes';
+import { gallById } from '../../libs/db/gall';
 import { allHostsWithPlaces } from '../../libs/db/host';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
-// needed as ReactTooltip does not play nicely with SSR. See: https://github.com/wwayne/react-tooltip/issues/675
-import dynamic from 'next/dynamic';
-import { gallById } from '../../libs/db/gall';
-import axios from 'axios';
-
-const ReactTooltip = dynamic(() => import('react-tooltip'), {
-    ssr: false,
-});
 
 type Props = {
     id: string | null;
@@ -40,9 +37,10 @@ type Props = {
     hosts: SpeciesWithPlaces[];
 };
 
-const schema = yup.object().shape({
-    mainField: yup.array().required('You must provide the gall.'),
-});
+const schema = t.intersection([
+    adminFormFieldsSchema(GallApiSchema),
+    t.type({ hosts: t.array(GallHostSchema), places: t.array(PlaceNoTreeApiSchema) }),
+]);
 
 type FormFields = AdminFormFields<GallApi> & {
     hosts: GallHost[];
@@ -334,7 +332,7 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
                                     </Geographies>
                                 </ZoomableGroup>
                             </ComposableMap>
-                            <ReactTooltip>{tooltipContent}</ReactTooltip>
+                            <Tooltip>{tooltipContent}</Tooltip>
                         </Col>
                     </Row>
                     <Row className="my-1">

@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import React, { ChangeEvent, useState } from 'react';
 import { Alert, Col, ProgressBar, Row } from 'react-bootstrap';
 import toast from 'react-hot-toast';
-import { ImageApi } from '../libs/api/apitypes';
+import { ImageApi, ImageLicenseValues } from '../libs/api/apitypes';
 import { sessionUserOrUnknown } from '../libs/utils/util';
 
 type Props = {
@@ -100,7 +100,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                         id: -1,
                         attribution: '',
                         creator: '',
-                        license: '',
+                        license: ImageLicenseValues.NONE,
                         licenselink: '',
                         path: path,
                         sourcelink: '',
@@ -121,7 +121,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
 
             if (!error) {
                 // update the database with the new image(s)
-                const dbres = await fetch('../api/images/upsert', {
+                const dbResponse = await fetch('../api/images/upsert', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -129,7 +129,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                     body: JSON.stringify(images),
                 });
 
-                const newImages: ImageApi[] = await dbres.json();
+                const newImages: ImageApi[] = await dbResponse.json();
 
                 //hack: add a delay here to hopefully give a chance for the image to be picked up by the CDN
                 const steps = 100;

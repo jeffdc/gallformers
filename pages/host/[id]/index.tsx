@@ -13,14 +13,15 @@ import RangeMap from '../../../components/rangemap';
 import SeeAlso from '../../../components/seealso';
 import SourceList from '../../../components/sourcelist';
 import SpeciesSynonymy from '../../../components/speciesSynonymy';
-import { GallSimple, HostApi, HostTaxon } from '../../../libs/api/apitypes';
-import { FGS } from '../../../libs/api/taxonomy';
+import { GallSimple, HostApi } from '../../../libs/api/apitypes';
+import { FGS } from '../../../libs/api/apitypes';
 import { allHostIds, hostById } from '../../../libs/db/host';
 import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
 import { linkSourceToGlossary } from '../../../libs/pages/glossary';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { formatWithDescription } from '../../../libs/pages/renderhelpers';
 import { TABLE_CUSTOM_STYLES } from '../../../libs/utils/DataTableConstants';
+import { TaxonCodeValues } from '../../../libs/api/apitypes';
 
 type Props = {
     host: HostApi;
@@ -192,7 +193,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                         data={host.speciessource}
                         defaultSelection={selectedSource}
                         onSelectionChange={(s) => setSelectedSource(host.speciessource.find((spso) => spso.source_id == s?.id))}
-                        taxonType={HostTaxon}
+                        taxonType={TaxonCodeValues.PLANT}
                     />
                     <hr />
                     <Row>

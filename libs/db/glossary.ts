@@ -5,19 +5,13 @@ import { TaskEither } from 'fp-ts/lib/TaskEither';
 import { DeleteResult, GlossaryEntryUpsertFields } from '../api/apitypes';
 import { handleError } from '../utils/util';
 import db from './db';
-
-export type Entry = {
-    id: number;
-    word: string;
-    definition: string;
-    urls: string; // \n separated
-};
+import { Entry } from '../api/glossary';
 
 const adaptor = (e: glossary): Entry => e;
 
 export const allGlossaryEntries = (): TaskEither<Error, Entry[]> => {
     const glossary = () =>
-        // prisma does not handle sort order by collate nocase
+        // prisma does not handle sort order by collate NOCASE
         // https://github.com/prisma/prisma/issues/5068
         db.$queryRaw<glossary[]>(Prisma.sql`
             SELECT * from glossary

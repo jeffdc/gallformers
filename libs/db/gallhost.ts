@@ -1,7 +1,9 @@
 import { Prisma, PrismaPromise } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
-import { GallApi, GallHostUpdateFields, SpeciesWithPlaces } from '../api/apitypes';
+import { pipe } from 'fp-ts/lib/function';
+import { GallHostUpdateFields, SpeciesWithPlaces } from '../api/apitypes';
+import { GallApi } from '../api/apitypes';
+import { taxonCodeAsStringToValue } from '../api/apitypes';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
@@ -56,7 +58,7 @@ export const hostsByGallId = (gallid: number): TE.TaskEither<Error, SpeciesWithP
             h.hostspecies != undefined
                 ? {
                       ...h.hostspecies,
-                      taxoncode: h.hostspecies.taxoncode ? h.hostspecies.taxoncode : '',
+                      taxoncode: taxonCodeAsStringToValue(h.hostspecies.taxoncode),
                       places: h.hostspecies.places.map((p) => p.place),
                   }
                 : [],

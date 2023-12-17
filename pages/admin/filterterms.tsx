@@ -1,41 +1,48 @@
 import axios from 'axios';
-import { constant, constFalse, pipe } from 'fp-ts/lib/function';
+import { constant } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import React, { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Controller } from 'react-hook-form';
-import * as yup from 'yup';
 import { RenameEvent } from '../../components/editname';
 import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields } from '../../hooks/useAPIs';
+import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
 import {
-    asFilterFieldType,
     DeleteResult,
     FilterField,
+    FilterFieldSchema,
+    FilterFieldTypeValue,
     FilterFieldWithType,
-    FILTER_FIELD_ALIGNMENTS,
-    FILTER_FIELD_TYPES,
+    asFilterType,
 } from '../../libs/api/apitypes';
 import { getAlignments, getCells, getForms, getLocations, getShapes, getTextures, getWalls } from '../../libs/db/filterfield';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
+import * as t from 'io-ts';
+import * as tt from 'io-ts-types';
 
 type FormFields = AdminFormFields<FilterField> & Pick<FilterField, 'description'>;
 
-const schema = yup.object({
-    mainField: yup.array().required(),
-    description: yup.object<O.Option<string>>().test('definition', 'must not be empty', (value: O.Option<string>) => {
-        return (
-            value &&
-            pipe(
-                value,
-                O.fold(constFalse, (d) => !!d && d.length > 0),
-            )
-        );
+const schema = t.intersection([
+    adminFormFieldsSchema(FilterFieldSchema),
+    t.type({
+        description: tt.option(t.string),
     }),
-    del: yup.boolean().required(),
-});
+]);
+// const schema = yup.object({
+//     mainField: yup.array().required(),
+//     description: yup.object<O.Option<string>>().test('definition', 'must not be empty', (value: O.Option<string>) => {
+//         return (
+//             value &&
+//             pipe(
+//                 value,
+//                 O.fold(constFalse, (d) => !!d && d.length > 0),
+//             )
+//         );
+//     }),
+//     del: yup.boolean().required(),
+// });
 
 type Props = {
     alignments: FilterField[];
@@ -75,7 +82,7 @@ const createNewFilterField = (field: string): FilterField => ({
 });
 
 const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, walls }: Props): JSX.Element => {
-    const [fieldType, setFieldType] = useState(FILTER_FIELD_ALIGNMENTS);
+    const [fieldType, setFieldType] = useState(FilterFieldTypeValue.ALIGNMENTS);
 
     const dataFromSelection = (field: string): FilterField[] => {
         switch (field) {
@@ -103,7 +110,7 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
             ...fields,
             id: id,
             field: field,
-            fieldType: asFilterFieldType(fieldType),
+            fieldType: fieldType,
         };
     };
 
@@ -180,13 +187,15 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
                                 className="form-control"
                                 onChange={(e) => {
                                     setSelected(undefined);
-                                    setFieldType(e.currentTarget.value);
+                                    setFieldType(asFilterType(e.currentTarget.value));
                                     setData(dataFromSelection(e.currentTarget.value));
                                 }}
                             >
-                                {FILTER_FIELD_TYPES.filter((ff) => ff.localeCompare('seasons')).map((ff) => (
-                                    <option key={ff}>{ff}</option>
-                                ))}
+                                {Object.values(FilterFieldTypeValue)
+                                    .filter((ff) => ff.localeCompare('seasons'))
+                                    .map((ff) => (
+                                        <option key={ff}>{ff}</option>
+                                    ))}
                             </select>
                         </Col>
                     </Row>
@@ -233,7 +242,7 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
                                 )}
                             />
                             {form.formState.errors.description && (
-                                <span className="text-danger">You must provide the defintion.</span>
+                                <span className="text-danger">You must provide the definition.</span>
                             )}
                         </Col>
                     </Row>

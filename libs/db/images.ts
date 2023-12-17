@@ -3,7 +3,7 @@ import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { asLicenseType, ImageApi, ImageNoSourceApi } from '../api/apitypes';
+import { ImageApi, ImageLicenseValues, ImageNoSourceApi } from '../api/apitypes';
 import {
     createOtherSizes,
     deleteImagesByPaths,
@@ -144,7 +144,7 @@ export const adaptImage = <T extends ImageWithSource>(img: T): ImageApi => ({
     xlarge: makePath(img.path, XLARGE),
     original: makePath(img.path, ORIGINAL),
     source: O.fromNullable(img.source),
-    license: asLicenseType(img.license),
+    license: ImageLicenseValues[img.license as keyof typeof ImageLicenseValues],
 });
 
 export const adaptImageNoSource = <T extends image>(img: T): ImageNoSourceApi => ({

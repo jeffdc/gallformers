@@ -1,4 +1,3 @@
-import { source as DBSource, species } from '@prisma/client';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
@@ -11,43 +10,40 @@ import { Controller } from 'react-hook-form';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
-import externalLinks from 'remark-external-links';
-import * as yup from 'yup';
+import externalLinks from 'rehype-external-links';
 import Auth from '../../components/auth';
 import { RenameEvent } from '../../components/editname';
 import Picker from '../../components/picker';
 import Typeahead from '../../components/Typeahead';
 import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields } from '../../hooks/useAPIs';
+import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { GallTaxon, SpeciesSourceApi, SpeciesSourceInsertFields } from '../../libs/api/apitypes';
+import { SourceApi, SpeciesSourceApi, SpeciesSourceApiSchema, SpeciesSourceInsertFields } from '../../libs/api/apitypes';
 import { allSources } from '../../libs/db/source';
-import { allSpecies } from '../../libs/db/species';
+import { allSpeciesSimple } from '../../libs/db/species';
 import Admin from '../../libs/pages/admin';
 import { defaultSource, sourceToDisplay } from '../../libs/pages/renderhelpers';
 import { mightFailWithArray } from '../../libs/utils/util';
+import { SimpleSpecies, SimpleSpeciesSchema, TaxonCodeValues } from '../../libs/api/apitypes';
+import * as t from 'io-ts';
 
 type Props = {
     speciesid: string;
-    allSpecies: species[];
-    allSources: DBSource[];
+    allSpecies: SimpleSpecies[]; //species[];
+    allSources: SourceApi[]; //DBSource[]; source
 };
-
-const schema = yup.object().shape({
-    // type-coverage:ignore-next-line
-    mainField: yup.array().required(),
-    // type-coverage:ignore-next-line
-    sources: yup.array().required(),
+const additionalSchema = t.type({
+    sources: t.array(SpeciesSourceApiSchema),
+    description: t.string,
+    externallink: t.string,
+    useasdefault: t.boolean,
 });
 
-type FormFields = AdminFormFields<species> & {
-    sources: SpeciesSourceApi[];
-    description: string;
-    externallink: string;
-    useasdefault: boolean;
-};
+const schema = t.intersection([adminFormFieldsSchema(SimpleSpeciesSchema), additionalSchema]);
 
-const update = async (s: species, e: RenameEvent) => ({
+type FormFields = AdminFormFields<SimpleSpecies> & t.TypeOf<typeof additionalSchema>;
+
+const update = async (s: SimpleSpecies, e: RenameEvent) => ({
     ...s,
     name: e.new,
 });
@@ -70,7 +66,6 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
     const [selectedSource, setSelectedSource] = useState<SpeciesSourceApi[]>([]);
     const [description, setDescription] = useState('');
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const toUpsertFields = (fields: FormFields, name: string, id: number): SpeciesSourceInsertFields => {
         const selSo = selectedSource[0];
         return {
@@ -84,7 +79,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
         };
     };
 
-    const updatedFormFields = async (sp: species | undefined): Promise<FormFields> => {
+    const updatedFormFields = async (sp: SimpleSpecies | undefined): Promise<FormFields> => {
         try {
             if (sp != undefined) {
                 const sources = await fetchSources(sp.id);
@@ -147,7 +142,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
         postDelete,
         mainField,
         deleteButton,
-    } = useAdmin<species, FormFields, SpeciesSourceInsertFields>(
+    } = useAdmin<SimpleSpecies, FormFields, SpeciesSourceInsertFields>(
         'Species-Source Mapping',
         speciesid,
         update,
@@ -167,7 +162,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
 
     const router = useRouter();
 
-    const addMappedSource = (so: DBSource | undefined) => {
+    const addMappedSource = (so: SourceApi | undefined) => {
         if (so != undefined && selected != undefined) {
             const newSpSo: SpeciesSourceApi = {
                 id: -1,
@@ -279,7 +274,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                         size="lg"
                         data={allSources
                             // remove the sources that are already mapped to this species
-                            .filter((s) => !sourcesForSpecies.find((sosp) => sosp.source_id === s.id))
+                            .filter((s) => !sourcesForSpecies.find((sourceSpecies) => sourceSpecies.source_id === s.id))
                             .sort((a, b) => sourceToDisplay(a).localeCompare(sourceToDisplay(b)))}
                         toLabel={sourceToDisplay}
                         title="Add Mapped Source"
@@ -401,7 +396,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                         <Col>
                             <br />
                             <div>
-                                {selected?.taxoncode === GallTaxon ? (
+                                {selected?.taxoncode === TaxonCodeValues.GALL ? (
                                     <Link href={`./gall?id=${selected?.id}`}>Edit the Species</Link>
                                 ) : (
                                     <Link href={`./host?id=${selected?.id}`}>Edit the Species</Link>
@@ -429,8 +424,8 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     return {
         props: {
             speciesid: id,
-            allSpecies: await mightFailWithArray<species>()(allSpecies()),
-            allSources: await mightFailWithArray<DBSource>()(allSources()),
+            allSpecies: await mightFailWithArray<SimpleSpecies>()(allSpeciesSimple()),
+            allSources: await mightFailWithArray<SourceApi>()(allSources()),
         },
     };
 };

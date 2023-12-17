@@ -1,21 +1,21 @@
-import { yupResolver } from '@hookform/resolvers/yup';
+import { ioTsResolver } from '@hookform/resolvers/io-ts';
 import axios from 'axios';
+import * as t from 'io-ts';
 import { useSession } from 'next-auth/react';
 import router from 'next/router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
-import { DeepPartial, DefaultValues, FieldValues, Path, Resolver, useForm, UseFormReturn } from 'react-hook-form';
+import { DefaultValues, FieldValues, Path, UseFormReturn, useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import * as yup from 'yup';
+import Typeahead, { AsyncTypeahead, TypeaheadLabelKey } from '../components/Typeahead';
 import { superAdmins } from '../components/auth';
 import { ConfirmationOptions } from '../components/confirmationdialog';
 import { RenameEvent } from '../components/editname';
-import Typeahead, { AsyncTypeahead, TypeaheadLabelKey } from '../components/Typeahead';
 import { DeleteResult } from '../libs/api/apitypes';
 import { WithID } from '../libs/utils/types';
 import { hasProp, pluralize } from '../libs/utils/util';
 import { AdminFormFields, useAPIs } from './useAPIs';
-import { useConfirmation } from './useconfirmation';
+import { useConfirmation } from './useConfirmation';
 
 type AdminData<T, FormFields extends FieldValues> = {
     data: T[];
@@ -82,7 +82,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         delQueryString?: () => string;
         nameExistsEndpoint?: (name: string) => string;
     },
-    schema: yup.ObjectSchema<FormFields>,
+    schema: t.Type<FormFields>,
     updatedFormFields: (t: T | undefined) => Promise<FormFields>,
     reloadOnUpdate = false,
     createNew?: (v: string) => T,
@@ -109,9 +109,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
 
     const form = useForm<FormFields>({
         mode: 'onBlur',
-        //TODO figure this out...
-        // @ts-expect-error
-        resolver: yupResolver(schema),
+        resolver: ioTsResolver(schema),
     });
 
     const { isValid } = form.formState;
@@ -152,6 +150,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                                 setSelected(undefined);
                                 router.replace(``, undefined, { shallow: true });
                             } else {
+                                //TODO remember how this logic works and what we need to do to get rid of customOption
                                 if (hasProp(s[0], 'customOption') && hasProp(s[0], 'name')) {
                                     if (createNew) {
                                         const x = createNew(s[0].name as string);
@@ -198,6 +197,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                                 setSelected(undefined);
                                 router.replace(``, undefined, { shallow: true });
                             } else {
+                                //TODO remember how this logic works and what we need to do to get rid of customOption
                                 if (hasProp(s[0], 'customOption') && hasProp(s[0], 'name')) {
                                     if (createNew) {
                                         const x = createNew(s[0].name as string);

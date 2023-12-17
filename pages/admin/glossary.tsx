@@ -3,24 +3,19 @@ import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { Button, Col, Row } from 'react-bootstrap';
-import * as yup from 'yup';
 import { RenameEvent } from '../../components/editname';
 import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields } from '../../hooks/useAPIs';
+import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { GlossaryEntryUpsertFields } from '../../libs/api/apitypes';
-import { allGlossaryEntries, Entry } from '../../libs/db/glossary';
+import { allGlossaryEntries } from '../../libs/db/glossary';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
+import * as t from 'io-ts';
+import { Entry, EntrySchema } from '../../libs/api/glossary';
 
+const schema = t.intersection([adminFormFieldsSchema(EntrySchema), EntrySchema]);
 type FormFields = AdminFormFields<Entry> & Pick<Entry, 'definition' | 'urls'>;
-
-const schema = yup.object<FormFields>({
-    mainField: yup.mixed().required(),
-    definition: yup.string().required(),
-    urls: yup.string().required(),
-    del: yup.boolean().required(),
-});
 
 type Props = {
     id: string;
@@ -135,7 +130,9 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                     <Col>
                         Definition (required):
                         <textarea {...form.register('definition')} className="form-control" rows={4} disabled={!selected} />
-                        {form.formState.errors.definition && <span className="text-danger">You must provide the defintion.</span>}
+                        {form.formState.errors.definition && (
+                            <span className="text-danger">You must provide the definition.</span>
+                        )}
                     </Col>
                 </Row>
                 <Row className="my-1">
@@ -143,7 +140,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                         URLs (required) (separated by a newline [enter]):
                         <textarea {...form.register('urls')} className="form-control" rows={3} disabled={!selected} />
                         {form.formState.errors.urls && (
-                            <span className="text-danger">You must provide a URL for the source of the defintion.</span>
+                            <span className="text-danger">You must provide a URL for the source of the definition.</span>
                         )}
                     </Col>
                 </Row>

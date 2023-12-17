@@ -2,12 +2,13 @@ import { source } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { PlaceNoTreeApi } from '../api/apitypes';
-import { TaxonomyEntryNoParent, TaxonomyType } from '../api/taxonomy';
+import { TaxonomyEntryNoParent, TaxonomyType } from '../api/apitypes';
 import { sourceToDisplay } from '../pages/renderhelpers';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
-import { allGlossaryEntries, Entry } from './glossary';
+import { allGlossaryEntries } from './glossary';
+import { Entry } from '../api/glossary';
 
 export type TinySpecies = {
     id: number;

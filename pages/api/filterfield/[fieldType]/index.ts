@@ -1,9 +1,10 @@
-import { constant, pipe } from 'fp-ts/lib/function';
+import * as E from 'fp-ts/Either';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { Err, getQueryParam, getQueryParams, sendErrResponse, sendSuccResponse, toErr } from '../../../../libs/api/apipage';
-import { asFilterFieldType, FilterField } from '../../../../libs/api/apitypes';
+import { Err, getQueryParam, getQueryParams, sendErrorResponse, sendSuccessResponse, toErr } from '../../../../libs/api/apipage';
+import { FilterField, FilterFieldTypeSchema, FilterFieldTypeValue, asFilterType } from '../../../../libs/api/apitypes';
 import { getFilterFieldByNameAndType, getFilterFieldsByType } from '../../../../libs/db/filterfield';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
@@ -13,8 +14,23 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
         return;
     }
 
-    const fieldType = asFilterFieldType(O.fold(constant(''), (ft) => ft as string)(params['fieldType']));
+    const endWithError = (msg: string): FilterFieldTypeValue => {
+        res.status(400).end(`Invalid Request: ${msg}.`);
+        return FilterFieldTypeValue.ALIGNMENTS; // never get here but keeps types inline
+    };
 
+    const fieldType = pipe(
+        params['fieldType'],
+        E.fromOption(() => 'Missing fieldType parameter.'),
+        E.map((s) => FilterFieldTypeSchema.decode(s)),
+        E.match(
+            (err) => endWithError(err),
+            E.match(
+                (err) => endWithError(err.join(', ')),
+                (v) => FilterFieldTypeValue[v as unknown as keyof typeof FilterFieldTypeValue],
+            ),
+        ),
+    );
     const errMsg = (): TE.TaskEither<Error, FilterField[]> => {
         return TE.left(new Error('Failed to fetch the filter field.'));
     };
@@ -24,7 +40,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             params['name'],
             O.fold(errMsg, (n) => getFilterFieldByNameAndType(n, fieldType)),
             TE.mapLeft(toErr),
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else {
         // fetch all for the given fieldType
@@ -35,11 +51,11 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
         await pipe(
             'fieldType',
             getQueryParam(req),
-            O.map(asFilterFieldType),
+            O.map(asFilterType),
             O.map(getFilterFieldsByType),
             O.map(TE.mapLeft(toErr)),
             O.getOrElse(errMsg('q')),
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     }
 };

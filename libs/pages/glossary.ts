@@ -4,8 +4,9 @@ import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { PorterStemmer, WordTokenizer } from 'natural';
 import { SpeciesSourceApi } from '../api/apitypes';
-import { allGlossaryEntries, Entry } from '../db/glossary';
+import { allGlossaryEntries } from '../db/glossary';
 import { errorThrow } from '../utils/util';
+import { Entry } from '../api/glossary';
 
 export type EntryLinked = Entry & {
     linkedDefinition: string | JSX.Element[];
@@ -29,8 +30,8 @@ const stemText = (es: Entry[]): WordStem[] =>
         };
     });
 
-//TODO - this is a bad implemenation. Figure out how to use Popper (via bootstrap OverlayTrigger). Not clear
-// how to inject a React component in to the Makrdown...
+//TODO - this is a bad implementation. Figure out how to use Popper (via bootstrap OverlayTrigger). Not clear
+// how to inject a React component in to the Markdown...
 const makeLinkHtml = (display: string, entry: Entry | undefined): string => {
     return `<span class="jargon-term"><a href="/glossary/#${entry?.word}">${display}</a><span class="jargon-info">${entry?.definition}</span></span>`;
 };
@@ -139,7 +140,7 @@ export const linkSourceToGlossary = async (data: SpeciesSourceApi[]): Promise<Sp
     return await internalLinker(data, update, (e: SpeciesSourceApi) => e.description);
 };
 
-export const linkDefintionToGlossary = async (data: Entry[]): Promise<Entry[]> => {
+export const linkDefinitionToGlossary = async (data: Entry[]): Promise<Entry[]> => {
     const update = (d: string, e: Entry): Entry => ({
         ...e,
         definition: d,

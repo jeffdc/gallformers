@@ -10,7 +10,7 @@ import { Col, Container, Row } from 'react-bootstrap';
 import DataTable from '../components/DataTable';
 import { extractQueryParam } from '../libs/api/apipage';
 import { PlaceNoTreeApi } from '../libs/api/apitypes';
-import { TaxonomyEntryNoParent } from '../libs/api/taxonomy';
+import { TaxonomyEntryNoParent } from '../libs/api/apitypes';
 import { globalSearch, GlobalSearchResults, TinySource, TinySpecies } from '../libs/db/search';
 import { EntryLinked } from '../libs/pages/glossary';
 import { formatWithDescription } from '../libs/pages/renderhelpers';

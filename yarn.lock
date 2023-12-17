@@ -3297,15 +3297,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/yup@npm:^0.32.0":
-  version: 0.32.0
-  resolution: "@types/yup@npm:0.32.0"
-  dependencies:
-    yup: "npm:*"
-  checksum: 5b30f1118bca288d949bcd4c7e17d1425ffa320eddd751a78c895b158fae0b6cbf242ced45ad47e9e70643c9475da09a7ad004192fb6f2111791d37e6a627e73
-  languageName: node
-  linkType: hard
-
 "@typescript-eslint/eslint-plugin@npm:^6.11.0":
   version: 6.11.0
   resolution: "@typescript-eslint/eslint-plugin@npm:6.11.0"
@@ -5679,7 +5670,6 @@ __metadata:
     "@types/react-is": "npm:^18.2.4"
     "@types/react-simple-maps": "npm:^3.0.4"
     "@types/unist": "npm:^3.0.2"
-    "@types/yup": "npm:^0.32.0"
     "@typescript-eslint/eslint-plugin": "npm:^6.11.0"
     "@typescript-eslint/parser": "npm:^6.11.0"
     axios: "npm:^1.6.2"
@@ -5696,12 +5686,15 @@ __metadata:
     gray-matter: "npm:^4.0.3"
     identity-obj-proxy: "npm:^3.0.0"
     io-ts: "npm:^2.2.20"
+    io-ts-types: "npm:^0.5.19"
     jest: "npm:^29.7.0"
     jest-environment-jsdom: "npm:^29.7.0"
     jimp: "npm:^0.22.10"
     jquery: "npm:^3.7.1"
     logging-ts: "npm:^0.3.4"
+    monocle-ts: "npm:^2.3.13"
     natural: "npm:^6.8.0"
+    newtype-ts: "npm:^0.3.5"
     next: "npm:^14.0.3"
     next-auth: "npm:^4.24.5"
     nuka-carousel: "npm:^7.0.0"
@@ -5737,7 +5730,6 @@ __metadata:
     typescript: "npm:^5.2.2"
     why-is-node-running: "npm:^2.2.2"
     yarn: "npm:^1.22.21"
-    yup: "npm:^1.3.2"
   languageName: unknown
   linkType: soft
 
@@ -6428,6 +6420,18 @@ __metadata:
   dependencies:
     loose-envify: "npm:^1.0.0"
   checksum: cc3182d793aad82a8d1f0af697b462939cb46066ec48bbf1707c150ad5fad6406137e91a262022c269702e01621f35ef60269f6c0d7fd178487959809acdfb14
+  languageName: node
+  linkType: hard
+
+"io-ts-types@npm:^0.5.19":
+  version: 0.5.19
+  resolution: "io-ts-types@npm:0.5.19"
+  peerDependencies:
+    fp-ts: ^2.0.0
+    io-ts: ^2.0.0
+    monocle-ts: ^2.0.0
+    newtype-ts: ^0.3.2
+  checksum: 395cef244149f62c273ab28c86834703468a56279ef91765198b6b4afebb08966f5c4de40ba21add0a15df38aa00bc4fe6c9dd4e8f05f3e6818a60b8b30f0c1c
   languageName: node
   linkType: hard
 
@@ -8248,6 +8252,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"monocle-ts@npm:^2.3.13":
+  version: 2.3.13
+  resolution: "monocle-ts@npm:2.3.13"
+  peerDependencies:
+    fp-ts: ^2.5.0
+  checksum: 6dc2fb990ee996bcdaa14717be48ca75db977d1318ccb599ce37051bd096afe9e37602f99fb2f04032de5930caeecd6a25646df1e878560dc5e2a19c15c0b24b
+  languageName: node
+  linkType: hard
+
 "ms@npm:2.1.2":
   version: 2.1.2
   resolution: "ms@npm:2.1.2"
@@ -8298,6 +8311,16 @@ __metadata:
     underscore: "npm:^1.9.1"
     wordnet-db: "npm:^3.1.11"
   checksum: 5fb201f051985b36881bff0f5c84e95ca75997ab3346b8f850afe0b7ffbacc42b4d89472fd859781341c7cae6b3b19b51d375f9cca43b3d8cdf2ce3d55957d83
+  languageName: node
+  linkType: hard
+
+"newtype-ts@npm:^0.3.5":
+  version: 0.3.5
+  resolution: "newtype-ts@npm:0.3.5"
+  peerDependencies:
+    fp-ts: ^2.0.0
+    monocle-ts: ^2.0.0
+  checksum: 8eb4dfacdb2a5fcabeca9a6dd1c863b4b9c576ee6987c6d09a3e3b5fe16fff932a34b207f668c9a7d545a5be7936965d445d5cf2d28cfb945911bde9e1108c9a
   languageName: node
   linkType: hard
 
@@ -9186,13 +9209,6 @@ __metadata:
     object-assign: "npm:^4.1.1"
     react-is: "npm:^16.13.1"
   checksum: 7d959caec002bc964c86cdc461ec93108b27337dabe6192fb97d69e16a0c799a03462713868b40749bfc1caf5f57ef80ac3e4ffad3effa636ee667582a75e2c0
-  languageName: node
-  linkType: hard
-
-"property-expr@npm:^2.0.5":
-  version: 2.0.6
-  resolution: "property-expr@npm:2.0.6"
-  checksum: 89977f4bb230736c1876f460dd7ca9328034502fd92e738deb40516d16564b850c0bbc4e052c3df88b5b8cd58e51c93b46a94bea049a3f23f4a022c038864cab
   languageName: node
   linkType: hard
 
@@ -10726,13 +10742,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tiny-case@npm:^1.0.3":
-  version: 1.0.3
-  resolution: "tiny-case@npm:1.0.3"
-  checksum: 3f7a30c39d5b0e1bc097b0b271bec14eb5b836093db034f35a0de26c14422380b50dc12bfd37498cf35b192f5df06f28a710712c87ead68872a9e37ad6f6049d
-  languageName: node
-  linkType: hard
-
 "tiny-debounce@npm:^0.1.1":
   version: 0.1.1
   resolution: "tiny-debounce@npm:0.1.1"
@@ -10797,13 +10806,6 @@ __metadata:
     topomerge: bin/topomerge
     topoquantize: bin/topoquantize
   checksum: a0bd2f313dfeb2893ccbe00492f47518c62f0da41f6ee16a9d362dced57f79ba5bd51ae62038387b446463cd8e033d68a217c98c62d8b5fe2b807d9dd18406fc
-  languageName: node
-  linkType: hard
-
-"toposort@npm:^2.0.2":
-  version: 2.0.2
-  resolution: "toposort@npm:2.0.2"
-  checksum: 6f128353e4ed9739e49a28fb756b0a00f3752b29fc9b862ff781446598ee3b486cd229697feebc4eabd916eac5de219f3dae450c585bf13673f6b133a7226e06
   languageName: node
   linkType: hard
 
@@ -10978,13 +10980,6 @@ __metadata:
   version: 0.21.3
   resolution: "type-fest@npm:0.21.3"
   checksum: f4254070d9c3d83a6e573bcb95173008d73474ceadbbf620dd32d273940ca18734dff39c2b2480282df9afe5d1675ebed5499a00d791758748ea81f61a38961f
-  languageName: node
-  linkType: hard
-
-"type-fest@npm:^2.19.0":
-  version: 2.19.0
-  resolution: "type-fest@npm:2.19.0"
-  checksum: 7bf9e8fdf34f92c8bb364c0af14ca875fac7e0183f2985498b77be129dc1b3b1ad0a6b3281580f19e48c6105c037fb966ad9934520c69c6434d17fd0af4eed78
   languageName: node
   linkType: hard
 
@@ -11647,18 +11642,6 @@ __metadata:
   version: 0.1.0
   resolution: "yocto-queue@npm:0.1.0"
   checksum: f77b3d8d00310def622123df93d4ee654fc6a0096182af8bd60679ddcdfb3474c56c6c7190817c84a2785648cdee9d721c0154eb45698c62176c322fb46fc700
-  languageName: node
-  linkType: hard
-
-"yup@npm:*, yup@npm:^1.3.2":
-  version: 1.3.2
-  resolution: "yup@npm:1.3.2"
-  dependencies:
-    property-expr: "npm:^2.0.5"
-    tiny-case: "npm:^1.0.3"
-    toposort: "npm:^2.0.2"
-    type-fest: "npm:^2.19.0"
-  checksum: 68ea930cbbb159ecbfd9e6d256d237a9f0f24ca05ee8e92c0a1058eee73988f3fabcd39a05cf2eded4d394d4813206e8deb90caef610feae88abab9801d1d6af
   languageName: node
   linkType: hard
 
