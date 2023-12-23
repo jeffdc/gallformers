@@ -1,9 +1,9 @@
 import { image, Prisma, source, speciessource } from '@prisma/client';
-import { constant, pipe } from 'fp-ts/lib/function.js';
-import * as O from 'fp-ts/lib/Option.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import { TaskEither } from 'fp-ts/lib/TaskEither.js';
-import { ImageApi, ImageLicenseValues, ImageNoSourceApi } from '../api/apitypes.js';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { TaskEither } from 'fp-ts/lib/TaskEither';
+import { ImageApi, ImageLicenseValues, ImageNoSourceApi } from '../api/apitypes';
 import {
     createOtherSizes,
     deleteImagesByPaths,
@@ -14,11 +14,11 @@ import {
     ORIGINAL,
     SMALL,
     XLARGE,
-} from '../images/images.js';
-import { ExtractTFromPromise } from '../utils/types.js';
-import { handleError } from '../utils/util.js';
-import db from './db.js';
-import { connectIfNotNull } from './utils.js';
+} from '../images/images';
+import { ExtractTFromPromise } from '../utils/types';
+import { handleError } from '../utils/util';
+import db from './db';
+import { connectIfNotNull } from './utils';
 
 export const addImages = (images: ImageApi[]): TaskEither<Error, ImageApi[]> => {
     // N.B. - the default will also be false for new images, only later can it be changed. So we do not need to worry about

@@ -1,8 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { Button } from 'react-bootstrap';
 import DataTable, { TableColumn, TableProps } from 'react-data-table-component';
-import { useConfirmation } from '../hooks/useConfirmation.js';
-import { WithID } from '../libs/utils/types.js';
+import { useConfirmation } from '../hooks/useConfirmation';
+import { WithID } from '../libs/utils/types';
 
 export type SelectEditorOptions = {
     value: string;
@@ -192,7 +192,7 @@ const EditableTable = <T extends WithID>(props: EditableTableProps<T>): JSX.Elem
     };
 
     return (
-        <DataTable.default
+        <DataTable
             {...props}
             columns={editableColumns()}
             data={props.data}

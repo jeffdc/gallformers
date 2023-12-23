@@ -6,8 +6,8 @@ import {
     DetachableNone,
     GallIDApi,
     SearchQuery,
-} from '../../../libs/api/apitypes.js';
-import { checkGall, testables } from '../../../libs/utils/gallsearch.js';
+} from '../../../libs/api/apitypes';
+import { checkGall, testables } from '../../../libs/utils/gallsearch.ts';
 
 const { dontCare } = testables;
 

@@ -1,21 +1,21 @@
 import axios from 'axios';
-import * as O from 'fp-ts/lib/Option.js';
-import { constant, pipe } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
 import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
-import Link from 'next/link.js';
+import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import { useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { ComposableMap, Geographies, Geography, ProjectionConfig, ZoomableGroup } from 'react-simple-maps';
 import { Tooltip } from 'react-tooltip';
-import Typeahead from '../../components/Typeahead.js';
-import Auth from '../../components/auth.js';
-import { RenameEvent } from '../../components/editname.js';
-import InfoTip from '../../components/infotip.js';
-import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs.js';
-import useAdmin from '../../hooks/useadmin.js';
-import { extractQueryParam } from '../../libs/api/apipage.js';
+import Typeahead from '../../components/Typeahead';
+import Auth from '../../components/auth';
+import { RenameEvent } from '../../components/editname';
+import InfoTip from '../../components/infotip';
+import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
+import useAdmin from '../../hooks/useadmin';
+import { extractQueryParam } from '../../libs/api/apipage';
 import {
     GallApi,
     GallApiSchema,
@@ -26,11 +26,11 @@ import {
     PlaceNoTreeApiSchema,
     SimpleSpecies,
     SpeciesWithPlaces,
-} from '../../libs/api/apitypes.js';
-import { gallById } from '../../libs/db/gall.js';
-import { allHostsWithPlaces } from '../../libs/db/host.js';
-import Admin from '../../libs/pages/admin.js';
-import { mightFailWithArray } from '../../libs/utils/util.js';
+} from '../../libs/api/apitypes';
+import { gallById } from '../../libs/db/gall';
+import { allHostsWithPlaces } from '../../libs/db/host';
+import Admin from '../../libs/pages/admin';
+import { mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
     id: string | null;
@@ -188,8 +188,8 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
                         can edit these mappings (add or delete).
                     </p>
                     <p>
-                        At least one host species must exist before mapping. <Link.default href="./host">Go add one</Link.default>{' '}
-                        now if you need to.
+                        At least one host species must exist before mapping. <Link href="./host">Go add one</Link> now if you need
+                        to.
                     </p>
                     <Row className="my-1">
                         <Col>

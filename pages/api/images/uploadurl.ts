@@ -1,13 +1,13 @@
-import * as E from 'fp-ts/lib/Either.js';
-import * as O from 'fp-ts/lib/Option.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import { pipe } from 'fp-ts/lib/function.js';
+import * as E from 'fp-ts/lib/Either';
+import * as O from 'fp-ts/lib/Option';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from 'next-auth/react';
-import { Err, extractQueryParam, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage.js';
-import { IMAGES_ENDPOINT } from '../../../libs/constants.js';
-import { getPresignedUrl } from '../../../libs/images/images.js';
-import { handleError } from '../../../libs/utils/util.js';
+import { Err, extractQueryParam, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage';
+import { IMAGES_ENDPOINT } from '../../../libs/constants';
+import { getPresignedUrl } from '../../../libs/images/images';
+import { handleError } from '../../../libs/utils/util';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     const session = await getSession({ req });

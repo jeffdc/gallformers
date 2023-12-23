@@ -1,17 +1,17 @@
 import axios from 'axios';
-import * as O from 'fp-ts/lib/Option.js';
-import { constant, pipe } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
 import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Path } from 'react-hook-form';
-import { AsyncTypeahead } from '../../components/Typeahead.js';
-import { RenameEvent } from '../../components/editname.js';
-import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs.js';
-import useAdmin from '../../hooks/useadmin.js';
-import { extractQueryParam } from '../../libs/api/apipage.js';
+import { AsyncTypeahead } from '../../components/Typeahead';
+import { RenameEvent } from '../../components/editname';
+import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
+import useAdmin from '../../hooks/useadmin';
+import { extractQueryParam } from '../../libs/api/apipage';
 import {
     SimpleSpecies,
     TaxSection,
@@ -20,10 +20,10 @@ import {
     TaxonomyEntry,
     TaxonomyTypeValues,
     TaxonomyUpsertFields,
-} from '../../libs/api/apitypes.js';
-import { allGenera, allSections } from '../../libs/db/taxonomy.js';
-import Admin from '../../libs/pages/admin.js';
-import { extractGenus, hasProp, mightFailWithArray } from '../../libs/utils/util.js';
+} from '../../libs/api/apitypes';
+import { allGenera, allSections } from '../../libs/db/taxonomy';
+import Admin from '../../libs/pages/admin';
+import { extractGenus, hasProp, mightFailWithArray } from '../../libs/utils/util';
 
 const schema = t.intersection([adminFormFieldsSchema(TaxSectionSchema), TaxSectionSchema]);
 

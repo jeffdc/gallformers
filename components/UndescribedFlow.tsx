@@ -1,11 +1,11 @@
 import axios from 'axios';
-import { constant, constFalse, pipe } from 'fp-ts/lib/function.js';
-import * as O from 'fp-ts/lib/Option.js';
+import { constant, constFalse, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import { useEffect, useState } from 'react';
 import { Alert, Button, Col, Form, Modal, Row } from 'react-bootstrap';
 import { Controller, useForm } from 'react-hook-form';
-import { GallSimple, HostSimple, TaxonomyEntry, TaxonomyEntryNoParent, TaxonomyTypeValues } from '../libs/api/apitypes.js';
-import Typeahead, { AsyncTypeahead } from './Typeahead.js';
+import { GallSimple, HostSimple, TaxonomyEntry, TaxonomyEntryNoParent, TaxonomyTypeValues } from '../libs/api/apitypes';
+import Typeahead, { AsyncTypeahead } from './Typeahead';
 
 export type UndescribedData = {
     family: TaxonomyEntry;

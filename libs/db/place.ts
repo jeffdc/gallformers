@@ -1,11 +1,11 @@
 import { place, Prisma } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import { TaskEither } from 'fp-ts/lib/TaskEither.js';
-import { DeleteResult, PlaceApi, PlaceNoTreeApi, PlaceNoTreeUpsertFields, PlaceWithHostsApi } from '../api/apitypes.js';
-import { ExtractTFromPromise } from '../utils/types.js';
-import { handleError } from '../utils/util.js';
-import db from './db.js';
+import { pipe } from 'fp-ts/lib/function';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { TaskEither } from 'fp-ts/lib/TaskEither';
+import { DeleteResult, PlaceApi, PlaceNoTreeApi, PlaceNoTreeUpsertFields, PlaceWithHostsApi } from '../api/apitypes';
+import { ExtractTFromPromise } from '../utils/types';
+import { handleError } from '../utils/util';
+import db from './db';
 
 /**
  * Fetch all the ids for the places.

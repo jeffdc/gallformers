@@ -1,11 +1,10 @@
 import { GetStaticProps } from 'next';
-import Head from 'next/head.js';
+import Head from 'next/head';
 import Image from 'next/image.js';
 import React from 'react';
 import { Accordion, Card, Col, Row } from 'react-bootstrap';
-import { getCurrentStats, Stat } from '../libs/db/stats.js';
-import { mightFailWithArray } from '../libs/utils/util.js';
-import GallMeMaybe from '../public/images/gallmemaybe.jpg';
+import { getCurrentStats, Stat } from '../libs/db/stats.ts';
+import { mightFailWithArray } from '../libs/utils/util';
 
 type Props = {
     stats: Stat[];
@@ -16,10 +15,10 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
     const statMap = new Map(stats.map((s) => [s.type, s.count] as [string, number]));
     return (
         <div className="p-4">
-            <Head.default>
+            <Head>
                 <title>About Gallformers</title>
                 <meta name="description" content="About the creators of gallformers and why we built the site." />
-            </Head.default>
+            </Head>
 
             <Row>
                 <Col>
@@ -211,8 +210,8 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
                             <Accordion.Header>Dare You Click?</Accordion.Header>
                             <Accordion.Body>
                                 <Card.Body className="d-flex justify-content-center">
-                                    <Image.default
-                                        src={GallMeMaybe}
+                                    <Image
+                                        src="../public/images/gallmemaybe.jpg"
                                         alt="Gall Me Maybe"
                                         width="300"
                                         height="532"

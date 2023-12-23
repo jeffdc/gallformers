@@ -13,10 +13,10 @@ import {
     speciessource,
 } from '@prisma/client';
 import * as A from 'fp-ts/lib/Array.js';
-import { constant, flow, pipe } from 'fp-ts/lib/function.js';
-import * as O from 'fp-ts/lib/Option.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import { TaskEither } from 'fp-ts/lib/TaskEither.js';
+import { constant, flow, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { TaskEither } from 'fp-ts/lib/TaskEither';
 import {
     DeleteResult,
     FGS,
@@ -28,20 +28,20 @@ import {
     SpeciesWithPlaces,
     TaxonCodeValues,
     TaxonomyTypeValues,
-} from '../api/apitypes.js';
-import { deleteImagesBySpeciesId } from '../images/images.js';
-import { ExtractTFromPromise } from '../utils/types.js';
-import { handleError, hasProp, optionalWith } from '../utils/util.js';
-import db from './db.js';
-import { adaptImage } from './images.js';
+} from '../api/apitypes';
+import { deleteImagesBySpeciesId } from '../images/images';
+import { ExtractTFromPromise } from '../utils/types';
+import { handleError, hasProp, optionalWith } from '../utils/util';
+import db from './db';
+import { adaptImage } from './images';
 import {
     adaptAbundance,
     speciesCreateData,
     speciesTaxonomyAdditionalUpdateSteps,
     speciesUpdateData,
     updateAbundance,
-} from './species.js';
-import { taxonomyForSpecies } from './taxonomy.js';
+} from './species';
+import { taxonomyForSpecies } from './taxonomy';
 
 type DBHost = species & {
     abundance: abundance | null;

@@ -1,7 +1,7 @@
 import { Prisma, PrismaPromise, species, speciestaxonomy, taxonomy, taxonomyalias, taxonomytaxonomy } from '@prisma/client';
-import * as O from 'fp-ts/lib/Option.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import { pipe } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import {
     ALL_FAMILY_TYPES,
     AliasApi,
@@ -22,12 +22,12 @@ import {
     TaxonomyType,
     TaxonomyTypeValues,
     TaxonomyUpsertFields,
-} from '../api/apitypes.js';
-import { logger } from '../utils/logger.js';
-import { ExtractTFromPromise } from '../utils/types.js';
-import { handleError } from '../utils/util.js';
-import db from './db.js';
-import { extractId } from './utils.js';
+} from '../api/apitypes';
+import { logger } from '../utils/logger.ts';
+import { ExtractTFromPromise } from '../utils/types';
+import { handleError } from '../utils/util';
+import db from './db';
+import { extractId } from './utils';
 
 export type TaxonomyTree = taxonomy & {
     parent: taxonomy | null;
@@ -730,7 +730,7 @@ const familyCreate = async (f: FamilyUpsertFields): Promise<number> => {
 
 const generaCreate =
     (f: FamilyUpsertFields) =>
-    (fid: number): TE.TE.TaskEither<Error, unknown> => {
+    (fid: number): TE.TaskEither<Error, unknown> => {
         // add the genera and relationships
         const doCreate = () =>
             db.$transaction(

@@ -1,11 +1,11 @@
 import axios from 'axios';
-import * as O from 'fp-ts/lib/Option.js';
+import * as O from 'fp-ts/lib/Option';
 import { useSession } from 'next-auth/react';
 import React, { ChangeEvent, useState } from 'react';
 import { Alert, Col, ProgressBar, Row } from 'react-bootstrap';
 import { toast } from 'react-hot-toast';
-import { ImageApi, ImageLicenseValues } from '../libs/api/apitypes.js';
-import { sessionUserOrUnknown } from '../libs/utils/util.js';
+import { ImageApi, ImageLicenseValues } from '../libs/api/apitypes';
+import { sessionUserOrUnknown } from '../libs/utils/util';
 
 type Props = {
     id: number;

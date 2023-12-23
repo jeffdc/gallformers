@@ -1,12 +1,12 @@
 import { source, species, speciessource } from '@prisma/client';
 import * as A from 'fp-ts/lib/Array.js';
-import * as O from 'fp-ts/lib/Option.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import { TaskEither } from 'fp-ts/lib/TaskEither.js';
-import { pipe } from 'fp-ts/lib/function.js';
-import { DeleteResult, SpeciesSourceApi, SpeciesSourceInsertFields } from '../api/apitypes.js';
-import { handleError } from '../utils/util.js';
-import db from './db.js';
+import * as O from 'fp-ts/lib/Option';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { TaskEither } from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
+import { DeleteResult, SpeciesSourceApi, SpeciesSourceInsertFields } from '../api/apitypes';
+import { handleError } from '../utils/util';
+import db from './db';
 
 type DBSpeciesSource = speciessource & { source: source };
 const adaptor = (dbs: DBSpeciesSource[]): SpeciesSourceApi[] =>

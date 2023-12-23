@@ -1,16 +1,10 @@
-import * as O from 'fp-ts/lib/Option.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import { pipe } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import {
-    apiSearchEndpoint,
-    getQueryParams,
-    sendErrorResponse,
-    sendSuccessResponse,
-    toErr,
-} from '../../../../libs/api/apipage.js';
-import { TaxonomyEntry } from '../../../../libs/api/apitypes.js';
-import { allFamilies, familyByName, familySearch, taxonomyEntryById } from '../../../../libs/db/taxonomy.js';
+import { apiSearchEndpoint, getQueryParams, sendErrorResponse, sendSuccessResponse, toErr } from '../../../../libs/api/apipage';
+import { TaxonomyEntry } from '../../../../libs/api/apitypes';
+import { allFamilies, familyByName, familySearch, taxonomyEntryById } from '../../../../libs/db/taxonomy';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     // 1: an ID is passed in fetch that family

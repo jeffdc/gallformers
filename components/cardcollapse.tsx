@@ -1,8 +1,8 @@
 import { Card, Button, Collapse, Container } from 'react-bootstrap';
 import { useState } from 'react';
-import * as O from 'fp-ts/lib/Option.js';
-import { constant, pipe } from 'fp-ts/lib/function.js';
-import { truncateAtWord } from '../libs/utils/util.js';
+import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
+import { truncateAtWord } from '../libs/utils/util';
 
 //TODO This component is kind of janky and was really just a quick hack. We should make it better.
 type Props = {

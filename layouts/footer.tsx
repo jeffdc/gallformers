@@ -1,8 +1,8 @@
 import { signOut, useSession } from 'next-auth/react';
 import React from 'react';
 import { Button, Nav, Navbar } from 'react-bootstrap';
-import useIsMounted from '../hooks/useIsMounted.js';
-import { sessionUserOrUnknown } from '../libs/utils/util.js';
+import useIsMounted from '../hooks/useIsMounted';
+import { sessionUserOrUnknown } from '../libs/utils/util';
 
 const Footer = (): JSX.Element => {
     const { data: session } = useSession();

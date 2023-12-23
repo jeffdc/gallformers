@@ -1,9 +1,9 @@
 import { useSession } from 'next-auth/react';
-import Head from 'next/head.js';
-import { useRouter } from 'next/router.js';
+import Head from 'next/head';
+import { useRouter } from 'next/router';
 import { KeyboardEvent, SyntheticEvent, useState } from 'react';
 import { Button, Container, Form, FormControl, Nav, NavDropdown, Navbar } from 'react-bootstrap';
-import useIsMounted from '../hooks/useIsMounted.js';
+import useIsMounted from '../hooks/useIsMounted';
 
 const Header = (): JSX.Element => {
     const { data: session } = useSession();
@@ -31,10 +31,10 @@ const Header = (): JSX.Element => {
 
     return (
         <>
-            <Head.default>
+            <Head>
                 <title>Gallformers</title>
                 <link rel="icon" href="/favicon.ico" />
-            </Head.default>
+            </Head>
             <Navbar sticky="top" collapseOnSelect expand="md" className="navbar-custom px-3 pt-2" variant="dark">
                 <Container fluid>
                     <Navbar.Brand href="/">

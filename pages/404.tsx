@@ -1,5 +1,5 @@
 import Image from 'next/image.js';
-import Link from 'next/link.js';
+import Link from 'next/link';
 import React from 'react';
 import { Container, Row, Col } from 'react-bootstrap';
 

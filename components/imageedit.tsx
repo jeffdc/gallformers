@@ -1,6 +1,6 @@
 import { ioTsResolver } from '@hookform/resolvers/io-ts';
-import { constant, pipe } from 'fp-ts/lib/function.js';
-import * as O from 'fp-ts/lib/Option.js';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import * as t from 'io-ts';
 import { useEffect, useState } from 'react';
 import { Button, Col, Modal, Row } from 'react-bootstrap';
@@ -12,9 +12,9 @@ import {
     ImageLicenseValues,
     ImageSourceSchema,
     SourceWithSpeciesSourceApi,
-} from '../libs/api/apitypes.js';
-import InfoTip from './infotip.js';
-import Typeahead from './Typeahead.js';
+} from '../libs/api/apitypes';
+import InfoTip from './infotip';
+import Typeahead from './Typeahead';
 
 type Props = {
     image: ImageApi;

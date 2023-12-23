@@ -1,8 +1,8 @@
-import { pipe } from 'fp-ts/lib/function.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
+import { pipe } from 'fp-ts/lib/function';
+import * as TE from 'fp-ts/lib/TaskEither';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage.js';
-import { allGlossaryEntries } from '../../../libs/db/glossary.js';
+import { sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage';
+import { allGlossaryEntries } from '../../../libs/db/glossary.ts';
 
 // GET: ../glossary
 // fetches the glossary entries

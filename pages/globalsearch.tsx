@@ -1,21 +1,21 @@
-import * as O from 'fp-ts/lib/Option.js';
-import { pipe } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option';
+import { pipe } from 'fp-ts/lib/function';
 import { GetServerSideProps } from 'next';
-import Head from 'next/head.js';
+import Head from 'next/head';
 import Image from 'next/image.js';
-import Link from 'next/link.js';
+import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import { useMemo } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
-import DataTable from '../components/DataTable.js';
-import { extractQueryParam } from '../libs/api/apipage.js';
-import { PlaceNoTreeApi, TaxonomyEntryNoParent } from '../libs/api/apitypes.js';
-import { GlobalSearchResults, TinySource, TinySpecies, globalSearch } from '../libs/db/search.js';
-import { EntryLinked } from '../libs/pages/glossary.js';
-import { formatWithDescription } from '../libs/pages/renderhelpers.js';
-import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants.js';
-import { logger } from '../libs/utils/logger.js';
-import { capitalizeFirstLetter, mightFail } from '../libs/utils/util.js';
+import DataTable from '../components/DataTable';
+import { extractQueryParam } from '../libs/api/apipage';
+import { PlaceNoTreeApi, TaxonomyEntryNoParent } from '../libs/api/apitypes';
+import { GlobalSearchResults, TinySource, TinySpecies, globalSearch } from '../libs/db/search.ts';
+import { EntryLinked } from '../libs/pages/glossary.ts';
+import { formatWithDescription } from '../libs/pages/renderhelpers';
+import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
+import { logger } from '../libs/utils/logger.ts';
+import { capitalizeFirstLetter, mightFail } from '../libs/utils/util';
 
 type SearchResultItem = {
     // we need a unique ID for the data table and to keep React happy. we can not just use the ID of the
@@ -36,23 +36,21 @@ type Props = {
 const imageForType = (i: SearchResultItem) => {
     switch (i.type) {
         case 'gall':
-            return <Image.default src="/images/cynipid_R.svg" alt="gallformer" aria-label="gallformer" width="45" height="45" />;
+            return <Image src="/images/cynipid_R.svg" alt="gallformer" aria-label="gallformer" width="45" height="45" />;
         case 'plant':
-            return <Image.default src="/images/host.svg" alt="plant" aria-label="plant" width="25" height="25" />;
+            return <Image src="/images/host.svg" alt="plant" aria-label="plant" width="25" height="25" />;
         case 'entry':
-            return (
-                <Image.default src="/images/entry.svg" alt="glossary entry" aria-label="glossary entry" width="25" height="25" />
-            );
+            return <Image src="/images/entry.svg" alt="glossary entry" aria-label="glossary entry" width="25" height="25" />;
         case 'source':
-            return <Image.default src="/images/source.svg" alt="source" aria-label="source" width="25" height="25" />;
+            return <Image src="/images/source.svg" alt="source" aria-label="source" width="25" height="25" />;
         case 'genus':
-            return <Image.default src="/images/taxon.svg" alt="genus" aria-label="genus" width="25" height="25" />;
+            return <Image src="/images/taxon.svg" alt="genus" aria-label="genus" width="25" height="25" />;
         case 'section':
-            return <Image.default src="/images/taxon.svg" alt="section" aria-label="section" width="25" height="25" />;
+            return <Image src="/images/taxon.svg" alt="section" aria-label="section" width="25" height="25" />;
         case 'family':
-            return <Image.default src="/images/taxon.svg" alt="family" aria-label="family" width="25" height="25" />;
+            return <Image src="/images/taxon.svg" alt="family" aria-label="family" width="25" height="25" />;
         case 'place':
-            return <Image.default src="/images/place.svg" alt="place" aria-label="place" width="25" height="25" />;
+            return <Image src="/images/place.svg" alt="place" aria-label="place" width="25" height="25" />;
         default:
             return <></>;
     }
@@ -62,36 +60,36 @@ const linkItem = (i: SearchResultItem) => {
     switch (i.type) {
         case 'gall':
             return (
-                <Link.default href={`/gall/${i.id}`}>
+                <Link href={`/gall/${i.id}`}>
                     <em>{formatWithDescription(i.name, i.aliases, true)}</em>
-                </Link.default>
+                </Link>
             );
         case 'plant':
             return (
-                <Link.default href={`/host/${i.id}`}>
+                <Link href={`/host/${i.id}`}>
                     <em>{formatWithDescription(i.name, i.aliases, true)}</em>
-                </Link.default>
+                </Link>
             );
         case 'entry':
-            return <Link.default href={`/glossary#${i.name.toLocaleLowerCase()}`}>{i.name}</Link.default>;
+            return <Link href={`/glossary#${i.name.toLocaleLowerCase()}`}>{i.name}</Link>;
         case 'source':
-            return <Link.default href={`/source/${i.id}`}>{i.name}</Link.default>;
+            return <Link href={`/source/${i.id}`}>{i.name}</Link>;
         case 'genus':
             return (
-                <Link.default href={`/genus/${i.id}`}>
+                <Link href={`/genus/${i.id}`}>
                     <em>{`Genus ${formatWithDescription(i.name, i.aliases, true)}`}</em>
-                </Link.default>
+                </Link>
             );
         case 'section':
             return (
-                <Link.default href={`/section/${i.id}`}>
+                <Link href={`/section/${i.id}`}>
                     <em>{`Section ${formatWithDescription(i.name, i.aliases, true)}`}</em>
-                </Link.default>
+                </Link>
             );
         case 'family':
-            return <Link.default href={`/family/${i.id}`}>{`Family ${i.name}`}</Link.default>;
+            return <Link href={`/family/${i.id}`}>{`Family ${i.name}`}</Link>;
         case 'place':
-            return <Link.default href={`/place/${i.id}`}>{i.name}</Link.default>;
+            return <Link href={`/place/${i.id}`}>{i.name}</Link>;
         default:
             return <></>;
     }
@@ -124,10 +122,10 @@ const GlobalSearch = ({ results, search }: Props): JSX.Element => {
 
     return (
         <Container className="pt-2" fluid>
-            <Head.default>
+            <Head>
                 <title>Search Results - {`'${search}'`}</title>
                 <meta name="description" content="Gallformer Search Results" />
-            </Head.default>
+            </Head>
 
             {results.length <= 0 && (
                 <Row className="p-2">

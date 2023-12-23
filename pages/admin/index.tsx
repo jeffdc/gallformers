@@ -1,8 +1,8 @@
 import { useSession } from 'next-auth/react';
-import Head from 'next/head.js';
-import Link from 'next/link.js';
+import Head from 'next/head';
+import Link from 'next/link';
 import { Col, ListGroup, ListGroupItem, Row } from 'react-bootstrap';
-import Auth, { superAdmins } from '../../components/auth.js';
+import Auth, { superAdmins } from '../../components/auth';
 
 const Admin = (): JSX.Element => {
     const { data: session } = useSession();
@@ -10,9 +10,9 @@ const Admin = (): JSX.Element => {
     return (
         <Auth>
             <div className="p-3 m-3">
-                <Head.default>
+                <Head>
                     <title>Administration</title>
-                </Head.default>
+                </Head>
                 <Row>
                     <Col className="font-weight-bold">Things that you can do as an Admin:</Col>
                 </Row>
@@ -20,36 +20,36 @@ const Admin = (): JSX.Element => {
                     <Col>
                         <ListGroup className="pt-3">
                             <ListGroupItem>
-                                Create/modify <Link.default href="./admin/taxonomy">Taxonomy</Link.default>
+                                Create/modify <Link href="./admin/taxonomy">Taxonomy</Link>
                             </ListGroupItem>
                             <ListGroupItem>
-                                Create/modify <Link.default href="./admin/section">Sections</Link.default>
+                                Create/modify <Link href="./admin/section">Sections</Link>
                             </ListGroupItem>
                             <ListGroupItem>
-                                Create/modify <Link.default href="./admin/host">Hosts</Link.default>
+                                Create/modify <Link href="./admin/host">Hosts</Link>
                             </ListGroupItem>
                             <ListGroupItem>
-                                Create/modify <Link.default href="./admin/gall">Galls</Link.default>
+                                Create/modify <Link href="./admin/gall">Galls</Link>
                             </ListGroupItem>
                             <ListGroupItem>
-                                Add/Edit <Link.default href="./admin/images">Images</Link.default>
+                                Add/Edit <Link href="./admin/images">Images</Link>
                             </ListGroupItem>
                             <ListGroupItem>
-                                Create <Link.default href="./admin/gallhost">Gall-Host Mappings</Link.default>
+                                Create <Link href="./admin/gallhost">Gall-Host Mappings</Link>
                             </ListGroupItem>{' '}
                             <ListGroupItem>
-                                Create/modify <Link.default href="./admin/source">Sources</Link.default>
+                                Create/modify <Link href="./admin/source">Sources</Link>
                             </ListGroupItem>
                             <ListGroupItem>
-                                Create <Link.default href="./admin/speciessource">Species-Source Mappings</Link.default>
+                                Create <Link href="./admin/speciessource">Species-Source Mappings</Link>
                             </ListGroupItem>
                             <ListGroupItem>
-                                Create/modify <Link.default href="./admin/glossary">Glossary Entries</Link.default>
+                                Create/modify <Link href="./admin/glossary">Glossary Entries</Link>
                             </ListGroupItem>
                             <ListGroupItem>
-                                Browse <Link.default href="./admin/browse/galls">galls</Link.default>,{' '}
-                                <Link.default href="./admin/browse/hosts">hosts</Link.default>, or{' '}
-                                <Link.default href="./admin/browse/sources">sources</Link.default>.
+                                Browse <Link href="./admin/browse/galls">galls</Link>,{' '}
+                                <Link href="./admin/browse/hosts">hosts</Link>, or{' '}
+                                <Link href="./admin/browse/sources">sources</Link>.
                             </ListGroupItem>
                         </ListGroup>
                     </Col>
@@ -63,10 +63,10 @@ const Admin = (): JSX.Element => {
                             <Col>
                                 <ListGroup>
                                     <ListGroupItem>
-                                        Create/modify <Link.default href="./admin/filterterms">Filter Terms</Link.default>
+                                        Create/modify <Link href="./admin/filterterms">Filter Terms</Link>
                                     </ListGroupItem>
                                     <ListGroupItem>
-                                        Create/modify <Link.default href="./admin/place">Places</Link.default>
+                                        Create/modify <Link href="./admin/place">Places</Link>
                                     </ListGroupItem>
                                 </ListGroup>
                             </Col>

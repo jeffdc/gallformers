@@ -1,7 +1,7 @@
 import { Prisma, source } from '@prisma/client';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import { TaskEither } from 'fp-ts/lib/TaskEither.js';
-import { pipe } from 'fp-ts/lib/function.js';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { TaskEither } from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import {
     DeleteResult,
     SourceApi,
@@ -9,11 +9,11 @@ import {
     SourceWithSpeciesApi,
     SourceWithSpeciesSourceApi,
     taxonCodeAsStringToValue,
-} from '../api/apitypes.js';
-import { isOfType } from '../utils/types.js';
-import { handleError } from '../utils/util.js';
-import db from './db.js';
-import { extractId } from './utils.js';
+} from '../api/apitypes';
+import { isOfType } from '../utils/types';
+import { handleError } from '../utils/util';
+import db from './db';
+import { extractId } from './utils';
 
 const adaptor = <T extends source>(source: T): SourceApi | SourceWithSpeciesSourceApi =>
     isOfType(source, 'speciessource' as keyof SourceWithSpeciesSourceApi)

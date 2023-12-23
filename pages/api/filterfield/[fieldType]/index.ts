@@ -1,18 +1,11 @@
-import * as E from 'fp-ts/lib/Either.js';
-import * as O from 'fp-ts/lib/Option.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import { pipe } from 'fp-ts/lib/function.js';
+import * as E from 'fp-ts/lib/Either';
+import * as O from 'fp-ts/lib/Option';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import {
-    Err,
-    getQueryParam,
-    getQueryParams,
-    sendErrorResponse,
-    sendSuccessResponse,
-    toErr,
-} from '../../../../libs/api/apipage.js';
-import { FilterField, FilterFieldTypeSchema, FilterFieldTypeValue, asFilterType } from '../../../../libs/api/apitypes.js';
-import { getFilterFieldByNameAndType, getFilterFieldsByType } from '../../../../libs/db/filterfield.js';
+import { Err, getQueryParam, getQueryParams, sendErrorResponse, sendSuccessResponse, toErr } from '../../../../libs/api/apipage';
+import { FilterField, FilterFieldTypeSchema, FilterFieldTypeValue, asFilterType } from '../../../../libs/api/apitypes';
+import { getFilterFieldByNameAndType, getFilterFieldsByType } from '../../../../libs/db/filterfield';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     const params = getQueryParams(req.query, ['fieldType', 'name']);

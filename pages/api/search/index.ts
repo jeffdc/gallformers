@@ -1,12 +1,12 @@
-import * as E from 'fp-ts/lib/Either.js';
-import * as O from 'fp-ts/lib/Option.js';
-import * as R from 'fp-ts/lib/Record.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import { pipe } from 'fp-ts/lib/function.js';
+import * as E from 'fp-ts/lib/Either';
+import * as O from 'fp-ts/lib/Option';
+import * as R from 'fp-ts/lib/Record';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { Err, getQueryParam, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage.js';
-import { GallIDApi } from '../../../libs/api/apitypes.js';
-import { gallsByHostGenus, gallsByHostName, gallsByHostSection } from '../../../libs/db/gall.js';
+import { Err, getQueryParam, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage';
+import { GallIDApi } from '../../../libs/api/apitypes';
+import { gallsByHostGenus, gallsByHostName, gallsByHostSection } from '../../../libs/db/gall';
 
 /**
  * The expected query params are one of:

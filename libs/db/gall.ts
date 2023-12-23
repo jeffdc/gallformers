@@ -34,10 +34,10 @@ import {
     walls as ws,
 } from '@prisma/client';
 import * as A from 'fp-ts/lib/Array.js';
-import * as O from 'fp-ts/lib/Option.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import { TaskEither } from 'fp-ts/lib/TaskEither.js';
-import { flow, pipe } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { TaskEither } from 'fp-ts/lib/TaskEither';
+import { flow, pipe } from 'fp-ts/lib/function';
 import {
     DeleteResult,
     FGS,
@@ -51,14 +51,14 @@ import {
     TaxonomyTypeValues,
     detachableFromId,
     detachableFromString,
-} from '../api/apitypes.js';
-import { SMALL, deleteImagesBySpeciesId, makePath } from '../images/images.js';
-import { defaultSource } from '../pages/renderhelpers.js';
-import { unsafeDecode } from '../utils/io-ts.js';
-import { logger } from '../utils/logger.js';
-import { ExtractTFromPromise } from '../utils/types.js';
-import { handleError, optionalWith } from '../utils/util.js';
-import db from './db.js';
+} from '../api/apitypes';
+import { SMALL, deleteImagesBySpeciesId, makePath } from '../images/images';
+import { defaultSource } from '../pages/renderhelpers';
+import { unsafeDecode } from '../utils/io-ts.ts';
+import { logger } from '../utils/logger.ts';
+import { ExtractTFromPromise } from '../utils/types';
+import { handleError, optionalWith } from '../utils/util';
+import db from './db';
 import {
     adaptAlignments,
     adaptCells,
@@ -69,17 +69,17 @@ import {
     adaptShapes,
     adaptTextures,
     adaptWalls,
-} from './filterfield.js';
-import { adaptImage, adaptImageNoSource } from './images.js';
+} from './filterfield';
+import { adaptImage, adaptImageNoSource } from './images';
 import {
     adaptAbundance,
     speciesCreateData,
     speciesTaxonomyAdditionalUpdateSteps,
     speciesUpdateData,
     updateAbundance,
-} from './species.js';
-import { taxonomyForSpecies } from './taxonomy.js';
-import { connectWithIds } from './utils.js';
+} from './species';
+import { taxonomyForSpecies } from './taxonomy';
+import { connectWithIds } from './utils';
 
 /**
  * A general way to fetch galls. Check this file for pre-defined helpers that are easier to use.

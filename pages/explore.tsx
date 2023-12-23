@@ -1,15 +1,15 @@
 import { GetStaticProps } from 'next';
-import Head from 'next/head.js';
-import { useRouter } from 'next/router.js';
+import Head from 'next/head';
+import { useRouter } from 'next/router';
 import React from 'react';
 import { Card, Col, Container, Row, Tab, Tabs } from 'react-bootstrap';
 import TreeMenu, { Item, TreeNodeInArray } from 'react-simple-tree-menu';
 import 'react-simple-tree-menu/dist/main.css';
-import { FamilyTaxonomy, getFamiliesWithSpecies } from '../libs/db/taxonomy.js';
-import { getStaticPropsWith } from '../libs/pages/nextPageHelpers.js';
-import { formatWithDescription } from '../libs/pages/renderhelpers.js';
-import { hasProp } from '../libs/utils/util.js';
-import { TaxonCodeValues } from '../libs/api/apitypes.js';
+import { FamilyTaxonomy, getFamiliesWithSpecies } from '../libs/db/taxonomy';
+import { getStaticPropsWith } from '../libs/pages/nextPageHelpers';
+import { formatWithDescription } from '../libs/pages/renderhelpers';
+import { hasProp } from '../libs/utils/util';
+import { TaxonCodeValues } from '../libs/api/apitypes';
 
 type Props = {
     gallmakers: TreeNodeInArray[];
@@ -29,10 +29,10 @@ const Explore = ({ gallmakers, undescribed, hosts }: Props): JSX.Element => {
 
     return (
         <Container className="pt-2" fluid>
-            <Head.default>
+            <Head>
                 <title>Explore Galls & Hosts</title>
                 <meta name="description" content="Browse all of the galls and hosts that gallformers has in its database." />
-            </Head.default>
+            </Head>
 
             <Row>
                 <Col xs={12}>
@@ -42,19 +42,19 @@ const Explore = ({ gallmakers, undescribed, hosts }: Props): JSX.Element => {
                                 <Tab eventKey="galls" title="Galls">
                                     <Card.Body>
                                         <Card.Title>Browse Galls - By Family</Card.Title>
-                                        <TreeMenu.default data={gallmakers} onClickItem={handleClick} />
+                                        <TreeMenu data={gallmakers} onClickItem={handleClick} />
                                     </Card.Body>
                                 </Tab>
                                 <Tab eventKey="undescribed" title="Undescribed Galls">
                                     <Card.Body>
                                         <Card.Title>Browse Undescibed Galls</Card.Title>
-                                        <TreeMenu.default data={undescribed} onClickItem={handleClick} />
+                                        <TreeMenu data={undescribed} onClickItem={handleClick} />
                                     </Card.Body>
                                 </Tab>
                                 <Tab eventKey="hosts" title="Hosts">
                                     <Card.Body>
                                         <Card.Title>Browse Hosts - By Family</Card.Title>
-                                        <TreeMenu.default data={hosts} onClickItem={handleClick} />
+                                        <TreeMenu data={hosts} onClickItem={handleClick} />
                                     </Card.Body>
                                 </Tab>
                             </Tabs>

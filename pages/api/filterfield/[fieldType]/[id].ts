@@ -1,19 +1,12 @@
-import * as E from 'fp-ts/lib/Either.js';
-import * as O from 'fp-ts/lib/Option.js';
-import * as R from 'fp-ts/lib/Record.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import { constant, identity, pipe } from 'fp-ts/lib/function.js';
+import * as E from 'fp-ts/lib/Either';
+import * as O from 'fp-ts/lib/Option';
+import * as R from 'fp-ts/lib/Record';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { constant, identity, pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import {
-    Err,
-    getQueryParam,
-    getQueryParams,
-    sendErrorResponse,
-    sendSuccessResponse,
-    toErr,
-} from '../../../../libs/api/apipage.js';
-import { asFilterType } from '../../../../libs/api/apitypes.js';
-import { deleteFilterField, getFilterFieldByIdAndType } from '../../../../libs/db/filterfield.js';
+import { Err, getQueryParam, getQueryParams, sendErrorResponse, sendSuccessResponse, toErr } from '../../../../libs/api/apipage';
+import { asFilterType } from '../../../../libs/api/apitypes';
+import { deleteFilterField, getFilterFieldByIdAndType } from '../../../../libs/db/filterfield';
 
 // GET: ../filterfield/{filedType}/{id}
 // fetches the field if it exists - returns an array, might be empty if the field does not exist

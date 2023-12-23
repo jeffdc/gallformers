@@ -1,9 +1,9 @@
-import * as O from 'fp-ts/lib/Option.js';
-import { constant, pipe } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
 import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
-import Link from 'next/link.js';
-import { useRouter } from 'next/router.js';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import { useState } from 'react';
 import { Button, Col, Row, Tab, Tabs } from 'react-bootstrap';
@@ -12,13 +12,13 @@ import ReactMarkdown from 'react-markdown';
 import externalLinks from 'rehype-external-links';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
-import Typeahead from '../../components/Typeahead.js';
-import Auth from '../../components/auth.js';
-import { RenameEvent } from '../../components/editname.js';
-import Picker from '../../components/picker.js';
-import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs.js';
-import useAdmin from '../../hooks/useadmin.js';
-import { extractQueryParam } from '../../libs/api/apipage.js';
+import Typeahead from '../../components/Typeahead';
+import Auth from '../../components/auth';
+import { RenameEvent } from '../../components/editname';
+import Picker from '../../components/picker';
+import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
+import useAdmin from '../../hooks/useadmin';
+import { extractQueryParam } from '../../libs/api/apipage';
 import {
     SimpleSpecies,
     SimpleSpeciesSchema,
@@ -27,12 +27,12 @@ import {
     SpeciesSourceApiSchema,
     SpeciesSourceInsertFields,
     TaxonCodeValues,
-} from '../../libs/api/apitypes.js';
-import { allSources } from '../../libs/db/source.js';
-import { allSpeciesSimple } from '../../libs/db/species.js';
-import Admin from '../../libs/pages/admin.js';
-import { defaultSource, sourceToDisplay } from '../../libs/pages/renderhelpers.js';
-import { mightFailWithArray } from '../../libs/utils/util.js';
+} from '../../libs/api/apitypes';
+import { allSources } from '../../libs/db/source';
+import { allSpeciesSimple } from '../../libs/db/species';
+import Admin from '../../libs/pages/admin';
+import { defaultSource, sourceToDisplay } from '../../libs/pages/renderhelpers';
+import { mightFailWithArray } from '../../libs/utils/util';
 
 type Props = {
     speciesid: string;
@@ -404,16 +404,16 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                             <br />
                             <div>
                                 {selected?.taxoncode === TaxonCodeValues.GALL ? (
-                                    <Link.default href={`./gall?id=${selected?.id}`}>Edit the Species</Link.default>
+                                    <Link href={`./gall?id=${selected?.id}`}>Edit the Species</Link>
                                 ) : (
-                                    <Link.default href={`./host?id=${selected?.id}`}>Edit the Species</Link.default>
+                                    <Link href={`./host?id=${selected?.id}`}>Edit the Species</Link>
                                 )}
                             </div>
                             <div>
-                                <Link.default
+                                <Link
                                     href={`./images?speciesid=${selected?.id}`}
                                     legacyBehavior
-                                >{`Add/Edit Images for this Species`}</Link.default>
+                                >{`Add/Edit Images for this Species`}</Link>
                             </div>
                         </Col>
                     </Row>

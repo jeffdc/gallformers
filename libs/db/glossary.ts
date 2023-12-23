@@ -1,10 +1,10 @@
 import { glossary, Prisma } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import { TaskEither } from 'fp-ts/lib/TaskEither.js';
-import { DeleteResult, Entry, GlossaryEntryUpsertFields } from '../api/apitypes.js';
-import { handleError } from '../utils/util.js';
-import db from './db.js';
+import { pipe } from 'fp-ts/lib/function';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { TaskEither } from 'fp-ts/lib/TaskEither';
+import { DeleteResult, Entry, GlossaryEntryUpsertFields } from '../api/apitypes';
+import { handleError } from '../utils/util';
+import db from './db';
 
 const adaptor = (e: glossary): Entry => e;
 

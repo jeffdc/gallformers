@@ -1,14 +1,14 @@
 import { GetStaticPaths, GetStaticProps } from 'next';
-import Head from 'next/head.js';
-import { useRouter } from 'next/router.js';
+import Head from 'next/head';
+import { useRouter } from 'next/router';
 import { useMemo } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
 import DataTable, { TableColumn } from 'react-data-table-component';
-import Edit from '../../../components/edit.js';
-import { HostSimple, PlaceWithHostsApi } from '../../../libs/api/apitypes.js';
-import { allPlaceIds, placeById } from '../../../libs/db/place.js';
-import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers.js';
-import { TABLE_CUSTOM_STYLES } from '../../../libs/utils/DataTableConstants.js';
+import Edit from '../../../components/edit';
+import { HostSimple, PlaceWithHostsApi } from '../../../libs/api/apitypes';
+import { allPlaceIds, placeById } from '../../../libs/db/place.ts';
+import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
+import { TABLE_CUSTOM_STYLES } from '../../../libs/utils/DataTableConstants';
 
 type Props = {
     place: PlaceWithHostsApi;
@@ -56,10 +56,10 @@ const PlacePage = ({ place }: Props): JSX.Element => {
 
     return (
         <Container className="pt-2" fluid>
-            <Head.default>
+            <Head>
                 <title>{place.name}</title>
                 <meta name="description" content={`Place ${place.name}`} />
-            </Head.default>
+            </Head>
             <Row>
                 <Col>
                     <h2>{`${place.name} - ${place.code}`}</h2>
@@ -79,7 +79,7 @@ const PlacePage = ({ place }: Props): JSX.Element => {
             </Row>
             <Row className="pt-2">
                 <Col>
-                    <DataTable.default
+                    <DataTable
                         keyField={'id'}
                         data={place.hosts.sort((a, b) => a.name.localeCompare(b.name))}
                         columns={columns}

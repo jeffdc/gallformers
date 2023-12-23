@@ -1,7 +1,7 @@
-import Head from 'next/head.js';
-import Link from 'next/link.js';
+import Head from 'next/head';
+import Link from 'next/link';
 import { Container } from 'react-bootstrap';
-import { getAllPosts } from '../libs/pages/refposts.js';
+import { getAllPosts } from '../libs/pages/refposts';
 import Post from '../types/post.js';
 
 type Props = {
@@ -11,17 +11,17 @@ type Props = {
 const Index = ({ allPosts }: Props) => {
     return (
         <>
-            <Head.default>
+            <Head>
                 <title>Gallformers Reference Library</title>
-            </Head.default>
+            </Head>
             <Container className="mx-0 mt-4">
                 <h1 className="my-4">The Gallformers Reference Library</h1>
                 {allPosts.map((p) => (
                     <article key={p.slug}>
                         <header className="">
-                            <Link.default href={`/ref/${p.slug}`}>
+                            <Link href={`/ref/${p.slug}`}>
                                 <h5 className="">{p.title}</h5>
-                            </Link.default>
+                            </Link>
                             <span className="small">
                                 <em>{`${p.author.name} - ${p.date}`}</em>
                             </span>

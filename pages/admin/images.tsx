@@ -1,28 +1,28 @@
 import { ioTsResolver } from '@hookform/resolvers/io-ts';
 import { species } from '@prisma/client';
 import axios from 'axios';
-import * as O from 'fp-ts/lib/Option.js';
-import { constant, pipe } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
 import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/router.js';
+import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Col, Modal, Row } from 'react-bootstrap';
 import DataTable, { TableColumn } from 'react-data-table-component';
 import { useForm } from 'react-hook-form';
-import { AsyncTypeahead } from '../../components/Typeahead.js';
-import AddImage from '../../components/addImage.js';
-import ImageEdit from '../../components/imageEdit.js';
-import ImageGrid from '../../components/imageGrid.js';
-import { useConfirmation } from '../../hooks/useConfirmation.js';
-import { extractQueryParam } from '../../libs/api/apipage.js';
-import { ImageApi } from '../../libs/api/apitypes.js';
-import { speciesById } from '../../libs/db/species.js';
-import Admin from '../../libs/pages/admin.js';
-import { TABLE_CUSTOM_STYLES } from '../../libs/utils/DataTableConstants.js';
-import { mightFailWithArray, sessionUserOrUnknown } from '../../libs/utils/util.js';
+import { AsyncTypeahead } from '../../components/Typeahead';
+import AddImage from '../../components/addImage';
+import ImageEdit from '../../components/imageEdit';
+import ImageGrid from '../../components/imageGrid';
+import { useConfirmation } from '../../hooks/useConfirmation';
+import { extractQueryParam } from '../../libs/api/apipage';
+import { ImageApi } from '../../libs/api/apitypes';
+import { speciesById } from '../../libs/db/species';
+import Admin from '../../libs/pages/admin';
+import { TABLE_CUSTOM_STYLES } from '../../libs/utils/DataTableConstants';
+import { mightFailWithArray, sessionUserOrUnknown } from '../../libs/utils/util';
 
 const schema = t.type({
     species: t.string,
@@ -69,7 +69,7 @@ const sourceFormatter = (row: ImageApi) => {
 };
 
 const defaultFieldFormatter = (img: ImageApi) => {
-    return <span>{img.default ? '✓' : ''}</span>;
+    return <span>{img ? '✓' : ''}</span>;
 };
 
 const Images = ({ sp }: Props): JSX.Element => {
@@ -109,7 +109,10 @@ const Images = ({ sp }: Props): JSX.Element => {
             },
             {
                 id: 'default',
-                selector: (row: ImageApi) => row.default,
+                // this is needed because the ReactDataTable component changed the contract and is trying to be overly clever with its types
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                selector: (row: ImageApi) => row,
                 name: 'Default',
                 sortable: true,
                 maxWidth: '100px',
@@ -424,7 +427,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                     </Row>
                     <Row className="my-1">
                         <Col>
-                            <DataTable.default
+                            <DataTable
                                 keyField={'id'}
                                 data={images ? images : []}
                                 columns={columns}

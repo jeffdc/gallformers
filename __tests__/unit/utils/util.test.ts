@@ -1,7 +1,7 @@
 import * as fc from 'fast-check';
-import { constant, pipe } from 'fp-ts/lib/function.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import * as U from '../../../libs/utils/util.js';
+import { constant, pipe } from 'fp-ts/lib/function';
+import * as TE from 'fp-ts/lib/TaskEither';
+import * as U from '../../../libs/utils/util';
 
 test('randInt should always return a number within the bounds', () => {
     fc.assert(

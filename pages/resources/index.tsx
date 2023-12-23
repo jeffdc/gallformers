@@ -1,28 +1,28 @@
-import Head from 'next/head.js';
-import Link from 'next/link.js';
+import Head from 'next/head';
+import Link from 'next/link';
 import { Container, Col, Row } from 'react-bootstrap';
 
 function Resources(): JSX.Element {
     return (
         <Container className="p-3 m-3">
-            <Head.default>
+            <Head>
                 <meta name="description" content="Resources about plant galls" />
-            </Head.default>
+            </Head>
             <Row>
                 <Col>
                     <h1>General Resources</h1>
                     <ul>
                         <li>
-                            <Link.default href="/ref/IDGuide">Our guide to gall identification</Link.default>
+                            <Link href="/ref/IDGuide">Our guide to gall identification</Link>
                         </li>
                         <li>
-                            <Link.default href="/filterguide">Detailed descriptions for our key filters</Link.default>
+                            <Link href="/filterguide">Detailed descriptions for our key filters</Link>
                         </li>
                         <li>
-                            <Link.default href="/glossary">Glossary for plant and insect terms</Link.default>
+                            <Link href="/glossary">Glossary for plant and insect terms</Link>
                         </li>
                         <li>
-                            <Link.default href="/refindex">Our reference library</Link.default>
+                            <Link href="/refindex">Our reference library</Link>
                         </li>
                         <li>
                             <a href="https://www.inaturalist.org/posts/47564-tips-for-gall-hunting">Advice on finding galls</a>

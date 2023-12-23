@@ -1,13 +1,13 @@
-import * as E from 'fp-ts/lib/Either.js';
-import * as O from 'fp-ts/lib/Option.js';
-import * as R from 'fp-ts/lib/Record.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import { constant, pipe } from 'fp-ts/lib/function.js';
+import * as E from 'fp-ts/lib/Either';
+import * as O from 'fp-ts/lib/Option';
+import * as R from 'fp-ts/lib/Record';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { constant, pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { Err, getQueryParam, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage.js';
-import { SpeciesSourceApi } from '../../../libs/api/apitypes.js';
-import { deleteSpeciesSourceByIds, sourcesBySpecies, speciesSourceByIds } from '../../../libs/db/speciessource.js';
-import { logger } from '../../../libs/utils/logger.js';
+import { Err, getQueryParam, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage';
+import { SpeciesSourceApi } from '../../../libs/api/apitypes';
+import { deleteSpeciesSourceByIds, sourcesBySpecies, speciesSourceByIds } from '../../../libs/db/speciessource';
+import { logger } from '../../../libs/utils/logger.ts';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     const speciesId = getQueryParam(req)('speciesid');

@@ -1,13 +1,13 @@
 import { GetStaticPaths, GetStaticProps } from 'next';
-import Head from 'next/head.js';
-import { useRouter } from 'next/router.js';
+import Head from 'next/head';
+import { useRouter } from 'next/router';
 import React from 'react';
 import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
-import Edit from '../../../components/edit.js';
-import SpeciesTable from '../../../components/speciesTable.js';
-import { SourceWithSpeciesApi } from '../../../libs/api/apitypes.js';
-import { allSourceIds, sourceById } from '../../../libs/db/source.js';
-import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers.js';
+import Edit from '../../../components/edit';
+import SpeciesTable from '../../../components/speciesTable';
+import { SourceWithSpeciesApi } from '../../../libs/api/apitypes';
+import { allSourceIds, sourceById } from '../../../libs/db/source';
+import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 
 type Props = {
     source: SourceWithSpeciesApi;
@@ -22,10 +22,10 @@ const Source = ({ source }: Props): JSX.Element => {
 
     return (
         <Container className="pt-2" fluid>
-            <Head.default>
+            <Head>
                 <title>{source.title}</title>
                 <meta name="description" content={`${source.citation}`} />
-            </Head.default>
+            </Head>
 
             <Row className="pb-4">
                 <Col>

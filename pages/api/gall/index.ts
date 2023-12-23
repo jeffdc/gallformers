@@ -1,10 +1,10 @@
-import * as O from 'fp-ts/lib/Option.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import { pipe } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { apiSearchEndpoint, getQueryParams, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage.js';
-import { GallApi } from '../../../libs/api/apitypes.js';
-import { gallById, gallByName, searchGalls } from '../../../libs/db/gall.js';
+import { apiSearchEndpoint, getQueryParams, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage';
+import { GallApi } from '../../../libs/api/apitypes';
+import { gallById, gallByName, searchGalls } from '../../../libs/db/gall';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     // 1: an ID is passed in fetch that gall

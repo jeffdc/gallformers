@@ -3,7 +3,7 @@ import { IO } from 'fp-ts/lib/IO.js';
 import * as L from 'logging-ts/lib/IO.js';
 import pino from 'pino';
 
-export const logger = pino.default();
+export const logger = pino();
 
 // WIP stuff below here:
 type Level = 'Debug' | 'Info' | 'Warning' | 'Error';

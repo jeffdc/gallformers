@@ -1,10 +1,10 @@
-import * as O from 'fp-ts/lib/Option.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import { pipe } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { Err, getQueryParams, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage.js';
-import { SourceApi, SourceWithSpeciesSourceApi } from '../../../libs/api/apitypes.js';
-import { searchSources, sourcesWithSpeciesSourceBySpeciesId } from '../../../libs/db/source.js';
+import { Err, getQueryParams, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage';
+import { SourceApi, SourceWithSpeciesSourceApi } from '../../../libs/api/apitypes';
+import { searchSources, sourcesWithSpeciesSourceBySpeciesId } from '../../../libs/db/source';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     // 2 paths:

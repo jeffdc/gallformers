@@ -1,11 +1,11 @@
 import { GetStaticProps } from 'next';
-import Head from 'next/head.js';
+import Head from 'next/head';
 import React from 'react';
 import { Card } from 'react-bootstrap';
-import SourceTable from '../../../components/sourceTable.js';
-import { SourceWithSpeciesApi } from '../../../libs/api/apitypes.js';
-import { allSourcesWithSpecies } from '../../../libs/db/source.js';
-import { getStaticPropsWith } from '../../../libs/pages/nextPageHelpers.js';
+import SourceTable from '../../../components/sourceTable';
+import { SourceWithSpeciesApi } from '../../../libs/api/apitypes';
+import { allSourcesWithSpecies } from '../../../libs/db/source';
+import { getStaticPropsWith } from '../../../libs/pages/nextPageHelpers';
 
 type Props = {
     sources: SourceWithSpeciesApi[];
@@ -14,9 +14,9 @@ type Props = {
 const BrowseSources = ({ sources }: Props): JSX.Element => {
     return (
         <>
-            <Head.default>
+            <Head>
                 <title>Browse Sources</title>
-            </Head.default>
+            </Head>
 
             <Card>
                 <Card.Body>

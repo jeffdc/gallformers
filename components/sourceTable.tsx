@@ -1,9 +1,9 @@
-import Link from 'next/link.js';
+import Link from 'next/link';
 import React, { useMemo } from 'react';
-import DataTable from './DataTable.js';
-import { SourceApi } from '../libs/api/apitypes.js';
-import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants.js';
-import Edit from './edit.js';
+import DataTable from './DataTable';
+import { SourceApi } from '../libs/api/apitypes';
+import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
+import Edit from './edit';
 
 export type SourceTableProps = {
     sources: SourceApi[];
@@ -12,9 +12,9 @@ const MAX_TITLE_LEN = 150;
 const linkSource = (s: SourceApi) => {
     return (
         <>
-            <Link.default key={s.id} href={`/source/${s.id}`}>
+            <Link key={s.id} href={`/source/${s.id}`}>
                 {s.title.length > MAX_TITLE_LEN ? `${s.title.substring(0, MAX_TITLE_LEN)}...` : s.title}
-            </Link.default>
+            </Link>
             <Edit id={s.id} type="source" />
         </>
     );

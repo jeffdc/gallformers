@@ -1,6 +1,6 @@
 import axios from 'axios';
-import * as O from 'fp-ts/lib/Option.js';
-import { constant, pipe } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
 import * as t from 'io-ts';
 import * as tt from 'io-ts-types';
 import { GetServerSideProps } from 'next';
@@ -8,12 +8,12 @@ import { ParsedUrlQuery } from 'querystring';
 import { useEffect, useState } from 'react';
 import { Button, Col, Form, FormGroup, Row } from 'react-bootstrap';
 import 'react-simple-tree-menu/dist/main.css';
-import EditableDataTable, { EditableTableColumn } from '../../components/EditableDataTable.js';
-import { RenameEvent } from '../../components/editname.js';
-import MoveFamily, { MoveEvent } from '../../components/movefamily.js';
-import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs.js';
-import useAdmin from '../../hooks/useadmin.js';
-import { extractQueryParam } from '../../libs/api/apipage.js';
+import EditableDataTable, { EditableTableColumn } from '../../components/EditableDataTable';
+import { RenameEvent } from '../../components/editname';
+import MoveFamily, { MoveEvent } from '../../components/movefamily';
+import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
+import useAdmin from '../../hooks/useadmin';
+import { extractQueryParam } from '../../libs/api/apipage';
 import {
     ALL_FAMILY_TYPES,
     EMPTY_GENUS,
@@ -23,12 +23,12 @@ import {
     GeneraMoveFields,
     Genus,
     TaxonomyTypeValues,
-} from '../../libs/api/apitypes.js';
-import { familyById } from '../../libs/db/taxonomy.js';
-import Admin from '../../libs/pages/admin.js';
-import { TABLE_CUSTOM_STYLES } from '../../libs/utils/DataTableConstants.js';
-import { genOptions } from '../../libs/utils/forms.js';
-import { mightFailWithArray } from '../../libs/utils/util.js';
+} from '../../libs/api/apitypes';
+import { familyById } from '../../libs/db/taxonomy';
+import Admin from '../../libs/pages/admin';
+import { TABLE_CUSTOM_STYLES } from '../../libs/utils/DataTableConstants';
+import { genOptions } from '../../libs/utils/forms';
+import { mightFailWithArray } from '../../libs/utils/util';
 
 type FormFields = AdminFormFields<FamilyAPI> & Pick<FamilyAPI, 'description' | 'genera'>;
 

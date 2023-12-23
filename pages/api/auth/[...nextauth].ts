@@ -7,9 +7,9 @@ if (!process.env.AUTH0_CLIENT_ID || !process.env.AUTH0_SECRET || !process.env.AU
     throw new Error(msg);
 }
 
-export default NextAuth.default({
+export default NextAuth({
     providers: [
-        Auth0Provider.default({
+        Auth0Provider({
             clientId: process.env.AUTH0_CLIENT_ID,
             clientSecret: process.env.AUTH0_SECRET,
             issuer: process.env.AUTH0_DOMAIN,

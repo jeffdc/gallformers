@@ -1,15 +1,15 @@
 import { GetStaticPaths, GetStaticProps } from 'next';
 import ErrorPage from 'next/error.js';
-import Head from 'next/head.js';
-import { useRouter } from 'next/router.js';
+import Head from 'next/head';
+import { useRouter } from 'next/router';
 import { useMemo } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
-import DataTable from '../../../components/DataTable.js';
-import Edit from '../../../components/edit.js';
-import { SectionApi, SimpleSpecies } from '../../../libs/api/apitypes.js';
-import { allSectionIds, sectionById } from '../../../libs/db/taxonomy.js';
-import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers.js';
-import { TABLE_CUSTOM_STYLES } from '../../../libs/utils/DataTableConstants.js';
+import DataTable from '../../../components/DataTable';
+import Edit from '../../../components/edit';
+import { SectionApi, SimpleSpecies } from '../../../libs/api/apitypes';
+import { allSectionIds, sectionById } from '../../../libs/db/taxonomy';
+import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
+import { TABLE_CUSTOM_STYLES } from '../../../libs/utils/DataTableConstants';
 
 type Props = {
     sec: SectionApi[];
@@ -46,7 +46,7 @@ const Section = ({ sec }: Props): JSX.Element => {
     }
 
     if (!sec) {
-        return <ErrorPage.default statusCode={404} />;
+        return <ErrorPage statusCode={404} />;
     }
 
     const section = sec[0];
@@ -55,10 +55,10 @@ const Section = ({ sec }: Props): JSX.Element => {
 
     return (
         <Container className="pt-2" fluid>
-            <Head.default>
+            <Head>
                 <title>{fullName}</title>
                 <meta name="description" content={`Section ${fullName}`} />
-            </Head.default>
+            </Head>
             <Row>
                 <Col>
                     <h2>{fullName}</h2>

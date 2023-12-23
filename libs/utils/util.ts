@@ -1,10 +1,10 @@
 // Welcome to the inevitable utils file!!!
 
-import { constant, constFalse, constTrue, pipe } from 'fp-ts/lib/function.js';
-import * as O from 'fp-ts/lib/Option.js';
+import { constant, constFalse, constTrue, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option';
 import * as T from 'fp-ts/lib/Task.js';
-import * as TE from 'fp-ts/lib/TaskEither.js';
-import { logger } from './logger.js';
+import * as TE from 'fp-ts/lib/TaskEither';
+import { logger } from './logger.ts';
 
 /**
  * Checks an object, o, for the presence of the prop.

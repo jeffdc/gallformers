@@ -3,11 +3,11 @@
  * must stay out of here.
  */
 import * as Eq from 'fp-ts/lib/Eq.js';
-import * as O from 'fp-ts/lib/Option.js';
-import { Option } from 'fp-ts/lib/Option.js';
+import * as O from 'fp-ts/lib/Option';
+import { Option } from 'fp-ts/lib/Option';
 import * as t from 'io-ts';
 import * as tt from 'io-ts-types';
-import { fromEnum } from '../utils/io-ts.js';
+import { fromEnum } from '../utils/io-ts.ts';
 
 export type Deletable = {
     delete?: boolean;

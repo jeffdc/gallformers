@@ -1,5 +1,5 @@
-import * as O from 'fp-ts/lib/Option.js';
-import { constant, pipe } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
 import {
     DetachableDetachable,
     GallApi,
@@ -9,8 +9,8 @@ import {
     ImageNoSourceApi,
     SourceApi,
     WithImages,
-} from '../api/apitypes.js';
-import { truncateAtWord } from '../utils/util.js';
+} from '../api/apitypes';
+import { truncateAtWord } from '../utils/util';
 
 /**
  * Renders the given string input with line breaks for any embedded new lines.

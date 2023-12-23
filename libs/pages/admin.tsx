@@ -1,11 +1,11 @@
 import { useSession } from 'next-auth/react';
-import Head from 'next/head.js';
+import Head from 'next/head';
 import { Alert, Col, Nav, Navbar, Row } from 'react-bootstrap';
 import { Toaster } from 'react-hot-toast';
-import Auth, { superAdmins } from '../../components/auth.js';
-import EditName, { RenameEvent } from '../../components/editname.js';
-import { DeleteResult, TaxonCodeValues } from '../api/apitypes.js';
-import { WithID } from '../utils/types.js';
+import Auth, { superAdmins } from '../../components/auth';
+import EditName, { RenameEvent } from '../../components/editname';
+import { DeleteResult, TaxonCodeValues } from '../api/apitypes';
+import { WithID } from '../utils/types';
 
 export type AdminTypes =
     | 'Taxonomy'
@@ -111,9 +111,9 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
     return (
         <Auth superAdmin={!!props.superAdmin}>
             <>
-                <Head.default>
+                <Head>
                     <title>{`Add/ Edit ${props.type}s`}</title>
-                </Head.default>
+                </Head>
 
                 <Toaster />
 
