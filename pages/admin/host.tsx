@@ -1,35 +1,39 @@
-import * as O from 'fp-ts/lib/Option';
-import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option.js';
+import { constant, pipe } from 'fp-ts/lib/function.js';
 import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
-import Link from 'next/link';
+import Link from 'next/link.js';
 import { ParsedUrlQuery } from 'querystring';
 import { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Controller } from 'react-hook-form';
 import { ComposableMap, Geographies, Geography, ProjectionConfig, ZoomableGroup } from 'react-simple-maps';
 import { Tooltip } from 'react-tooltip';
-import Typeahead from '../../components/Typeahead';
-import AliasTable from '../../components/aliastable';
-import useSpecies, { SpeciesNamingHelp, SpeciesProps, speciesFormFieldsSchema } from '../../hooks/useSpecies';
-import useAdmin from '../../hooks/useadmin';
-import { extractQueryParam } from '../../libs/api/apipage';
+import Typeahead from '../../components/Typeahead.js';
+import AliasTable from '../../components/aliastable.js';
+import useSpecies, { SpeciesNamingHelp, SpeciesProps, speciesFormFieldsSchema } from '../../hooks/useSpecies.js';
+import useAdmin from '../../hooks/useadmin.js';
+import { extractQueryParam } from '../../libs/api/apipage.js';
 import {
     AbundanceApi,
     AliasApi,
     HOST_FAMILY_TYPES,
+    HostApi,
+    HostApiSchema,
     PlaceNoTreeApi,
     PlaceNoTreeApiSchema,
     SpeciesUpsertFields,
-} from '../../libs/api/apitypes';
-import { HostApi, HostApiSchema, TaxonCodeValues } from '../../libs/api/apitypes';
-import { TaxonomyEntry, TaxonomyEntryNoParentSchema, TaxonomyTypeValues } from '../../libs/api/apitypes';
-import { hostById } from '../../libs/db/host';
-import { getPlaces } from '../../libs/db/place';
-import { getAbundances } from '../../libs/db/species';
-import { allFamilies, allGenera, allSections } from '../../libs/db/taxonomy';
-import Admin from '../../libs/pages/admin';
-import { mightFailWithArray } from '../../libs/utils/util';
+    TaxonCodeValues,
+    TaxonomyEntry,
+    TaxonomyEntryNoParentSchema,
+    TaxonomyTypeValues,
+} from '../../libs/api/apitypes.js';
+import { hostById } from '../../libs/db/host.js';
+import { getPlaces } from '../../libs/db/place.js';
+import { getAbundances } from '../../libs/db/species.js';
+import { allFamilies, allGenera, allSections } from '../../libs/db/taxonomy.js';
+import Admin from '../../libs/pages/admin.js';
+import { mightFailWithArray } from '../../libs/utils/util.js';
 
 const projConfig: ProjectionConfig = {
     center: [-4, 48],
@@ -193,10 +197,11 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                 <h4>Add/Edit Hosts</h4>
                 <p>
                     This is for all of the details about a Host. To add a description (which must be referenced to a source) go
-                    add <Link href="/admin/source">Sources</Link>, if they do not already exist, then go{' '}
-                    <Link href="/admin/speciessource">map species to sources with description</Link>. If you want to assign a{' '}
-                    <Link href="/admin/taxonomy">Family</Link> or <Link href="/admin/section">Section</Link> then you will need to
-                    have created them first if they do not exist.
+                    add <Link.default href="/admin/source">Sources</Link.default>, if they do not already exist, then go{' '}
+                    <Link.default href="/admin/speciessource">map species to sources with description</Link.default>. If you want
+                    to assign a <Link.default href="/admin/taxonomy">Family</Link.default> or{' '}
+                    <Link.default href="/admin/section">Section</Link.default> then you will need to have created them first if
+                    they do not exist.
                 </p>
                 <Row className="my-1">
                     <Col>

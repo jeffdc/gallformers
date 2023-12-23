@@ -11,10 +11,10 @@ import { createRequest } from '@aws-sdk/util-create-request';
 import { formatUrl } from '@aws-sdk/util-format-url';
 import { image } from '@prisma/client';
 import Jimp from 'jimp';
-import { ImagePaths } from '../api/apitypes';
-import db from '../db/db';
-import { logger } from '../utils/logger';
-import { tryBackoff } from '../utils/network';
+import { ImagePaths } from '../api/apitypes.js';
+import db from '../db/db.js';
+import { logger } from '../utils/logger.js';
+import { tryBackoff } from '../utils/network.js';
 
 const checkCred = (cred: string | undefined): string => {
     if (process.env.NODE_ENV === 'production') {

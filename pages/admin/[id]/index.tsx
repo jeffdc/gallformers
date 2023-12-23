@@ -1,9 +1,9 @@
 import { GetServerSideProps } from 'next';
-import Head from 'next/head';
+import Head from 'next/head.js';
 import React from 'react';
-import Auth from '../../../components/auth';
-import { placeById } from '../../../libs/db/place';
-import { getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
+import Auth from '../../../components/auth.js';
+import { placeById } from '../../../libs/db/place.js';
+import { getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers.js';
 
 type Props = {
     data: unknown[];

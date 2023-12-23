@@ -1,10 +1,9 @@
 import { GetServerSideProps } from 'next';
-import Link from 'next/link';
-import React from 'react';
+import Link from 'next/link.js';
 import { Card, Col, Container, Row } from 'react-bootstrap';
-import { RandomGall } from '../libs/api/apitypes';
-import { randomGall } from '../libs/db/gall';
-import { getStaticPropsWith } from '../libs/pages/nextPageHelpers';
+import { RandomGall } from '../libs/api/apitypes.js';
+import { randomGall } from '../libs/db/gall.js';
+import { getStaticPropsWith } from '../libs/pages/nextPageHelpers.js';
 
 type Props = {
     randomGall: RandomGall;
@@ -43,13 +42,13 @@ function Home({ randomGall }: Props): JSX.Element {
                         <Card.Body>
                             <ul>
                                 <li>
-                                    <Link href="/id">Identify Galls</Link>
+                                    <Link.default href="/id">Identify Galls</Link.default>
                                 </li>
                                 <li>
-                                    <Link href="/refindex">Learn More About Galls</Link>
+                                    <Link.default href="/refindex">Learn More About Galls</Link.default>
                                 </li>
                                 <li>
-                                    <Link href="/explore">Explore the Data</Link>
+                                    <Link.default href="/explore">Explore the Data</Link.default>
                                 </li>
                             </ul>
                         </Card.Body>
@@ -59,15 +58,15 @@ function Home({ randomGall }: Props): JSX.Element {
             <Row className="pb-4 pt-4">
                 <Col sm="12" md="6">
                     <Card>
-                        <Link href={`/gall/${randomGall.id}`}>
+                        <Link.default href={`/gall/${randomGall.id}`}>
                             <Card.Img variant="top" src={randomGall.imagePath} width="300" />
-                        </Link>{' '}
+                        </Link.default>{' '}
                         <Card.Body>
                             Here is a random gall from our database. This one is{' '}
                             {randomGall.undescribed ? 'an undescribed species' : ''} called{' '}
-                            <Link href={`/gall/${randomGall.id}`}>
+                            <Link.default href={`/gall/${randomGall.id}`}>
                                 <i>{randomGall.name}</i>
-                            </Link>{' '}
+                            </Link.default>{' '}
                             and the photo was taken by{' '}
                             <a href={randomGall.sourceLink} target="_blank" rel="noreferrer">
                                 {randomGall.creator}
@@ -95,19 +94,19 @@ function Home({ randomGall }: Props): JSX.Element {
                                     ways you can do so:
                                     <ul>
                                         <li>
-                                            <Link href="https://www.patreon.com/gallformers">
+                                            <Link.default href="https://www.patreon.com/gallformers">
                                                 Help cover operational costs via donations to our Patreon
-                                            </Link>
+                                            </Link.default>
                                         </li>
                                         <li>
-                                            <Link href="/about#administrators">
+                                            <Link.default href="/about#administrators">
                                                 Help add and maintain our data as an Administrator
-                                            </Link>
+                                            </Link.default>
                                         </li>
                                         <li>
-                                            <Link href="https://github.com/jeffdc/gallformers">
+                                            <Link.default href="https://github.com/jeffdc/gallformers">
                                                 Help fix bugs and add new features
-                                            </Link>
+                                            </Link.default>
                                         </li>
                                     </ul>
                                 </Card.Body>

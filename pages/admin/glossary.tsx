@@ -1,18 +1,17 @@
-import { constant, pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option.js';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { Button, Col, Row } from 'react-bootstrap';
-import { RenameEvent } from '../../components/editname';
-import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
-import { extractQueryParam } from '../../libs/api/apipage';
-import { GlossaryEntryUpsertFields } from '../../libs/api/apitypes';
-import { allGlossaryEntries } from '../../libs/db/glossary';
-import Admin from '../../libs/pages/admin';
-import { mightFailWithArray } from '../../libs/utils/util';
+import { RenameEvent } from '../../components/editname.js';
+import useAdmin from '../../hooks/useadmin.js';
+import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs.js';
+import { extractQueryParam } from '../../libs/api/apipage.js';
+import { Entry, EntrySchema, GlossaryEntryUpsertFields } from '../../libs/api/apitypes.js';
+import { allGlossaryEntries } from '../../libs/db/glossary.js';
+import Admin from '../../libs/pages/admin.js';
+import { mightFailWithArray } from '../../libs/utils/util.js';
 import * as t from 'io-ts';
-import { Entry, EntrySchema } from '../../libs/api/glossary';
 
 const schema = t.intersection([adminFormFieldsSchema(EntrySchema), EntrySchema]);
 type FormFields = AdminFormFields<Entry> & Pick<Entry, 'definition' | 'urls'>;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Col, Row } from 'react-bootstrap';
-import { ImageApi } from '../libs/api/apitypes';
+import { ImageApi } from '../libs/api/apitypes.js';
 
 type Props = {
     colCount: 1 | 2 | 3 | 4 | 6 | 12;

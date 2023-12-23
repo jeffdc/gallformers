@@ -1,14 +1,14 @@
-import { pipe } from 'fp-ts/lib/function';
-import * as T from 'fp-ts/lib/Task';
-import * as TE from 'fp-ts/lib/TaskEither';
-import { TaskEither } from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function.js';
+import * as T from 'fp-ts/lib/Task.js';
+import * as TE from 'fp-ts/lib/TaskEither.js';
+import { TaskEither } from 'fp-ts/lib/TaskEither.js';
 import { GetStaticPathsResult, GetStaticPropsContext } from 'next';
 import { ParsedUrlQuery } from 'querystring';
-import { logger } from '../utils/logger';
-import { errorThrow } from '../utils/util';
+import { logger } from '../utils/logger.js';
+import { errorThrow } from '../utils/util.js';
 
 /**
- * Helper to hadnle the boilerplate for fetching static props for a next.js page.
+ * Helper to handle the boilerplate for fetching static props for a next.js page.
  * @param f how to fetch the values
  * @param dataType a string describing the data type. Used in error messages.
  */

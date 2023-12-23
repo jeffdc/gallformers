@@ -1,31 +1,36 @@
 import axios from 'axios';
-import * as O from 'fp-ts/lib/Option';
-import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option.js';
+import { constant, pipe } from 'fp-ts/lib/function.js';
 import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
-import Link from 'next/link';
+import Link from 'next/link.js';
 import { ParsedUrlQuery } from 'querystring';
 import { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Controller } from 'react-hook-form';
-import Typeahead, { AsyncTypeahead } from '../../components/Typeahead';
-import UndescribedFlow, { UndescribedData } from '../../components/UndescribedFlow';
-import AliasTable from '../../components/aliastable';
-import useSpecies, { SpeciesNamingHelp, SpeciesProps, speciesFormFieldsSchema } from '../../hooks/useSpecies';
-import useAdmin from '../../hooks/useadmin';
-import { extractQueryParam } from '../../libs/api/apipage';
-import { AbundanceApi, AliasApi, FilterField, GALL_FAMILY_TYPES, GallUpsertFields } from '../../libs/api/apitypes';
+import Typeahead, { AsyncTypeahead } from '../../components/Typeahead.js';
+import UndescribedFlow, { UndescribedData } from '../../components/UndescribedFlow.js';
+import AliasTable from '../../components/aliastable.js';
+import useSpecies, { SpeciesNamingHelp, SpeciesProps, speciesFormFieldsSchema } from '../../hooks/useSpecies.js';
+import useAdmin from '../../hooks/useadmin.js';
+import { extractQueryParam } from '../../libs/api/apipage.js';
 import {
+    AbundanceApi,
+    AliasApi,
     DetachableNone,
     Detachables,
+    FilterField,
+    GALL_FAMILY_TYPES,
     GallApi,
     GallApiSchema,
     GallPropertiesSchema,
+    GallUpsertFields,
     HostSimple,
     TaxonCodeValues,
+    TaxonomyEntry,
+    TaxonomyTypeValues,
     detachableFromString,
-} from '../../libs/api/apitypes';
-import { TaxonomyEntry, TaxonomyTypeValues } from '../../libs/api/apitypes';
+} from '../../libs/api/apitypes.js';
 import {
     getAlignments,
     getCells,
@@ -36,12 +41,12 @@ import {
     getShapes,
     getTextures,
     getWalls,
-} from '../../libs/db/filterfield';
-import { gallById } from '../../libs/db/gall';
-import { getAbundances } from '../../libs/db/species';
-import { allFamilies, allGenera } from '../../libs/db/taxonomy';
-import Admin from '../../libs/pages/admin';
-import { hasProp, mightFailWithArray } from '../../libs/utils/util';
+} from '../../libs/db/filterfield.js';
+import { gallById } from '../../libs/db/gall.js';
+import { getAbundances } from '../../libs/db/species.js';
+import { allFamilies, allGenera } from '../../libs/db/taxonomy.js';
+import Admin from '../../libs/pages/admin.js';
+import { hasProp, mightFailWithArray } from '../../libs/utils/util.js';
 
 type Props = SpeciesProps & {
     gall: GallApi[];
@@ -325,9 +330,10 @@ const Gall = ({
                 <h4>Add/Edit Gallformers</h4>
                 <p>
                     This is for all of the details about a Gall. To add a description (which must be referenced to a source) go
-                    add <Link href="/admin/source">Sources</Link>, if they do not already exist, then go{' '}
-                    <Link href="/admin/speciessource">map species to sources with description</Link>. To associate a gall with all
-                    plants in a genus, add one species here first, then go to <Link href="./gallhost">Gall-Host Mappings</Link>.
+                    add <Link.default href="/admin/source">Sources</Link.default>, if they do not already exist, then go{' '}
+                    <Link.default href="/admin/speciessource">map species to sources with description</Link.default>. To associate
+                    a gall with all plants in a genus, add one species here first, then go to{' '}
+                    <Link.default href="./gallhost">Gall-Host Mappings</Link.default>.
                 </p>
                 <Row className="my-1">
                     <Col>

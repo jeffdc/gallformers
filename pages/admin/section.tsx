@@ -1,22 +1,29 @@
 import axios from 'axios';
-import { constant, pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
+import * as O from 'fp-ts/lib/Option.js';
+import { constant, pipe } from 'fp-ts/lib/function.js';
+import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Path } from 'react-hook-form';
-import { RenameEvent } from '../../components/editname';
-import { AsyncTypeahead } from '../../components/Typeahead';
-import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
-import { extractQueryParam } from '../../libs/api/apipage';
-import { SimpleSpecies, TaxonCodeValues } from '../../libs/api/apitypes';
-import { TaxSection, TaxSectionSchema, TaxonomyEntry, TaxonomyTypeValues, TaxonomyUpsertFields } from '../../libs/api/apitypes';
-import { allGenera, allSections } from '../../libs/db/taxonomy';
-import Admin from '../../libs/pages/admin';
-import { extractGenus, hasProp, mightFailWithArray } from '../../libs/utils/util';
-import * as t from 'io-ts';
+import { AsyncTypeahead } from '../../components/Typeahead.js';
+import { RenameEvent } from '../../components/editname.js';
+import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs.js';
+import useAdmin from '../../hooks/useadmin.js';
+import { extractQueryParam } from '../../libs/api/apipage.js';
+import {
+    SimpleSpecies,
+    TaxSection,
+    TaxSectionSchema,
+    TaxonCodeValues,
+    TaxonomyEntry,
+    TaxonomyTypeValues,
+    TaxonomyUpsertFields,
+} from '../../libs/api/apitypes.js';
+import { allGenera, allSections } from '../../libs/db/taxonomy.js';
+import Admin from '../../libs/pages/admin.js';
+import { extractGenus, hasProp, mightFailWithArray } from '../../libs/utils/util.js';
 
 const schema = t.intersection([adminFormFieldsSchema(TaxSectionSchema), TaxSectionSchema]);
 

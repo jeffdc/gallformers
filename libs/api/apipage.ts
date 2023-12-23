@@ -1,13 +1,13 @@
-import * as E from 'fp-ts/lib/Either';
-import { pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
-import * as TA from 'fp-ts/lib/Task';
-import * as TE from 'fp-ts/lib/TaskEither';
+import * as E from 'fp-ts/lib/Either.js';
+import * as O from 'fp-ts/lib/Option.js';
+import * as TA from 'fp-ts/lib/Task.js';
+import * as TE from 'fp-ts/lib/TaskEither.js';
+import { pipe } from 'fp-ts/lib/function.js';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from 'next-auth/react';
 import { ParsedUrlQuery } from 'querystring';
-import { logger } from '../utils/logger';
-import { DeleteResult } from './apitypes';
+import { logger } from '../utils/logger.js';
+import { DeleteResult } from './apitypes.js';
 
 /**
  *

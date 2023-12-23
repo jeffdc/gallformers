@@ -2,8 +2,9 @@
     "name": "gallformers",
     "version": "0.1.0",
     "private": true,
+    "type": "module",
     "scripts": {
-        "dev": "NODE_OPTIONS='--inspect' next dev",
+        "dev": "NODE_OPTIONS='' next dev",
         "build": "next build",
         "start": "next start",
         "generate": "npx prisma generate",
@@ -78,6 +79,10 @@
         "styled-components": "^6.1.1",
         "yarn": "^1.22.21"
     },
+    "resolutions": {
+        "@types/react": "18.2.45",
+        "@types/react-dom": "18.2.18"
+    },
     "devDependencies": {
         "@babel/preset-typescript": "^7.23.3",
         "@next/eslint-plugin-next": "^14.0.3",
@@ -87,8 +92,8 @@
         "@types/jest": "^29.5.8",
         "@types/natural": "^5.1.5",
         "@types/node": "^20.9.2",
-        "@types/react": "^18.2.37",
-        "@types/react-dom": "^18.2.15",
+        "@types/react": "^18.2.45",
+        "@types/react-dom": "^18.2.18",
         "@types/react-is": "^18.2.4",
         "@types/react-simple-maps": "^3.0.4",
         "@types/unist": "^3.0.2",

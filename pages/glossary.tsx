@@ -1,14 +1,14 @@
 import { GetStaticProps } from 'next';
-import Head from 'next/head';
-import React, { useMemo } from 'react';
+import Head from 'next/head.js';
+import { useMemo } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
-import DataTable from '../components/DataTable';
-import Edit from '../components/edit';
-import { allGlossaryEntries } from '../libs/db/glossary';
-import { EntryLinked, linkDefinitionToGlossary } from '../libs/pages/glossary';
-import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
-import { mightFailWithArray } from '../libs/utils/util';
-import { Entry } from '../libs/api/glossary';
+import DataTable from '../components/DataTable.js';
+import Edit from '../components/edit.js';
+import { Entry } from '../libs/api/apitypes.js';
+import { allGlossaryEntries } from '../libs/db/glossary.js';
+import { EntryLinked, linkDefinitionToGlossary } from '../libs/pages/glossary.js';
+import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants.js';
+import { mightFailWithArray } from '../libs/utils/util.js';
 
 type Props = {
     es: EntryLinked[];
@@ -90,10 +90,10 @@ const Glossary = ({ es }: Props): JSX.Element => {
     }
     return (
         <Container className="pt-2" fluid>
-            <Head>
+            <Head.default>
                 <title>Glossary</title>
                 <meta name="description" content="A Glossary of Gall Related Terminology" />
-            </Head>
+            </Head.default>
             <h1 className="ms-3 pt-3">A Glossary of Gall Related Terminology</h1>
             <Row className="p-3">
                 <Col>

@@ -1,31 +1,38 @@
-import { constant, pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
+import * as O from 'fp-ts/lib/Option.js';
+import { constant, pipe } from 'fp-ts/lib/function.js';
+import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
+import Link from 'next/link.js';
+import { useRouter } from 'next/router.js';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button, Col, Row, Tab, Tabs } from 'react-bootstrap';
 import { Controller } from 'react-hook-form';
 import ReactMarkdown from 'react-markdown';
+import externalLinks from 'rehype-external-links';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
-import externalLinks from 'rehype-external-links';
-import Auth from '../../components/auth';
-import { RenameEvent } from '../../components/editname';
-import Picker from '../../components/picker';
-import Typeahead from '../../components/Typeahead';
-import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
-import { extractQueryParam } from '../../libs/api/apipage';
-import { SourceApi, SpeciesSourceApi, SpeciesSourceApiSchema, SpeciesSourceInsertFields } from '../../libs/api/apitypes';
-import { allSources } from '../../libs/db/source';
-import { allSpeciesSimple } from '../../libs/db/species';
-import Admin from '../../libs/pages/admin';
-import { defaultSource, sourceToDisplay } from '../../libs/pages/renderhelpers';
-import { mightFailWithArray } from '../../libs/utils/util';
-import { SimpleSpecies, SimpleSpeciesSchema, TaxonCodeValues } from '../../libs/api/apitypes';
-import * as t from 'io-ts';
+import Typeahead from '../../components/Typeahead.js';
+import Auth from '../../components/auth.js';
+import { RenameEvent } from '../../components/editname.js';
+import Picker from '../../components/picker.js';
+import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs.js';
+import useAdmin from '../../hooks/useadmin.js';
+import { extractQueryParam } from '../../libs/api/apipage.js';
+import {
+    SimpleSpecies,
+    SimpleSpeciesSchema,
+    SourceApi,
+    SpeciesSourceApi,
+    SpeciesSourceApiSchema,
+    SpeciesSourceInsertFields,
+    TaxonCodeValues,
+} from '../../libs/api/apitypes.js';
+import { allSources } from '../../libs/db/source.js';
+import { allSpeciesSimple } from '../../libs/db/species.js';
+import Admin from '../../libs/pages/admin.js';
+import { defaultSource, sourceToDisplay } from '../../libs/pages/renderhelpers.js';
+import { mightFailWithArray } from '../../libs/utils/util.js';
 
 type Props = {
     speciesid: string;
@@ -397,16 +404,16 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                             <br />
                             <div>
                                 {selected?.taxoncode === TaxonCodeValues.GALL ? (
-                                    <Link href={`./gall?id=${selected?.id}`}>Edit the Species</Link>
+                                    <Link.default href={`./gall?id=${selected?.id}`}>Edit the Species</Link.default>
                                 ) : (
-                                    <Link href={`./host?id=${selected?.id}`}>Edit the Species</Link>
+                                    <Link.default href={`./host?id=${selected?.id}`}>Edit the Species</Link.default>
                                 )}
                             </div>
                             <div>
-                                <Link
+                                <Link.default
                                     href={`./images?speciesid=${selected?.id}`}
                                     legacyBehavior
-                                >{`Add/Edit Images for this Species`}</Link>
+                                >{`Add/Edit Images for this Species`}</Link.default>
                             </div>
                         </Col>
                     </Row>

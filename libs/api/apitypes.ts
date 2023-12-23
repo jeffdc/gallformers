@@ -2,12 +2,12 @@
  * Types for calling the APIs. These are to be used by browser code when it calls the APIs so all database stuff
  * must stay out of here.
  */
-import * as Eq from 'fp-ts/lib/Eq';
-import * as O from 'fp-ts/lib/Option';
-import { Option } from 'fp-ts/lib/Option';
+import * as Eq from 'fp-ts/lib/Eq.js';
+import * as O from 'fp-ts/lib/Option.js';
+import { Option } from 'fp-ts/lib/Option.js';
 import * as t from 'io-ts';
 import * as tt from 'io-ts-types';
-import { fromEnum } from '../utils/io-ts';
+import { fromEnum } from '../utils/io-ts.js';
 
 export type Deletable = {
     delete?: boolean;
@@ -545,7 +545,7 @@ export enum FilterFieldTypeValue {
 export const FilterFieldTypeSchema = fromEnum<FilterFieldTypeValue>('FilterFieldTypeValue', FilterFieldTypeValue);
 // export type FilterFieldType = t.TypeOf<typeof FilterFieldTypeSchema>;
 export const asFilterType = (possibleFilterType?: string | null): FilterFieldTypeValue =>
-    FilterFieldTypeValue[possibleFilterType as keyof typeof FilterFieldTypeValue];
+    FilterFieldTypeValue[possibleFilterType?.toUpperCase() as keyof typeof FilterFieldTypeValue];
 
 export const FilterFieldWithTypeSchema = t.intersection([FilterFieldSchema, t.type({ fieldType: FilterFieldTypeSchema })]);
 

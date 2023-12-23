@@ -1,14 +1,12 @@
 import { source } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function';
-import * as TE from 'fp-ts/lib/TaskEither';
-import { PlaceNoTreeApi } from '../api/apitypes';
-import { TaxonomyEntryNoParent, TaxonomyType } from '../api/apitypes';
-import { sourceToDisplay } from '../pages/renderhelpers';
-import { ExtractTFromPromise } from '../utils/types';
-import { handleError } from '../utils/util';
-import db from './db';
-import { allGlossaryEntries } from './glossary';
-import { Entry } from '../api/glossary';
+import * as TE from 'fp-ts/lib/TaskEither.js';
+import { pipe } from 'fp-ts/lib/function.js';
+import { Entry, PlaceNoTreeApi, TaxonomyEntryNoParent, TaxonomyType } from '../api/apitypes.js';
+import { sourceToDisplay } from '../pages/renderhelpers.js';
+import { ExtractTFromPromise } from '../utils/types.js';
+import { handleError } from '../utils/util.js';
+import db from './db.js';
+import { allGlossaryEntries } from './glossary.js';
 
 export type TinySpecies = {
     id: number;

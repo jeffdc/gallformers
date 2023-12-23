@@ -1,17 +1,16 @@
-import * as O from 'fp-ts/lib/Option';
-import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option.js';
+import { constant, pipe } from 'fp-ts/lib/function.js';
 import { useSession } from 'next-auth/react';
-import Image from 'next/image';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
+import Image from 'next/image.js';
+import Link from 'next/link.js';
+import { useRouter } from 'next/router.js';
 import Carousel from 'nuka-carousel';
 import { useState } from 'react';
 import { Button, ButtonGroup, ButtonToolbar, Col, Modal, OverlayTrigger, Popover, Row } from 'react-bootstrap';
-import useIsMounted from '../hooks/useIsMounted';
-import useWindowDimensions from '../hooks/usewindowdimension';
-import { ImageApi, ImageLicenseValues, ImageNoSourceApi, SpeciesApi } from '../libs/api/apitypes';
-import { TaxonCodeValues } from '../libs/api/apitypes';
-import { hasProp } from '../libs/utils/util';
+import useIsMounted from '../hooks/useIsMounted.js';
+import useWindowDimensions from '../hooks/usewindowdimension.js';
+import { ImageApi, ImageLicenseValues, ImageNoSourceApi, SpeciesApi, TaxonCodeValues } from '../libs/api/apitypes.js';
+import { hasProp } from '../libs/utils/util.js';
 import NoImage from '../public/images/noimage.jpg';
 import NoImageHost from '../public/images/noimagehost.jpg';
 
@@ -52,7 +51,7 @@ const Images = ({ sp }: Props): JSX.Element => {
 
     return species.images.length < 1 ? (
         <div className="p-2">
-            <Image
+            <Image.default
                 src={species.taxoncode === TaxonCodeValues.GALL ? NoImage : NoImageHost}
                 alt={`missing image of ${species.name}`}
                 className="img-fluid d-block"
@@ -83,7 +82,7 @@ const Images = ({ sp }: Props): JSX.Element => {
             <Modal show={showModal} onHide={() => setShowModal(false)} centered dialogClassName="modal-90w">
                 <Modal.Header closeButton />
                 <Modal.Body>
-                    <Carousel
+                    <Carousel.default
                         renderCenterLeftControls={({ previousSlide }) => (
                             <Button variant="secondary" size="sm" onClick={previousSlide} className="m-1">
                                 {'<'}
@@ -104,7 +103,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                     >
                         {species.images.map((image) => (
                             <div key={image.id}>
-                                <Image
+                                <Image.default
                                     //TODO when all images have XL versions show those here rather than the original
                                     src={image.original}
                                     alt={`image of ${species.name}`}
@@ -133,7 +132,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                                 )}
                             </div>
                         ))}
-                    </Carousel>
+                    </Carousel.default>
                 </Modal.Body>
             </Modal>
 
@@ -167,9 +166,9 @@ const Images = ({ sp }: Props): JSX.Element => {
                                                 </a>,
                                             ),
                                             (s) => (
-                                                <Link href={`/source/${s.id}`} target="_blank" rel="noreferrer">
+                                                <Link.default href={`/source/${s.id}`} target="_blank" rel="noreferrer">
                                                     {s.title}
-                                                </Link>
+                                                </Link.default>
                                             ),
                                         ),
                                     )}
@@ -212,7 +211,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                 </Modal.Body>
             </Modal>
             <div className="border rounded pb-1">
-                <Carousel
+                <Carousel.default
                     renderCenterLeftControls={({ previousSlide }) => (
                         <Button variant="secondary" size="sm" onClick={previousSlide} className="ms-1">
                             {'<'}
@@ -251,7 +250,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                             />
                         </div>
                     ))}
-                </Carousel>
+                </Carousel.default>
                 <ButtonToolbar className="pt-1 d-flex justify-content-center">
                     <ButtonGroup size="sm">
                         <OverlayTrigger

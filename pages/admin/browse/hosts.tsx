@@ -1,16 +1,16 @@
-import { constant, pipe } from 'fp-ts/lib/function';
+import { constant, pipe } from 'fp-ts/lib/function.js';
 import * as O from 'fp-ts/Option';
 import { GetStaticProps } from 'next';
-import Head from 'next/head';
-import Link from 'next/link';
+import Head from 'next/head.js';
+import Link from 'next/link.js';
 import React, { useMemo } from 'react';
 import { Card } from 'react-bootstrap';
-import DataTable from '../../../components/DataTable';
-import Edit from '../../../components/edit';
-import { HostApi } from '../../../libs/api/apitypes';
-import { allHosts } from '../../../libs/db/host';
-import { getStaticPropsWith } from '../../../libs/pages/nextPageHelpers';
-import { TABLE_CUSTOM_STYLES } from '../../../libs/utils/DataTableConstants';
+import DataTable from '../../../components/DataTable.js';
+import Edit from '../../../components/edit.js';
+import { HostApi } from '../../../libs/api/apitypes.js';
+import { allHosts } from '../../../libs/db/host.js';
+import { getStaticPropsWith } from '../../../libs/pages/nextPageHelpers.js';
+import { TABLE_CUSTOM_STYLES } from '../../../libs/utils/DataTableConstants.js';
 
 type Props = {
     hosts: HostApi[];
@@ -19,9 +19,9 @@ type Props = {
 const linkHost = (s: HostApi) => {
     return (
         <>
-            <Link key={s.id} href={`/host/${s.id}`}>
+            <Link.default key={s.id} href={`/host/${s.id}`}>
                 {s.name}
-            </Link>
+            </Link.default>
             <Edit id={s.id} type="host" />
         </>
     );
@@ -71,9 +71,9 @@ const BrowseHosts = ({ hosts }: Props): JSX.Element => {
 
     return (
         <>
-            <Head>
+            <Head.default>
                 <title>Browse Hosts</title>
-            </Head>
+            </Head.default>
 
             <Card>
                 <Card.Body>

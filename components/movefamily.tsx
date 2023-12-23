@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button, Modal } from 'react-bootstrap';
 import { Typeahead } from 'react-bootstrap-typeahead';
 import toast, { Toaster } from 'react-hot-toast';
-import { FamilyAPI, Genus } from '../libs/api/apitypes';
+import { FamilyAPI, Genus } from '../libs/api/apitypes.js';
 
 type TaxFamily = Omit<FamilyAPI, 'parent'>;
 export type MoveEvent = {
@@ -59,7 +59,7 @@ const MoveFamily = ({ genera, families, showModal, setShowModal, moveCallback }:
                         disabled={!value}
                         onClick={() => {
                             if (!value) {
-                                toast.error(`You must select a new family, or cancel if you do not want to make changes.`);
+                                toast.toast.error(`You must select a new family, or cancel if you do not want to make changes.`);
                             } else {
                                 moveCallback({
                                     new: value,

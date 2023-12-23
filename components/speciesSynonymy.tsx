@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Button } from 'react-bootstrap';
-import DataTable from './DataTable';
-import { AliasApi, COMMON_NAME, SCIENTIFIC_NAME } from '../libs/api/apitypes';
-import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
+import DataTable from './DataTable.js';
+import { AliasApi, COMMON_NAME, SCIENTIFIC_NAME } from '../libs/api/apitypes.js';
+import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants.js';
 
 export type SpeciesSynonymyProps = {
     aliases: AliasApi[];

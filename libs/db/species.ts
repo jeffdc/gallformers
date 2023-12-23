@@ -1,13 +1,11 @@
 import { abundance, Prisma, PrismaPromise, species } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
-import * as TE from 'fp-ts/lib/TaskEither';
-import { AbundanceApi, SpeciesUpsertFields } from '../api/apitypes';
-import { SimpleSpecies } from '../api/apitypes';
-import { TaxonomyTypeValues } from '../api/apitypes';
-import { handleError } from '../utils/util';
-import db from './db';
-import { connectIfNotNull } from './utils';
+import { pipe } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option.js';
+import * as TE from 'fp-ts/lib/TaskEither.js';
+import { AbundanceApi, SimpleSpecies, SpeciesUpsertFields, TaxonomyTypeValues } from '../api/apitypes.js';
+import { handleError } from '../utils/util.js';
+import db from './db.js';
+import { connectIfNotNull } from './utils.js';
 
 export const updateAbundance = (id: number, abundance: string | undefined | null): PrismaPromise<number> => {
     if (abundance == undefined || abundance == null) {

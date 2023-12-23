@@ -1,18 +1,17 @@
-import { constant, pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
+import * as O from 'fp-ts/lib/Option.js';
+import { constant, pipe } from 'fp-ts/lib/function.js';
 import { GetStaticPaths, GetStaticProps } from 'next';
-import ErrorPage from 'next/error';
-import Head from 'next/head';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
+import ErrorPage from 'next/error.js';
+import Head from 'next/head.js';
+import Link from 'next/link.js';
+import { useRouter } from 'next/router.js';
 import { Col, Container, Row } from 'react-bootstrap';
 import 'react-simple-tree-menu/dist/main.css';
-import SpeciesTable from '../../../components/speciesTable';
-import { SimpleSpecies } from '../../../libs/api/apitypes';
-import { EMPTY_TAXONOMYENTRY, TaxonomyEntry } from '../../../libs/api/apitypes';
-import { allGenusIds, getAllSpeciesForSectionOrGenus, taxonomyEntryById } from '../../../libs/db/taxonomy';
-import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { formatWithDescription } from '../../../libs/pages/renderhelpers';
+import SpeciesTable from '../../../components/speciesTable.js';
+import { EMPTY_TAXONOMYENTRY, SimpleSpecies, TaxonomyEntry } from '../../../libs/api/apitypes.js';
+import { allGenusIds, getAllSpeciesForSectionOrGenus, taxonomyEntryById } from '../../../libs/db/taxonomy.js';
+import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers.js';
+import { formatWithDescription } from '../../../libs/pages/renderhelpers.js';
 
 type Props = {
     genus: TaxonomyEntry[];
@@ -27,7 +26,7 @@ const Genus = ({ genus, species }: Props): JSX.Element => {
     }
 
     if (genus.length <= 0) {
-        return <ErrorPage statusCode={404} />;
+        return <ErrorPage.default statusCode={404} />;
     }
     const gen = genus[0];
     const fam = pipe(gen.parent, O.getOrElse(constant(EMPTY_TAXONOMYENTRY)));
@@ -36,10 +35,10 @@ const Genus = ({ genus, species }: Props): JSX.Element => {
 
     return (
         <Container className="pt-2" fluid>
-            <Head>
+            <Head.default>
                 <title>{fullName}</title>
                 <meta name="description" content={`Genus ${gen.name}`} />
-            </Head>
+            </Head.default>
 
             <Row>
                 <Col>
@@ -51,9 +50,9 @@ const Genus = ({ genus, species }: Props): JSX.Element => {
             <Row>
                 <Col>
                     <strong>Family:</strong>{' '}
-                    <Link key={fam.id} href={`/family/${fam.id}`}>
+                    <Link.default key={fam.id} href={`/family/${fam.id}`}>
                         <i>{fam.name}</i>
-                    </Link>
+                    </Link.default>
                     {` (${fam.description})`}
                 </Col>
             </Row>

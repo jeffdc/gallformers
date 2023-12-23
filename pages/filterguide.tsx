@@ -1,13 +1,13 @@
-import { constant } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/Option';
+import { constant } from 'fp-ts/lib/function.js';
 import { GetStaticProps } from 'next';
-import Head from 'next/head';
-import Link from 'next/link';
+import Head from 'next/head.js';
+import Link from 'next/link.js';
 import React from 'react';
 import { Accordion, Container, ListGroup } from 'react-bootstrap';
-import { FilterField } from '../libs/api/apitypes';
-import { getAlignments, getCells, getForms, getLocations, getShapes, getTextures, getWalls } from '../libs/db/filterfield';
-import { mightFailWithArray } from '../libs/utils/util';
+import { FilterField } from '../libs/api/apitypes.js';
+import { getAlignments, getCells, getForms, getLocations, getShapes, getTextures, getWalls } from '../libs/db/filterfield.js';
+import { mightFailWithArray } from '../libs/utils/util.js';
 
 const { Item } = ListGroup;
 
@@ -34,10 +34,10 @@ const filterFieldsToItems = (fields: FilterField[]) =>
 const FilterGuide = ({ alignments, cells, forms, locations, shapes, textures, walls }: Props): JSX.Element => {
     return (
         <React.Fragment>
-            <Head>
+            <Head.default>
                 <title>Filter Guide</title>
                 <meta name="description" content="A Guide to all of the terms that used on the gallformers ID page." />
-            </Head>
+            </Head.default>
             <Container fluid className="mt-4 m-2">
                 <h1>ID Tool Filter Guide</h1>
                 <br />
@@ -55,7 +55,7 @@ const FilterGuide = ({ alignments, cells, forms, locations, shapes, textures, wa
                                 {filterFieldsToItems(cells)}
                                 <Item>
                                     NOTE: If multiple larvae are found in one space, these may be{' '}
-                                    <Link href="/glossary#inquiline">inquilines</Link> rather than gall-inducers.
+                                    <Link.default href="/glossary#inquiline">inquilines</Link.default> rather than gall-inducers.
                                 </Item>
                             </ListGroup>
                         </Accordion.Body>

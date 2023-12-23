@@ -2,20 +2,20 @@ import { ioTsResolver } from '@hookform/resolvers/io-ts';
 import axios from 'axios';
 import * as t from 'io-ts';
 import { useSession } from 'next-auth/react';
-import router from 'next/router';
+import router from 'next/router.js';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { DefaultValues, FieldValues, Path, UseFormReturn, useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import Typeahead, { AsyncTypeahead, TypeaheadLabelKey } from '../components/Typeahead';
-import { superAdmins } from '../components/auth';
-import { ConfirmationOptions } from '../components/confirmationdialog';
-import { RenameEvent } from '../components/editname';
-import { DeleteResult } from '../libs/api/apitypes';
-import { WithID } from '../libs/utils/types';
-import { hasProp, pluralize } from '../libs/utils/util';
-import { AdminFormFields, useAPIs } from './useAPIs';
-import { useConfirmation } from './useConfirmation';
+import Typeahead, { AsyncTypeahead, TypeaheadLabelKey } from '../components/Typeahead.js';
+import { superAdmins } from '../components/auth.js';
+import { ConfirmationOptions } from '../components/confirmationdialog.js';
+import { RenameEvent } from '../components/editname.js';
+import { DeleteResult } from '../libs/api/apitypes.js';
+import { WithID } from '../libs/utils/types.js';
+import { hasProp, pluralize } from '../libs/utils/util.js';
+import { AdminFormFields, useAPIs } from './useAPIs.js';
+import { useConfirmation } from './useConfirmation.js';
 
 type AdminData<T, FormFields extends FieldValues> = {
     data: T[];
@@ -148,7 +148,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                         onChange={(s) => {
                             if (s.length <= 0) {
                                 setSelected(undefined);
-                                router.replace(``, undefined, { shallow: true });
+                                router.default.replace(``, undefined, { shallow: true });
                             } else {
                                 //TODO remember how this logic works and what we need to do to get rid of customOption
                                 if (hasProp(s[0], 'customOption') && hasProp(s[0], 'name')) {
@@ -156,11 +156,11 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                                         const x = createNew(s[0].name as string);
                                         setSelected(x);
                                     }
-                                    router.replace(``, undefined, { shallow: true });
+                                    router.default.replace(``, undefined, { shallow: true });
                                 } else {
                                     const t = s[0] as T;
                                     setSelected(t);
-                                    router.replace(`?id=${t.id}`, undefined, { shallow: true });
+                                    router.default.replace(`?id=${t.id}`, undefined, { shallow: true });
                                 }
                             }
                         }}
@@ -195,7 +195,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                         onChange={(s) => {
                             if (s.length <= 0) {
                                 setSelected(undefined);
-                                router.replace(``, undefined, { shallow: true });
+                                router.default.replace(``, undefined, { shallow: true });
                             } else {
                                 //TODO remember how this logic works and what we need to do to get rid of customOption
                                 if (hasProp(s[0], 'customOption') && hasProp(s[0], 'name')) {
@@ -203,13 +203,13 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                                         const x = createNew(s[0].name as string);
                                         setSelected(x);
                                     }
-                                    router.replace(``, undefined, { shallow: true });
+                                    router.default.replace(``, undefined, { shallow: true });
                                 } else {
                                     // should? be ok since we know it is not a string at this point. need to really look
                                     // into rethinking the way this Typeahead is used/implemented.
                                     const t = s[0] as unknown as T;
                                     setSelected(t);
-                                    router.replace(`?id=${t.id}`, undefined, { shallow: true });
+                                    router.default.replace(`?id=${t.id}`, undefined, { shallow: true });
                                 }
                             }
                         }}
@@ -261,10 +261,10 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     const postDelete = (id: number | string, result: DeleteResult) => {
         setData(data.filter((d) => d.id !== id));
         setSelected(undefined);
-        router.replace(``, undefined, { shallow: true });
+        router.default.replace(``, undefined, { shallow: true });
         setDeleteResults(result);
         setError('');
-        toast.success(`${type} deleted`);
+        toast.toast.success(`${type} deleted`);
     };
 
     const postUpdate = async (res: Response) => {
@@ -281,8 +281,8 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         setError('');
         setData(updated);
         setSelected(s);
-        toast.success(`${type} Updated`);
-        router.replace(`?id=${s.id}`, undefined, { shallow: !reloadOnUpdate });
+        toast.toast.success(`${type} Updated`);
+        router.default.replace(`?id=${s.id}`, undefined, { shallow: !reloadOnUpdate });
     };
 
     const formSubmit = async (fields: FormFields) => {

@@ -1,7 +1,7 @@
 import React from 'react';
-import { AliasApi, COMMON_NAME, EmptyAlias, SCIENTIFIC_NAME } from '../libs/api/apitypes';
-import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
-import EditableDataTable, { EditableTableColumn } from './EditableDataTable';
+import { AliasApi, COMMON_NAME, EmptyAlias, SCIENTIFIC_NAME } from '../libs/api/apitypes.js';
+import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants.js';
+import EditableDataTable, { EditableTableColumn } from './EditableDataTable.jsx';
 
 export type AliasTableProps = {
     data: AliasApi[];

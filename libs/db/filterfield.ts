@@ -1,11 +1,11 @@
 import { Prisma, alignment, color, cells as cs, form, location, season, shape, texture, walls as ws } from '@prisma/client';
-import * as O from 'fp-ts/lib/Option';
-import * as TE from 'fp-ts/lib/TaskEither';
-import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { constant, pipe } from 'fp-ts/lib/function';
-import { DeleteResult, FilterField, FilterFieldTypeValue, FilterFieldWithType } from '../api/apitypes';
-import { handleError } from '../utils/util';
-import db from './db';
+import * as O from 'fp-ts/lib/Option.js';
+import * as TE from 'fp-ts/lib/TaskEither.js';
+import { TaskEither } from 'fp-ts/lib/TaskEither.js';
+import { constant, pipe } from 'fp-ts/lib/function.js';
+import { DeleteResult, FilterField, FilterFieldTypeValue, FilterFieldWithType } from '../api/apitypes.js';
+import { handleError } from '../utils/util.js';
+import db from './db.js';
 
 export const adaptLocations = (ls: location[]): FilterField[] => {
     return ls.map((l) => ({

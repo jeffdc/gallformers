@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { sendSuccessResponse } from '../../../libs/api/apipage';
-import { FilterFieldTypeValue } from '../../../libs/api/apitypes';
+import { sendSuccessResponse } from '../../../libs/api/apipage.js';
+import { FilterFieldTypeValue } from '../../../libs/api/apitypes.js';
 
 // GET: ../filterfield
 // fetches the filter field types

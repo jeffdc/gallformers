@@ -1,13 +1,11 @@
 import { Prisma, PrismaPromise } from '@prisma/client';
-import * as TE from 'fp-ts/lib/TaskEither';
-import { pipe } from 'fp-ts/lib/function';
-import { GallHostUpdateFields, SpeciesWithPlaces } from '../api/apitypes';
-import { GallApi } from '../api/apitypes';
-import { taxonCodeAsStringToValue } from '../api/apitypes';
-import { ExtractTFromPromise } from '../utils/types';
-import { handleError } from '../utils/util';
-import db from './db';
-import { gallByIdAsO } from './gall';
+import * as TE from 'fp-ts/lib/TaskEither.js';
+import { pipe } from 'fp-ts/lib/function.js';
+import { GallApi, GallHostUpdateFields, SpeciesWithPlaces, taxonCodeAsStringToValue } from '../api/apitypes.js';
+import { ExtractTFromPromise } from '../utils/types.js';
+import { handleError } from '../utils/util.js';
+import db from './db.js';
+import { gallByIdAsO } from './gall.js';
 
 const toValues = (gallid: number, hostids: number[]) => hostids.map((h) => `(NULL, ${gallid}, ${h})`).join(',');
 

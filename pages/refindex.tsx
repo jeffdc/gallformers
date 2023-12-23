@@ -1,8 +1,8 @@
-import Head from 'next/head';
-import Link from 'next/link';
+import Head from 'next/head.js';
+import Link from 'next/link.js';
 import { Container } from 'react-bootstrap';
-import { getAllPosts } from '../libs/pages/refposts';
-import Post from '../types/post';
+import { getAllPosts } from '../libs/pages/refposts.js';
+import Post from '../types/post.js';
 
 type Props = {
     allPosts: Post[];
@@ -11,28 +11,26 @@ type Props = {
 const Index = ({ allPosts }: Props) => {
     return (
         <>
-            <Head>
+            <Head.default>
                 <title>Gallformers Reference Library</title>
-            </Head>
+            </Head.default>
             <Container className="mx-0 mt-4">
                 <h1 className="my-4">The Gallformers Reference Library</h1>
-                {allPosts
-                    .sort((a, b) => a.title.localeCompare(b.title))
-                    .map((p) => (
-                        <article key={p.slug}>
-                            <header className="">
-                                <Link href={`/ref/${p.slug}`}>
-                                    <h5 className="">{p.title}</h5>
-                                </Link>
-                                <span className="small">
-                                    <em>{`${p.author.name} - ${p.date}`}</em>
-                                </span>
-                            </header>
-                            <section>
-                                <p className="small">{p.description}</p>
-                            </section>
-                        </article>
-                    ))}
+                {allPosts.map((p) => (
+                    <article key={p.slug}>
+                        <header className="">
+                            <Link.default href={`/ref/${p.slug}`}>
+                                <h5 className="">{p.title}</h5>
+                            </Link.default>
+                            <span className="small">
+                                <em>{`${p.author.name} - ${p.date}`}</em>
+                            </span>
+                        </header>
+                        <section>
+                            <p className="small">{p.description}</p>
+                        </section>
+                    </article>
+                ))}
             </Container>
         </>
     );

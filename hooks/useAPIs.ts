@@ -1,8 +1,8 @@
 import * as t from 'io-ts';
-import { DeleteResult } from '../libs/api/apitypes';
-import { logger } from '../libs/utils/logger';
-import { WithID } from '../libs/utils/types';
-import { hasProp } from '../libs/utils/util';
+import { DeleteResult } from '../libs/api/apitypes.js';
+import { logger } from '../libs/utils/logger.js';
+import { WithID } from '../libs/utils/types.js';
+import { hasProp } from '../libs/utils/util.js';
 
 /** The schema has to be generated at runtime since the type is not known until then. */
 export const adminFormFieldsSchema = <T>(schemaT: t.Type<T>) =>

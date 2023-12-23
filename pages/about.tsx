@@ -1,10 +1,10 @@
 import { GetStaticProps } from 'next';
-import Head from 'next/head';
-import Image from 'next/image';
+import Head from 'next/head.js';
+import Image from 'next/image.js';
 import React from 'react';
 import { Accordion, Card, Col, Row } from 'react-bootstrap';
-import { getCurrentStats, Stat } from '../libs/db/stats';
-import { mightFailWithArray } from '../libs/utils/util';
+import { getCurrentStats, Stat } from '../libs/db/stats.js';
+import { mightFailWithArray } from '../libs/utils/util.js';
 import GallMeMaybe from '../public/images/gallmemaybe.jpg';
 
 type Props = {
@@ -16,10 +16,10 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
     const statMap = new Map(stats.map((s) => [s.type, s.count] as [string, number]));
     return (
         <div className="p-4">
-            <Head>
+            <Head.default>
                 <title>About Gallformers</title>
                 <meta name="description" content="About the creators of gallformers and why we built the site." />
-            </Head>
+            </Head.default>
 
             <Row>
                 <Col>
@@ -95,15 +95,16 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
                                 Jeff is a Software Engineer who stumbled upon galls and became obsessed. So much so that he
                                 co-founded this site, wrote all the code for this site, and is responsible for keeping it going,
                                 fixing it, and implementing new features, and paying the bills. If the site is broken, it is most
-                                likely his fault. He is also way too into Oaks and will soon start building an ID tool for them.
+                                likely his fault. He is also way too into Oaks and will (HOPEFULLY) soon start building an ID tool
+                                for them.
                             </Card.Text>
                         </Card.Body>
                         <Card.Footer>
                             <Card.Link href="https://www.inaturalist.org/people/jeffdc" target="_blank" rel="noreferrer">
                                 iNaturalist
                             </Card.Link>
-                            <Card.Link href="https://twitter.com/jeffc666" target="_blank" rel="noreferrer">
-                                Twitter
+                            <Card.Link href="https://mastodon.social/@jeffdc" target="_blank" rel="noreferrer">
+                                Mastodon
                             </Card.Link>
                         </Card.Footer>
                     </Card>
@@ -210,7 +211,13 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
                             <Accordion.Header>Dare You Click?</Accordion.Header>
                             <Accordion.Body>
                                 <Card.Body className="d-flex justify-content-center">
-                                    <Image src={GallMeMaybe} alt="Gall Me Maybe" width="300" height="532" layout="fixed" />
+                                    <Image.default
+                                        src={GallMeMaybe}
+                                        alt="Gall Me Maybe"
+                                        width="300"
+                                        height="532"
+                                        layout="fixed"
+                                    />
                                 </Card.Body>
                             </Accordion.Body>
                         </Accordion.Item>

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Button, Modal } from 'react-bootstrap';
 import toast, { Toaster } from 'react-hot-toast';
-import { SpeciesNamingHelp } from '../hooks/useSpecies';
-import { AdminTypes } from '../libs/pages/admin';
-import { capitalizeFirstLetter, isValidSpeciesName } from '../libs/utils/util';
+import { SpeciesNamingHelp } from '../hooks/useSpecies.js';
+import { AdminTypes } from '../libs/pages/admin.js';
+import { capitalizeFirstLetter, isValidSpeciesName } from '../libs/utils/util.js';
 
 export type RenameEvent = {
     old: string | undefined;
@@ -80,13 +80,13 @@ const EditName = ({
                         disabled={!dirty || value == undefined || value === ''}
                         onClick={() => {
                             if (value == undefined || value === '') {
-                                toast.error(`The name must not be empty.`);
+                                toast.toast.error(`The name must not be empty.`);
                             } else if (isGallOrHost && !isValidSpeciesName(value)) {
-                                toast.error('The name must be a valid species name construction.');
+                                toast.toast.error('The name must be a valid species name construction.');
                             } else {
                                 nameExistsCallback(value).then((b) => {
                                     if (b) {
-                                        toast.error('That name is already in use.');
+                                        toast.toast.error('That name is already in use.');
                                     } else {
                                         renameCallback({
                                             old: defaultValue,

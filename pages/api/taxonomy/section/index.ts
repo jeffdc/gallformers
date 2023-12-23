@@ -1,10 +1,16 @@
-import { pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
-import * as TE from 'fp-ts/lib/TaskEither';
+import * as O from 'fp-ts/lib/Option.js';
+import * as TE from 'fp-ts/lib/TaskEither.js';
+import { pipe } from 'fp-ts/lib/function.js';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { apiSearchEndpoint, getQueryParams, sendErrorResponse, sendSuccessResponse, toErr } from '../../../../libs/api/apipage';
-import { SectionApi } from '../../../../libs/api/apitypes';
-import { allSections, sectionById, sectionByName, sectionSearch } from '../../../../libs/db/taxonomy';
+import {
+    apiSearchEndpoint,
+    getQueryParams,
+    sendErrorResponse,
+    sendSuccessResponse,
+    toErr,
+} from '../../../../libs/api/apipage.js';
+import { SectionApi } from '../../../../libs/api/apitypes.js';
+import { allSections, sectionById, sectionByName, sectionSearch } from '../../../../libs/db/taxonomy.js';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     // 1: an ID is passed in fetch that section

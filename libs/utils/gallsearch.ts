@@ -1,5 +1,4 @@
-import { GallIDApi, SearchQuery } from '../api/apitypes';
-import { DetachableApi, DetachableBoth, DetachableNone } from '../api/apitypes';
+import { DetachableApi, DetachableBoth, DetachableNone, GallIDApi, SearchQuery } from '../api/apitypes.js';
 
 const dontCare = (o: string | string[] | undefined): boolean => {
     const truthy = !!o;

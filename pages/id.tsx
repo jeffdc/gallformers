@@ -1,23 +1,38 @@
 import { yupResolver } from '@hookform/resolvers/yup';
-import { constant, constFalse, pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
+import { constant, constFalse, pipe } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option.js';
+import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
 import { useSession } from 'next-auth/react';
-import Head from 'next/head';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
+import Head from 'next/head.js';
+import Link from 'next/link.js';
+import { useRouter } from 'next/router.js';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, Col, Container, Form, OverlayTrigger, Popover, Row } from 'react-bootstrap';
 import { Controller, useForm } from 'react-hook-form';
-import Edit from '../components/edit';
-import InfoTip from '../components/infotip';
-import Typeahead from '../components/Typeahead';
-import { getQueryParams } from '../libs/api/apipage';
-import { EMPTYSEARCHQUERY, FilterField, GallIDApi, PlaceApi, SearchQuery } from '../libs/api/apitypes';
-import { HostSimple, HostSimpleSchema } from '../libs/api/apitypes';
-import { DetachableApi, detachableFromString, DetachableNone, Detachables, TaxonCodeValues } from '../libs/api/apitypes';
-import { TaxonomyEntry, TaxonomyEntryNoParent, TaxonomyEntryNoParentSchema, TaxonomyTypeValues } from '../libs/api/apitypes';
+import Edit from '../components/edit.js';
+import InfoTip from '../components/infotip.js';
+import Typeahead from '../components/Typeahead.js';
+import { getQueryParams } from '../libs/api/apipage.js';
+import {
+    DetachableApi,
+    detachableFromString,
+    DetachableNone,
+    Detachables,
+    EMPTYSEARCHQUERY,
+    FilterField,
+    GallIDApi,
+    HostSimple,
+    HostSimpleSchema,
+    PlaceApi,
+    SearchQuery,
+    TaxonCodeValues,
+    TaxonomyEntry,
+    TaxonomyEntryNoParent,
+    TaxonomyEntryNoParentSchema,
+    TaxonomyTypeValues,
+} from '../libs/api/apitypes.js';
 import {
     getAlignments,
     getCells,
@@ -28,14 +43,13 @@ import {
     getShapes,
     getTextures,
     getWalls,
-} from '../libs/db/filterfield';
-import { allHostsSimple } from '../libs/db/host';
-import { getPlaces } from '../libs/db/place';
-import { allGenera, allSections } from '../libs/db/taxonomy';
-import { createSummary, defaultImage, formatWithDescription } from '../libs/pages/renderhelpers';
-import { checkGall, GALL_FORM, LEAF_ANYWHERE } from '../libs/utils/gallsearch';
-import { capitalizeFirstLetter, hasProp, mightFailWithArray } from '../libs/utils/util';
-import * as t from 'io-ts';
+} from '../libs/db/filterfield.js';
+import { allHostsSimple } from '../libs/db/host.js';
+import { getPlaces } from '../libs/db/place.js';
+import { allGenera, allSections } from '../libs/db/taxonomy.js';
+import { createSummary, defaultImage, formatWithDescription } from '../libs/pages/renderhelpers.js';
+import { checkGall, GALL_FORM, LEAF_ANYWHERE } from '../libs/utils/gallsearch.js';
+import { capitalizeFirstLetter, hasProp, mightFailWithArray } from '../libs/utils/util.js';
 
 type SearchFormHostField = {
     host: HostSimple[];
@@ -303,10 +317,10 @@ const IDGall = (props: Props): JSX.Element => {
 
     return (
         <Container className="m-2" fluid>
-            <Head>
+            <Head.default>
                 <title>ID Galls</title>
                 <meta name="description" content="A tool for IDing galls on host plants." />
-            </Head>
+            </Head.default>
 
             <Row className="">
                 <Col>
@@ -381,7 +395,8 @@ const IDGall = (props: Props): JSX.Element => {
                                                         iNaturalist.
                                                     </a>{' '}
                                                     You can then filter the found galls using the boxes below. See the{' '}
-                                                    <Link href="/filterguide">Gall Filter Term Guide</Link> for more details.
+                                                    <Link.default href="/filterguide">Gall Filter Term Guide</Link.default> for
+                                                    more details.
                                                 </p>
                                                 <p>
                                                     Note: that leaving a field blank doesn’t exclude any galls, whether they have
@@ -694,18 +709,18 @@ const IDGall = (props: Props): JSX.Element => {
                             return (
                                 <Col key={g.id.toString() + 'col'} xs={6} md={3} className="pb-2">
                                     <Card key={g.id} border="secondary">
-                                        <Link href={`gall/${g.id}`}>
+                                        <Link.default href={`gall/${g.id}`}>
                                             <Card.Img
                                                 variant="top"
                                                 src={defaultImage(g)?.small ? defaultImage(g)?.small : '/images/noimage.jpg'}
                                                 alt={`${g.name} - ${summary}`}
                                             />
-                                        </Link>
+                                        </Link.default>
                                         <Card.Body>
                                             <Card.Title>
-                                                <Link href={`gall/${g.id}`} className="small">
+                                                <Link.default href={`gall/${g.id}`} className="small">
                                                     {g.name}
-                                                </Link>
+                                                </Link.default>
                                             </Card.Title>
                                             <Card.Text className="small">
                                                 {!defaultImage(g) && summary}
@@ -736,7 +751,7 @@ const IDGall = (props: Props): JSX.Element => {
                             <Alert variant="primary" className="small">
                                 There are no galls that match your filter. It’s possible there are no described species that fit
                                 this set of traits and your gall is undescribed. However, before giving up, try{' '}
-                                <Link href="ref/IDGuide#troubleshooting">altering your filter choices</Link>.{' '}
+                                <Link.default href="ref/IDGuide#troubleshooting">altering your filter choices</Link.default>.{' '}
                                 {isHostComplete(hostOrTaxon) && (
                                     <span>
                                         To our knowledge, every gall that occurs on the host you have selected is included in the
@@ -750,7 +765,7 @@ const IDGall = (props: Props): JSX.Element => {
                         <Alert variant="primary" className="small">
                             If none of these results match your gall, you may have found an undescribed species. However, before
                             concluding that your gall is not in the database, try{' '}
-                            <Link href="ref/IDGuide#troubleshooting">altering your filter choices</Link>.{' '}
+                            <Link.default href="ref/IDGuide#troubleshooting">altering your filter choices</Link.default>.{' '}
                             {isHostComplete(hostOrTaxon) && (
                                 <span>
                                     To our knowledge, every gall that occurs on the host you have selected is included in the
@@ -797,6 +812,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     const genera = await mightFailWithArray<TaxonomyEntry>()(allGenera(TaxonCodeValues.PLANT));
     const sections = await mightFailWithArray<TaxonomyEntry>()(allSections());
     const sectionsAndGenera = [...genera, ...sections].sort((a, b) => a.name.localeCompare(b.name));
+    // console.log(sectionsAndGenera);
 
     const query = getQueryParams(context.query, queryUrlParams);
     const hostOrTaxon = pipe(

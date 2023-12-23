@@ -11,9 +11,12 @@
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
+    "types": ["node"],
+    "allowSyntheticDefaultImports": true,
+    "allowArbitraryExtensions": true,
     "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "node",
+    "module": "Node16",
+    "moduleResolution": "Node16",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
@@ -24,7 +27,8 @@
     ],
     "incremental": true,
     "strictFunctionTypes": false,
-    "strictNullChecks": true
+    "strictNullChecks": true,
+    "alwaysStrict": true
   },
   "include": [
     "next-env.d.ts",

@@ -1,15 +1,15 @@
-import * as O from 'fp-ts/lib/Option';
-import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option.js';
+import { constant, pipe } from 'fp-ts/lib/function.js';
 import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { Alert, Button, Col, Row } from 'react-bootstrap';
-import { RenameEvent } from '../../components/editname';
-import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
-import useAdmin from '../../hooks/useadmin';
-import { extractQueryParam } from '../../libs/api/apipage';
-import { PLACE_TYPES, PlaceNoTreeApi, PlaceNoTreeApiSchema, PlaceNoTreeUpsertFields } from '../../libs/api/apitypes';
-import Admin from '../../libs/pages/admin';
+import { RenameEvent } from '../../components/editname.js';
+import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs.js';
+import useAdmin from '../../hooks/useadmin.js';
+import { extractQueryParam } from '../../libs/api/apipage.js';
+import { PLACE_TYPES, PlaceNoTreeApi, PlaceNoTreeApiSchema, PlaceNoTreeUpsertFields } from '../../libs/api/apitypes.js';
+import Admin from '../../libs/pages/admin.js';
 
 type Props = {
     id: string;

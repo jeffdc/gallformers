@@ -1,8 +1,8 @@
 import { Card, Button, Collapse, Container } from 'react-bootstrap';
 import { useState } from 'react';
-import * as O from 'fp-ts/lib/Option';
-import { constant, pipe } from 'fp-ts/lib/function';
-import { truncateAtWord } from '../libs/utils/util';
+import * as O from 'fp-ts/lib/Option.js';
+import { constant, pipe } from 'fp-ts/lib/function.js';
+import { truncateAtWord } from '../libs/utils/util.js';
 
 //TODO This component is kind of janky and was really just a quick hack. We should make it better.
 type Props = {
@@ -17,10 +17,7 @@ const CardTextCollapse = ({ text }: Props): JSX.Element => {
     );
 
     // eslint-disable-next-line prettier/prettier
-    const t = pipe(
-        text,
-        O.getOrElse(constant('')),
-    );
+    const t = pipe(text, O.getOrElse(constant('')));
 
     // if (text === null || text === undefined || text.length === 0) {
     //     return noCollapse;

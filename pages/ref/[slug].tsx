@@ -1,12 +1,12 @@
 import { GetStaticPaths } from 'next';
-import ErrorPage from 'next/error';
-import Head from 'next/head';
-import { useRouter } from 'next/router';
-import DateFormatter from '../../components/ref/dateformatter';
-import PostBody from '../../components/ref/postBody';
-import markdownToHtml from '../../libs/pages/mdtoHtml';
-import { getAllPosts, getPostBySlug } from '../../libs/pages/refposts';
-import PostType from '../../types/post';
+import ErrorPage from 'next/error.js';
+import Head from 'next/head.js';
+import { useRouter } from 'next/router.js';
+import DateFormatter from '../../components/ref/dateformatter.js';
+import PostBody from '../../components/ref/postBody.js';
+import markdownToHtml from '../../libs/pages/mdtoHtml.js';
+import { getAllPosts, getPostBySlug } from '../../libs/pages/refposts.js';
+import PostType from '../../types/post.js';
 
 type Props = {
     post: PostType;
@@ -17,7 +17,7 @@ type Props = {
 const Post = ({ post }: Props) => {
     const router = useRouter();
     if (!router.isFallback && !post?.slug) {
-        return <ErrorPage statusCode={404} />;
+        return <ErrorPage.default statusCode={404} />;
     }
     return (
         <>
@@ -26,9 +26,9 @@ const Post = ({ post }: Props) => {
             ) : (
                 <>
                     <article className="m-4">
-                        <Head>
+                        <Head.default>
                             <title>{post.title}</title>
-                        </Head>
+                        </Head.default>
                         <h1 className="my-2">{post.title}</h1>
                         <em>
                             <DateFormatter dateString={post.date} /> - {post.author.name}

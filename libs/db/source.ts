@@ -1,13 +1,19 @@
 import { Prisma, source } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function';
-import * as TE from 'fp-ts/lib/TaskEither';
-import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, SourceApi, SourceUpsertFields, SourceWithSpeciesApi, SourceWithSpeciesSourceApi } from '../api/apitypes';
-import { isOfType } from '../utils/types';
-import { handleError } from '../utils/util';
-import db from './db';
-import { extractId } from './utils';
-import { TaxonCodeValues, taxonCodeAsStringToValue } from '../api/apitypes';
+import * as TE from 'fp-ts/lib/TaskEither.js';
+import { TaskEither } from 'fp-ts/lib/TaskEither.js';
+import { pipe } from 'fp-ts/lib/function.js';
+import {
+    DeleteResult,
+    SourceApi,
+    SourceUpsertFields,
+    SourceWithSpeciesApi,
+    SourceWithSpeciesSourceApi,
+    taxonCodeAsStringToValue,
+} from '../api/apitypes.js';
+import { isOfType } from '../utils/types.js';
+import { handleError } from '../utils/util.js';
+import db from './db.js';
+import { extractId } from './utils.js';
 
 const adaptor = <T extends source>(source: T): SourceApi | SourceWithSpeciesSourceApi =>
     isOfType(source, 'speciessource' as keyof SourceWithSpeciesSourceApi)

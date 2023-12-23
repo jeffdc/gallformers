@@ -1,10 +1,10 @@
 import { species } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
-import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option.js';
+import * as TE from 'fp-ts/lib/TaskEither.js';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { apiSearchEndpoint, getQueryParams, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage';
-import { speciesById, speciesByName, speciesSearch } from '../../../libs/db/species';
+import { apiSearchEndpoint, getQueryParams, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage.js';
+import { speciesById, speciesByName, speciesSearch } from '../../../libs/db/species.js';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     // 1: an ID is passed in fetch that species

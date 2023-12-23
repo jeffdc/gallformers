@@ -1,12 +1,13 @@
-import { GallIDApi, SearchQuery } from '../../../libs/api/apitypes';
 import {
     DetachableApi,
     DetachableBoth,
     DetachableDetachable,
     DetachableIntegral,
     DetachableNone,
-} from '../../../libs/api/apitypes';
-import { checkGall, testables } from '../../../libs/utils/gallsearch';
+    GallIDApi,
+    SearchQuery,
+} from '../../../libs/api/apitypes.js';
+import { checkGall, testables } from '../../../libs/utils/gallsearch.js';
 
 const { dontCare } = testables;
 

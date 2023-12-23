@@ -1,21 +1,21 @@
-import { pipe } from 'fp-ts/lib/function';
-import * as E from 'fp-ts/lib/Either';
-import * as O from 'fp-ts/lib/Option';
-import * as TE from 'fp-ts/lib/TaskEither';
+import * as E from 'fp-ts/lib/Either.js';
+import * as O from 'fp-ts/lib/Option.js';
+import * as TE from 'fp-ts/lib/TaskEither.js';
+import { pipe } from 'fp-ts/lib/function.js';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from 'next-auth/react';
 import {
-    apiUpsertEndpoint,
     Err,
+    apiUpsertEndpoint,
     getQueryParam,
     onCompleteSendJson,
     sendErrorResponse,
     sendSuccessResponse,
     toErr,
-} from '../../../libs/api/apipage';
+} from '../../../libs/api/apipage.js';
 
-import { deleteImages, getImages, updateImage } from '../../../libs/db/images';
-import { csvAsNumberArr } from '../../../libs/utils/util';
+import { deleteImages, getImages, updateImage } from '../../../libs/db/images.js';
+import { csvAsNumberArr } from '../../../libs/utils/util.js';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     const session = await getSession({ req });

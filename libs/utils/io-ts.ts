@@ -1,6 +1,6 @@
 // stuff for making io-ts nicer
-import * as E from 'fp-ts/lib/Either';
-import { identity, pipe } from 'fp-ts/lib/function';
+import * as E from 'fp-ts/lib/Either.js';
+import { identity, pipe } from 'fp-ts/lib/function.js';
 import t, { Type } from 'io-ts';
 
 // From: https://github.com/gcanti/io-ts/issues/216#issuecomment-599020040

@@ -1,9 +1,16 @@
-import { constant, pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
-import { GallIDApi, ImageApi, ImageLicenseValues, ImageNoSourceApi, SourceApi, WithImages } from '../api/apitypes';
-import { GallApi } from '../api/apitypes';
-import { DetachableDetachable } from '../api/apitypes';
-import { truncateAtWord } from '../utils/util';
+import * as O from 'fp-ts/lib/Option.js';
+import { constant, pipe } from 'fp-ts/lib/function.js';
+import {
+    DetachableDetachable,
+    GallApi,
+    GallIDApi,
+    ImageApi,
+    ImageLicenseValues,
+    ImageNoSourceApi,
+    SourceApi,
+    WithImages,
+} from '../api/apitypes.js';
+import { truncateAtWord } from '../utils/util.js';
 
 /**
  * Renders the given string input with line breaks for any embedded new lines.

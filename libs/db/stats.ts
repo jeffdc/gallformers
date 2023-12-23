@@ -1,8 +1,9 @@
 import { Prisma } from '@prisma/client';
-import * as TE from 'fp-ts/lib/TaskEither';
-import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { handleError } from '../utils/util';
-import db from './db';
+import * as TE from 'fp-ts/lib/TaskEither.js';
+import { TaskEither } from 'fp-ts/lib/TaskEither.js';
+import { handleError } from '../utils/util.js';
+import db from './db.js';
+import { pipe } from 'fp-ts/lib/function.js';
 
 export type Stat = {
     type: string;
@@ -77,5 +78,15 @@ export const getCurrentStats = (): TaskEither<Error, Stat[]> => {
             ;
        `);
 
-    return TE.tryCatch(stats, handleError);
+    return pipe(
+        TE.tryCatch(stats, handleError),
+        // yeah Prisma screwing me over again -- they changed the raw type returned from number to bigint :(, bigint is not serializable as-is, yeah Primsa!
+        // their solution, https://www.prisma.io/docs/orm/prisma-client/special-fields-and-types LOL!
+        TE.map((stats) => {
+            return stats.map((s) => ({
+                ...s,
+                count: Number(s.count),
+            }));
+        }),
+    );
 };

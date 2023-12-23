@@ -1,29 +1,25 @@
-import { constant, pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
+import * as O from 'fp-ts/lib/Option.js';
+import { constant, pipe } from 'fp-ts/lib/function.js';
 import { GetStaticPaths, GetStaticProps } from 'next';
-import ErrorPage from 'next/error';
-import Head from 'next/head';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
-import React, { useState } from 'react';
+import ErrorPage from 'next/error.js';
+import Head from 'next/head.js';
+import Link from 'next/link.js';
+import { useRouter } from 'next/router.js';
+import { useState } from 'react';
 import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
-import Edit from '../../../components/edit';
-import Images from '../../../components/images';
-import InfoTip from '../../../components/infotip';
-import RangeMap from '../../../components/rangemap';
-import SeeAlso from '../../../components/seealso';
-import SourceList from '../../../components/sourcelist';
-import SpeciesSynonymy from '../../../components/speciesSynonymy';
-import { GallHost } from '../../../libs/api/apitypes';
-import { GallApi } from '../../../libs/api/apitypes';
-import { SimpleSpecies, TaxonCodeValues } from '../../../libs/api/apitypes';
-import { DetachableBoth } from '../../../libs/api/apitypes';
-import { FGS } from '../../../libs/api/apitypes';
-import { allGallIds, gallById, getRelatedGalls } from '../../../libs/db/gall';
-import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
-import { linkSourceToGlossary } from '../../../libs/pages/glossary';
-import { getStaticPathsFromIds, getStaticPropsWith, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { createSummaryGall, defaultSource, formatWithDescription } from '../../../libs/pages/renderhelpers';
+import Edit from '../../../components/edit.js';
+import Images from '../../../components/images.js';
+import InfoTip from '../../../components/infotip.js';
+import RangeMap from '../../../components/rangemap.js';
+import SeeAlso from '../../../components/seealso.js';
+import SourceList from '../../../components/sourcelist.js';
+import SpeciesSynonymy from '../../../components/speciesSynonymy.js';
+import { DetachableBoth, FGS, GallApi, GallHost, SimpleSpecies, TaxonCodeValues } from '../../../libs/api/apitypes.js';
+import { allGallIds, gallById, getRelatedGalls } from '../../../libs/db/gall.js';
+import { taxonomyForSpecies } from '../../../libs/db/taxonomy.js';
+import { linkSourceToGlossary } from '../../../libs/pages/glossary.js';
+import { getStaticPathsFromIds, getStaticPropsWith, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers.js';
+import { createSummaryGall, defaultSource, formatWithDescription } from '../../../libs/pages/renderhelpers.js';
 
 type Props = {
     species: GallApi;
@@ -35,7 +31,7 @@ type Props = {
 const hostAsLink = (len: number) => (h: GallHost, idx: number) => {
     return (
         <span key={h.id}>
-            <Link href={`/host/${h.id}`}>{h.name}</Link>
+            <Link.default href={`/host/${h.id}`}>{h.name}</Link.default>
             {idx < len - 1 ? ' / ' : ''}
         </span>
     );
@@ -54,7 +50,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
     if (router.isFallback) {
         return <div>Loading...</div>;
     } else if (species == null) {
-        return <ErrorPage statusCode={404} />;
+        return <ErrorPage.default statusCode={404} />;
     }
 
     // the hosts will not be sorted, so sort them for display
@@ -63,10 +59,10 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
 
     return (
         <Container className="pt-2 fluid">
-            <Head>
+            <Head.default>
                 <title>{species.name}</title>
                 <meta name="description" content={`${species.name} - ${createSummaryGall(species)}`} />
-            </Head>
+            </Head.default>
             <Row className="mt-2">
                 {/* Details */}
                 <Col sm={12} md={8}>
@@ -104,14 +100,14 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                             <Row>
                                 <Col>
                                     <strong>Family: </strong>
-                                    <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
+                                    <Link.default key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
                                         {taxonomy.family.name}
-                                    </Link>
+                                    </Link.default>
                                     {' | '}
                                     <strong>Genus: </strong>
-                                    <Link key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
+                                    <Link.default key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
                                         {formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}
-                                    </Link>
+                                    </Link.default>
                                 </Col>
                             </Row>
                             <Row className="">
@@ -168,9 +164,9 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                                             {relatedGalls.map((g, i) => (
                                                 <span key={g.id}>
                                                     {' '}
-                                                    <Link key={g.id} href={`/gall/${g.id}`}>
+                                                    <Link.default key={g.id} href={`/gall/${g.id}`}>
                                                         {g.name}
-                                                    </Link>
+                                                    </Link.default>
                                                     {i < relatedGalls.length - 1 ? ', ' : ''}
                                                 </span>
                                             ))}

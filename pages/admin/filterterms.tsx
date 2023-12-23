@@ -1,13 +1,13 @@
 import axios from 'axios';
-import { constant } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
+import { constant } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option.js';
 import { GetServerSideProps } from 'next';
 import React, { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Controller } from 'react-hook-form';
-import { RenameEvent } from '../../components/editname';
-import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
+import { RenameEvent } from '../../components/editname.js';
+import useAdmin from '../../hooks/useadmin.js';
+import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs.js';
 import {
     DeleteResult,
     FilterField,
@@ -15,10 +15,10 @@ import {
     FilterFieldTypeValue,
     FilterFieldWithType,
     asFilterType,
-} from '../../libs/api/apitypes';
-import { getAlignments, getCells, getForms, getLocations, getShapes, getTextures, getWalls } from '../../libs/db/filterfield';
-import Admin from '../../libs/pages/admin';
-import { mightFailWithArray } from '../../libs/utils/util';
+} from '../../libs/api/apitypes.js';
+import { getAlignments, getCells, getForms, getLocations, getShapes, getTextures, getWalls } from '../../libs/db/filterfield.js';
+import Admin from '../../libs/pages/admin.js';
+import { mightFailWithArray } from '../../libs/utils/util.js';
 import * as t from 'io-ts';
 import * as tt from 'io-ts-types';
 

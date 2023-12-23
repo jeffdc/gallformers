@@ -1,23 +1,27 @@
-import * as O from 'fp-ts/lib/Option';
-import { constant, pipe } from 'fp-ts/lib/function';
+import * as O from 'fp-ts/lib/Option.js';
+import { constant, pipe } from 'fp-ts/lib/function.js';
 import * as t from 'io-ts';
 import { Badge, OverlayTrigger, Popover } from 'react-bootstrap';
-import { ConfirmationOptions } from '../components/confirmationdialog';
-import { RenameEvent } from '../components/editname';
+import { ConfirmationOptions } from '../components/confirmationdialog.js';
+import { RenameEvent } from '../components/editname.js';
 import {
     AbundanceApi,
     AbundanceApiSchema,
     AliasApi,
     AliasApiSchema,
     EmptyAbundance,
+    FGS,
     SCIENTIFIC_NAME,
     SpeciesApi,
     SpeciesUpsertFields,
-} from '../libs/api/apitypes';
-import { TaxonCodeValues } from '../libs/api/apitypes';
-import { FGS, TaxonomyEntry, TaxonomyEntryNoParent, TaxonomyEntryNoParentSchema, TaxonomyTypeValues } from '../libs/api/apitypes';
-import { extractGenus } from '../libs/utils/util';
-import { AdminFormFields, adminFormFieldsSchema } from './useAPIs';
+    TaxonCodeValues,
+    TaxonomyEntry,
+    TaxonomyEntryNoParent,
+    TaxonomyEntryNoParentSchema,
+    TaxonomyTypeValues,
+} from '../libs/api/apitypes.js';
+import { extractGenus } from '../libs/utils/util.js';
+import { AdminFormFields, adminFormFieldsSchema } from './useAPIs.js';
 
 export const SpeciesNamingHelp = (): JSX.Element => (
     <OverlayTrigger

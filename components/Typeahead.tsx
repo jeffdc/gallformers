@@ -1,7 +1,7 @@
 import React, { FocusEvent, KeyboardEvent } from 'react';
 import { Typeahead as RBTypeahead, AsyncTypeahead as RBAsyncTypeahead, UseAsyncProps } from 'react-bootstrap-typeahead';
 import { TypeaheadComponentProps } from 'react-bootstrap-typeahead/types/components/Typeahead';
-import { LabelKey, Option } from 'react-bootstrap-typeahead/types/types';
+import { LabelKey, Option } from 'react-bootstrap-typeahead/types/types.js';
 import { Control, Controller, FieldValues, Path } from 'react-hook-form';
 
 export type TypeaheadProps<FormFields extends FieldValues> = TypeaheadComponentProps & {

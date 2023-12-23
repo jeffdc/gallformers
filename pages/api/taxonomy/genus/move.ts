@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { apiUpsertEndpoint, onCompleteSendJson } from '../../../../libs/api/apipage';
-import { moveGenera } from '../../../../libs/db/taxonomy';
+import { apiUpsertEndpoint, onCompleteSendJson } from '../../../../libs/api/apipage.js';
+import { moveGenera } from '../../../../libs/db/taxonomy.js';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     if (req.method !== 'POST') {

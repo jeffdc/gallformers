@@ -1,16 +1,16 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Button, Col, Row } from 'react-bootstrap';
+import { ImageLicenseValues, SpeciesSourceApi } from '../libs/api/apitypes.js';
+import { TaxonCodeValues } from '../libs/api/apitypes.js';
+import { formatLicense, sourceToDisplay } from '../libs/pages/renderhelpers.js';
+import { SELECTED_ROW_STYLE, TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants.js';
+import DataTable from './DataTable.js';
+import Edit from './edit.js';
+import InfoTip from './infotip.js';
 import ReactMarkdown from 'react-markdown';
 import rehypeExternalLinks from 'rehype-external-links';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
-import { ImageLicenseValues, SpeciesSourceApi } from '../libs/api/apitypes';
-import { TaxonCodeValues } from '../libs/api/apitypes';
-import { formatLicense, sourceToDisplay } from '../libs/pages/renderhelpers';
-import { SELECTED_ROW_STYLE, TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
-import DataTable from './DataTable';
-import Edit from './edit';
-import InfoTip from './infotip';
 
 export type SourceListProps = {
     data: SpeciesSourceApi[];

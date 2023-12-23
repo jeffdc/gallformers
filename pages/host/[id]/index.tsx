@@ -1,27 +1,25 @@
-import { constant, pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
+import * as O from 'fp-ts/lib/Option.js';
+import { constant, pipe } from 'fp-ts/lib/function.js';
 import { GetStaticPaths, GetStaticProps } from 'next';
-import Head from 'next/head';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
-import React, { useMemo, useState } from 'react';
+import Head from 'next/head.js';
+import Link from 'next/link.js';
+import { useRouter } from 'next/router.js';
+import { useMemo, useState } from 'react';
 import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
-import DataTable from '../../../components/DataTable';
-import Edit from '../../../components/edit';
-import Images from '../../../components/images';
-import RangeMap from '../../../components/rangemap';
-import SeeAlso from '../../../components/seealso';
-import SourceList from '../../../components/sourcelist';
-import SpeciesSynonymy from '../../../components/speciesSynonymy';
-import { GallSimple, HostApi } from '../../../libs/api/apitypes';
-import { FGS } from '../../../libs/api/apitypes';
-import { allHostIds, hostById } from '../../../libs/db/host';
-import { taxonomyForSpecies } from '../../../libs/db/taxonomy';
-import { linkSourceToGlossary } from '../../../libs/pages/glossary';
-import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { formatWithDescription } from '../../../libs/pages/renderhelpers';
-import { TABLE_CUSTOM_STYLES } from '../../../libs/utils/DataTableConstants';
-import { TaxonCodeValues } from '../../../libs/api/apitypes';
+import DataTable from '../../../components/DataTable.js';
+import Edit from '../../../components/edit.js';
+import Images from '../../../components/images.js';
+import RangeMap from '../../../components/rangemap.js';
+import SeeAlso from '../../../components/seealso.js';
+import SourceList from '../../../components/sourcelist.js';
+import SpeciesSynonymy from '../../../components/speciesSynonymy.js';
+import { FGS, GallSimple, HostApi, TaxonCodeValues } from '../../../libs/api/apitypes.js';
+import { allHostIds, hostById } from '../../../libs/db/host.js';
+import { taxonomyForSpecies } from '../../../libs/db/taxonomy.js';
+import { linkSourceToGlossary } from '../../../libs/pages/glossary.js';
+import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers.js';
+import { formatWithDescription } from '../../../libs/pages/renderhelpers.js';
+import { TABLE_CUSTOM_STYLES } from '../../../libs/utils/DataTableConstants.js';
 
 type Props = {
     host: HostApi;
@@ -31,9 +29,9 @@ type Props = {
 const linkGall = (g: GallSimple) => {
     return (
         <>
-            <Link key={g.id} href={`/gall/${g.id}`}>
+            <Link.default key={g.id} href={`/gall/${g.id}`}>
                 <i>{g.name}</i>
-            </Link>
+            </Link.default>
             <Edit id={g.id} type="gall" />
         </>
     );
@@ -69,10 +67,10 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
 
     return (
         <Container className="pt-2" fluid>
-            <Head>
+            <Head.default>
                 <title>{host.name}</title>
                 <meta name="description" content={[host.name, ...host.aliases.map((a) => a.name)].join(', ')} />
-            </Head>
+            </Head.default>
 
             <Row>
                 {/* The details column */}
@@ -80,13 +78,13 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                     <Row>
                         <Col className="">
                             <h2>
-                                <Link
+                                <Link.default
                                     href={`/id?hostOrTaxon=${encodeURI(
                                         host.name,
                                     )}&type=host&detachable=&alignment=&cells=&color=&locations=&season=&shape=&textures=&walls=&form=&undescribed=false`}
                                 >
                                     <em>{host.name}</em>
-                                </Link>
+                                </Link.default>
                             </h2>
                         </Col>
                         <Col xs={2} className="me-1">
@@ -111,9 +109,9 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                         <Col>
                             <p>
                                 <strong>Family: </strong>
-                                <Link key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
+                                <Link.default key={taxonomy.family.id} href={`/family/${taxonomy.family.id}`}>
                                     {taxonomy.family.name}
-                                </Link>
+                                </Link.default>
                                 {pipe(
                                     taxonomy.section,
                                     O.map((s) => (
@@ -121,9 +119,9 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                         <span>
                                             {' | '}
                                             <strong> Section: </strong>{' '}
-                                            <Link key={s.id} href={`/section/${s.id}`}>
+                                            <Link.default key={s.id} href={`/section/${s.id}`}>
                                                 <em>{`${s.name} (${s.description})`}</em>
-                                            </Link>
+                                            </Link.default>
                                         </span>
                                     )),
                                     O.map((s) => s),
@@ -131,10 +129,10 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
                                 )}
                                 {' | '}
                                 <strong>Genus: </strong>
-                                <Link key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
+                                <Link.default key={taxonomy.genus.id} href={`/genus/${taxonomy.genus.id}`}>
                                     {' '}
                                     <em>{formatWithDescription(taxonomy.genus.name, taxonomy.genus.description)}</em>
-                                </Link>
+                                </Link.default>
                             </p>
                         </Col>
                     </Row>

@@ -1,19 +1,18 @@
-import { constant, pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
+import * as O from 'fp-ts/lib/Option.js';
+import { constant, pipe } from 'fp-ts/lib/function.js';
 import { GetStaticPaths, GetStaticProps } from 'next';
-import ErrorPage from 'next/error';
-import Head from 'next/head';
-import { useRouter } from 'next/router';
+import ErrorPage from 'next/error.js';
+import Head from 'next/head.js';
+import { useRouter } from 'next/router.js';
 import { Card, Col, Container, Row } from 'react-bootstrap';
 import TreeMenu, { Item, TreeNodeInArray } from 'react-simple-tree-menu';
 import 'react-simple-tree-menu/dist/main.css';
-import Edit from '../../../components/edit';
-import { TaxonomyEntry } from '../../../libs/api/apitypes';
-import { TaxonomyTree, allFamilyIds, taxonomyEntryById, taxonomyTreeForId } from '../../../libs/db/taxonomy';
-import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
-import { formatWithDescription } from '../../../libs/pages/renderhelpers';
-import { hasProp } from '../../../libs/utils/util';
-import { TaxonCodeValues } from '../../../libs/api/apitypes';
+import Edit from '../../../components/edit.js';
+import { TaxonCodeValues, TaxonomyEntry } from '../../../libs/api/apitypes.js';
+import { TaxonomyTree, allFamilyIds, taxonomyEntryById, taxonomyTreeForId } from '../../../libs/db/taxonomy.js';
+import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers.js';
+import { formatWithDescription } from '../../../libs/pages/renderhelpers.js';
+import { hasProp } from '../../../libs/utils/util.js';
 
 type Props = {
     family: TaxonomyEntry[];
@@ -28,7 +27,7 @@ const Family = ({ family, tree }: Props): JSX.Element => {
     }
 
     if (family.length <= 0) {
-        return <ErrorPage statusCode={404} />;
+        return <ErrorPage.default statusCode={404} />;
     }
 
     const fam = family[0];
@@ -42,10 +41,10 @@ const Family = ({ family, tree }: Props): JSX.Element => {
 
     return (
         <Container className="pt-2" fluid>
-            <Head>
+            <Head.default>
                 <title>{fam.name}</title>
                 <meta name="description" content={`Family ${fam.name}`} />
-            </Head>
+            </Head.default>
             <Row>
                 <Col xs={12}>
                     <Card>
@@ -56,7 +55,7 @@ const Family = ({ family, tree }: Props): JSX.Element => {
                             </h1>
                         </Card.Header>
                         <Card.Body>
-                            <TreeMenu data={tree} onClickItem={handleClick} initialOpenNodes={[fam.id.toString()]} />
+                            <TreeMenu.default data={tree} onClickItem={handleClick} initialOpenNodes={[fam.id.toString()]} />
                         </Card.Body>
                     </Card>
                 </Col>

@@ -1,12 +1,11 @@
-import * as A from 'fp-ts/lib/Array';
-import { constant, pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
-import * as TE from 'fp-ts/lib/TaskEither';
+import * as A from 'fp-ts/lib/Array.js';
+import { constant, pipe } from 'fp-ts/lib/function.js';
+import * as O from 'fp-ts/lib/Option.js';
+import * as TE from 'fp-ts/lib/TaskEither.js';
 import { PorterStemmer, WordTokenizer } from 'natural';
-import { SpeciesSourceApi } from '../api/apitypes';
-import { allGlossaryEntries } from '../db/glossary';
-import { errorThrow } from '../utils/util';
-import { Entry } from '../api/glossary';
+import { Entry, SpeciesSourceApi } from '../api/apitypes.js';
+import { allGlossaryEntries } from '../db/glossary.js';
+import { errorThrow } from '../utils/util.js';
 
 export type EntryLinked = Entry & {
     linkedDefinition: string | JSX.Element[];

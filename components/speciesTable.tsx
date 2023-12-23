@@ -1,8 +1,8 @@
-import Link from 'next/link';
+import Link from 'next/link.js';
 import React, { useMemo } from 'react';
-import DataTable from './DataTable';
-import { SimpleSpecies, TaxonCodeValues } from '../libs/api/apitypes';
-import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
+import DataTable from './DataTable.js';
+import { SimpleSpecies, TaxonCodeValues } from '../libs/api/apitypes.js';
+import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants.js';
 
 export type SourceListProps = {
     species: SimpleSpecies[];
@@ -11,9 +11,9 @@ export type SourceListProps = {
 const linkSpecies = (s: SimpleSpecies) => {
     const hostOrGall = s.taxoncode === TaxonCodeValues.GALL ? 'gall' : 'host';
     return (
-        <Link key={s.id} href={`/${hostOrGall}/${s.id}`}>
+        <Link.default key={s.id} href={`/${hostOrGall}/${s.id}`}>
             <i>{s.name}</i>
-        </Link>
+        </Link.default>
     );
 };
 
