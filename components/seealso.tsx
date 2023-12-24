@@ -1,6 +1,10 @@
 import React from 'react';
 import { Col, Row } from 'react-bootstrap';
 import Image from 'next/image.js';
+import iNatLogo from '../public/images/inatlogo-small.png';
+import BugGuideLogo from '../public/images/bugguide-small.png';
+import GScholarLogo from '../public/images/gscholar-small.png';
+import BHLLogo from '../public/images/bhllogo.png';
 
 // we allow species names to contain subspecies of the form 'Genus species subspecies' and for gallformers
 // sexual generation info 'Genus species (sexgen)'. For external linking we want to only link to the main species.
@@ -53,7 +57,7 @@ const SeeAlso = ({ name, undescribed }: Props): JSX.Element => {
                             rel="noreferrer"
                             aria-label="Search for more information about this species on iNaturalist."
                         >
-                            <Image src="../public/images/inatlogo-small.png" alt="iNaturalist logo" />
+                            <Image src={iNatLogo} alt="iNaturalist logo" />
                         </a>
                     </Col>
                     <Col xs={12} md={6} lg={3} className="align-self-center">
@@ -63,7 +67,7 @@ const SeeAlso = ({ name, undescribed }: Props): JSX.Element => {
                             rel="noreferrer"
                             aria-label="Search for more information about this species on BugGuide."
                         >
-                            <Image src="../public/images/bugguide-small.png" alt="BugGuide logo" />
+                            <Image src={BugGuideLogo} alt="BugGuide logo" />
                         </a>
                     </Col>
                     <Col xs={12} md={6} lg={3} className="align-self-center">
@@ -73,7 +77,7 @@ const SeeAlso = ({ name, undescribed }: Props): JSX.Element => {
                             rel="noreferrer"
                             aria-label="Search for more information about this species on Google Scholar."
                         >
-                            <Image src="../public/images/gscholar-small.png" alt="Google Scholar logo" />
+                            <Image src={GScholarLogo} alt="Google Scholar logo" />
                         </a>
                     </Col>
                     <Col xs={12} md={6} lg={3} className="align-self-center">
@@ -83,7 +87,7 @@ const SeeAlso = ({ name, undescribed }: Props): JSX.Element => {
                             rel="noreferrer"
                             aria-label="Search for more information about this species at the Biodiversity Heritage Library."
                         >
-                            <Image src="../public/images/bhllogo.png" alt="Biodiversity Heritage Library logo" />
+                            <Image src={BHLLogo} alt="Biodiversity Heritage Library logo" />
                         </a>
                     </Col>
                 </Row>
@@ -103,7 +107,7 @@ const SeeAlso = ({ name, undescribed }: Props): JSX.Element => {
                             rel="noreferrer"
                             aria-label="Search for more information about this species on iNaturalist."
                         >
-                            <Image src="../public/images/inatlogo-small.png" alt="iNaturalist logo" />
+                            <Image src={iNatLogo} alt="iNaturalist logo" />
                         </a>
                     </Col>
                 </Row>

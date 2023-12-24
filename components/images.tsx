@@ -11,6 +11,8 @@ import useIsMounted from '../hooks/useIsMounted';
 import useWindowDimensions from '../hooks/usewindowdimension';
 import { ImageApi, ImageLicenseValues, ImageNoSourceApi, SpeciesApi, TaxonCodeValues } from '../libs/api/apitypes';
 import { hasProp } from '../libs/utils/util';
+import NoImage from '../public/images/noimage.jpg';
+import NoImageHost from '../public/images/noimagehost.jpg';
 
 // type guard for dealing with possible Images without Source data. If this happens there is an upstream
 // programming error so we will fail fast and hard.
@@ -50,11 +52,7 @@ const Images = ({ sp }: Props): JSX.Element => {
     return species.images.length < 1 ? (
         <div className="p-2">
             <Image
-                src={
-                    species.taxoncode === TaxonCodeValues.GALL
-                        ? '../public/images/noimage.jpg'
-                        : '../public/images/noimagehost.jpg'
-                }
+                src={species.taxoncode === TaxonCodeValues.GALL ? NoImage : NoImageHost}
                 alt={`missing image of ${species.name}`}
                 className="img-fluid d-block"
             />

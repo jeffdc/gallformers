@@ -9,7 +9,16 @@ export default (phase) => {
             BUILD_ID: buildid,
         },
         images: {
-            domains: ['static.gallformers.org', 'dhz6u1p7t6okk.cloudfront.net'],
+            remotePatterns: [
+                {
+                    protocol: 'https',
+                    hostname: 'static.gallformers.org',
+                },
+                {
+                    protocol: 'https',
+                    hostname: 'dhz6u1p7t6okk.cloudfront.net',
+                },
+            ],
         },
         generateBuildId: async () => {
             //TODO convert this to the latest git hash

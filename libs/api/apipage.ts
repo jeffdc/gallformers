@@ -107,7 +107,7 @@ export async function apiSearchEndpoint<T>(
     dbSearch: (s: string) => TE.TaskEither<Error, T[]>,
 ) {
     const errMsg = (q: string) => (): TE.TaskEither<Err, unknown> => {
-        return TE.left({ status: 400, msg: `Failed to provide the ${q} d as a query param.` });
+        return TE.left({ status: 400, msg: `Failed to provide a value for ${q} as a query param. e.g., ?q=Andricus` });
     };
 
     return await pipe(

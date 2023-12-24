@@ -18,7 +18,7 @@ const Footer = (): JSX.Element => {
     };
 
     return (
-        <Navbar expand="sm" variant="dark" collapseOnSelect className="navbar-footer container-fluid px-4">
+        <Navbar expand="sm" variant="dark" collapseOnSelect className="navbar-footer fixed-bottom container-fluid px-4">
             <Navbar.Collapse>
                 {mounted && session && (
                     <>

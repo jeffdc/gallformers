@@ -20,6 +20,7 @@ import {
     TaxonCodeValues,
     TaxonomyEntry,
     TaxonomyType,
+    TaxonomyTypeSchema,
     TaxonomyTypeValues,
     TaxonomyUpsertFields,
 } from '../api/apitypes';
@@ -28,6 +29,7 @@ import { ExtractTFromPromise } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
 import { extractId } from './utils';
+import { decodeWithDefault } from '../utils/io-ts.ts';
 
 export type TaxonomyTree = taxonomy & {
     parent: taxonomy | null;
@@ -68,7 +70,7 @@ const toTaxonomyEntry = (dbTax: DBTaxonomyWithParent): TaxonomyEntry => {
         id: dbTax.id,
         description: dbTax.description == null ? '' : dbTax.description,
         name: dbTax.name,
-        type: TaxonomyTypeValues[dbTax.type.toUpperCase() as keyof typeof TaxonomyTypeValues],
+        type: decodeWithDefault(TaxonomyTypeSchema.decode(dbTax.type), TaxonomyTypeValues.GENUS),
         parent: pipe(dbTax.parent, O.fromNullable, O.map(toTaxonomyEntry)),
     };
 };

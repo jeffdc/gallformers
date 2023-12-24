@@ -3,7 +3,7 @@ import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { ImageApi, ImageLicenseValues, ImageNoSourceApi } from '../api/apitypes';
+import { ImageApi, ImageLicenseValues, ImageLicenseValuesSchema, ImageNoSourceApi } from '../api/apitypes';
 import {
     createOtherSizes,
     deleteImagesByPaths,
@@ -19,6 +19,7 @@ import { ExtractTFromPromise } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
 import { connectIfNotNull } from './utils';
+import { decodeWithDefault } from '../utils/io-ts';
 
 export const addImages = (images: ImageApi[]): TaskEither<Error, ImageApi[]> => {
     // N.B. - the default will also be false for new images, only later can it be changed. So we do not need to worry about
@@ -144,7 +145,7 @@ export const adaptImage = <T extends ImageWithSource>(img: T): ImageApi => ({
     xlarge: makePath(img.path, XLARGE),
     original: makePath(img.path, ORIGINAL),
     source: O.fromNullable(img.source),
-    license: ImageLicenseValues[img.license as keyof typeof ImageLicenseValues],
+    license: decodeWithDefault(ImageLicenseValuesSchema.decode(img.license), ImageLicenseValues.NONE),
 });
 
 export const adaptImageNoSource = <T extends image>(img: T): ImageNoSourceApi => ({

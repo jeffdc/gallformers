@@ -5,6 +5,7 @@ import React from 'react';
 import { Accordion, Card, Col, Row } from 'react-bootstrap';
 import { getCurrentStats, Stat } from '../libs/db/stats.ts';
 import { mightFailWithArray } from '../libs/utils/util';
+import GallMeMaybe from '../public/images/gallmemaybe.jpg';
 
 type Props = {
     stats: Stat[];
@@ -210,13 +211,7 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
                             <Accordion.Header>Dare You Click?</Accordion.Header>
                             <Accordion.Body>
                                 <Card.Body className="d-flex justify-content-center">
-                                    <Image
-                                        src="../public/images/gallmemaybe.jpg"
-                                        alt="Gall Me Maybe"
-                                        width="300"
-                                        height="532"
-                                        layout="fixed"
-                                    />
+                                    <Image src={GallMeMaybe} alt="Gall Me Maybe" width="300" height="532" />
                                 </Card.Body>
                             </Accordion.Body>
                         </Accordion.Item>

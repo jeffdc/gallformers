@@ -54,7 +54,7 @@ import {
 } from '../api/apitypes';
 import { SMALL, deleteImagesBySpeciesId, makePath } from '../images/images';
 import { defaultSource } from '../pages/renderhelpers';
-import { unsafeDecode } from '../utils/io-ts.ts';
+import { decodeWithDefault } from '../utils/io-ts.ts';
 import { logger } from '../utils/logger.ts';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError, optionalWith } from '../utils/util';
@@ -220,7 +220,7 @@ export const getGalls = (
                 name: g.species.name,
                 datacomplete: g.species.datacomplete,
                 speciessource: g.species.speciessource,
-                taxoncode: unsafeDecode(TaxonCodeSchema.decode(g.species.taxoncode)),
+                taxoncode: decodeWithDefault(TaxonCodeSchema.decode(g.species.taxoncode), TaxonCodeValues.GALL),
                 description: O.fromNullable(d),
                 abundance: optionalWith(g.species.abundance, adaptAbundance),
                 gall_id: g.gall_id,

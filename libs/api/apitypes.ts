@@ -7,7 +7,7 @@ import * as O from 'fp-ts/lib/Option';
 import { Option } from 'fp-ts/lib/Option';
 import * as t from 'io-ts';
 import * as tt from 'io-ts-types';
-import { fromEnum } from '../utils/io-ts.ts';
+import { decodeWithDefault, fromEnum } from '../utils/io-ts.ts';
 
 export type Deletable = {
     delete?: boolean;
@@ -545,7 +545,7 @@ export enum FilterFieldTypeValue {
 export const FilterFieldTypeSchema = fromEnum<FilterFieldTypeValue>('FilterFieldTypeValue', FilterFieldTypeValue);
 // export type FilterFieldType = t.TypeOf<typeof FilterFieldTypeSchema>;
 export const asFilterType = (possibleFilterType?: string | null): FilterFieldTypeValue =>
-    FilterFieldTypeValue[possibleFilterType?.toUpperCase() as keyof typeof FilterFieldTypeValue];
+    decodeWithDefault(FilterFieldTypeSchema.decode(possibleFilterType), FilterFieldTypeValue.ALIGNMENTS);
 
 export const FilterFieldWithTypeSchema = t.intersection([FilterFieldSchema, t.type({ fieldType: FilterFieldTypeSchema })]);
 

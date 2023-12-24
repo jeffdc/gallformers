@@ -2,6 +2,7 @@ import Image from 'next/image.js';
 import Link from 'next/link';
 import React from 'react';
 import { Container, Row, Col } from 'react-bootstrap';
+import Scale from '../public/images/scale.jpg';
 
 export default function FourOhFour(): JSX.Element {
     return (
@@ -20,7 +21,7 @@ export default function FourOhFour(): JSX.Element {
                         </Row>
                         <Row className="p-1 justify-content-md-center">
                             <a href="https://www.inaturalist.org/observations/58767231" target="_blank" rel="noreferrer">
-                                <Image src="../public/images/scale.jpg" alt="A scale insect not a gall." />
+                                <Image src={Scale} alt="A scale insect not a gall." />
                             </a>
                         </Row>
                         <Row className="p-3">
