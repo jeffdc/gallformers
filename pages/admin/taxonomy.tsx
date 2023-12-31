@@ -11,8 +11,7 @@ import 'react-simple-tree-menu/dist/main.css';
 import EditableDataTable, { EditableTableColumn } from '../../components/EditableDataTable';
 import { RenameEvent } from '../../components/editname';
 import MoveFamily, { MoveEvent } from '../../components/movefamily';
-import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
-import useAdmin from '../../hooks/useadmin';
+import useAdmin, { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useadmin';
 import { extractQueryParam } from '../../libs/api/apipage';
 import {
     ALL_FAMILY_TYPES,
@@ -128,6 +127,7 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
         mainField,
         deleteButton,
         isSuperAdmin,
+        isValid,
     } = useAdmin(
         'Family',
         id,
@@ -288,16 +288,16 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
                     </Row>
                     <Row>
                         <Col xs={2} className="me-3">
-                            <Button variant="primary" type="submit" value="Submit" disabled={!selected}>
-                                Submit
+                            <Button variant="primary" type="submit" value="Save Changes" disabled={!selected || !isValid}>
+                                Save Changes
                             </Button>
                         </Col>
                         <Col>
                             {isSuperAdmin
                                 ? deleteButton(
-                                      'Caution. If there are any species (galls or hosts) assigned to this Family they too will be deleted.',
+                                      'Caution. If there are any species (galls or hosts) assigned to this Family they too will be PERMANENTLY deleted.',
                                   )
-                                : 'If you need to delete a Family please contact Adam or Jeff on Slack.'}
+                                : 'If you need to delete a Family please contact Adam or Jeff on Slack/Discord.'}
                         </Col>
                     </Row>
                 </form>

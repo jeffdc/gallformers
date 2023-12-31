@@ -258,12 +258,14 @@ const Source = ({ id, sources }: Props): JSX.Element => {
 
                 <Row className="formGroup">
                     <Col>
-                        <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
+                        <Button variant="primary" type="submit" value="Save Changes" disabled={!selected || !isValid}>
+                            Save Changes
+                        </Button>
                     </Col>
                     <Col>
                         {isSuperAdmin
-                            ? deleteButton('Caution. All data associated with this Source will be deleted.')
-                            : 'If you need to delete a Source please contact Adam or Jeff on Slack.'}
+                            ? deleteButton('Caution. All data associated with this Source will be PERMANENTLY deleted.')
+                            : 'If you need to delete a Source please contact Adam or Jeff on Slack/Discord.'}
                     </Col>
                 </Row>
             </form>

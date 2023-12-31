@@ -145,9 +145,11 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                 </Row>
                 <Row className="my-1">
                     <Col>
-                        <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
+                        <Button variant="primary" type="submit" value="Save Changes" disabled={!selected || !isValid}>
+                            Save Changes
+                        </Button>
                     </Col>
-                    <Col>{deleteButton('Caution. The glossary entry will deleted.')}</Col>
+                    <Col>{deleteButton('Caution. The glossary entry will be PERMANENTLY deleted.')}</Col>
                 </Row>
             </form>
         </Admin>

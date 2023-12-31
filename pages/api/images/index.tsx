@@ -3,7 +3,6 @@ import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
 import {
     Err,
     apiUpsertEndpoint,
@@ -16,9 +15,11 @@ import {
 
 import { deleteImages, getImages, updateImage } from '../../../libs/db/images';
 import { csvAsNumberArr } from '../../../libs/utils/util';
+import { getServerSession } from 'next-auth';
+import authOptions from '../../../pages/api/auth/[...nextauth]';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
-    const session = await getSession({ req });
+    const session = await getServerSession(req, res, authOptions);
     if (!session) {
         res.status(401).end();
     }

@@ -25,7 +25,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else if (params && O.isSome(params['q'])) {
-        apiSearchEndpoint(req, res, sectionSearch);
+        await apiSearchEndpoint(req, res, sectionSearch);
     } else if (params && O.isSome(params['name'])) {
         await pipe(
             params['name'],

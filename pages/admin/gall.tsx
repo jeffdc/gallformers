@@ -766,9 +766,11 @@ const Gall = ({
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col>
-                        <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
+                        <Button variant="primary" type="submit" value="Save Changes" disabled={!selected || !isValid}>
+                            Save Changes
+                        </Button>
                     </Col>
-                    <Col>{deleteButton('Caution. All data associated with this Gall will be deleted.')}</Col>
+                    <Col>{deleteButton('Caution. All data associated with this Gall will be PERMANENTLY deleted.')}</Col>
                 </Row>
             </form>
         </Admin>

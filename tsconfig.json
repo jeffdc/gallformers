@@ -29,7 +29,8 @@
     "incremental": true,
     "strictFunctionTypes": false,
     "strictNullChecks": true,
-    "alwaysStrict": true
+    "alwaysStrict": true,
+    "sourceMap": true,
   },
   "include": [
     "next-env.d.ts",

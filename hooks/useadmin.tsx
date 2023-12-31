@@ -14,8 +14,21 @@ import { RenameEvent } from '../components/editname';
 import { DeleteResult } from '../libs/api/apitypes';
 import { WithID } from '../libs/utils/types';
 import { hasProp, pluralize } from '../libs/utils/util';
-import { AdminFormFields, useAPIs } from './useAPIs';
 import { useConfirmation } from './useConfirmation';
+import { useAPIs } from './useAPIs';
+
+/** The schema has to be generated at runtime since the type is not known until then. */
+export const adminFormFieldsSchema = <T,>(schemaT: t.Type<T>) =>
+    t.type({
+        mainField: t.array(schemaT),
+        del: t.boolean,
+    });
+
+// Have to define this rather than use io-ts type magic since we do not know the types now.
+export type AdminFormFields<T> = {
+    mainField: T[];
+    del: boolean;
+};
 
 type AdminData<T, FormFields extends FieldValues> = {
     data: T[];

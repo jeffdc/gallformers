@@ -1,13 +1,14 @@
 import axios from 'axios';
-import { constant } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
+import { constant } from 'fp-ts/lib/function';
+import * as t from 'io-ts';
+import * as tt from 'io-ts-types';
 import { GetServerSideProps } from 'next';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Controller } from 'react-hook-form';
 import { RenameEvent } from '../../components/editname';
-import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
+import useAdmin, { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useadmin';
 import {
     DeleteResult,
     FilterField,
@@ -16,11 +17,18 @@ import {
     FilterFieldWithType,
     asFilterType,
 } from '../../libs/api/apitypes';
-import { getAlignments, getCells, getForms, getLocations, getShapes, getTextures, getWalls } from '../../libs/db/filterfield';
+import {
+    getAlignments,
+    getCells,
+    getColors,
+    getForms,
+    getLocations,
+    getShapes,
+    getTextures,
+    getWalls,
+} from '../../libs/db/filterfield';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
-import * as t from 'io-ts';
-import * as tt from 'io-ts-types';
 
 type FormFields = AdminFormFields<FilterField> & Pick<FilterField, 'description'>;
 
@@ -44,9 +52,10 @@ const schema = t.intersection([
 //     del: yup.boolean().required(),
 // });
 
-type Props = {
+export type Props = {
     alignments: FilterField[];
     cells: FilterField[];
+    colors: FilterField[];
     forms: FilterField[];
     locations: FilterField[];
     shapes: FilterField[];
@@ -81,7 +90,7 @@ const createNewFilterField = (field: string): FilterField => ({
     id: -1,
 });
 
-const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, walls }: Props): JSX.Element => {
+const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, textures, walls }: Props): JSX.Element => {
     const [fieldType, setFieldType] = useState(FilterFieldTypeValue.ALIGNMENTS);
 
     const dataFromSelection = (field: string): FilterField[] => {
@@ -90,6 +99,8 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
                 return alignments;
             case 'cells':
                 return cells;
+            case 'colors':
+                return colors;
             case 'forms':
                 return forms;
             case 'locations':
@@ -184,6 +195,7 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
                     <Row className="my-1">
                         <Col>
                             <select
+                                title="fieldType"
                                 className="form-control"
                                 onChange={(e) => {
                                     setSelected(undefined);
@@ -227,6 +239,8 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
                                 rules={{ required: true }}
                                 render={({ field: { ref } }) => (
                                     <textarea
+                                        title="description"
+                                        placeholder="description"
                                         ref={ref}
                                         className="form-control"
                                         rows={4}
@@ -242,13 +256,17 @@ const FilterTerms = ({ alignments, cells, forms, locations, shapes, textures, wa
                                 )}
                             />
                             {form.formState.errors.description && (
-                                <span className="text-danger">You must provide the definition.</span>
+                                <span className="text-danger" title="description-error">
+                                    You must provide the definition.
+                                </span>
                             )}
                         </Col>
                     </Row>
                     <Row className="form-input">
                         <Col>
-                            <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
+                            <Button variant="primary" type="submit" value="Save Changes" disabled={!selected || !isValid}>
+                                Save Changes
+                            </Button>
                         </Col>
                         <Col>{deleteButton('Caution. The filter field will deleted.', doDelete)}</Col>
                     </Row>
@@ -263,6 +281,7 @@ export const getServerSideProps: GetServerSideProps = async () => {
         props: {
             alignments: await mightFailWithArray<FilterField>()(getAlignments()),
             cells: await mightFailWithArray<FilterField>()(getCells()),
+            colors: await mightFailWithArray<FilterField>()(getColors()),
             forms: await mightFailWithArray<FilterField>()(getForms()),
             locations: await mightFailWithArray<FilterField>()(getLocations()),
             shapes: await mightFailWithArray<FilterField>()(getShapes()),

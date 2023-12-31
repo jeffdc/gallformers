@@ -4,8 +4,9 @@ import * as TA from 'fp-ts/lib/Task.js';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth';
 import { ParsedUrlQuery } from 'querystring';
+import authOptions from '../../pages/api/auth/[...nextauth]';
 import { logger } from '../utils/logger.ts';
 import { DeleteResult } from './apitypes.js';
 
@@ -21,7 +22,7 @@ export async function apiIdEndpoint<T>(
     fDelete: ((id: number) => TE.TaskEither<Error, DeleteResult>) | undefined = undefined,
     fGet: ((id: number) => TE.TaskEither<Error, T>) | undefined = undefined,
 ): Promise<void> {
-    const session = await getSession({ req });
+    const session = await getServerSession(req, res, authOptions);
     if (!session) {
         res.status(401).end();
     }
@@ -62,7 +63,7 @@ export async function apiUpsertEndpoint<T, R>(
     fUpsert: (item: T) => TE.TaskEither<Error, R>,
     onComplete: (res: NextApiResponse) => (results: R) => TA.Task<never>,
 ): Promise<void> {
-    const session = await getSession({ req });
+    const session = await getServerSession(req, res, authOptions);
     if (!session) {
         res.status(401).end();
     }
@@ -71,10 +72,6 @@ export async function apiUpsertEndpoint<T, R>(
         status: 400,
         msg: 'Can not upsert. No valid item provided in request body.',
     };
-
-    //JDC: added this to try and help figure out what is causing the weird crash that Chris triggers
-    // logger.info(req, 'Upsert request');
-    // logger.info(req.body, 'Upsert request body');
 
     //TODO - figure out how to make this type safe. Maybe need to have caller pass conversion f?
     const t = !req.body ? O.none : O.of(req.body as T);
@@ -92,11 +89,6 @@ export async function apiUpsertEndpoint<T, R>(
         ),
         TE.fromEither,
         TE.flatten,
-        //JDC: added this to try and help figure out what is causing the weird crash that Chris triggers
-        TE.mapLeft((e) => {
-            logger.error(e, 'Failed doing upsert.');
-            return e;
-        }),
         TE.fold(sendErrorResponse(res), onComplete(res)),
     )();
 }

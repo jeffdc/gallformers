@@ -86,8 +86,8 @@ const Admin = (): JSX.Element => {
                         . If the issue is critical or you are not sure that it is an issue, then reach out on{' '}
                         <a href="https://gallformerdat-m1g8137.slack.com/archives/C01B319JAG6" target="_blank" rel="noreferrer">
                             Slack
-                        </a>
-                        .
+                        </a>{' '}
+                        or <a href="">Discord</a>.
                     </Col>
                 </Row>
             </div>

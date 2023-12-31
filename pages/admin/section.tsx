@@ -257,7 +257,9 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
                 </Row>
                 <Row className="form-input">
                     <Col>
-                        <input type="submit" className="button" value="Submit" disabled={!selected && !isValid} />
+                        <Button variant="primary" type="submit" value="Save Changes" disabled={!selected || !isValid}>
+                            Save Changes
+                        </Button>
                     </Col>
                     <Col>{deleteButton('Caution. The Section will be deleted.')}</Col>
                 </Row>

@@ -338,7 +338,14 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
                     </Row>
                     <Row className="my-1">
                         <Col>
-                            <input type="submit" className="button" value="Submit" disabled={!selected || gallHosts.length < 1} />
+                            <Button
+                                variant="primary"
+                                type="submit"
+                                value="Save Changes"
+                                disabled={!selected || gallHosts.length < 1}
+                            >
+                                Save Changes
+                            </Button>
                         </Col>
                     </Row>
                 </form>

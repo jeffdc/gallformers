@@ -6,6 +6,7 @@ import Auth, { superAdmins } from '../../components/auth';
 import EditName, { RenameEvent } from '../../components/editname';
 import { DeleteResult, TaxonCodeValues } from '../api/apitypes';
 import { WithID } from '../utils/types';
+import { pluralize } from '../utils/util';
 
 export type AdminTypes =
     | 'Taxonomy'
@@ -112,7 +113,7 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
         <Auth superAdmin={!!props.superAdmin}>
             <>
                 <Head>
-                    <title>{`Add/ Edit ${props.type}s`}</title>
+                    <title>{`Add/ Edit ${pluralize(props.type)}`}</title>
                 </Head>
 
                 <Toaster />
@@ -149,10 +150,10 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
                 )}
 
                 <Navbar bg="" variant="light">
-                    <Nav.Link disabled={!props.selected} href={link()}>
-                        🔗
-                    </Nav.Link>
                     <Nav variant="tabs" defaultActiveKey={props.type}>
+                        <Nav.Link disabled={!props.selected} href={link()}>
+                            🔗
+                        </Nav.Link>
                         <Nav.Link eventKey="Gall" href={`./gall${params('id', 'Gall')}`}>{`Galls`}</Nav.Link>
                         <Nav.Link eventKey="Host" href={`./host${params('id', 'Host')}`}>{`Hosts`}</Nav.Link>
                         <Nav.Link eventKey="Images" href={`./images${params('speciesid', 'Images')}`}>{`Images`}</Nav.Link>

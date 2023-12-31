@@ -156,9 +156,11 @@ const PlaceAdmin = ({ id }: Props): JSX.Element => {
                 </Row>
                 <Row className="form-input">
                     <Col>
-                        <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
+                        <Button variant="primary" type="submit" value="Save Changes" disabled={!selected || !isValid}>
+                            Save Changes
+                        </Button>
                     </Col>
-                    <Col>{deleteButton('Caution. The Place will be deleted.')}</Col>
+                    <Col>{deleteButton('Caution. The Place will be PERMANENTLY deleted.')}</Col>
                 </Row>
             </form>
         </Admin>

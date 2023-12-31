@@ -100,7 +100,8 @@ describe('pluralize tests', () => {
         expect(U.pluralize('Family')).toBe('Families');
     });
 
-    test('it must change not y  to s', () => {
+    test('it must change not y to s unless already s', () => {
         expect(U.pluralize('Gall')).toBe('Galls');
+        expect(U.pluralize('Terms')).toBe('Terms');
     });
 });

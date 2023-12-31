@@ -1,21 +1,7 @@
-import * as t from 'io-ts';
 import { DeleteResult } from '../libs/api/apitypes';
 import { logger } from '../libs/utils/logger.ts';
 import { WithID } from '../libs/utils/types';
 import { hasProp } from '../libs/utils/util';
-
-/** The schema has to be generated at runtime since the type is not known until then. */
-export const adminFormFieldsSchema = <T>(schemaT: t.Type<T>) =>
-    t.type({
-        mainField: t.array(schemaT),
-        del: t.boolean,
-    });
-
-// Have to define this rather than use io-ts type magic since we do not know the types now.
-export type AdminFormFields<T> = {
-    mainField: T[];
-    del: boolean;
-};
 
 /**
  * The type returned by the hook.
@@ -73,7 +59,8 @@ export const useAPIs = <T extends WithID, U>(
                     const result: DeleteResult = await res.json();
                     postDelete(value.id, result);
                 } else {
-                    throw new Error(await res.text());
+                    const txt = await res.text();
+                    throw new Error(`code: ${res.status} err: ${txt}`);
                 }
             } else {
                 const keyFieldVal = value[keyProp] as unknown as string;
@@ -90,13 +77,18 @@ export const useAPIs = <T extends WithID, U>(
                 if (res.status === 200) {
                     postUpdate(res);
                 } else {
-                    throw new Error(await res.text());
+                    const txt = await res.text();
+                    throw new Error(`code: ${res.status} err: ${txt}`);
                 }
             }
         } catch (e) {
-            logger.error(e);
+            const err = `Failed with endpoint "${data.del ? 'delete: ' + delEndpoint : 'upsert: ' + upsertEndpoint}". ${
+                delQueryString ? 'delQueryString: ' + delEndpoint : ''
+            } ${e}`;
+
+            logger.error(err);
             throw new Error(
-                `Failed to update/delete data. Check the console and open a new issue in Github copying any errors seen in the console as well as info about what you were doing when this occurred.`,
+                `Failed to update/delete data. Check the console and open a new issue in Github copying any errors seen in the console as well as info about what you were doing when this occurred. \n${err}`,
             );
         }
     };

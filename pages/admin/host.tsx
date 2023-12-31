@@ -484,7 +484,9 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                 </Row>
                 <Row className="formGroup">
                     <Col>
-                        <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
+                        <Button variant="primary" type="submit" value="Save Changes" disabled={!selected || !isValid}>
+                            Save Changes
+                        </Button>
                     </Col>
                     <Col>{deleteButton('Caution. All data associated with this Host will be deleted.')}</Col>
                 </Row>

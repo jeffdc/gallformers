@@ -34,7 +34,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else if (params && O.isSome(params['q'])) {
-        apiSearchEndpoint(req, res, generaSearch);
+        await apiSearchEndpoint(req, res, generaSearch);
     } else {
         res.status(400).end('No valid query params provided. Pass either a famID or a q.');
     }

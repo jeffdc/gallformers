@@ -390,12 +390,14 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
                     </Row>
                     <Row className="formGroup">
                         <Col>
-                            <input
+                            <Button
+                                variant="primary"
                                 type="submit"
-                                className="button"
-                                value="Submit"
+                                value="Save Changes"
                                 disabled={!selected || selectedSource.length <= 0}
-                            />
+                            >
+                                Save Changes
+                            </Button>
                         </Col>
                         <Col>{deleteButton('Caution. The selected Species Source mapping will be deleted.', onSubmit)}</Col>
                     </Row>
