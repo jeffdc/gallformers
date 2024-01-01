@@ -4,8 +4,7 @@ import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { Button, Col, Row } from 'react-bootstrap';
 import { RenameEvent } from '../../components/editname';
-import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
+import useAdmin, { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useadmin';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { Entry, EntrySchema, GlossaryEntryUpsertFields } from '../../libs/api/apitypes';
 import { allGlossaryEntries } from '../../libs/db/glossary.ts';
@@ -59,6 +58,8 @@ const createNewEntry = (word: string): Entry => ({
     id: -1,
 });
 
+const keyFieldName = 'word';
+
 const Glossary = ({ id, glossary }: Props): JSX.Element => {
     const {
         selected,
@@ -77,11 +78,11 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
         deleteButton,
     } = useAdmin(
         'Glossary Entry',
+        keyFieldName,
         id,
         renameEntry,
         toUpsertFields,
         {
-            keyProp: 'word',
             delEndpoint: '../api/glossary/',
             upsertEndpoint: '../api/glossary/upsert',
             nameExistsEndpoint: (s: string) => `/api/glossary?name=${s}`,
@@ -96,7 +97,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
     return (
         <Admin
             type="Glossary"
-            keyField="word"
+            keyField={keyFieldName}
             editName={{ getDefault: () => selected?.word, renameCallback: renameCallback, nameExistsCallback: nameExists }}
             setShowModal={setShowModal}
             showModal={showModal}
@@ -114,7 +115,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                             <Col>Word (unless it is a proper name, use lower case):</Col>
                         </Row>
                         <Row>
-                            <Col>{mainField('word', 'Word')}</Col>
+                            <Col>{mainField('Word')}</Col>
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowModal(true)}>

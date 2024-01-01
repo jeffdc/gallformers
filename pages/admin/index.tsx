@@ -87,7 +87,7 @@ const Admin = (): JSX.Element => {
                         <a href="https://gallformerdat-m1g8137.slack.com/archives/C01B319JAG6" target="_blank" rel="noreferrer">
                             Slack
                         </a>{' '}
-                        or <a href="">Discord</a>.
+                        or <a href="https://discord.gg/p99hPYy6bH">Discord</a>.
                     </Col>
                 </Row>
             </div>

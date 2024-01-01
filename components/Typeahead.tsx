@@ -19,6 +19,9 @@ export type TypeaheadProps<FormFields extends FieldValues> = TypeaheadComponentP
 
 export type TypeaheadLabelKey = LabelKey; //T extends object ? Option | ((option: T) => string) : never;
 
+// For convenience so others do not have to import from the main Typeahead lib
+export type TypeaheadOption = Option;
+
 /**
  * A wrapped version of react-bootstrap-typeahead that handles new items and other misc stuff.
  */

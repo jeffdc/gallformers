@@ -5,8 +5,7 @@ import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { Alert, Button, Col, Row } from 'react-bootstrap';
 import { RenameEvent } from '../../components/editname';
-import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
-import useAdmin from '../../hooks/useadmin';
+import useAdmin, { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useadmin';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { PLACE_TYPES, PlaceNoTreeApi, PlaceNoTreeApiSchema, PlaceNoTreeUpsertFields } from '../../libs/api/apitypes';
 import Admin from '../../libs/pages/admin';
@@ -57,6 +56,8 @@ const createNewPlace = (name: string): PlaceNoTreeApi => ({
     type: 'state',
 });
 
+const mainFieldName = 'name';
+
 const PlaceAdmin = ({ id }: Props): JSX.Element => {
     const {
         selected,
@@ -75,11 +76,11 @@ const PlaceAdmin = ({ id }: Props): JSX.Element => {
         deleteButton,
     } = useAdmin(
         'Place',
+        mainFieldName,
         id,
         renamePlace,
         toUpsertFields,
         {
-            keyProp: 'name',
             delEndpoint: '../api/place/',
             upsertEndpoint: '../api/place/upsert',
             nameExistsEndpoint: (s: string) => `/api/place?name=${s}`,
@@ -93,7 +94,7 @@ const PlaceAdmin = ({ id }: Props): JSX.Element => {
     return (
         <Admin
             type="Place"
-            keyField="name"
+            keyField={mainFieldName}
             editName={{ getDefault: () => selected?.name, renameCallback: renameCallback, nameExistsCallback: nameExists }}
             setShowModal={setShowModal}
             showModal={showModal}
@@ -119,7 +120,7 @@ const PlaceAdmin = ({ id }: Props): JSX.Element => {
                             <Col>Name:</Col>
                         </Row>
                         <Row>
-                            <Col>{mainField('name', 'Place', { searchEndpoint: (s) => `../api/place?q=${s}` })}</Col>
+                            <Col>{mainField('Place', { searchEndpoint: (s) => `../api/place?q=${s}` })}</Col>
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowModal(true)}>

@@ -30,27 +30,15 @@ import {
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
 
-type FormFields = AdminFormFields<FilterField> & Pick<FilterField, 'description'>;
+type FormFields = AdminFormFields<FilterField> & Pick<FilterField, 'description'> & { fieldType: string };
 
 const schema = t.intersection([
     adminFormFieldsSchema(FilterFieldSchema),
     t.type({
         description: tt.option(t.string),
+        fieldType: t.string,
     }),
 ]);
-// const schema = yup.object({
-//     mainField: yup.array().required(),
-//     description: yup.object<O.Option<string>>().test('definition', 'must not be empty', (value: O.Option<string>) => {
-//         return (
-//             value &&
-//             pipe(
-//                 value,
-//                 O.fold(constFalse, (d) => !!d && d.length > 0),
-//             )
-//         );
-//     }),
-//     del: yup.boolean().required(),
-// });
 
 export type Props = {
     alignments: FilterField[];
@@ -89,6 +77,8 @@ const createNewFilterField = (field: string): FilterField => ({
     description: O.none,
     id: -1,
 });
+
+const keyFieldName = 'field';
 
 const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, textures, walls }: Props): JSX.Element => {
     const [fieldType, setFieldType] = useState(FilterFieldTypeValue.ALIGNMENTS);
@@ -148,6 +138,7 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
         setShowRenameModal: setShowModal,
         isValid,
         error,
+        errors,
         setError,
         deleteResults,
         setDeleteResults,
@@ -159,11 +150,11 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
         deleteButton,
     } = useAdmin(
         'Filter Fields',
+        keyFieldName,
         '',
         renameField,
         toUpsertFields,
         {
-            keyProp: 'field',
             delEndpoint: `/api/filterfield/${fieldType}`,
             upsertEndpoint: '/api/filterfield/upsert',
             nameExistsEndpoint: (s: string) => `/api/filterfield/${fieldType}?name=${s}`,
@@ -178,7 +169,7 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
     return (
         <Admin
             type="FilterTerms"
-            keyField="word"
+            keyField={keyFieldName}
             editName={{ getDefault: () => selected?.field, renameCallback: renameCallback, nameExistsCallback: nameExists }}
             setShowModal={setShowModal}
             showModal={showModal}
@@ -195,14 +186,17 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
                     <Row className="my-1">
                         <Col>
                             <select
+                                {...form.register('fieldType', {
+                                    onChange: (e) => {
+                                        setSelected(undefined);
+                                        setFieldType(asFilterType(e.currentTarget.value));
+                                        setData(dataFromSelection(e.currentTarget.value));
+                                    },
+                                })}
                                 title="fieldType"
                                 className="form-control"
-                                onChange={(e) => {
-                                    setSelected(undefined);
-                                    setFieldType(asFilterType(e.currentTarget.value));
-                                    setData(dataFromSelection(e.currentTarget.value));
-                                }}
                             >
+                                {/* Do not show seasons since they are fixed. */}
                                 {Object.values(FilterFieldTypeValue)
                                     .filter((ff) => ff.localeCompare('seasons'))
                                     .map((ff) => (
@@ -219,7 +213,7 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
                                 <Col>Word:</Col>
                             </Row>
                             <Row>
-                                <Col>{mainField('field', 'Field')}</Col>
+                                <Col>{mainField('Field')}</Col>
                                 {selected && (
                                     <Col xs={1}>
                                         <Button variant="secondary" className="btn-sm" onClick={() => setShowModal(true)}>
@@ -227,12 +221,17 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
                                         </Button>
                                     </Col>
                                 )}
+                                {errors.mainField && (
+                                    <span className="text-danger" title="mainField-error">
+                                        {`The main field is invalid. Error: ${errors.mainField.message}`}
+                                    </span>
+                                )}
                             </Row>
                         </Col>
                     </Row>
                     <Row className="my-1">
                         <Col>
-                            Definition (required):
+                            Description:
                             <Controller
                                 control={form.control}
                                 name="description"
@@ -255,9 +254,9 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
                                     />
                                 )}
                             />
-                            {form.formState.errors.description && (
+                            {errors.description && (
                                 <span className="text-danger" title="description-error">
-                                    You must provide the definition.
+                                    You must provide the definition. Even for color, even though it will not be saved for color.
                                 </span>
                             )}
                         </Col>
