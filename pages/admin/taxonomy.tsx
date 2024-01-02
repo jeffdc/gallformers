@@ -1,8 +1,6 @@
 import axios from 'axios';
 import * as O from 'fp-ts/lib/Option';
 import { constant, pipe } from 'fp-ts/lib/function';
-import * as t from 'io-ts';
-import * as tt from 'io-ts-types';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { useEffect, useState } from 'react';
@@ -11,13 +9,12 @@ import 'react-simple-tree-menu/dist/main.css';
 import EditableDataTable, { EditableTableColumn } from '../../components/EditableDataTable';
 import { RenameEvent } from '../../components/editname';
 import MoveFamily, { MoveEvent } from '../../components/movefamily';
-import useAdmin, { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useadmin';
+import useAdmin, { AdminFormFields } from '../../hooks/useadmin';
 import { extractQueryParam } from '../../libs/api/apipage';
 import {
     ALL_FAMILY_TYPES,
     EMPTY_GENUS,
     FamilyAPI,
-    FamilyAPISchema,
     FamilyUpsertFields,
     GeneraMoveFields,
     Genus,
@@ -30,13 +27,6 @@ import { genOptions } from '../../libs/utils/forms';
 import { mightFailWithArray } from '../../libs/utils/util';
 
 type FormFields = AdminFormFields<FamilyAPI> & Pick<FamilyAPI, 'description' | 'genera'>;
-
-const schema = t.intersection([
-    adminFormFieldsSchema(FamilyAPISchema),
-    t.type({
-        description: tt.NonEmptyString,
-    }),
-]);
 
 type Props = {
     id: string;
@@ -103,6 +93,7 @@ const columns: EditableTableColumn<Genus>[] = [
         editKey: 'description',
     },
 ];
+const keyFieldName = 'name';
 
 const DELETE_CONFIRMATION_MSG = `The selected genera, ALL of the species in the genera, and all related data will 
     be deleted. Are you sure you want to do this? The change will not be made and saved until you Submit the 
@@ -127,19 +118,18 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
         mainField,
         deleteButton,
         isSuperAdmin,
-        isValid,
+        saveButton,
     } = useAdmin(
         'Family',
+        keyFieldName,
         id,
         renameFamily,
         toUpsertFields,
         {
-            keyProp: 'name',
             delEndpoint: '/api/taxonomy/family/',
             upsertEndpoint: '/api/taxonomy/family/upsert',
             nameExistsEndpoint: (s: string) => `/api/taxonomy/family?name=${s}`,
         },
-        schema,
         updatedFormFields,
         false,
         createNewFamily,
@@ -235,13 +225,18 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
                 setDeleteResults={setDeleteResults}
                 deleteResults={deleteResults}
                 selected={selected}
+                deleteButton={deleteButton(
+                    'Caution. If there are any species (galls or hosts) assigned to this Family they too will be PERMANENTLY deleted.',
+                    true,
+                )}
+                saveButton={saveButton()}
             >
                 <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                     <h4>Manage Taxonomy</h4>
                     <Row className="my-1">
                         <Col>
                             <Form.Label>Family Name:</Form.Label>
-                            {mainField('name', 'Family', { searchEndpoint: (s) => `/api/taxonomy/family?q=${s}` })}
+                            {mainField('Family', { searchEndpoint: (s) => `/api/taxonomy/family?q=${s}` })}
                         </Col>
                         <Col>
                             <Form.Label>Description:</Form.Label>
@@ -285,20 +280,6 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
                             deleteConfirmation={DELETE_CONFIRMATION_MSG}
                         />
                         <hr />
-                    </Row>
-                    <Row>
-                        <Col xs={2} className="me-3">
-                            <Button variant="primary" type="submit" value="Save Changes" disabled={!selected || !isValid}>
-                                Save Changes
-                            </Button>
-                        </Col>
-                        <Col>
-                            {isSuperAdmin
-                                ? deleteButton(
-                                      'Caution. If there are any species (galls or hosts) assigned to this Family they too will be PERMANENTLY deleted.',
-                                  )
-                                : 'If you need to delete a Family please contact Adam or Jeff on Slack/Discord.'}
-                        </Col>
                     </Row>
                 </form>
             </Admin>

@@ -1,18 +1,16 @@
-import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { Button, Col, Row } from 'react-bootstrap';
 import { RenameEvent } from '../../components/editname';
-import useAdmin, { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useadmin';
+import useAdmin, { AdminFormFields } from '../../hooks/useadmin';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { Entry, EntrySchema, GlossaryEntryUpsertFields } from '../../libs/api/apitypes';
+import { Entry, GlossaryEntryUpsertFields } from '../../libs/api/apitypes';
 import { allGlossaryEntries } from '../../libs/db/glossary.ts';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
-import * as t from 'io-ts';
 
-const schema = t.intersection([adminFormFieldsSchema(EntrySchema), EntrySchema]);
 type FormFields = AdminFormFields<Entry> & Pick<Entry, 'definition' | 'urls'>;
 
 type Props = {
@@ -65,7 +63,6 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
         selected,
         showRenameModal: showModal,
         setShowRenameModal: setShowModal,
-        isValid,
         error,
         setError,
         deleteResults,
@@ -76,6 +73,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
         formSubmit,
         mainField,
         deleteButton,
+        saveButton,
     } = useAdmin(
         'Glossary Entry',
         keyFieldName,
@@ -87,7 +85,6 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
             upsertEndpoint: '../api/glossary/upsert',
             nameExistsEndpoint: (s: string) => `/api/glossary?name=${s}`,
         },
-        schema,
         updatedFormFields,
         false,
         createNewEntry,
@@ -106,6 +103,8 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
             setDeleteResults={setDeleteResults}
             deleteResults={deleteResults}
             selected={selected}
+            deleteButton={deleteButton('Caution. The glossary entry will be PERMANENTLY deleted.')}
+            saveButton={saveButton()}
         >
             <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                 <h4>Add/Edit Glossary Entries</h4>
@@ -129,7 +128,14 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                 <Row className="my-1">
                     <Col>
                         Definition (required):
-                        <textarea {...form.register('definition')} className="form-control" rows={4} disabled={!selected} />
+                        <textarea
+                            {...form.register('definition', {
+                                required: true,
+                                disabled: !selected,
+                            })}
+                            className="form-control"
+                            rows={4}
+                        />
                         {form.formState.errors.definition && (
                             <span className="text-danger">You must provide the definition.</span>
                         )}
@@ -138,19 +144,15 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                 <Row className="my-1">
                     <Col>
                         URLs (required) (separated by a newline [enter]):
-                        <textarea {...form.register('urls')} className="form-control" rows={3} disabled={!selected} />
+                        <textarea
+                            {...form.register('urls', { required: true, disabled: !selected })}
+                            className="form-control"
+                            rows={3}
+                        />
                         {form.formState.errors.urls && (
                             <span className="text-danger">You must provide a URL for the source of the definition.</span>
                         )}
                     </Col>
-                </Row>
-                <Row className="my-1">
-                    <Col>
-                        <Button variant="primary" type="submit" value="Save Changes" disabled={!selected || !isValid}>
-                            Save Changes
-                        </Button>
-                    </Col>
-                    <Col>{deleteButton('Caution. The glossary entry will be PERMANENTLY deleted.')}</Col>
                 </Row>
             </form>
         </Admin>
@@ -159,7 +161,6 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
 
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
     const queryParam = 'id';
-    // eslint-disable-next-line prettier/prettier
     const id = pipe(extractQueryParam(context.query, queryParam), O.getOrElse(constant('')));
     return {
         props: {

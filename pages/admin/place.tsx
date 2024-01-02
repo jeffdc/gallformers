@@ -1,20 +1,17 @@
 import * as O from 'fp-ts/lib/Option';
 import { constant, pipe } from 'fp-ts/lib/function';
-import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { Alert, Button, Col, Row } from 'react-bootstrap';
 import { RenameEvent } from '../../components/editname';
-import useAdmin, { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useadmin';
+import useAdmin, { AdminFormFields } from '../../hooks/useadmin';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { PLACE_TYPES, PlaceNoTreeApi, PlaceNoTreeApiSchema, PlaceNoTreeUpsertFields } from '../../libs/api/apitypes';
+import { PLACE_TYPES, PlaceNoTreeApi, PlaceNoTreeUpsertFields } from '../../libs/api/apitypes';
 import Admin from '../../libs/pages/admin';
 
 type Props = {
     id: string;
 };
-
-const schema = t.intersection([adminFormFieldsSchema(PlaceNoTreeApiSchema), PlaceNoTreeApiSchema]);
 
 type FormFields = AdminFormFields<PlaceNoTreeApi> & Omit<PlaceNoTreeApi, 'id' | 'name'>;
 
@@ -63,7 +60,6 @@ const PlaceAdmin = ({ id }: Props): JSX.Element => {
         selected,
         showRenameModal: showModal,
         setShowRenameModal: setShowModal,
-        isValid,
         error,
         setError,
         deleteResults,
@@ -74,6 +70,7 @@ const PlaceAdmin = ({ id }: Props): JSX.Element => {
         formSubmit,
         mainField,
         deleteButton,
+        saveButton,
     } = useAdmin(
         'Place',
         mainFieldName,
@@ -85,7 +82,6 @@ const PlaceAdmin = ({ id }: Props): JSX.Element => {
             upsertEndpoint: '../api/place/upsert',
             nameExistsEndpoint: (s: string) => `/api/place?name=${s}`,
         },
-        schema,
         updatedFormFields,
         false,
         createNewPlace,
@@ -104,6 +100,8 @@ const PlaceAdmin = ({ id }: Props): JSX.Element => {
             deleteResults={deleteResults}
             selected={selected}
             superAdmin={true}
+            saveButton={saveButton()}
+            deleteButton={deleteButton('Caution. The Place will be PERMANENTLY deleted.')}
         >
             <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                 <h4>Add/Edit Places</h4>
@@ -135,17 +133,20 @@ const PlaceAdmin = ({ id }: Props): JSX.Element => {
                     <Col>
                         Code (required):
                         <input
-                            {...form.register('code')}
+                            {...form.register('code', { required: true, disabled: !selected })}
                             type="text"
                             placeholder="Code"
                             className="form-control"
-                            disabled={!selected}
                         />
                         {form.formState.errors.code && <span className="text-danger">You must provide the code.</span>}
                     </Col>
                     <Col>
                         Type (required):
-                        <select {...form.register('type')} aria-placeholder="Type" className="form-control" disabled={!selected}>
+                        <select
+                            {...form.register('type', { disabled: !selected })}
+                            aria-placeholder="Type"
+                            className="form-control"
+                        >
                             {PLACE_TYPES.map((t) => (
                                 <option key={t}>{t}</option>
                             ))}
@@ -154,14 +155,6 @@ const PlaceAdmin = ({ id }: Props): JSX.Element => {
                             <span className="text-danger">You must provide the Type of the Place.</span>
                         )}
                     </Col>
-                </Row>
-                <Row className="form-input">
-                    <Col>
-                        <Button variant="primary" type="submit" value="Save Changes" disabled={!selected || !isValid}>
-                            Save Changes
-                        </Button>
-                    </Col>
-                    <Col>{deleteButton('Caution. The Place will be PERMANENTLY deleted.')}</Col>
                 </Row>
             </form>
         </Admin>

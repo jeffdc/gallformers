@@ -1,22 +1,12 @@
 import axios from 'axios';
 import * as O from 'fp-ts/lib/Option';
 import { constant } from 'fp-ts/lib/function';
-import * as t from 'io-ts';
-import * as tt from 'io-ts-types';
 import { GetServerSideProps } from 'next';
 import { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
-import { Controller } from 'react-hook-form';
 import { RenameEvent } from '../../components/editname';
-import useAdmin, { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useadmin';
-import {
-    DeleteResult,
-    FilterField,
-    FilterFieldSchema,
-    FilterFieldTypeValue,
-    FilterFieldWithType,
-    asFilterType,
-} from '../../libs/api/apitypes';
+import useAdmin, { AdminFormFields } from '../../hooks/useadmin';
+import { DeleteResult, FilterField, FilterFieldTypeValue, FilterFieldWithType, asFilterType } from '../../libs/api/apitypes';
 import {
     getAlignments,
     getCells,
@@ -30,15 +20,10 @@ import {
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
 
-type FormFields = AdminFormFields<FilterField> & Pick<FilterField, 'description'> & { fieldType: string };
-
-const schema = t.intersection([
-    adminFormFieldsSchema(FilterFieldSchema),
-    t.type({
-        description: tt.option(t.string),
-        fieldType: t.string,
-    }),
-]);
+type FormFields = AdminFormFields<FilterField> & {
+    fieldType: string;
+    description: string;
+};
 
 export type Props = {
     alignments: FilterField[];
@@ -55,22 +40,6 @@ const renameField = async (s: FilterField, e: RenameEvent): Promise<FilterField>
     ...s,
     field: e.new,
 });
-
-const updatedFormFields = async (e: FilterField | undefined): Promise<FormFields> => {
-    if (e != undefined) {
-        return {
-            mainField: [e],
-            description: e.description,
-            del: false,
-        };
-    }
-
-    return {
-        mainField: [],
-        description: O.none,
-        del: false,
-    };
-};
 
 const createNewFilterField = (field: string): FilterField => ({
     field: field,
@@ -106,12 +75,30 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
         }
     };
 
+    const updatedFormFields = async (e: FilterField | undefined): Promise<FormFields> => {
+        if (e != undefined) {
+            return {
+                mainField: [e],
+                description: O.getOrElse(constant(''))(e.description),
+                del: false,
+                fieldType: fieldType,
+            };
+        }
+
+        return {
+            mainField: [],
+            description: '',
+            del: false,
+            fieldType: '',
+        };
+    };
+
     const toUpsertFields = (fields: FormFields, field: string, id: number): FilterFieldWithType => {
         return {
-            ...fields,
             id: id,
             field: field,
             fieldType: fieldType,
+            description: O.of(fields.description),
         };
     };
 
@@ -136,7 +123,6 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
         setSelected,
         showRenameModal: showModal,
         setShowRenameModal: setShowModal,
-        isValid,
         error,
         errors,
         setError,
@@ -148,6 +134,7 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
         formSubmit,
         mainField,
         deleteButton,
+        saveButton,
     } = useAdmin(
         'Filter Fields',
         keyFieldName,
@@ -159,7 +146,6 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
             upsertEndpoint: '/api/filterfield/upsert',
             nameExistsEndpoint: (s: string) => `/api/filterfield/${fieldType}?name=${s}`,
         },
-        schema,
         updatedFormFields,
         false,
         createNewFilterField,
@@ -179,6 +165,8 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
             deleteResults={deleteResults}
             selected={selected}
             superAdmin={true}
+            deleteButton={deleteButton('Caution. The filter field will deleted.', doDelete)}
+            saveButton={saveButton()}
         >
             <>
                 <form className="m-4 pe-4">
@@ -192,6 +180,7 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
                                         setFieldType(asFilterType(e.currentTarget.value));
                                         setData(dataFromSelection(e.currentTarget.value));
                                     },
+                                    required: 'required',
                                 })}
                                 title="fieldType"
                                 className="form-control"
@@ -232,27 +221,22 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
                     <Row className="my-1">
                         <Col>
                             Description:
-                            <Controller
-                                control={form.control}
-                                name="description"
-                                rules={{ required: true }}
-                                render={({ field: { ref } }) => (
-                                    <textarea
-                                        title="description"
-                                        placeholder="description"
-                                        ref={ref}
-                                        className="form-control"
-                                        rows={4}
-                                        disabled={!selected}
-                                        value={selected?.description ? O.getOrElse(constant(''))(selected.description) : ''}
-                                        onChange={(e) => {
-                                            if (selected) {
-                                                selected.description = O.some(e.currentTarget.value);
-                                                setSelected({ ...selected });
-                                            }
-                                        }}
-                                    />
-                                )}
+                            <textarea
+                                title="description"
+                                placeholder="description"
+                                className="form-control"
+                                rows={4}
+                                {...form.register('description', {
+                                    onChange: (e) => {
+                                        if (selected) {
+                                            selected.description = O.some(e.currentTarget.value);
+                                            setSelected({ ...selected });
+                                        }
+                                    },
+                                    required: true,
+                                    value: selected?.description ? O.getOrElse(constant(''))(selected.description) : '',
+                                    disabled: !selected,
+                                })}
                             />
                             {errors.description && (
                                 <span className="text-danger" title="description-error">
@@ -260,14 +244,6 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
                                 </span>
                             )}
                         </Col>
-                    </Row>
-                    <Row className="form-input">
-                        <Col>
-                            <Button variant="primary" type="submit" value="Save Changes" disabled={!selected || !isValid}>
-                                Save Changes
-                            </Button>
-                        </Col>
-                        <Col>{deleteButton('Caution. The filter field will deleted.', doDelete)}</Col>
                     </Row>
                 </form>
             </>

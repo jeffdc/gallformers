@@ -1,21 +1,17 @@
 import axios from 'axios';
 import * as O from 'fp-ts/lib/Option';
 import { constant, pipe } from 'fp-ts/lib/function';
-import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Path } from 'react-hook-form';
-import { AsyncTypeahead } from '../../components/Typeahead';
 import { RenameEvent } from '../../components/editname';
-import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
-import useAdmin from '../../hooks/useadmin';
+import useAdmin, { AdminFormFields } from '../../hooks/useadmin';
 import { extractQueryParam } from '../../libs/api/apipage';
 import {
     SimpleSpecies,
     TaxSection,
-    TaxSectionSchema,
     TaxonCodeValues,
     TaxonomyEntry,
     TaxonomyTypeValues,
@@ -24,8 +20,7 @@ import {
 import { allGenera, allSections } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
 import { extractGenus, hasProp, mightFailWithArray } from '../../libs/utils/util';
-
-const schema = t.intersection([adminFormFieldsSchema(TaxSectionSchema), TaxSectionSchema]);
+import { AsyncTypeahead } from 'react-bootstrap-typeahead';
 
 // const schema = yup.object().shape({
 //     mainField: yup.array().required('A name is required.'),
@@ -43,7 +38,6 @@ type Props = {
     id: string;
     sections: TaxonomyEntry[];
     genera: TaxonomyEntry[];
-    // hosts: HostApi[];
 };
 
 type FormFields = AdminFormFields<TaxSection> & Omit<TaxSection, 'id' | 'name' | 'type'>;
@@ -98,12 +92,13 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
         type: TaxonomyTypeValues.SECTION,
     });
 
+    const keyFieldName = 'name';
+
     const {
         data,
         selected,
         showRenameModal,
         setShowRenameModal,
-        isValid,
         error,
         setError,
         deleteResults,
@@ -114,18 +109,18 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
         formSubmit,
         mainField,
         deleteButton,
+        saveButton,
     } = useAdmin(
         'Section',
+        keyFieldName,
         id,
         renameSection,
         toUpsertFields,
         {
-            keyProp: 'name',
             delEndpoint: '/api/taxonomy/',
             upsertEndpoint: '/api/taxonomy/upsert',
             nameExistsEndpoint: (s: string) => `/api/taxonomy/section?name=${s}`,
         },
-        schema,
         updatedFormFields,
         false,
         createNewSection,
@@ -187,6 +182,8 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
             setDeleteResults={setDeleteResults}
             deleteResults={deleteResults}
             selected={selected}
+            deleteButton={deleteButton('Caution. The Section will be deleted.')}
+            saveButton={saveButton()}
         >
             <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                 <h4>Add or Edit a Section</h4>
@@ -197,7 +194,7 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
                             <Col xs={8}>Name:</Col>
                         </Row>
                         <Row>
-                            <Col>{mainField('name', 'Section', { searchEndpoint: (s) => `../api/taxonomy/section?q=${s}` })}</Col>
+                            <Col>{mainField('Section', { searchEndpoint: (s) => `../api/taxonomy/section?q=${s}` })}</Col>
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowRenameModal(true)}>
@@ -212,11 +209,10 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
                     <Col>
                         Description (required):
                         <textarea
-                            {...form.register('description')}
+                            {...form.register('description', { required: true, disabled: !selected })}
                             placeholder="A short friendly name/description, e.g., Red Oaks"
                             className="form-control"
                             rows={1}
-                            disabled={!selected}
                         />
                         {form.formState.errors.description && (
                             <span className="text-danger">{form.formState.errors.description.message}</span>
@@ -227,21 +223,22 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
                     <Col>
                         Species (required):
                         <AsyncTypeahead
-                            name="species"
-                            control={form.control}
+                            id="species"
                             options={hosts}
                             labelKey="name"
                             placeholder="Mapped Species"
                             clearButton
                             multiple
-                            rules={{ required: true }}
+                            {...form.register('species', {
+                                required: true,
+                                onChange: (s) => {
+                                    setSpecies(s);
+                                    form.setValue('species' as Path<FormFields>, s);
+                                },
+                                disabled: !selected,
+                            })}
                             isInvalid={!!form.formState.errors.species}
                             selected={species ? species : []}
-                            onChange={(s) => {
-                                setSpecies(s);
-                                form.setValue('species' as Path<FormFields>, s);
-                            }}
-                            disabled={!selected}
                             isLoading={isLoading}
                             onSearch={handleSearch}
                         />
@@ -255,14 +252,6 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
                         </p>
                     </Col>
                 </Row>
-                <Row className="form-input">
-                    <Col>
-                        <Button variant="primary" type="submit" value="Save Changes" disabled={!selected || !isValid}>
-                            Save Changes
-                        </Button>
-                    </Col>
-                    <Col>{deleteButton('Caution. The Section will be deleted.')}</Col>
-                </Row>
             </form>
         </Admin>
     );
@@ -270,7 +259,6 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
 
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
     const queryParam = 'id';
-    // eslint-disable-next-line prettier/prettier
     const id = pipe(extractQueryParam(context.query, queryParam), O.getOrElse(constant('')));
 
     return {
@@ -278,7 +266,6 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
             id: id,
             sections: await mightFailWithArray<TaxonomyEntry>()(allSections()),
             genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(TaxonCodeValues.PLANT)),
-            // hosts: await mightFailWithArray<HostApi>()(allHosts()),
         },
     };
 };

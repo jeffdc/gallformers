@@ -1,13 +1,14 @@
-import { ioTsResolver } from '@hookform/resolvers/io-ts';
+import { DevTool } from '@hookform/devtools';
 import axios from 'axios';
 import * as t from 'io-ts';
 import { useSession } from 'next-auth/react';
 import router from 'next/router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
+import { AsyncTypeahead, Typeahead } from 'react-bootstrap-typeahead';
+import { Option as TypeaheadOption } from 'react-bootstrap-typeahead/types/types';
 import { DefaultValues, FieldErrors, FieldValues, Path, UseFormReturn, useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import Typeahead, { AsyncTypeahead, TypeaheadOption } from '../components/Typeahead';
 import { superAdmins } from '../components/auth';
 import { ConfirmationOptions } from '../components/confirmationdialog';
 import { RenameEvent } from '../components/editname';
@@ -38,6 +39,7 @@ type AdminData<T, FormFields extends FieldValues> = {
     showRenameModal: boolean;
     setShowRenameModal: (show: boolean) => void;
     isValid: boolean;
+    isDirty: boolean;
     errors: FieldErrors<FormFields>;
     error: string;
     setError: (err: string) => void;
@@ -51,7 +53,12 @@ type AdminData<T, FormFields extends FieldValues> = {
     postUpdate: (res: Response) => void;
     postDelete: (id: number | string, result: DeleteResult) => void;
     mainField: (placeholder: string, asyncProps?: AsyncMainFieldProps) => JSX.Element;
-    deleteButton: (warning: string, customDeleteHandler?: (fields: FormFields) => Promise<void>) => JSX.Element;
+    deleteButton: (
+        warning: string,
+        needSuperAdmin: boolean,
+        customDeleteHandler?: (fields: FormFields) => Promise<void>,
+    ) => JSX.Element;
+    saveButton: () => JSX.Element;
     isSuperAdmin: boolean;
 };
 
@@ -100,7 +107,6 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         delQueryString?: () => string;
         nameExistsEndpoint?: (name: string) => string;
     },
-    schema: t.Type<FormFields>,
     updatedFormFields: (t: T | undefined) => Promise<FormFields>,
     reloadOnUpdate = false,
     createNew?: (v: string) => T,
@@ -128,18 +134,10 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     const { formState: formState, ...form } = useForm<FormFields>({
         mode: 'onChange',
         reValidateMode: 'onChange',
-        // resolver: ioTsResolver(schema),
-        // useful for debugging form validation
-        resolver: async (data, context, options) => {
-            console.log('formData', data);
-            const r = ioTsResolver(schema)(data, context, options);
-            console.log('JDC: Val: ', r);
-            return ioTsResolver(schema)(data, context, options);
-        },
     });
 
     // subscribe to relevant form state - the form lib uses a proxy object to provide (IMO) a mandatory optimization that creates confusion
-    const { isValid, errors } = formState;
+    const { isDirty, isValid, errors } = formState;
 
     const labelKey = mainFieldName as string;
 
@@ -181,14 +179,25 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     };
 
     const theMainField = (placeholder: string, asyncProps?: AsyncMainFieldProps) => {
+        const { name, onChange: _oC, ...rest } = form.register('mainField' as Path<FormFields>);
         return (
             <>
-                <code>{`IsValid: ${isValid} -- Err: ${JSON.stringify(errors)}`}</code>
+                <DevTool control={form.control} placement="top-right" />
+                {/* <ul>
+                    <li>
+                        <code>{`IsValid: ${isValid} -- isDirty: ${isDirty}`}</code>
+                    </li>
+                    <li>
+                        <code>{`Err: ${errors}`}</code>
+                    </li>
+                    <li>
+                        <code>{`Selected: ${JSON.stringify(selected)}`}</code>
+                    </li>
+                </ul> */}
 
                 {asyncProps ? (
                     <AsyncTypeahead
-                        name={'mainField' as Path<FormFields>}
-                        control={form.control}
+                        id={name}
                         options={data}
                         labelKey={labelKey}
                         selected={selected ? [selected] : []}
@@ -208,20 +217,20 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                         promptText={`Type in a ${type} name.`}
                         searchText={`Searching for ${pluralize(type)}...`}
                         {...asyncProps}
+                        {...rest}
                     />
                 ) : (
                     <Typeahead
-                        name={'mainField' as Path<FormFields>}
-                        control={form.control}
+                        id={name}
                         options={data}
-                        labelKey={labelKey}
-                        selected={selected ? [selected] : []}
                         placeholder={placeholder}
+                        labelKey={labelKey}
                         clearButton
                         isInvalid={!!errors.mainField}
                         newSelectionPrefix={`Add a new ${placeholder}: `}
                         allowNew={!!createNew}
                         onChange={onChange}
+                        {...rest}
                     />
                 )}
             </>
@@ -248,24 +257,44 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
             .catch(() => Promise.resolve());
     };
 
-    const deleteButton = (warning: string, customDeleteHandler?: (fields: FormFields) => Promise<void>) => {
+    const deleteButton = (
+        warning: string,
+        needSuperAdmin = false,
+        customDeleteHandler?: (fields: FormFields) => Promise<void>,
+    ) => {
         return (
             <Row hidden={!selected}>
                 <Col>
                     <Row>
                         <Col className="">
-                            <Button variant="danger" className="" onClick={() => doDelete(customDeleteHandler)}>
-                                Delete
-                            </Button>
+                            {needSuperAdmin && !isSuperAdmin ? (
+                                'If you need to delete this please contact Adam or Jeff on Discord.'
+                            ) : (
+                                <Button variant="danger" className="" onClick={() => doDelete(customDeleteHandler)}>
+                                    Delete
+                                </Button>
+                            )}
                         </Col>
                     </Row>
-                    <Row>
-                        <Col>
-                            <em className="text-danger">{warning}</em>
-                        </Col>
-                    </Row>
+                    {needSuperAdmin && isSuperAdmin ? (
+                        <Row>
+                            <Col>
+                                <em className="text-danger">{warning}</em>
+                            </Col>
+                        </Row>
+                    ) : (
+                        ''
+                    )}
                 </Col>
             </Row>
+        );
+    };
+
+    const saveButton = () => {
+        return (
+            <Button variant="primary" type="submit" value="Save Changes" disabled={!isDirty || !isValid}>
+                Save Changes
+            </Button>
         );
     };
 
@@ -354,6 +383,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         showRenameModal: showModal,
         setShowRenameModal: setShowModal,
         isValid: isValid,
+        isDirty: isDirty,
         errors: errors,
         error: error,
         setError: setError,
@@ -371,6 +401,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         postDelete: postDelete,
         mainField: theMainField,
         deleteButton: deleteButton,
+        saveButton: saveButton,
         isSuperAdmin: isSuperAdmin,
     };
 };

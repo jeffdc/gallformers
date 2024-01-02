@@ -1,7 +1,7 @@
 import React, { FocusEvent, KeyboardEvent } from 'react';
 import { Typeahead as RBTypeahead, AsyncTypeahead as RBAsyncTypeahead, UseAsyncProps } from 'react-bootstrap-typeahead';
 import { TypeaheadComponentProps } from 'react-bootstrap-typeahead/types/components/Typeahead';
-import { LabelKey, Option } from 'react-bootstrap-typeahead/types/types.js';
+import { LabelKey, Option } from 'react-bootstrap-typeahead/types/types';
 import { Control, Controller, FieldValues, Path } from 'react-hook-form';
 
 export type TypeaheadProps<FormFields extends FieldValues> = TypeaheadComponentProps & {
@@ -11,16 +11,30 @@ export type TypeaheadProps<FormFields extends FieldValues> = TypeaheadComponentP
     rules?: Record<string, unknown>;
     onBlurT?: (e: FocusEvent<HTMLInputElement>) => void;
     onKeyDownT?: (e: KeyboardEvent<HTMLInputElement>) => void;
-    // options: Option[];
-    // onChange: (t: Option[]) => void;
-    // selected: Option[];
     labelKey?: string | ((t: Option) => string);
 };
 
-export type TypeaheadLabelKey = LabelKey; //T extends object ? Option | ((option: T) => string) : never;
+export type TypeaheadLabelKey = LabelKey;
 
 // For convenience so others do not have to import from the main Typeahead lib
 export type TypeaheadOption = Option;
+
+// export type UncontrolledTypeaheadProps<FormFields extends FieldValues> = TypeaheadComponentProps & {
+//     name: Path<FormFields>;
+//     newSelectionPrefix?: string;
+//     rules?: Record<string, unknown>;
+//     onBlurT?: (e: FocusEvent<HTMLInputElement>) => void;
+//     onKeyDownT?: (e: KeyboardEvent<HTMLInputElement>) => void;
+//     labelKey?: string | ((t: Option) => string);
+// };
+
+// export const UncontrolledTypeahead = RBTypeahead;
+
+// export const UncontrolledTypeahead = <T extends Option, FormFields extends FieldValues>({
+//     ...taProps
+// }: UncontrolledTypeaheadProps<FormFields>): JSX.Element => {
+//     return <RBTypeahead {...taProps} />;
+// };
 
 /**
  * A wrapped version of react-bootstrap-typeahead that handles new items and other misc stuff.

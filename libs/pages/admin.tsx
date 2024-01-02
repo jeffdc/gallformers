@@ -38,6 +38,8 @@ export type AdminProps<T> = {
     setDeleteResults?: (dr: DeleteResult) => void;
     selected: T | undefined;
     superAdmin?: boolean;
+    saveButton: JSX.Element;
+    deleteButton: JSX.Element;
 };
 
 type AdminType = WithID & { taxoncode?: string | null };
@@ -172,6 +174,11 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
                 </Navbar>
 
                 {props.children}
+
+                <Row className="form-input">
+                    <Col>{props.saveButton}</Col>
+                    <Col>{props.deleteButton}</Col>
+                </Row>
 
                 <Row hidden={!props.deleteResults}>
                     <Col>{`Deleted ${props.deleteResults?.name}.`}</Col>

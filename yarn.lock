@@ -6022,6 +6022,7 @@ __metadata:
     eslint-plugin-react: "npm:^7.33.2"
     eslint-plugin-react-hooks: "npm:^4.6.0"
     fast-check: "npm:^3.14.0"
+    flatted: "npm:^3.2.9"
     fp-ts: "npm:^2.16.1"
     gray-matter: "npm:^4.0.3"
     identity-obj-proxy: "npm:^3.0.0"
