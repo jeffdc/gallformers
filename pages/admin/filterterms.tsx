@@ -165,7 +165,7 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
             deleteResults={deleteResults}
             selected={selected}
             superAdmin={true}
-            deleteButton={deleteButton('Caution. The filter field will deleted.', doDelete)}
+            deleteButton={deleteButton('Caution. The filter field will deleted.', true, doDelete)}
             saveButton={saveButton()}
         >
             <>
@@ -240,7 +240,7 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
                             />
                             {errors.description && (
                                 <span className="text-danger" title="description-error">
-                                    You must provide the definition. Even for color, even though it will not be saved for color.
+                                    You must provide the description. Even for color, even though it will not be saved for color.
                                 </span>
                             )}
                         </Col>

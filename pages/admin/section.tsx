@@ -182,7 +182,7 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
             setDeleteResults={setDeleteResults}
             deleteResults={deleteResults}
             selected={selected}
-            deleteButton={deleteButton('Caution. The Section will be deleted.')}
+            deleteButton={deleteButton('Caution. The Section will be deleted.', true)}
             saveButton={saveButton()}
         >
             <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">

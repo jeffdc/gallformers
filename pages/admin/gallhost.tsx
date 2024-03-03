@@ -13,8 +13,7 @@ import Typeahead from '../../components/Typeahead';
 import Auth from '../../components/auth';
 import { RenameEvent } from '../../components/editname';
 import InfoTip from '../../components/infotip';
-import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
-import useAdmin from '../../hooks/useadmin';
+import useAdmin, { AdminFormFields } from '../../hooks/useadmin';
 import { extractQueryParam } from '../../libs/api/apipage';
 import {
     GallApi,
@@ -37,11 +36,6 @@ type Props = {
     sp: GallApi[];
     hosts: SpeciesWithPlaces[];
 };
-
-const schema = t.intersection([
-    adminFormFieldsSchema(GallApiSchema),
-    t.type({ hosts: t.array(GallHostSchema), places: t.array(PlaceNoTreeApiSchema) }),
-]);
 
 type FormFields = AdminFormFields<GallApi> & {
     hosts: GallHost[];
@@ -111,22 +105,25 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
         };
     };
 
-    // eslint-disable-next-line prettier/prettier
+    const keyFieldName = 'name';
+
     const { selected, setSelected, error, setError, deleteResults, setDeleteResults, form, formSubmit, mainField } = useAdmin<
         GallApi,
         FormFields,
         GallHostUpdateFields
     >(
         'Gall-Host',
+        keyFieldName,
         id ?? undefined,
         update,
         toUpsertFields,
-        { keyProp: 'name', delEndpoint: '/api/gallhost/', upsertEndpoint: '/api/gallhost/insert' },
-        schema,
+        { delEndpoint: '/api/gallhost/', upsertEndpoint: '/api/gallhost/insert' },
         updatedFormFields,
         false,
         undefined,
         sp,
+        deleteButton,
+        saveButton,
     );
 
     const selectAll = () => {
@@ -180,6 +177,8 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
                 setDeleteResults={setDeleteResults}
                 deleteResults={deleteResults}
                 selected={selected}
+                saveButton={saveButton()}
+                deleteButton={deleteButton()}
             >
                 <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                     <h4>Gall - Host Mappings</h4>

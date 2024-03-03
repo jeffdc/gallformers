@@ -183,17 +183,17 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         return (
             <>
                 <DevTool control={form.control} placement="top-right" />
-                {/* <ul>
+                <ul>
                     <li>
                         <code>{`IsValid: ${isValid} -- isDirty: ${isDirty}`}</code>
                     </li>
                     <li>
-                        <code>{`Err: ${errors}`}</code>
+                        <code>{`Err: ${JSON.stringify(errors)}`}</code>
                     </li>
                     <li>
                         <code>{`Selected: ${JSON.stringify(selected)}`}</code>
                     </li>
-                </ul> */}
+                </ul>
 
                 {asyncProps ? (
                     <AsyncTypeahead

@@ -1,6 +1,5 @@
 import * as O from 'fp-ts/lib/Option';
 import { constant, pipe } from 'fp-ts/lib/function';
-import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -16,18 +15,9 @@ import Typeahead from '../../components/Typeahead';
 import Auth from '../../components/auth';
 import { RenameEvent } from '../../components/editname';
 import Picker from '../../components/picker';
-import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
-import useAdmin from '../../hooks/useadmin';
+import useAdmin, { AdminFormFields } from '../../hooks/useadmin';
 import { extractQueryParam } from '../../libs/api/apipage';
-import {
-    SimpleSpecies,
-    SimpleSpeciesSchema,
-    SourceApi,
-    SpeciesSourceApi,
-    SpeciesSourceApiSchema,
-    SpeciesSourceInsertFields,
-    TaxonCodeValues,
-} from '../../libs/api/apitypes';
+import { SimpleSpecies, SourceApi, SpeciesSourceApi, SpeciesSourceInsertFields, TaxonCodeValues } from '../../libs/api/apitypes';
 import { allSources } from '../../libs/db/source';
 import { allSpeciesSimple } from '../../libs/db/species';
 import Admin from '../../libs/pages/admin';
@@ -39,16 +29,13 @@ type Props = {
     allSpecies: SimpleSpecies[]; //species[];
     allSources: SourceApi[]; //DBSource[]; source
 };
-const additionalSchema = t.type({
-    sources: t.array(SpeciesSourceApiSchema),
-    description: t.string,
-    externallink: t.string,
-    useasdefault: t.boolean,
-});
 
-const schema = t.intersection([adminFormFieldsSchema(SimpleSpeciesSchema), additionalSchema]);
-
-type FormFields = AdminFormFields<SimpleSpecies> & t.TypeOf<typeof additionalSchema>;
+type FormFields = AdminFormFields<SimpleSpecies> & {
+    sources: SpeciesSourceApi[];
+    description: string;
+    externallink: string;
+    useasdefault: string;
+};
 
 const update = async (s: SimpleSpecies, e: RenameEvent) => ({
     ...s,
@@ -149,6 +136,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
         postDelete,
         mainField,
         deleteButton,
+        saveButton,
     } = useAdmin<SimpleSpecies, FormFields, SpeciesSourceInsertFields>(
         'Species-Source Mapping',
         speciesid,
@@ -160,7 +148,6 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
             upsertEndpoint: '/api/speciessource/insert',
             delQueryString: buildDelQueryString,
         },
-        schema,
         updatedFormFields,
         false,
         undefined,

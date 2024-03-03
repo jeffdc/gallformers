@@ -101,7 +101,7 @@ const PlaceAdmin = ({ id }: Props): JSX.Element => {
             selected={selected}
             superAdmin={true}
             saveButton={saveButton()}
-            deleteButton={deleteButton('Caution. The Place will be PERMANENTLY deleted.')}
+            deleteButton={deleteButton('Caution. The Place will be PERMANENTLY deleted.', true)}
         >
             <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                 <h4>Add/Edit Places</h4>

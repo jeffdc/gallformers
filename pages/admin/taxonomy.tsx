@@ -117,7 +117,6 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
         formSubmit,
         mainField,
         deleteButton,
-        isSuperAdmin,
         saveButton,
     } = useAdmin(
         'Family',
@@ -216,7 +215,7 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
 
             <Admin
                 type="Taxonomy"
-                keyField="name"
+                keyField={keyFieldName}
                 editName={{ getDefault: () => selected?.name, renameCallback: renameCallback, nameExistsCallback: nameExists }}
                 setShowModal={setShowRenameModal}
                 showModal={showRenameModal}

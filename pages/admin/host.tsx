@@ -1,6 +1,5 @@
 import * as O from 'fp-ts/lib/Option';
 import { constant, pipe } from 'fp-ts/lib/function';
-import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
@@ -11,7 +10,7 @@ import { ComposableMap, Geographies, Geography, ProjectionConfig, ZoomableGroup 
 import { Tooltip } from 'react-tooltip';
 import Typeahead from '../../components/Typeahead';
 import AliasTable from '../../components/aliastable';
-import useSpecies, { SpeciesNamingHelp, SpeciesProps, speciesFormFieldsSchema } from '../../hooks/useSpecies';
+import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '../../hooks/useSpecies';
 import useAdmin from '../../hooks/useadmin';
 import { extractQueryParam } from '../../libs/api/apipage';
 import {
@@ -19,13 +18,11 @@ import {
     AliasApi,
     HOST_FAMILY_TYPES,
     HostApi,
-    HostApiSchema,
     PlaceNoTreeApi,
-    PlaceNoTreeApiSchema,
     SpeciesUpsertFields,
     TaxonCodeValues,
     TaxonomyEntry,
-    TaxonomyEntryNoParentSchema,
+    TaxonomyEntryNoParent,
     TaxonomyTypeValues,
 } from '../../libs/api/apitypes';
 import { hostById } from '../../libs/db/host';
@@ -68,18 +65,13 @@ type Props = SpeciesProps & {
 //         .required(),
 // });
 
-const schema = t.intersection([
-    speciesFormFieldsSchema(HostApiSchema),
-    t.type({
-        section: t.array(TaxonomyEntryNoParentSchema),
-        places: t.array(PlaceNoTreeApiSchema),
-    }),
-]);
-
-export type FormFields = t.TypeOf<typeof schema>;
+export type FormFields = SpeciesFormFields<HostApi> & {
+    section: TaxonomyEntryNoParent[];
+    places: PlaceNoTreeApi[];
+};
 
 export const testables = {
-    Schema: schema,
+    // Schema: schema,
 };
 
 const Host = ({ id, host, genera, families, sections, abundances, places }: Props): JSX.Element => {
@@ -126,12 +118,13 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
         places: [],
     });
 
+    const keyFieldName = 'name';
+
     const {
         selected,
         setSelected,
         showRenameModal,
         setShowRenameModal,
-        isValid,
         error,
         setError,
         deleteResults,
@@ -142,18 +135,18 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
         formSubmit,
         mainField,
         deleteButton,
+        saveButton,
     } = useAdmin(
         'Host',
+        keyFieldName,
         id,
         renameSpecies,
         toUpsertFields,
         {
-            keyProp: 'name',
             delEndpoint: '../api/host/',
             upsertEndpoint: '../api/host/upsert',
             nameExistsEndpoint: (s: string) => `/api/species?name=${s}`,
         },
-        schema,
         updatedFormFields,
         true,
         createNewHost,
@@ -183,7 +176,7 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
     return (
         <Admin
             type="Host"
-            keyField="name"
+            keyField={keyFieldName}
             editName={{ getDefault: () => selected?.name, renameCallback: renameCallback, nameExistsCallback: nameExists }}
             setShowModal={setShowRenameModal}
             showModal={showRenameModal}
@@ -192,6 +185,8 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
             setDeleteResults={setDeleteResults}
             deleteResults={deleteResults}
             selected={selected}
+            deleteButton={deleteButton('Caution. All data associated with this Host will be deleted.', false)}
+            saveButton={saveButton()}
         >
             <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pe-4">
                 <h4>Add/Edit Hosts</h4>
@@ -212,7 +207,7 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                         </Row>
                         <Row>
                             <Col>
-                                {mainField('name', 'Host', {
+                                {mainField('Host', {
                                     searchEndpoint: (s) => `../api/host?q=${s}`,
                                     promptText: 'Type in a Host name.',
                                     searchText: 'Searching for Hosts...',
@@ -481,14 +476,6 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                         and Detachable. However, sources and images for galls associated with this host may be incomplete or
                         absent, and other filters may not have been entered comprehensively or at all.
                     </Col>
-                </Row>
-                <Row className="formGroup">
-                    <Col>
-                        <Button variant="primary" type="submit" value="Save Changes" disabled={!selected || !isValid}>
-                            Save Changes
-                        </Button>
-                    </Col>
-                    <Col>{deleteButton('Caution. All data associated with this Host will be deleted.')}</Col>
                 </Row>
             </form>
         </Admin>

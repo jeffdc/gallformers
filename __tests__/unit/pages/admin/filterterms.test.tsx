@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import FilterTerms, { Props } from '../../../../pages/admin/filterterms';
 import * as O from 'fp-ts/lib/Option';
+import { debuglog } from 'util';
 
 jest.mock('next-auth/react', () => {
     const originalModule = jest.requireActual('next-auth/react');
@@ -51,7 +52,7 @@ it('should have Submit disabled with no valid selection', async () => {
     expect(descriptionField).toBeDisabled();
 
     // set a value but not a description
-    await user.selectOptions(fieldField, 'drooping');
+    user.selectOptions(fieldField, 'drooping');
     expect(fieldField.value).toBe('drooping');
     expect(submitButton).toBeDisabled();
     expect(descriptionField).toBeEnabled();

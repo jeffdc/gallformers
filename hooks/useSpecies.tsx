@@ -1,14 +1,11 @@
 import * as O from 'fp-ts/lib/Option';
 import { constant, pipe } from 'fp-ts/lib/function';
-import * as t from 'io-ts';
 import { Badge, OverlayTrigger, Popover } from 'react-bootstrap';
 import { ConfirmationOptions } from '../components/confirmationdialog';
 import { RenameEvent } from '../components/editname';
 import {
     AbundanceApi,
-    AbundanceApiSchema,
     AliasApi,
-    AliasApiSchema,
     EmptyAbundance,
     FGS,
     SCIENTIFIC_NAME,
@@ -17,11 +14,10 @@ import {
     TaxonCodeValues,
     TaxonomyEntry,
     TaxonomyEntryNoParent,
-    TaxonomyEntryNoParentSchema,
     TaxonomyTypeValues,
 } from '../libs/api/apitypes';
 import { extractGenus } from '../libs/utils/util';
-import { AdminFormFields, adminFormFieldsSchema } from './useAPIs';
+import { AdminFormFields } from './useadmin';
 
 export const SpeciesNamingHelp = (): JSX.Element => (
     <OverlayTrigger
@@ -102,19 +98,6 @@ export type SpeciesProps = {
     genera: TaxonomyEntry[];
     abundances: AbundanceApi[];
 };
-
-/** The schema has to be generated at runtime since the type is not known until then. */
-export const speciesFormFieldsSchema = <T,>(schemaT: t.Type<T>) =>
-    t.intersection([
-        adminFormFieldsSchema(schemaT),
-        t.type({
-            genus: t.array(TaxonomyEntryNoParentSchema),
-            family: t.array(TaxonomyEntryNoParentSchema),
-            abundance: t.array(AbundanceApiSchema),
-            datacomplete: t.boolean,
-            aliases: t.array(AliasApiSchema),
-        }),
-    ]);
 
 // Have to define this rather than use io-ts type magic since we do not know the types now.
 export type SpeciesFormFields<T> = AdminFormFields<T> & {

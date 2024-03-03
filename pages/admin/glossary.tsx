@@ -103,7 +103,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
             setDeleteResults={setDeleteResults}
             deleteResults={deleteResults}
             selected={selected}
-            deleteButton={deleteButton('Caution. The glossary entry will be PERMANENTLY deleted.')}
+            deleteButton={deleteButton('Caution. The glossary entry will be PERMANENTLY deleted.', false)}
             saveButton={saveButton()}
         >
             <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">

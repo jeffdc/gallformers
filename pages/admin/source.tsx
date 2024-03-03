@@ -1,34 +1,15 @@
 import * as O from 'fp-ts/lib/Option';
 import { constant, pipe } from 'fp-ts/lib/function';
-import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { Button, Col, Row } from 'react-bootstrap';
 import { RenameEvent } from '../../components/editname';
-import { AdminFormFields, adminFormFieldsSchema } from '../../hooks/useAPIs';
-import useAdmin from '../../hooks/useadmin';
+import useAdmin, { AdminFormFields } from '../../hooks/useadmin';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { ImageLicenseValues, SourceApi, SourceApiSchema, SourceUpsertFields } from '../../libs/api/apitypes';
+import { ImageLicenseValues, SourceApi, SourceUpsertFields } from '../../libs/api/apitypes';
 import { allSources } from '../../libs/db/source';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
-
-const schema = t.intersection([adminFormFieldsSchema(SourceApiSchema), SourceApiSchema]);
-
-// const schema = yup.object().shape({
-//     mainField: yup.mixed().required(),
-//     author: yup.string().required(),
-//     pubyear: yup.string().matches(/([12][0-9]{3})/),
-//     citation: yup.string().required(),
-//     license: yup.string().required('You must select a license.'),
-//     licenselink: yup
-//         .string()
-//         .url('The link must be a valid URL.')
-//         .when('license', {
-//             is: (l: string) => l === CCBY,
-//             then: yup.string().url().required('The CC-BY license requires that you provide a link to the license.'),
-//         }),
-// });
 
 type Props = {
     id: string;
@@ -90,12 +71,13 @@ const createNewSource = (title: string): SourceApi => ({
     licenselink: '',
 });
 
+const keyFieldName = 'title';
+
 const Source = ({ id, sources }: Props): JSX.Element => {
     const {
         selected,
         showRenameModal: showModal,
         setShowRenameModal: setShowModal,
-        isValid,
         error,
         setError,
         deleteResults,
@@ -106,19 +88,18 @@ const Source = ({ id, sources }: Props): JSX.Element => {
         formSubmit,
         mainField,
         deleteButton,
-        isSuperAdmin,
+        saveButton,
     } = useAdmin(
         'Source',
+        keyFieldName,
         id,
         renameSource,
         toUpsertFields,
         {
-            keyProp: 'title',
             delEndpoint: '../api/source/',
             upsertEndpoint: '../api/source/upsert',
             nameExistsEndpoint: (s: string) => `/api/source?title=${s}`,
         },
-        schema,
         updatedFormFields,
         false,
         createNewSource,
@@ -128,7 +109,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
     return (
         <Admin
             type="Source"
-            keyField="title"
+            keyField={keyFieldName}
             editName={{ getDefault: () => selected?.title, renameCallback: renameCallback, nameExistsCallback: nameExists }}
             setShowModal={setShowModal}
             showModal={showModal}
@@ -137,6 +118,8 @@ const Source = ({ id, sources }: Props): JSX.Element => {
             setDeleteResults={setDeleteResults}
             deleteResults={deleteResults}
             selected={selected}
+            deleteButton={deleteButton('Caution. All data associated with this Source will be PERMANENTLY deleted.', true)}
+            saveButton={saveButton()}
         >
             <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
                 <h4>Add/Edit Sources</h4>
@@ -146,7 +129,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                             <Col>Title:</Col>
                         </Row>
                         <Row>
-                            <Col>{mainField('title', 'Source', { searchEndpoint: (s) => `../api/source?q=${s}` })}</Col>
+                            <Col>{mainField('Source', { searchEndpoint: (s) => `../api/source?q=${s}` })}</Col>
                             {selected && (
                                 <Col xs={1}>
                                     <Button variant="secondary" className="btn-sm" onClick={() => setShowModal(true)}>
@@ -161,7 +144,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                     <Col>
                         Author (required):
                         <input
-                            {...form.register('author')}
+                            {...form.register('author', { required: true })}
                             type="text"
                             placeholder="Author(s)"
                             className="form-control"
@@ -172,7 +155,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                     <Col>
                         Publication Year (required):
                         <input
-                            {...form.register('pubyear')}
+                            {...form.register('pubyear', { required: true, pattern: /([12][0-9]{3})/ })}
                             type="text"
                             placeholder="Pub Year"
                             className="form-control"
@@ -183,11 +166,12 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                         )}
                     </Col>
                 </Row>
+
                 <Row className="my-1">
                     <Col>
                         Reference Link (required):
                         <input
-                            {...form.register('link')}
+                            {...form.register('link', { required: true })}
                             type="text"
                             placeholder="Link"
                             className="form-control"
@@ -198,7 +182,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                 <Row className="my-1">
                     <Col>
                         License (required):
-                        <select {...form.register('license')} className="form-control" disabled={!selected}>
+                        <select {...form.register('license', { required: true })} className="form-control" disabled={!selected}>
                             <option>{ImageLicenseValues.PUBLIC_DOMAIN}</option>
                             <option>{ImageLicenseValues.CC_BY}</option>
                             <option>{ImageLicenseValues.ALL_RIGHTS}</option>
@@ -212,7 +196,12 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                     <Col>
                         License Link:
                         <input
-                            {...form.register('licenselink')}
+                            {...form.register('licenselink', {
+                                required: true,
+                                validate: (v) =>
+                                    (form.getValues('license') === ImageLicenseValues.CC_BY && (!v || v.length < 1)) ||
+                                    'When using the CC BY license, you must provide a link to the license.',
+                            })}
                             type="text"
                             placeholder="License Link"
                             className="form-control"
@@ -233,7 +222,7 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                             ):
                         </p>
                         <textarea
-                            {...form.register('citation')}
+                            {...form.register('citation', { required: true })}
                             placeholder="Citation"
                             className="form-control"
                             rows={8}
@@ -255,19 +244,6 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                         All information from this Source has been input into the database?
                     </Col>
                 </Row>
-
-                <Row className="formGroup">
-                    <Col>
-                        <Button variant="primary" type="submit" value="Save Changes" disabled={!selected || !isValid}>
-                            Save Changes
-                        </Button>
-                    </Col>
-                    <Col>
-                        {isSuperAdmin
-                            ? deleteButton('Caution. All data associated with this Source will be PERMANENTLY deleted.')
-                            : 'If you need to delete a Source please contact Adam or Jeff on Slack/Discord.'}
-                    </Col>
-                </Row>
             </form>
         </Admin>
     );
@@ -275,7 +251,6 @@ const Source = ({ id, sources }: Props): JSX.Element => {
 
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
     const queryParam = 'id';
-    // eslint-disable-next-line prettier/prettier
     const id = pipe(extractQueryParam(context.query, queryParam), O.getOrElse(constant('')));
     return {
         props: {
