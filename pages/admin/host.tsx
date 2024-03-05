@@ -5,10 +5,9 @@ import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
-import { Controller } from 'react-hook-form';
+import { Typeahead } from 'react-bootstrap-typeahead';
 import { ComposableMap, Geographies, Geography, ProjectionConfig, ZoomableGroup } from 'react-simple-maps';
 import { Tooltip } from 'react-tooltip';
-import Typeahead from '../../components/Typeahead';
 import AliasTable from '../../components/aliastable';
 import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '../../hooks/useSpecies';
 import useAdmin from '../../hooks/useadmin';
@@ -45,33 +44,9 @@ type Props = SpeciesProps & {
     places: PlaceNoTreeApi[];
 };
 
-// const schema = yup.object().shape({
-//     mainField: yup
-//         .array()
-//         .of(
-//             yup.object({
-//                 name: yup.string().matches(SPECIES_NAME_REGEX).required(),
-//             }),
-//         )
-//         .min(1)
-//         .max(1),
-//     family: yup
-//         .array()
-//         .of(
-//             yup.object({
-//                 name: yup.string().required(),
-//             }),
-//         )
-//         .required(),
-// });
-
 export type FormFields = SpeciesFormFields<HostApi> & {
     section: TaxonomyEntryNoParent[];
     places: PlaceNoTreeApi[];
-};
-
-export const testables = {
-    // Schema: schema,
 };
 
 const Host = ({ id, host, genera, families, sections, abundances, places }: Props): JSX.Element => {
@@ -120,23 +95,7 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
 
     const keyFieldName = 'name';
 
-    const {
-        selected,
-        setSelected,
-        showRenameModal,
-        setShowRenameModal,
-        error,
-        setError,
-        deleteResults,
-        setDeleteResults,
-        renameCallback,
-        nameExists,
-        form,
-        formSubmit,
-        mainField,
-        deleteButton,
-        saveButton,
-    } = useAdmin(
+    const { selected, setSelected, renameCallback, nameExists, ...adminForm } = useAdmin(
         'Host',
         keyFieldName,
         id,
@@ -154,7 +113,7 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
     );
 
     const onSubmit = async (fields: FormFields) => {
-        formSubmit(fields);
+        adminForm.formSubmit(fields);
     };
 
     const selectAll = () => {
@@ -178,17 +137,13 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
             type="Host"
             keyField={keyFieldName}
             editName={{ getDefault: () => selected?.name, renameCallback: renameCallback, nameExistsCallback: nameExists }}
-            setShowModal={setShowRenameModal}
-            showModal={showRenameModal}
-            setError={setError}
-            error={error}
-            setDeleteResults={setDeleteResults}
-            deleteResults={deleteResults}
             selected={selected}
-            deleteButton={deleteButton('Caution. All data associated with this Host will be deleted.', false)}
-            saveButton={saveButton()}
+            {...adminForm}
+            deleteButton={adminForm.deleteButton('Caution. All data associated with this Host will be deleted.', false)}
+            saveButton={adminForm.saveButton()}
+            formSubmit={onSubmit}
         >
-            <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pe-4">
+            <>
                 <h4>Add/Edit Hosts</h4>
                 <p>
                     This is for all of the details about a Host. To add a description (which must be referenced to a source) go
@@ -207,7 +162,7 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                         </Row>
                         <Row>
                             <Col>
-                                {mainField('Host', {
+                                {adminForm.mainField('Host', {
                                     searchEndpoint: (s) => `../api/host?q=${s}`,
                                     promptText: 'Type in a Host name.',
                                     searchText: 'Searching for Hosts...',
@@ -215,7 +170,11 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                             </Col>
                             {selected && (
                                 <Col xs={1}>
-                                    <Button variant="secondary" className="btn-sm" onClick={() => setShowRenameModal(true)}>
+                                    <Button
+                                        variant="secondary"
+                                        className="btn-sm"
+                                        onClick={() => adminForm.setShowRenameModal(true)}
+                                    >
                                         Rename
                                     </Button>
                                 </Col>
@@ -227,19 +186,18 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                     <Col>
                         Genus (filled automatically):
                         <Typeahead
-                            name="genus"
-                            control={form.control}
+                            id="genus"
                             placeholder="Genus"
                             options={genera}
                             labelKey="name"
-                            selected={selected?.fgs?.genus ? [selected.fgs.genus] : []}
-                            disabled={true}
+                            {...adminForm.form.register('genus', { required: true, disabled: true })}
                             onChange={(g) => {
                                 if (selected) {
                                     selected.fgs.genus = g[0] as TaxonomyEntry;
                                     setSelected({ ...selected });
                                 }
                             }}
+                            selected={selected?.fgs?.genus ? [selected.fgs.genus] : []}
                             clearButton
                             multiple
                         />
@@ -247,13 +205,15 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                     <Col>
                         Family (required):
                         <Typeahead
-                            name="family"
-                            control={form.control}
+                            id="family"
                             placeholder="Family"
                             options={families}
                             labelKey="name"
                             selected={selected?.fgs?.family && selected.fgs.family.id >= 0 ? [selected.fgs.family] : []}
-                            disabled={!selected || (selected && selected.id > 0)}
+                            {...adminForm.form.register('family', {
+                                required: true,
+                                disabled: !selected || (selected && selected.id > 0),
+                            })}
                             onChange={(f) => {
                                 if (!selected) return;
 
@@ -286,7 +246,7 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                             }}
                             clearButton
                         />
-                        {form.formState.errors.family && (
+                        {adminForm.form.formState.errors.family && (
                             <span className="text-danger">
                                 The Family name is required. If it is not present in the list you will have to go add the family
                                 first. :(
@@ -298,11 +258,11 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                     <Col>
                         Section:
                         <Typeahead
-                            name="section"
-                            control={form.control}
+                            id="section"
                             placeholder="Section"
                             options={sections}
                             labelKey="name"
+                            {...adminForm.form.register('section', { required: true, disabled: !selected })}
                             selected={
                                 selected?.fgs?.section
                                     ? pipe(
@@ -324,12 +284,12 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                     <Col>
                         Abundance:
                         <Typeahead
-                            name="abundance"
-                            control={form.control}
+                            id="abundance"
                             placeholder=""
                             options={abundances}
                             labelKey="abundance"
                             disabled={!selected}
+                            {...adminForm.form.register('abundance', { required: true, disabled: !selected })}
                             selected={
                                 selected?.abundance
                                     ? pipe(
@@ -434,50 +394,39 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                 </Row>
                 <Row className="my-1">
                     <Col>
-                        <Controller
-                            control={form.control}
-                            name="aliases"
-                            render={() => (
-                                <AliasTable
-                                    data={selected?.aliases ?? []}
-                                    setData={(aliases: AliasApi[]) => {
-                                        if (selected) {
-                                            selected.aliases = aliases;
-                                            setSelected({ ...selected });
-                                        }
-                                    }}
-                                />
-                            )}
-                        ></Controller>
+                        <AliasTable
+                            data={selected?.aliases ?? []}
+                            setData={(aliases: AliasApi[]) => {
+                                if (selected) {
+                                    selected.aliases = aliases;
+                                    setSelected({ ...selected });
+                                }
+                            }}
+                            {...adminForm.form.register('aliases')}
+                        />
                     </Col>
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col className="me-auto">
-                        <Controller
-                            control={form.control}
-                            name="datacomplete"
-                            render={({ field: { ref } }) => (
-                                <input
-                                    ref={ref}
-                                    type="checkbox"
-                                    className="form-input-checkbox"
-                                    checked={selected ? selected.datacomplete : false}
-                                    disabled={!selected}
-                                    onChange={(e) => {
-                                        if (selected) {
-                                            selected.datacomplete = e.currentTarget.checked;
-                                            setSelected({ ...selected });
-                                        }
-                                    }}
-                                />
-                            )}
+                        <input
+                            type="checkbox"
+                            className="form-input-checkbox"
+                            checked={selected ? selected.datacomplete : false}
+                            disabled={!selected}
+                            {...adminForm.form.register('datacomplete')}
+                            onChange={(e) => {
+                                if (selected) {
+                                    selected.datacomplete = e.currentTarget.checked;
+                                    setSelected({ ...selected });
+                                }
+                            }}
                         />{' '}
                         All galls known to occur on this plant have been added to the database, and can be filtered by Location
                         and Detachable. However, sources and images for galls associated with this host may be incomplete or
                         absent, and other filters may not have been entered comprehensively or at all.
                     </Col>
                 </Row>
-            </form>
+            </>
         </Admin>
     );
 };

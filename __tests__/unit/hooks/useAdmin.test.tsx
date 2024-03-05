@@ -3,14 +3,13 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as t from 'io-ts';
 import App from 'next/app';
 import { Button, Col } from 'react-bootstrap';
-import useAdmin, { adminFormFieldsSchema } from '../../../hooks/useadmin';
+import useAdmin, from '../../../hooks/useadmin';
 import Admin from '../../../pages/admin';
 
 // These are tests to make sure that the base schema resolvers work in conjunction with the form stuff
 
 const fooWithIdSchema = t.type({ id: t.number, foo: t.string });
 type FooWithID = t.TypeOf<typeof fooWithIdSchema>;
-const schema = adminFormFieldsSchema(fooWithIdSchema);
 type FormFields = t.TypeOf<typeof schema>;
 
 const UseAdminTestForm = (): JSX.Element => {

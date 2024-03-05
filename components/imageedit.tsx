@@ -1,4 +1,3 @@
-import { ioTsResolver } from '@hookform/resolvers/io-ts';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as t from 'io-ts';
@@ -6,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Button, Col, Modal, Row } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
 
+import { Typeahead } from 'react-bootstrap-typeahead';
 import {
     ImageApi,
     ImageBaseSchema,
@@ -14,7 +14,6 @@ import {
     SourceWithSpeciesSourceApi,
 } from '../libs/api/apitypes';
 import InfoTip from './infotip';
-import Typeahead from './Typeahead';
 
 type Props = {
     image: ImageApi;
@@ -23,6 +22,7 @@ type Props = {
     onClose: () => void;
 };
 
+//JDC TODO move away from this ...
 const Schema = t.intersection([ImageBaseSchema, ImageSourceSchema]);
 
 type FormFields = t.TypeOf<typeof Schema>;
@@ -48,10 +48,8 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
         register,
         setValue,
         formState: { isDirty, errors },
-        control,
     } = useForm<FormFields>({
         mode: 'onBlur',
-        resolver: ioTsResolver(Schema),
         defaultValues: formFromImage(image),
     });
 
@@ -140,23 +138,22 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                 </Col>
                                 <Col>
                                     <Typeahead
-                                        name="source"
-                                        control={control}
+                                        id="source"
                                         options={sources}
                                         labelKey={(s) => (s as SourceWithSpeciesSourceApi).title}
                                         clearButton
-                                        selected={sourceFromOption(selected.source)}
-                                        // onChange={(o) => {
-                                        // const s = o[0] as SourceWithSpeciesSourceApi;
-                                        // setSelected({
-                                        //     ...selected,
-                                        //     source: O.fromNullable(s),
-                                        //     // license: s ? asLicenseType(s.license) : '',
-                                        //     license: s.license,
-                                        //     licenselink: s ? s.licenselink : '',
-                                        //     creator: s ? s.author : '',
-                                        // });
-                                        // }}
+                                        defaultSelected={sourceFromOption(selected.source)}
+                                        onChange={(o) => {
+                                            const s = o[0] as SourceWithSpeciesSourceApi;
+                                            setSelected({
+                                                ...selected,
+                                                source: O.fromNullable(s),
+                                                // license: s ? asLicenseType(s.license) : '',
+                                                license: s.license,
+                                                licenselink: s ? s.licenselink : '',
+                                                creator: s ? s.author : '',
+                                            });
+                                        }}
                                     />
                                 </Col>
                             </Row>

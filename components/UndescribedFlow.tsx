@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Button, Col, Form, Modal, Row } from 'react-bootstrap';
 import { Controller, useForm } from 'react-hook-form';
 import { GallSimple, HostSimple, TaxonomyEntry, TaxonomyEntryNoParent, TaxonomyTypeValues } from '../libs/api/apitypes';
-import Typeahead, { AsyncTypeahead } from './Typeahead';
+import { AsyncTypeahead, Typeahead } from 'react-bootstrap-typeahead';
 
 export type UndescribedData = {
     family: TaxonomyEntry;
@@ -162,9 +162,8 @@ const UndescribedFlow = ({ show, onClose, genera, families }: Props): JSX.Elemen
                         <Col>
                             <Form.Label>Genus</Form.Label>
                             <Typeahead
-                                name="genus"
-                                control={control}
-                                selected={genus ? [genus] : []}
+                                id="genus"
+                                defaultSelected={genus ? [genus] : []}
                                 onChange={(g) => {
                                     const genus = g[0] as TaxonomyEntryNoParent;
                                     setGenus(genus);
@@ -185,9 +184,8 @@ const UndescribedFlow = ({ show, onClose, genera, families }: Props): JSX.Elemen
                         <Col>
                             <Form.Label>Family</Form.Label>
                             <Typeahead
-                                name="family"
-                                control={control}
-                                selected={family ? [family] : []}
+                                id="family"
+                                defaultSelected={family ? [family] : []}
                                 onChange={(f) => {
                                     const family = f[0] as TaxonomyEntryNoParent;
                                     setFamily(family);
@@ -228,11 +226,10 @@ const UndescribedFlow = ({ show, onClose, genera, families }: Props): JSX.Elemen
                         <Col>
                             <Form.Label>Type Host</Form.Label>
                             <AsyncTypeahead
-                                name="host"
-                                control={control}
-                                selected={host ? [host] : []}
+                                id="host"
+                                defaultSelected={host ? [host] : []}
                                 onChange={(h) => {
-                                    setHost(h[0]);
+                                    setHost(h[0] as HostSimple);
                                 }}
                                 clearButton
                                 options={hosts}
@@ -249,19 +246,13 @@ const UndescribedFlow = ({ show, onClose, genera, families }: Props): JSX.Elemen
                     <Row>
                         <Col>
                             <Form.Label>Description</Form.Label>
-                            <Controller
-                                name="description"
-                                control={control}
-                                render={({ field }) => (
-                                    <Form.Control
-                                        value={description}
-                                        onChange={(e) => {
-                                            setDescription(e.currentTarget.value);
-                                            field.onChange(e);
-                                        }}
-                                    ></Form.Control>
-                                )}
-                            />
+                            <Form.Control
+                                id="description"
+                                value={description}
+                                onChange={(e) => {
+                                    setDescription(e.currentTarget.value);
+                                }}
+                            ></Form.Control>
                             <Form.Text id="descriptionHelp" muted>
                                 2 or 3 adjectives separated by dashes, e.g. red-bead-gall.
                             </Form.Text>

@@ -1,8 +1,8 @@
-import { useSession } from 'next-auth/react';
 import Head from 'next/head';
 import { Alert, Col, Nav, Navbar, Row } from 'react-bootstrap';
+import { FieldValues, UseFormReturn } from 'react-hook-form';
 import { Toaster } from 'react-hot-toast';
-import Auth, { superAdmins } from '../../components/auth';
+import Auth from '../../components/auth';
 import EditName, { RenameEvent } from '../../components/editname';
 import { DeleteResult, TaxonCodeValues } from '../api/apitypes';
 import { WithID } from '../utils/types';
@@ -21,7 +21,7 @@ export type AdminTypes =
     | 'Place'
     | 'FilterTerms';
 
-export type AdminProps<T> = {
+export type AdminProps<T, V extends FieldValues> = {
     type: AdminTypes;
     keyField: string;
     children: JSX.Element;
@@ -38,8 +38,11 @@ export type AdminProps<T> = {
     setDeleteResults?: (dr: DeleteResult) => void;
     selected: T | undefined;
     superAdmin?: boolean;
-    saveButton: JSX.Element;
-    deleteButton: JSX.Element;
+    saveButton?: JSX.Element;
+    deleteButton?: JSX.Element;
+    form?: UseFormReturn<V>;
+    formSubmit?: (v: V) => Promise<void>;
+    isSuperAdmin?: boolean;
 };
 
 type AdminType = WithID & { taxoncode?: string | null };
@@ -50,11 +53,12 @@ type AdminType = WithID & { taxoncode?: string | null };
  * 2) Toasts
  * 3) Ability to Edit the "name" field. Does not have to be called name.
  * 4) Displaying errors.
+ * 5) The Save and Delete buttons as well as hooking Save up to the submit action for the form
  *
  * @param props @see AdminProps
  * @returns
  */
-const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
+const Admin = <T extends AdminType, V extends FieldValues>(props: AdminProps<T, V>): JSX.Element => {
     const params = (key: string, destination: string) => {
         const allowed = () => {
             if (
@@ -107,9 +111,6 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
                 return `/place/${props.selected?.id}`;
         }
     };
-
-    const session = useSession();
-    const isSuperAdmin = session?.data?.user?.name && superAdmins.includes(session.data.user.name);
 
     return (
         <Auth superAdmin={!!props.superAdmin}>
@@ -168,21 +169,28 @@ const Admin = <T extends AdminType>(props: AdminProps<T>): JSX.Element => {
                         <Nav.Link eventKey="Taxonomy" href={`./taxonomy`}>{`Taxonomy`}</Nav.Link>
                         <Nav.Link eventKey="Section" href={`./section`}>{`Sections`}</Nav.Link>
                         <Nav.Link eventKey="Glossary" href={`./glossary`}>{`Glossary`}</Nav.Link>
-                        {isSuperAdmin && <Nav.Link eventKey="Place" href={`./place`}>{`Place`}</Nav.Link>}
-                        {isSuperAdmin && <Nav.Link eventKey="FilterTerms" href={`./filterterms`}>{`Filter Terms`}</Nav.Link>}
+                        {props.isSuperAdmin && <Nav.Link eventKey="Place" href={`./place`}>{`Place`}</Nav.Link>}
+                        {props.isSuperAdmin && (
+                            <Nav.Link eventKey="FilterTerms" href={`./filterterms`}>{`Filter Terms`}</Nav.Link>
+                        )}
                     </Nav>
                 </Navbar>
 
-                {props.children}
+                {props.form && props.formSubmit && (
+                    <>
+                        <form onSubmit={props.form.handleSubmit(props.formSubmit)} className="m-4 pe-4">
+                            {props.children}
 
-                <Row className="form-input">
-                    <Col>{props.saveButton}</Col>
-                    <Col>{props.deleteButton}</Col>
-                </Row>
-
-                <Row hidden={!props.deleteResults}>
-                    <Col>{`Deleted ${props.deleteResults?.name}.`}</Col>
-                </Row>
+                            <Row className="form-input">
+                                <Col>{props.saveButton ? props.saveButton : ''}</Col>
+                                <Col>{props.deleteButton ? props.deleteButton : ''}</Col>
+                            </Row>
+                        </form>
+                        <Row hidden={!props.deleteResults}>
+                            <Col>{`Deleted ${props.deleteResults?.name}.`}</Col>
+                        </Row>
+                    </>
+                )}
             </>
         </Auth>
     );

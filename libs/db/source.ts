@@ -188,3 +188,15 @@ export const searchSources = (s: string): TaskEither<Error, SourceApi[]> => {
         ),
     );
 };
+
+export const getSourceByTitle = (title: string): TaskEither<Error, SourceApi[]> => {
+    return pipe(
+        TE.tryCatch(
+            () =>
+                db.source.findMany({
+                    where: { title: { equals: title } },
+                }),
+            handleError,
+        ),
+    );
+};

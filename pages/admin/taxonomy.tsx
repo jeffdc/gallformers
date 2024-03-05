@@ -100,25 +100,7 @@ const DELETE_CONFIRMATION_MSG = `The selected genera, ALL of the species in the 
     changes on the main page.`;
 
 const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
-    const {
-        data,
-        setData,
-        selected,
-        setSelected,
-        showRenameModal,
-        setShowRenameModal,
-        error,
-        setError,
-        deleteResults,
-        setDeleteResults,
-        renameCallback,
-        nameExists,
-        form,
-        formSubmit,
-        mainField,
-        deleteButton,
-        saveButton,
-    } = useAdmin(
+    const { data, setData, selected, renameCallback, nameExists, ...adminForm } = useAdmin(
         'Family',
         keyFieldName,
         id,
@@ -141,7 +123,7 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
 
     const updateGeneraFromTable = (genera: Genus[]) => {
         if (selected) {
-            setSelected({ ...selected, genera: genera });
+            adminForm.setSelected({ ...selected, genera: genera });
         }
     };
 
@@ -169,7 +151,7 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
             .then((res) => {
                 const families = res.data;
                 setData(families);
-                setSelected(families.find((f) => f.id === selected.id));
+                adminForm.setSelected(families.find((f) => f.id === selected.id));
                 setGeneraToMove([]);
             })
             .catch((e) => {
@@ -185,7 +167,7 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
         const updateGenera = async () => {
             if (selected) {
                 if (!data.find((s) => s.id == selected.id)) {
-                    return [];
+                    setGenera([]);
                 }
 
                 return axios
@@ -217,32 +199,27 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
                 type="Taxonomy"
                 keyField={keyFieldName}
                 editName={{ getDefault: () => selected?.name, renameCallback: renameCallback, nameExistsCallback: nameExists }}
-                setShowModal={setShowRenameModal}
-                showModal={showRenameModal}
-                setError={setError}
-                error={error}
-                setDeleteResults={setDeleteResults}
-                deleteResults={deleteResults}
                 selected={selected}
-                deleteButton={deleteButton(
+                {...adminForm}
+                deleteButton={adminForm.deleteButton(
                     'Caution. If there are any species (galls or hosts) assigned to this Family they too will be PERMANENTLY deleted.',
                     true,
                 )}
-                saveButton={saveButton()}
+                saveButton={adminForm.saveButton()}
             >
-                <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
+                <>
                     <h4>Manage Taxonomy</h4>
                     <Row className="my-1">
                         <Col>
                             <Form.Label>Family Name:</Form.Label>
-                            {mainField('Family', { searchEndpoint: (s) => `/api/taxonomy/family?q=${s}` })}
+                            {adminForm.mainField('Family', { searchEndpoint: (s) => `/api/taxonomy/family?q=${s}` })}
                         </Col>
                         <Col>
                             <Form.Label>Description:</Form.Label>
-                            <select {...form.register('description')} className="form-control" disabled={!selected}>
+                            <select {...adminForm.form.register('description')} className="form-control" disabled={!selected}>
                                 {genOptions(ALL_FAMILY_TYPES)}
                             </select>
-                            {form.formState.errors.description && (
+                            {adminForm.form.formState.errors.description && (
                                 <span className="text-danger">You must provide the description.</span>
                             )}
                         </Col>
@@ -250,7 +227,12 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
                     <Row>
                         {selected && (
                             <Col>
-                                <Button variant="secondary" size="sm" className="button" onClick={() => setShowRenameModal(true)}>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className="button"
+                                    onClick={() => adminForm.setShowRenameModal(true)}
+                                >
                                     Rename
                                 </Button>
                             </Col>
@@ -280,7 +262,7 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
                         />
                         <hr />
                     </Row>
-                </form>
+                </>
             </Admin>
         </>
     );

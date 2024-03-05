@@ -1,6 +1,5 @@
 import { DevTool } from '@hookform/devtools';
 import axios from 'axios';
-import * as t from 'io-ts';
 import { useSession } from 'next-auth/react';
 import router from 'next/router';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -18,14 +17,6 @@ import { hasProp, pluralize } from '../libs/utils/util';
 import { useAPIs } from './useAPIs';
 import { useConfirmation } from './useConfirmation';
 
-/** The schema has to be generated at runtime since the type is not known until then. */
-export const adminFormFieldsSchema = <T,>(schemaT: t.Type<T>) =>
-    t.type({
-        mainField: t.array(schemaT),
-        del: t.boolean,
-    });
-
-// Have to define this rather than use io-ts type magic since we do not know the types now.
 export type AdminFormFields<T> = {
     mainField: T[];
     del: boolean;
@@ -120,6 +111,17 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     const [selected, setSelected] = useState<T | undefined>(
         id && initialData ? initialData.find((d) => d.id === parseInt(id)) : undefined,
     );
+
+    const onDataChange = useCallback(async (t: T | undefined) => {
+        const ff = await updatedFormFields(t);
+        form.reset(ff as DefaultValues<FormFields>);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        onDataChange(selected);
+    }, [onDataChange, selected]);
+
     const [showModal, setShowModal] = useState(false);
     const [error, setError] = useState('');
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
@@ -131,8 +133,9 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         apiConfig.delQueryString,
     );
 
+    // Main form config is set here.
     const { formState: formState, ...form } = useForm<FormFields>({
-        mode: 'onChange',
+        mode: 'all',
         reValidateMode: 'onChange',
     });
 
@@ -144,7 +147,6 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     const confirm = useConfirmation();
 
     const onChange = (s: TypeaheadOption[]) => {
-        console.log(`JDC: useAdmin:onChange -- ${JSON.stringify(s, null, '  ')}`);
         if (s.length <= 0) {
             setSelected(undefined);
             router.replace(``, undefined, { shallow: true });
@@ -178,8 +180,21 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
             });
     };
 
+    const debugDumpValidation = (): string => {
+        let s: string = '';
+        let key: keyof typeof errors;
+        for (key in errors) {
+            s = `${s}\n${String(key)} -- ${errors[key]?.message}`;
+        }
+        return s;
+    };
+
     const theMainField = (placeholder: string, asyncProps?: AsyncMainFieldProps) => {
+        // - we pull _oC now to make the spread of "rest" later easier
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { name, onChange: _oC, ...rest } = form.register('mainField' as Path<FormFields>);
+        console.log(`JDC: ${JSON.stringify('BLOW UP?', null, '  ')}`);
+
         return (
             <>
                 <DevTool control={form.control} placement="top-right" />
@@ -188,19 +203,18 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                         <code>{`IsValid: ${isValid} -- isDirty: ${isDirty}`}</code>
                     </li>
                     <li>
-                        <code>{`Err: ${JSON.stringify(errors)}`}</code>
+                        <code>{`Err: ${debugDumpValidation()}`}</code>
                     </li>
-                    <li>
+                    {/* <li>
                         <code>{`Selected: ${JSON.stringify(selected)}`}</code>
-                    </li>
+                    </li> */}
                 </ul>
-
                 {asyncProps ? (
                     <AsyncTypeahead
                         id={name}
                         options={data}
                         labelKey={labelKey}
-                        selected={selected ? [selected] : []}
+                        defaultSelected={selected ? [selected] : []}
                         placeholder={`Start typing a ${placeholder} name to begin`}
                         clearButton
                         isInvalid={!!errors.mainField}
@@ -223,6 +237,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                     <Typeahead
                         id={name}
                         options={data}
+                        defaultSelected={selected ? [selected] : []}
                         placeholder={placeholder}
                         labelKey={labelKey}
                         clearButton
@@ -340,7 +355,6 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
             setError(msg);
             return;
         }
-
         rename(selected, e, confirm)
             .then(async (u) => {
                 try {
@@ -364,16 +378,6 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
             return Promise.resolve(false);
         }
     };
-
-    const onDataChange = useCallback(async (t: T | undefined) => {
-        const ff = await updatedFormFields(t);
-        form.reset(ff as DefaultValues<FormFields>);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    useEffect(() => {
-        onDataChange(selected);
-    }, [onDataChange, selected]);
 
     return {
         data: data,

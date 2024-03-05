@@ -2,6 +2,7 @@ import { DeleteResult } from '../libs/api/apitypes';
 import { logger } from '../libs/utils/logger.ts';
 import { WithID } from '../libs/utils/types';
 import { hasProp } from '../libs/utils/util';
+import { AdminFormFields } from './useadmin.tsx';
 
 /**
  * The type returned by the hook.

@@ -94,23 +94,7 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
 
     const keyFieldName = 'name';
 
-    const {
-        data,
-        selected,
-        showRenameModal,
-        setShowRenameModal,
-        error,
-        setError,
-        deleteResults,
-        setDeleteResults,
-        renameCallback,
-        nameExists,
-        form,
-        formSubmit,
-        mainField,
-        deleteButton,
-        saveButton,
-    } = useAdmin(
+    const { data, selected, renameCallback, nameExists, ...adminForm } = useAdmin(
         'Section',
         keyFieldName,
         id,
@@ -175,17 +159,12 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
             type="Section"
             keyField="name"
             editName={{ getDefault: () => selected?.name, renameCallback: renameCallback, nameExistsCallback: nameExists }}
-            setShowModal={setShowRenameModal}
-            showModal={showRenameModal}
-            setError={setError}
-            error={error}
-            setDeleteResults={setDeleteResults}
-            deleteResults={deleteResults}
             selected={selected}
-            deleteButton={deleteButton('Caution. The Section will be deleted.', true)}
-            saveButton={saveButton()}
+            {...adminForm}
+            deleteButton={adminForm.deleteButton('Caution. The Section will be deleted.', true)}
+            saveButton={adminForm.saveButton()}
         >
-            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
+            <>
                 <h4>Add or Edit a Section</h4>
                 <p>This is only for host sections. Currently we do not support sections for gallformers.</p>
                 <Row className="my-1">
@@ -194,10 +173,16 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
                             <Col xs={8}>Name:</Col>
                         </Row>
                         <Row>
-                            <Col>{mainField('Section', { searchEndpoint: (s) => `../api/taxonomy/section?q=${s}` })}</Col>
+                            <Col>
+                                {adminForm.mainField('Section', { searchEndpoint: (s) => `../api/taxonomy/section?q=${s}` })}
+                            </Col>
                             {selected && (
                                 <Col xs={1}>
-                                    <Button variant="secondary" className="btn-sm" onClick={() => setShowRenameModal(true)}>
+                                    <Button
+                                        variant="secondary"
+                                        className="btn-sm"
+                                        onClick={() => adminForm.setShowRenameModal(true)}
+                                    >
                                         Rename
                                     </Button>
                                 </Col>
@@ -209,13 +194,16 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
                     <Col>
                         Description (required):
                         <textarea
-                            {...form.register('description', { required: true, disabled: !selected })}
+                            {...adminForm.form.register('description', {
+                                required: 'A description is required.',
+                                disabled: !selected,
+                            })}
                             placeholder="A short friendly name/description, e.g., Red Oaks"
                             className="form-control"
                             rows={1}
                         />
-                        {form.formState.errors.description && (
-                            <span className="text-danger">{form.formState.errors.description.message}</span>
+                        {adminForm.form.formState.errors.description && (
+                            <span className="text-danger">{adminForm.form.formState.errors.description.message}</span>
                         )}
                     </Col>
                 </Row>
@@ -229,22 +217,22 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
                             placeholder="Mapped Species"
                             clearButton
                             multiple
-                            {...form.register('species', {
-                                required: true,
-                                onChange: (s) => {
-                                    setSpecies(s);
-                                    form.setValue('species' as Path<FormFields>, s);
-                                },
+                            {...adminForm.form.register('species', {
+                                required: 'You must provide at least one species.',
                                 disabled: !selected,
                             })}
-                            isInvalid={!!form.formState.errors.species}
-                            selected={species ? species : []}
+                            onChange={(s) => {
+                                setSpecies(s as SimpleSpecies[]);
+                                adminForm.form.setValue('species' as Path<FormFields>, s as SimpleSpecies[]);
+                            }}
+                            defaultSelected={species ? species : []}
                             isLoading={isLoading}
                             onSearch={handleSearch}
                         />
-                        {form.formState.errors.species && hasProp(form.formState.errors.species, 'message') && (
-                            <span className="text-danger">{form.formState.errors.species.message as string}</span>
-                        )}
+                        {adminForm.form.formState.errors.species &&
+                            hasProp(adminForm.form.formState.errors.species, 'message') && (
+                                <span className="text-danger">{adminForm.form.formState.errors.species.message as string}</span>
+                            )}
                         <p>
                             The species that you add should all be from the same genus. If they are not then you will not be able
                             to save. If this is a new Section, then the correct Genus will be assigned based on the species that
@@ -252,7 +240,7 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
                         </p>
                     </Col>
                 </Row>
-            </form>
+            </>
         </Admin>
     );
 };

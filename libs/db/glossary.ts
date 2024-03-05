@@ -66,3 +66,35 @@ export const upsertGlossary = (entry: GlossaryEntryUpsertFields): TaskEither<Err
         TE.map(adaptor),
     );
 };
+
+/**
+ * A general way to fetch glossary entries. Check this file for pre-defined helpers that are easier to use.
+ * @param whereClause a where clause by which to filter places
+ */
+export const getEntries = (whereClause: Prisma.glossaryWhereInput): TaskEither<Error, Entry[]> => {
+    const entries = () =>
+        db.glossary.findMany({
+            where: whereClause,
+            orderBy: { word: 'asc' },
+        });
+
+    return TE.tryCatch(entries, handleError);
+};
+
+/**
+ * A way to search for glossary entries.
+ * @param s the string to search for, will search only on the glossary entry Words
+ * @returns an array of results
+ */
+export const searchGlossary = (s: string): TaskEither<Error, Entry[]> => {
+    return getEntries({ word: { contains: s } });
+};
+
+/**
+ *
+ * @param word Exact match on a glossary word adn return it if it exists
+ * @returns An array containing the Entry if it is found, otherwise an empty array.
+ */
+export const getEntryByWord = (word: string): TaskEither<Error, Entry[]> => {
+    return getEntries({ word: { equals: word } });
+};

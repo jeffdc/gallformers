@@ -108,34 +108,16 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
                 .delete<DeleteResult>(`/api/filterfield/${fieldType}/${fields.mainField[0].id}`)
                 .then((res) => {
                     setSelected(undefined);
-                    setDeleteResults(res.data);
+                    adminForm.setDeleteResults(res.data);
                 })
                 .catch((e) => {
                     console.error(e.toString());
-                    setError(e.toString());
+                    adminForm.setError(e.toString());
                 });
         }
     };
 
-    const {
-        setData,
-        selected,
-        setSelected,
-        showRenameModal: showModal,
-        setShowRenameModal: setShowModal,
-        error,
-        errors,
-        setError,
-        deleteResults,
-        setDeleteResults,
-        renameCallback,
-        nameExists,
-        form,
-        formSubmit,
-        mainField,
-        deleteButton,
-        saveButton,
-    } = useAdmin(
+    const { setData, selected, setSelected, renameCallback, nameExists, ...adminForm } = useAdmin(
         'Filter Fields',
         keyFieldName,
         '',
@@ -157,16 +139,11 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
             type="FilterTerms"
             keyField={keyFieldName}
             editName={{ getDefault: () => selected?.field, renameCallback: renameCallback, nameExistsCallback: nameExists }}
-            setShowModal={setShowModal}
-            showModal={showModal}
-            setError={setError}
-            error={error}
-            setDeleteResults={setDeleteResults}
-            deleteResults={deleteResults}
             selected={selected}
             superAdmin={true}
-            deleteButton={deleteButton('Caution. The filter field will deleted.', true, doDelete)}
-            saveButton={saveButton()}
+            {...adminForm}
+            deleteButton={adminForm.deleteButton('Caution. The filter field will deleted.', true, doDelete)}
+            saveButton={adminForm.saveButton()}
         >
             <>
                 <form className="m-4 pe-4">
@@ -174,7 +151,7 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
                     <Row className="my-1">
                         <Col>
                             <select
-                                {...form.register('fieldType', {
+                                {...adminForm.form.register('fieldType', {
                                     onChange: (e) => {
                                         setSelected(undefined);
                                         setFieldType(asFilterType(e.currentTarget.value));
@@ -195,24 +172,28 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
                         </Col>
                     </Row>
                 </form>
-                <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
+                <>
                     <Row className="my-1">
                         <Col>
                             <Row>
                                 <Col>Word:</Col>
                             </Row>
                             <Row>
-                                <Col>{mainField('Field')}</Col>
+                                <Col>{adminForm.mainField('Field')}</Col>
                                 {selected && (
                                     <Col xs={1}>
-                                        <Button variant="secondary" className="btn-sm" onClick={() => setShowModal(true)}>
+                                        <Button
+                                            variant="secondary"
+                                            className="btn-sm"
+                                            onClick={() => adminForm.setShowRenameModal(true)}
+                                        >
                                             Rename
                                         </Button>
                                     </Col>
                                 )}
-                                {errors.mainField && (
+                                {adminForm.form.formState.errors.mainField && (
                                     <span className="text-danger" title="mainField-error">
-                                        {`The main field is invalid. Error: ${errors.mainField.message}`}
+                                        {`The main field is invalid. Error: ${adminForm.form.formState.errors.mainField.message}`}
                                     </span>
                                 )}
                             </Row>
@@ -220,32 +201,32 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
                     </Row>
                     <Row className="my-1">
                         <Col>
-                            Description:
+                            Description (required):
                             <textarea
-                                title="description"
-                                placeholder="description"
-                                className="form-control"
-                                rows={4}
-                                {...form.register('description', {
+                                {...adminForm.form.register('description', {
                                     onChange: (e) => {
                                         if (selected) {
                                             selected.description = O.some(e.currentTarget.value);
                                             setSelected({ ...selected });
+                                            // form.setValue('description', e.currentTarget.value, { shouldDirty: true });
                                         }
                                     },
                                     required: true,
                                     value: selected?.description ? O.getOrElse(constant(''))(selected.description) : '',
                                     disabled: !selected,
                                 })}
+                                placeholder="description"
+                                className="form-control"
+                                rows={4}
                             />
-                            {errors.description && (
+                            {adminForm.form.formState.errors.description && (
                                 <span className="text-danger" title="description-error">
                                     You must provide the description. Even for color, even though it will not be saved for color.
                                 </span>
                             )}
                         </Col>
                     </Row>
-                </form>
+                </>
             </>
         </Admin>
     );

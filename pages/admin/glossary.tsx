@@ -59,22 +59,7 @@ const createNewEntry = (word: string): Entry => ({
 const keyFieldName = 'word';
 
 const Glossary = ({ id, glossary }: Props): JSX.Element => {
-    const {
-        selected,
-        showRenameModal: showModal,
-        setShowRenameModal: setShowModal,
-        error,
-        setError,
-        deleteResults,
-        setDeleteResults,
-        renameCallback,
-        nameExists,
-        form,
-        formSubmit,
-        mainField,
-        deleteButton,
-        saveButton,
-    } = useAdmin(
+    const { selected, renameCallback, nameExists, ...adminForm } = useAdmin(
         'Glossary Entry',
         keyFieldName,
         id,
@@ -83,7 +68,7 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
         {
             delEndpoint: '../api/glossary/',
             upsertEndpoint: '../api/glossary/upsert',
-            nameExistsEndpoint: (s: string) => `/api/glossary?name=${s}`,
+            nameExistsEndpoint: (s: string) => `/api/glossary/word/${s}`,
         },
         updatedFormFields,
         false,
@@ -96,17 +81,12 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
             type="Glossary"
             keyField={keyFieldName}
             editName={{ getDefault: () => selected?.word, renameCallback: renameCallback, nameExistsCallback: nameExists }}
-            setShowModal={setShowModal}
-            showModal={showModal}
-            setError={setError}
-            error={error}
-            setDeleteResults={setDeleteResults}
-            deleteResults={deleteResults}
             selected={selected}
-            deleteButton={deleteButton('Caution. The glossary entry will be PERMANENTLY deleted.', false)}
-            saveButton={saveButton()}
+            {...adminForm}
+            deleteButton={adminForm.deleteButton('Caution. The glossary entry will be PERMANENTLY deleted.', false)}
+            saveButton={adminForm.saveButton()}
         >
-            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
+            <>
                 <h4>Add/Edit Glossary Entries</h4>
                 <Row className="my-1">
                     <Col>
@@ -114,10 +94,14 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                             <Col>Word (unless it is a proper name, use lower case):</Col>
                         </Row>
                         <Row>
-                            <Col>{mainField('Word')}</Col>
+                            <Col>{adminForm.mainField('Word')}</Col>
                             {selected && (
                                 <Col xs={1}>
-                                    <Button variant="secondary" className="btn-sm" onClick={() => setShowModal(true)}>
+                                    <Button
+                                        variant="secondary"
+                                        className="btn-sm"
+                                        onClick={() => adminForm.setShowRenameModal(true)}
+                                    >
                                         Rename
                                     </Button>
                                 </Col>
@@ -129,15 +113,15 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                     <Col>
                         Definition (required):
                         <textarea
-                            {...form.register('definition', {
-                                required: true,
+                            {...adminForm.form.register('definition', {
+                                required: 'You must provide a definition',
                                 disabled: !selected,
                             })}
                             className="form-control"
                             rows={4}
                         />
-                        {form.formState.errors.definition && (
-                            <span className="text-danger">You must provide the definition.</span>
+                        {adminForm.form.formState.errors.definition && (
+                            <span className="text-danger">{adminForm.errors.definition?.message}</span>
                         )}
                     </Col>
                 </Row>
@@ -145,16 +129,19 @@ const Glossary = ({ id, glossary }: Props): JSX.Element => {
                     <Col>
                         URLs (required) (separated by a newline [enter]):
                         <textarea
-                            {...form.register('urls', { required: true, disabled: !selected })}
+                            {...adminForm.form.register('urls', {
+                                required: 'You must provide at least one URL that is the source of the definition.',
+                                disabled: !selected,
+                            })}
                             className="form-control"
                             rows={3}
                         />
-                        {form.formState.errors.urls && (
-                            <span className="text-danger">You must provide a URL for the source of the definition.</span>
+                        {adminForm.form.formState.errors.urls && (
+                            <span className="text-danger">{adminForm.errors.urls?.message}</span>
                         )}
                     </Col>
                 </Row>
-            </form>
+            </>
         </Admin>
     );
 };

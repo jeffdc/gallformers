@@ -64,10 +64,11 @@ export const getPlaces = (
 };
 
 export const searchPlaces = (s: string): TaskEither<Error, PlaceNoTreeApi[]> => {
-    return pipe(
-        getPlaces({ name: { contains: s } }),
-        TE.map((p) => p.map((pp) => ({ ...pp }))),
-    );
+    return getPlaces({ name: { contains: s } });
+};
+
+export const getPlaceByName = (name: string): TaskEither<Error, PlaceNoTreeApi[]> => {
+    return getPlaces({ name: { equals: name } });
 };
 
 export const placeById = (id: number): TaskEither<Error, PlaceWithHostsApi[]> => {

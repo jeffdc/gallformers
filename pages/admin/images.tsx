@@ -12,7 +12,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Col, Modal, Row } from 'react-bootstrap';
 import DataTable, { TableColumn } from 'react-data-table-component';
 import { useForm } from 'react-hook-form';
-import { AsyncTypeahead } from '../../components/Typeahead';
 import AddImage from '../../components/addImage';
 import ImageEdit from '../../components/imageEdit';
 import ImageGrid from '../../components/imageGrid';
@@ -23,6 +22,7 @@ import { speciesById } from '../../libs/db/species';
 import Admin from '../../libs/pages/admin';
 import { TABLE_CUSTOM_STYLES } from '../../libs/utils/DataTableConstants';
 import { mightFailWithArray, sessionUserOrUnknown } from '../../libs/utils/util';
+import { AsyncTypeahead } from 'react-bootstrap-typeahead';
 
 const schema = t.type({
     species: t.string,
@@ -86,7 +86,7 @@ const Images = ({ sp }: Props): JSX.Element => {
     const [isLoading, setIsLoading] = useState(false);
     const [species, setSpecies] = useState<species[]>(sp ?? []);
 
-    const { control, reset } = useForm<FormFields>({
+    const { register, reset } = useForm<FormFields>({
         mode: 'onBlur',
         resolver: ioTsResolver(schema),
         defaultValues: {
@@ -393,12 +393,12 @@ const Images = ({ sp }: Props): JSX.Element => {
                         </Col>
                         <Col>
                             <AsyncTypeahead
-                                name="species"
-                                control={control}
+                                id="species"
                                 options={species}
                                 labelKey="name"
                                 clearButton
-                                selected={selected ? [selected] : []}
+                                defaultSelected={selected ? [selected] : []}
+                                {...register('species')}
                                 onChange={(s: species[]) => {
                                     if (s.length > 0) {
                                         setSelected(s[0]);

@@ -1,5 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { deleteGlossaryEntry } from '../../../libs/db/glossary.ts';
 import { apiIdEndpoint } from '../../../libs/api/apipage';
+import { deleteGlossaryEntry } from '../../../libs/db/glossary.ts';
 
-export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => apiIdEndpoint(req, res, deleteGlossaryEntry);
+// GET: ../glossary/[id]
+// fetches the glossary entry  id
+//
+export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
+    return await apiIdEndpoint(req, res, deleteGlossaryEntry);
+};
