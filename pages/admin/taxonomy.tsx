@@ -56,17 +56,6 @@ const updatedFormFields = async (fam: FamilyAPI | undefined): Promise<FormFields
     };
 };
 
-const toUpsertFields = (fields: FormFields, name: string, id: number): FamilyUpsertFields => {
-    return {
-        ...fields,
-        name: name,
-        type: TaxonomyTypeValues.FAMILY,
-        id: id,
-        description: fields.description ?? '',
-        genera: fields.genera ?? [],
-    };
-};
-
 const createNewFamily = (name: string): FamilyAPI => ({
     name: name,
     description: '',
@@ -100,7 +89,29 @@ const DELETE_CONFIRMATION_MSG = `The selected genera, ALL of the species in the 
     changes on the main page.`;
 
 const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
-    const { data, setData, selected, renameCallback, nameExists, ...adminForm } = useAdmin(
+    const [genera, setGenera] = useState<Genus[]>([]);
+    const [showMoveFamily, setShowMoveFamily] = useState(false);
+    const [generaToMove, setGeneraToMove] = useState<Genus[]>([]);
+
+    const toUpsertFields = (fields: FormFields, name: string, id: number): FamilyUpsertFields => {
+        return {
+            ...fields,
+            name: name,
+            type: TaxonomyTypeValues.FAMILY,
+            id: id,
+            description: fields.description ?? '',
+            genera: genera ?? [],
+        };
+    };
+
+    const {
+        data: families,
+        setData: setFamilies,
+        selected,
+        renameCallback,
+        nameExists,
+        ...adminForm
+    } = useAdmin(
         'Family',
         keyFieldName,
         id,
@@ -117,13 +128,10 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
         fs,
     );
 
-    const [genera, setGenera] = useState<Genus[]>([]);
-    const [showMoveFamily, setShowMoveFamily] = useState(false);
-    const [generaToMove, setGeneraToMove] = useState<Genus[]>([]);
-
     const updateGeneraFromTable = (genera: Genus[]) => {
         if (selected) {
-            adminForm.setSelected({ ...selected, genera: genera });
+            // adminForm.setSelected({ ...selected, genera: genera });
+            setGenera(genera);
         }
     };
 
@@ -150,7 +158,7 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
             })
             .then((res) => {
                 const families = res.data;
-                setData(families);
+                setFamilies(families);
                 adminForm.setSelected(families.find((f) => f.id === selected.id));
                 setGeneraToMove([]);
             })
@@ -163,14 +171,14 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
             });
     };
 
+    // Handle when selected or data changes. Need to update the genera list. This is
     useEffect(() => {
         const updateGenera = async () => {
             if (selected) {
-                if (!data.find((s) => s.id == selected.id)) {
+                if (!families.find((s) => s.id == selected.id)) {
                     setGenera([]);
                 }
-
-                return axios
+                await axios
                     .get<Genus[]>(`/api/taxonomy/genus?famid=${selected.id}`)
                     .then((res) => setGenera(res.data))
                     .catch((e) => {
@@ -181,14 +189,14 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
         };
 
         updateGenera();
-    }, [data, selected]);
+    }, [families, selected]);
 
     return (
         <>
             {showMoveFamily && selected && (
                 <MoveFamily
                     genera={generaToMove}
-                    families={data}
+                    families={families}
                     showModal={showMoveFamily}
                     setShowModal={setShowMoveFamily}
                     moveCallback={move}
@@ -206,6 +214,7 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
                     true,
                 )}
                 saveButton={adminForm.saveButton()}
+                superAdmin={true}
             >
                 <>
                     <h4>Manage Taxonomy</h4>

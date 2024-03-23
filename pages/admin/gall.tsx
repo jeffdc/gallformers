@@ -7,6 +7,7 @@ import { ParsedUrlQuery } from 'querystring';
 import { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { AsyncTypeahead, Typeahead } from 'react-bootstrap-typeahead';
+import { Controller } from 'react-hook-form';
 import UndescribedFlow, { UndescribedData } from '../../components/UndescribedFlow';
 import AliasTable from '../../components/aliastable';
 import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '../../hooks/useSpecies';
@@ -15,6 +16,7 @@ import { extractQueryParam } from '../../libs/api/apipage';
 import {
     AbundanceApi,
     AliasApi,
+    DetachableApi,
     DetachableNone,
     Detachables,
     FilterField,
@@ -26,7 +28,6 @@ import {
     TaxonCodeValues,
     TaxonomyEntry,
     TaxonomyTypeValues,
-    detachableFromString,
 } from '../../libs/api/apitypes';
 import {
     getAlignments,
@@ -43,7 +44,7 @@ import { gallById } from '../../libs/db/gall';
 import { getAbundances } from '../../libs/db/species';
 import { allFamilies, allGenera } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
-import { hasProp, mightFailWithArray } from '../../libs/utils/util';
+import { mightFailWithArray } from '../../libs/utils/util';
 
 type Props = SpeciesProps & {
     gall: GallApi[];
@@ -92,12 +93,12 @@ const Gall = ({
 
         return {
             ...toSpeciesUpsertFields(fields, name, id),
-            gallid: hasProp(fields.mainField[0], 'gall') ? (fields.mainField[0] as GallApi).gall_id : -1,
+            gallid: fields.mainField[0].gall_id,
             alignments: fields.alignment.map((a) => a.id),
             cells: fields.cells.map((c) => c.id),
             colors: fields.color.map((c) => c.id),
             seasons: fields.season.map((c) => c.id),
-            detachable: fields.detachable.value,
+            detachable: fields.detachable,
             fgs: selected.fgs,
             hosts: fields.hosts.map((h) => h.id),
             locations: fields.location.map((l) => l.id),
@@ -200,6 +201,13 @@ const Gall = ({
     };
 
     const onSubmit = async (fields: FormFields): Promise<void> => {
+        if (!selected) {
+            console.error(
+                `Can not save. Looks like the genus and/or family are empty. We should not be in this pickle, yet here we are.`,
+            );
+            return;
+        }
+
         // see if a new Unknown Genus is needed - we are hiding this complexity from the user
         const genus = fields.genus[0];
         const family = fields.family[0];
@@ -216,10 +224,7 @@ const Gall = ({
         }
 
         // if either genus or family is Unknown and the undescribed box is not checked they are probably messing up
-        if (
-            !fields.undescribed &&
-            (fields.genus[0].name.localeCompare('Unknown') == 0 || fields.family[0].name.localeCompare('Unknown') == 0)
-        ) {
+        if (!fields.undescribed && (genus.name.localeCompare('Unknown') == 0 || family.name.localeCompare('Unknown') == 0)) {
             return confirm({
                 variant: 'danger',
                 catchOnCancel: true,
@@ -229,6 +234,7 @@ const Gall = ({
                 .then(() => Promise.bind(adminForm.formSubmit(fields)))
                 .catch(() => Promise.resolve()) as Promise<void>;
         }
+
         return adminForm.formSubmit(fields);
     };
 
@@ -247,26 +253,32 @@ const Gall = ({
     };
 
     const createGallPropertyField = (name: keyof FormFields, items: FilterField[], multiple = true) => (
-        <Typeahead
-            id={name}
-            options={items}
-            labelKey="field"
-            multiple={multiple}
-            clearButton
-            {...adminForm.form.register(name, {
-                disabled: areRequiredFieldsFilled(),
-            })}
-            onChange={(x) => {
-                if (selected) {
+        <Controller
+            control={adminForm.form.control}
+            name={name}
+            render={() => (
+                <Typeahead
+                    id={name}
+                    options={items}
+                    labelKey="field"
+                    multiple={multiple}
+                    clearButton
+                    {...adminForm.form.register(name, {
+                        disabled: areRequiredFieldsFilled(),
+                    })}
+                    onChange={(x) => {
+                        if (selected) {
+                            // @ts-expect-error breaking type safety here as it is non-trivial (and not seemingly worth it)
+                            // to pass the property name in a type safe manner
+                            selected[name] = x as FilterField[];
+                            adminForm.setSelected({ ...selected });
+                        }
+                    }}
                     // @ts-expect-error breaking type safety here as it is non-trivial (and not seemingly worth it)
                     // to pass the property name in a type safe manner
-                    selected[name] = x as FilterField[];
-                    adminForm.setSelected({ ...selected });
-                }
-            }}
-            // @ts-expect-error breaking type safety here as it is non-trivial (and not seemingly worth it)
-            // to pass the property name in a type safe manner
-            selected={selected ? selected[name] : []}
+                    selected={selected ? selected[name] : []}
+                />
+            )}
         />
     );
 
@@ -338,69 +350,75 @@ const Gall = ({
                 <Row className="my-1">
                     <Col>
                         Genus (filled automatically):
-                        <Typeahead
-                            id="genus"
-                            placeholder="Genus"
-                            options={genera}
-                            labelKey="name"
-                            {...adminForm.form.register('genus', {
-                                required: true,
-                                disabled: true,
-                            })}
-                            onChange={(g) => {
-                                if (selected) {
-                                    selected.fgs.genus = g[0] as TaxonomyEntry;
-                                    adminForm.setSelected({ ...selected });
-                                }
-                            }}
-                            selected={selected?.fgs?.genus ? [selected.fgs.genus] : []}
-                            clearButton
-                            multiple
+                        <Controller
+                            control={adminForm.form.control}
+                            name="genus"
+                            render={() => (
+                                <Typeahead
+                                    id="genus"
+                                    placeholder="Genus"
+                                    options={genera}
+                                    labelKey="name"
+                                    disabled={true}
+                                    onChange={(g) => {
+                                        if (selected) {
+                                            selected.fgs.genus = g[0] as TaxonomyEntry;
+                                            adminForm.setSelected({ ...selected });
+                                        }
+                                    }}
+                                    selected={selected?.fgs?.genus ? [selected.fgs.genus] : []}
+                                    clearButton
+                                    multiple
+                                />
+                            )}
                         />
                     </Col>
                     <Col>
                         Family (required):
-                        <Typeahead
-                            id="family"
-                            placeholder="Family"
-                            options={families}
-                            labelKey="name"
-                            {...adminForm.form.register('genus', {
-                                required: true,
-                                disabled: (selected && selected.id > 0) || !selected,
-                            })}
-                            onChange={(f) => {
-                                if (!selected) return;
+                        <Controller
+                            control={adminForm.form.control}
+                            name="genus"
+                            render={() => (
+                                <Typeahead
+                                    id="family"
+                                    placeholder="Family"
+                                    options={families}
+                                    labelKey="name"
+                                    disabled={(selected && selected.id > 0) || !selected}
+                                    onChange={(f) => {
+                                        if (!selected) return;
 
-                                if (f && f.length > 0) {
-                                    // handle the case when a new species is created
-                                    // either the genus is new or is not
-                                    const fam = f[0] as TaxonomyEntry;
-                                    const genus = genera.find((gg) => gg.id === selected.fgs.genus.id);
-                                    if (genus && O.isNone(genus.parent)) {
-                                        genus.parent = O.some({ ...fam, parent: O.none });
-                                        selected.fgs = { ...selected.fgs, genus: genus };
-                                        adminForm.setSelected({ ...selected, fgs: { ...selected.fgs, family: fam } });
-                                    } else {
-                                        selected.fgs = { ...selected.fgs, family: fam };
-                                        adminForm.setSelected({ ...selected });
-                                    }
-                                } else {
-                                    selected.fgs = {
-                                        ...selected.fgs,
-                                        family: {
-                                            name: '',
-                                            description: '',
-                                            id: -1,
-                                            type: TaxonomyTypeValues.FAMILY,
-                                            parent: O.none,
-                                        },
-                                    };
-                                    adminForm.setSelected({ ...selected });
-                                }
-                            }}
-                            selected={selected?.fgs?.family && selected.fgs.family.id >= 0 ? [selected.fgs.family] : []}
-                            clearButton
+                                        if (f && f.length > 0) {
+                                            // handle the case when a new species is created
+                                            // either the genus is new or is not
+                                            const fam = f[0] as TaxonomyEntry;
+                                            const genus = genera.find((gg) => gg.id === selected.fgs.genus.id);
+                                            if (genus && O.isNone(genus.parent)) {
+                                                genus.parent = O.some({ ...fam, parent: O.none });
+                                                selected.fgs = { ...selected.fgs, genus: genus };
+                                                adminForm.setSelected({ ...selected, fgs: { ...selected.fgs, family: fam } });
+                                            } else {
+                                                selected.fgs = { ...selected.fgs, family: fam };
+                                                adminForm.setSelected({ ...selected });
+                                            }
+                                        } else {
+                                            selected.fgs = {
+                                                ...selected.fgs,
+                                                family: {
+                                                    name: '',
+                                                    description: '',
+                                                    id: -1,
+                                                    type: TaxonomyTypeValues.FAMILY,
+                                                    parent: O.none,
+                                                },
+                                            };
+                                            adminForm.setSelected({ ...selected });
+                                        }
+                                    }}
+                                    selected={selected?.fgs?.family && selected.fgs.family.id >= 0 ? [selected.fgs.family] : []}
+                                    clearButton
+                                />
+                            )}
                         />
                         {adminForm.form.formState.errors.family && (
                             <span className="text-danger">
@@ -413,26 +431,29 @@ const Gall = ({
                 <Row className="my-1">
                     <Col>
                         Hosts (required):
-                        <AsyncTypeahead
-                            id="hosts"
-                            placeholder="Hosts"
-                            options={hosts}
-                            labelKey="name"
-                            multiple
-                            {...adminForm.form.register('genus', {
-                                required: true,
-                                disabled: !selected,
-                            })}
-                            onChange={(h) => {
-                                if (selected) {
-                                    selected.hosts = h as HostSimple[];
-                                    adminForm.setSelected({ ...selected });
-                                }
-                            }}
-                            selected={selected ? selected.hosts : []}
-                            clearButton
-                            isLoading={isLoading}
-                            onSearch={handleSearch}
+                        <Controller
+                            control={adminForm.form.control}
+                            name="hosts"
+                            render={() => (
+                                <AsyncTypeahead
+                                    id="hosts"
+                                    placeholder="Hosts"
+                                    options={hosts}
+                                    labelKey="name"
+                                    multiple
+                                    disabled={!selected}
+                                    onChange={(h) => {
+                                        if (selected) {
+                                            selected.hosts = h as HostSimple[];
+                                            adminForm.setSelected({ ...selected });
+                                        }
+                                    }}
+                                    selected={selected ? selected.hosts : []}
+                                    clearButton
+                                    isLoading={isLoading}
+                                    onSearch={handleSearch}
+                                />
+                            )}
                         />
                         {adminForm.form.formState.errors.hosts && (
                             <span className="text-danger">You must map this gall to at least one host.</span>
@@ -442,10 +463,30 @@ const Gall = ({
                 <Row className="my-1">
                     <Col>
                         Detachable:
-                        <select
+                        <Controller
+                            control={adminForm.form.control}
+                            name="detachable"
+                            render={() => (
+                                <Typeahead
+                                    id="detachable"
+                                    options={Detachables}
+                                    labelKey="value"
+                                    disabled={areRequiredFieldsFilled()}
+                                    onChange={(d) => {
+                                        if (selected?.detachable) {
+                                            selected.detachable = d[0] as DetachableApi;
+                                            adminForm.setSelected({ ...selected });
+                                        }
+                                    }}
+                                    aria-placeholder="Detachable"
+                                    selected={selected ? [selected.detachable] : []}
+                                    clearButton
+                                />
+                            )}
+                        />
+                        {/* <select
                             {...adminForm.form.register('detachable', {
                                 disabled: areRequiredFieldsFilled(),
-                                value: selected ? selected.detachable : DetachableNone,
                                 onChange: (e) => {
                                     if (selected) {
                                         selected.detachable = detachableFromString(e.currentTarget.value);
@@ -453,13 +494,14 @@ const Gall = ({
                                     }
                                 },
                             })}
+                            value={selected ? selected.detachable.value : DetachableNone.value}
                             aria-placeholder="Detachable"
                             className="form-control"
                         >
                             {Detachables.map((d) => (
                                 <option key={d.id}>{d.value}</option>
                             ))}
-                        </select>
+                        </select> */}
                     </Col>
                     <Col>Walls:{createGallPropertyField('walls', walls)}</Col>
                     <Col>Cells: {createGallPropertyField('cells', cells)}</Col>
@@ -476,44 +518,52 @@ const Gall = ({
                     <Col>Texture(s): {createGallPropertyField('texture', textures)}</Col>
                     <Col>
                         Abundance:
-                        <Typeahead
-                            id="abundance"
-                            options={abundances}
-                            labelKey="abundance"
-                            {...adminForm.form.register('abundance', {
-                                disabled: areRequiredFieldsFilled(),
-                            })}
-                            onChange={(a) => {
-                                if (selected) {
-                                    selected.abundance = O.fromNullable(a[0] as AbundanceApi);
-                                    adminForm.setSelected({ ...selected });
-                                }
-                            }}
-                            selected={
-                                selected?.abundance
-                                    ? pipe(
-                                          selected.abundance,
-                                          O.fold(constant([]), (a) => [a]),
-                                      )
-                                    : []
-                            }
-                            clearButton
+                        <Controller
+                            control={adminForm.form.control}
+                            name="abundance"
+                            render={() => (
+                                <Typeahead
+                                    id="abundance"
+                                    options={abundances}
+                                    labelKey="abundance"
+                                    disabled={areRequiredFieldsFilled()}
+                                    onChange={(a) => {
+                                        if (selected) {
+                                            selected.abundance = O.fromNullable(a[0] as AbundanceApi);
+                                            adminForm.setSelected({ ...selected });
+                                        }
+                                    }}
+                                    selected={
+                                        selected?.abundance
+                                            ? pipe(
+                                                  selected.abundance,
+                                                  O.fold(constant([]), (a) => [a]),
+                                              )
+                                            : []
+                                    }
+                                    clearButton
+                                />
+                            )}
                         />
                     </Col>
                 </Row>
                 <Row className="my-1">
                     <Col>
-                        <AliasTable
-                            {...adminForm.form.register('aliases', {
-                                disabled: areRequiredFieldsFilled(),
-                            })}
-                            data={selected?.aliases ?? []}
-                            setData={(aliases: AliasApi[]) => {
-                                if (selected) {
-                                    selected.aliases = aliases;
-                                    adminForm.setSelected({ ...selected });
-                                }
-                            }}
+                        <Controller
+                            control={adminForm.form.control}
+                            name="aliases"
+                            render={() => (
+                                <AliasTable
+                                    data={selected?.aliases ?? []}
+                                    setData={(aliases: AliasApi[]) => {
+                                        if (selected) {
+                                            selected.aliases = aliases;
+                                            adminForm.setSelected({ ...selected });
+                                        }
+                                    }}
+                                    disabled={areRequiredFieldsFilled()}
+                                />
+                            )}
                         />
                     </Col>
                 </Row>
@@ -532,7 +582,7 @@ const Gall = ({
                             type="checkbox"
                             className="form-input-checkbox"
                             checked={selected ? selected.datacomplete : false}
-                        />
+                        />{' '}
                         All sources containing unique information relevant to this gall have been added and are reflected in its
                         associated data. However, filter criteria may not be comprehensive in every field.
                     </Col>
@@ -544,7 +594,7 @@ const Gall = ({
                                 disabled: areRequiredFieldsFilled(),
                                 onChange: (e) => {
                                     if (selected) {
-                                        selected.datacomplete = e.currentTarget.checked;
+                                        selected.undescribed = e.currentTarget.checked;
                                         adminForm.setSelected({ ...selected });
                                     }
                                 },
@@ -552,7 +602,7 @@ const Gall = ({
                             type="checkbox"
                             className="form-input-checkbox"
                             checked={selected ? selected.undescribed : false}
-                        />
+                        />{' '}
                         Undescribed?
                     </Col>
                 </Row>

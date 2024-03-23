@@ -1,10 +1,9 @@
-import * as E from 'fp-ts/lib/Either';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
-import { pipe } from 'fp-ts/lib/function';
+import { constant, pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Err, getQueryParam, getQueryParams, sendErrorResponse, sendSuccessResponse, toErr } from '../../../../libs/api/apipage';
-import { FilterField, FilterFieldTypeSchema, FilterFieldTypeValue, asFilterType } from '../../../../libs/api/apitypes';
+import { FilterField, asFilterType } from '../../../../libs/api/apitypes';
 import { getFilterFieldByNameAndType, getFilterFieldsByType } from '../../../../libs/db/filterfield';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
@@ -14,23 +13,25 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
         return;
     }
 
-    const endWithError = (msg: string): FilterFieldTypeValue => {
-        res.status(400).end(`Invalid Request: ${msg}.`);
-        return FilterFieldTypeValue.ALIGNMENTS; // never get here but keeps types inline
-    };
+    // const endWithError = (msg: string): FilterFieldTypeValue => {
+    //     res.status(400).end(`Invalid Request: ${msg}.`);
+    //     return FilterFieldTypeValue.ALIGNMENTS; // never get here but keeps types inline
+    // };
 
-    const fieldType = pipe(
-        params['fieldType'],
-        E.fromOption(() => 'Missing fieldType parameter.'),
-        E.map((s) => FilterFieldTypeSchema.decode(s)),
-        E.match(
-            (err) => endWithError(err),
-            E.match(
-                (err) => endWithError(err.join(', ')),
-                (v) => v,
-            ),
-        ),
-    );
+    const fieldType = asFilterType(O.fold(constant(''), (ft) => ft as string)(params['fieldType']));
+
+    // const fieldType: FilterFieldTypeValue = pipe(
+    //     params['fieldType'],
+    //     E.fromOption(() => 'Missing fieldType parameter.'),
+    //     E.map((s) => asFilterFieldType(s)),
+    //     E.match(
+    //         (err) => endWithError(err),
+    //         E.match(
+    //             (err) => endWithError(err.join(', ')),
+    //             (v) => v,
+    //         ),
+    //     ),
+    // );
     const errMsg = (): TE.TaskEither<Error, FilterField[]> => {
         return TE.left(new Error('Failed to fetch the filter field.'));
     };

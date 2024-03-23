@@ -75,7 +75,6 @@ export async function apiUpsertEndpoint<T, R>(
 
     //TODO - figure out how to make this type safe. Maybe need to have caller pass conversion f?
     const t = !req.body ? O.none : O.of(req.body as T);
-
     await pipe(
         t,
         O.map(fUpsert),
@@ -199,7 +198,7 @@ export const sendErrorResponse =
     };
 
 /**
- * Type used for representing Repsonse failures back to the client.
+ * Type used for representing Response failures back to the client.
  */
 export type Err = {
     status: number;

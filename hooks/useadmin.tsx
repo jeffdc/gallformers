@@ -1,4 +1,3 @@
-import { DevTool } from '@hookform/devtools';
 import axios from 'axios';
 import { useSession } from 'next-auth/react';
 import router from 'next/router';
@@ -49,7 +48,7 @@ type AdminData<T, FormFields extends FieldValues> = {
         needSuperAdmin: boolean,
         customDeleteHandler?: (fields: FormFields) => Promise<void>,
     ) => JSX.Element;
-    saveButton: () => JSX.Element;
+    saveButton: (disabled?: () => boolean) => JSX.Element;
     isSuperAdmin: boolean;
 };
 
@@ -122,7 +121,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         onDataChange(selected);
     }, [onDataChange, selected]);
 
-    const [showModal, setShowModal] = useState(false);
+    const [showRenameModal, setShowRenameModal] = useState(false);
     const [error, setError] = useState('');
     const [deleteResults, setDeleteResults] = useState<DeleteResult>();
 
@@ -180,41 +179,19 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
             });
     };
 
-    const debugDumpValidation = (): string => {
-        let s: string = '';
-        let key: keyof typeof errors;
-        for (key in errors) {
-            s = `${s}\n${String(key)} -- ${errors[key]?.message}`;
-        }
-        return s;
-    };
-
     const theMainField = (placeholder: string, asyncProps?: AsyncMainFieldProps) => {
         // - we pull _oC now to make the spread of "rest" later easier
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { name, onChange: _oC, ...rest } = form.register('mainField' as Path<FormFields>);
-        console.log(`JDC: ${JSON.stringify('BLOW UP?', null, '  ')}`);
 
         return (
             <>
-                <DevTool control={form.control} placement="top-right" />
-                <ul>
-                    <li>
-                        <code>{`IsValid: ${isValid} -- isDirty: ${isDirty}`}</code>
-                    </li>
-                    <li>
-                        <code>{`Err: ${debugDumpValidation()}`}</code>
-                    </li>
-                    {/* <li>
-                        <code>{`Selected: ${JSON.stringify(selected)}`}</code>
-                    </li> */}
-                </ul>
                 {asyncProps ? (
                     <AsyncTypeahead
                         id={name}
                         options={data}
                         labelKey={labelKey}
-                        defaultSelected={selected ? [selected] : []}
+                        selected={selected ? [selected] : []}
                         placeholder={`Start typing a ${placeholder} name to begin`}
                         clearButton
                         isInvalid={!!errors.mainField}
@@ -237,7 +214,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                     <Typeahead
                         id={name}
                         options={data}
-                        defaultSelected={selected ? [selected] : []}
+                        selected={selected ? [selected] : []}
                         placeholder={placeholder}
                         labelKey={labelKey}
                         clearButton
@@ -305,9 +282,11 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         );
     };
 
-    const saveButton = () => {
+    // const saveButton = (disabled = () => !isDirty || !isValid) => {
+    // TODO - removing the isDirty check for now since it is not working as expected
+    const saveButton = (disabled = () => !isValid) => {
         return (
-            <Button variant="primary" type="submit" value="Save Changes" disabled={!isDirty || !isValid}>
+            <Button variant="primary" type="submit" value="Save Changes" disabled={disabled()}>
                 Save Changes
             </Button>
         );
@@ -372,7 +351,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     const nameExists = async <T,>(name: string): Promise<boolean> => {
         if (apiConfig.nameExistsEndpoint) {
             return axios.get<T[]>(apiConfig.nameExistsEndpoint(name)).then((res) => {
-                return res.data.length > 0;
+                return res.data.length > 0 && res.status == 200;
             });
         } else {
             return Promise.resolve(false);
@@ -384,8 +363,8 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         setData: setData,
         selected: selected,
         setSelected: setSelected,
-        showRenameModal: showModal,
-        setShowRenameModal: setShowModal,
+        showRenameModal: showRenameModal,
+        setShowRenameModal: setShowRenameModal,
         isValid: isValid,
         isDirty: isDirty,
         errors: errors,

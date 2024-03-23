@@ -1,18 +1,10 @@
-import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
-import * as t from 'io-ts';
 import { useEffect, useState } from 'react';
 import { Button, Col, Modal, Row } from 'react-bootstrap';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 
 import { Typeahead } from 'react-bootstrap-typeahead';
-import {
-    ImageApi,
-    ImageBaseSchema,
-    ImageLicenseValues,
-    ImageSourceSchema,
-    SourceWithSpeciesSourceApi,
-} from '../libs/api/apitypes';
+import { asImageLicense, ImageApi, ImageLicenseValues, SourceWithSpeciesSourceApi } from '../libs/api/apitypes';
 import InfoTip from './infotip';
 
 type Props = {
@@ -22,21 +14,10 @@ type Props = {
     onClose: () => void;
 };
 
-//JDC TODO move away from this ...
-const Schema = t.intersection([ImageBaseSchema, ImageSourceSchema]);
-
-type FormFields = t.TypeOf<typeof Schema>;
-
-const sourceFromOption = (so: O.Option<SourceWithSpeciesSourceApi>): SourceWithSpeciesSourceApi[] =>
-    pipe(
-        so,
-        O.fold(constant(new Array<SourceWithSpeciesSourceApi>()), (s) => [s]),
-    );
+type FormFields = ImageApi;
 
 const formFromImage = (img: ImageApi): FormFields => ({
     ...img,
-    // license: img.license as LicenseType,
-    // source: sourceFromOption(img.source),
 });
 
 const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
@@ -48,6 +29,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
         register,
         setValue,
         formState: { isDirty, errors },
+        control,
     } = useForm<FormFields>({
         mode: 'onBlur',
         defaultValues: formFromImage(image),
@@ -74,10 +56,8 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
         setValue('creator', selected.creator);
         setValue('attribution', selected.attribution);
         setValue('sourcelink', selected.sourcelink);
-        // setValue('license', selected.license as LicenseType);
         setValue('license', selected.license);
         setValue('licenselink', selected.licenselink);
-        // setValue('source', sourceFromOption(selected.source));
         setValue('source', selected.source);
         setValue('caption', selected.caption);
     }, [selected, setValue]);
@@ -90,7 +70,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
         const newImg: ImageApi = {
             ...image,
             ...fields,
-            // source: O.fromNullable(fields.source[0]),
+            source: fields.source,
         };
         await onSave(newImg);
         onHide();
@@ -137,23 +117,29 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                     />
                                 </Col>
                                 <Col>
-                                    <Typeahead
-                                        id="source"
-                                        options={sources}
-                                        labelKey={(s) => (s as SourceWithSpeciesSourceApi).title}
-                                        clearButton
-                                        defaultSelected={sourceFromOption(selected.source)}
-                                        onChange={(o) => {
-                                            const s = o[0] as SourceWithSpeciesSourceApi;
-                                            setSelected({
-                                                ...selected,
-                                                source: O.fromNullable(s),
-                                                // license: s ? asLicenseType(s.license) : '',
-                                                license: s.license,
-                                                licenselink: s ? s.licenselink : '',
-                                                creator: s ? s.author : '',
-                                            });
-                                        }}
+                                    <Controller
+                                        name="source"
+                                        control={control}
+                                        render={() => (
+                                            <Typeahead
+                                                id="source"
+                                                options={sources}
+                                                labelKey={(s) => (s as SourceWithSpeciesSourceApi).title}
+                                                clearButton
+                                                selected={selected.source ? [selected.source] : []}
+                                                onChange={(o) => {
+                                                    const s = o[0] as SourceWithSpeciesSourceApi;
+                                                    setSelected({
+                                                        ...selected,
+                                                        source: s,
+                                                        license: s ? asImageLicense(s.license) : '',
+                                                        // license: s.license,
+                                                        licenselink: s ? s.licenselink : '',
+                                                        creator: s ? s.author : '',
+                                                    });
+                                                }}
+                                            />
+                                        )}
                                     />
                                 </Col>
                             </Row>

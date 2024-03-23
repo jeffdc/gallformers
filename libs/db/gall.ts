@@ -46,15 +46,13 @@ import {
     GallUpsertFields,
     RandomGall,
     SimpleSpecies,
-    TaxonCodeSchema,
     TaxonCodeValues,
     TaxonomyTypeValues,
     detachableFromId,
-    detachableFromString,
+    taxonCodeAsStringToValue,
 } from '../api/apitypes';
 import { SMALL, deleteImagesBySpeciesId, makePath } from '../images/images';
 import { defaultSource } from '../pages/renderhelpers';
-import { decodeWithDefault } from '../utils/io-ts.ts';
 import { logger } from '../utils/logger.ts';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError, optionalWith } from '../utils/util';
@@ -220,7 +218,7 @@ export const getGalls = (
                 name: g.species.name,
                 datacomplete: g.species.datacomplete,
                 speciessource: g.species.speciessource,
-                taxoncode: decodeWithDefault(TaxonCodeSchema.decode(g.species.taxoncode), TaxonCodeValues.GALL),
+                taxoncode: taxonCodeAsStringToValue(g.species.taxoncode),
                 description: O.fromNullable(d),
                 abundance: optionalWith(g.species.abundance, adaptAbundance),
                 gall_id: g.gall_id,
@@ -637,7 +635,7 @@ const gallCreateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                                 gallcells: { create: gall.cells.map((id) => ({ cells_id: id })) },
                                 gallcolor: { create: gall.colors.map((id) => ({ color_id: id })) },
                                 gallseason: { create: gall.seasons.map((id) => ({ season_id: id })) },
-                                detachable: detachableFromString(gall.detachable).id,
+                                detachable: gall.detachable.id,
                                 gallshape: { create: gall.shapes.map((id) => ({ shape_id: id })) },
                                 gallwalls: { create: gall.walls.map((id) => ({ walls_id: id })) },
                                 taxontype: { connect: { taxoncode: TaxonCodeValues.GALL } },
@@ -666,7 +664,7 @@ const gallUpdateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                             gall: {
                                 update: {
                                     undescribed: gall.undescribed,
-                                    detachable: detachableFromString(gall.detachable).id,
+                                    detachable: gall.detachable.id,
                                     gallalignment: {
                                         deleteMany: { alignment_id: { notIn: [] } },
                                         create: gall.alignments.map((a) => ({ alignment_id: a })),

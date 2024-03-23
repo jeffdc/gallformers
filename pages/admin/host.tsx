@@ -30,6 +30,7 @@ import { getAbundances } from '../../libs/db/species';
 import { allFamilies, allGenera, allSections } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
+import { Controller } from 'react-hook-form';
 
 const projConfig: ProjectionConfig = {
     center: [-4, 48],
@@ -140,7 +141,7 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
             selected={selected}
             {...adminForm}
             deleteButton={adminForm.deleteButton('Caution. All data associated with this Host will be deleted.', false)}
-            saveButton={adminForm.saveButton()}
+            saveButton={adminForm.saveButton(() => false)}
             formSubmit={onSubmit}
         >
             <>
@@ -185,66 +186,75 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                 <Row className="my-1">
                     <Col>
                         Genus (filled automatically):
-                        <Typeahead
-                            id="genus"
-                            placeholder="Genus"
-                            options={genera}
-                            labelKey="name"
-                            {...adminForm.form.register('genus', { required: true, disabled: true })}
-                            onChange={(g) => {
-                                if (selected) {
-                                    selected.fgs.genus = g[0] as TaxonomyEntry;
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                            selected={selected?.fgs?.genus ? [selected.fgs.genus] : []}
-                            clearButton
-                            multiple
+                        <Controller
+                            control={adminForm.form.control}
+                            name="genus"
+                            render={() => (
+                                <Typeahead
+                                    id="genus"
+                                    placeholder="Genus"
+                                    options={genera}
+                                    labelKey="name"
+                                    disabled={true}
+                                    onChange={(g) => {
+                                        if (selected) {
+                                            selected.fgs.genus = g[0] as TaxonomyEntry;
+                                            setSelected({ ...selected });
+                                        }
+                                    }}
+                                    selected={selected?.fgs?.genus ? [selected.fgs.genus] : []}
+                                    clearButton
+                                    multiple
+                                />
+                            )}
                         />
                     </Col>
                     <Col>
                         Family (required):
-                        <Typeahead
-                            id="family"
-                            placeholder="Family"
-                            options={families}
-                            labelKey="name"
-                            selected={selected?.fgs?.family && selected.fgs.family.id >= 0 ? [selected.fgs.family] : []}
-                            {...adminForm.form.register('family', {
-                                required: true,
-                                disabled: !selected || (selected && selected.id > 0),
-                            })}
-                            onChange={(f) => {
-                                if (!selected) return;
+                        <Controller
+                            control={adminForm.form.control}
+                            name="family"
+                            render={() => (
+                                <Typeahead
+                                    id="family"
+                                    placeholder="Family"
+                                    options={families}
+                                    labelKey="name"
+                                    disabled={!selected || (selected && selected.id > 0)}
+                                    selected={selected?.fgs?.family && selected.fgs.family.id >= 0 ? [selected.fgs.family] : []}
+                                    onChange={(f) => {
+                                        if (!selected) return;
 
-                                if (f && f.length > 0) {
-                                    // handle the case when a new species is created
-                                    // either the genus is new or is not
-                                    const genus = genera.find((gg) => gg.id === selected.fgs.genus.id);
-                                    const fam = f[0] as TaxonomyEntry;
-                                    if (genus && O.isNone(genus.parent)) {
-                                        genus.parent = O.some({ ...fam, parent: O.none });
-                                        selected.fgs = { ...selected.fgs, genus: genus };
-                                        setSelected({ ...selected, fgs: { ...selected.fgs, family: fam } });
-                                    } else {
-                                        selected.fgs = { ...selected.fgs, family: fam };
-                                        setSelected({ ...selected });
-                                    }
-                                } else {
-                                    selected.fgs = {
-                                        ...selected.fgs,
-                                        family: {
-                                            name: '',
-                                            description: '',
-                                            id: -1,
-                                            type: TaxonomyTypeValues.FAMILY,
-                                            parent: O.none,
-                                        },
-                                    };
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                            clearButton
+                                        if (f && f.length > 0) {
+                                            // handle the case when a new species is created
+                                            // either the genus is new or is not
+                                            const genus = genera.find((gg) => gg.id === selected.fgs.genus.id);
+                                            const fam = f[0] as TaxonomyEntry;
+                                            if (genus && O.isNone(genus.parent)) {
+                                                genus.parent = O.some({ ...fam, parent: O.none });
+                                                selected.fgs = { ...selected.fgs, genus: genus };
+                                                setSelected({ ...selected, fgs: { ...selected.fgs, family: fam } });
+                                            } else {
+                                                selected.fgs = { ...selected.fgs, family: fam };
+                                                setSelected({ ...selected });
+                                            }
+                                        } else {
+                                            selected.fgs = {
+                                                ...selected.fgs,
+                                                family: {
+                                                    name: '',
+                                                    description: '',
+                                                    id: -1,
+                                                    type: TaxonomyTypeValues.FAMILY,
+                                                    parent: O.none,
+                                                },
+                                            };
+                                            setSelected({ ...selected });
+                                        }
+                                    }}
+                                    clearButton
+                                />
+                            )}
                         />
                         {adminForm.form.formState.errors.family && (
                             <span className="text-danger">
@@ -257,54 +267,64 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                 <Row className="my-1">
                     <Col>
                         Section:
-                        <Typeahead
-                            id="section"
-                            placeholder="Section"
-                            options={sections}
-                            labelKey="name"
-                            {...adminForm.form.register('section', { required: true, disabled: !selected })}
-                            selected={
-                                selected?.fgs?.section
-                                    ? pipe(
-                                          selected.fgs.section,
-                                          O.fold(constant([]), (s) => [s]),
-                                      )
-                                    : []
-                            }
-                            onChange={(g) => {
-                                if (selected) {
-                                    selected.fgs.section = O.fromNullable(g[0] as TaxonomyEntry);
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                            disabled={!selected}
-                            clearButton
+                        <Controller
+                            control={adminForm.form.control}
+                            name="section"
+                            render={() => (
+                                <Typeahead
+                                    id="section"
+                                    placeholder="Section"
+                                    options={sections}
+                                    labelKey="name"
+                                    disabled={!selected}
+                                    selected={
+                                        selected?.fgs?.section
+                                            ? pipe(
+                                                  selected.fgs.section,
+                                                  O.fold(constant([]), (s) => [s]),
+                                              )
+                                            : []
+                                    }
+                                    onChange={(g) => {
+                                        if (selected) {
+                                            selected.fgs.section = O.fromNullable(g[0] as TaxonomyEntry);
+                                            setSelected({ ...selected });
+                                        }
+                                    }}
+                                    clearButton
+                                />
+                            )}
                         />
                     </Col>
                     <Col>
                         Abundance:
-                        <Typeahead
-                            id="abundance"
-                            placeholder=""
-                            options={abundances}
-                            labelKey="abundance"
-                            disabled={!selected}
-                            {...adminForm.form.register('abundance', { required: true, disabled: !selected })}
-                            selected={
-                                selected?.abundance
-                                    ? pipe(
-                                          selected.abundance,
-                                          O.fold(constant([]), (a) => [a]),
-                                      )
-                                    : []
-                            }
-                            onChange={(g) => {
-                                if (selected) {
-                                    selected.abundance = O.fromNullable(g[0] as AbundanceApi);
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                            clearButton
+                        <Controller
+                            control={adminForm.form.control}
+                            name="abundance"
+                            render={() => (
+                                <Typeahead
+                                    id="abundance"
+                                    placeholder=""
+                                    options={abundances}
+                                    labelKey="abundance"
+                                    disabled={!selected}
+                                    selected={
+                                        selected?.abundance
+                                            ? pipe(
+                                                  selected.abundance,
+                                                  O.fold(constant([]), (a) => [a]),
+                                              )
+                                            : []
+                                    }
+                                    onChange={(g) => {
+                                        if (selected) {
+                                            selected.abundance = O.fromNullable(g[0] as AbundanceApi);
+                                            setSelected({ ...selected });
+                                        }
+                                    }}
+                                    clearButton
+                                />
+                            )}
                         />
                     </Col>
                 </Row>
@@ -394,15 +414,21 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                 </Row>
                 <Row className="my-1">
                     <Col>
-                        <AliasTable
-                            data={selected?.aliases ?? []}
-                            setData={(aliases: AliasApi[]) => {
-                                if (selected) {
-                                    selected.aliases = aliases;
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                            {...adminForm.form.register('aliases')}
+                        <Controller
+                            control={adminForm.form.control}
+                            name="aliases"
+                            render={() => (
+                                <AliasTable
+                                    data={selected?.aliases ?? []}
+                                    setData={(aliases: AliasApi[]) => {
+                                        if (selected) {
+                                            selected.aliases = aliases;
+                                            setSelected({ ...selected });
+                                        }
+                                    }}
+                                    {...adminForm.form.register('aliases')}
+                                />
+                            )}
                         />
                     </Col>
                 </Row>

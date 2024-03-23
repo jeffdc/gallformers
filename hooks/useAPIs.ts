@@ -66,7 +66,6 @@ export const useAPIs = <T extends WithID, U>(
             } else {
                 const keyFieldVal = value[keyProp] as unknown as string;
                 const updated = convertFieldsToUpsert(data, keyFieldVal.trim(), value.id);
-
                 const res = await fetch(upsertEndpoint, {
                     method: 'POST',
                     headers: {

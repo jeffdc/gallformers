@@ -92,34 +92,36 @@ export const connectOrCreateGenus = (sp: SpeciesUpsertFields): Prisma.taxonomyCr
 });
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export const speciesUpdateData = (sp: SpeciesUpsertFields, isHost = true) => ({
-    // more Prisma stupidity: disconnecting a record that is not connected throws. :(
-    // so instead of this:
-    // abundance: host.abundance
-    //     ? {
-    //           connect: { abundance: host.abundance },
-    //       }
-    //     : {
-    //           disconnect: true,
-    //       },
-    //   we instead have to have a totally separate step in a transaction to update abundance 😠
-    datacomplete: sp.datacomplete,
-    name: sp.name,
-    aliasspecies: {
-        // typical hack, delete them all and then add
-        deleteMany: { species_id: sp.id },
-        create: sp.aliases.map((a) => ({
-            alias: { create: { description: a.description, name: a.name, type: a.type } },
-        })),
-    },
-    // standard pattern of delete, then re-add for Places (only for hosts since gall places are managed by gall-host mappings)
-    places: isHost
-        ? {
-              deleteMany: { species_id: sp.id },
-              create: sp.places.map((p) => ({ place_id: p.id })),
-          }
-        : {},
-});
+export const speciesUpdateData = (sp: SpeciesUpsertFields, isHost = true) => {
+    return {
+        // more Prisma stupidity: disconnecting a record that is not connected throws. :(
+        // so instead of this:
+        // abundance: host.abundance
+        //     ? {
+        //           connect: { abundance: host.abundance },
+        //       }
+        //     : {
+        //           disconnect: true,
+        //       },
+        //   we instead have to have a totally separate step in a transaction to update abundance 😠
+        datacomplete: sp.datacomplete,
+        name: sp.name,
+        aliasspecies: {
+            // typical hack, delete them all and then add
+            deleteMany: { species_id: sp.id },
+            create: sp.aliases.map((a) => ({
+                alias: { create: { description: a.description, name: a.name, type: a.type } },
+            })),
+        },
+        // standard pattern of delete, then re-add for Places (only for hosts since gall places are managed by gall-host mappings)
+        places: isHost
+            ? {
+                  deleteMany: { species_id: sp.id },
+                  create: sp.places.map((p) => ({ place_id: p.id })),
+              }
+            : {},
+    };
+};
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export const speciesCreateData = (sp: SpeciesUpsertFields) => {

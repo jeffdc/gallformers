@@ -120,21 +120,23 @@ const EditableTable = <T extends WithID>(props: EditableTableProps<T>): JSX.Elem
 
     const confirm = useConfirmation();
 
-    const deleteSelected = () => {
-        return confirm({
-            variant: 'danger',
-            catchOnCancel: true,
-            title: 'Are you sure want to delete?',
-            message:
-                props.deleteConfirmation ?? `This will delete the current row and all associated data. Do you want to continue?`,
-        })
-            .then(() => {
-                const d = props.data.filter((a) => !selected.has(a.id));
-                setSelected(new Set());
-                setToggleCleared(!toggleCleared);
-                props.update(d);
-            })
-            .catch(() => Promise.resolve());
+    const deleteSelected = async () => {
+        try {
+            await confirm({
+                variant: 'danger',
+                catchOnCancel: true,
+                title: 'Are you sure want to delete?',
+                message:
+                    props.deleteConfirmation ??
+                    `This will delete the current row and all associated data. Do you want to continue?`,
+            });
+            const d = props.data.filter((a) => !selected.has(a.id));
+            setSelected(new Set());
+            setToggleCleared(!toggleCleared);
+            props.update(d);
+        } catch {
+            return await Promise.resolve();
+        }
     };
 
     const add = () => {

@@ -1,12 +1,13 @@
 import Head from 'next/head';
 import { Alert, Col, Nav, Navbar, Row } from 'react-bootstrap';
-import { FieldValues, UseFormReturn } from 'react-hook-form';
+import { FieldErrors, FieldValues, UseFormReturn } from 'react-hook-form';
 import { Toaster } from 'react-hot-toast';
 import Auth from '../../components/auth';
 import EditName, { RenameEvent } from '../../components/editname';
 import { DeleteResult, TaxonCodeValues } from '../api/apitypes';
 import { WithID } from '../utils/types';
 import { pluralize } from '../utils/util';
+import { DevTool } from '@hookform/devtools';
 
 export type AdminTypes =
     | 'Taxonomy'
@@ -30,8 +31,8 @@ export type AdminProps<T, V extends FieldValues> = {
         renameCallback: (e: RenameEvent) => void;
         nameExistsCallback: (name: string) => Promise<boolean>;
     };
-    showModal?: boolean;
-    setShowModal?: (show: boolean) => void;
+    showRenameModal?: boolean;
+    setShowRenameModal?: (show: boolean) => void;
     error: string;
     setError: (err: string) => void;
     deleteResults?: DeleteResult;
@@ -112,6 +113,15 @@ const Admin = <T extends AdminType, V extends FieldValues>(props: AdminProps<T, 
         }
     };
 
+    const debugDumpValidation = (errors: FieldErrors): string => {
+        let s: string = '';
+        let key: keyof typeof errors;
+        for (key in errors) {
+            s = `${s}\n${String(key)} -- ${errors[key]?.message}`;
+        }
+        return s;
+    };
+
     return (
         <Auth superAdmin={!!props.superAdmin}>
             <>
@@ -121,13 +131,13 @@ const Admin = <T extends AdminType, V extends FieldValues>(props: AdminProps<T, 
 
                 <Toaster />
 
-                {props.editName != undefined && props.setShowModal != undefined && props.showModal != undefined && (
+                {props.editName != undefined && props.setShowRenameModal != undefined && props.showRenameModal != undefined && (
                     <EditName
                         type={props.type}
                         keyField={props.keyField}
                         defaultValue={props.editName.getDefault()}
-                        showModal={props.showModal}
-                        setShowModal={props.setShowModal}
+                        showModal={props.showRenameModal}
+                        setShowModal={props.setShowRenameModal}
                         renameCallback={props.editName.renameCallback}
                         nameExistsCallback={props.editName.nameExistsCallback}
                     />
@@ -176,16 +186,29 @@ const Admin = <T extends AdminType, V extends FieldValues>(props: AdminProps<T, 
                     </Nav>
                 </Navbar>
 
-                {props.form && props.formSubmit && (
+                {props.form && (
                     <>
-                        <form onSubmit={props.form.handleSubmit(props.formSubmit)} className="m-4 pe-4">
-                            {props.children}
+                        <DevTool control={props.form.control} placement="top-right" />
+                        <ul>
+                            <li>
+                                <code>{`IsValid: ${props.form.formState.isValid} -- isDirty: ${props.form.formState.isDirty}`}</code>
+                            </li>
+                            <li>
+                                <code>{`Err: ${debugDumpValidation(props.form.formState.errors)}`}</code>
+                            </li>
+                        </ul>
+                        {props.formSubmit ? (
+                            <form onSubmit={props.form.handleSubmit(props.formSubmit)} className="m-4 pe-4">
+                                {props.children}
 
-                            <Row className="form-input">
-                                <Col>{props.saveButton ? props.saveButton : ''}</Col>
-                                <Col>{props.deleteButton ? props.deleteButton : ''}</Col>
-                            </Row>
-                        </form>
+                                <Row className="form-input">
+                                    <Col>{props.saveButton ? props.saveButton : ''}</Col>
+                                    <Col>{props.deleteButton ? props.deleteButton : ''}</Col>
+                                </Row>
+                            </form>
+                        ) : (
+                            <form className="m-4 pe-4">{props.children}</form>
+                        )}
                         <Row hidden={!props.deleteResults}>
                             <Col>{`Deleted ${props.deleteResults?.name}.`}</Col>
                         </Row>

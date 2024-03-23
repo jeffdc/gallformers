@@ -135,6 +135,14 @@ export const check = <A, B>(a: O.Option<A>, b: O.Option<B>, f: (a: A, b: B) => b
         ),
     );
 
+export const serializeOption = <T>(o: O.Option<T>): string =>
+    JSON.stringify(O.isNone(o) ? { type: 'None' } : { type: 'Some', value: o.value });
+
+export const deserializeOption = <T>(s: string): O.Option<T> => {
+    const o = JSON.parse(s);
+    return o.type === 'None' ? O.none : O.some(o.value);
+};
+
 /**
  * Takes a simple CSV of numbers (just commas with no escaping) and returns it as number[].
  * @param s

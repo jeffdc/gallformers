@@ -225,7 +225,7 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
                                 setSpecies(s as SimpleSpecies[]);
                                 adminForm.form.setValue('species' as Path<FormFields>, s as SimpleSpecies[]);
                             }}
-                            defaultSelected={species ? species : []}
+                            selected={species ? species : []}
                             isLoading={isLoading}
                             onSearch={handleSearch}
                         />

@@ -52,7 +52,6 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                 // this is a hack and something changed to put double quotes around the response
                 // i have no idea what and I am out of time trying to figure it out :(
                 const url = (await res.text()).split('"').join('');
-                console.log(`JDC: url: ${url}`);
 
                 // upload file
                 const resp = await axios

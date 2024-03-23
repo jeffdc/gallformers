@@ -1,17 +1,16 @@
-import { ioTsResolver } from '@hookform/resolvers/io-ts';
 import { species } from '@prisma/client';
 import axios from 'axios';
 import * as O from 'fp-ts/lib/Option';
 import { constant, pipe } from 'fp-ts/lib/function';
-import * as t from 'io-ts';
 import { GetServerSideProps } from 'next';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Col, Modal, Row } from 'react-bootstrap';
+import { AsyncTypeahead } from 'react-bootstrap-typeahead';
 import DataTable, { TableColumn } from 'react-data-table-component';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import AddImage from '../../components/addImage';
 import ImageEdit from '../../components/imageEdit';
 import ImageGrid from '../../components/imageGrid';
@@ -22,12 +21,6 @@ import { speciesById } from '../../libs/db/species';
 import Admin from '../../libs/pages/admin';
 import { TABLE_CUSTOM_STYLES } from '../../libs/utils/DataTableConstants';
 import { mightFailWithArray, sessionUserOrUnknown } from '../../libs/utils/util';
-import { AsyncTypeahead } from 'react-bootstrap-typeahead';
-
-const schema = t.type({
-    species: t.string,
-    delete: t.array(t.number),
-});
 
 type Props = {
     sp: species[];
@@ -58,14 +51,21 @@ const imageFormatter = (row: ImageApi) => {
 };
 
 const sourceFormatter = (row: ImageApi) => {
-    return pipe(
-        row.source,
-        O.fold(constant(<span></span>), (s) => (
-            <span>
-                <a href={`/source/${s.id}`}>{s.title}</a>
-            </span>
-        )),
+    return row.source ? (
+        <span>
+            <a href={`/source/${row.source.id}`}>{row.source.title}</a>
+        </span>
+    ) : (
+        <span></span>
     );
+    // return pipe(
+    //     row.source,
+    //     O.fold(constant(<span></span>), (s) => (
+    //         <span>
+    //             <a href={`/source/${s.id}`}>{s.title}</a>
+    //         </span>
+    //     )),
+    // );
 };
 
 const defaultFieldFormatter = (img: ImageApi) => {
@@ -86,9 +86,8 @@ const Images = ({ sp }: Props): JSX.Element => {
     const [isLoading, setIsLoading] = useState(false);
     const [species, setSpecies] = useState<species[]>(sp ?? []);
 
-    const { register, reset } = useForm<FormFields>({
+    const form = useForm<FormFields>({
         mode: 'onBlur',
-        resolver: ioTsResolver(schema),
         defaultValues: {
             species: sp[0]?.name,
         },
@@ -190,13 +189,14 @@ const Images = ({ sp }: Props): JSX.Element => {
 
             axios
                 .get<ImageApi[]>(`/api/images?speciesid=${id}`)
-                .then((res) => setImages(res.data))
+                .then((res) => {
+                    setImages(res.data);
+                })
                 .catch((e) => {
                     console.error(e);
                     setError(e.toString());
                 });
         };
-
         // clear out any selections from previous work
         setSelectedImages([]);
         setCurrentImage(undefined);
@@ -221,13 +221,13 @@ const Images = ({ sp }: Props): JSX.Element => {
     };
 
     const saveImage = async (img: ImageApi) => {
+        const body = {
+            ...img,
+            lastchangedby: sessionUserOrUnknown(session?.user?.name),
+        };
+
         axios
-            .post<ImageApi[]>(`/api/images`, {
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ ...img, lastchangedby: sessionUserOrUnknown(session?.user?.name) }),
-            })
+            .post<ImageApi[]>(`/api/images`, body)
             .then((res) => setImages(res.data))
             .catch((e) => {
                 const msg = `Error while trying to update image.\n${JSON.stringify(img)}\n${e}`;
@@ -305,7 +305,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                                 )
                                 .then(() => setImages(images?.filter((i) => !selectedImages.find((oi) => oi.id === i.id))));
 
-                            reset({ delete: [], species: selected.name });
+                            form.reset({ delete: [], species: selected.name });
                             setToggleCleared(!toggleCleared);
                         })
                         .catch(() => Promise.resolve());
@@ -359,7 +359,7 @@ const Images = ({ sp }: Props): JSX.Element => {
     };
 
     return (
-        <Admin type="Images" keyField="name" setError={setError} error={error} selected={selected}>
+        <Admin type="Images" keyField="name" selected={selected} form={form} setError={setError} error={error}>
             <>
                 {currentImage && <ImageEdit image={currentImage} onSave={saveImage} show={edit} onClose={handleClose} />}
 
@@ -385,33 +385,39 @@ const Images = ({ sp }: Props): JSX.Element => {
                         </Button>
                     </Modal.Body>
                 </Modal>
-                <form className="m-4 pe-4">
+                <>
                     <h4>Add/Edit Species Images</h4>
                     <Row className="my-1" xs={3}>
                         <Col xs={1} style={{ paddingTop: '5px' }}>
                             Species:
                         </Col>
                         <Col>
-                            <AsyncTypeahead
-                                id="species"
-                                options={species}
-                                labelKey="name"
-                                clearButton
-                                defaultSelected={selected ? [selected] : []}
-                                {...register('species')}
-                                onChange={(s: species[]) => {
-                                    if (s.length > 0) {
-                                        setSelected(s[0]);
-                                        router.push(`?speciesid=${s[0]?.id}`, undefined, { shallow: true });
-                                    } else {
-                                        setSelected(undefined);
-                                        router.push(``, undefined, { shallow: true });
-                                    }
-                                }}
-                                isLoading={isLoading}
-                                onSearch={handleSearch}
-                                filterBy={() => true}
-                                minLength={1}
+                            <Controller
+                                name="species"
+                                control={form.control}
+                                render={() => (
+                                    <AsyncTypeahead
+                                        id="species"
+                                        options={species}
+                                        labelKey="name"
+                                        clearButton
+                                        selected={selected ? [selected] : []}
+                                        {...form.register('species')}
+                                        onChange={(s: species[]) => {
+                                            if (s.length > 0) {
+                                                setSelected(s[0]);
+                                                router.push(`?speciesid=${s[0]?.id}`, undefined, { shallow: true });
+                                            } else {
+                                                setSelected(undefined);
+                                                router.push(``, undefined, { shallow: true });
+                                            }
+                                        }}
+                                        isLoading={isLoading}
+                                        onSearch={handleSearch}
+                                        filterBy={() => true}
+                                        minLength={1}
+                                    />
+                                )}
                             />
                         </Col>
                         <Col xs={7}>
@@ -445,7 +451,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                             />
                         </Col>
                     </Row>
-                </form>
+                </>
             </>
         </Admin>
     );

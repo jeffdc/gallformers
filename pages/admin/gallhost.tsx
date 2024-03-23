@@ -26,6 +26,7 @@ import { allHostsWithPlaces } from '../../libs/db/host';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
 import { Typeahead } from 'react-bootstrap-typeahead';
+import { Controller } from 'react-hook-form';
 
 type Props = {
     id: string | null;
@@ -80,7 +81,10 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
 
     const updatedFormFields = async (gall: GallApi | undefined): Promise<FormFields> => {
         if (gall != undefined) {
-            const hosts = gallHosts.length <= 0 ? await fetchGallHosts(gall.id) : gallHosts;
+            const hosts =
+                gallHosts.length <= 0
+                    ? await fetchGallHosts(gall.id).then((hs) => hs.sort((a, b) => a.name.localeCompare(b.name)))
+                    : gallHosts;
             setGallHosts(hosts);
 
             return {
@@ -191,20 +195,29 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
                     <Row className="my-1">
                         <Col>
                             Hosts:
-                            <Typeahead
-                                id="hosts"
-                                placeholder="Hosts"
-                                options={hosts}
-                                labelKey="name"
-                                multiple
-                                clearButton
-                                disabled={!selected}
-                                defaultSelected={gallHosts ? gallHosts : []}
-                                {...(adminForm.form.register('hosts'),
-                                { required: 'You must map at least one host to this gall.' })}
-                                onChange={(s) => {
-                                    setGallHosts(s as SpeciesWithPlaces[]);
-                                }}
+                            <Controller
+                                control={adminForm.form.control}
+                                name="hosts"
+                                render={() => (
+                                    <Typeahead
+                                        id="hosts"
+                                        placeholder="Hosts"
+                                        options={hosts}
+                                        labelKey="name"
+                                        multiple
+                                        clearButton
+                                        disabled={!selected}
+                                        {...adminForm.form.register('hosts', {
+                                            validate: (gh) => {
+                                                return gh.length > 0 || 'You must map at least one host to this gall.';
+                                            },
+                                        })}
+                                        selected={gallHosts ? gallHosts : []}
+                                        onChange={(s) => {
+                                            setGallHosts([...s] as SpeciesWithPlaces[]);
+                                        }}
+                                    />
+                                )}
                             />
                             {adminForm.form.formState.errors.hosts && (
                                 <span className="text-danger">{adminForm.errors.hosts?.message}</span>

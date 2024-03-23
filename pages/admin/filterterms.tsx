@@ -146,87 +146,83 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
             saveButton={adminForm.saveButton()}
         >
             <>
-                <form className="m-4 pe-4">
-                    <h4>Add/Edit Filter Fields</h4>
-                    <Row className="my-1">
-                        <Col>
-                            <select
-                                {...adminForm.form.register('fieldType', {
-                                    onChange: (e) => {
-                                        setSelected(undefined);
-                                        setFieldType(asFilterType(e.currentTarget.value));
-                                        setData(dataFromSelection(e.currentTarget.value));
-                                    },
-                                    required: 'required',
-                                })}
-                                title="fieldType"
-                                className="form-control"
-                            >
-                                {/* Do not show seasons since they are fixed. */}
-                                {Object.values(FilterFieldTypeValue)
-                                    .filter((ff) => ff.localeCompare('seasons'))
-                                    .map((ff) => (
-                                        <option key={ff}>{ff}</option>
-                                    ))}
-                            </select>
-                        </Col>
-                    </Row>
-                </form>
-                <>
-                    <Row className="my-1">
-                        <Col>
-                            <Row>
-                                <Col>Word:</Col>
-                            </Row>
-                            <Row>
-                                <Col>{adminForm.mainField('Field')}</Col>
-                                {selected && (
-                                    <Col xs={1}>
-                                        <Button
-                                            variant="secondary"
-                                            className="btn-sm"
-                                            onClick={() => adminForm.setShowRenameModal(true)}
-                                        >
-                                            Rename
-                                        </Button>
-                                    </Col>
-                                )}
-                                {adminForm.form.formState.errors.mainField && (
-                                    <span className="text-danger" title="mainField-error">
-                                        {`The main field is invalid. Error: ${adminForm.form.formState.errors.mainField.message}`}
-                                    </span>
-                                )}
-                            </Row>
-                        </Col>
-                    </Row>
-                    <Row className="my-1">
-                        <Col>
-                            Description (required):
-                            <textarea
-                                {...adminForm.form.register('description', {
-                                    onChange: (e) => {
-                                        if (selected) {
-                                            selected.description = O.some(e.currentTarget.value);
-                                            setSelected({ ...selected });
-                                            // form.setValue('description', e.currentTarget.value, { shouldDirty: true });
-                                        }
-                                    },
-                                    required: true,
-                                    value: selected?.description ? O.getOrElse(constant(''))(selected.description) : '',
-                                    disabled: !selected,
-                                })}
-                                placeholder="description"
-                                className="form-control"
-                                rows={4}
-                            />
-                            {adminForm.form.formState.errors.description && (
-                                <span className="text-danger" title="description-error">
-                                    You must provide the description. Even for color, even though it will not be saved for color.
+                <h4>Add/Edit Filter Fields</h4>
+                <Row className="my-1">
+                    <Col>
+                        <select
+                            {...adminForm.form.register('fieldType', {
+                                onChange: (e) => {
+                                    setSelected(undefined);
+                                    setFieldType(asFilterType(e.currentTarget.value));
+                                    setData(dataFromSelection(e.currentTarget.value));
+                                },
+                                required: 'You must select a field type.',
+                            })}
+                            title="fieldType"
+                            className="form-control"
+                        >
+                            {/* Do not show seasons since they are fixed. */}
+                            {Object.values(FilterFieldTypeValue)
+                                .filter((ff) => ff.localeCompare('seasons'))
+                                .map((ff) => (
+                                    <option key={ff}>{ff}</option>
+                                ))}
+                        </select>
+                    </Col>
+                </Row>
+                <Row className="my-1">
+                    <Col>
+                        <Row>
+                            <Col>Word:</Col>
+                        </Row>
+                        <Row>
+                            <Col>{adminForm.mainField('Field')}</Col>
+                            {selected && (
+                                <Col xs={1}>
+                                    <Button
+                                        variant="secondary"
+                                        className="btn-sm"
+                                        onClick={() => adminForm.setShowRenameModal(true)}
+                                    >
+                                        Rename
+                                    </Button>
+                                </Col>
+                            )}
+                            {adminForm.form.formState.errors.mainField && (
+                                <span className="text-danger" title="mainField-error">
+                                    {`The main field is invalid. Error: ${adminForm.form.formState.errors.mainField.message}`}
                                 </span>
                             )}
-                        </Col>
-                    </Row>
-                </>
+                        </Row>
+                    </Col>
+                </Row>
+                <Row className="my-1">
+                    <Col>
+                        Description (required):
+                        <textarea
+                            {...adminForm.form.register('description', {
+                                onChange: (e) => {
+                                    if (selected) {
+                                        selected.description = O.some(e.currentTarget.value);
+                                        setSelected({ ...selected });
+                                        // form.setValue('description', e.currentTarget.value, { shouldDirty: true });
+                                    }
+                                },
+                                required: true,
+                                value: selected?.description ? O.getOrElse(constant(''))(selected.description) : '',
+                                disabled: !selected,
+                            })}
+                            placeholder="description"
+                            className="form-control"
+                            rows={4}
+                        />
+                        {adminForm.form.formState.errors.description && (
+                            <span className="text-danger" title="description-error">
+                                You must provide the description. Even for color, even though it will not be saved for color.
+                            </span>
+                        )}
+                    </Col>
+                </Row>
             </>
         </Admin>
     );

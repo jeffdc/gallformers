@@ -20,16 +20,15 @@ import {
     TaxonCodeValues,
     TaxonomyEntry,
     TaxonomyType,
-    TaxonomyTypeSchema,
     TaxonomyTypeValues,
     TaxonomyUpsertFields,
+    asTaxonomyType,
 } from '../api/apitypes';
 import { logger } from '../utils/logger.ts';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
 import { extractId } from './utils';
-import { decodeWithDefault } from '../utils/io-ts.ts';
 
 export type TaxonomyTree = taxonomy & {
     parent: taxonomy | null;
@@ -70,7 +69,8 @@ const toTaxonomyEntry = (dbTax: DBTaxonomyWithParent): TaxonomyEntry => {
         id: dbTax.id,
         description: dbTax.description == null ? '' : dbTax.description,
         name: dbTax.name,
-        type: decodeWithDefault(TaxonomyTypeSchema.decode(dbTax.type), TaxonomyTypeValues.GENUS),
+        // type: decodeWithDefault(TaxonomyTypeSchema.decode(dbTax.type), TaxonomyTypeValues.GENUS),
+        type: asTaxonomyType(dbTax.type),
         parent: pipe(dbTax.parent, O.fromNullable, O.map(toTaxonomyEntry)),
     };
 };

@@ -99,7 +99,6 @@ export type SpeciesProps = {
     abundances: AbundanceApi[];
 };
 
-// Have to define this rather than use io-ts type magic since we do not know the types now.
 export type SpeciesFormFields<T> = AdminFormFields<T> & {
     genus: TaxonomyEntryNoParent[];
     family: TaxonomyEntryNoParent[];

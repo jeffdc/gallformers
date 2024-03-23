@@ -131,27 +131,33 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                     <Col>
                         Author (required):
                         <input
-                            {...adminForm.form.register('author', { required: true })}
+                            {...adminForm.form.register('author', { required: 'You must provide an author.' })}
                             type="text"
                             placeholder="Author(s)"
                             className="form-control"
                             disabled={!selected}
                         />
                         {adminForm.form.formState.errors.author && (
-                            <span className="text-danger">You must provide an author.</span>
+                            <span className="text-danger">{adminForm.form.formState.errors.author.message}</span>
                         )}
                     </Col>
                     <Col>
                         Publication Year (required):
                         <input
-                            {...adminForm.form.register('pubyear', { required: true, pattern: /([12][0-9]{3})/ })}
+                            {...adminForm.form.register('pubyear', {
+                                required: 'You must provide a valid 4 digit year.',
+                                pattern: {
+                                    value: /([12][0-9]{3}$)/,
+                                    message: 'You must provide a valid 4 digit year.',
+                                },
+                            })}
                             type="text"
                             placeholder="Pub Year"
                             className="form-control"
                             disabled={!selected}
                         />
                         {adminForm.form.formState.errors.pubyear && (
-                            <span className="text-danger">You must provide a valid 4 digit year.</span>
+                            <span className="text-danger">{adminForm.form.formState.errors.pubyear.message}</span>
                         )}
                     </Col>
                 </Row>
@@ -160,19 +166,22 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                     <Col>
                         Reference Link (required):
                         <input
-                            {...adminForm.form.register('link', { required: true })}
+                            {...adminForm.form.register('link', { required: 'You must provide a reference link.' })}
                             type="text"
                             placeholder="Link"
                             className="form-control"
                             disabled={!selected}
                         />
+                        {adminForm.form.formState.errors.link && (
+                            <span className="text-danger">{adminForm.form.formState.errors.link.message}</span>
+                        )}
                     </Col>
                 </Row>
                 <Row className="my-1">
                     <Col>
                         License (required):
                         <select
-                            {...adminForm.form.register('license', { required: true })}
+                            {...adminForm.form.register('license', { required: 'You must choose a license.' })}
                             className="form-control"
                             disabled={!selected}
                         >
@@ -190,9 +199,8 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                         License Link:
                         <input
                             {...adminForm.form.register('licenselink', {
-                                required: true,
                                 validate: (v) =>
-                                    (adminForm.form.getValues('license') === ImageLicenseValues.CC_BY && (!v || v.length < 1)) ||
+                                    !(adminForm.form.getValues('license') === ImageLicenseValues.CC_BY && (!v || v.length < 1)) ||
                                     'When using the CC BY license, you must provide a link to the license.',
                             })}
                             type="text"
@@ -215,14 +223,14 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                             ):
                         </p>
                         <textarea
-                            {...adminForm.form.register('citation', { required: true })}
+                            {...adminForm.form.register('citation', { required: 'You must provide a citation in MLA form.' })}
                             placeholder="Citation"
                             className="form-control"
                             rows={8}
                             disabled={!selected}
                         />
                         {adminForm.form.formState.errors.citation && (
-                            <span className="text-danger">You must provide a citation in MLA form.</span>
+                            <span className="text-danger">{adminForm.form.formState.errors.citation.message}</span>
                         )}
                     </Col>
                 </Row>
