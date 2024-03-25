@@ -1,7 +1,6 @@
 import axios from 'axios';
-import * as O from 'fp-ts/lib/Option';
 import { useSession } from 'next-auth/react';
-import React, { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useState } from 'react';
 import { Alert, Col, ProgressBar, Row } from 'react-bootstrap';
 import { toast } from 'react-hot-toast';
 import { ImageApi, ImageLicenseValues } from '../libs/api/apitypes';
@@ -103,7 +102,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                         licenselink: '',
                         path: path,
                         sourcelink: '',
-                        source: O.none,
+                        source: null,
                         uploader: sessionUserOrUnknown(session?.user?.name),
                         lastchangedby: sessionUserOrUnknown(session?.user?.name),
                         speciesid: id,
@@ -114,6 +113,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                         large: '',
                         xlarge: '',
                         original: '',
+                        source_id: null,
                     });
                 }
             }

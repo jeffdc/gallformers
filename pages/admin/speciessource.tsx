@@ -209,7 +209,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
             const insertData: SpeciesSourceInsertFields = {
                 id: selSo.id,
                 species: selected.id,
-                source: selSo.source_id,
+                source: selSo.source_id ?? -1,
                 description: description ? description : '',
                 useasdefault: fields.useasdefault,
                 externallink: fields.externallink,
