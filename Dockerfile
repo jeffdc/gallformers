@@ -7,7 +7,7 @@
 # COPY package.json yarn.lock ./
 # RUN yarn set version berry && yarn install 
 
-FROM node:16-alpine as build
+FROM node:20-alpine as build
 WORKDIR /usr/src/app
 COPY . .
 # COPY --from=deps /usr/src/app/node_modules ./node_modules
@@ -29,12 +29,12 @@ RUN	yarn generate \
 # this gets huge and we do not need it for the final build
 RUN rm -rf .next/cache
 # these are dev tools related to Prisma that are large and not needed in prod
-RUN rm node_modules/@prisma/engines/introspection-engine-linux-musl
-RUN rm node_modules/@prisma/engines/migration-engine-linux-musl
-RUN rm node_modules/@prisma/engines/prisma-fmt-linux-musl
+# RUN rm node_modules/@prisma/engines/introspection-engine-linux-musl
+# RUN rm node_modules/@prisma/engines/migration-engine-linux-musl
+# RUN rm node_modules/@prisma/engines/prisma-fmt-linux-musl
 
 ## Shrink final image, copy built nextjs and startup the server
-FROM node:16-alpine
+FROM node:20-alpine
 
 WORKDIR /usr/src/app
 ENV NODE_ENV production

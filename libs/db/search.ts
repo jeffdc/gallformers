@@ -1,13 +1,12 @@
 import { source } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
-import { PlaceNoTreeApi } from '../api/apitypes';
-import { TaxonomyEntryNoParent, TaxonomyType } from '../api/taxonomy';
+import { pipe } from 'fp-ts/lib/function';
+import { Entry, PlaceNoTreeApi, TaxonomyEntryNoParent, TaxonomyType } from '../api/apitypes';
 import { sourceToDisplay } from '../pages/renderhelpers';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
-import { allGlossaryEntries, Entry } from './glossary';
+import { allGlossaryEntries } from './glossary';
 
 export type TinySpecies = {
     id: number;
@@ -30,13 +29,12 @@ export type GlobalSearchResults = {
 };
 
 export const globalSearch = (search: string): TE.TaskEither<Error, GlobalSearchResults> => {
-    // const q = `%${search}%`;
     const q = `${search.replaceAll(' ', '%')}`;
 
     const speciesSearch = () =>
         db.species.findMany({
             where: {
-                OR: { name: { contains: q } },
+                OR: [{ name: { contains: q } }],
             },
             include: {
                 aliasspecies: {

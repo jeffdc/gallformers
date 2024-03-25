@@ -1,24 +1,25 @@
-import { pipe } from 'fp-ts/lib/function';
 import * as E from 'fp-ts/lib/Either';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
 import {
-    apiUpsertEndpoint,
     Err,
+    apiUpsertEndpoint,
     getQueryParam,
     onCompleteSendJson,
-    sendErrResponse,
-    sendSuccResponse,
+    sendErrorResponse,
+    sendSuccessResponse,
     toErr,
 } from '../../../libs/api/apipage';
 
 import { deleteImages, getImages, updateImage } from '../../../libs/db/images';
 import { csvAsNumberArr } from '../../../libs/utils/util';
+import { getServerSession } from 'next-auth';
+import authOptions from '../../../pages/api/auth/[...nextauth]';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
-    const session = await getSession({ req });
+    const session = await getServerSession(req, res, authOptions);
     if (!session) {
         res.status(401).end();
     }
@@ -35,7 +36,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             O.map(parseInt),
             O.fold(errMsg('Failed to provide the speciesid as a query param.'), getImages),
             TE.mapLeft(toErr),
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else if (req.method === 'POST') {
         await apiUpsertEndpoint(req, res, updateImage, onCompleteSendJson);
@@ -50,14 +51,14 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             getQueryParam(req),
             O.map(parseInt),
             // eslint-disable-next-line prettier/prettier
-            O.map((spid) => pipe('imageids', getQueryParam(req), O.map(csvAsNumberArr), O.map(deleteImages(spid)))),
+            O.map((spId) => pipe('imageids', getQueryParam(req), O.map(csvAsNumberArr), O.map(deleteImages(spId)))),
             O.flatten,
             O.map(TE.mapLeft(toErr)),
             // eslint-disable-next-line prettier/prettier
             O.fold(() => E.left<Err, TE.TaskEither<Err, number>>(invalidQueryErr), E.right),
             TE.fromEither,
             TE.flatten,
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else {
         res.status(405).end();

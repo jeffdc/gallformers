@@ -1,16 +1,16 @@
-import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
 import {
     apiSearchEndpoint,
     getQueryParam,
     getQueryParams,
-    sendErrResponse,
-    sendSuccResponse,
+    sendErrorResponse,
+    sendSuccessResponse,
     toErr,
 } from '../../../../libs/api/apipage';
-import { Genus } from '../../../../libs/api/taxonomy';
+import { Genus } from '../../../../libs/api/apitypes';
 import { generaSearch, getGeneraForFamily } from '../../../../libs/db/taxonomy';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
@@ -31,10 +31,10 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             O.map(parseInt),
             O.fold(errMsg, getGeneraForFamily),
             TE.mapLeft(toErr),
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else if (params && O.isSome(params['q'])) {
-        apiSearchEndpoint(req, res, generaSearch);
+        await apiSearchEndpoint(req, res, generaSearch);
     } else {
         res.status(400).end('No valid query params provided. Pass either a famID or a q.');
     }

@@ -2,9 +2,9 @@
 
 import { constant, constFalse, constTrue, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
-import * as T from 'fp-ts/lib/Task';
+import * as T from 'fp-ts/lib/Task.js';
 import * as TE from 'fp-ts/lib/TaskEither';
-import { logger } from './logger';
+import { logger } from './logger.ts';
 
 /**
  * Checks an object, o, for the presence of the prop.
@@ -105,6 +105,8 @@ export const lowercaseFirstLetter = (s: string): string => doToFirstLetter(s, fa
 export const pluralize = (s: string): string => {
     if (s.endsWith('y')) {
         return `${s.slice(0, s.length - 1)}ies`;
+    } else if (s.endsWith('s')) {
+        return s;
     } else {
         return `${s}s`;
     }
@@ -132,6 +134,14 @@ export const check = <A, B>(a: O.Option<A>, b: O.Option<B>, f: (a: A, b: B) => b
             ),
         ),
     );
+
+export const serializeOption = <T>(o: O.Option<T>): string =>
+    JSON.stringify(O.isNone(o) ? { type: 'None' } : { type: 'Some', value: o.value });
+
+export const deserializeOption = <T>(s: string): O.Option<T> => {
+    const o = JSON.parse(s);
+    return o.type === 'None' ? O.none : O.some(o.value);
+};
 
 /**
  * Takes a simple CSV of numbers (just commas with no escaping) and returns it as number[].

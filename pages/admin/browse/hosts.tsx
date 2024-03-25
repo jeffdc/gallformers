@@ -20,7 +20,7 @@ const linkHost = (s: HostApi) => {
     return (
         <>
             <Link key={s.id} href={`/host/${s.id}`}>
-                <a>{s.name}</a>
+                {s.name}
             </Link>
             <Edit id={s.id} type="host" />
         </>

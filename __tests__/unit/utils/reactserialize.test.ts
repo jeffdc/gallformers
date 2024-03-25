@@ -1,5 +1,5 @@
 import React from 'react';
-import { deserialize, serialize } from '../../../libs/utils/reactserialize';
+import { deserialize, serialize } from '../../../libs/utils/reactserialize.js';
 import { hasProp } from '../../../libs/utils/util';
 
 // const reactNode = React.createElement();

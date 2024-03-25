@@ -1,9 +1,9 @@
 import { source, species, speciessource } from '@prisma/client';
-import * as A from 'fp-ts/lib/Array';
-import { pipe } from 'fp-ts/lib/function';
+import * as A from 'fp-ts/lib/Array.js';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import { DeleteResult, SpeciesSourceApi, SpeciesSourceInsertFields } from '../api/apitypes';
 import { handleError } from '../utils/util';
 import db from './db';

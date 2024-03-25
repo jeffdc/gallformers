@@ -3,17 +3,29 @@ import { SessionProvider } from 'next-auth/react';
 import { AppProps } from 'next/app';
 import Head from 'next/head';
 import React from 'react';
-import { Col, Container, Row, SSRProvider } from 'react-bootstrap';
+import { Col, Container, Row } from 'react-bootstrap';
 import 'react-bootstrap-typeahead/css/Typeahead.css';
 import 'react-bootstrap-typeahead/css/Typeahead.bs5.css';
-import { ConfirmationServiceProvider } from '../hooks/useconfirmation';
+import { ConfirmationServiceProvider } from '../hooks/useConfirmation';
 import Footer from '../layouts/footer';
 import Header from '../layouts/header';
 import './style.scss';
+import { StyleSheetManager } from 'styled-components';
+import isPropValid from '@emotion/is-prop-valid';
+
+// This implements the default behavior from styled-components v5
+function shouldForwardProp(propName: string, target: unknown) {
+    if (typeof target === 'string') {
+        // For HTML elements, forward the prop if it is a valid HTML attribute
+        return isPropValid(propName);
+    }
+    // For other elements, forward all props
+    return true;
+}
 
 function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
     return (
-        <SSRProvider>
+        <StyleSheetManager shouldForwardProp={shouldForwardProp}>
             <SessionProvider session={pageProps.session}>
                 <Container fluid className="p-0 m-0">
                     <Head>
@@ -35,7 +47,7 @@ function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
                         </Col>
                     </Row>
                     <Row>
-                        <Col className="m-2 p-2">
+                        <Col className="m-3 mb-5 p-2">
                             <ConfirmationServiceProvider>
                                 <Component {...pageProps} />
                             </ConfirmationServiceProvider>
@@ -48,7 +60,7 @@ function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
                     </Row>
                 </Container>
             </SessionProvider>
-        </SSRProvider>
+        </StyleSheetManager>
     );
 }
 

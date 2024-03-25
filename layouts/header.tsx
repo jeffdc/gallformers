@@ -1,9 +1,13 @@
+import { useSession } from 'next-auth/react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import React, { KeyboardEvent, SyntheticEvent, useState } from 'react';
-import { Button, Container, Form, FormControl, Nav, Navbar, NavDropdown } from 'react-bootstrap';
+import { KeyboardEvent, SyntheticEvent, useState } from 'react';
+import { Button, Container, Form, FormControl, Nav, NavDropdown, Navbar } from 'react-bootstrap';
+import useIsMounted from '../hooks/useIsMounted';
 
 const Header = (): JSX.Element => {
+    const { data: session } = useSession();
+    const mounted = useIsMounted();
     const [searchText, setSearchText] = useState('');
     const router = useRouter();
 
@@ -31,7 +35,7 @@ const Header = (): JSX.Element => {
                 <title>Gallformers</title>
                 <link rel="icon" href="/favicon.ico" />
             </Head>
-            <Navbar sticky="top" collapseOnSelect expand="md" className="navbar-custom p-0 m-0" variant="dark">
+            <Navbar sticky="top" collapseOnSelect expand="md" className="navbar-custom px-3 pt-2" variant="dark">
                 <Container fluid>
                     <Navbar.Brand href="/">
                         <img
@@ -45,6 +49,7 @@ const Header = (): JSX.Element => {
                     </Navbar.Toggle>
                     <Navbar.Collapse id="responsive-navbar-nav">
                         <Nav className="ms-auto my-0 my-lg-0">
+                            {mounted && session && <Nav.Link href="/admin">Admin</Nav.Link>}
                             <Nav.Link href="/id">Identify</Nav.Link>
                             <Nav.Link href="/explore">Explore</Nav.Link>
                             <Form

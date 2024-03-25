@@ -2,8 +2,7 @@ import { abundance, Prisma, PrismaPromise, species } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
-import { AbundanceApi, SimpleSpecies, SpeciesUpsertFields } from '../api/apitypes';
-import { GENUS } from '../api/taxonomy';
+import { AbundanceApi, SimpleSpecies, SpeciesUpsertFields, TaxonomyTypeValues } from '../api/apitypes';
 import { handleError } from '../utils/util';
 import db from './db';
 import { connectIfNotNull } from './utils';
@@ -55,7 +54,7 @@ export const allSpecies = (): TE.TaskEither<Error, species[]> => {
 export const allSpeciesSimple = (): TE.TaskEither<Error, SimpleSpecies[]> =>
     pipe(
         allSpecies(),
-        TE.map((s) => s.map((sp) => ({ ...sp } as SimpleSpecies))),
+        TE.map((s) => s.map((sp) => ({ ...sp }) as SimpleSpecies)),
     );
 
 export const speciesByName = (name: string): TE.TaskEither<Error, species[]> => {
@@ -86,41 +85,43 @@ export const connectOrCreateGenus = (sp: SpeciesUpsertFields): Prisma.taxonomyCr
         create: {
             description: sp.fgs.genus.description,
             name: sp.fgs.genus.name,
-            type: GENUS,
+            type: TaxonomyTypeValues.GENUS,
             parent: { connect: { id: sp.fgs.family.id } },
         },
     },
 });
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export const speciesUpdateData = (sp: SpeciesUpsertFields, isHost = true) => ({
-    // more Prisma stupidity: disconnecting a record that is not connected throws. :(
-    // so instead of this:
-    // abundance: host.abundance
-    //     ? {
-    //           connect: { abundance: host.abundance },
-    //       }
-    //     : {
-    //           disconnect: true,
-    //       },
-    //   we instead have to have a totally separate step in a transaction to update abundance 😠
-    datacomplete: sp.datacomplete,
-    name: sp.name,
-    aliasspecies: {
-        // typical hack, delete them all and then add
-        deleteMany: { species_id: sp.id },
-        create: sp.aliases.map((a) => ({
-            alias: { create: { description: a.description, name: a.name, type: a.type } },
-        })),
-    },
-    // standard pattern of delete, then re-add for Places (only for hosts since gall places are managed by gall-host mappings)
-    places: isHost
-        ? {
-              deleteMany: { species_id: sp.id },
-              create: sp.places.map((p) => ({ place_id: p.id })),
-          }
-        : {},
-});
+export const speciesUpdateData = (sp: SpeciesUpsertFields, isHost = true) => {
+    return {
+        // more Prisma stupidity: disconnecting a record that is not connected throws. :(
+        // so instead of this:
+        // abundance: host.abundance
+        //     ? {
+        //           connect: { abundance: host.abundance },
+        //       }
+        //     : {
+        //           disconnect: true,
+        //       },
+        //   we instead have to have a totally separate step in a transaction to update abundance 😠
+        datacomplete: sp.datacomplete,
+        name: sp.name,
+        aliasspecies: {
+            // typical hack, delete them all and then add
+            deleteMany: { species_id: sp.id },
+            create: sp.aliases.map((a) => ({
+                alias: { create: { description: a.description, name: a.name, type: a.type } },
+            })),
+        },
+        // standard pattern of delete, then re-add for Places (only for hosts since gall places are managed by gall-host mappings)
+        places: isHost
+            ? {
+                  deleteMany: { species_id: sp.id },
+                  create: sp.places.map((p) => ({ place_id: p.id })),
+              }
+            : {},
+    };
+};
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export const speciesCreateData = (sp: SpeciesUpsertFields) => {
@@ -132,7 +133,7 @@ export const speciesCreateData = (sp: SpeciesUpsertFields) => {
                 create: {
                     description: sp.fgs.genus.description,
                     name: sp.fgs.genus.name,
-                    type: GENUS,
+                    type: TaxonomyTypeValues.GENUS,
                     parent: {
                         connect: {
                             id: sp.fgs.family.id,
@@ -179,11 +180,15 @@ export const speciesTaxonomyAdditionalUpdateSteps = (sp: SpeciesUpsertFields): P
     // delete any records that map this species to a genus that are not the same as what is inbound
     db.speciestaxonomy.deleteMany({
         where: {
-            AND: [{ species_id: sp.id }, { taxonomy: { type: GENUS } }, { taxonomy: { name: { not: sp.fgs.genus.name } } }],
+            AND: [
+                { species_id: sp.id },
+                { taxonomy: { type: TaxonomyTypeValues.GENUS } },
+                { taxonomy: { name: { not: sp.fgs.genus.name } } },
+            ],
         },
     }),
     // now upsert a new species-taxonomy mapping and possibly create
-    // a new Genus Taxonomy record assinging it to the known Family
+    // a new Genus Taxonomy record assigning it to the known Family
     db.speciestaxonomy.upsert({
         where: { species_id_taxonomy_id: { species_id: sp.id, taxonomy_id: sp.fgs.genus.id } },
         create: {
@@ -194,7 +199,7 @@ export const speciesTaxonomyAdditionalUpdateSteps = (sp: SpeciesUpsertFields): P
                     create: {
                         description: sp.fgs.genus.description,
                         name: sp.fgs.genus.name,
-                        type: GENUS,
+                        type: TaxonomyTypeValues.GENUS,
                         parent: { connect: { id: sp.fgs.family.id } },
                         children: {
                             create: {

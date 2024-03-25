@@ -1,11 +1,11 @@
 import * as E from 'fp-ts/lib/Either';
-import { constant, identity, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as R from 'fp-ts/lib/Record';
 import * as TE from 'fp-ts/lib/TaskEither';
+import { constant, identity, pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { Err, getQueryParam, getQueryParams, sendErrResponse, sendSuccResponse, toErr } from '../../../../libs/api/apipage';
-import { asFilterFieldType } from '../../../../libs/api/apitypes';
+import { Err, getQueryParam, getQueryParams, sendErrorResponse, sendSuccessResponse, toErr } from '../../../../libs/api/apipage';
+import { asFilterType } from '../../../../libs/api/apitypes';
 import { deleteFilterField, getFilterFieldByIdAndType } from '../../../../libs/db/filterfield';
 
 // GET: ../filterfield/{filedType}/{id}
@@ -31,10 +31,10 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
 
         return await pipe(
             query,
-            E.map((q) => pipe(deleteFilterField(asFilterFieldType(q.fieldType), q.id), TE.mapLeft(toErr))),
+            E.map((q) => pipe(deleteFilterField(asFilterType(q.fieldType), q.id), TE.mapLeft(toErr))),
             TE.fromEither,
             TE.flatten,
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     }
 
@@ -43,12 +43,12 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
 
     if (params && O.isSome(params['id']) && O.isSome(params['fieldType'])) {
         const id = O.fold<number, number>(constant(-1), identity)(O.map(parseInt)(params['id']));
-        const fieldType = asFilterFieldType(O.fold<string, string>(constant(''), identity)(params['fieldType']));
+        const fieldType = asFilterType(O.fold<string, string>(constant(''), identity)(params['fieldType']));
 
         await pipe(
             getFilterFieldByIdAndType(id, fieldType),
             TE.mapLeft(toErr),
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else {
         res.status(400).end('No valid query params provided.');

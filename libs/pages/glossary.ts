@@ -1,10 +1,10 @@
-import * as A from 'fp-ts/lib/Array';
+import * as A from 'fp-ts/lib/Array.js';
 import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { PorterStemmer, WordTokenizer } from 'natural';
-import { SpeciesSourceApi } from '../api/apitypes';
-import { allGlossaryEntries, Entry } from '../db/glossary';
+import { Entry, SpeciesSourceApi } from '../api/apitypes';
+import { allGlossaryEntries } from '../db/glossary.ts';
 import { errorThrow } from '../utils/util';
 
 export type EntryLinked = Entry & {
@@ -29,8 +29,8 @@ const stemText = (es: Entry[]): WordStem[] =>
         };
     });
 
-//TODO - this is a bad implemenation. Figure out how to use Popper (via bootstrap OverlayTrigger). Not clear
-// how to inject a React component in to the Makrdown...
+//TODO - this is a bad implementation. Figure out how to use Popper (via bootstrap OverlayTrigger). Not clear
+// how to inject a React component in to the Markdown...
 const makeLinkHtml = (display: string, entry: Entry | undefined): string => {
     return `<span class="jargon-term"><a href="/glossary/#${entry?.word}">${display}</a><span class="jargon-info">${entry?.definition}</span></span>`;
 };
@@ -41,7 +41,7 @@ const linkHtml =
         const els: string[] = [];
         let curr = 0;
         const tokens = new WordTokenizer().tokenize(text);
-        tokens.forEach((t, i) => {
+        tokens?.forEach((t, i) => {
             const stemmed = PorterStemmer.stem(t);
             const raw = tokens[i];
 
@@ -97,10 +97,9 @@ const internalLinker = async <T>(data: T[], update: (d: string, t: T) => T, getV
     const toContext = (glossary: Entry[]): Context => ({ stems: stemText(glossary), glossary: glossary });
 
     const linkText =
-        (context: Context) =>
-        (s: typeof data[0]): TE.TaskEither<Error, string> =>
-            // eslint-disable-next-line prettier/prettier
-        pipe(
+        () =>
+        (s: (typeof data)[0]): TE.TaskEither<Error, string> =>
+            pipe(
                 O.fromNullable(getVal(s)),
                 TE.fromOption(constant(new Error('Received invalid text.'))),
                 // for now turning this off while I work on a new solution.
@@ -111,10 +110,10 @@ const internalLinker = async <T>(data: T[], update: (d: string, t: T) => T, getV
     return await pipe(
         allGlossaryEntries(),
         TE.map(toContext),
-        TE.chain((context) =>
+        TE.chain(() =>
             pipe(
                 data,
-                A.map(linkText(context)),
+                A.map(linkText()),
                 TE.sequenceArray,
                 // sequence makes the array readonly, the rest of the fp-ts API does not use readonly, ...sigh.
                 TE.map((d) => A.zipWith(d as string[], data, update)),
@@ -140,7 +139,7 @@ export const linkSourceToGlossary = async (data: SpeciesSourceApi[]): Promise<Sp
     return await internalLinker(data, update, (e: SpeciesSourceApi) => e.description);
 };
 
-export const linkDefintionToGlossary = async (data: Entry[]): Promise<Entry[]> => {
+export const linkDefinitionToGlossary = async (data: Entry[]): Promise<Entry[]> => {
     const update = (d: string, e: Entry): Entry => ({
         ...e,
         definition: d,

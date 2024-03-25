@@ -1,5 +1,5 @@
-import { constant } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/Option';
+import { constant } from 'fp-ts/lib/function';
 import { GetStaticProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';

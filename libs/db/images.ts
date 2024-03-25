@@ -1,9 +1,8 @@
 import { image, Prisma, source, speciessource } from '@prisma/client';
-import { constant, pipe } from 'fp-ts/lib/function';
-import * as O from 'fp-ts/lib/Option';
+import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { asLicenseType, ImageApi, ImageNoSourceApi } from '../api/apitypes';
+import { asImageLicense, ImageApi, ImageNoSourceApi } from '../api/apitypes';
 import {
     createOtherSizes,
     deleteImagesByPaths,
@@ -38,10 +37,11 @@ export const addImages = (images: ImageApi[]): TaskEither<Error, ImageApi[]> => 
                     default: image.default,
                     caption: image.caption,
                     species: { connect: { id: image.speciesid } },
-                    source: connectIfNotNull<Prisma.sourceCreateNestedOneWithoutImageInput, number>(
-                        'source',
-                        O.getOrElseW(constant(undefined))(image.source)?.id,
-                    ),
+                    // source: connectIfNotNull<Prisma.sourceCreateNestedOneWithoutImageInput, number>(
+                    //     'source',
+                    //     O.getOrElseW(constant(undefined))(image.source)?.id,
+                    // ),
+                    source: connectIfNotNull<Prisma.sourceCreateNestedOneWithoutImageInput, number>('source', image.source?.id),
                 },
             }),
         );
@@ -74,10 +74,7 @@ export const addImages = (images: ImageApi[]): TaskEither<Error, ImageApi[]> => 
 };
 
 export const updateImage = (theImage: ImageApi): TaskEither<Error, readonly ImageApi[]> => {
-    const connectSource = pipe(
-        theImage.source,
-        O.fold(constant({}), (s) => ({ connect: { id: s.id } })),
-    );
+    const connectSource = theImage.source ? { connect: { id: theImage.source.id } } : {};
 
     const update = (image: ImageApi) =>
         db.image.update({
@@ -137,14 +134,15 @@ export const updateImage = (theImage: ImageApi): TaskEither<Error, readonly Imag
 
 export const adaptImage = <T extends ImageWithSource>(img: T): ImageApi => ({
     ...img,
+    source_id: img.source ? img.source.id : null,
     speciesid: img.species_id,
     small: makePath(img.path, SMALL),
     medium: makePath(img.path, MEDIUM),
     large: makePath(img.path, LARGE),
     xlarge: makePath(img.path, XLARGE),
     original: makePath(img.path, ORIGINAL),
-    source: O.fromNullable(img.source),
-    license: asLicenseType(img.license),
+    source: img.source ? img.source : null,
+    license: asImageLicense(img.license),
 });
 
 export const adaptImageNoSource = <T extends image>(img: T): ImageNoSourceApi => ({

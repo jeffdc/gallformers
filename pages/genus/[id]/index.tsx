@@ -1,15 +1,14 @@
-import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
 import { GetStaticPaths, GetStaticProps } from 'next';
-import ErrorPage from 'next/error';
+import ErrorPage from 'next/error.js';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Col, Container, Row } from 'react-bootstrap';
 import 'react-simple-tree-menu/dist/main.css';
 import SpeciesTable from '../../../components/speciesTable';
-import { SimpleSpecies } from '../../../libs/api/apitypes';
-import { EMPTY_TAXONOMYENTRY, TaxonomyEntry } from '../../../libs/api/taxonomy';
+import { EMPTY_TAXONOMYENTRY, SimpleSpecies, TaxonomyEntry } from '../../../libs/api/apitypes';
 import { allGenusIds, getAllSpeciesForSectionOrGenus, taxonomyEntryById } from '../../../libs/db/taxonomy';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { formatWithDescription } from '../../../libs/pages/renderhelpers';
@@ -52,9 +51,7 @@ const Genus = ({ genus, species }: Props): JSX.Element => {
                 <Col>
                     <strong>Family:</strong>{' '}
                     <Link key={fam.id} href={`/family/${fam.id}`}>
-                        <a>
-                            <i>{fam.name}</i>
-                        </a>
+                        <i>{fam.name}</i>
                     </Link>
                     {` (${fam.description})`}
                 </Col>

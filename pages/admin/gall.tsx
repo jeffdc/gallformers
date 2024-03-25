@@ -1,21 +1,34 @@
 import axios from 'axios';
-import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
+import { AsyncTypeahead, Typeahead } from 'react-bootstrap-typeahead';
 import { Controller } from 'react-hook-form';
-import * as yup from 'yup';
-import AliasTable from '../../components/aliastable';
-import Typeahead, { AsyncTypeahead } from '../../components/Typeahead';
 import UndescribedFlow, { UndescribedData } from '../../components/UndescribedFlow';
-import useAdmin from '../../hooks/useadmin';
+import AliasTable from '../../components/aliastable';
 import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '../../hooks/useSpecies';
+import useAdmin from '../../hooks/useadmin';
 import { extractQueryParam } from '../../libs/api/apipage';
-import * as AT from '../../libs/api/apitypes';
-import { FAMILY, GENUS, TaxonomyEntry, TaxonomyEntryNoParent } from '../../libs/api/taxonomy';
+import {
+    AbundanceApi,
+    AliasApi,
+    DetachableApi,
+    DetachableNone,
+    Detachables,
+    FilterField,
+    GALL_FAMILY_TYPES,
+    GallApi,
+    GallPropertiesType,
+    GallUpsertFields,
+    HostSimple,
+    TaxonCodeValues,
+    TaxonomyEntry,
+    TaxonomyTypeValues,
+} from '../../libs/api/apitypes';
 import {
     getAlignments,
     getCells,
@@ -31,60 +44,24 @@ import { gallById } from '../../libs/db/gall';
 import { getAbundances } from '../../libs/db/species';
 import { allFamilies, allGenera } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
-import { hasProp, mightFailWithArray, SPECIES_NAME_REGEX } from '../../libs/utils/util';
+import { mightFailWithArray } from '../../libs/utils/util';
 
 type Props = SpeciesProps & {
-    gall: AT.GallApi[];
-    locations: AT.FilterField[];
-    colors: AT.FilterField[];
-    seasons: AT.FilterField[];
-    shapes: AT.FilterField[];
-    textures: AT.FilterField[];
-    alignments: AT.FilterField[];
-    walls: AT.FilterField[];
-    cells: AT.FilterField[];
-    forms: AT.FilterField[];
+    gall: GallApi[];
+    locations: FilterField[];
+    colors: FilterField[];
+    seasons: FilterField[];
+    shapes: FilterField[];
+    textures: FilterField[];
+    alignments: FilterField[];
+    walls: FilterField[];
+    cells: FilterField[];
+    forms: FilterField[];
 };
 
-const schema = yup.object().shape({
-    mainField: yup
-        .array()
-        .of(
-            yup.object({
-                name: yup.string().matches(SPECIES_NAME_REGEX).required(),
-            }),
-        )
-        .min(1)
-        .max(1),
-    family: yup
-        .array()
-        .of(
-            yup.object({
-                name: yup.string().required(),
-            }),
-        )
-        .required(),
-    // only force hosts to be present when adding, not deleting.
-    hosts: yup.array().when('del', {
-        is: false,
-        then: yup.array().min(1),
-    }),
-});
+export type FormFields = SpeciesFormFields<GallApi> & GallPropertiesType;
 
-export type FormFields = SpeciesFormFields<AT.GallApi> & {
-    hosts: AT.GallHost[];
-    detachable: AT.DetachableValues;
-    walls: AT.FilterField[];
-    cells: AT.FilterField[];
-    alignments: AT.FilterField[];
-    shapes: AT.FilterField[];
-    colors: AT.FilterField[];
-    seasons: AT.FilterField[];
-    locations: AT.FilterField[];
-    textures: AT.FilterField[];
-    forms: AT.FilterField[];
-    undescribed: boolean;
-};
+const keyFieldName = 'name';
 
 const Gall = ({
     id,
@@ -103,121 +80,104 @@ const Gall = ({
     forms,
 }: Props): JSX.Element => {
     const [showNewUndescribed, setShowNewUndescribed] = useState(false);
-    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields } = useSpecies<AT.GallApi>(genera);
-    const [hosts, setHosts] = useState<AT.HostSimple[]>([]);
+    const { renameSpecies, createNewSpecies, updatedSpeciesFormFields, toSpeciesUpsertFields } = useSpecies<GallApi, FormFields>(
+        genera,
+    );
+    const [hosts, setHosts] = useState<HostSimple[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
-    const toUpsertFields = (fields: FormFields, name: string, id: number): AT.GallUpsertFields => {
+    const toUpsertFields = (fields: FormFields, name: string, id: number): GallUpsertFields => {
         if (!selected) {
             throw new Error('Trying to submit with a null selection which seems impossible but here we are.');
         }
 
         return {
             ...toSpeciesUpsertFields(fields, name, id),
-            gallid: hasProp(fields.mainField[0], 'gall') ? (fields.mainField[0] as AT.GallApi).gall.id : -1,
-            alignments: fields.alignments.map((a) => a.id),
+            gallid: fields.mainField[0].gall_id,
+            alignments: fields.alignment.map((a) => a.id),
             cells: fields.cells.map((c) => c.id),
-            colors: fields.colors.map((c) => c.id),
-            seasons: fields.seasons.map((c) => c.id),
+            colors: fields.color.map((c) => c.id),
+            seasons: fields.season.map((c) => c.id),
             detachable: fields.detachable,
             fgs: selected.fgs,
             hosts: fields.hosts.map((h) => h.id),
-            locations: fields.locations.map((l) => l.id),
-            shapes: fields.shapes.map((s) => s.id),
-            textures: fields.textures.map((t) => t.id),
+            locations: fields.location.map((l) => l.id),
+            shapes: fields.shape.map((s) => s.id),
+            textures: fields.texture.map((t) => t.id),
             undescribed: fields.undescribed,
             walls: fields.walls.map((w) => w.id),
-            forms: fields.forms.map((f) => f.id),
+            forms: fields.form.map((f) => f.id),
         };
     };
 
-    const updatedFormFields = async (s: AT.GallApi | undefined): Promise<FormFields> => {
+    const updatedFormFields = async (s: GallApi | undefined): Promise<FormFields> => {
         const speciesFields = updatedSpeciesFormFields(s);
 
         if (s != undefined) {
             return {
                 ...speciesFields,
-                alignments: s.gall.gallalignment,
-                cells: s.gall.gallcells,
-                colors: s.gall.gallcolor,
-                detachable: s.gall.detachable.value,
+                alignment: s.alignment,
+                cells: s.cells,
+                color: s.color,
+                detachable: s.detachable,
                 hosts: s.hosts,
-                locations: s.gall.galllocation,
-                seasons: s.gall.gallseason,
-                shapes: s.gall.gallshape,
-                textures: s.gall.galltexture,
-                undescribed: s.gall.undescribed,
-                walls: s.gall.gallwalls,
-                forms: s.gall.gallform,
+                location: s.location,
+                season: s.season,
+                shape: s.shape,
+                texture: s.texture,
+                undescribed: s.undescribed,
+                walls: s.walls,
+                form: s.form,
             };
         }
 
         return {
             ...speciesFields,
-            alignments: [],
+            alignment: [],
             cells: [],
-            colors: [],
-            detachable: AT.DetachableNone.value,
+            color: [],
+            detachable: DetachableNone,
             hosts: [],
-            locations: [],
-            seasons: [],
-            shapes: [],
-            textures: [],
+            location: [],
+            season: [],
+            shape: [],
+            texture: [],
             undescribed: false,
             walls: [],
-            forms: [],
+            form: [],
         };
     };
 
-    const createNewGall = (name: string): AT.GallApi => ({
-        ...createNewSpecies(name, AT.GallTaxon),
-        gall: {
-            detachable: AT.DetachableNone,
-            gallalignment: [],
-            gallcells: [],
-            gallcolor: [],
-            galllocation: [],
-            gallseason: [],
-            gallshape: [],
-            galltexture: [],
-            gallwalls: [],
-            gallform: [],
-            undescribed: false,
-            id: -1,
-        },
+    const createNewGall = (name: string): GallApi => ({
+        ...createNewSpecies(name, TaxonCodeValues.GALL),
+        detachable: DetachableNone,
+        alignment: [],
+        cells: [],
+        color: [],
+        location: [],
+        season: [],
+        shape: [],
+        texture: [],
+        walls: [],
+        form: [],
+        undescribed: false,
+        id: -1,
         hosts: [],
         excludedPlaces: [],
+        gall_id: -1,
     });
 
-    const {
-        selected,
-        setSelected,
-        showRenameModal,
-        setShowRenameModal,
-        error,
-        isValid,
-        setError,
-        deleteResults,
-        setDeleteResults,
-        renameCallback,
-        nameExists,
-        confirm,
-        form,
-        formSubmit,
-        mainField,
-        deleteButton,
-    } = useAdmin(
+    const { selected, renameCallback, nameExists, confirm, ...adminForm } = useAdmin(
         'Gall',
+        keyFieldName,
         id,
         renameSpecies,
         toUpsertFields,
         {
-            keyProp: 'name',
             delEndpoint: '../api/gall/',
             upsertEndpoint: '../api/gall/upsert',
             nameExistsEndpoint: (s: string) => `/api/species?name=${s}`,
         },
-        schema,
         updatedFormFields,
         true,
         createNewGall,
@@ -235,12 +195,19 @@ const Gall = ({
             newG.hosts = [{ ...data.host, places: [] }];
             newG.fgs.genus = data.genus;
             newG.fgs.family = data.family;
-            newG.gall.undescribed = true;
-            setSelected(newG);
+            newG.undescribed = true;
+            adminForm.setSelected(newG);
         }
     };
 
-    const onSubmit = async (fields: FormFields) => {
+    const onSubmit = async (fields: FormFields): Promise<void> => {
+        if (!selected) {
+            console.error(
+                `Can not save. Looks like the genus and/or family are empty. We should not be in this pickle, yet here we are.`,
+            );
+            return;
+        }
+
         // see if a new Unknown Genus is needed - we are hiding this complexity from the user
         const genus = fields.genus[0];
         const family = fields.family[0];
@@ -253,31 +220,29 @@ const Gall = ({
         );
 
         if (newGenusNeeded) {
-            fields.genus = [{ id: -1, description: '', name: 'Unknown', type: GENUS }];
+            fields.genus = [{ id: -1, description: '', name: 'Unknown', type: TaxonomyTypeValues.GENUS }];
         }
 
         // if either genus or family is Unknown and the undescribed box is not checked they are probably messing up
-        if (
-            !fields.undescribed &&
-            (fields.genus[0].name.localeCompare('Unknown') == 0 || fields.family[0].name.localeCompare('Unknown') == 0)
-        ) {
+        if (!fields.undescribed && (genus.name.localeCompare('Unknown') == 0 || family.name.localeCompare('Unknown') == 0)) {
             return confirm({
                 variant: 'danger',
                 catchOnCancel: true,
                 title: 'Unknown Genus/Family But Not Undescribed!',
                 message: `The gall is assigned to an Unknown genus/family but it is not marked as undescribed. This is almost certainly an error. Do you really want to proceed?`,
             })
-                .then(() => Promise.bind(formSubmit(fields)))
-                .catch(() => Promise.resolve());
+                .then(() => Promise.bind(adminForm.formSubmit(fields)))
+                .catch(() => Promise.resolve()) as Promise<void>;
         }
-        formSubmit(fields);
+
+        return adminForm.formSubmit(fields);
     };
 
     const handleSearch = (s: string) => {
         setIsLoading(true);
 
         axios
-            .get<AT.HostSimple[]>(`../api/host?q=${s}&simple`)
+            .get<HostSimple[]>(`../api/host?q=${s}&simple`)
             .then((resp) => {
                 setHosts(resp.data);
                 setIsLoading(false);
@@ -286,6 +251,36 @@ const Gall = ({
                 console.error(e);
             });
     };
+
+    const createGallPropertyField = (name: keyof FormFields, items: FilterField[], multiple = true) => (
+        <Controller
+            control={adminForm.form.control}
+            name={name}
+            render={() => (
+                <Typeahead
+                    id={name}
+                    options={items}
+                    labelKey="field"
+                    multiple={multiple}
+                    clearButton
+                    {...adminForm.form.register(name, {
+                        disabled: areRequiredFieldsFilled(),
+                    })}
+                    onChange={(x) => {
+                        if (selected) {
+                            // @ts-expect-error breaking type safety here as it is non-trivial (and not seemingly worth it)
+                            // to pass the property name in a type safe manner
+                            selected[name] = x as FilterField[];
+                            adminForm.setSelected({ ...selected });
+                        }
+                    }}
+                    // @ts-expect-error breaking type safety here as it is non-trivial (and not seemingly worth it)
+                    // to pass the property name in a type safe manner
+                    selected={selected ? selected[name] : []}
+                />
+            )}
+        />
+    );
 
     return (
         <Admin
@@ -296,26 +291,23 @@ const Gall = ({
                 renameCallback: renameCallback,
                 nameExistsCallback: nameExists,
             }}
-            setShowModal={setShowRenameModal}
-            showModal={showRenameModal}
-            setError={setError}
-            error={error}
-            setDeleteResults={setDeleteResults}
-            deleteResults={deleteResults}
             selected={selected}
+            {...adminForm}
+            deleteButton={adminForm.deleteButton(
+                'Caution. All data associated with this Gall will be PERMANENTLY deleted.',
+                false,
+            )}
+            saveButton={adminForm.saveButton()}
+            formSubmit={onSubmit}
         >
-            <form onSubmit={form.handleSubmit(onSubmit)} className="m-4 pe-4">
+            <>
                 <UndescribedFlow show={showNewUndescribed} onClose={newUndescribedDone} genera={genera} families={families} />
                 <h4>Add/Edit Gallformers</h4>
                 <p>
                     This is for all of the details about a Gall. To add a description (which must be referenced to a source) go
                     add <Link href="/admin/source">Sources</Link>, if they do not already exist, then go{' '}
                     <Link href="/admin/speciessource">map species to sources with description</Link>. To associate a gall with all
-                    plants in a genus, add one species here first, then go to{' '}
-                    <Link href="./gallhost">
-                        <a>Gall-Host Mappings</a>
-                    </Link>
-                    .
+                    plants in a genus, add one species here first, then go to <Link href="./gallhost">Gall-Host Mappings</Link>.
                 </p>
                 <Row className="my-1">
                     <Col>
@@ -334,7 +326,8 @@ const Gall = ({
                         </Row>
                         <Row>
                             <Col>
-                                {mainField('name', 'Gall', {
+                                {/* // name: yup.string().matches(SPECIES_NAME_REGEX).required(), */}
+                                {adminForm.mainField('Gall', {
                                     searchEndpoint: (s: string) => `../api/gall?q=${s}`,
                                     promptText: 'Gall',
                                     searchText: 'Searching for Galls...',
@@ -342,7 +335,11 @@ const Gall = ({
                             </Col>
                             {selected && (
                                 <Col xs={1}>
-                                    <Button variant="secondary" className="btn-sm" onClick={() => setShowRenameModal(true)}>
+                                    <Button
+                                        variant="secondary"
+                                        className="btn-sm"
+                                        onClick={() => adminForm.setShowRenameModal(true)}
+                                    >
                                         Rename
                                     </Button>
                                 </Col>
@@ -353,62 +350,77 @@ const Gall = ({
                 <Row className="my-1">
                     <Col>
                         Genus (filled automatically):
-                        <Typeahead
+                        <Controller
+                            control={adminForm.form.control}
                             name="genus"
-                            control={form.control}
-                            placeholder="Genus"
-                            options={genera}
-                            labelKey="name"
-                            selected={selected?.fgs?.genus ? [selected.fgs.genus] : []}
-                            disabled={true}
-                            onChange={(g) => {
-                                if (selected) {
-                                    selected.fgs.genus = g[0] as TaxonomyEntryNoParent;
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                            clearButton
-                            multiple
+                            render={() => (
+                                <Typeahead
+                                    id="genus"
+                                    placeholder="Genus"
+                                    options={genera}
+                                    labelKey="name"
+                                    disabled={true}
+                                    onChange={(g) => {
+                                        if (selected) {
+                                            selected.fgs.genus = g[0] as TaxonomyEntry;
+                                            adminForm.setSelected({ ...selected });
+                                        }
+                                    }}
+                                    selected={selected?.fgs?.genus ? [selected.fgs.genus] : []}
+                                    clearButton
+                                    multiple
+                                />
+                            )}
                         />
                     </Col>
                     <Col>
                         Family (required):
-                        <Typeahead
-                            name="family"
-                            control={form.control}
-                            rules={{ required: true }}
-                            placeholder="Family"
-                            options={families}
-                            labelKey="name"
-                            selected={selected?.fgs?.family && selected.fgs.family.id >= 0 ? [selected.fgs.family] : []}
-                            disabled={(selected && selected.id > 0) || !selected}
-                            onChange={(f) => {
-                                if (!selected) return;
+                        <Controller
+                            control={adminForm.form.control}
+                            name="genus"
+                            render={() => (
+                                <Typeahead
+                                    id="family"
+                                    placeholder="Family"
+                                    options={families}
+                                    labelKey="name"
+                                    disabled={(selected && selected.id > 0) || !selected}
+                                    onChange={(f) => {
+                                        if (!selected) return;
 
-                                if (f && f.length > 0) {
-                                    // handle the case when a new species is created
-                                    // either the genus is new or is not
-                                    const fam = f[0] as TaxonomyEntryNoParent;
-                                    const genus = genera.find((gg) => gg.id === selected.fgs.genus.id);
-                                    if (genus && O.isNone(genus.parent)) {
-                                        genus.parent = O.some({ ...fam, parent: O.none });
-                                        selected.fgs = { ...selected.fgs, genus: genus };
-                                        setSelected({ ...selected, fgs: { ...selected.fgs, family: fam } });
-                                    } else {
-                                        selected.fgs = { ...selected.fgs, family: fam };
-                                        setSelected({ ...selected });
-                                    }
-                                } else {
-                                    selected.fgs = {
-                                        ...selected.fgs,
-                                        family: { name: '', description: '', id: -1, type: FAMILY },
-                                    };
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                            clearButton
+                                        if (f && f.length > 0) {
+                                            // handle the case when a new species is created
+                                            // either the genus is new or is not
+                                            const fam = f[0] as TaxonomyEntry;
+                                            const genus = genera.find((gg) => gg.id === selected.fgs.genus.id);
+                                            if (genus && O.isNone(genus.parent)) {
+                                                genus.parent = O.some({ ...fam, parent: O.none });
+                                                selected.fgs = { ...selected.fgs, genus: genus };
+                                                adminForm.setSelected({ ...selected, fgs: { ...selected.fgs, family: fam } });
+                                            } else {
+                                                selected.fgs = { ...selected.fgs, family: fam };
+                                                adminForm.setSelected({ ...selected });
+                                            }
+                                        } else {
+                                            selected.fgs = {
+                                                ...selected.fgs,
+                                                family: {
+                                                    name: '',
+                                                    description: '',
+                                                    id: -1,
+                                                    type: TaxonomyTypeValues.FAMILY,
+                                                    parent: O.none,
+                                                },
+                                            };
+                                            adminForm.setSelected({ ...selected });
+                                        }
+                                    }}
+                                    selected={selected?.fgs?.family && selected.fgs.family.id >= 0 ? [selected.fgs.family] : []}
+                                    clearButton
+                                />
+                            )}
                         />
-                        {form.formState.errors.family && (
+                        {adminForm.form.formState.errors.family && (
                             <span className="text-danger">
                                 The Family name is required. If it is not present in the list you will have to go add the family
                                 first. :(
@@ -419,26 +431,31 @@ const Gall = ({
                 <Row className="my-1">
                     <Col>
                         Hosts (required):
-                        <AsyncTypeahead
+                        <Controller
+                            control={adminForm.form.control}
                             name="hosts"
-                            control={form.control}
-                            placeholder="Hosts"
-                            options={hosts}
-                            labelKey="name"
-                            multiple
-                            disabled={!selected}
-                            selected={selected ? selected.hosts : []}
-                            onChange={(h) => {
-                                if (selected) {
-                                    selected.hosts = h;
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                            clearButton
-                            isLoading={isLoading}
-                            onSearch={handleSearch}
+                            render={() => (
+                                <AsyncTypeahead
+                                    id="hosts"
+                                    placeholder="Hosts"
+                                    options={hosts}
+                                    labelKey="name"
+                                    multiple
+                                    disabled={!selected}
+                                    onChange={(h) => {
+                                        if (selected) {
+                                            selected.hosts = h as HostSimple[];
+                                            adminForm.setSelected({ ...selected });
+                                        }
+                                    }}
+                                    selected={selected ? selected.hosts : []}
+                                    clearButton
+                                    isLoading={isLoading}
+                                    onSearch={handleSearch}
+                                />
+                            )}
                         />
-                        {form.formState.errors.hosts && (
+                        {adminForm.form.formState.errors.hosts && (
                             <span className="text-danger">You must map this gall to at least one host.</span>
                         )}
                     </Col>
@@ -447,270 +464,124 @@ const Gall = ({
                     <Col>
                         Detachable:
                         <Controller
-                            control={form.control}
+                            control={adminForm.form.control}
                             name="detachable"
-                            render={({ field: { ref } }) => (
-                                <select
-                                    ref={ref}
-                                    value={selected ? selected.gall.detachable.value : AT.DetachableNone.value}
-                                    onChange={(e) => {
-                                        if (selected) {
-                                            selected.gall.detachable = AT.detachableFromString(e.currentTarget.value);
-                                            setSelected({ ...selected });
+                            render={() => (
+                                <Typeahead
+                                    id="detachable"
+                                    options={Detachables}
+                                    labelKey="value"
+                                    disabled={areRequiredFieldsFilled()}
+                                    onChange={(d) => {
+                                        if (selected?.detachable) {
+                                            selected.detachable = d[0] as DetachableApi;
+                                            adminForm.setSelected({ ...selected });
                                         }
                                     }}
-                                    placeholder="Detachable"
-                                    className="form-control"
-                                    disabled={areRequiredFieldsFilled()}
-                                >
-                                    {AT.Detachables.map((d) => (
-                                        <option key={d.id}>{d.value}</option>
-                                    ))}
-                                </select>
+                                    aria-placeholder="Detachable"
+                                    selected={selected ? [selected.detachable] : []}
+                                    clearButton
+                                />
                             )}
                         />
+                        {/* <select
+                            {...adminForm.form.register('detachable', {
+                                disabled: areRequiredFieldsFilled(),
+                                onChange: (e) => {
+                                    if (selected) {
+                                        selected.detachable = detachableFromString(e.currentTarget.value);
+                                        adminForm.setSelected({ ...selected });
+                                    }
+                                },
+                            })}
+                            value={selected ? selected.detachable.value : DetachableNone.value}
+                            aria-placeholder="Detachable"
+                            className="form-control"
+                        >
+                            {Detachables.map((d) => (
+                                <option key={d.id}>{d.value}</option>
+                            ))}
+                        </select> */}
                     </Col>
-                    <Col>
-                        Walls:
-                        <Typeahead
-                            name="walls"
-                            control={form.control}
-                            options={walls}
-                            labelKey="field"
-                            multiple
-                            clearButton
-                            disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.gallwalls : []}
-                            onChange={(w) => {
-                                if (selected) {
-                                    selected.gall.gallwalls = w as AT.FilterField[];
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                        />
-                    </Col>
-                    <Col>
-                        Cells:
-                        <Typeahead
-                            name="cells"
-                            control={form.control}
-                            options={cells}
-                            labelKey="field"
-                            multiple
-                            clearButton
-                            disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.gallcells : []}
-                            onChange={(w) => {
-                                if (selected) {
-                                    selected.gall.gallcells = w as AT.FilterField[];
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                        />
-                    </Col>
-                    <Col>
-                        Alignment(s):
-                        <Typeahead
-                            name="alignments"
-                            control={form.control}
-                            options={alignments}
-                            labelKey="field"
-                            multiple
-                            clearButton
-                            disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.gallalignment : []}
-                            onChange={(w) => {
-                                if (selected) {
-                                    selected.gall.gallalignment = w as AT.FilterField[];
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                        />
-                    </Col>
+                    <Col>Walls:{createGallPropertyField('walls', walls)}</Col>
+                    <Col>Cells: {createGallPropertyField('cells', cells)}</Col>
+                    <Col>Alignment(s): {createGallPropertyField('alignment', alignments)}</Col>
                 </Row>
                 <Row className="my-1">
-                    <Col>
-                        Color(s):
-                        <Typeahead
-                            name="colors"
-                            control={form.control}
-                            options={colors}
-                            labelKey="field"
-                            multiple
-                            clearButton
-                            disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.gallcolor : []}
-                            onChange={(w) => {
-                                if (selected) {
-                                    selected.gall.gallcolor = w as AT.FilterField[];
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                        />
-                    </Col>
-                    <Col>
-                        Shape(s):
-                        <Typeahead
-                            name="shapes"
-                            control={form.control}
-                            options={shapes}
-                            labelKey="field"
-                            multiple
-                            clearButton
-                            disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.gallshape : []}
-                            onChange={(w) => {
-                                if (selected) {
-                                    selected.gall.gallshape = w as AT.FilterField[];
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                        />
-                    </Col>
-                    <Col>
-                        Season(s):
-                        <Typeahead
-                            name="seasons"
-                            control={form.control}
-                            options={seasons}
-                            labelKey="field"
-                            multiple
-                            clearButton
-                            disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.gallseason : []}
-                            onChange={(w) => {
-                                if (selected) {
-                                    selected.gall.gallseason = w as AT.FilterField[];
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                        />
-                    </Col>
-                    <Col>
-                        Form(s):
-                        <Typeahead
-                            name="forms"
-                            control={form.control}
-                            options={forms}
-                            labelKey="field"
-                            multiple
-                            clearButton
-                            disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.gallform : []}
-                            onChange={(w) => {
-                                if (selected) {
-                                    selected.gall.gallform = w as AT.FilterField[];
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                        />
-                    </Col>
+                    <Col>Color(s): {createGallPropertyField('color', colors)}</Col>
+                    <Col>Shape(s): {createGallPropertyField('shape', shapes)}</Col>
+                    <Col>Season(s): {createGallPropertyField('season', seasons)}</Col>
+                    <Col>Form(s): {createGallPropertyField('form', forms)}</Col>
                 </Row>
                 <Row className="my-1">
-                    <Col>
-                        Location(s):
-                        <Typeahead
-                            name="locations"
-                            control={form.control}
-                            options={locations}
-                            labelKey="field"
-                            multiple
-                            clearButton
-                            disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.galllocation : []}
-                            onChange={(w) => {
-                                if (selected) {
-                                    selected.gall.galllocation = w as AT.FilterField[];
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                        />
-                    </Col>
-                    <Col>
-                        Texture(s):
-                        <Typeahead
-                            name="textures"
-                            control={form.control}
-                            options={textures}
-                            labelKey="field"
-                            multiple
-                            clearButton
-                            disabled={areRequiredFieldsFilled()}
-                            selected={selected ? selected.gall.galltexture : []}
-                            onChange={(w) => {
-                                if (selected) {
-                                    selected.gall.galltexture = w as AT.FilterField[];
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                        />
-                    </Col>
+                    <Col>Location(s): {createGallPropertyField('location', locations)}</Col>
+                    <Col>Texture(s): {createGallPropertyField('texture', textures)}</Col>
                     <Col>
                         Abundance:
-                        <Typeahead
+                        <Controller
+                            control={adminForm.form.control}
                             name="abundance"
-                            control={form.control}
-                            options={abundances}
-                            labelKey="abundance"
-                            disabled={areRequiredFieldsFilled()}
-                            selected={
-                                selected?.abundance
-                                    ? pipe(
-                                          selected.abundance,
-                                          O.fold(constant([]), (a) => [a]),
-                                      )
-                                    : []
-                            }
-                            onChange={(g) => {
-                                if (selected) {
-                                    selected.abundance = O.fromNullable(g[0] as AT.AbundanceApi);
-                                    setSelected({ ...selected });
-                                }
-                            }}
-                            clearButton
+                            render={() => (
+                                <Typeahead
+                                    id="abundance"
+                                    options={abundances}
+                                    labelKey="abundance"
+                                    disabled={areRequiredFieldsFilled()}
+                                    onChange={(a) => {
+                                        if (selected) {
+                                            selected.abundance = O.fromNullable(a[0] as AbundanceApi);
+                                            adminForm.setSelected({ ...selected });
+                                        }
+                                    }}
+                                    selected={
+                                        selected?.abundance
+                                            ? pipe(
+                                                  selected.abundance,
+                                                  O.fold(constant([]), (a) => [a]),
+                                              )
+                                            : []
+                                    }
+                                    clearButton
+                                />
+                            )}
                         />
                     </Col>
                 </Row>
                 <Row className="my-1">
                     <Col>
                         <Controller
-                            control={form.control}
+                            control={adminForm.form.control}
                             name="aliases"
                             render={() => (
                                 <AliasTable
                                     data={selected?.aliases ?? []}
-                                    setData={(aliases: AT.AliasApi[]) => {
+                                    setData={(aliases: AliasApi[]) => {
                                         if (selected) {
                                             selected.aliases = aliases;
-                                            setSelected({ ...selected });
+                                            adminForm.setSelected({ ...selected });
                                         }
                                     }}
                                     disabled={areRequiredFieldsFilled()}
                                 />
                             )}
-                        ></Controller>
+                        />
                     </Col>
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col className="me-auto">
-                        <Controller
-                            control={form.control}
-                            name="datacomplete"
-                            render={({ field: { ref } }) => (
-                                <input
-                                    ref={ref}
-                                    type="checkbox"
-                                    className="form-input-checkbox"
-                                    checked={selected ? selected.datacomplete : false}
-                                    disabled={areRequiredFieldsFilled()}
-                                    onChange={(e) => {
-                                        if (selected) {
-                                            selected.datacomplete = e.currentTarget.checked;
-                                            setSelected({ ...selected });
-                                        }
-                                    }}
-                                />
-                            )}
+                        <input
+                            {...adminForm.form.register('datacomplete', {
+                                disabled: areRequiredFieldsFilled(),
+                                onChange: (e) => {
+                                    if (selected) {
+                                        selected.datacomplete = e.currentTarget.checked;
+                                        adminForm.setSelected({ ...selected });
+                                    }
+                                },
+                            })}
+                            type="checkbox"
+                            className="form-input-checkbox"
+                            checked={selected ? selected.datacomplete : false}
                         />{' '}
                         All sources containing unique information relevant to this gall have been added and are reflected in its
                         associated data. However, filter criteria may not be comprehensive in every field.
@@ -718,35 +589,24 @@ const Gall = ({
                 </Row>
                 <Row className="formGroup pb-1">
                     <Col className="me-auto">
-                        <Controller
-                            control={form.control}
-                            name="undescribed"
-                            render={({ field: { ref } }) => (
-                                <input
-                                    ref={ref}
-                                    type="checkbox"
-                                    className="form-input-checkbox"
-                                    checked={selected ? selected.gall.undescribed : false}
-                                    disabled={areRequiredFieldsFilled()}
-                                    onChange={(e) => {
-                                        if (selected) {
-                                            selected.gall.undescribed = e.currentTarget.checked;
-                                            setSelected({ ...selected });
-                                        }
-                                    }}
-                                />
-                            )}
+                        <input
+                            {...adminForm.form.register('undescribed', {
+                                disabled: areRequiredFieldsFilled(),
+                                onChange: (e) => {
+                                    if (selected) {
+                                        selected.undescribed = e.currentTarget.checked;
+                                        adminForm.setSelected({ ...selected });
+                                    }
+                                },
+                            })}
+                            type="checkbox"
+                            className="form-input-checkbox"
+                            checked={selected ? selected.undescribed : false}
                         />{' '}
                         Undescribed?
                     </Col>
                 </Row>
-                <Row className="formGroup pb-1">
-                    <Col>
-                        <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
-                    </Col>
-                    <Col>{deleteButton('Caution. All data associated with this Gall will be deleted.')}</Col>
-                </Row>
-            </form>
+            </>
         </Admin>
     );
 };
@@ -756,25 +616,25 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     const gall = pipe(
         id,
         O.map(parseInt),
-        O.map((id) => mightFailWithArray<AT.GallApi>()(gallById(id))),
-        O.getOrElse(constant(Promise.resolve(Array<AT.GallApi>()))),
+        O.map((id) => mightFailWithArray<GallApi>()(gallById(id))),
+        O.getOrElse(constant(Promise.resolve(Array<GallApi>()))),
     );
     return {
         props: {
             id: O.getOrElseW(constant(null))(id),
             gall: await gall,
-            families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(AT.GALL_FAMILY_TYPES)),
-            genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(AT.GallTaxon, true)),
-            locations: await mightFailWithArray<AT.FilterField>()(getLocations()),
-            colors: await mightFailWithArray<AT.FilterField>()(getColors()),
-            seasons: await mightFailWithArray<AT.FilterField>()(getSeasons()),
-            shapes: await mightFailWithArray<AT.FilterField>()(getShapes()),
-            textures: await mightFailWithArray<AT.FilterField>()(getTextures()),
-            alignments: await mightFailWithArray<AT.FilterField>()(getAlignments()),
-            walls: await mightFailWithArray<AT.FilterField>()(getWalls()),
-            cells: await mightFailWithArray<AT.FilterField>()(getCells()),
-            abundances: await mightFailWithArray<AT.AbundanceApi>()(getAbundances()),
-            forms: await mightFailWithArray<AT.FilterField>()(getForms()),
+            families: await mightFailWithArray<TaxonomyEntry>()(allFamilies(GALL_FAMILY_TYPES)),
+            genera: await mightFailWithArray<TaxonomyEntry>()(allGenera(TaxonCodeValues.GALL, true)),
+            locations: await mightFailWithArray<FilterField>()(getLocations()),
+            colors: await mightFailWithArray<FilterField>()(getColors()),
+            seasons: await mightFailWithArray<FilterField>()(getSeasons()),
+            shapes: await mightFailWithArray<FilterField>()(getShapes()),
+            textures: await mightFailWithArray<FilterField>()(getTextures()),
+            alignments: await mightFailWithArray<FilterField>()(getAlignments()),
+            walls: await mightFailWithArray<FilterField>()(getWalls()),
+            cells: await mightFailWithArray<FilterField>()(getCells()),
+            abundances: await mightFailWithArray<AbundanceApi>()(getAbundances()),
+            forms: await mightFailWithArray<FilterField>()(getForms()),
         },
     };
 };

@@ -1,16 +1,17 @@
 import * as E from 'fp-ts/lib/Either';
-import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
-import { Err, extractQueryParam, sendErrResponse, sendSuccResponse, toErr } from '../../../libs/api/apipage';
+import { Err, extractQueryParam, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage';
 import { IMAGES_ENDPOINT } from '../../../libs/constants';
 import { getPresignedUrl } from '../../../libs/images/images';
 import { handleError } from '../../../libs/utils/util';
+import authOptions from '../../../pages/api/auth/[...nextauth]';
+import { getServerSession } from 'next-auth';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
-    const session = await getSession({ req });
+    const session = await getServerSession(req, res, authOptions);
     if (!session) {
         res.status(401).end();
     }
@@ -41,7 +42,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             ),
             TE.fromEither,
             TE.flatten,
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else {
         res.status(405).end();

@@ -1,4 +1,4 @@
-import Image from 'next/image';
+import Image from 'next/image.js';
 import Link from 'next/link';
 import React from 'react';
 import { Container, Row, Col } from 'react-bootstrap';
@@ -26,9 +26,7 @@ export default function FourOhFour(): JSX.Element {
                         </Row>
                         <Row className="p-3">
                             <p>
-                                <Link href="/">
-                                    <a>Go back home</a>
-                                </Link>
+                                <Link href="/">Go back home</Link>
                             </p>
                         </Row>
                     </div>

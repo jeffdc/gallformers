@@ -1,21 +1,22 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, Button, Col, Row } from 'react-bootstrap';
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
-import remarkBreaks from 'remark-breaks';
-import externalLinks from 'remark-external-links';
-import { ALLRIGHTS, CC0, CCBY, GallTaxon, HostTaxon, SpeciesSourceApi } from '../libs/api/apitypes';
+import { ImageLicenseValues, SpeciesSourceApi } from '../libs/api/apitypes';
+import { TaxonCodeValues } from '../libs/api/apitypes';
 import { formatLicense, sourceToDisplay } from '../libs/pages/renderhelpers';
 import { SELECTED_ROW_STYLE, TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
 import DataTable from './DataTable';
 import Edit from './edit';
 import InfoTip from './infotip';
+import ReactMarkdown from 'react-markdown';
+import rehypeExternalLinks from 'rehype-external-links';
+import rehypeRaw from 'rehype-raw';
+import remarkBreaks from 'remark-breaks';
 
 export type SourceListProps = {
     data: SpeciesSourceApi[];
     defaultSelection: SpeciesSourceApi | undefined;
     onSelectionChange: (selected: SpeciesSourceApi | undefined) => void;
-    taxonType: typeof GallTaxon | typeof HostTaxon;
+    taxonType: TaxonCodeValues;
 };
 
 const linkTitle = (row: SpeciesSourceApi) => {
@@ -35,13 +36,13 @@ const linkLicense = (row: SpeciesSourceApi) => {
                 <img
                     alt={link}
                     src={
-                        row.source.license === CC0
+                        row.source.license === ImageLicenseValues.PUBLIC_DOMAIN
                             ? '/images/CC0.png'
-                            : row.source.license === CCBY
-                            ? '/images/CCBY.png'
-                            : row.source.license === ALLRIGHTS
-                            ? '/images/allrights.svg'
-                            : ''
+                            : row.source.license === ImageLicenseValues.CC_BY
+                              ? '/images/CCBY.png'
+                              : row.source.license === ImageLicenseValues.ALL_RIGHTS
+                                ? '/images/allrights.svg'
+                                : ''
                     }
                     height="20"
                 />
@@ -130,7 +131,7 @@ const SourceList = ({ data, defaultSelection, onSelectionChange, taxonType }: So
                 dismissible
                 onClose={() => setNotesAlertShown(false)}
                 hidden={
-                    taxonType === HostTaxon ||
+                    taxonType === TaxonCodeValues.PLANT ||
                     !notesAlertShown ||
                     !(gallformersNotes && gallformersNotes.id !== selectedSource?.source.id)
                 }
@@ -177,7 +178,7 @@ const SourceList = ({ data, defaultSelection, onSelectionChange, taxonType }: So
                     {selectedSource && selectedSource.description && (
                         <span>
                             <span className="source-quotemark">&ldquo;</span>
-                            <ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[externalLinks, remarkBreaks]}>
+                            <ReactMarkdown rehypePlugins={[rehypeRaw]} remarkPlugins={[rehypeExternalLinks, remarkBreaks]}>
                                 {selectedSource.description}
                             </ReactMarkdown>
                             <span className="source-quotemark">&rdquo;</span>

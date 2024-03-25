@@ -1,47 +1,84 @@
-import { Prisma, PrismaPromise } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function';
+import { Prisma, PrismaPromise, species, speciestaxonomy, taxonomy, taxonomyalias, taxonomytaxonomy } from '@prisma/client';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
-import { TaskEither } from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import {
-    AliasApi,
     ALL_FAMILY_TYPES,
+    AliasApi,
     DeleteResult,
+    EMPTY_TAXONOMYENTRY,
+    FGS,
+    FamilyAPI,
     FamilyGallTypesTuples,
     FamilyHostTypesTuple,
     FamilyTypesTuple,
-    GallTaxon,
-    HostTaxon,
-    SimpleSpecies,
-} from '../api/apitypes';
-import {
-    FAMILY,
-    FamilyTaxonomy,
     FamilyUpsertFields,
-    FamilyWithGenera,
-    FGS,
     GeneraMoveFields,
     Genus,
-    GENUS,
-    SECTION,
     SectionApi,
+    SimpleSpecies,
+    TaxonCodeValues,
     TaxonomyEntry,
-    TaxonomyTree,
     TaxonomyType,
+    TaxonomyTypeValues,
     TaxonomyUpsertFields,
-    toTaxonomyEntry,
-} from '../api/taxonomy';
-import { logger } from '../utils/logger';
+    asTaxonomyType,
+} from '../api/apitypes';
+import { logger } from '../utils/logger.ts';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
 import { extractId } from './utils';
 
+export type TaxonomyTree = taxonomy & {
+    parent: taxonomy | null;
+    speciestaxonomy: (speciestaxonomy & {
+        species: species;
+    })[];
+    taxonomy: (taxonomy & {
+        speciestaxonomy: (speciestaxonomy & {
+            species: species;
+        })[];
+        taxonomy: taxonomy[];
+        taxonomyalias: taxonomyalias[];
+        taxonomytaxonomy: taxonomytaxonomy[];
+    })[];
+    taxonomyalias: taxonomyalias[];
+};
+
+export type FamilyTaxonomy = taxonomy & {
+    taxonomytaxonomy: (taxonomytaxonomy & {
+        child: taxonomy & {
+            speciestaxonomy: (speciestaxonomy & {
+                species: species;
+            })[];
+        };
+    })[];
+};
+
+type DBTaxonomyWithParent =
+    | (taxonomy & {
+          parent?: taxonomy | null;
+      })
+    | null;
+
+const toTaxonomyEntry = (dbTax: DBTaxonomyWithParent): TaxonomyEntry => {
+    if (dbTax == undefined) return EMPTY_TAXONOMYENTRY;
+
+    return {
+        id: dbTax.id,
+        description: dbTax.description == null ? '' : dbTax.description,
+        name: dbTax.name,
+        // type: decodeWithDefault(TaxonomyTypeSchema.decode(dbTax.type), TaxonomyTypeValues.GENUS),
+        type: asTaxonomyType(dbTax.type),
+        parent: pipe(dbTax.parent, O.fromNullable, O.map(toTaxonomyEntry)),
+    };
+};
 /**
  * Fetch a TaxonomyEntry by taxonomy id.
  * @param id
  */
-export const taxonomyEntryById = (id: number): TaskEither<Error, TaxonomyEntry[]> => {
+export const taxonomyEntryById = (id: number): TE.TaskEither<Error, TaxonomyEntry[]> => {
     const tax = () =>
         db.taxonomy.findMany({
             where: { id: { equals: id } },
@@ -55,20 +92,20 @@ export const taxonomyEntryById = (id: number): TaskEither<Error, TaxonomyEntry[]
     );
 };
 
-export const taxonomyByName = (name: string): TaskEither<Error, TaxonomyEntry[]> => {
+export const taxonomyByName = (name: string): TE.TaskEither<Error, TaxonomyEntry[]> => {
     return pipe(
         TE.tryCatch(() => db.taxonomy.findMany({ where: { name: { equals: name } } }), handleError),
         TE.map((ts) => ts.map(toTaxonomyEntry)),
     );
 };
 
-export const familyById = (id: number): TaskEither<Error, FamilyWithGenera[]> => {
+export const familyById = (id: number): TE.TaskEither<Error, FamilyAPI[]> => {
     return pipe(
         TE.tryCatch(
             () =>
                 db.taxonomy.findMany({
                     include: { taxonomy: true },
-                    where: { AND: [{ id: id }, { type: { equals: FAMILY } }] },
+                    where: { AND: [{ id: id }, { type: { equals: TaxonomyTypeValues.FAMILY } }] },
                 }),
             handleError,
         ),
@@ -81,13 +118,13 @@ export const familyById = (id: number): TaskEither<Error, FamilyWithGenera[]> =>
     );
 };
 
-export const familyByName = (name: string): TaskEither<Error, FamilyWithGenera[]> => {
+export const familyByName = (name: string): TE.TaskEither<Error, TaxonomyEntry[]> => {
     return pipe(
         TE.tryCatch(
             () =>
                 db.taxonomy.findMany({
                     include: { taxonomy: true },
-                    where: { AND: [{ name: { equals: name } }, { type: { equals: FAMILY } }] },
+                    where: { AND: [{ name: { equals: name } }, { type: { equals: TaxonomyTypeValues.FAMILY } }] },
                 }),
             handleError,
         ),
@@ -104,7 +141,7 @@ export const familyByName = (name: string): TaskEither<Error, FamilyWithGenera[]
  * Fetch a taxonomy tree for a taxonomy id.
  * @param id
  */
-export const taxonomyTreeForId = (id: number): TaskEither<Error, O.Option<TaxonomyTree>> => {
+export const taxonomyTreeForId = (id: number): TE.TaskEither<Error, O.Option<TaxonomyTree>> => {
     const sps = () =>
         db.taxonomy.findFirst({
             include: {
@@ -147,7 +184,7 @@ export const taxonomyTreeForId = (id: number): TaskEither<Error, O.Option<Taxono
  */
 export const allFamilies = (
     types: FamilyTypesTuple | FamilyGallTypesTuples | FamilyHostTypesTuple = ALL_FAMILY_TYPES,
-): TaskEither<Error, TaxonomyEntry[]> => {
+): TE.TaskEither<Error, TaxonomyEntry[]> => {
     const families = () =>
         db.taxonomy.findMany({
             orderBy: { name: 'asc' },
@@ -160,7 +197,7 @@ export const allFamilies = (
     );
 };
 
-export const allFamiliesWithGenera = (): TaskEither<Error, FamilyWithGenera[]> => {
+export const allFamiliesWithGenera = (): TE.TaskEither<Error, FamilyAPI[]> => {
     const families = () =>
         db.taxonomy.findMany({
             include: {
@@ -188,10 +225,7 @@ export const allFamiliesWithGenera = (): TaskEither<Error, FamilyWithGenera[]> =
  * also be returned. It is generally useful to not show empty genera in the main (non-Admin) UI but in the admin
  * UI it is necessary so that new species can be assigned to them.
  */
-export const allGenera = (
-    taxon: typeof GallTaxon | typeof HostTaxon,
-    includeEmpty = false,
-): TaskEither<Error, TaxonomyEntry[]> => {
+export const allGenera = (taxon: TaxonCodeValues, includeEmpty = false): TE.TaskEither<Error, TaxonomyEntry[]> => {
     const genera = () =>
         db.taxonomy.findMany({
             include: { parent: true },
@@ -199,14 +233,24 @@ export const allGenera = (
             where: {
                 OR: includeEmpty
                     ? [
-                          { AND: [{ type: GENUS }, { speciestaxonomy: { some: { species: { taxoncode: taxon } } } }] },
-                          { AND: [{ type: GENUS }, { name: 'Unknown' }] },
+                          {
+                              AND: [
+                                  { type: TaxonomyTypeValues.GENUS },
+                                  { speciestaxonomy: { some: { species: { taxoncode: taxon } } } },
+                              ],
+                          },
+                          { AND: [{ type: TaxonomyTypeValues.GENUS }, { name: 'Unknown' }] },
                           // this clause will pull in all genera that are not yet assigned to any species.
-                          { AND: [{ type: GENUS }, { speciestaxonomy: { none: {} } }] },
+                          { AND: [{ type: TaxonomyTypeValues.GENUS }, { speciestaxonomy: { none: {} } }] },
                       ]
                     : [
-                          { AND: [{ type: GENUS }, { speciestaxonomy: { some: { species: { taxoncode: taxon } } } }] },
-                          { AND: [{ type: GENUS }, { name: 'Unknown' }] },
+                          {
+                              AND: [
+                                  { type: TaxonomyTypeValues.GENUS },
+                                  { speciestaxonomy: { some: { species: { taxoncode: taxon } } } },
+                              ],
+                          },
+                          { AND: [{ type: TaxonomyTypeValues.GENUS }, { name: 'Unknown' }] },
                       ],
             },
         });
@@ -221,12 +265,12 @@ export const allGenera = (
  * Fetch all of the Sections.
  * @returns
  */
-export const allSections = (): TaskEither<Error, TaxonomyEntry[]> => {
+export const allSections = (): TE.TaskEither<Error, TaxonomyEntry[]> => {
     const sections = () =>
         db.taxonomy.findMany({
             include: { parent: true },
             orderBy: { name: 'asc' },
-            where: { type: SECTION },
+            where: { type: TaxonomyTypeValues.SECTION },
         });
 
     return pipe(
@@ -235,7 +279,7 @@ export const allSections = (): TaskEither<Error, TaxonomyEntry[]> => {
     );
 };
 
-export const allSectionIds = (): TaskEither<Error, string[]> =>
+export const allSectionIds = (): TE.TaskEither<Error, string[]> =>
     pipe(
         allSections(),
         TE.map((sections) => sections.map((s) => s.id.toString())),
@@ -248,7 +292,7 @@ export const allSectionIds = (): TaskEither<Error, string[]> =>
  * - optionally a Section
  * @param id
  */
-export const taxonomyForSpecies = (id: number): TaskEither<Error, FGS> => {
+export const taxonomyForSpecies = (id: number): TE.TaskEither<Error, FGS> => {
     const tree = () => {
         const r = db.speciestaxonomy
             .findMany({
@@ -271,9 +315,9 @@ export const taxonomyForSpecies = (id: number): TaskEither<Error, FGS> => {
     };
 
     const toFGS = (tax: ExtractTFromPromise<ReturnType<typeof tree>>): FGS => {
-        const genus = tax.find((t) => t.taxonomy.type === GENUS)?.taxonomy;
+        const genus = tax.find((t) => t.taxonomy.type === TaxonomyTypeValues.GENUS)?.taxonomy;
         const family = genus?.parent;
-        const section = O.fromNullable(tax.find((t) => t.taxonomy.type === SECTION)?.taxonomy);
+        const section = O.fromNullable(tax.find((t) => t.taxonomy.type === TaxonomyTypeValues.SECTION)?.taxonomy);
 
         if (genus == null || family == null) {
             const msg = `Species with id ${id} is missing its family or genus.`;
@@ -301,7 +345,7 @@ export const taxonomyForSpecies = (id: number): TaskEither<Error, FGS> => {
  */
 export const getFamiliesWithSpecies =
     (gall: boolean, undescribedOnly = false) =>
-    (): TaskEither<Error, FamilyTaxonomy[]> => {
+    (): TE.TaskEither<Error, FamilyTaxonomy[]> => {
         const filterOnlyUndescribed = (fs: FamilyTaxonomy[]) => {
             return fs
                 .map(
@@ -310,7 +354,7 @@ export const getFamiliesWithSpecies =
                         ({
                             ...family,
                             taxonomytaxonomy: family.taxonomytaxonomy.filter((genus) => genus.child.speciestaxonomy.length > 0),
-                        } as FamilyTaxonomy),
+                        }) as FamilyTaxonomy,
                     // filter out famlies that have no genera in them after the above filter
                 )
                 .filter((f) => f.taxonomytaxonomy.length > 0);
@@ -318,8 +362,8 @@ export const getFamiliesWithSpecies =
 
         const fams = async () => {
             const where = gall
-                ? [{ type: FAMILY }, { description: { not: 'Plant' } }]
-                : [{ type: FAMILY }, { description: { equals: 'Plant' } }];
+                ? [{ type: TaxonomyTypeValues.FAMILY }, { description: { not: 'Plant' } }]
+                : [{ type: TaxonomyTypeValues.FAMILY }, { description: { equals: 'Plant' } }];
 
             return db.taxonomy
                 .findMany({
@@ -361,7 +405,7 @@ export const getFamiliesWithSpecies =
 /**
  * Fetches all of the ids for all of the families.
  */
-export const allFamilyIds = (): TaskEither<Error, string[]> => {
+export const allFamilyIds = (): TE.TaskEither<Error, string[]> => {
     const families = () =>
         db.taxonomy.findMany({
             select: { id: true },
@@ -374,7 +418,7 @@ export const allFamilyIds = (): TaskEither<Error, string[]> => {
     );
 };
 
-export const allGenusIds = (): TaskEither<Error, string[]> => {
+export const allGenusIds = (): TE.TaskEither<Error, string[]> => {
     const genera = () =>
         db.taxonomy.findMany({
             select: { id: true },
@@ -387,7 +431,7 @@ export const allGenusIds = (): TaskEither<Error, string[]> => {
     );
 };
 
-export const getAllSpeciesForSectionOrGenus = (id: number): TaskEither<Error, SimpleSpecies[]> => {
+export const getAllSpeciesForSectionOrGenus = (id: number): TE.TaskEither<Error, SimpleSpecies[]> => {
     const sectionSpecies = () =>
         db.speciestaxonomy.findMany({
             where: { taxonomy_id: id },
@@ -397,7 +441,7 @@ export const getAllSpeciesForSectionOrGenus = (id: number): TaskEither<Error, Si
 
     return pipe(
         TE.tryCatch(sectionSpecies, handleError),
-        TE.map((s) => s.map((sp) => ({ ...sp.species } as SimpleSpecies))),
+        TE.map((s) => s.map((sp) => ({ ...sp.species }) as SimpleSpecies)),
     );
 };
 
@@ -406,7 +450,7 @@ export const getAllSpeciesForSectionOrGenus = (id: number): TaskEither<Error, Si
  * @param id the id of the family
  * @returns an array of the genera
  */
-export const getGeneraForFamily = (id: number): TaskEither<Error, Genus[]> => {
+export const getGeneraForFamily = (id: number): TE.TaskEither<Error, Genus[]> => {
     const familyGenera = () =>
         db.taxonomytaxonomy.findMany({
             where: { taxonomy_id: id },
@@ -426,7 +470,7 @@ export const getGeneraForFamily = (id: number): TaskEither<Error, Genus[]> => {
     );
 };
 
-export const sectionById = (id: number): TaskEither<Error, SectionApi[]> => {
+export const sectionById = (id: number): TE.TaskEither<Error, SectionApi[]> => {
     const section = () =>
         db.taxonomy.findMany({
             select: {
@@ -436,7 +480,7 @@ export const sectionById = (id: number): TaskEither<Error, SectionApi[]> => {
                 speciestaxonomy: { include: { species: true } },
                 taxonomyalias: { include: { alias: true } },
             },
-            where: { AND: [{ id: { equals: id } }, { type: { equals: SECTION } }] },
+            where: { AND: [{ id: { equals: id } }, { type: { equals: TaxonomyTypeValues.SECTION } }] },
         });
 
     return pipe(
@@ -445,14 +489,14 @@ export const sectionById = (id: number): TaskEither<Error, SectionApi[]> => {
             ts.map((t) => ({
                 ...t,
                 description: t.description ?? '',
-                species: t?.speciestaxonomy.map((sp) => ({ ...sp.species } as SimpleSpecies)),
-                aliases: t.taxonomyalias.map((a) => ({ ...a.alias } as AliasApi)),
+                species: t?.speciestaxonomy.map((sp) => ({ ...sp.species }) as SimpleSpecies),
+                aliases: t.taxonomyalias.map((a) => ({ ...a.alias }) as AliasApi),
             })),
         ),
     );
 };
 
-export const sectionByName = (name: string): TaskEither<Error, SectionApi[]> => {
+export const sectionByName = (name: string): TE.TaskEither<Error, SectionApi[]> => {
     return pipe(
         TE.tryCatch(
             () =>
@@ -464,7 +508,7 @@ export const sectionByName = (name: string): TaskEither<Error, SectionApi[]> => 
                         speciestaxonomy: { include: { species: true } },
                         taxonomyalias: { include: { alias: true } },
                     },
-                    where: { AND: [{ name: { equals: name } }, { type: { equals: SECTION } }] },
+                    where: { AND: [{ name: { equals: name } }, { type: { equals: TaxonomyTypeValues.SECTION } }] },
                 }),
             handleError,
         ),
@@ -472,8 +516,8 @@ export const sectionByName = (name: string): TaskEither<Error, SectionApi[]> => 
             ts.map((t) => ({
                 ...t,
                 description: t.description ?? '',
-                species: t?.speciestaxonomy.map((sp) => ({ ...sp.species } as SimpleSpecies)),
-                aliases: t.taxonomyalias.map((a) => ({ ...a.alias } as AliasApi)),
+                species: t?.speciestaxonomy.map((sp) => ({ ...sp.species }) as SimpleSpecies),
+                aliases: t.taxonomyalias.map((a) => ({ ...a.alias }) as AliasApi),
             })),
         ),
     );
@@ -483,7 +527,7 @@ export const sectionByName = (name: string): TaskEither<Error, SectionApi[]> => 
  * delete species that are assigned to that family. So be careful!
  * @param id
  */
-export const deleteTaxonomyEntry = (id: number): TaskEither<Error, DeleteResult> => {
+export const deleteTaxonomyEntry = (id: number): TE.TaskEither<Error, DeleteResult> => {
     const doDelete = () => {
         // have to do raw calls since Prisma does not support cascade deletion.
         const delSpeciesSql = `
@@ -526,7 +570,7 @@ const connectSpecies = (f: TaxonomyUpsertFields) => f.species.map((s) => ({ spec
  * @param f
  * @returns the count of the number of records added, will be 1 for success and 0 for a failure
  */
-export const upsertTaxonomy = (f: TaxonomyUpsertFields): TaskEither<Error, TaxonomyEntry> => {
+export const upsertTaxonomy = (f: TaxonomyUpsertFields): TE.TaskEither<Error, TaxonomyEntry> => {
     const connectParentOrNot = pipe(
         f.parent,
         O.fold(
@@ -699,7 +743,7 @@ const generaCreate =
                                 create: {
                                     name: g.name,
                                     description: g.description,
-                                    type: GENUS,
+                                    type: TaxonomyTypeValues.GENUS,
                                     parent_id: fid,
                                 },
                             },
@@ -721,7 +765,7 @@ const generaCreate =
  * @param f
  * @returns the count of the number of records added, will be 1 for success and 0 for a failure
  */
-export const upsertFamily = (f: FamilyUpsertFields): TaskEither<Error, FamilyWithGenera> => {
+export const upsertFamily = (f: FamilyUpsertFields): TE.TaskEither<Error, TaxonomyEntry> => {
     const updateFamilyTx = TE.tryCatch(() => db.$transaction(familyUpdateSteps(f)), handleError);
 
     // eslint-disable-next-line prettier/prettier
@@ -755,7 +799,7 @@ export const upsertFamily = (f: FamilyUpsertFields): TaskEither<Error, FamilyWit
     );
 };
 
-export const moveGenera = (f: GeneraMoveFields): TaskEither<Error, FamilyWithGenera[]> => {
+export const moveGenera = (f: GeneraMoveFields): TE.TaskEither<Error, FamilyAPI[]> => {
     const doMove = () =>
         db.$transaction([
             // reassign the parent to the new family for all of the passed in genera
@@ -789,7 +833,7 @@ export const moveGenera = (f: GeneraMoveFields): TaskEither<Error, FamilyWithGen
 
 const taxonomySearch =
     (taxonType: TaxonomyType) =>
-    (s: string): TaskEither<Error, TaxonomyEntry[]> => {
+    (s: string): TE.TaskEither<Error, TaxonomyEntry[]> => {
         const doSearch = () =>
             db.taxonomy.findMany({
                 where: {
@@ -803,6 +847,6 @@ const taxonomySearch =
         );
     };
 
-export const generaSearch = taxonomySearch(GENUS);
-export const sectionSearch = taxonomySearch(SECTION);
-export const familySearch = taxonomySearch(FAMILY);
+export const generaSearch = taxonomySearch(TaxonomyTypeValues.GENUS);
+export const sectionSearch = taxonomySearch(TaxonomyTypeValues.SECTION);
+export const familySearch = taxonomySearch(TaxonomyTypeValues.FAMILY);

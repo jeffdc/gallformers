@@ -2,22 +2,15 @@ import { glossary, Prisma } from '@prisma/client';
 import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, GlossaryEntryUpsertFields } from '../api/apitypes';
+import { DeleteResult, Entry, GlossaryEntryUpsertFields } from '../api/apitypes';
 import { handleError } from '../utils/util';
 import db from './db';
-
-export type Entry = {
-    id: number;
-    word: string;
-    definition: string;
-    urls: string; // \n separated
-};
 
 const adaptor = (e: glossary): Entry => e;
 
 export const allGlossaryEntries = (): TaskEither<Error, Entry[]> => {
     const glossary = () =>
-        // prisma does not handle sort order by collate nocase
+        // prisma does not handle sort order by collate NOCASE
         // https://github.com/prisma/prisma/issues/5068
         db.$queryRaw<glossary[]>(Prisma.sql`
             SELECT * from glossary
@@ -72,4 +65,36 @@ export const upsertGlossary = (entry: GlossaryEntryUpsertFields): TaskEither<Err
         TE.tryCatch(upsert, handleError),
         TE.map(adaptor),
     );
+};
+
+/**
+ * A general way to fetch glossary entries. Check this file for pre-defined helpers that are easier to use.
+ * @param whereClause a where clause by which to filter places
+ */
+export const getEntries = (whereClause: Prisma.glossaryWhereInput): TaskEither<Error, Entry[]> => {
+    const entries = () =>
+        db.glossary.findMany({
+            where: whereClause,
+            orderBy: { word: 'asc' },
+        });
+
+    return TE.tryCatch(entries, handleError);
+};
+
+/**
+ * A way to search for glossary entries.
+ * @param s the string to search for, will search only on the glossary entry Words
+ * @returns an array of results
+ */
+export const searchGlossary = (s: string): TaskEither<Error, Entry[]> => {
+    return getEntries({ word: { contains: s } });
+};
+
+/**
+ *
+ * @param word Exact match on a glossary word adn return it if it exists
+ * @returns An array containing the Entry if it is found, otherwise an empty array.
+ */
+export const getEntryByWord = (word: string): TaskEither<Error, Entry[]> => {
+    return getEntries({ word: { equals: word } });
 };

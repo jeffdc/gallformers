@@ -13,8 +13,8 @@ import { image } from '@prisma/client';
 import Jimp from 'jimp';
 import { ImagePaths } from '../api/apitypes';
 import db from '../db/db';
-import { logger } from '../utils/logger';
-import { tryBackoff } from '../utils/network';
+import { logger } from '../utils/logger.ts';
+import { tryBackoff } from '../utils/network.ts';
 
 const checkCred = (cred: string | undefined): string => {
     if (process.env.NODE_ENV === 'production') {
@@ -49,7 +49,7 @@ export const getImagePaths = async (speciesId: number, imageids: number[] = []):
     try {
         const imageidsWhere = imageids.length > 0 ? { id: { in: imageids } } : {};
         const images = await db.image.findMany({
-            where: { AND: [{ species_id: { in: speciesId } }, imageidsWhere] },
+            where: { AND: [{ species_id: { in: [speciesId] } }, imageidsWhere] },
             orderBy: { id: 'asc' },
         });
 

@@ -1,13 +1,11 @@
-import { yupResolver } from '@hookform/resolvers/yup';
-import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Col, Modal, Row } from 'react-bootstrap';
-import { useForm } from 'react-hook-form';
-import * as yup from 'yup';
-import { ALLRIGHTS, asLicenseType, CC0, CCBY, ImageApi, LicenseType, SourceWithSpeciesSourceApi } from '../libs/api/apitypes';
+import { Controller, useForm } from 'react-hook-form';
+
+import { Typeahead } from 'react-bootstrap-typeahead';
+import { asImageLicense, ImageApi, ImageLicenseValues, SourceWithSpeciesSourceApi } from '../libs/api/apitypes';
 import InfoTip from './infotip';
-import Typeahead from './Typeahead';
 
 type Props = {
     image: ImageApi;
@@ -16,53 +14,10 @@ type Props = {
     onClose: () => void;
 };
 
-const Schema = yup.object().shape({
-    source: yup.array(),
-    sourcelink: yup
-        .string()
-        .url()
-        .when('source', {
-            is: (s: []) => s.length === 0,
-            then: yup.string().required('You must provide a link to the source.'),
-        }),
-    license: yup.string().required('You must select a license.'),
-    creator: yup.string().required('You must provide a reference to the creator.'),
-    licenselink: yup
-        .string()
-        .url()
-        .when('license', {
-            is: (l: string) => l === CCBY,
-            then: yup.string().url().required('The CC-BY license requires that you provide a link to the license.'),
-        }),
-    attribution: yup.string().when('license', {
-        is: (l: string) => l === ALLRIGHTS,
-        then: yup
-            .string()
-            .required('You must document proof that we are allowed to use the image when using an All Rights Reserved license.'),
-    }),
-});
-
-type FormFields = {
-    default: boolean;
-    creator: string;
-    attribution: string;
-    sourcelink: string;
-    source: SourceWithSpeciesSourceApi[];
-    license: LicenseType;
-    licenselink: string;
-    caption: string;
-};
-
-const sourceFromOption = (so: O.Option<SourceWithSpeciesSourceApi>): SourceWithSpeciesSourceApi[] =>
-    pipe(
-        so,
-        O.fold(constant(new Array<SourceWithSpeciesSourceApi>()), (s) => [s]),
-    );
+type FormFields = ImageApi;
 
 const formFromImage = (img: ImageApi): FormFields => ({
     ...img,
-    license: img.license as LicenseType,
-    source: sourceFromOption(img.source),
 });
 
 const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
@@ -77,7 +32,6 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
         control,
     } = useForm<FormFields>({
         mode: 'onBlur',
-        resolver: yupResolver(Schema),
         defaultValues: formFromImage(image),
     });
 
@@ -102,9 +56,9 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
         setValue('creator', selected.creator);
         setValue('attribution', selected.attribution);
         setValue('sourcelink', selected.sourcelink);
-        setValue('license', selected.license as LicenseType);
+        setValue('license', selected.license);
         setValue('licenselink', selected.licenselink);
-        setValue('source', sourceFromOption(selected.source));
+        setValue('source', selected.source);
         setValue('caption', selected.caption);
     }, [selected, setValue]);
 
@@ -116,7 +70,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
         const newImg: ImageApi = {
             ...image,
             ...fields,
-            source: O.fromNullable(fields.source[0]),
+            source: fields.source,
         };
         await onSave(newImg);
         onHide();
@@ -163,23 +117,29 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                     />
                                 </Col>
                                 <Col>
-                                    <Typeahead
+                                    <Controller
                                         name="source"
                                         control={control}
-                                        options={sources}
-                                        labelKey={(s) => (s as SourceWithSpeciesSourceApi).title}
-                                        clearButton
-                                        selected={sourceFromOption(selected.source)}
-                                        onChange={(o) => {
-                                            const s = o[0] as SourceWithSpeciesSourceApi;
-                                            setSelected({
-                                                ...selected,
-                                                source: O.fromNullable(s),
-                                                license: s ? asLicenseType(s.license) : '',
-                                                licenselink: s ? s.licenselink : '',
-                                                creator: s ? s.author : '',
-                                            });
-                                        }}
+                                        render={() => (
+                                            <Typeahead
+                                                id="source"
+                                                options={sources}
+                                                labelKey={(s) => (s as SourceWithSpeciesSourceApi).title}
+                                                clearButton
+                                                selected={selected.source ? [selected.source] : []}
+                                                onChange={(o) => {
+                                                    const s = o[0] as SourceWithSpeciesSourceApi;
+                                                    setSelected({
+                                                        ...selected,
+                                                        source: s,
+                                                        license: s ? asImageLicense(s.license) : '',
+                                                        // license: s.license,
+                                                        licenselink: s ? s.licenselink : '',
+                                                        creator: s ? s.author : '',
+                                                    });
+                                                }}
+                                            />
+                                        )}
                                     />
                                 </Col>
                             </Row>
@@ -220,9 +180,9 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
                                 </Col>
                                 <Col>
                                     <select {...register('license')} className="form-control">
-                                        <option>{CC0}</option>
-                                        <option>{CCBY}</option>
-                                        <option>{ALLRIGHTS}</option>
+                                        <option>{ImageLicenseValues.PUBLIC_DOMAIN}</option>
+                                        <option>{ImageLicenseValues.CC_BY}</option>
+                                        <option>{ImageLicenseValues.ALL_RIGHTS}</option>
                                     </select>
                                     {errors.license && <span className="text-danger">{errors.license.message}</span>}
                                 </Col>

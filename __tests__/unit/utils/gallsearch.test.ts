@@ -7,7 +7,7 @@ import {
     GallIDApi,
     SearchQuery,
 } from '../../../libs/api/apitypes';
-import { checkGall, testables } from '../../../libs/utils/gallsearch';
+import { checkGall, testables } from '../../../libs/utils/gallsearch.ts';
 
 const { dontCare } = testables;
 
@@ -37,6 +37,7 @@ describe('checkGall tests', () => {
         images: [],
         datacomplete: false,
         places: [],
+        family: '',
     };
 
     const q: SearchQuery = {
@@ -52,6 +53,7 @@ describe('checkGall tests', () => {
         form: [],
         undescribed: false,
         place: [],
+        family: [''],
     };
 
     // helper to create test galls in the tests.

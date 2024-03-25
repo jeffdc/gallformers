@@ -13,7 +13,7 @@ const linkSource = (s: SourceApi) => {
     return (
         <>
             <Link key={s.id} href={`/source/${s.id}`}>
-                <a>{s.title.length > MAX_TITLE_LEN ? `${s.title.substring(0, MAX_TITLE_LEN)}...` : s.title}</a>
+                {s.title.length > MAX_TITLE_LEN ? `${s.title.substring(0, MAX_TITLE_LEN)}...` : s.title}
             </Link>
             <Edit id={s.id} type="source" />
         </>

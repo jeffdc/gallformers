@@ -1,13 +1,14 @@
 import * as E from 'fp-ts/lib/Either';
-import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
-import * as TA from 'fp-ts/lib/Task';
+import * as TA from 'fp-ts/lib/Task.js';
 import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth';
 import { ParsedUrlQuery } from 'querystring';
-import { logger } from '../utils/logger';
-import { DeleteResult } from './apitypes';
+import authOptions from '../../pages/api/auth/[...nextauth]';
+import { logger } from '../utils/logger.ts';
+import { DeleteResult } from './apitypes.js';
 
 /**
  *
@@ -21,7 +22,7 @@ export async function apiIdEndpoint<T>(
     fDelete: ((id: number) => TE.TaskEither<Error, DeleteResult>) | undefined = undefined,
     fGet: ((id: number) => TE.TaskEither<Error, T>) | undefined = undefined,
 ): Promise<void> {
-    const session = await getSession({ req });
+    const session = await getServerSession(req, res, authOptions);
     if (!session) {
         res.status(401).end();
     }
@@ -44,7 +45,7 @@ export async function apiIdEndpoint<T>(
             ),
             TE.fromEither,
             TE.flatten,
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
 
     if (req.method === 'GET' && fGet != undefined) {
@@ -62,7 +63,7 @@ export async function apiUpsertEndpoint<T, R>(
     fUpsert: (item: T) => TE.TaskEither<Error, R>,
     onComplete: (res: NextApiResponse) => (results: R) => TA.Task<never>,
 ): Promise<void> {
-    const session = await getSession({ req });
+    const session = await getServerSession(req, res, authOptions);
     if (!session) {
         res.status(401).end();
     }
@@ -72,13 +73,8 @@ export async function apiUpsertEndpoint<T, R>(
         msg: 'Can not upsert. No valid item provided in request body.',
     };
 
-    //JDC: added this to try and help figure out what is causing the weird crash that Chris triggers
-    logger.info(req, 'Upsert request');
-    logger.info(req.body, 'Upsert request body');
-
     //TODO - figure out how to make this type safe. Maybe need to have caller pass conversion f?
     const t = !req.body ? O.none : O.of(req.body as T);
-
     await pipe(
         t,
         O.map(fUpsert),
@@ -92,12 +88,7 @@ export async function apiUpsertEndpoint<T, R>(
         ),
         TE.fromEither,
         TE.flatten,
-        //JDC: added this to try and help figure out what is causing the weird crash that Chris triggers
-        TE.mapLeft((e) => {
-            logger.error(e, 'Failed doing upsert.');
-            return e;
-        }),
-        TE.fold(sendErrResponse(res), onComplete(res)),
+        TE.fold(sendErrorResponse(res), onComplete(res)),
     )();
 }
 
@@ -107,16 +98,16 @@ export async function apiSearchEndpoint<T>(
     dbSearch: (s: string) => TE.TaskEither<Error, T[]>,
 ) {
     const errMsg = (q: string) => (): TE.TaskEither<Err, unknown> => {
-        return TE.left({ status: 400, msg: `Failed to provide the ${q} d as a query param.` });
+        return TE.left({ status: 400, msg: `Failed to provide a value for ${q} as a query param. e.g., ?q=Andricus` });
     };
 
-    await pipe(
+    return await pipe(
         'q',
         getQueryParam(req),
         O.map(dbSearch),
         O.map(TE.mapLeft(toErr)),
         O.getOrElse(errMsg('q')),
-        TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+        TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
     )();
 }
 
@@ -182,11 +173,11 @@ export const getQueryParam =
         extractQueryParam(req.query, prop);
 
 /**
- * Send a 200 success repsonse as JSON.
+ * Send a 200 success response as JSON.
  * @param res
  * @returns we only have a return value to make it easier to compose in pipes. This function sends the requests without delay.
  */
-export const sendSuccResponse =
+export const sendSuccessResponse =
     (res: NextApiResponse) =>
     <T>(t: T): TA.Task<never> => {
         res.status(200).json(t);
@@ -198,7 +189,7 @@ export const sendSuccResponse =
  * @param res
  * @returns we only have a return value to make it easier to compose in pipes. This function sends the requests without delay.
  */
-export const sendErrResponse =
+export const sendErrorResponse =
     (res: NextApiResponse) =>
     (e: Err): TA.Task<never> => {
         logger.error(e);
@@ -207,7 +198,7 @@ export const sendErrResponse =
     };
 
 /**
- * Type used for representing Repsonse failures back to the client.
+ * Type used for representing Response failures back to the client.
  */
 export type Err = {
     status: number;

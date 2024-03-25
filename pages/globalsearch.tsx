@@ -1,21 +1,20 @@
-import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
+import { pipe } from 'fp-ts/lib/function';
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
-import Image from 'next/image';
+import Image from 'next/image.js';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
 import DataTable from '../components/DataTable';
 import { extractQueryParam } from '../libs/api/apipage';
-import { PlaceNoTreeApi } from '../libs/api/apitypes';
-import { TaxonomyEntryNoParent } from '../libs/api/taxonomy';
-import { globalSearch, GlobalSearchResults, TinySource, TinySpecies } from '../libs/db/search';
-import { EntryLinked } from '../libs/pages/glossary';
+import { PlaceNoTreeApi, TaxonomyEntryNoParent } from '../libs/api/apitypes';
+import { GlobalSearchResults, TinySource, TinySpecies, globalSearch } from '../libs/db/search.ts';
+import { EntryLinked } from '../libs/pages/glossary.ts';
 import { formatWithDescription } from '../libs/pages/renderhelpers';
 import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
-import { logger } from '../libs/utils/logger';
+import { logger } from '../libs/utils/logger.ts';
 import { capitalizeFirstLetter, mightFail } from '../libs/utils/util';
 
 type SearchResultItem = {
@@ -37,21 +36,21 @@ type Props = {
 const imageForType = (i: SearchResultItem) => {
     switch (i.type) {
         case 'gall':
-            return <Image src="/images/cynipid_R.svg" alt="gallformer" aria-label="gallformer" width="45px" height="45px" />;
+            return <Image src="/images/cynipid_R.svg" alt="gallformer" aria-label="gallformer" width="45" height="45" />;
         case 'plant':
-            return <Image src="/images/host.svg" alt="plant" aria-label="plant" width="25px" height="25px" />;
+            return <Image src="/images/host.svg" alt="plant" aria-label="plant" width="25" height="25" />;
         case 'entry':
-            return <Image src="/images/entry.svg" alt="glossary entry" aria-label="glossary entry" width="25px" height="25px" />;
+            return <Image src="/images/entry.svg" alt="glossary entry" aria-label="glossary entry" width="25" height="25" />;
         case 'source':
-            return <Image src="/images/source.svg" alt="source" aria-label="source" width="25px" height="25px" />;
+            return <Image src="/images/source.svg" alt="source" aria-label="source" width="25" height="25" />;
         case 'genus':
-            return <Image src="/images/taxon.svg" alt="genus" aria-label="genus" width="25px" height="25px" />;
+            return <Image src="/images/taxon.svg" alt="genus" aria-label="genus" width="25" height="25" />;
         case 'section':
-            return <Image src="/images/taxon.svg" alt="section" aria-label="section" width="25px" height="25px" />;
+            return <Image src="/images/taxon.svg" alt="section" aria-label="section" width="25" height="25" />;
         case 'family':
-            return <Image src="/images/taxon.svg" alt="family" aria-label="family" width="25px" height="25px" />;
+            return <Image src="/images/taxon.svg" alt="family" aria-label="family" width="25" height="25" />;
         case 'place':
-            return <Image src="/images/place.svg" alt="place" aria-label="place" width="25px" height="25px" />;
+            return <Image src="/images/place.svg" alt="place" aria-label="place" width="25" height="25" />;
         default:
             return <></>;
     }
@@ -62,59 +61,35 @@ const linkItem = (i: SearchResultItem) => {
         case 'gall':
             return (
                 <Link href={`/gall/${i.id}`}>
-                    <a>
-                        <em>{formatWithDescription(i.name, i.aliases, true)}</em>
-                    </a>
+                    <em>{formatWithDescription(i.name, i.aliases, true)}</em>
                 </Link>
             );
         case 'plant':
             return (
                 <Link href={`/host/${i.id}`}>
-                    <a>
-                        <em>{formatWithDescription(i.name, i.aliases, true)}</em>
-                    </a>
+                    <em>{formatWithDescription(i.name, i.aliases, true)}</em>
                 </Link>
             );
         case 'entry':
-            return (
-                <Link href={`/glossary#${i.name.toLocaleLowerCase()}`}>
-                    <a>{i.name}</a>
-                </Link>
-            );
+            return <Link href={`/glossary#${i.name.toLocaleLowerCase()}`}>{i.name}</Link>;
         case 'source':
-            return (
-                <Link href={`/source/${i.id}`}>
-                    <a>{i.name}</a>
-                </Link>
-            );
+            return <Link href={`/source/${i.id}`}>{i.name}</Link>;
         case 'genus':
             return (
                 <Link href={`/genus/${i.id}`}>
-                    <a>
-                        <em>{`Genus ${formatWithDescription(i.name, i.aliases, true)}`}</em>
-                    </a>
+                    <em>{`Genus ${formatWithDescription(i.name, i.aliases, true)}`}</em>
                 </Link>
             );
         case 'section':
             return (
                 <Link href={`/section/${i.id}`}>
-                    <a>
-                        <em>{`Section ${formatWithDescription(i.name, i.aliases, true)}`}</em>
-                    </a>
+                    <em>{`Section ${formatWithDescription(i.name, i.aliases, true)}`}</em>
                 </Link>
             );
         case 'family':
-            return (
-                <Link href={`/family/${i.id}`}>
-                    <a>{`Family ${i.name}`}</a>
-                </Link>
-            );
+            return <Link href={`/family/${i.id}`}>{`Family ${i.name}`}</Link>;
         case 'place':
-            return (
-                <Link href={`/place/${i.id}`}>
-                    <a>{i.name}</a>
-                </Link>
-            );
+            return <Link href={`/place/${i.id}`}>{i.name}</Link>;
         default:
             return <></>;
     }

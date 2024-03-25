@@ -1,13 +1,8 @@
-import { hasProp } from '../libs/utils/util';
-import { WithID } from '../libs/utils/types';
 import { DeleteResult } from '../libs/api/apitypes';
-import { logger } from '../libs/utils/logger';
-import { TypeaheadCustomOption } from '../components/Typeahead';
-
-export type AdminFormFields<T> = {
-    mainField: T[] | TypeaheadCustomOption[];
-    del: boolean;
-};
+import { logger } from '../libs/utils/logger.ts';
+import { WithID } from '../libs/utils/types';
+import { hasProp } from '../libs/utils/util';
+import { AdminFormFields } from './useadmin.tsx';
 
 /**
  * The type returned by the hook.
@@ -28,13 +23,13 @@ export type UseAPIsType<T, U> = {
 
 /**
  * A hook to make implementing the admin forms easier. The hook handles all of the plumbing of doing a delete or an upsert
- * with minimal fuss from the caller of the hook. The prerequsites are:
+ * with minimal fuss from the caller of the hook. The prerequisites are:
  * 1) have a type defined that extends AdminFormFields (this must be same type passed to the useForm hook). This type
  * should exclude the id (if present in T).
  * 2) have a "key" field in the form that takes an object type (T). This is the field that is the key for insert vs update.
  * This field *must* be named 'mainField' when defining the form. Its types is bound when you satisfy prerequisite #1.
  *
- * @param keyProp the name of the property within T that is contains the actual value that is displaed to the user in the
+ * @param keyProp the name of the property within T that is contains the actual value that is displayed to the user in the
  *  form. This name is also what gets bound by the Typeahead component to new items which in turn comes from the 'labelKey'
  *  that is passed to the typeahead.
  * @param delEndpoint the url path fragment to the delete API for @T
@@ -65,21 +60,12 @@ export const useAPIs = <T extends WithID, U>(
                     const result: DeleteResult = await res.json();
                     postDelete(value.id, result);
                 } else {
-                    throw new Error(await res.text());
+                    const txt = await res.text();
+                    throw new Error(`code: ${res.status} err: ${txt}`);
                 }
             } else {
-                let updated: U;
-                if (hasProp(value, 'customOption')) {
-                    const v = value as TypeaheadCustomOption;
-                    // extract the "key" form value from the object (the typeahead component forces the name of the key
-                    // to match the 'labelKey' that is used to extract the options. but there is no way to bind this
-                    // until runtime so we can not do this in a type safe way.)
-                    const keyFieldVal = v[keyProp as keyof TypeaheadCustomOption] as string;
-                    updated = convertFieldsToUpsert(data, keyFieldVal.trim(), -1);
-                } else {
-                    const keyFieldVal = value[keyProp] as unknown as string;
-                    updated = convertFieldsToUpsert(data, keyFieldVal.trim(), value.id);
-                }
+                const keyFieldVal = value[keyProp] as unknown as string;
+                const updated = convertFieldsToUpsert(data, keyFieldVal.trim(), value.id);
                 const res = await fetch(upsertEndpoint, {
                     method: 'POST',
                     headers: {
@@ -91,13 +77,18 @@ export const useAPIs = <T extends WithID, U>(
                 if (res.status === 200) {
                     postUpdate(res);
                 } else {
-                    throw new Error(await res.text());
+                    const txt = await res.text();
+                    throw new Error(`code: ${res.status} err: ${txt}`);
                 }
             }
         } catch (e) {
-            logger.error(e);
+            const err = `Failed with endpoint "${data.del ? 'delete: ' + delEndpoint : 'upsert: ' + upsertEndpoint}". ${
+                delQueryString ? 'delQueryString: ' + delEndpoint : ''
+            } ${e}`;
+
+            logger.error(err);
             throw new Error(
-                `Failed to update/delete data. Check the console and open a new issue in Github copying any errors seen in the console as well as info about what you were doing when this occurred.`,
+                `Failed to update/delete data. Check the console and open a new issue in Github copying any errors seen in the console as well as info about what you were doing when this occurred. \n${err}`,
             );
         }
     };

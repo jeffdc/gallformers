@@ -1,7 +1,6 @@
 import { useSession } from 'next-auth/react';
 import Head from 'next/head';
 import Link from 'next/link';
-import React from 'react';
 import { Col, ListGroup, ListGroupItem, Row } from 'react-bootstrap';
 import Auth, { superAdmins } from '../../components/auth';
 
@@ -87,8 +86,8 @@ const Admin = (): JSX.Element => {
                         . If the issue is critical or you are not sure that it is an issue, then reach out on{' '}
                         <a href="https://gallformerdat-m1g8137.slack.com/archives/C01B319JAG6" target="_blank" rel="noreferrer">
                             Slack
-                        </a>
-                        .
+                        </a>{' '}
+                        or <a href="https://discord.gg/p99hPYy6bH">Discord</a>.
                     </Col>
                 </Row>
             </div>

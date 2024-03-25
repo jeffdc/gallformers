@@ -1,5 +1,5 @@
-import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
 import { Badge, OverlayTrigger, Popover } from 'react-bootstrap';
 import { ConfirmationOptions } from '../components/confirmationdialog';
 import { RenameEvent } from '../components/editname';
@@ -7,15 +7,17 @@ import {
     AbundanceApi,
     AliasApi,
     EmptyAbundance,
-    GallTaxon,
-    HostTaxon,
+    FGS,
     SCIENTIFIC_NAME,
     SpeciesApi,
     SpeciesUpsertFields,
+    TaxonCodeValues,
+    TaxonomyEntry,
+    TaxonomyEntryNoParent,
+    TaxonomyTypeValues,
 } from '../libs/api/apitypes';
-import { FAMILY, FGS, GENUS, TaxonomyEntry, TaxonomyEntryNoParent } from '../libs/api/taxonomy';
 import { extractGenus } from '../libs/utils/util';
-import { AdminFormFields } from './useAPIs';
+import { AdminFormFields } from './useadmin';
 
 export const SpeciesNamingHelp = (): JSX.Element => (
     <OverlayTrigger
@@ -105,27 +107,29 @@ export type SpeciesFormFields<T> = AdminFormFields<T> & {
     aliases: AliasApi[];
 };
 
-export type UseSpecies<T extends SpeciesApi> = {
+export type UseSpecies<T extends SpeciesApi, F extends SpeciesFormFields<T>> = {
     renameSpecies: (s: T, e: RenameEvent, confirm: (options: ConfirmationOptions) => Promise<void>) => Promise<T>;
-    createNewSpecies: (name: string, taxon: typeof HostTaxon | typeof GallTaxon) => SpeciesApi;
+    createNewSpecies: (name: string, taxon: TaxonCodeValues) => SpeciesApi;
     updatedSpeciesFormFields: (s: T | undefined) => SpeciesFormFields<T>;
-    toSpeciesUpsertFields: (fields: SpeciesFormFields<T>, name: string, id: number) => SpeciesUpsertFields;
+    toSpeciesUpsertFields: (fields: F, name: string, id: number) => SpeciesUpsertFields;
 };
 
-const useSpecies = <T extends SpeciesApi>(genera: TaxonomyEntry[]): UseSpecies<T> => {
+const useSpecies = <T extends SpeciesApi, F extends SpeciesFormFields<T>>(genera: TaxonomyEntry[]): UseSpecies<T, F> => {
     const fgsFromName = (name: string): FGS => {
         const genusName = extractGenus(name);
         const genus = genera.find((g) => g.name.localeCompare(genusName) == 0);
         const family = genus?.parent ? pipe(genus.parent, O.getOrElseW(constant(undefined))) : undefined;
 
         return {
-            family: family ? family : { id: -1, description: '', name: '', type: FAMILY },
-            genus: genus ? { ...genus } : { id: -1, description: '', name: genusName, type: GENUS },
+            family: family ? family : { id: -1, description: '', name: '', type: TaxonomyTypeValues.FAMILY, parent: O.none },
+            genus: genus
+                ? { ...genus }
+                : { id: -1, description: '', name: genusName, type: TaxonomyTypeValues.GENUS, parent: O.none },
             section: O.none,
         };
     };
 
-    const createNewSpecies = (name: string, taxon: typeof HostTaxon | typeof GallTaxon): SpeciesApi => ({
+    const createNewSpecies = (name: string, taxon: TaxonCodeValues): SpeciesApi => ({
         id: -1,
         name: name,
         abundance: O.none,
@@ -157,7 +161,8 @@ const useSpecies = <T extends SpeciesApi>(genera: TaxonomyEntry[]): UseSpecies<T
                             id: -1,
                             description: '',
                             name: newGenus,
-                            type: GENUS,
+                            type: TaxonomyTypeValues.GENUS,
+                            parent: O.of(s.fgs.family),
                         };
                         if (e.addAlias) {
                             if (e.old == undefined) throw new Error('Trying to add rename but old name is missing?!');
@@ -192,6 +197,13 @@ const useSpecies = <T extends SpeciesApi>(genera: TaxonomyEntry[]): UseSpecies<T
         return s;
     };
 
+    // const stripParent = (te: TaxonomyEntry): TaxonomyEntryNoParent => ({
+    //     id: te.id,
+    //     name: te.name,
+    //     type: te.type,
+    //     description: te.description,
+    // });
+
     const updatedSpeciesFormFields = (s: T | undefined): SpeciesFormFields<T> => {
         if (s != undefined) {
             return {
@@ -216,9 +228,9 @@ const useSpecies = <T extends SpeciesApi>(genera: TaxonomyEntry[]): UseSpecies<T
         };
     };
 
-    const toSpeciesUpsertFields = (fields: SpeciesFormFields<T>, name: string, id: number): SpeciesUpsertFields => {
-        const family = { ...fields.family[0], parent: O.none };
-        const genus = { ...fields.genus[0], parent: O.of(family) };
+    const toSpeciesUpsertFields = (fields: F, name: string, id: number): SpeciesUpsertFields => {
+        const family: TaxonomyEntry = { ...fields.family[0], parent: O.none };
+        const genus: TaxonomyEntry = { ...fields.genus[0], parent: O.of(family) };
 
         return {
             abundance: fields.abundance.length > 0 ? fields.abundance[0].abundance : undefined,

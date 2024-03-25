@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { ComposableMap, Geographies, Geography, ProjectionConfig, ZoomableGroup } from 'react-simple-maps';
 // needed as ReactTooltip does not play nicely with SSR. See: https://github.com/wwayne/react-tooltip/issues/675
-import dynamic from 'next/dynamic';
+// import dynamic from 'next/dynamic';
+import { Tooltip } from 'react-tooltip';
 
-const ReactTooltip = dynamic(() => import('react-tooltip'), {
-    ssr: false,
-});
+// const ReactTooltip = dynamic(() => import('react-tooltip'), {
+//     ssr: false,
+// });
 
 type Props = {
     range: Set<string>;
@@ -56,9 +57,7 @@ const RangeMap = ({ range }: Props): JSX.Element => {
                     </Geographies>
                 </ZoomableGroup>
             </ComposableMap>
-            <ReactTooltip type="dark" textColor="white">
-                {tooltipContent}
-            </ReactTooltip>
+            <Tooltip variant="dark" /*textColor="white"*/>{tooltipContent}</Tooltip>
         </>
     );
 };

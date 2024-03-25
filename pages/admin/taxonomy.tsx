@@ -1,48 +1,44 @@
 import axios from 'axios';
-import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { useEffect, useState } from 'react';
 import { Button, Col, Form, FormGroup, Row } from 'react-bootstrap';
 import 'react-simple-tree-menu/dist/main.css';
-import * as yup from 'yup';
 import EditableDataTable, { EditableTableColumn } from '../../components/EditableDataTable';
 import { RenameEvent } from '../../components/editname';
 import MoveFamily, { MoveEvent } from '../../components/movefamily';
-import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields } from '../../hooks/useAPIs';
+import useAdmin, { AdminFormFields } from '../../hooks/useadmin';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { ALL_FAMILY_TYPES } from '../../libs/api/apitypes';
-import { EMPTY_GENUS, FAMILY, FamilyUpsertFields, FamilyWithGenera, GeneraMoveFields, Genus } from '../../libs/api/taxonomy';
+import {
+    ALL_FAMILY_TYPES,
+    EMPTY_GENUS,
+    FamilyAPI,
+    FamilyUpsertFields,
+    GeneraMoveFields,
+    Genus,
+    TaxonomyTypeValues,
+} from '../../libs/api/apitypes';
 import { familyById } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
 import { TABLE_CUSTOM_STYLES } from '../../libs/utils/DataTableConstants';
 import { genOptions } from '../../libs/utils/forms';
 import { mightFailWithArray } from '../../libs/utils/util';
 
-const schema = yup.object().shape({
-    // type-coverage:ignore-next-line
-    mainField: yup.mixed().required(),
-    description: yup.string().required(),
-});
-
-// We have to remove the parent property as the Form library can not handle circular references in the data.
-type TaxFamily = Omit<FamilyWithGenera, 'parent'>;
-
-type FormFields = AdminFormFields<TaxFamily> & Pick<TaxFamily, 'description' | 'genera'>;
+type FormFields = AdminFormFields<FamilyAPI> & Pick<FamilyAPI, 'description' | 'genera'>;
 
 type Props = {
     id: string;
-    fs: FamilyWithGenera[];
+    fs: FamilyAPI[];
 };
 
-const renameFamily = async (s: TaxFamily, e: RenameEvent) => ({
+const renameFamily = async (s: FamilyAPI, e: RenameEvent) => ({
     ...s,
     name: e.new,
 });
 
-const updatedFormFields = async (fam: TaxFamily | undefined): Promise<FormFields> => {
+const updatedFormFields = async (fam: FamilyAPI | undefined): Promise<FormFields> => {
     if (fam != undefined) {
         return {
             mainField: [fam],
@@ -60,22 +56,11 @@ const updatedFormFields = async (fam: TaxFamily | undefined): Promise<FormFields
     };
 };
 
-const toUpsertFields = (fields: FormFields, name: string, id: number): FamilyUpsertFields => {
-    return {
-        ...fields,
-        name: name,
-        type: 'family',
-        id: id,
-        description: fields.description ?? '',
-        genera: fields.genera ?? [],
-    };
-};
-
-const createNewFamily = (name: string): TaxFamily => ({
+const createNewFamily = (name: string): FamilyAPI => ({
     name: name,
     description: '',
     id: -1,
-    type: FAMILY,
+    type: TaxonomyTypeValues.FAMILY,
     genera: [],
 });
 
@@ -97,55 +82,56 @@ const columns: EditableTableColumn<Genus>[] = [
         editKey: 'description',
     },
 ];
+const keyFieldName = 'name';
 
 const DELETE_CONFIRMATION_MSG = `The selected genera, ALL of the species in the genera, and all related data will 
     be deleted. Are you sure you want to do this? The change will not be made and saved until you Submit the 
     changes on the main page.`;
 
 const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
+    const [genera, setGenera] = useState<Genus[]>([]);
+    const [showMoveFamily, setShowMoveFamily] = useState(false);
+    const [generaToMove, setGeneraToMove] = useState<Genus[]>([]);
+
+    const toUpsertFields = (fields: FormFields, name: string, id: number): FamilyUpsertFields => {
+        return {
+            ...fields,
+            name: name,
+            type: TaxonomyTypeValues.FAMILY,
+            id: id,
+            description: fields.description ?? '',
+            genera: genera ?? [],
+        };
+    };
+
     const {
-        data,
-        setData,
+        data: families,
+        setData: setFamilies,
         selected,
-        setSelected,
-        showRenameModal,
-        setShowRenameModal,
-        error,
-        setError,
-        deleteResults,
-        setDeleteResults,
         renameCallback,
         nameExists,
-        form,
-        formSubmit,
-        mainField,
-        deleteButton,
-        isSuperAdmin,
+        ...adminForm
     } = useAdmin(
         'Family',
+        keyFieldName,
         id,
         renameFamily,
         toUpsertFields,
         {
-            keyProp: 'name',
             delEndpoint: '/api/taxonomy/family/',
             upsertEndpoint: '/api/taxonomy/family/upsert',
             nameExistsEndpoint: (s: string) => `/api/taxonomy/family?name=${s}`,
         },
-        schema,
         updatedFormFields,
         false,
         createNewFamily,
         fs,
     );
 
-    const [genera, setGenera] = useState<Genus[]>([]);
-    const [showMoveFamily, setShowMoveFamily] = useState(false);
-    const [generaToMove, setGeneraToMove] = useState<Genus[]>([]);
-
     const updateGeneraFromTable = (genera: Genus[]) => {
         if (selected) {
-            setSelected({ ...selected, genera: genera });
+            // adminForm.setSelected({ ...selected, genera: genera });
+            setGenera(genera);
         }
     };
 
@@ -164,7 +150,7 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
         };
 
         axios
-            .post<FamilyWithGenera[]>('/api/taxonomy/genus/move', {
+            .post<FamilyAPI[]>('/api/taxonomy/genus/move', {
                 headers: {
                     'Content-Type': 'application/json',
                 },
@@ -172,8 +158,8 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
             })
             .then((res) => {
                 const families = res.data;
-                setData(families);
-                setSelected(families.find((f) => f.id === selected.id));
+                setFamilies(families);
+                adminForm.setSelected(families.find((f) => f.id === selected.id));
                 setGeneraToMove([]);
             })
             .catch((e) => {
@@ -185,14 +171,14 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
             });
     };
 
+    // Handle when selected or data changes. Need to update the genera list. This is
     useEffect(() => {
         const updateGenera = async () => {
             if (selected) {
-                if (!data.find((s) => s.id == selected.id)) {
-                    return [];
+                if (!families.find((s) => s.id == selected.id)) {
+                    setGenera([]);
                 }
-
-                return axios
+                await axios
                     .get<Genus[]>(`/api/taxonomy/genus?famid=${selected.id}`)
                     .then((res) => setGenera(res.data))
                     .catch((e) => {
@@ -203,14 +189,14 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
         };
 
         updateGenera();
-    }, [data, selected]);
+    }, [families, selected]);
 
     return (
         <>
             {showMoveFamily && selected && (
                 <MoveFamily
                     genera={generaToMove}
-                    families={data}
+                    families={families}
                     showModal={showMoveFamily}
                     setShowModal={setShowMoveFamily}
                     moveCallback={move}
@@ -219,29 +205,30 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
 
             <Admin
                 type="Taxonomy"
-                keyField="name"
+                keyField={keyFieldName}
                 editName={{ getDefault: () => selected?.name, renameCallback: renameCallback, nameExistsCallback: nameExists }}
-                setShowModal={setShowRenameModal}
-                showModal={showRenameModal}
-                setError={setError}
-                error={error}
-                setDeleteResults={setDeleteResults}
-                deleteResults={deleteResults}
                 selected={selected}
+                {...adminForm}
+                deleteButton={adminForm.deleteButton(
+                    'Caution. If there are any species (galls or hosts) assigned to this Family they too will be PERMANENTLY deleted.',
+                    true,
+                )}
+                saveButton={adminForm.saveButton()}
+                superAdmin={true}
             >
-                <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
+                <>
                     <h4>Manage Taxonomy</h4>
                     <Row className="my-1">
                         <Col>
                             <Form.Label>Family Name:</Form.Label>
-                            {mainField('name', 'Family', { searchEndpoint: (s) => `/api/taxonomy/family?q=${s}` })}
+                            {adminForm.mainField('Family', { searchEndpoint: (s) => `/api/taxonomy/family?q=${s}` })}
                         </Col>
                         <Col>
                             <Form.Label>Description:</Form.Label>
-                            <select {...form.register('description')} className="form-control" disabled={!selected}>
+                            <select {...adminForm.form.register('description')} className="form-control" disabled={!selected}>
                                 {genOptions(ALL_FAMILY_TYPES)}
                             </select>
-                            {form.formState.errors.description && (
+                            {adminForm.form.formState.errors.description && (
                                 <span className="text-danger">You must provide the description.</span>
                             )}
                         </Col>
@@ -249,7 +236,12 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
                     <Row>
                         {selected && (
                             <Col>
-                                <Button variant="secondary" size="sm" className="button" onClick={() => setShowRenameModal(true)}>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className="button"
+                                    onClick={() => adminForm.setShowRenameModal(true)}
+                                >
                                     Rename
                                 </Button>
                             </Col>
@@ -279,21 +271,7 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
                         />
                         <hr />
                     </Row>
-                    <Row>
-                        <Col xs={2} className="me-3">
-                            <Button variant="primary" type="submit" value="Submit" disabled={!selected}>
-                                Submit
-                            </Button>
-                        </Col>
-                        <Col>
-                            {isSuperAdmin
-                                ? deleteButton(
-                                      'Caution. If there are any species (galls or hosts) assigned to this Family they too will be deleted.',
-                                  )
-                                : 'If you need to delete a Family please contact Adam or Jeff on Slack.'}
-                        </Col>
-                    </Row>
-                </form>
+                </>
             </Admin>
         </>
     );
@@ -304,8 +282,8 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
     const fs = pipe(
         id,
         O.map(parseInt),
-        O.map((id) => mightFailWithArray<FamilyWithGenera>()(familyById(id))),
-        O.getOrElse(constant(Promise.resolve(Array<FamilyWithGenera>()))),
+        O.map((id) => mightFailWithArray<FamilyAPI>()(familyById(id))),
+        O.getOrElse(constant(Promise.resolve(Array<FamilyAPI>()))),
     );
 
     return {

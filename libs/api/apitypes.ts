@@ -2,104 +2,9 @@
  * Types for calling the APIs. These are to be used by browser code when it calls the APIs so all database stuff
  * must stay out of here.
  */
-import { alias } from '@prisma/client';
+import * as Eq from 'fp-ts/lib/Eq.js';
 import * as O from 'fp-ts/lib/Option';
-import * as Eq from 'fp-ts/lib/Eq';
 import { Option } from 'fp-ts/lib/Option';
-import { FGS } from './taxonomy';
-
-export const GallTaxon = 'gall';
-export const HostTaxon = 'plant';
-
-export type DetachableApi = {
-    id: number;
-    value: DetachableValues;
-};
-
-export const DetachableNone: DetachableApi = {
-    id: 0,
-    value: '',
-};
-
-export const DetachableIntegral: DetachableApi = {
-    id: 1,
-    value: 'integral',
-};
-
-export const DetachableDetachable: DetachableApi = {
-    id: 2,
-    value: 'detachable',
-};
-
-export const DetachableBoth: DetachableApi = {
-    id: 3,
-    value: 'both',
-};
-
-export const Detachables = [DetachableNone, DetachableIntegral, DetachableDetachable, DetachableBoth];
-export type DetachableValues = '' | 'integral' | 'detachable' | 'both';
-
-// there has got to be a better way of doing this...
-export const detachableFromString = (s: string): DetachableApi => {
-    switch (s) {
-        case '':
-            return DetachableNone;
-        case 'integral':
-            return DetachableIntegral;
-        case 'detachable':
-            return DetachableDetachable;
-        case 'both':
-            return DetachableBoth;
-        default:
-            console.error(`Received invalid value '${s}' for Detachable.`);
-            return DetachableNone;
-    }
-};
-
-export const detachableFromId = (id: null | undefined | number): DetachableApi => {
-    if (id == undefined || id == null) return DetachableNone;
-
-    const d = Detachables.find((d) => d.id === id);
-    if (d == undefined) {
-        throw new Error(`Received invalid id '${id}' for Detachable.`);
-    }
-    return d;
-};
-
-/**
- *
- */
-export type SearchQuery = {
-    detachable: DetachableApi[];
-    alignment: string[];
-    walls: string[];
-    locations: string[];
-    textures: string[];
-    color: string[];
-    season: string[];
-    shape: string[];
-    cells: string[];
-    form: string[];
-    undescribed: boolean;
-    place: string[];
-    family: string[];
-};
-
-export const EMPTYSEARCHQUERY: SearchQuery = {
-    detachable: [DetachableNone],
-    alignment: [],
-    walls: [],
-    locations: [],
-    textures: [],
-    color: [],
-    shape: [],
-    cells: [],
-    season: [],
-    form: [],
-    undescribed: false,
-    place: [],
-    family: [],
-};
 
 export type Deletable = {
     delete?: boolean;
@@ -176,10 +81,92 @@ export type GallUpsertFields = SpeciesUpsertFields & {
     walls: number[];
     cells: number[];
     forms: number[];
-    detachable: DetachableValues;
+    detachable: DetachableApi;
     undescribed: boolean;
 };
 
+export type AbundanceApi = {
+    id: number;
+    abundance: string;
+    description: string;
+    reference: Option<string>;
+};
+// export const AbundanceApiSchema = t.type({
+//     id: t.number,
+//     abundance: t.string,
+//     description: t.string,
+//     reference: tt.option(t.string),
+// });
+
+export const EmptyAbundance: AbundanceApi = {
+    id: -1,
+    abundance: '',
+    description: '',
+    reference: O.none,
+};
+
+////////////////////////////////////////////////////////////////////
+// Place Schemas and Types
+
+// For now only these two until we support the Place hierarchy.
+export const PLACE_TYPES = ['state', 'province'];
+
+export const placeNoTreeApiEq: Eq.Eq<PlaceNoTreeApi> = {
+    equals: (a, b) => a.code === b.code,
+};
+
+// export const PlaceNoTreeApiSchema = t.type({
+//     id: t.number,
+//     name: t.string,
+//     code: t.string,
+//     type: t.string,
+// });
+
+// export type PlaceNoTreeApi = t.TypeOf<typeof PlaceNoTreeApiSchema>;
+export type PlaceNoTreeApi = {
+    id: number;
+    name: string;
+    code: string;
+    type: string;
+};
+
+export type PlaceNoTreeUpsertFields = PlaceNoTreeApi & Deletable;
+
+export type PlaceApi = PlaceNoTreeApi & {
+    parent: PlaceApi[];
+    children: PlaceApi[];
+};
+
+export type PlaceWithHostsApi = PlaceApi & {
+    hosts: HostSimple[];
+};
+
+////////////////////////////////////////////////////////////////////
+// SimpleSpecies Schema and Type
+export enum TaxonCodeValues {
+    GALL = 'gall',
+    PLANT = 'plant',
+}
+
+/** Given a string value, look up the proper TaxonCode. If the value is not one of the valid values then an error will be thrown. */
+export const taxonCodeAsStringToValue = (tc?: string | null): TaxonCodeValues => {
+    if (tc === TaxonCodeValues.GALL) {
+        return TaxonCodeValues.GALL;
+    } else if (tc === TaxonCodeValues.PLANT) {
+        return TaxonCodeValues.PLANT;
+    } else {
+        throw new Error(`Invalid TaxonCode value detected: '${tc}'.`);
+    }
+};
+
+export type SimpleSpecies = {
+    id: number;
+    taxoncode: TaxonCodeValues;
+    name: string;
+};
+
+////////////////////////////////////////////////////////////////////
+// Source Schemas and Types
 export type SourceApi = {
     id: number;
     title: string;
@@ -191,67 +178,181 @@ export type SourceApi = {
     license: string;
     licenselink: string;
 };
-
+export type SpeciesSourceNoSourceApi = {
+    id: number;
+    species_id: number;
+    source_id: number | null;
+    description: string;
+    useasdefault: number;
+    externallink: string;
+};
+export type SpeciesSourceApi = SpeciesSourceNoSourceApi & { source: SourceApi };
 export type SourceWithSpeciesApi = SourceApi & {
     species: SimpleSpecies[];
 };
-
 export type SourceWithSpeciesSourceApi = SourceApi & {
     speciessource: Omit<SpeciesSourceApi, 'source'>[];
 };
 
-export type SpeciesSourceApi = {
-    id: number;
-    species_id: number;
-    source_id: number;
-    description: string;
-    useasdefault: number;
-    externallink: string;
-    source: SourceApi;
-};
-
-export type GallHost = {
-    id: number;
-    name: string;
-    places: PlaceNoTreeApi[];
-};
-
-export type AbundanceApi = {
-    id: number;
-    abundance: string;
-    description: string;
-    reference: Option<string>;
-};
-export const EmptyAbundance: AbundanceApi = {
-    id: -1,
-    abundance: '',
-    description: '',
-    reference: O.none,
-};
-
-export type SimpleSpecies = {
-    id: number;
-    taxoncode: string;
-    name: string;
-};
+////////////////////////////////////////////////////////////////////
+// SpeciesSource Schemas and Types
 
 export type SpeciesWithPlaces = SimpleSpecies & {
     places: PlaceNoTreeApi[];
 };
 
+////////////////////////////////////////////////////////////////////////////////
+// Taxonomy Types
+/**
+ * There are three valid types in the taxonomy.
+ */
+export enum TaxonomyTypeValues {
+    FAMILY = 'family',
+    SECTION = 'section',
+    GENUS = 'genus',
+}
+// export const TaxonomyTypeSchema = fromEnum<TaxonomyTypeValues>('TaxonomyTypeValues', TaxonomyTypeValues);
+// export type TaxonomyType = t.TypeOf<typeof TaxonomyTypeSchema>;
+export type TaxonomyType = 'family' | 'section' | 'genus';
+export const asTaxonomyType = (possibleType?: string | null): TaxonomyType => {
+    if (possibleType === TaxonomyTypeValues.FAMILY) {
+        return TaxonomyTypeValues.FAMILY;
+    } else if (possibleType === TaxonomyTypeValues.SECTION) {
+        return TaxonomyTypeValues.SECTION;
+    } else if (possibleType === TaxonomyTypeValues.GENUS) {
+        return TaxonomyTypeValues.GENUS;
+    } else {
+        return TaxonomyTypeValues.FAMILY;
+    }
+};
+
+/**
+ * A general Taxonomy entry from the database. It can be recursive and this can lead to trouble with certain libraries etc.
+ * So look at @see {TaxonomyEntryNoParent} as well.
+ */
+export interface TaxonomyEntry {
+    id: number;
+    name: string;
+    type: TaxonomyType;
+    description: string;
+    parent: O.Option<TaxonomyEntry>;
+}
+
+export type TaxonomyEntryNoParent = {
+    id: number;
+    name: string;
+    type: TaxonomyType;
+    description: string;
+};
+
+export const EMPTY_TAXONOMYENTRY: TaxonomyEntry = {
+    description: '',
+    id: -1,
+    name: '',
+    type: TaxonomyTypeValues.FAMILY,
+    parent: O.none,
+};
+
+export const EMPTY_GENUS: TaxonomyEntry = { ...EMPTY_TAXONOMYENTRY, type: TaxonomyTypeValues.GENUS };
+
+export type FGS = {
+    family: TaxonomyEntry;
+    genus: TaxonomyEntry;
+    section: Option<TaxonomyEntry>;
+};
+
+export type Genus = TaxonomyEntryNoParent;
+
+export type FamilyAPI = TaxonomyEntryNoParent & {
+    genera: Genus[];
+};
+export type SectionApi = Omit<TaxonomyEntryNoParent, 'type'> & {
+    species: SimpleSpecies[];
+    aliases: AliasApi[];
+};
+/**
+ * The id should be set to any number less than 0 to indicate a new record.
+ */
+
+export type TaxonomyUpsertFields = TaxonomyEntry & {
+    species: number[];
+};
+
+export type FamilyUpsertFields = Omit<TaxonomyUpsertFields, 'species' | 'parent'> & {
+    genera: Genus[];
+};
+
+export type GeneraMoveFields = {
+    oldFamilyId: number;
+    newFamilyId: number;
+    genera: number[];
+};
+
+////////////////////////////////////////////////////////////////////////////////////
+// Image types
+export type ImageBase = {
+    default: boolean;
+    creator: string;
+    attribution: string;
+    caption: string;
+};
+
+export enum ImageLicenseValues {
+    NONE = '',
+    PUBLIC_DOMAIN = 'Public Domain / CC0',
+    CC_BY = 'CC-BY',
+    ALL_RIGHTS = 'All Rights Reserved',
+}
+export type ImageLicenseType = '' | 'Public Domain / CC0' | 'CC-BY' | 'All Rights Reserved';
+export const asImageLicense = (possibleLicense?: string | null): ImageLicenseType => {
+    if (possibleLicense === ImageLicenseValues.PUBLIC_DOMAIN) {
+        return ImageLicenseValues.PUBLIC_DOMAIN;
+    } else if (possibleLicense === ImageLicenseValues.CC_BY) {
+        return ImageLicenseValues.CC_BY;
+    } else if (possibleLicense === ImageLicenseValues.ALL_RIGHTS) {
+        return ImageLicenseValues.ALL_RIGHTS;
+    } else {
+        return ImageLicenseValues.NONE;
+    }
+};
+
+export type ImageSource = {
+    license: ImageLicenseType;
+    licenselink: string;
+    sourcelink: string;
+    // source: Option<SourceWithSpeciesSourceApi>;
+    source: SourceWithSpeciesSourceApi | null;
+    source_id: number | null;
+};
+
+export type ImageAdditional = {
+    id: number;
+    path: string;
+    uploader: string;
+    lastchangedby: string;
+    speciesid: number;
+    small: string;
+    medium: string;
+    large: string;
+    xlarge: string;
+    original: string;
+};
+
+export type ImageNoSourceApi = ImageBase & ImageAdditional;
+
+export type ImageApi = ImageNoSourceApi & ImageSource;
+
+export type ImagePaths = {
+    small: string[];
+    medium: string[];
+    large: string[];
+    xlarge: string[];
+    original: string[];
+};
+
 export type WithImages = {
     images: ImageApi[] | ImageNoSourceApi[];
 };
-
-export type SpeciesApi = SimpleSpecies &
-    WithImages & {
-        datacomplete: boolean;
-        abundance: Option<AbundanceApi>;
-        description: Option<string>; // to make the caller's life easier we will load the default if we can
-        speciessource: SpeciesSourceApi[];
-        aliases: AliasApi[];
-        fgs: FGS;
-    };
 
 export const COMMON_NAME = 'common';
 export const SCIENTIFIC_NAME = 'scientific';
@@ -269,6 +370,16 @@ export const EmptyAlias: AliasApi = {
     type: SCIENTIFIC_NAME,
     description: '',
 };
+
+export type SpeciesApi = SimpleSpecies &
+    WithImages & {
+        datacomplete: boolean;
+        abundance: Option<AbundanceApi>;
+        description: Option<string>; // to make the caller's life easier we will load the default if we can
+        speciessource: SpeciesSourceApi[];
+        aliases: AliasApi[];
+        fgs: FGS;
+    };
 
 export const FILTER_FIELD_ALIGNMENTS = 'alignments';
 export const FILTER_FIELD_CELLS = 'cells';
@@ -324,33 +435,50 @@ export type FilterField = {
     description: Option<string>;
 };
 
+export enum FilterFieldTypeValue {
+    ALIGNMENTS = 'alignments',
+    CELLS = 'cells',
+    COLORS = 'colors',
+    FORMS = 'forms',
+    LOCATIONS = 'locations',
+    SEASONS = 'seasons',
+    SHAPES = 'shapes',
+    TEXTURES = 'textures',
+    WALLS = 'walls',
+}
+
+export const asFilterType = (possibleFilterType?: string | null): FilterFieldTypeValue => {
+    if (possibleFilterType === FilterFieldTypeValue.ALIGNMENTS) {
+        return FilterFieldTypeValue.ALIGNMENTS;
+    } else if (possibleFilterType === FilterFieldTypeValue.CELLS) {
+        return FilterFieldTypeValue.CELLS;
+    } else if (possibleFilterType === FilterFieldTypeValue.COLORS) {
+        return FilterFieldTypeValue.COLORS;
+    } else if (possibleFilterType === FilterFieldTypeValue.FORMS) {
+        return FilterFieldTypeValue.FORMS;
+    } else if (possibleFilterType === FilterFieldTypeValue.LOCATIONS) {
+        return FilterFieldTypeValue.LOCATIONS;
+    } else if (possibleFilterType === FilterFieldTypeValue.SEASONS) {
+        return FilterFieldTypeValue.SEASONS;
+    } else if (possibleFilterType === FilterFieldTypeValue.SHAPES) {
+        return FilterFieldTypeValue.SHAPES;
+    } else if (possibleFilterType === FilterFieldTypeValue.TEXTURES) {
+        return FilterFieldTypeValue.TEXTURES;
+    } else if (possibleFilterType === FilterFieldTypeValue.WALLS) {
+        return FilterFieldTypeValue.WALLS;
+    } else {
+        return FilterFieldTypeValue.ALIGNMENTS;
+    }
+};
+
 export type FilterFieldWithType = FilterField & {
     fieldType: FilterFieldType;
 };
 
-// For now only these two until we support the Place hierarchy.
-export const PLACE_TYPES = ['state', 'province'];
-
-export const placeNoTreeApiEq: Eq.Eq<PlaceNoTreeApi> = {
-    equals: (a, b) => a.code === b.code,
-};
-
-export type PlaceNoTreeApi = {
+export type GallHost = {
     id: number;
     name: string;
-    code: string;
-    type: string;
-};
-
-export type PlaceNoTreeUpsertFields = PlaceNoTreeApi & Deletable;
-
-export type PlaceApi = PlaceNoTreeApi & {
-    parent: PlaceApi[];
-    children: PlaceApi[];
-};
-
-export type PlaceWithHostsApi = PlaceApi & {
-    hosts: HostSimple[];
+    places: PlaceNoTreeApi[];
 };
 
 export type RandomGall = {
@@ -382,43 +510,6 @@ export type GallIDApi = WithImages & {
     undescribed: boolean;
     walls: string[];
     family: string;
-};
-
-export type GallApi = SpeciesApi & {
-    gall: {
-        id: number;
-        gallalignment: FilterField[];
-        gallcells: FilterField[];
-        gallcolor: FilterField[];
-        gallseason: FilterField[];
-        detachable: DetachableApi;
-        gallshape: FilterField[];
-        gallwalls: FilterField[];
-        galltexture: FilterField[];
-        galllocation: FilterField[];
-        gallform: FilterField[];
-        undescribed: boolean;
-    };
-    hosts: GallHost[];
-    excludedPlaces: PlaceNoTreeApi[];
-};
-
-export type HostSimple = {
-    id: number;
-    name: string;
-    aliases: alias[];
-    datacomplete: boolean;
-    places: PlaceNoTreeApi[];
-};
-
-export type GallSimple = {
-    id: number;
-    name: string;
-};
-
-export type HostApi = SpeciesApi & {
-    galls: GallSimple[];
-    places: PlaceNoTreeApi[];
 };
 
 export type SourceUpsertFields = Deletable & {
@@ -461,57 +552,146 @@ export type GlossaryEntryUpsertFields = Deletable & {
     urls: string; // newline separated
 };
 
-export const NONE = '';
-export const CC0 = 'Public Domain / CC0';
-export const CCBY = 'CC-BY';
-export const ALLRIGHTS = 'All Rights Reserved';
+export enum DetachableValues {
+    NONE = '',
+    INTEGRAL = 'integral',
+    DETACHABLE = 'detachable',
+    BOTH = 'both',
+}
 
-export type LicenseType = typeof NONE | typeof CC0 | typeof CCBY | typeof ALLRIGHTS;
+export type DetachableApi = {
+    id: number;
+    value: DetachableValues;
+};
 
-export const asLicenseType = (l: string): LicenseType => {
-    // Seems like there should be a better way to handle this and maintain types.
-    switch (l) {
-        case NONE:
-            return NONE;
-        case CC0:
-            return CC0;
-        case CCBY:
-            return CCBY;
-        case ALLRIGHTS:
-            return ALLRIGHTS;
+export const DetachableNone: DetachableApi = {
+    id: 0,
+    value: DetachableValues.NONE,
+};
+
+export const DetachableIntegral: DetachableApi = {
+    id: 1,
+    value: DetachableValues.INTEGRAL,
+};
+
+export const DetachableDetachable: DetachableApi = {
+    id: 2,
+    value: DetachableValues.DETACHABLE,
+};
+
+export const DetachableBoth: DetachableApi = {
+    id: 3,
+    value: DetachableValues.BOTH,
+};
+
+export const Detachables = [DetachableNone, DetachableIntegral, DetachableDetachable, DetachableBoth];
+// there has got to be a better way of doing this...
+export const detachableFromString = (s: string): DetachableApi => {
+    switch (s) {
+        case DetachableValues.NONE:
+            return DetachableNone;
+        case DetachableValues.INTEGRAL:
+            return DetachableIntegral;
+        case DetachableValues.DETACHABLE:
+            return DetachableDetachable;
+        case DetachableValues.BOTH:
+            return DetachableBoth;
         default:
-            throw new Error(`Invalid license type: '${l}'.`);
+            console.error(`Received invalid value '${s}' for Detachable.`);
+            return DetachableNone;
     }
 };
 
-export type ImageNoSourceApi = {
+export const detachableFromId = (id: null | undefined | number): DetachableApi => {
+    if (id == undefined || id == null) return DetachableNone;
+
+    const d = Detachables.find((d) => d.id === id);
+    if (d == undefined) {
+        throw new Error(`Received invalid id '${id}' for Detachable.`);
+    }
+    return d;
+};
+
+export type HostSimple = {
     id: number;
-    attribution: string;
-    creator: string;
-    path: string;
-    uploader: string;
-    lastchangedby: string;
-    caption: string;
-    speciesid: number;
-    default: boolean;
-    small: string;
-    medium: string;
-    large: string;
-    xlarge: string;
-    original: string;
+    name: string;
+    aliases: AliasApi[];
+    datacomplete: boolean;
+    places: PlaceNoTreeApi[];
 };
 
-export type ImageApi = ImageNoSourceApi & {
-    license: LicenseType;
-    licenselink: string;
-    sourcelink: string;
-    source: Option<SourceWithSpeciesSourceApi>;
+export type GallSimple = {
+    id: number;
+    name: string;
 };
 
-export type ImagePaths = {
-    small: string[];
-    medium: string[];
-    large: string[];
-    xlarge: string[];
-    original: string[];
+export type HostApi = SpeciesApi & {
+    galls: GallSimple[];
+    places: PlaceNoTreeApi[];
+};
+export type GallPropertiesType = {
+    alignment: FilterField[];
+    cells: FilterField[];
+    color: FilterField[];
+    form: FilterField[];
+    season: FilterField[];
+    shape: FilterField[];
+    walls: FilterField[];
+    texture: FilterField[];
+    location: FilterField[];
+    detachable: DetachableApi;
+    undescribed: boolean;
+    hosts: GallHost[];
+};
+
+export type GallApi = SpeciesApi &
+    GallPropertiesType & {
+        gall_id: number;
+        excludedPlaces: PlaceNoTreeApi[];
+    };
+
+export type TaxSection = TaxonomyEntryNoParent & {
+    species: SimpleSpecies[];
+};
+
+/**
+ *
+ */
+export type SearchQuery = {
+    detachable: DetachableApi[];
+    alignment: string[];
+    walls: string[];
+    locations: string[];
+    textures: string[];
+    color: string[];
+    season: string[];
+    shape: string[];
+    cells: string[];
+    form: string[];
+    undescribed: boolean;
+    place: string[];
+    family: string[];
+};
+
+export const EMPTYSEARCHQUERY: SearchQuery = {
+    detachable: [DetachableNone],
+    alignment: [],
+    walls: [],
+    locations: [],
+    textures: [],
+    color: [],
+    shape: [],
+    cells: [],
+    season: [],
+    form: [],
+    undescribed: false,
+    place: [],
+    family: [],
+};
+
+export type Entry = {
+    id: number;
+    word: string;
+    definition: string;
+    urls: string; // /n separated
 };

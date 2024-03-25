@@ -1,0 +1,386 @@
+[
+  {
+    "name": "Alberta",
+    "id": "CA-AB",
+    "CNTRY": "Canada",
+    "TYPE": "Province"
+  },
+  {
+    "name": "British Columbia",
+    "id": "CA-BC",
+    "CNTRY": "Canada",
+    "TYPE": "Province"
+  },
+  {
+    "name": "Manitoba",
+    "id": "CA-MB",
+    "CNTRY": "Canada",
+    "TYPE": "Province"
+  },
+  {
+    "name": "New Brunswick",
+    "id": "CA-NB",
+    "CNTRY": "Canada",
+    "TYPE": "Province"
+  },
+  {
+    "name": "Newfoundland and Labrador",
+    "id": "CA-NL",
+    "CNTRY": "Canada",
+    "TYPE": "Province"
+  },
+  {
+    "name": "Nova Scotia",
+    "id": "CA-NS",
+    "CNTRY": "Canada",
+    "TYPE": "Province"
+  },
+  {
+    "name": "Northwest Territories",
+    "id": "CA-NT",
+    "CNTRY": "Canada",
+    "TYPE": "Territory"
+  },
+  {
+    "name": "Nunavut",
+    "id": "CA-NU",
+    "CNTRY": "Canada",
+    "TYPE": "Territory"
+  },
+  {
+    "name": "Ontario",
+    "id": "CA-ON",
+    "CNTRY": "Canada",
+    "TYPE": "Province"
+  },
+  {
+    "name": "Prince Edward Island",
+    "id": "CA-PE",
+    "CNTRY": "Canada",
+    "TYPE": "Province"
+  },
+  {
+    "name": "Quebec",
+    "id": "CA-QC",
+    "CNTRY": "Canada",
+    "TYPE": "Province"
+  },
+  {
+    "name": "Saskatchewan",
+    "id": "CA-SK",
+    "CNTRY": "Canada",
+    "TYPE": "Province"
+  },
+  {
+    "name": "Yukon",
+    "id": "CA-YT",
+    "CNTRY": "Canada",
+    "TYPE": "Territory"
+  },
+  {
+    "name": "Alaska",
+    "id": "US-AK",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Alabama",
+    "id": "US-AL",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Arkansas",
+    "id": "US-AR",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Arizona",
+    "id": "US-AZ",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "California",
+    "id": "US-CA",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Colorado",
+    "id": "US-CO",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Connecticut",
+    "id": "US-CT",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "District of Columbia",
+    "id": "US-DC",
+    "CNTRY": "United States of America",
+    "TYPE": "Federal District"
+  },
+  {
+    "name": "Delaware",
+    "id": "US-DE",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Florida",
+    "id": "US-FL",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Georgia",
+    "id": "US-GA",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Hawaii",
+    "id": "US-HI",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Iowa",
+    "id": "US-IA",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Idaho",
+    "id": "US-ID",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Illinois",
+    "id": "US-IL",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Indiana",
+    "id": "US-IN",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Kansas",
+    "id": "US-KS",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Kentucky",
+    "id": "US-KY",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Louisiana",
+    "id": "US-LA",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Massachusetts",
+    "id": "US-MA",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Maryland",
+    "id": "US-MD",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Maine",
+    "id": "US-ME",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Michigan",
+    "id": "US-MI",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Minnesota",
+    "id": "US-MN",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Missouri",
+    "id": "US-MO",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Mississippi",
+    "id": "US-MS",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Montana",
+    "id": "US-MT",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "North Carolina",
+    "id": "US-NC",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "North Dakota",
+    "id": "US-ND",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Nebraska",
+    "id": "US-NE",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "New Hampshire",
+    "id": "US-NH",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "New Jersey",
+    "id": "US-NJ",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "New Mexico",
+    "id": "US-NM",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Nevada",
+    "id": "US-NV",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "New York",
+    "id": "US-NY",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Ohio",
+    "id": "US-OH",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Oklahoma",
+    "id": "US-OK",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Oregon",
+    "id": "US-OR",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Pennsylvania",
+    "id": "US-PA",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Rhode Island",
+    "id": "US-RI",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "South Carolina",
+    "id": "US-SC",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "South Dakota",
+    "id": "US-SD",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Tennessee",
+    "id": "US-TN",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Texas",
+    "id": "US-TX",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Utah",
+    "id": "US-UT",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Virginia",
+    "id": "US-VA",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Vermont",
+    "id": "US-VT",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Washington",
+    "id": "US-WA",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Wisconsin",
+    "id": "US-WI",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "West Virginia",
+    "id": "US-WV",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  },
+  {
+    "name": "Wyoming",
+    "id": "US-WY",
+    "CNTRY": "United States of America",
+    "TYPE": "State"
+  }
+]

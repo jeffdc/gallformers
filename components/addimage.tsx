@@ -1,10 +1,9 @@
 import axios from 'axios';
-import * as O from 'fp-ts/lib/Option';
 import { useSession } from 'next-auth/react';
-import React, { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useState } from 'react';
 import { Alert, Col, ProgressBar, Row } from 'react-bootstrap';
-import toast from 'react-hot-toast';
-import { ImageApi } from '../libs/api/apitypes';
+import { toast } from 'react-hot-toast';
+import { ImageApi, ImageLicenseValues } from '../libs/api/apitypes';
 import { sessionUserOrUnknown } from '../libs/utils/util';
 
 type Props = {
@@ -49,10 +48,9 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                 const ext = file.name.split('.').pop();
                 const path = `gall/${id}/${id}_${t}_original.${ext}`;
                 const res = await fetch(`../api/images/uploadurl?path=${path}&mime=${file.type}`);
-                // this is a hack and something changed to put double quotes around the reponse
+                // this is a hack and something changed to put double quotes around the response
                 // i have no idea what and I am out of time trying to figure it out :(
                 const url = (await res.text()).split('"').join('');
-                console.log(`JDC: url: ${url}`);
 
                 // upload file
                 const resp = await axios
@@ -61,7 +59,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                             'Content-Type': file.type,
                         },
                         onUploadProgress: (e) =>
-                            setProgress(Math.round((100 * e.loaded) / e.total / filesRemaining) * uploadMaxPercent),
+                            setProgress(Math.round((100 * e.loaded) / (e.total ?? 4) / filesRemaining) * uploadMaxPercent),
                     })
                     .catch((e) => {
                         if (axios.isAxiosError(e)) {
@@ -100,11 +98,11 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                         id: -1,
                         attribution: '',
                         creator: '',
-                        license: '',
+                        license: ImageLicenseValues.NONE,
                         licenselink: '',
                         path: path,
                         sourcelink: '',
-                        source: O.none,
+                        source: null,
                         uploader: sessionUserOrUnknown(session?.user?.name),
                         lastchangedby: sessionUserOrUnknown(session?.user?.name),
                         speciesid: id,
@@ -115,13 +113,14 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                         large: '',
                         xlarge: '',
                         original: '',
+                        source_id: null,
                     });
                 }
             }
 
             if (!error) {
                 // update the database with the new image(s)
-                const dbres = await fetch('../api/images/upsert', {
+                const dbResponse = await fetch('../api/images/upsert', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -129,7 +128,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                     body: JSON.stringify(images),
                 });
 
-                const newImages: ImageApi[] = await dbres.json();
+                const newImages: ImageApi[] = await dbResponse.json();
 
                 //hack: add a delay here to hopefully give a chance for the image to be picked up by the CDN
                 const steps = 100;

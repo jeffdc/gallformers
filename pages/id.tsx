@@ -1,4 +1,3 @@
-import { yupResolver } from '@hookform/resolvers/yup';
 import { constant, constFalse, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import { GetServerSideProps } from 'next';
@@ -7,13 +6,12 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, Col, Container, Form, OverlayTrigger, Popover, Row } from 'react-bootstrap';
+import { Typeahead } from 'react-bootstrap-typeahead';
 import { Controller, useForm } from 'react-hook-form';
-import * as yup from 'yup';
 import Edit from '../components/edit';
 import InfoTip from '../components/infotip';
-import Typeahead from '../components/Typeahead';
 import { getQueryParams } from '../libs/api/apipage';
 import {
     DetachableApi,
@@ -24,11 +22,13 @@ import {
     FilterField,
     GallIDApi,
     HostSimple,
-    HostTaxon,
     PlaceApi,
     SearchQuery,
+    TaxonCodeValues,
+    TaxonomyEntry,
+    TaxonomyEntryNoParent,
+    TaxonomyTypeValues,
 } from '../libs/api/apitypes';
-import { SECTION, TaxonomyEntry, TaxonomyEntryNoParent } from '../libs/api/taxonomy';
 import {
     getAlignments,
     getCells,
@@ -41,10 +41,10 @@ import {
     getWalls,
 } from '../libs/db/filterfield';
 import { allHostsSimple } from '../libs/db/host';
-import { getPlaces } from '../libs/db/place';
+import { getPlaces } from '../libs/db/place.ts';
 import { allGenera, allSections } from '../libs/db/taxonomy';
 import { createSummary, defaultImage, formatWithDescription } from '../libs/pages/renderhelpers';
-import { checkGall, GALL_FORM, LEAF_ANYWHERE } from '../libs/utils/gallsearch';
+import { checkGall, GALL_FORM, LEAF_ANYWHERE } from '../libs/utils/gallsearch.ts';
 import { capitalizeFirstLetter, hasProp, mightFailWithArray } from '../libs/utils/util';
 
 type SearchFormHostField = {
@@ -75,28 +75,37 @@ type FilterFormFields = {
     family: string;
 };
 
-const invalidArraySelection = (arr: unknown[]) => {
-    return arr?.length === 0;
-};
+// const invalidArraySelection = (arr: unknown[]) => {
+//     return arr?.length === 0;
+// };
 
 const isTaxonomy = (o: unknown): o is TaxonomyEntryNoParent => hasProp(o, 'type');
 const isHost = (o: unknown): o is HostSimple => hasProp(o, 'datacomplete') && hasProp(o, 'aliases');
 
-const Schema = yup.object().shape(
-    {
-        host: yup.array().when('genus', {
-            is: invalidArraySelection,
-            then: yup.array().required('You must provide a search,'),
-            otherwise: yup.array(),
-        }),
-        genus: yup.array().when('host', {
-            is: invalidArraySelection,
-            then: yup.array().required('You must provide a search,'),
-            otherwise: yup.array(),
-        }),
-    },
-    [['host', 'genus']],
-);
+// const Schema = t.union([
+//     t.type({
+//         host: t.array(TaxonomyEntryNoParentSchema),
+//     }),
+//     t.type({
+//         genus: t.array(HostSimpleSchema),
+//     }),
+// ]);
+
+// const Schema = yup.object().shape(
+//     {
+//         host: yup.array().when('genus', {
+//             is: invalidArraySelection,
+//             then: yup.array().required('You must provide a search,'),
+//             otherwise: yup.array(),
+//         }),
+//         genus: yup.array().when('host', {
+//             is: invalidArraySelection,
+//             then: yup.array().required('You must provide a search,'),
+//             otherwise: yup.array(),
+//         }),
+//     },
+//     [['host', 'genus']],
+// );
 
 type Props = {
     hostOrTaxon: TaxonomyEntryNoParent | HostSimple | undefined | null;
@@ -180,11 +189,11 @@ const IDGall = (props: Props): JSX.Element => {
 
     // this is the search form on species or genus
     const {
-        control,
         formState: { errors },
+        control: taxonControl,
     } = useForm<SearchFormFields>({
         mode: 'onBlur',
-        resolver: yupResolver(Schema),
+        // resolver: yupResolver(Schema),
     });
 
     const router = useRouter();
@@ -213,7 +222,7 @@ const IDGall = (props: Props): JSX.Element => {
             try {
                 let queryString = '';
                 if (isTaxonomy(hostOrTaxon)) {
-                    if (hostOrTaxon.type === SECTION) {
+                    if (hostOrTaxon.type === TaxonomyTypeValues.SECTION) {
                         queryString = `?section=${hostOrTaxon.name}`;
                     } else {
                         queryString = `?genus=${hostOrTaxon.name}`;
@@ -283,22 +292,43 @@ const IDGall = (props: Props): JSX.Element => {
         multiple = false,
     ) => {
         return (
-            <Typeahead
+            <Controller
                 name={field}
                 control={filterControl}
-                selected={query ? query[field] : []}
-                onChange={(selected) => {
-                    setQuery({
-                        ...(query ? query : EMPTYSEARCHQUERY),
-                        [field]: selected,
-                    });
-                }}
-                placeholder={capitalizeFirstLetter(field)}
-                options={opts}
-                disabled={disableFilter()}
-                clearButton={true}
-                multiple={multiple}
+                render={() => (
+                    <Typeahead
+                        id={field}
+                        selected={query ? query[field] : []}
+                        onChange={(selected) => {
+                            setQuery({
+                                ...(query ? query : EMPTYSEARCHQUERY),
+                                [field]: selected,
+                            });
+                        }}
+                        placeholder={capitalizeFirstLetter(field)}
+                        options={opts}
+                        disabled={disableFilter()}
+                        clearButton={true}
+                        multiple={multiple}
+                    />
+                )}
             />
+            // <Typeahead
+            //     id={field}
+            //     control={filterControl}
+            //     selected={query ? query[field] : []}
+            //     onChange={(selected) => {
+            //         setQuery({
+            //             ...(query ? query : EMPTYSEARCHQUERY),
+            //             [field]: selected,
+            //         });
+            //     }}
+            //     placeholder={capitalizeFirstLetter(field)}
+            //     options={opts}
+            //     disabled={disableFilter()}
+            //     clearButton={true}
+            //     multiple={multiple}
+            // />
         );
     };
 
@@ -315,7 +345,37 @@ const IDGall = (props: Props): JSX.Element => {
                         <Row>
                             <Col sm={12} md={5}>
                                 <Form.Label>Host:</Form.Label>
-                                <Typeahead
+                                <Controller
+                                    name="host"
+                                    control={taxonControl}
+                                    render={() => (
+                                        <Typeahead
+                                            id="host"
+                                            selected={hostOrTaxon && isHost(hostOrTaxon) ? [hostOrTaxon] : []}
+                                            onChange={(h) => {
+                                                setHostOrTaxon(h[0] as HostSimple);
+                                                // clear the Place if any
+                                                if (query) query.place = [];
+                                            }}
+                                            placeholder="Host"
+                                            clearButton
+                                            options={props.hosts}
+                                            labelKey={(h) => {
+                                                const host = h as HostSimple;
+                                                if (host) {
+                                                    const aliases = host.aliases
+                                                        .map((a) => a.name)
+                                                        .sort()
+                                                        .join(', ');
+                                                    return aliases.length > 0 ? `${host.name} (${aliases})` : host.name;
+                                                } else {
+                                                    return '';
+                                                }
+                                            }}
+                                        />
+                                    )}
+                                />
+                                {/* <Typeahead
                                     name="host"
                                     control={control}
                                     selected={hostOrTaxon && isHost(hostOrTaxon) ? [hostOrTaxon] : []}
@@ -339,14 +399,38 @@ const IDGall = (props: Props): JSX.Element => {
                                             return '';
                                         }
                                     }}
-                                />
+                                /> */}
                             </Col>
                             <Col sm={12} md={1} className="align-self-end text-center my-2">
                                 OR
                             </Col>
                             <Col sm={12} md={5}>
                                 <Form.Label>Genus / Section:</Form.Label>
-                                <Typeahead
+                                <Controller
+                                    name="genus"
+                                    control={taxonControl}
+                                    render={() => (
+                                        <Typeahead
+                                            id="genus"
+                                            selected={hostOrTaxon && isTaxonomy(hostOrTaxon) ? [hostOrTaxon] : []}
+                                            onChange={(g) => {
+                                                setHostOrTaxon(g[0] as TaxonomyEntryNoParent);
+                                            }}
+                                            placeholder="Genus"
+                                            clearButton
+                                            options={props.sectionsAndGenera}
+                                            labelKey={(t) => {
+                                                const tax = t as TaxonomyEntryNoParent;
+                                                if (tax) {
+                                                    return formatWithDescription(tax.name, tax.description);
+                                                } else {
+                                                    return '';
+                                                }
+                                            }}
+                                        />
+                                    )}
+                                />
+                                {/* <Typeahead
                                     name="genus"
                                     control={control}
                                     selected={hostOrTaxon && isTaxonomy(hostOrTaxon) ? [hostOrTaxon] : []}
@@ -364,7 +448,7 @@ const IDGall = (props: Props): JSX.Element => {
                                             return '';
                                         }
                                     }}
-                                />
+                                /> */}
                             </Col>
                             <Col>
                                 <OverlayTrigger
@@ -427,7 +511,32 @@ const IDGall = (props: Props): JSX.Element => {
                                     Location(s):
                                     <InfoTip id="locationstip" text="Where on the host the gall is found." />
                                 </Form.Label>
-                                <Typeahead
+                                <Controller
+                                    name="locations"
+                                    control={filterControl}
+                                    render={() => (
+                                        <Typeahead
+                                            id="locations"
+                                            selected={query ? query.locations : []}
+                                            onChange={(s) => {
+                                                const selected = s as string[];
+                                                setQuery({
+                                                    ...(query ? query : EMPTYSEARCHQUERY),
+                                                    locations: selected,
+                                                });
+                                            }}
+                                            placeholder="Locations"
+                                            options={props.locations
+                                                .map((l) => l.field)
+                                                .concat(LEAF_ANYWHERE)
+                                                .sort()}
+                                            disabled={disableFilter()}
+                                            clearButton={true}
+                                            multiple={true}
+                                        />
+                                    )}
+                                />
+                                {/* <Typeahead
                                     name="locations"
                                     control={filterControl}
                                     selected={query ? query.locations : []}
@@ -446,14 +555,35 @@ const IDGall = (props: Props): JSX.Element => {
                                     disabled={disableFilter()}
                                     clearButton={true}
                                     multiple={true}
-                                />
+                                /> */}
                             </Col>
                             <Col sm={12} md={6} lg={3}>
                                 <Form.Label>
                                     Detachable:
                                     <InfoTip id="detachabletip" text="Can the gall be removed from the host without cutting?" />
                                 </Form.Label>
-                                <Typeahead
+                                <Controller
+                                    name="detachable"
+                                    control={filterControl}
+                                    render={() => (
+                                        <Typeahead
+                                            id="detachable"
+                                            selected={query ? query.detachable : []}
+                                            onChange={(s) => {
+                                                const selected = s as DetachableApi[];
+                                                setQuery({
+                                                    ...(query ? query : EMPTYSEARCHQUERY),
+                                                    detachable: selected.length > 0 ? selected : [DetachableNone],
+                                                });
+                                            }}
+                                            options={Detachables}
+                                            labelKey={'value'}
+                                            disabled={disableFilter()}
+                                            clearButton={true}
+                                        />
+                                    )}
+                                />
+                                {/* <Typeahead
                                     name="detachable"
                                     control={filterControl}
                                     selected={query ? query.detachable : []}
@@ -468,14 +598,34 @@ const IDGall = (props: Props): JSX.Element => {
                                     labelKey={'value'}
                                     disabled={disableFilter()}
                                     clearButton={true}
-                                />
+                                /> */}
                             </Col>
                             <Col sm={12} md={6} lg={3}>
                                 <Form.Label>
                                     Place:
                                     <InfoTip id="placetip" text="Where did you see the Gall? (US states or CAN provinces)." />
                                 </Form.Label>
-                                <Typeahead
+                                <Controller
+                                    name="place"
+                                    control={filterControl}
+                                    render={() => (
+                                        <Typeahead
+                                            id="place"
+                                            selected={query ? query.place : []}
+                                            onChange={(s) => {
+                                                const selected = s as string[];
+                                                setQuery({
+                                                    ...(query ? query : EMPTYSEARCHQUERY),
+                                                    place: selected.length > 0 ? selected : [],
+                                                });
+                                            }}
+                                            options={props.places.map((p) => p.name)}
+                                            disabled={disableFilter()}
+                                            clearButton={true}
+                                        />
+                                    )}
+                                />
+                                {/* <Typeahead
                                     name="place"
                                     control={filterControl}
                                     selected={query ? query.place : []}
@@ -489,14 +639,34 @@ const IDGall = (props: Props): JSX.Element => {
                                     options={props.places.map((p) => p.name)}
                                     disabled={disableFilter()}
                                     clearButton={true}
-                                />
+                                /> */}
                             </Col>
                             <Col sm={12} md={6} lg={3}>
                                 <Form.Label>
                                     Gall Family:
                                     <InfoTip id="familytip" text="The taxonomic Family of the Gallformer." />
                                 </Form.Label>
-                                <Typeahead
+                                <Controller
+                                    name="family"
+                                    control={filterControl}
+                                    render={() => (
+                                        <Typeahead
+                                            id="family"
+                                            selected={query ? query.family : []}
+                                            onChange={(s) => {
+                                                const selected = s as string[];
+                                                setQuery({
+                                                    ...(query ? query : EMPTYSEARCHQUERY),
+                                                    family: selected.length > 0 ? selected : [],
+                                                });
+                                            }}
+                                            options={gallFamilies}
+                                            disabled={disableFilter()}
+                                            clearButton={true}
+                                        />
+                                    )}
+                                />
+                                {/* <Typeahead
                                     name="family"
                                     control={filterControl}
                                     selected={query ? query.family : []}
@@ -510,7 +680,7 @@ const IDGall = (props: Props): JSX.Element => {
                                     options={gallFamilies}
                                     disabled={disableFilter()}
                                     clearButton={true}
-                                />
+                                /> */}
                             </Col>
                         </Row>
                         <Row>
@@ -696,18 +866,16 @@ const IDGall = (props: Props): JSX.Element => {
                                 <Col key={g.id.toString() + 'col'} xs={6} md={3} className="pb-2">
                                     <Card key={g.id} border="secondary">
                                         <Link href={`gall/${g.id}`}>
-                                            <a>
-                                                <Card.Img
-                                                    variant="top"
-                                                    src={defaultImage(g)?.small ? defaultImage(g)?.small : '/images/noimage.jpg'}
-                                                    alt={`${g.name} - ${summary}`}
-                                                />
-                                            </a>
+                                            <Card.Img
+                                                variant="top"
+                                                src={defaultImage(g)?.small ? defaultImage(g)?.small : '/images/noimage.jpg'}
+                                                alt={`${g.name} - ${summary}`}
+                                            />
                                         </Link>
                                         <Card.Body>
                                             <Card.Title>
-                                                <Link href={`gall/${g.id}`}>
-                                                    <a className="small">{g.name}</a>
+                                                <Link href={`gall/${g.id}`} className="small">
+                                                    {g.name}
                                                 </Link>
                                             </Card.Title>
                                             <Card.Text className="small">
@@ -790,16 +958,17 @@ const queryUrlParams = [
 // Ideally we would generate this page and serve it statically via getStaticProps and use Incremental Static Regeneration.
 // See: https://nextjs.org/docs/basic-features/data-fetching#incremental-static-regeneration
 // However, as it stands right now next.js can not support query parameters for static content. This sucks given
-// that the query parameters that we have only fiter data on the client side.
+// that the query parameters that we have only filter data on the client side.
 // It seems like it might be possible to "solve" this by implementing a convoluted approach using URL paths rather than
 // query parameters but I think that would introduce a ton of complexity.
 // This will likely end up the most frequently accessed page on the site AND the most resource intensive on the server
 // (other than Admin pages which will never have a lot of traffic). My guess is that we will revisiting this issue.
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
     const hosts = await mightFailWithArray<HostSimple>()(allHostsSimple());
-    const genera = await mightFailWithArray<TaxonomyEntry>()(allGenera(HostTaxon));
+    const genera = await mightFailWithArray<TaxonomyEntry>()(allGenera(TaxonCodeValues.PLANT));
     const sections = await mightFailWithArray<TaxonomyEntry>()(allSections());
     const sectionsAndGenera = [...genera, ...sections].sort((a, b) => a.name.localeCompare(b.name));
+    // console.log(sectionsAndGenera);
 
     const query = getQueryParams(context.query, queryUrlParams);
     const hostOrTaxon = pipe(

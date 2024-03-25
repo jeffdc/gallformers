@@ -1,10 +1,12 @@
 import {
+    Prisma,
+    PrismaPromise,
     abundance,
     alias,
     aliasspecies,
     alignment,
-    cells as cs,
     color,
+    cells as cs,
     form,
     gallalignment,
     gallcells,
@@ -20,8 +22,6 @@ import {
     image,
     location,
     place,
-    Prisma,
-    PrismaPromise,
     season,
     shape,
     source,
@@ -33,26 +33,27 @@ import {
     texture,
     walls as ws,
 } from '@prisma/client';
-import * as A from 'fp-ts/lib/Array';
-import { flow, pipe } from 'fp-ts/lib/function';
+import * as A from 'fp-ts/lib/Array.js';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
+import { flow, pipe } from 'fp-ts/lib/function';
 import {
     DeleteResult,
-    detachableFromId,
-    detachableFromString,
+    FGS,
     GallApi,
     GallIDApi,
-    GallTaxon,
     GallUpsertFields,
     RandomGall,
     SimpleSpecies,
+    TaxonCodeValues,
+    TaxonomyTypeValues,
+    detachableFromId,
+    taxonCodeAsStringToValue,
 } from '../api/apitypes';
-import { FAMILY, FGS, GENUS, SECTION } from '../api/taxonomy';
-import { deleteImagesBySpeciesId, makePath, SMALL } from '../images/images';
+import { SMALL, deleteImagesBySpeciesId, makePath } from '../images/images';
 import { defaultSource } from '../pages/renderhelpers';
-import { logger } from '../utils/logger';
+import { logger } from '../utils/logger.ts';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError, optionalWith } from '../utils/util';
 import db from './db';
@@ -88,8 +89,8 @@ export const getGalls = (
     // distinct: Prisma.GallspeciesScalarFieldEnum[] = [],
 ): TaskEither<Error, GallApi[]> => {
     const w = operatorAnd
-        ? { AND: [...whereClause, { species: { taxoncode: GallTaxon } }] }
-        : { AND: [{ species: { taxoncode: GallTaxon } }, { OR: whereClause }] };
+        ? { AND: [...whereClause, { species: { taxoncode: TaxonCodeValues.GALL } }] }
+        : { AND: [{ species: { taxoncode: TaxonCodeValues.GALL } }, { OR: whereClause }] };
     const galls = () =>
         db.gallspecies.findMany({
             include: {
@@ -200,7 +201,7 @@ export const getGalls = (
         };
     };
 
-    // we want a stronger no-null contract on what we return then is modelable in the DB
+    // we want a stronger no-null contract on what we return then is model-able in the DB
     const clean = (galls: readonly DBGallWithFGS[]): GallApi[] =>
         galls.flatMap((g) => {
             if (g.gall == null) {
@@ -217,24 +218,22 @@ export const getGalls = (
                 name: g.species.name,
                 datacomplete: g.species.datacomplete,
                 speciessource: g.species.speciessource,
-                taxoncode: g.species.taxoncode ? g.species.taxoncode : '',
+                taxoncode: taxonCodeAsStringToValue(g.species.taxoncode),
                 description: O.fromNullable(d),
                 abundance: optionalWith(g.species.abundance, adaptAbundance),
-                gall: {
-                    ...g.gall,
-                    id: g.gall_id,
-                    gallalignment: adaptAlignments(g.gall.gallalignment.map((a) => a.alignment)),
-                    gallcells: adaptCells(g.gall.gallcells.map((c) => c.cells)),
-                    gallcolor: adaptColors(g.gall.gallcolor.map((c) => c.color)),
-                    gallseason: adaptSeasons(g.gall.gallseason.map((c) => c.season)),
-                    gallshape: adaptShapes(g.gall.gallshape.map((s) => s.shape)),
-                    gallwalls: adaptWalls(g.gall.gallwalls.map((w) => w.walls)),
-                    detachable: detachableFromId(g.gall.detachable),
-                    galllocation: adaptLocations(g.gall.galllocation.map((l) => l.location)),
-                    galltexture: adaptTextures(g.gall.galltexture.map((t) => t.texture)),
-                    gallform: adaptForm(g.gall.gallform.map((c) => c.form)),
-                    undescribed: g.gall.undescribed,
-                },
+                gall_id: g.gall_id,
+                alignment: adaptAlignments(g.gall.gallalignment.map((a) => a.alignment)),
+                cells: adaptCells(g.gall.gallcells.map((c) => c.cells)),
+                color: adaptColors(g.gall.gallcolor.map((c) => c.color)),
+                season: adaptSeasons(g.gall.gallseason.map((c) => c.season)),
+                shape: adaptShapes(g.gall.gallshape.map((s) => s.shape)),
+                walls: adaptWalls(g.gall.gallwalls.map((w) => w.walls)),
+                detachable: detachableFromId(g.gall.detachable),
+                location: adaptLocations(g.gall.galllocation.map((l) => l.location)),
+                texture: adaptTextures(g.gall.galltexture.map((t) => t.texture)),
+                form: adaptForm(g.gall.gallform.map((c) => c.form)),
+                undescribed: g.gall.undescribed,
+
                 // remove the indirection of the many-to-many table for easier usage
                 hosts: g.species.hosts.map((h) => {
                     return {
@@ -267,7 +266,7 @@ export const getGalls = (
                                         ...g.species,
                                         fgs: fgs,
                                     },
-                                } as DBGallWithFGS),
+                                }) as DBGallWithFGS,
                         ),
                     ),
                 ),
@@ -293,7 +292,7 @@ export const allGallIds = (): TaskEither<Error, string[]> => {
     const galls = () =>
         db.species.findMany({
             select: { id: true },
-            where: { taxoncode: { equals: GallTaxon } },
+            where: { taxoncode: { equals: TaxonCodeValues.GALL } },
         });
 
     return pipe(
@@ -303,7 +302,7 @@ export const allGallIds = (): TaskEither<Error, string[]> => {
 };
 
 const gallsByHostGenusForID = (whereClause: Prisma.gallspeciesWhereInput[]): TaskEither<Error, GallIDApi[]> => {
-    const w = { AND: [...whereClause, { species: { taxoncode: GallTaxon } }] };
+    const w = { AND: [...whereClause, { species: { taxoncode: TaxonCodeValues.GALL } }] };
     const galls = () =>
         db.gallspecies.findMany({
             include: {
@@ -353,7 +352,7 @@ const gallsByHostGenusForID = (whereClause: Prisma.gallspeciesWhereInput[]): Tas
             orderBy: { species: { name: 'asc' } },
         });
 
-    // helper type that makes dealing wuth the next function a lot easier
+    // helper type that makes dealing with the next function a lot easier
     type DBGall = ExtractTFromPromise<ReturnType<typeof galls>>;
 
     const clean = (galls: DBGall): GallIDApi[] =>
@@ -394,7 +393,9 @@ const gallsByHostGenusForID = (whereClause: Prisma.gallspeciesWhereInput[]): Tas
                         .map((p) => p.place.name);
                 }),
                 images: g.species.image.map(adaptImageNoSource),
-                family: g.species.speciestaxonomy.find((t) => t.taxonomy.parent?.type === FAMILY)?.taxonomy.parent?.name ?? '',
+                family:
+                    g.species.speciestaxonomy.find((t) => t.taxonomy.parent?.type === TaxonomyTypeValues.FAMILY)?.taxonomy.parent
+                        ?.name ?? '',
             };
             return newg;
         });
@@ -428,7 +429,7 @@ export const gallsByHostGenus = (hostGenus: string): TaskEither<Error, GallIDApi
                             speciestaxonomy: {
                                 some: {
                                     taxonomy: {
-                                        AND: [{ type: GENUS }, { name: hostGenus }],
+                                        AND: [{ type: TaxonomyTypeValues.GENUS }, { name: hostGenus }],
                                     },
                                 },
                             },
@@ -450,7 +451,7 @@ export const gallsByHostSection = (hostSection: string): TaskEither<Error, GallI
                             speciestaxonomy: {
                                 some: {
                                     taxonomy: {
-                                        AND: [{ type: SECTION }, { name: hostSection }],
+                                        AND: [{ type: TaxonomyTypeValues.SECTION }, { name: hostSection }],
                                     },
                                 },
                             },
@@ -463,7 +464,7 @@ export const gallsByHostSection = (hostSection: string): TaskEither<Error, GallI
 };
 
 /**
- * Gets all galls that have the same binomial name as the passed in name. This wokrs beacuse we are using a naming
+ * Gets all galls that have the same binomial name as the passed in name. This works because we are using a naming
  * convention for different galls created by the same species.
  * @param gall
  * @returns
@@ -490,7 +491,7 @@ export const getRelatedGalls = (gall: GallApi): TaskEither<Error, SimpleSpecies[
 
     return pipe(
         TE.tryCatch(get, handleError),
-        TE.map((galls) => galls.filter((g) => g.id !== gall.id).map((g) => ({ ...g } as SimpleSpecies))),
+        TE.map((galls) => galls.filter((g) => g.id !== gall.id).map((g) => ({ ...g }) as SimpleSpecies)),
     );
 };
 
@@ -572,7 +573,12 @@ export const allGallGenera = (): TaskEither<Error, string[]> => {
     const genera = () =>
         db.taxonomy.findMany({
             distinct: [Prisma.AliasScalarFieldEnum.type],
-            where: { AND: [{ type: GENUS }, { speciestaxonomy: { every: { species: { taxoncode: GallTaxon } } } }] },
+            where: {
+                AND: [
+                    { type: TaxonomyTypeValues.GENUS },
+                    { speciestaxonomy: { every: { species: { taxoncode: TaxonCodeValues.GALL } } } },
+                ],
+            },
         });
 
     return pipe(
@@ -616,7 +622,7 @@ const gallCreateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
         db.species.create({
             data: {
                 ...speciesCreateData(gall),
-                taxontype: { connect: { taxoncode: GallTaxon } },
+                taxontype: { connect: { taxoncode: TaxonCodeValues.GALL } },
                 hosts: {
                     create: connectWithIds<Prisma.hostCreateWithoutGallspeciesInput>('hostspecies', gall.hosts),
                 },
@@ -629,10 +635,10 @@ const gallCreateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                                 gallcells: { create: gall.cells.map((id) => ({ cells_id: id })) },
                                 gallcolor: { create: gall.colors.map((id) => ({ color_id: id })) },
                                 gallseason: { create: gall.seasons.map((id) => ({ season_id: id })) },
-                                detachable: detachableFromString(gall.detachable).id,
+                                detachable: gall.detachable.id,
                                 gallshape: { create: gall.shapes.map((id) => ({ shape_id: id })) },
                                 gallwalls: { create: gall.walls.map((id) => ({ walls_id: id })) },
-                                taxontype: { connect: { taxoncode: GallTaxon } },
+                                taxontype: { connect: { taxoncode: TaxonCodeValues.GALL } },
                                 galllocation: { create: gall.locations.map((id) => ({ location_id: id })) },
                                 galltexture: { create: gall.textures.map((id) => ({ texture_id: id })) },
                                 gallform: { create: gall.forms.map((id) => ({ form_id: id })) },
@@ -658,7 +664,7 @@ const gallUpdateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
                             gall: {
                                 update: {
                                     undescribed: gall.undescribed,
-                                    detachable: detachableFromString(gall.detachable).id,
+                                    detachable: gall.detachable.id,
                                     gallalignment: {
                                         deleteMany: { alignment_id: { notIn: [] } },
                                         create: gall.alignments.map((a) => ({ alignment_id: a })),
@@ -714,7 +720,7 @@ const gallUpdateSteps = (gall: GallUpsertFields): PrismaPromise<unknown>[] => {
 /**
  * Insert or update a gall based on its existence in the DB.
  * @param gall the data to update or insert
- * @returns a Promise when resolved that will containe the id of the species created (a Gall is just a specialization of a species)
+ * @returns a Promise when resolved that will contain the id of the species created (a Gall is just a specialization of a species)
  */
 export const upsertGall = (gall: GallUpsertFields): TaskEither<Error, GallApi> => {
     const updateGallTx = TE.tryCatch(() => db.$transaction(gallUpdateSteps(gall)), handleError);
@@ -744,7 +750,7 @@ export const deleteGall = (speciesid: number): TaskEither<Error, DeleteResult> =
 
     const toDeleteResult = (count: number): DeleteResult => {
         return {
-            type: 'gall',
+            type: TaxonCodeValues.GALL,
             name: speciesid.toString(),
             count: count,
         };

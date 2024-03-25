@@ -1,30 +1,26 @@
-import { yupResolver } from '@hookform/resolvers/yup';
 import { species } from '@prisma/client';
 import axios from 'axios';
-import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
 import { GetServerSideProps } from 'next';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { ParsedUrlQuery } from 'querystring';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Col, Modal, Row } from 'react-bootstrap';
+import { AsyncTypeahead } from 'react-bootstrap-typeahead';
 import DataTable, { TableColumn } from 'react-data-table-component';
-import { useForm } from 'react-hook-form';
-import * as yup from 'yup';
-import AddImage from '../../components/addimage';
-import ImageEdit from '../../components/imageedit';
-import ImageGrid from '../../components/imagegrid';
-import { AsyncTypeahead } from '../../components/Typeahead';
-import { useConfirmation } from '../../hooks/useconfirmation';
+import { Controller, useForm } from 'react-hook-form';
+import AddImage from '../../components/addImage';
+import ImageEdit from '../../components/imageEdit';
+import ImageGrid from '../../components/imageGrid';
+import { useConfirmation } from '../../hooks/useConfirmation';
 import { extractQueryParam } from '../../libs/api/apipage';
 import { ImageApi } from '../../libs/api/apitypes';
 import { speciesById } from '../../libs/db/species';
 import Admin from '../../libs/pages/admin';
 import { TABLE_CUSTOM_STYLES } from '../../libs/utils/DataTableConstants';
 import { mightFailWithArray, sessionUserOrUnknown } from '../../libs/utils/util';
-
-const Schema = yup.object().shape({});
 
 type Props = {
     sp: species[];
@@ -55,18 +51,25 @@ const imageFormatter = (row: ImageApi) => {
 };
 
 const sourceFormatter = (row: ImageApi) => {
-    return pipe(
-        row.source,
-        O.fold(constant(<span></span>), (s) => (
-            <span>
-                <a href={`/source/${s.id}`}>{s.title}</a>
-            </span>
-        )),
+    return row.source ? (
+        <span>
+            <a href={`/source/${row.source.id}`}>{row.source.title}</a>
+        </span>
+    ) : (
+        <span></span>
     );
+    // return pipe(
+    //     row.source,
+    //     O.fold(constant(<span></span>), (s) => (
+    //         <span>
+    //             <a href={`/source/${s.id}`}>{s.title}</a>
+    //         </span>
+    //     )),
+    // );
 };
 
 const defaultFieldFormatter = (img: ImageApi) => {
-    return <span>{img.default ? '✓' : ''}</span>;
+    return <span>{img ? '✓' : ''}</span>;
 };
 
 const Images = ({ sp }: Props): JSX.Element => {
@@ -83,9 +86,8 @@ const Images = ({ sp }: Props): JSX.Element => {
     const [isLoading, setIsLoading] = useState(false);
     const [species, setSpecies] = useState<species[]>(sp ?? []);
 
-    const { control, reset } = useForm<FormFields>({
+    const form = useForm<FormFields>({
         mode: 'onBlur',
-        resolver: yupResolver(Schema),
         defaultValues: {
             species: sp[0]?.name,
         },
@@ -106,7 +108,10 @@ const Images = ({ sp }: Props): JSX.Element => {
             },
             {
                 id: 'default',
-                selector: (row: ImageApi) => row.default,
+                // this is needed because the ReactDataTable component changed the contract and is trying to be overly clever with its types
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                selector: (row: ImageApi) => row,
                 name: 'Default',
                 sortable: true,
                 maxWidth: '100px',
@@ -114,7 +119,7 @@ const Images = ({ sp }: Props): JSX.Element => {
             },
             {
                 id: 'source',
-                // this is needed because the ReactDataTable component changed the contract and is tryign to be overly clever with its types
+                // this is needed because the ReactDataTable component changed the contract and is trying to be overly clever with its types
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
                 selector: (g: ImageApi) => g.source,
@@ -184,13 +189,14 @@ const Images = ({ sp }: Props): JSX.Element => {
 
             axios
                 .get<ImageApi[]>(`/api/images?speciesid=${id}`)
-                .then((res) => setImages(res.data))
+                .then((res) => {
+                    setImages(res.data);
+                })
                 .catch((e) => {
                     console.error(e);
                     setError(e.toString());
                 });
         };
-
         // clear out any selections from previous work
         setSelectedImages([]);
         setCurrentImage(undefined);
@@ -215,13 +221,13 @@ const Images = ({ sp }: Props): JSX.Element => {
     };
 
     const saveImage = async (img: ImageApi) => {
+        const body = {
+            ...img,
+            lastchangedby: sessionUserOrUnknown(session?.user?.name),
+        };
+
         axios
-            .post<ImageApi[]>(`/api/images`, {
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ ...img, lastchangedby: sessionUserOrUnknown(session?.user?.name) }),
-            })
+            .post<ImageApi[]>(`/api/images`, body)
             .then((res) => setImages(res.data))
             .catch((e) => {
                 const msg = `Error while trying to update image.\n${JSON.stringify(img)}\n${e}`;
@@ -299,7 +305,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                                 )
                                 .then(() => setImages(images?.filter((i) => !selectedImages.find((oi) => oi.id === i.id))));
 
-                            reset({ delete: [], species: selected.name });
+                            form.reset({ delete: [], species: selected.name });
                             setToggleCleared(!toggleCleared);
                         })
                         .catch(() => Promise.resolve());
@@ -353,7 +359,7 @@ const Images = ({ sp }: Props): JSX.Element => {
     };
 
     return (
-        <Admin type="Images" keyField="name" setError={setError} error={error} selected={selected}>
+        <Admin type="Images" keyField="name" selected={selected} form={form} setError={setError} error={error}>
             <>
                 {currentImage && <ImageEdit image={currentImage} onSave={saveImage} show={edit} onClose={handleClose} />}
 
@@ -379,33 +385,39 @@ const Images = ({ sp }: Props): JSX.Element => {
                         </Button>
                     </Modal.Body>
                 </Modal>
-                <form className="m-4 pe-4">
+                <>
                     <h4>Add/Edit Species Images</h4>
                     <Row className="my-1" xs={3}>
                         <Col xs={1} style={{ paddingTop: '5px' }}>
                             Species:
                         </Col>
                         <Col>
-                            <AsyncTypeahead
+                            <Controller
                                 name="species"
-                                control={control}
-                                options={species}
-                                labelKey="name"
-                                clearButton
-                                selected={selected ? [selected] : []}
-                                onChange={(s: species[]) => {
-                                    if (s.length > 0) {
-                                        setSelected(s[0]);
-                                        router.push(`?speciesid=${s[0]?.id}`, undefined, { shallow: true });
-                                    } else {
-                                        setSelected(undefined);
-                                        router.push(``, undefined, { shallow: true });
-                                    }
-                                }}
-                                isLoading={isLoading}
-                                onSearch={handleSearch}
-                                filterBy={() => true}
-                                minLength={1}
+                                control={form.control}
+                                render={() => (
+                                    <AsyncTypeahead
+                                        id="species"
+                                        options={species}
+                                        labelKey="name"
+                                        clearButton
+                                        selected={selected ? [selected] : []}
+                                        {...form.register('species')}
+                                        onChange={(s: species[]) => {
+                                            if (s.length > 0) {
+                                                setSelected(s[0]);
+                                                router.push(`?speciesid=${s[0]?.id}`, undefined, { shallow: true });
+                                            } else {
+                                                setSelected(undefined);
+                                                router.push(``, undefined, { shallow: true });
+                                            }
+                                        }}
+                                        isLoading={isLoading}
+                                        onSearch={handleSearch}
+                                        filterBy={() => true}
+                                        minLength={1}
+                                    />
+                                )}
                             />
                         </Col>
                         <Col xs={7}>
@@ -439,7 +451,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                             />
                         </Col>
                     </Row>
-                </form>
+                </>
             </>
         </Admin>
     );

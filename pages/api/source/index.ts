@@ -1,8 +1,8 @@
-import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { Err, getQueryParams, sendErrResponse, sendSuccResponse, toErr } from '../../../libs/api/apipage';
+import { Err, getQueryParams, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage';
 import { SourceApi, SourceWithSpeciesSourceApi } from '../../../libs/api/apitypes';
 import { searchSources, sourcesWithSpeciesSourceBySpeciesId } from '../../../libs/db/source';
 
@@ -24,7 +24,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             O.map(sourcesWithSpeciesSourceBySpeciesId),
             O.map(TE.mapLeft(toErr)),
             O.getOrElse(errMsg),
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else if (params && O.isSome(params['q'])) {
         const errMsg = (): TE.TaskEither<Error, SourceApi[]> => {
@@ -34,7 +34,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             params['q'],
             O.fold(errMsg, searchSources),
             TE.mapLeft(toErr),
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else {
         res.status(400).end('No valid query params provided. Pass either a speciesId or a query.');

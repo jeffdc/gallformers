@@ -5,8 +5,8 @@ import { hostsSearch, hostsSearchSimple } from '../../../libs/db/host';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
     if (O.isSome(getQueryParam(req)('simple'))) {
-        apiSearchEndpoint(req, res, hostsSearchSimple);
+        await apiSearchEndpoint(req, res, hostsSearchSimple);
     } else {
-        apiSearchEndpoint(req, res, hostsSearch);
+        await apiSearchEndpoint(req, res, hostsSearch);
     }
 };

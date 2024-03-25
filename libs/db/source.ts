@@ -1,8 +1,15 @@
 import { Prisma, source } from '@prisma/client';
-import { pipe } from 'fp-ts/lib/function';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
-import { DeleteResult, SourceApi, SourceUpsertFields, SourceWithSpeciesApi, SourceWithSpeciesSourceApi } from '../api/apitypes';
+import { pipe } from 'fp-ts/lib/function';
+import {
+    DeleteResult,
+    SourceApi,
+    SourceUpsertFields,
+    SourceWithSpeciesApi,
+    SourceWithSpeciesSourceApi,
+    taxonCodeAsStringToValue,
+} from '../api/apitypes';
 import { isOfType } from '../utils/types';
 import { handleError } from '../utils/util';
 import db from './db';
@@ -45,7 +52,10 @@ export const sourceById = (id: number): TaskEither<Error, SourceWithSpeciesApi[]
         TE.map((sources) =>
             sources.map((s) => ({
                 ...s,
-                species: s.speciessource.map((spsp) => ({ ...spsp.species, taxoncode: spsp.species.taxoncode ?? '' })),
+                species: s.speciessource.map((speciesSource) => ({
+                    ...speciesSource.species,
+                    taxoncode: taxonCodeAsStringToValue(speciesSource.species.taxoncode),
+                })),
             })),
         ),
     );
@@ -79,9 +89,9 @@ export const allSourcesWithSpecies = (): TaskEither<Error, SourceWithSpeciesApi[
         TE.map((sos) =>
             sos.map((s) => ({
                 ...s,
-                species: s.speciessource.map((spso) => ({
-                    ...spso.species,
-                    taxoncode: spso.species.taxoncode ? spso.species.taxoncode : '',
+                species: s.speciessource.map((speciesSource) => ({
+                    ...speciesSource.species,
+                    taxoncode: taxonCodeAsStringToValue(speciesSource.species.taxoncode),
                 })),
             })),
         ),
@@ -173,6 +183,18 @@ export const searchSources = (s: string): TaskEither<Error, SourceApi[]> => {
                 db.source.findMany({
                     where: { title: { contains: s } },
                     orderBy: { title: 'asc' },
+                }),
+            handleError,
+        ),
+    );
+};
+
+export const getSourceByTitle = (title: string): TaskEither<Error, SourceApi[]> => {
+    return pipe(
+        TE.tryCatch(
+            () =>
+                db.source.findMany({
+                    where: { title: { equals: title } },
                 }),
             handleError,
         ),

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button, Col, Modal, Row } from 'react-bootstrap';
 import { Typeahead } from 'react-bootstrap-typeahead';
-import { Option } from 'react-bootstrap-typeahead/types/types';
+import { Option } from 'react-bootstrap-typeahead/types/types.js';
 
 type Props<T> = {
     size?: 'sm' | 'lg' | 'xl';

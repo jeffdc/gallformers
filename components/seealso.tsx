@@ -1,6 +1,6 @@
 import React from 'react';
 import { Col, Row } from 'react-bootstrap';
-import Image from 'next/image';
+import Image from 'next/image.js';
 import iNatLogo from '../public/images/inatlogo-small.png';
 import BugGuideLogo from '../public/images/bugguide-small.png';
 import GScholarLogo from '../public/images/gscholar-small.png';

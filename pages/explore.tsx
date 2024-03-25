@@ -5,12 +5,11 @@ import React from 'react';
 import { Card, Col, Container, Row, Tab, Tabs } from 'react-bootstrap';
 import TreeMenu, { Item, TreeNodeInArray } from 'react-simple-tree-menu';
 import 'react-simple-tree-menu/dist/main.css';
-import { GallTaxon } from '../libs/api/apitypes';
-import { FamilyTaxonomy } from '../libs/api/taxonomy';
-import { getFamiliesWithSpecies } from '../libs/db/taxonomy';
+import { FamilyTaxonomy, getFamiliesWithSpecies } from '../libs/db/taxonomy';
 import { getStaticPropsWith } from '../libs/pages/nextPageHelpers';
 import { formatWithDescription } from '../libs/pages/renderhelpers';
 import { hasProp } from '../libs/utils/util';
+import { TaxonCodeValues } from '../libs/api/apitypes';
 
 type Props = {
     gallmakers: TreeNodeInArray[];
@@ -93,7 +92,7 @@ const toTree = (fgs: readonly FamilyTaxonomy[]): TreeNodeInArray[] =>
                     .map((st) => ({
                         key: st.species.id.toString(),
                         label: st.species.name,
-                        url: `/${st.species.taxoncode === GallTaxon ? 'gall' : 'host'}/${st.species.id}`,
+                        url: `/${st.species.taxoncode === TaxonCodeValues.GALL ? 'gall' : 'host'}/${st.species.id}`,
                     })),
             })),
     }));

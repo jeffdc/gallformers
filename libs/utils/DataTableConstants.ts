@@ -17,7 +17,7 @@ export const TABLE_CUSTOM_STYLES: TableStyles = {
         style: {
             fontSize: '16px',
             paddingLeft: '12px',
-            paddingRight: '4px',
+            paddingRight: '8px',
         },
     },
 };

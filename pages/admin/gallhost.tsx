@@ -1,18 +1,17 @@
-import { constant, pipe } from 'fp-ts/lib/function';
+import axios from 'axios';
 import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import { ParsedUrlQuery } from 'querystring';
 import { useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { ComposableMap, Geographies, Geography, ProjectionConfig, ZoomableGroup } from 'react-simple-maps';
-import * as yup from 'yup';
+import { Tooltip } from 'react-tooltip';
 import Auth from '../../components/auth';
 import { RenameEvent } from '../../components/editname';
 import InfoTip from '../../components/infotip';
-import Typeahead from '../../components/Typeahead';
-import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields } from '../../hooks/useAPIs';
+import useAdmin, { AdminFormFields } from '../../hooks/useadmin';
 import { extractQueryParam } from '../../libs/api/apipage';
 import {
     GallApi,
@@ -22,27 +21,18 @@ import {
     SimpleSpecies,
     SpeciesWithPlaces,
 } from '../../libs/api/apitypes';
+import { gallById } from '../../libs/db/gall';
 import { allHostsWithPlaces } from '../../libs/db/host';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
-// needed as ReactTooltip does not play nicely with SSR. See: https://github.com/wwayne/react-tooltip/issues/675
-import dynamic from 'next/dynamic';
-import { gallById } from '../../libs/db/gall';
-import axios from 'axios';
-
-const ReactTooltip = dynamic(() => import('react-tooltip'), {
-    ssr: false,
-});
+import { Typeahead } from 'react-bootstrap-typeahead';
+import { Controller } from 'react-hook-form';
 
 type Props = {
     id: string | null;
     sp: GallApi[];
     hosts: SpeciesWithPlaces[];
 };
-
-const schema = yup.object().shape({
-    mainField: yup.array().required('You must provide the gall.'),
-});
 
 type FormFields = AdminFormFields<GallApi> & {
     hosts: GallHost[];
@@ -91,7 +81,10 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
 
     const updatedFormFields = async (gall: GallApi | undefined): Promise<FormFields> => {
         if (gall != undefined) {
-            const hosts = gallHosts.length <= 0 ? await fetchGallHosts(gall.id) : gallHosts;
+            const hosts =
+                gallHosts.length <= 0
+                    ? await fetchGallHosts(gall.id).then((hs) => hs.sort((a, b) => a.name.localeCompare(b.name)))
+                    : gallHosts;
             setGallHosts(hosts);
 
             return {
@@ -112,18 +105,15 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
         };
     };
 
-    // eslint-disable-next-line prettier/prettier
-    const { selected, setSelected, error, setError, deleteResults, setDeleteResults, form, formSubmit, mainField } = useAdmin<
-        GallApi,
-        FormFields,
-        GallHostUpdateFields
-    >(
+    const keyFieldName = 'name';
+
+    const { selected, setSelected, ...adminForm } = useAdmin<GallApi, FormFields, GallHostUpdateFields>(
         'Gall-Host',
+        keyFieldName,
         id ?? undefined,
         update,
         toUpsertFields,
-        { keyProp: 'name', delEndpoint: '/api/gallhost/', upsertEndpoint: '/api/gallhost/insert' },
-        schema,
+        { delEndpoint: '/api/gallhost/', upsertEndpoint: '/api/gallhost/insert' },
         updatedFormFields,
         false,
         undefined,
@@ -176,29 +166,25 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
             <Admin
                 type="Gallhost"
                 keyField="name"
-                setError={setError}
-                error={error}
-                setDeleteResults={setDeleteResults}
-                deleteResults={deleteResults}
                 selected={selected}
+                {...adminForm}
+                saveButton={adminForm.saveButton()}
+                deleteButton={undefined}
             >
-                <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
+                <>
                     <h4>Gall - Host Mappings</h4>
                     <p>
                         First select a gall. If any mappings to hosts already exist they will show up in the Host field. Then you
                         can edit these mappings (add or delete).
                     </p>
                     <p>
-                        At least one host species must exist before mapping.{' '}
-                        <Link href="./host">
-                            <a>Go add one</a>
-                        </Link>{' '}
-                        now if you need to.
+                        At least one host species must exist before mapping. <Link href="./host">Go add one</Link> now if you need
+                        to.
                     </p>
                     <Row className="my-1">
                         <Col>
                             Gall:
-                            {mainField('name', 'Gall', { searchEndpoint: (s) => `../api/gall?q=${s}` })}
+                            {adminForm.mainField('name', { searchEndpoint: (s) => `../api/gall?q=${s}` })}
                         </Col>
                     </Row>
                     <Row>
@@ -209,22 +195,32 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
                     <Row className="my-1">
                         <Col>
                             Hosts:
-                            <Typeahead
+                            <Controller
+                                control={adminForm.form.control}
                                 name="hosts"
-                                control={form.control}
-                                placeholder="Hosts"
-                                options={hosts}
-                                labelKey="name"
-                                multiple
-                                clearButton
-                                disabled={!selected}
-                                selected={gallHosts ? gallHosts : []}
-                                onChange={(s) => {
-                                    setGallHosts(s as SpeciesWithPlaces[]);
-                                }}
+                                render={() => (
+                                    <Typeahead
+                                        id="hosts"
+                                        placeholder="Hosts"
+                                        options={hosts}
+                                        labelKey="name"
+                                        multiple
+                                        clearButton
+                                        disabled={!selected}
+                                        {...adminForm.form.register('hosts', {
+                                            validate: (gh) => {
+                                                return gh.length > 0 || 'You must map at least one host to this gall.';
+                                            },
+                                        })}
+                                        selected={gallHosts ? gallHosts : []}
+                                        onChange={(s) => {
+                                            setGallHosts([...s] as SpeciesWithPlaces[]);
+                                        }}
+                                    />
+                                )}
                             />
-                            {form.formState.errors.hosts && (
-                                <span className="text-danger">You must map at least one host to this gall.</span>
+                            {adminForm.form.formState.errors.hosts && (
+                                <span className="text-danger">{adminForm.errors.hosts?.message}</span>
                             )}
                         </Col>
                     </Row>
@@ -306,8 +302,8 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
                                                             outRange.has(code)
                                                                 ? 'LightCoral'
                                                                 : inRange.has(code)
-                                                                ? 'ForestGreen'
-                                                                : 'White'
+                                                                  ? 'ForestGreen'
+                                                                  : 'White'
                                                         }
                                                         style={{
                                                             default: { outline: 'none' },
@@ -337,15 +333,10 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
                                     </Geographies>
                                 </ZoomableGroup>
                             </ComposableMap>
-                            <ReactTooltip>{tooltipContent}</ReactTooltip>
+                            <Tooltip>{tooltipContent}</Tooltip>
                         </Col>
                     </Row>
-                    <Row className="my-1">
-                        <Col>
-                            <input type="submit" className="button" value="Submit" disabled={!selected || gallHosts.length < 1} />
-                        </Col>
-                    </Row>
-                </form>
+                </>
             </Admin>
         </Auth>
     );

@@ -1,27 +1,19 @@
-import { constant, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
+import { constant, pipe } from 'fp-ts/lib/function';
 import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { Alert, Button, Col, Row } from 'react-bootstrap';
-import * as yup from 'yup';
 import { RenameEvent } from '../../components/editname';
-import useAdmin from '../../hooks/useadmin';
-import { AdminFormFields } from '../../hooks/useAPIs';
+import useAdmin, { AdminFormFields } from '../../hooks/useadmin';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { PlaceNoTreeApi, PlaceNoTreeUpsertFields, PLACE_TYPES } from '../../libs/api/apitypes';
+import { PLACE_TYPES, PlaceNoTreeApi, PlaceNoTreeUpsertFields } from '../../libs/api/apitypes';
 import Admin from '../../libs/pages/admin';
-
-const schema = yup.object().shape({
-    mainField: yup.mixed().required(),
-    code: yup.string().required(),
-    type: yup.string().required(),
-});
 
 type Props = {
     id: string;
 };
 
-type FormFields = AdminFormFields<PlaceNoTreeApi> & Pick<PlaceNoTreeApi, 'code' | 'type'>;
+type FormFields = AdminFormFields<PlaceNoTreeApi> & Omit<PlaceNoTreeApi, 'id' | 'name'>;
 
 const renamePlace = async (s: PlaceNoTreeApi, e: RenameEvent): Promise<PlaceNoTreeApi> => ({
     ...s,
@@ -61,34 +53,20 @@ const createNewPlace = (name: string): PlaceNoTreeApi => ({
     type: 'state',
 });
 
+const mainFieldName = 'name';
+
 const PlaceAdmin = ({ id }: Props): JSX.Element => {
-    const {
-        selected,
-        showRenameModal: showModal,
-        setShowRenameModal: setShowModal,
-        isValid,
-        error,
-        setError,
-        deleteResults,
-        setDeleteResults,
-        renameCallback,
-        nameExists,
-        form,
-        formSubmit,
-        mainField,
-        deleteButton,
-    } = useAdmin(
+    const { selected, renameCallback, nameExists, ...adminForm } = useAdmin(
         'Place',
+        mainFieldName,
         id,
         renamePlace,
         toUpsertFields,
         {
-            keyProp: 'name',
             delEndpoint: '../api/place/',
             upsertEndpoint: '../api/place/upsert',
-            nameExistsEndpoint: (s: string) => `/api/place?name=${s}`,
+            nameExistsEndpoint: (s: string) => `/api/place/name/${s}`,
         },
-        schema,
         updatedFormFields,
         false,
         createNewPlace,
@@ -97,18 +75,17 @@ const PlaceAdmin = ({ id }: Props): JSX.Element => {
     return (
         <Admin
             type="Place"
-            keyField="name"
+            keyField={mainFieldName}
             editName={{ getDefault: () => selected?.name, renameCallback: renameCallback, nameExistsCallback: nameExists }}
-            setShowModal={setShowModal}
-            showModal={showModal}
-            setError={setError}
-            error={error}
-            setDeleteResults={setDeleteResults}
-            deleteResults={deleteResults}
             selected={selected}
             superAdmin={true}
+            {...adminForm}
+            saveButton={adminForm.saveButton()}
+            deleteButton={adminForm.deleteButton('Caution. The Place will be PERMANENTLY deleted.', true)}
+            form={adminForm.form}
+            formSubmit={adminForm.formSubmit}
         >
-            <form onSubmit={form.handleSubmit(formSubmit)} className="m-4 pe-4">
+            <>
                 <h4>Add/Edit Places</h4>
                 <Alert variant="info">
                     This is really just a stub page for now. Much work still needs to be done to support Place hierarchies as well
@@ -123,10 +100,14 @@ const PlaceAdmin = ({ id }: Props): JSX.Element => {
                             <Col>Name:</Col>
                         </Row>
                         <Row>
-                            <Col>{mainField('name', 'Place', { searchEndpoint: (s) => `../api/place?q=${s}` })}</Col>
+                            <Col>{adminForm.mainField('Place', { searchEndpoint: (s) => `../api/place/?q=${s}` })}</Col>
                             {selected && (
                                 <Col xs={1}>
-                                    <Button variant="secondary" className="btn-sm" onClick={() => setShowModal(true)}>
+                                    <Button
+                                        variant="secondary"
+                                        className="btn-sm"
+                                        onClick={() => adminForm.setShowRenameModal(true)}
+                                    >
                                         Rename
                                     </Button>
                                 </Col>
@@ -138,33 +119,30 @@ const PlaceAdmin = ({ id }: Props): JSX.Element => {
                     <Col>
                         Code (required):
                         <input
-                            {...form.register('code')}
+                            {...adminForm.form.register('code', { required: true, disabled: !selected })}
                             type="text"
                             placeholder="Code"
                             className="form-control"
-                            disabled={!selected}
                         />
-                        {form.formState.errors.code && <span className="text-danger">You must provide the code.</span>}
+                        {adminForm.form.formState.errors.code && <span className="text-danger">You must provide the code.</span>}
                     </Col>
                     <Col>
                         Type (required):
-                        <select {...form.register('type')} placeholder="Type" className="form-control" disabled={!selected}>
+                        <select
+                            {...adminForm.form.register('type', { required: true, disabled: !selected })}
+                            aria-placeholder="Type"
+                            className="form-control"
+                        >
                             {PLACE_TYPES.map((t) => (
                                 <option key={t}>{t}</option>
                             ))}
                         </select>{' '}
-                        {form.formState.errors.type && (
+                        {adminForm.form.formState.errors.type && (
                             <span className="text-danger">You must provide the Type of the Place.</span>
                         )}
                     </Col>
                 </Row>
-                <Row className="form-input">
-                    <Col>
-                        <input type="submit" className="button" value="Submit" disabled={!selected || !isValid} />
-                    </Col>
-                    <Col>{deleteButton('Caution. The Place will be deleted.')}</Col>
-                </Row>
-            </form>
+            </>
         </Admin>
     );
 };

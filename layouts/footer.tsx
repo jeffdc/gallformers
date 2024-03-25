@@ -18,7 +18,7 @@ const Footer = (): JSX.Element => {
     };
 
     return (
-        <Navbar expand="sm" variant="dark" collapseOnSelect className="navbar-footer container-fluid">
+        <Navbar expand="sm" variant="dark" collapseOnSelect className="navbar-footer fixed-bottom container-fluid px-4">
             <Navbar.Collapse>
                 {mounted && session && (
                     <>
@@ -32,13 +32,12 @@ const Footer = (): JSX.Element => {
                         </Nav.Item>
                         <Navbar.Text className="px-2">{sessionUserOrUnknown(session?.user?.name)}</Navbar.Text>
                         <Nav.Item className="ps-2">{logoff()}</Nav.Item>
-                        <Nav.Link href="/admin">Admin</Nav.Link>
                     </>
                 )}
-                <Nav.Link href="https://www.patreon.com/gallformers" target="__blank" rel="noreferrer" className="ms-auto">
+                <Nav.Link href="https://www.patreon.com/gallformers" target="__blank" rel="noreferrer" className="ms-auto px-2">
                     Donate
                 </Nav.Link>
-                <Nav.Link href="/about" className="justify-content-end">
+                <Nav.Link href="/about" className="justify-content-end px-2">
                     About
                 </Nav.Link>
             </Navbar.Collapse>

@@ -1,4 +1,4 @@
-import { tryBackoff } from '../../../libs/utils/network';
+import { tryBackoff } from '../../../libs/utils/network.ts';
 
 let counter = 0;
 

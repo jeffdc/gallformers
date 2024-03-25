@@ -1,10 +1,10 @@
 import * as E from 'fp-ts/lib/Either';
-import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as R from 'fp-ts/lib/Record';
 import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { Err, getQueryParam, sendErrResponse, sendSuccResponse, toErr } from '../../../libs/api/apipage';
+import { Err, getQueryParam, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage';
 import { GallIDApi } from '../../../libs/api/apitypes';
 import { gallsByHostGenus, gallsByHostName, gallsByHostSection } from '../../../libs/db/gall';
 
@@ -30,6 +30,6 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
         E.fromOption(() => ({ status: 500, msg: 'Failed to run search' })),
         TE.fromEither,
         TE.flatten,
-        TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+        TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
     )();
 };

@@ -12,22 +12,23 @@ import {
     speciesplace,
     speciessource,
 } from '@prisma/client';
-import * as A from 'fp-ts/lib/Array';
+import * as A from 'fp-ts/lib/Array.js';
 import { constant, flow, pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { TaskEither } from 'fp-ts/lib/TaskEither';
 import {
     DeleteResult,
+    FGS,
     HostApi,
     HostSimple,
-    HostTaxon,
     SimpleSpecies,
     SpeciesApi,
     SpeciesUpsertFields,
     SpeciesWithPlaces,
+    TaxonCodeValues,
+    TaxonomyTypeValues,
 } from '../api/apitypes';
-import { FGS, GENUS, SECTION } from '../api/taxonomy';
 import { deleteImagesBySpeciesId } from '../images/images';
 import { ExtractTFromPromise } from '../utils/types';
 import { handleError, hasProp, optionalWith } from '../utils/util';
@@ -79,7 +80,7 @@ const adaptor = (hosts: readonly DBHost[]): HostApi[] =>
             name: h.name,
             datacomplete: h.datacomplete,
             description: O.fromNullable(d),
-            taxoncode: h.taxoncode ? h.taxoncode : '',
+            taxoncode: h.taxoncode == TaxonCodeValues.PLANT ? TaxonCodeValues.PLANT : TaxonCodeValues.GALL,
             abundance: optionalWith(h.abundance, adaptAbundance),
             speciessource: h.speciessource,
             // remove the indirection of the many-to-many table for easier usage
@@ -112,7 +113,7 @@ export const allHosts = (): TaskEither<Error, HostApi[]> => getHosts();
 export const allHostsWithPlaces = (): TaskEither<Error, SpeciesWithPlaces[]> => {
     const getHostsWithPlaces = () =>
         db.species.findMany({
-            where: { taxoncode: { equals: HostTaxon } },
+            where: { taxoncode: { equals: TaxonCodeValues.PLANT } },
             select: {
                 id: true,
                 name: true,
@@ -126,7 +127,7 @@ export const allHostsWithPlaces = (): TaskEither<Error, SpeciesWithPlaces[]> => 
         hosts.map((h) => {
             return {
                 ...h,
-                taxoncode: HostTaxon,
+                taxoncode: TaxonCodeValues.PLANT,
                 places: h.places.map((p) => p.place),
             };
         });
@@ -141,7 +142,7 @@ export const allHostsSimple = (): TaskEither<Error, HostSimple[]> => {
     // if we call allHosts() the performance is quite poor so this is an optimized version that minimizes the data fetched
     const getSimpleHosts = () =>
         db.species.findMany({
-            where: { taxoncode: { equals: HostTaxon } },
+            where: { taxoncode: { equals: TaxonCodeValues.PLANT } },
             select: {
                 id: true,
                 name: true,
@@ -199,8 +200,8 @@ export const getHosts = (
     distinct: Prisma.SpeciesScalarFieldEnum[] = ['id'],
 ): TaskEither<Error, HostApi[]> => {
     const w = operatorAnd
-        ? { AND: [...whereClause, { taxoncode: { equals: HostTaxon } }] }
-        : { AND: [{ taxoncode: { equals: HostTaxon } }, { OR: whereClause }] };
+        ? { AND: [...whereClause, { taxoncode: { equals: TaxonCodeValues.PLANT } }] }
+        : { AND: [{ taxoncode: { equals: TaxonCodeValues.PLANT } }, { OR: whereClause }] };
 
     const hosts = () =>
         db.species.findMany({
@@ -234,7 +235,7 @@ export const getHosts = (
                 A.map((h) =>
                     pipe(
                         taxonomyForSpecies(h.id),
-                        TE.map((fgs) => ({ ...h, fgs: fgs } as DBHost)),
+                        TE.map((fgs) => ({ ...h, fgs: fgs }) as DBHost),
                     ),
                 ),
             ),
@@ -269,7 +270,7 @@ export const hostsByGenus = (genus: string): TaskEither<Error, HostApi[]> => {
         {
             speciestaxonomy: {
                 some: {
-                    taxonomy: { AND: [{ name: { equals: genus } }, { type: { equals: GENUS } }] },
+                    taxonomy: { AND: [{ name: { equals: genus } }, { type: { equals: TaxonomyTypeValues.GENUS } }] },
                 },
             },
         },
@@ -300,7 +301,7 @@ const hostUpdateSteps = (host: SpeciesUpsertFields): PrismaPromise<unknown>[] =>
         updateAbundance(host.id, host.abundance),
         ...speciesTaxonomyAdditionalUpdateSteps(host),
         db.speciestaxonomy.deleteMany({
-            where: { AND: [{ species_id: host.id }, { taxonomy: { type: { equals: SECTION } } }] },
+            where: { AND: [{ species_id: host.id }, { taxonomy: { type: { equals: TaxonomyTypeValues.SECTION } } }] },
         }),
         // deal with a possible change to Section, added, changed, deleted
         upsertSection(host),
@@ -312,7 +313,7 @@ const hostCreate = (host: SpeciesUpsertFields): PrismaPromise<unknown>[] => {
         db.species.create({
             data: {
                 ...speciesCreateData(host),
-                taxontype: { connect: { taxoncode: HostTaxon } },
+                taxontype: { connect: { taxoncode: TaxonCodeValues.PLANT } },
             },
         }),
     ];

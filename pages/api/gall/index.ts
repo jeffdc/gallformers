@@ -1,8 +1,8 @@
-import { pipe } from 'fp-ts/lib/function';
 import * as O from 'fp-ts/lib/Option';
 import * as TE from 'fp-ts/lib/TaskEither';
+import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { apiSearchEndpoint, getQueryParams, sendErrResponse, sendSuccResponse, toErr } from '../../../libs/api/apipage';
+import { apiSearchEndpoint, getQueryParams, sendErrorResponse, sendSuccessResponse, toErr } from '../../../libs/api/apipage';
 import { GallApi } from '../../../libs/api/apitypes';
 import { gallById, gallByName, searchGalls } from '../../../libs/db/gall';
 
@@ -22,16 +22,16 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
             O.map(parseInt),
             O.fold(errMsg, gallById),
             TE.mapLeft(toErr),
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else if (params && O.isSome(params['q'])) {
-        apiSearchEndpoint(req, res, searchGalls);
+        await apiSearchEndpoint(req, res, searchGalls);
     } else if (params && O.isSome(params['name'])) {
         await pipe(
             params['name'],
             O.fold(errMsg, gallByName),
             TE.mapLeft(toErr),
-            TE.fold(sendErrResponse(res), sendSuccResponse(res)),
+            TE.fold(sendErrorResponse(res), sendSuccessResponse(res)),
         )();
     } else {
         res.status(400).end('No valid query params provided.');

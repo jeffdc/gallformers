@@ -1,5 +1,5 @@
 import { GetStaticPaths } from 'next';
-import ErrorPage from 'next/error';
+import ErrorPage from 'next/error.js';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import DateFormatter from '../../components/ref/dateformatter';

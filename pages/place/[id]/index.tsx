@@ -1,12 +1,12 @@
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { Col, Container, Row } from 'react-bootstrap';
 import DataTable, { TableColumn } from 'react-data-table-component';
 import Edit from '../../../components/edit';
 import { HostSimple, PlaceWithHostsApi } from '../../../libs/api/apitypes';
-import { allPlaceIds, placeById } from '../../../libs/db/place';
+import { allPlaceIds, placeById } from '../../../libs/db/place.ts';
 import { getStaticPathsFromIds, getStaticPropsWithContext } from '../../../libs/pages/nextPageHelpers';
 import { TABLE_CUSTOM_STYLES } from '../../../libs/utils/DataTableConstants';
 
