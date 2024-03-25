@@ -190,6 +190,7 @@ const IDGall = (props: Props): JSX.Element => {
     // this is the search form on species or genus
     const {
         formState: { errors },
+        control: taxonControl,
     } = useForm<SearchFormFields>({
         mode: 'onBlur',
         // resolver: yupResolver(Schema),
@@ -346,6 +347,7 @@ const IDGall = (props: Props): JSX.Element => {
                                 <Form.Label>Host:</Form.Label>
                                 <Controller
                                     name="host"
+                                    control={taxonControl}
                                     render={() => (
                                         <Typeahead
                                             id="host"
@@ -406,6 +408,7 @@ const IDGall = (props: Props): JSX.Element => {
                                 <Form.Label>Genus / Section:</Form.Label>
                                 <Controller
                                     name="genus"
+                                    control={taxonControl}
                                     render={() => (
                                         <Typeahead
                                             id="genus"
@@ -510,6 +513,7 @@ const IDGall = (props: Props): JSX.Element => {
                                 </Form.Label>
                                 <Controller
                                     name="locations"
+                                    control={filterControl}
                                     render={() => (
                                         <Typeahead
                                             id="locations"
@@ -560,6 +564,7 @@ const IDGall = (props: Props): JSX.Element => {
                                 </Form.Label>
                                 <Controller
                                     name="detachable"
+                                    control={filterControl}
                                     render={() => (
                                         <Typeahead
                                             id="detachable"
@@ -602,6 +607,7 @@ const IDGall = (props: Props): JSX.Element => {
                                 </Form.Label>
                                 <Controller
                                     name="place"
+                                    control={filterControl}
                                     render={() => (
                                         <Typeahead
                                             id="place"
@@ -642,6 +648,7 @@ const IDGall = (props: Props): JSX.Element => {
                                 </Form.Label>
                                 <Controller
                                     name="family"
+                                    control={filterControl}
                                     render={() => (
                                         <Typeahead
                                             id="family"

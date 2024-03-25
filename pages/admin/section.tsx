@@ -5,7 +5,7 @@ import { GetServerSideProps } from 'next';
 import { ParsedUrlQuery } from 'querystring';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
-import { Path } from 'react-hook-form';
+import { Controller, Path } from 'react-hook-form';
 import { RenameEvent } from '../../components/editname';
 import useAdmin, { AdminFormFields } from '../../hooks/useadmin';
 import { extractQueryParam } from '../../libs/api/apipage';
@@ -21,18 +21,6 @@ import { allGenera, allSections } from '../../libs/db/taxonomy';
 import Admin from '../../libs/pages/admin';
 import { extractGenus, hasProp, mightFailWithArray } from '../../libs/utils/util';
 import { AsyncTypeahead } from 'react-bootstrap-typeahead';
-
-// const schema = yup.object().shape({
-//     mainField: yup.array().required('A name is required.'),
-//     description: yup.string().required('A description is required.'),
-//     species: yup
-//         .array()
-//         .required('At least one species must be selected.')
-//         .of(SpeciesSchema)
-//         .test('same genus', 'You must select at least one species and all selected species must be of the same genus', (v) => {
-//             return new Set(v?.map((s) => (s.name ? extractGenus(s?.name) : undefined))).size === 1;
-//         }),
-// });
 
 type Props = {
     id: string;
@@ -210,28 +198,38 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
                 <Row className="my-1">
                     <Col>
                         Species (required):
-                        <AsyncTypeahead
-                            id="species"
-                            options={hosts}
-                            labelKey="name"
-                            placeholder="Mapped Species"
-                            clearButton
-                            multiple
-                            {...adminForm.form.register('species', {
-                                required: 'You must provide at least one species.',
-                                disabled: !selected,
-                            })}
-                            onChange={(s) => {
-                                setSpecies(s as SimpleSpecies[]);
-                                adminForm.form.setValue('species' as Path<FormFields>, s as SimpleSpecies[]);
+                        <Controller
+                            control={adminForm.form.control}
+                            name="species"
+                            rules={{
+                                validate: (s) => {
+                                    console.log(`JDC: ${JSON.stringify(s, null, '  ')}`);
+                                    return s.length > 0 ? true : 'At least one species is required.';
+                                },
                             }}
-                            selected={species ? species : []}
-                            isLoading={isLoading}
-                            onSearch={handleSearch}
+                            // rules={ minLength: { value: 1, message: 'At least one species is required.' } }
+                            render={() => (
+                                <AsyncTypeahead
+                                    id="species"
+                                    options={hosts}
+                                    labelKey="name"
+                                    placeholder="Mapped Species"
+                                    clearButton
+                                    disabled={!selected}
+                                    multiple
+                                    onChange={(s) => {
+                                        setSpecies(s as SimpleSpecies[]);
+                                        adminForm.form.setValue('species' as Path<FormFields>, s as SimpleSpecies[]);
+                                    }}
+                                    selected={species ? species : []}
+                                    isLoading={isLoading}
+                                    onSearch={handleSearch}
+                                />
+                            )}
                         />
                         {adminForm.form.formState.errors.species &&
                             hasProp(adminForm.form.formState.errors.species, 'message') && (
-                                <span className="text-danger">{adminForm.form.formState.errors.species.message as string}</span>
+                                <span className="text-danger">{adminForm.form.formState.errors.species.message}</span>
                             )}
                         <p>
                             The species that you add should all be from the same genus. If they are not then you will not be able

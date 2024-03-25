@@ -134,14 +134,14 @@ export const updateImage = (theImage: ImageApi): TaskEither<Error, readonly Imag
 
 export const adaptImage = <T extends ImageWithSource>(img: T): ImageApi => ({
     ...img,
-    source_id: img.source,
+    source_id: img.source ? img.source.id : null,
     speciesid: img.species_id,
     small: makePath(img.path, SMALL),
     medium: makePath(img.path, MEDIUM),
     large: makePath(img.path, LARGE),
     xlarge: makePath(img.path, XLARGE),
     original: makePath(img.path, ORIGINAL),
-    source: img.source ? img.source : undefined,
+    source: img.source ? img.source : null,
     license: asImageLicense(img.license),
 });
 

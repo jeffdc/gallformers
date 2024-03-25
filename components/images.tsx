@@ -1,5 +1,3 @@
-import * as O from 'fp-ts/lib/Option';
-import { constant, pipe } from 'fp-ts/lib/function';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image.js';
 import Link from 'next/link';
@@ -157,20 +155,18 @@ const Images = ({ sp }: Props): JSX.Element => {
                             <Row>
                                 <Col>
                                     <b>Source:</b>{' '}
-                                    {pipe(
-                                        currentImage ? currentImage.source : O.none,
-                                        O.fold(
-                                            constant(
-                                                <a href={currentImage?.sourcelink} target="_blank" rel="noreferrer">
-                                                    {currentImage?.sourcelink}
-                                                </a>,
-                                            ),
-                                            (s) => (
-                                                <Link href={`/source/${s.id}`} target="_blank" rel="noreferrer">
-                                                    {s.title}
-                                                </Link>
-                                            ),
-                                        ),
+                                    {currentImage ? (
+                                        currentImage.source ? (
+                                            <Link href={`/source/${currentImage.source.id}`} target="_blank" rel="noreferrer">
+                                                {currentImage.source.title}
+                                            </Link>
+                                        ) : (
+                                            <a href={currentImage.sourcelink} target="_blank" rel="noreferrer">
+                                                {currentImage.sourcelink}
+                                            </a>
+                                        )
+                                    ) : (
+                                        <></>
                                     )}
                                 </Col>
                             </Row>

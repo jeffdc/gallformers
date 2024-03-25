@@ -7,7 +7,6 @@ import EditName, { RenameEvent } from '../../components/editname';
 import { DeleteResult, TaxonCodeValues } from '../api/apitypes';
 import { WithID } from '../utils/types';
 import { pluralize } from '../utils/util';
-import { DevTool } from '@hookform/devtools';
 
 export type AdminTypes =
     | 'Taxonomy'
@@ -188,7 +187,7 @@ const Admin = <T extends AdminType, V extends FieldValues>(props: AdminProps<T, 
 
                 {props.form && (
                     <>
-                        <DevTool control={props.form.control} placement="top-right" />
+                        {/* <DevTool control={props.form.control} placement="top-right" /> */}
                         <ul>
                             <li>
                                 <code>{`IsValid: ${props.form.formState.isValid} -- isDirty: ${props.form.formState.isDirty}`}</code>

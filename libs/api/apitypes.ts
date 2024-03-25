@@ -148,7 +148,6 @@ export enum TaxonCodeValues {
     PLANT = 'plant',
 }
 
-// export const TaxonCodeSchema = fromEnum<TaxonCodeValues>('TaxonCodeValues', TaxonCodeValues);
 /** Given a string value, look up the proper TaxonCode. If the value is not one of the valid values then an error will be thrown. */
 export const taxonCodeAsStringToValue = (tc?: string | null): TaxonCodeValues => {
     if (tc === TaxonCodeValues.GALL) {
@@ -160,12 +159,6 @@ export const taxonCodeAsStringToValue = (tc?: string | null): TaxonCodeValues =>
     }
 };
 
-// export const SimpleSpeciesSchema = t.type({
-//     id: t.number,
-//     taxoncode: TaxonCodeSchema,
-//     name: t.string, //.matches(SPECIES_NAME_REGEX).required(),
-// });
-// export type SimpleSpecies = t.TypeOf<typeof SimpleSpeciesSchema>;
 export type SimpleSpecies = {
     id: number;
     taxoncode: TaxonCodeValues;
@@ -174,20 +167,6 @@ export type SimpleSpecies = {
 
 ////////////////////////////////////////////////////////////////////
 // Source Schemas and Types
-// export const SourceApiSchema = t.type({
-//     id: t.number,
-//     title: t.string,
-//     author: t.string,
-//     pubyear: t.string,
-//     link: t.string,
-//     citation: t.string,
-//     datacomplete: t.boolean,
-//     license: t.string,
-//     licenselink: t.string,
-// });
-
-// export type SourceApi = t.TypeOf<typeof SourceApiSchema>;
-
 export type SourceApi = {
     id: number;
     title: string;
@@ -342,7 +321,7 @@ export type ImageSource = {
     licenselink: string;
     sourcelink: string;
     // source: Option<SourceWithSpeciesSourceApi>;
-    source: SourceWithSpeciesSourceApi | undefined;
+    source: SourceWithSpeciesSourceApi | null;
     source_id: number | null;
 };
 
