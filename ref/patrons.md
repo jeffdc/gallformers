@@ -21,6 +21,7 @@ Thank you to all our Patrons!
 # Cynipid tier:
 
 - Andrew Deans
+- Leslie Flint
 - Ellen Martinson
 
 # Eriophyid tier:
