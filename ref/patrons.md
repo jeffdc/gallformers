@@ -27,6 +27,7 @@ Thank you to all our Patrons!
 
 - Lisa Appelbaum
 - Deborah Barber
+- Bird Bird
 - Tricia Bippus
 - Ruta Daugavietis
 - Andrew Forbes
