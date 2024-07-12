@@ -38,6 +38,7 @@ Thank you to all our Patrons!
 - Sara Ruth Harrison
 - Noriko Ito
 - Henrik Kibak
+- Moe Morelock
 - Maureen Murphy
 - Robert Riedl
 - ribbon
