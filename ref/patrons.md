@@ -30,6 +30,7 @@ Thank you to all our Patrons!
 - Deborah Barber
 - Bird Bird
 - Tricia Bippus
+- Mimi Brown
 - Ruta Daugavietis
 - Andrew Forbes
 - Jennifer Flynn
