@@ -14,7 +14,8 @@ endif
 
 .PHONY: build
 build:
-	docker-compose build
+	# DOCKER_DEFAULT_PLATFORM=linux/amd64 docker-compose build 
+	docker buildx --platform linux/amd64 bake -f docker-compose.yml
 
 .PHONY: run-local
 run-local:

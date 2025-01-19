@@ -2,6 +2,7 @@ version: '3.7'
 
 services:
     gallformers:
+        platform: linux/amd64
         build:
             context: .
             dockerfile: ./Dockerfile
@@ -11,5 +12,7 @@ services:
         environment:
             PORT: 3000
         command: yarn start
-
+        x-bake:
+            platforms:
+                - linux/amd64
     

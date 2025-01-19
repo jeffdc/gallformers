@@ -45,6 +45,13 @@ You can also create a tar of the docker image by running:
 make save-image
 ```
 
+If you are an a newer Mac using an Apple Silicon chip (M1, M2, ...) then you will need to make sure that you can build and target `linux/amd64`. The easiest way
+is to use [Docker Desktop](https://www.docker.com/products/docker-desktop/) and then to install the emulators. 
+```
+docker run --privileged --rm tonistiigi/binfmt --install all
+```
+The builds are slower this way then [some of the other options](https://docs.docker.com/build/building/multi-platform/) but it works with little ceremony.
+
 The other commands are meant to be used on the server (at least until we get some deployment automation in place).
 
 ## Technical Overview
