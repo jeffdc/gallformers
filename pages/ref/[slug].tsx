@@ -54,7 +54,7 @@ export async function getStaticProps({ params }: Params) {
     try {
         const post = getPostBySlug(params.slug, ['title', 'date', 'slug', 'author', 'content']);
         const content = await markdownToHtml(post.content || '');
-        if (!post || !content) throw '404';
+        if (!post || !content) throw new Error('404');
 
         return {
             props: {
@@ -66,12 +66,12 @@ export async function getStaticProps({ params }: Params) {
             },
             revalidate: 60 * 60, // republish hourly
         };
-    } catch (e) {
+    } catch {
         return { notFound: true };
     }
 }
 
-export const getStaticPaths: GetStaticPaths = async () => {
+export const getStaticPaths: GetStaticPaths = () => {
     const posts = getAllPosts(['slug']);
 
     return {

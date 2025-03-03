@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef } from 'react';
 
@@ -20,7 +24,7 @@ import { useEffect, useRef } from 'react';
  *
  * @see https://stackoverflow.com/a/51082563/2391795
  */
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+
 const useRenderingTrace = (componentName: string, propsAndStates: any, level: 'debug' | 'info' | 'log' = 'debug') => {
     const prev = useRef(propsAndStates);
 

@@ -15,7 +15,14 @@ import { RenameEvent } from '../../components/editname';
 import Picker from '../../components/picker';
 import useAdmin, { AdminFormFields } from '../../hooks/useadmin';
 import { extractQueryParam } from '../../libs/api/apipage';
-import { SimpleSpecies, SourceApi, SpeciesSourceApi, SpeciesSourceInsertFields, TaxonCodeValues } from '../../libs/api/apitypes';
+import {
+    DeleteResult,
+    SimpleSpecies,
+    SourceApi,
+    SpeciesSourceApi,
+    SpeciesSourceInsertFields,
+    TaxonCodeValues,
+} from '../../libs/api/apitypes';
 import { allSources } from '../../libs/db/source';
 import { allSpeciesSimple } from '../../libs/db/species';
 import Admin from '../../libs/pages/admin';
@@ -36,10 +43,11 @@ type FormFields = AdminFormFields<SimpleSpecies> & {
     useasdefault: boolean;
 };
 
-const update = async (s: SimpleSpecies, e: RenameEvent) => ({
-    ...s,
-    name: e.new,
-});
+const update = (s: SimpleSpecies, e: RenameEvent) =>
+    Promise.resolve({
+        ...s,
+        name: e.new,
+    });
 
 const fetchSources = async (id: number): Promise<SpeciesSourceApi[]> => {
     if (id == undefined) return [];
@@ -107,7 +115,11 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const err: any = e;
             console.error(err);
-            setError(err.toString());
+            if (err instanceof Error) {
+                setError(err.toString());
+            } else {
+                setError('An error occurred while fetching sources for the selected species');
+            }
             return {
                 mainField: sp ? [sp] : [],
                 description: '',
@@ -177,7 +189,9 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
         // TODO - tweak the useAdmin hook to allow for more flexibility in how this works - really a useAPIs issue.
         if (selected == undefined || selectedSource.length < 1) {
             //nothing to do
-            console.debug(`Did nothing in onSubmit. selected: '${selected}' | selectedSource: '${selectedSource}'`);
+            console.debug(
+                `Did nothing in onSubmit. selected: '${selected ? JSON.stringify(selected) : 'undefined'}' | selectedSource: '${selectedSource.length > 0 ? JSON.stringify(selectedSource) : '[]'}'`,
+            );
             return;
         }
 
@@ -190,14 +204,15 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
 
                 if (res.status === 200) {
                     setSelectedSource([]);
-                    const dr = await res.json();
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                    const dr: DeleteResult = await res.json();
                     setDeleteResults(dr);
                     // kludge: postDelete makes assumptions that are not good for this screen...
                     const sp = selected;
                     adminForm.postDelete(fields.mainField[0].id, dr);
                     //... so we save the old species and re-select it after the delete
                     setSelected(sp);
-                    router.replace(`?id=${sp.id}`, undefined, { shallow: true });
+                    void router.replace(`?id=${sp.id}`, undefined, { shallow: true });
                     return;
                 } else {
                     throw new Error(await res.text());
@@ -224,7 +239,7 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
             });
 
             if (res.status == 200) {
-                adminForm.postUpdate(res);
+                void adminForm.postUpdate(res);
                 setSelectedSource([selSo]);
             } else {
                 throw new Error(await res.text());
@@ -233,7 +248,11 @@ const SpeciesSource = ({ speciesid, allSpecies, allSources }: Props): JSX.Elemen
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const err: any = e;
             console.error(err);
-            setError(err.toString());
+            if (err instanceof Error) {
+                setError(err.toString());
+            } else {
+                setError('An error occurred while saving the species-source mapping');
+            }
         }
     };
 

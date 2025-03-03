@@ -51,7 +51,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
             }
         };
 
-        fetchData();
+        void fetchData();
         setValue('default', selected.default);
         setValue('creator', selected.creator);
         setValue('attribution', selected.attribution);
@@ -82,7 +82,7 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
 
     return (
         <Modal show={show} onHide={onHide} size="lg">
-            <form onSubmit={handleSubmit(onSubmit)}>
+            <form onSubmit={void handleSubmit(onSubmit)}>
                 <Modal.Header closeButton>
                     <Modal.Title>Edit Image Details</Modal.Title>
                 </Modal.Header>

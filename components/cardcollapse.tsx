@@ -16,12 +16,7 @@ const CardTextCollapse = ({ text }: Props): JSX.Element => {
         </Container>
     );
 
-    // eslint-disable-next-line prettier/prettier
     const t = pipe(text, O.getOrElse(constant('')));
-
-    // if (text === null || text === undefined || text.length === 0) {
-    //     return noCollapse;
-    // }
 
     const truncated = truncateAtWord(40)(t);
     const start = t.substring(truncated.length, t.length + 1);

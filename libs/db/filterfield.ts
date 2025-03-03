@@ -221,7 +221,7 @@ export const deleteFilterField = (fieldType: FilterFieldTypeValue, id: string): 
             case FilterFieldTypeValue.WALLS:
                 return db.walls.delete(deleteConfig('walls'));
             default:
-                return Promise.reject('Unknown type passed to deleteFilterField');
+                return Promise.reject(new Error('Unknown type passed to deleteFilterField'));
         }
     };
 
@@ -232,7 +232,7 @@ export const deleteFilterField = (fieldType: FilterFieldTypeValue, id: string): 
             count: 1,
         };
     };
-    // eslint-disable-next-line prettier/prettier
+
     return pipe(
         // @ts-expect-error TODO fix this...
         TE.tryCatch(results, handleError),
@@ -412,7 +412,7 @@ export const upsertFilterField = (field: FilterFieldWithType): TaskEither<Error,
                     }));
 
             default:
-                return Promise.reject('Unknown type passed to upsertFilterField');
+                return Promise.reject(new Error('Unknown type passed to upsertFilterField'));
         }
     };
 
@@ -480,7 +480,7 @@ const getFilterFields = (where: Wheres, fieldType: FilterFieldTypeValue): TaskEi
                 TE.map(adaptWalls),
             );
         default:
-            return Promise.reject;
+            return TE.left(new Error('Unknown type passed to getFilterFields'));
     }
 };
 
@@ -509,7 +509,7 @@ export const getFilterFieldByNameAndType = (name: string, fieldType: FilterField
         case FilterFieldTypeValue.WALLS:
             return getFilterFields({ walls: name }, fieldType);
         default:
-            return Promise.reject;
+            return TE.left(new Error('Unknown type passed to getFilterFieldByNameAndType'));
     }
 };
 

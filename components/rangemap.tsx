@@ -35,11 +35,11 @@ const RangeMap = ({ range }: Props): JSX.Element => {
                 >
                     <Geographies geography="../usa-can-topo.json">
                         {({ geographies }) =>
-                            geographies.map((geo) => {
+                            geographies.map((geo: { id: string; properties: { postal: string; name: string } }) => {
                                 const code = geo.properties.postal;
                                 return (
                                     <Geography
-                                        key={geo.rsmKey}
+                                        key={geo.id}
                                         geography={geo}
                                         stroke={'Black'}
                                         fill={range.has(code) ? 'ForestGreen' : 'White'}

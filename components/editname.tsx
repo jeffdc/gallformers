@@ -18,7 +18,7 @@ type Props = {
     showModal: boolean;
     setShowModal: (showModal: boolean) => void;
     nameExistsCallback: (name: string) => Promise<boolean>;
-    renameCallback: (e: RenameEvent) => void;
+    renameCallback: (e: RenameEvent) => Promise<void>;
 };
 
 const EditName = ({
@@ -84,18 +84,23 @@ const EditName = ({
                             } else if (isGallOrHost && !isValidSpeciesName(value)) {
                                 toast.error('The name must be a valid species name construction.');
                             } else {
-                                nameExistsCallback(value).then((b) => {
-                                    if (b) {
-                                        toast.error('That name is already in use.');
-                                    } else {
-                                        renameCallback({
-                                            old: defaultValue,
-                                            new: value,
-                                            addAlias: addAlias,
-                                        });
-                                        setShowModal(false);
-                                    }
-                                });
+                                nameExistsCallback(value)
+                                    .then((b) => {
+                                        if (b) {
+                                            toast.error('That name is already in use.');
+                                        } else {
+                                            void renameCallback({
+                                                old: defaultValue,
+                                                new: value,
+                                                addAlias: addAlias,
+                                            });
+                                            setShowModal(false);
+                                        }
+                                    })
+                                    .catch((error) => {
+                                        toast.error('An error occurred while checking the name.');
+                                        console.error(error);
+                                    });
                             }
                         }}
                     >

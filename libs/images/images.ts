@@ -55,7 +55,6 @@ export const getImagePaths = async (speciesId: number, imageids: number[] = []):
 
         return toImagePaths(images);
     } catch (e) {
-        /* eslint-disable @typescript-eslint/no-explicit-any */
         logger.error(e as never);
     }
 
@@ -115,25 +114,29 @@ const sizes = new Map([
     [XLARGE, 2000],
 ]);
 
-export const createOtherSizes = (images: image[]): image[] => {
+export const createOtherSizes = async (images: image[]): Promise<image[]> => {
     try {
-        images.map(async (image) => {
-            const path = `${EDGE}/${image.path}`;
-            const img = await tryBackoff(3, () => Jimp.read(path)).catch((reason: Error) =>
-                logger.error(`Failed to load file ${path} with Jimp. Received error: ${reason}.`),
-            );
-            if (!img) return [];
+        await Promise.all(
+            images.map(async (image) => {
+                const path = `${EDGE}/${image.path}`;
+                const img = await tryBackoff(3, () => Jimp.read(path)).catch((reason: Error) =>
+                    logger.error(`Failed to load file ${path} with Jimp. Received error: ${reason}.`),
+                );
+                if (!img) return;
 
-            const mime = img.getMIME();
-            sizes.forEach(async (value, key) => {
-                img.resize(value, Jimp.AUTO);
-                img.quality(100);
-                const newPath = image.path.replace(ORIGINAL, key);
-                logger.info(`Will write ${newPath}`);
-                const buffer = await img.getBufferAsync(mime);
-                await uploadImage(newPath, buffer, mime);
-            });
-        });
+                const mime = img.getMIME();
+                await Promise.all(
+                    Array.from(sizes.entries()).map(async ([key, value]) => {
+                        img.resize(value, Jimp.AUTO);
+                        img.quality(100);
+                        const newPath = image.path.replace(ORIGINAL, key);
+                        logger.info(`Will write ${newPath}`);
+                        const buffer = await img.getBufferAsync(mime);
+                        await uploadImage(newPath, buffer, mime);
+                    }),
+                );
+            }),
+        );
 
         return images;
     } catch (e) {
@@ -184,6 +187,7 @@ export const deleteImagesByPaths = async (paths: ImagePaths): Promise<void> => {
     // nothing to do
     if (objects.length <= 0) return Promise.resolve();
 
+    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
     logger.info(`About to delete images: ${objects.map((o) => o.Key)}`);
 
     const deleteParams: DeleteObjectsRequest = {

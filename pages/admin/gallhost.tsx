@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import axios from 'axios';
 import * as O from 'fp-ts/lib/Option';
 import { constant, pipe } from 'fp-ts/lib/function';
@@ -39,10 +41,11 @@ type FormFields = AdminFormFields<GallApi> & {
     places: PlaceNoTreeApi[];
 };
 
-const update = async (s: GallApi, e: RenameEvent) => ({
-    ...s,
-    name: e.new,
-});
+const update = (s: GallApi, e: RenameEvent) =>
+    Promise.resolve({
+        ...s,
+        name: e.new,
+    });
 
 const fetchGallHosts = async (id: number | undefined): Promise<SpeciesWithPlaces[]> => {
     if (id == undefined) return [];
@@ -50,7 +53,7 @@ const fetchGallHosts = async (id: number | undefined): Promise<SpeciesWithPlaces
     return axios
         .get<SpeciesWithPlaces[]>(`/api/gallhost?gallid=${id}`)
         .then((res) => res.data)
-        .catch((e) => {
+        .catch((e: Error) => {
             console.error(e.toString());
             throw new Error('Failed to fetch host for the selected gall. Check console.', e);
         });
@@ -69,7 +72,6 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
     const [outRange, setOutRange] = useState<Map<string, PlaceNoTreeApi>>(new Map());
     const [tooltipContent, setTooltipContent] = useState('');
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const toUpsertFields = (fields: FormFields, name: string, id: number): GallHostUpdateFields => {
         return {
             gall: id,
@@ -292,7 +294,7 @@ const GallHostMapper = ({ sp, id, hosts }: Props): JSX.Element => {
                                     <Geographies geography="../usa-can-topo.json">
                                         {({ geographies }) =>
                                             geographies.map((geo) => {
-                                                const code = geo.properties.postal;
+                                                const code = geo.properties.postal as string;
                                                 return (
                                                     <Geography
                                                         key={geo.rsmKey}

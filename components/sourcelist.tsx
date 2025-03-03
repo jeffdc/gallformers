@@ -32,7 +32,7 @@ const linkLicense = (row: SpeciesSourceApi) => {
     return (
         <span>
             <a href={link} target="_blank" rel="noreferrer">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {}
                 <img
                     alt={link}
                     src={

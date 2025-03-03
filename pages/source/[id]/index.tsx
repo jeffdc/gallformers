@@ -1,7 +1,7 @@
 import { GetStaticPaths, GetStaticProps } from 'next';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import React from 'react';
+import React, { JSX } from 'react';
 import { Button, Col, Container, OverlayTrigger, Row, Tooltip } from 'react-bootstrap';
 import Edit from '../../../components/edit';
 import SpeciesTable from '../../../components/speciesTable';
@@ -91,7 +91,7 @@ const Source = ({ source }: Props): JSX.Element => {
 export const getStaticProps: GetStaticProps = async (context) => {
     try {
         const source = await getStaticPropsWithContext(context, sourceById, 'source');
-        if (!source[0]) throw '404';
+        if (!source[0]) throw new Error('404');
 
         return {
             props: {
@@ -101,7 +101,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
             },
             revalidate: 1,
         };
-    } catch (e) {
+    } catch {
         return { notFound: true };
     }
 };

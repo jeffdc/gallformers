@@ -19,6 +19,7 @@ import { getServerSession } from 'next-auth';
 import authOptions from '../../../pages/api/auth/[...nextauth]';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const session = await getServerSession(req, res, authOptions);
     if (!session) {
         res.status(401).end();
@@ -43,18 +44,18 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
     } else if (req.method === 'DELETE') {
         const invalidQueryErr: Err = {
             status: 400,
-            msg: `You must provide the speciesid and an array of imageids to delete as query params. The params you passed are: ${req.query}`,
+            msg: `You must provide the speciesid and an array of imageids to delete as query params. The params you passed are: ${JSON.stringify(req.query)}`,
         };
 
         await pipe(
             'speciesid',
             getQueryParam(req),
             O.map(parseInt),
-            // eslint-disable-next-line prettier/prettier
+
             O.map((spId) => pipe('imageids', getQueryParam(req), O.map(csvAsNumberArr), O.map(deleteImages(spId)))),
             O.flatten,
             O.map(TE.mapLeft(toErr)),
-            // eslint-disable-next-line prettier/prettier
+
             O.fold(() => E.left<Err, TE.TaskEither<Err, number>>(invalidQueryErr), E.right),
             TE.fromEither,
             TE.flatten,

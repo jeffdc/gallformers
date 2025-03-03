@@ -15,10 +15,10 @@ if (process.env.NODE_ENV === 'production') {
     // Ensure the prisma instance is re-used during hot-reloading
     // Otherwise, a new client will be created on every reload
     // @ts-ignore
-    globalThis['db'] = globalThis['db'] || new PrismaClient();
+    globalThis['db'] = (globalThis['db'] as PrismaClient) || new PrismaClient();
     // globalThis['db'] = globalThis['db'] || new PrismaClient({ log: [{ emit: 'event', level: 'query' }] });
     // @ts-ignore
-    db = globalThis['db'];
+    db = globalThis['db'] as PrismaClient;
 
     // db.$on('query', (e) => {
     //     console.log(`${e.query} // ${e.params}`);
@@ -29,6 +29,6 @@ if (process.env.NODE_ENV === 'production') {
 
 // const db = new PrismaClient();
 // make sure foreign key support is turned on
-db.$executeRaw`PRAGMA foreign_keys = ON`;
+void db.$executeRaw`PRAGMA foreign_keys = ON`;
 
 export default db;

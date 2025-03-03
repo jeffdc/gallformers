@@ -11,6 +11,7 @@ import authOptions from '../../../pages/api/auth/[...nextauth]';
 import { getServerSession } from 'next-auth';
 
 export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const session = await getServerSession(req, res, authOptions);
     if (!session) {
         res.status(401).end();
@@ -19,7 +20,7 @@ export default async (req: NextApiRequest, res: NextApiResponse): Promise<void> 
     if (req.method === 'GET') {
         const invalidQueryErr: Err = {
             status: 400,
-            msg: `You must provide the path (bucket key) to upload to and the mime type as query params. The params you passed are: ${req.query}`,
+            msg: `You must provide the path (bucket key) to upload to and the mime type as query params. The params you passed are: ${JSON.stringify(req.query)}`,
         };
 
         res.setHeader('Access-Control-Allow-Origin', IMAGES_ENDPOINT);

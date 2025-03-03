@@ -14,7 +14,7 @@ const Header = (): JSX.Element => {
     const submitSearch = (e: SyntheticEvent) => {
         e.preventDefault();
         if (searchText) {
-            router.push({
+            void router.push({
                 pathname: '/globalsearch',
                 query: {
                     searchText: searchText,

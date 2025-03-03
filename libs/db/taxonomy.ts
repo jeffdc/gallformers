@@ -85,7 +85,6 @@ export const taxonomyEntryById = (id: number): TE.TaskEither<Error, TaxonomyEntr
             include: { parent: true },
         });
 
-    // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(tax, handleError),
         TE.map((ts) => ts.map(toTaxonomyEntry)),
@@ -315,7 +314,7 @@ export const taxonomyForSpecies = (id: number): TE.TaskEither<Error, FGS> => {
     };
 
     const toFGS = (tax: ExtractTFromPromise<ReturnType<typeof tree>>): FGS => {
-        const genus = tax.find((t) => t.taxonomy.type === TaxonomyTypeValues.GENUS)?.taxonomy;
+        const genus = tax.find((t) => t.taxonomy.type === TaxonomyType.GENUS)?.taxonomy;
         const family = genus?.parent;
         const section = O.fromNullable(tax.find((t) => t.taxonomy.type === TaxonomyTypeValues.SECTION)?.taxonomy);
 
@@ -768,7 +767,6 @@ const generaCreate =
 export const upsertFamily = (f: FamilyUpsertFields): TE.TaskEither<Error, TaxonomyEntry> => {
     const updateFamilyTx = TE.tryCatch(() => db.$transaction(familyUpdateSteps(f)), handleError);
 
-    // eslint-disable-next-line prettier/prettier
     const createFamily = pipe(
         TE.tryCatch(() => familyCreate(f), handleError),
         TE.chain(generaCreate(f)),

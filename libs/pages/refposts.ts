@@ -32,6 +32,7 @@ export function getPostBySlug(slug: string, fields: string[] = []) {
         }
 
         if (typeof data[field] !== 'undefined') {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             items[field] = data[field];
         }
     });
@@ -44,13 +45,7 @@ export function getAllPosts(fields: string[] = []) {
     const posts = slugs
         .map((slug) => getPostBySlug(slug, fields))
         // sort posts by date in descending order - dates are in YYYY-MM-DD format
-        .sort(
-            (post1, post2) =>
-                post1.date
-                    ?.split('-')
-                    .join()
-                    .localeCompare(post2.date?.split('-').join()),
-        )
+        .sort((post1, post2) => post1.date?.split('-').join().localeCompare(post2.date?.split('-').join()))
         .reverse();
     return posts;
 }

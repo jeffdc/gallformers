@@ -1,7 +1,9 @@
 import { createContext, ReactNode, useContext, useRef, useState } from 'react';
 import { ConfirmationDialog, ConfirmationOptions, EmptyOptions } from '../components/confirmationdialog';
 
-const ConfirmationServiceContext = createContext<(options: ConfirmationOptions) => Promise<void>>(() => Promise.reject());
+const ConfirmationServiceContext = createContext<(options: ConfirmationOptions) => Promise<void>>(() =>
+    Promise.reject(new Error('Confirmation service not available')),
+);
 
 export const useConfirmation = (): ((options: ConfirmationOptions) => Promise<void>) => useContext(ConfirmationServiceContext);
 

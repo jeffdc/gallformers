@@ -83,7 +83,7 @@ export async function getStaticPropsWithContext<T>(
     if (context === undefined || context.params === undefined || context.params.id === undefined) {
         throw new Error('An id must be passed!');
     } else if (Array.isArray(context.params.id)) {
-        throw new Error(`Expected single id but got an array of ids ${context.params.id}.`);
+        throw new Error(`Expected single id but got an array of ids ${context.params.id.join(', ')}.`);
     }
 
     return getStaticPropsWithId(parseInt(context.params.id), fId, dataType, resultsRequired, many);

@@ -110,11 +110,11 @@ const Gall = ({
         };
     };
 
-    const updatedFormFields = async (s: GallApi | undefined): Promise<FormFields> => {
+    const updatedFormFields = (s: GallApi | undefined): Promise<FormFields> => {
         const speciesFields = updatedSpeciesFormFields(s);
 
         if (s != undefined) {
-            return {
+            return Promise.resolve({
                 ...speciesFields,
                 alignment: s.alignment,
                 cells: s.cells,
@@ -128,10 +128,10 @@ const Gall = ({
                 undescribed: s.undescribed,
                 walls: s.walls,
                 form: s.form,
-            };
+            });
         }
 
-        return {
+        return Promise.resolve({
             ...speciesFields,
             alignment: [],
             cells: [],
@@ -145,7 +145,7 @@ const Gall = ({
             undescribed: false,
             walls: [],
             form: [],
-        };
+        });
     };
 
     const createNewGall = (name: string): GallApi => ({
@@ -276,6 +276,7 @@ const Gall = ({
                     }}
                     // @ts-expect-error breaking type safety here as it is non-trivial (and not seemingly worth it)
                     // to pass the property name in a type safe manner
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                     selected={selected ? selected[name] : []}
                 />
             )}
@@ -574,6 +575,7 @@ const Gall = ({
                                 disabled: areRequiredFieldsFilled(),
                                 onChange: (e) => {
                                     if (selected) {
+                                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
                                         selected.datacomplete = e.currentTarget.checked;
                                         adminForm.setSelected({ ...selected });
                                     }
@@ -594,6 +596,7 @@ const Gall = ({
                                 disabled: areRequiredFieldsFilled(),
                                 onChange: (e) => {
                                     if (selected) {
+                                        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
                                         selected.undescribed = e.currentTarget.checked;
                                         adminForm.setSelected({ ...selected });
                                     }

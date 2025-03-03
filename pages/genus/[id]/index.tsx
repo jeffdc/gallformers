@@ -84,7 +84,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
             },
             revalidate: 1,
         };
-    } catch (e) {
+    } catch {
         return { notFound: true };
     }
 };

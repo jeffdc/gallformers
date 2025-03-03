@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { useSession } from 'next-auth/react';
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useState, JSX } from 'react';
 import { Alert, Col, ProgressBar, Row } from 'react-bootstrap';
 import { toast } from 'react-hot-toast';
 import { ImageApi, ImageLicenseValues } from '../libs/api/apitypes';
@@ -14,18 +14,19 @@ type Props = {
 const AddImage = ({ id, onChange }: Props): JSX.Element => {
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState(0);
-    const [error, setError] = useState();
+    const [error, setError] = useState<Error | null>(null);
 
     const { data: session } = useSession();
     if (!session) return <></>;
 
-    const selectFiles = async (e: ChangeEvent<HTMLInputElement>) => {
+    async function selectFiles(e: ChangeEvent) {
         try {
             e.preventDefault();
 
-            if (e.target.files == null) return;
+            const target = e.target as HTMLInputElement;
+            if (target.files == null) return;
 
-            if (e.target.files.length > 4) {
+            if (target.files.length > 4) {
                 toast.error('You can currently only upload 4 or fewer images at one time.');
                 return;
             }
@@ -33,7 +34,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
             setProgress(0);
             setUploading(true);
 
-            const files = e.target.files;
+            const files = target.files;
             const images = new Array<ImageApi>();
 
             let filesRemaining = files.length;
@@ -42,9 +43,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
             for (const file of files) {
                 // get presigned URL from server so that we can upload without needing secrets
                 const d = new Date();
-                const t = `${d.getUTCFullYear()}${
-                    d.getUTCMonth() + 1
-                }${d.getUTCDate()}${d.getUTCHours()}${d.getUTCMinutes()}${d.getUTCMilliseconds()}`;
+                const t = `${d.getUTCFullYear()}${d.getUTCMonth() + 1}${d.getUTCDate()}${d.getUTCHours()}${d.getUTCMinutes()}${d.getUTCMilliseconds()}`;
                 const ext = file.name.split('.').pop();
                 const path = `gall/${id}/${id}_${t}_original.${ext}`;
                 const res = await fetch(`../api/images/uploadurl?path=${path}&mime=${file.type}`);
@@ -83,7 +82,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                         } else {
                             console.error(`Image upload failed with non Axios error: ${JSON.stringify(e, null, ' ')}`);
                         }
-                        setError(e);
+                        setError(e as Error);
                         return undefined;
                     });
 
@@ -128,7 +127,7 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                     body: JSON.stringify(images),
                 });
 
-                const newImages: ImageApi[] = await dbResponse.json();
+                const newImages = (await dbResponse.json()) as ImageApi[];
 
                 //hack: add a delay here to hopefully give a chance for the image to be picked up by the CDN
                 const steps = 100;
@@ -141,18 +140,18 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                 onChange(newImages);
             }
         } catch (e) {
-            console.error(`Image upload failed with error: ${e}`);
+            console.error(`Image upload failed with error: ${e as string}`);
         } finally {
             setUploading(false);
         }
-    };
+    }
 
     return (
         <>
             {error && (
-                <Alert variant="danger" onClose={() => setError(undefined)} dismissible>
+                <Alert variant="danger" onClose={() => setError(null)} dismissible>
                     <Alert.Heading>Uh-oh</Alert.Heading>
-                    <p>{`${error}`}</p>
+                    <p>{JSON.stringify(error)}</p>
                     <p>
                         If you need to create an issue please do so in{' '}
                         <a href="https://github.com/jeffdc/gallformers/issues/new" target="_blank" rel="noreferrer">
@@ -186,7 +185,9 @@ const AddImage = ({ id, onChange }: Props): JSX.Element => {
                             className="form-control"
                             multiple
                             accept={'image/jpg, image/jpeg, image/png'}
-                            onChange={selectFiles}
+                            onChange={(e) => {
+                                void (async () => await selectFiles(e))();
+                            }}
                             style={{
                                 display: 'none',
                             }}

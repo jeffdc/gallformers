@@ -14,7 +14,7 @@ type Props = {
     families: TaxFamily[];
     showModal: boolean;
     setShowModal: (showModal: boolean) => void;
-    moveCallback: (e: MoveEvent) => void;
+    moveCallback: (e: MoveEvent) => Promise<void>;
 };
 
 const MoveFamily = ({ genera, families, showModal, setShowModal, moveCallback }: Props): JSX.Element => {
@@ -61,7 +61,7 @@ const MoveFamily = ({ genera, families, showModal, setShowModal, moveCallback }:
                             if (!value) {
                                 toast.error(`You must select a new family, or cancel if you do not want to make changes.`);
                             } else {
-                                moveCallback({
+                                void moveCallback({
                                     new: value,
                                 });
                                 setShowModal(false);

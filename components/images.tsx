@@ -65,7 +65,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                                     //  middle/command/ctrl click
                                     window.open(`/admin/images?speciesid=${species.id}`, '_blank');
                                 } else {
-                                    router.push(`/admin/images?speciesid=${species.id}`);
+                                    void router.push(`/admin/images?speciesid=${species.id}`);
                                 }
                             }}
                         >
@@ -142,7 +142,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                     <Row>
                         <Col className="p-0 m-0 border" xs={4}>
                             <div className="image-container">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                {}
                                 <img
                                     src={currentImage ? currentImage.small : ''}
                                     alt={`image of ${species.name}`}
@@ -235,7 +235,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                             className="align-items-center p-1"
                         >
                             {/* the Carousel and next.js Image do not play well together and layout becomes an issue */}
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            {}
                             <img
                                 src={image.medium}
                                 alt={`image of ${species.name}`}
@@ -282,7 +282,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                                         //  middle/command/ctrl click
                                         window.open(`/admin/images?speciesid=${species.id}`, '_blank');
                                     } else {
-                                        router.push(`/admin/images?speciesid=${species.id}`);
+                                        void router.push(`/admin/images?speciesid=${species.id}`);
                                     }
                                 }}
                             >

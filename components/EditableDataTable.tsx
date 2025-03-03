@@ -66,7 +66,7 @@ const EditableCell = <T extends WithID>({ row, rowIndex, col, onChange, columnKe
                             setValue(v);
                         }}
                         onBlur={onBlur}
-                        value={value as string}
+                        value={value}
                     >
                         {col.editor.options.map(({ value, label }) => (
                             <option key={value} value={value}>
@@ -87,7 +87,7 @@ const EditableCell = <T extends WithID>({ row, rowIndex, col, onChange, columnKe
                             setValue(e.target.value);
                         }}
                         onBlur={onBlur}
-                        value={value as string}
+                        value={value}
                     />
                 );
         }
@@ -175,7 +175,14 @@ const EditableTable = <T extends WithID>(props: EditableTableProps<T>): JSX.Elem
                     {ca.name}
                 </Button>
             ))}
-            <Button key="delete" variant="danger" className="btn-sm" onClick={deleteSelected}>
+            <Button
+                key="delete"
+                variant="danger"
+                className="btn-sm"
+                onClick={() => {
+                    void deleteSelected();
+                }}
+            >
                 Delete
             </Button>
         </>

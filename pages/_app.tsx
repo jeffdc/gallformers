@@ -26,6 +26,7 @@ function shouldForwardProp(propName: string, target: unknown) {
 function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
     return (
         <StyleSheetManager shouldForwardProp={shouldForwardProp}>
+            {/* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */}
             <SessionProvider session={pageProps.session}>
                 <Container fluid className="p-0 m-0">
                     <Head>

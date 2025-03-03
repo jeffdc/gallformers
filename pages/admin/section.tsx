@@ -30,10 +30,11 @@ type Props = {
 
 type FormFields = AdminFormFields<TaxSection> & Omit<TaxSection, 'id' | 'name' | 'type'>;
 
-const renameSection = async (s: TaxSection, e: RenameEvent) => ({
-    ...s,
-    name: e.new,
-});
+const renameSection = (s: TaxSection, e: RenameEvent) =>
+    Promise.resolve({
+        ...s,
+        name: e.new,
+    });
 
 const Section = ({ id, sections, genera }: Props): JSX.Element => {
     const [species, setSpecies] = useState<SimpleSpecies[]>([]);
@@ -97,7 +98,7 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
         false,
         createNewSection,
         // hack for now until I figure out how to switch away from the TaxSection type.
-        sections as unknown as unknown as TaxSection[],
+        sections as unknown as TaxSection[],
     );
 
     const fetchSectionSpecies = useCallback(
@@ -109,7 +110,7 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
             return axios
                 .get<SimpleSpecies[]>(`/api/taxonomy/section/${sec.id}`)
                 .then((res) => res.data)
-                .catch((e) => {
+                .catch((e: Error) => {
                     console.error(e);
                     throw new Error('Failed to fetch species for the selected section. Check console.', e);
                 });
@@ -123,7 +124,7 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
                 setSpecies(await fetchSectionSpecies(selected));
             }
         };
-        updateSpecies();
+        void updateSpecies();
     }, [fetchSectionSpecies, selected]);
 
     const handleSearch = (s: string) => {

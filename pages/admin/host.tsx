@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import * as O from 'fp-ts/lib/Option';
 import { constant, pipe } from 'fp-ts/lib/function';
 import { GetServerSideProps } from 'next';
@@ -68,24 +70,24 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
         };
     };
 
-    const updatedFormFields = async (s: HostApi | undefined): Promise<FormFields> => {
+    const updatedFormFields = (s: HostApi | undefined): Promise<FormFields> => {
         const speciesFields = updatedSpeciesFormFields(s);
         if (s != undefined) {
-            return {
+            return Promise.resolve({
                 ...speciesFields,
                 section: pipe(
                     s.fgs?.section,
                     O.fold(constant([]), (sec) => [sec]),
                 ),
                 places: s.places,
-            };
+            });
         }
 
-        return {
+        return Promise.resolve({
             ...speciesFields,
             section: [],
             places: [],
-        };
+        });
     };
 
     const createNewHost = (name: string): HostApi => ({
@@ -114,7 +116,7 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
     );
 
     const onSubmit = async (fields: FormFields) => {
-        adminForm.formSubmit(fields);
+        await adminForm.formSubmit(fields);
     };
 
     const selectAll = () => {
@@ -375,7 +377,7 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                                 <Geographies geography="../usa-can-topo.json">
                                     {({ geographies }) =>
                                         geographies.map((geo) => {
-                                            const code = geo.properties.postal;
+                                            const code = geo.properties.postal as string;
                                             return (
                                                 <Geography
                                                     key={geo.rsmKey}
