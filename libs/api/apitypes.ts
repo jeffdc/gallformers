@@ -587,7 +587,7 @@ export const DetachableBoth: DetachableApi = {
 export const Detachables = [DetachableNone, DetachableIntegral, DetachableDetachable, DetachableBoth];
 // there has got to be a better way of doing this...
 export const detachableFromString = (s: string): DetachableApi => {
-    switch (s) {
+    switch (s as DetachableValues) {
         case DetachableValues.NONE:
             return DetachableNone;
         case DetachableValues.INTEGRAL:

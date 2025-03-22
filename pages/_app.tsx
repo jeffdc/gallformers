@@ -30,11 +30,6 @@ function Gallformers({ Component, pageProps }: AppProps): JSX.Element {
             <SessionProvider session={pageProps.session}>
                 <Container fluid className="p-0 m-0">
                     <Head>
-                        {/* <script type="text/javascript"> */}
-                        {/* Fix for Firefox autofocus CSS bug See:
-                        http://stackoverflow.com/questions/18943276/html-5-autofocus-messes-up-css-loading/18945951#18945951 */}
-                        {/* </script> */}
-
                         <title>Gallformers</title>
                         <link rel="icon" href="/favicon.ico" />
                         <meta

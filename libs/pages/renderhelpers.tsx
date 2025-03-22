@@ -60,7 +60,7 @@ export const defaultSource = <T extends { useasdefault: number; source: { id: nu
 };
 
 export const formatLicense = (source: SourceApi): string => {
-    if (source.license === ImageLicenseValues.CC_BY) {
+    if ((source.license as ImageLicenseValues) === ImageLicenseValues.CC_BY) {
         return `${source.license}: ${source.author}`;
     } else {
         return source.license;
@@ -85,7 +85,6 @@ export const defaultImage = <T extends WithImages>(species: T): ImageApi | Image
  * @param truncateAfterWord
  */
 export const truncateOptionString = (description: O.Option<string>, truncateAfterWord = 40): string => {
-    // eslint-disable-next-line prettier/prettier
     return pipe(description, O.map(truncateAtWord(truncateAfterWord)), O.getOrElse(constant('')));
 };
 

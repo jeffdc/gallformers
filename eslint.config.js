@@ -43,7 +43,7 @@ export default [
     ...compat.extends('plugin:@next/next/recommended'),
     ...compat.extends('plugin:prettier/recommended'),
     {
-        files: ['**/*.{js,jsx,ts,tsx}', '!**/eslint.config.js'],
+        files: ['**/*.{js,jsx,ts,tsx}'],
         plugins: {
             '@typescript-eslint': tseslintPlugin,
             'react': reactPlugin,
@@ -89,6 +89,6 @@ export default [
         },
     },
     {
-        ignores: ['.next/**/*', '__tests__/**/*'],
+        ignores: ['.next/**/*', '__tests__/**/*', 'lambdas/**/*', 'eslint.config.js'],
     },
 ];

@@ -36,11 +36,11 @@ const linkLicense = (row: SpeciesSourceApi) => {
                 <img
                     alt={link}
                     src={
-                        row.source.license === ImageLicenseValues.PUBLIC_DOMAIN
+                        (row.source.license as ImageLicenseValues) === ImageLicenseValues.PUBLIC_DOMAIN
                             ? '/images/CC0.png'
-                            : row.source.license === ImageLicenseValues.CC_BY
+                            : (row.source.license as ImageLicenseValues) === ImageLicenseValues.CC_BY
                               ? '/images/CCBY.png'
-                              : row.source.license === ImageLicenseValues.ALL_RIGHTS
+                              : (row.source.license as ImageLicenseValues) === ImageLicenseValues.ALL_RIGHTS
                                 ? '/images/allrights.svg'
                                 : ''
                     }

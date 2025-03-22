@@ -314,9 +314,11 @@ export const taxonomyForSpecies = (id: number): TE.TaskEither<Error, FGS> => {
     };
 
     const toFGS = (tax: ExtractTFromPromise<ReturnType<typeof tree>>): FGS => {
-        const genus = tax.find((t) => t.taxonomy.type === TaxonomyType.GENUS)?.taxonomy;
+        const genus = tax.find((t) => (t.taxonomy.type as TaxonomyTypeValues) === TaxonomyTypeValues.GENUS)?.taxonomy;
         const family = genus?.parent;
-        const section = O.fromNullable(tax.find((t) => t.taxonomy.type === TaxonomyTypeValues.SECTION)?.taxonomy);
+        const section = O.fromNullable(
+            tax.find((t) => (t.taxonomy.type as TaxonomyTypeValues) === TaxonomyTypeValues.SECTION)?.taxonomy,
+        );
 
         if (genus == null || family == null) {
             const msg = `Species with id ${id} is missing its family or genus.`;

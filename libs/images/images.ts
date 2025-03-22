@@ -140,7 +140,7 @@ export const createOtherSizes = async (images: image[]): Promise<image[]> => {
 
         return images;
     } catch (e) {
-        logger.error('Err in createOtherSizes: ' + e);
+        logger.error('Err in createOtherSizes: ' + String(e));
         return [];
     }
 };
