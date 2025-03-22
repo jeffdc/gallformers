@@ -210,7 +210,7 @@ const Host = ({ host, taxonomy }: Props): JSX.Element => {
 export const getStaticProps: GetStaticProps = async (context) => {
     try {
         const h = await getStaticPropsWithContext(context, hostById, 'host');
-        if (!h[0]) throw '404';
+        if (!h[0]) throw new Error('404');
         const host = h[0];
         const sources = host ? await linkSourceToGlossary(host.speciessource) : null;
         const taxonomy = await getStaticPropsWithContext(context, taxonomyForSpecies, 'taxonomy');
@@ -224,7 +224,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
             },
             revalidate: 1,
         };
-    } catch (e) {
+    } catch {
         return { notFound: true };
     }
 };

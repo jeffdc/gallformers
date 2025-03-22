@@ -27,7 +27,7 @@ export type AdminProps<T, V extends FieldValues> = {
     children: JSX.Element;
     editName?: {
         getDefault: () => string | undefined;
-        renameCallback: (e: RenameEvent) => void;
+        renameCallback: (e: RenameEvent) => Promise<void>;
         nameExistsCallback: (name: string) => Promise<boolean>;
     };
     showRenameModal?: boolean;
@@ -116,6 +116,7 @@ const Admin = <T extends AdminType, V extends FieldValues>(props: AdminProps<T, 
         let s: string = '';
         let key: keyof typeof errors;
         for (key in errors) {
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string, @typescript-eslint/restrict-template-expressions
             s = `${s}\n${String(key)} -- ${errors[key]?.message}`;
         }
         return s;
@@ -197,6 +198,7 @@ const Admin = <T extends AdminType, V extends FieldValues>(props: AdminProps<T, 
                             </li>
                         </ul>
                         {props.formSubmit ? (
+                            // eslint-disable-next-line @typescript-eslint/no-misused-promises
                             <form onSubmit={props.form.handleSubmit(props.formSubmit)} className="m-4 pe-4">
                                 {props.children}
 

@@ -214,7 +214,7 @@ const IDGall = (props: Props): JSX.Element => {
                 resetFilter();
                 setGalls([]);
                 setFiltered([]);
-                router.replace('', undefined, { shallow: true });
+                void router.replace('', undefined, { shallow: true });
 
                 return;
             }
@@ -244,7 +244,7 @@ const IDGall = (props: Props): JSX.Element => {
                     setFiltered(g);
                     setGallFamilies([...new Set(g.map((gg) => gg.family))].sort());
 
-                    router.replace(
+                    void router.replace(
                         {
                             query: {
                                 ...convertQForUrl(hostOrTaxon, query),
@@ -261,20 +261,20 @@ const IDGall = (props: Props): JSX.Element => {
             }
         };
 
-        fetchData();
+        void fetchData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [hostOrTaxon]);
 
     useEffect(() => {
         if (!query || !hostOrTaxon) {
-            router.replace('', undefined, { shallow: true });
+            void router.replace('', undefined, { shallow: true });
             return;
         }
 
         const f = galls.filter((g) => checkGall(g, query));
         setFiltered(f);
 
-        router.replace(
+        void router.replace(
             {
                 query: {
                     ...convertQForUrl(hostOrTaxon, query),

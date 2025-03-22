@@ -35,7 +35,7 @@ const Family = ({ family, tree }: Props): JSX.Element => {
     const handleClick = (item: Item) => {
         if (hasProp(item, 'url')) {
             // type-coverage:ignore-next-line
-            router.push(item.url as string);
+            void router.push(item.url as string);
         }
     };
 
@@ -88,7 +88,7 @@ const toTreeNodeInArray = (tree: TaxonomyTree): TreeNodeInArray[] => [
 export const getStaticProps: GetStaticProps = async (context) => {
     try {
         const family = await getStaticPropsWithContext(context, taxonomyEntryById, 'family');
-        if (!family[0]) throw '404';
+        if (!family[0]) throw new Error('404');
         const tree = pipe(
             await getStaticPropsWithContext(context, taxonomyTreeForId, 'species', false, true),
             O.fold(constant([]), toTreeNodeInArray),
@@ -103,7 +103,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
             },
             revalidate: 1,
         };
-    } catch (e) {
+    } catch {
         return { notFound: true };
     }
 };

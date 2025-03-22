@@ -33,27 +33,28 @@ type Props = {
     fs: FamilyAPI[];
 };
 
-const renameFamily = async (s: FamilyAPI, e: RenameEvent) => ({
-    ...s,
-    name: e.new,
-});
+const renameFamily = (s: FamilyAPI, e: RenameEvent) =>
+    Promise.resolve({
+        ...s,
+        name: e.new,
+    });
 
-const updatedFormFields = async (fam: FamilyAPI | undefined): Promise<FormFields> => {
+const updatedFormFields = (fam: FamilyAPI | undefined): Promise<FormFields> => {
     if (fam != undefined) {
-        return {
+        return Promise.resolve({
             mainField: [fam],
             description: fam.description,
             del: false,
             genera: fam.genera,
-        };
+        });
     }
 
-    return {
+    return Promise.resolve({
         mainField: [],
         description: '',
         del: false,
         genera: [],
-    };
+    });
 };
 
 const createNewFamily = (name: string): FamilyAPI => ({
@@ -149,7 +150,7 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
             genera: generaToMove.map((g) => g.id),
         };
 
-        axios
+        await axios
             .post<FamilyAPI[]>('/api/taxonomy/genus/move', {
                 headers: {
                     'Content-Type': 'application/json',
@@ -162,7 +163,7 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
                 adminForm.setSelected(families.find((f) => f.id === selected.id));
                 setGeneraToMove([]);
             })
-            .catch((e) => {
+            .catch((e: Error) => {
                 console.error(e);
                 throw new Error(
                     `Failed to move genera. Check the console and open a new issue in Github copying any errors seen in the console as well as info about what you were doing when this occurred.`,
@@ -181,14 +182,14 @@ const FamilyAdmin = ({ id, fs }: Props): JSX.Element => {
                 await axios
                     .get<Genus[]>(`/api/taxonomy/genus?famid=${selected.id}`)
                     .then((res) => setGenera(res.data))
-                    .catch((e) => {
+                    .catch((e: Error) => {
                         console.error(e);
                         throw new Error('Failed to fetch species for the selected section. Check console.', e);
                     });
             }
         };
 
-        updateGenera();
+        void updateGenera();
     }, [families, selected]);
 
     return (

@@ -56,7 +56,7 @@ export function deserialize(data: string | object | undefined | null): ReactNode
     }
 
     if (typeof data === 'string') {
-        data = JSON.parse(data);
+        data = JSON.parse(data) as object;
     }
     if (data instanceof Object) {
         return deserializeElement(data, undefined);

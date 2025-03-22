@@ -17,7 +17,7 @@ const Auth = ({ superAdmin, children }: { superAdmin?: boolean; children: JSX.El
                     These are not the droids you are looking for. If you think that you really do want some droids, then login
                     first.
                 </p>
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */}
                 <button onClick={signIn as any}>Log In</button>
             </div>
         );

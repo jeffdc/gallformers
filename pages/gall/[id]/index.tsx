@@ -261,7 +261,7 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
 export const getStaticProps: GetStaticProps = async (context) => {
     try {
         const g = await getStaticPropsWithContext(context, gallById, 'gall');
-        if (!g[0]) throw '404';
+        if (!g[0]) throw new Error('404');
 
         const gall = g[0];
         const sources = gall ? await linkSourceToGlossary(gall.speciessource) : null;
@@ -278,7 +278,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
             },
             revalidate: 1,
         };
-    } catch (e) {
+    } catch {
         return { notFound: true };
     }
 };

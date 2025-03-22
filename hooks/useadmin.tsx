@@ -35,12 +35,12 @@ type AdminData<T, FormFields extends FieldValues> = {
     setError: (err: string) => void;
     deleteResults?: DeleteResult;
     setDeleteResults: (dr: DeleteResult) => void;
-    renameCallback: (e: RenameEvent) => void;
+    renameCallback: (e: RenameEvent) => Promise<void>;
     nameExists: (name: string) => Promise<boolean>;
     form: UseFormReturn<FormFields>;
     confirm: (options: ConfirmationOptions) => Promise<void>;
     formSubmit: (fields: FormFields) => Promise<void>;
-    postUpdate: (res: Response) => void;
+    postUpdate: (res: Response) => Promise<void>;
     postDelete: (id: number | string, result: DeleteResult) => void;
     mainField: (placeholder: string, asyncProps?: AsyncMainFieldProps) => JSX.Element;
     deleteButton: (
@@ -118,7 +118,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     }, []);
 
     useEffect(() => {
-        onDataChange(selected);
+        void onDataChange(selected);
     }, [onDataChange, selected]);
 
     const [showRenameModal, setShowRenameModal] = useState(false);
@@ -148,7 +148,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     const onChange = (s: TypeaheadOption[]) => {
         if (s.length <= 0) {
             setSelected(undefined);
-            router.replace(``, undefined, { shallow: true });
+            void router.replace(``, undefined, { shallow: true });
         } else {
             // the Typeahead is weird and new items will have the property 'customOption'... 🤷‍♂️
             if (hasProp(s[0], 'customOption') && hasProp(s[0], mainFieldName)) {
@@ -156,11 +156,11 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                     const x = createNew(s[0][mainFieldName] as string);
                     setSelected(x);
                 }
-                router.replace(``, undefined, { shallow: true });
+                void router.replace(``, undefined, { shallow: true });
             } else {
                 const t = s[0] as T;
                 setSelected(t);
-                router.replace(`?id=${t.id}`, undefined, { shallow: true });
+                void router.replace(`?id=${t.id}`, undefined, { shallow: true });
             }
         }
     };
@@ -262,7 +262,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
                             {needSuperAdmin && !isSuperAdmin ? (
                                 'If you need to delete this please contact Adam or Jeff on Discord.'
                             ) : (
-                                <Button variant="danger" className="" onClick={() => doDelete(customDeleteHandler)}>
+                                <Button variant="danger" className="" onClick={() => void doDelete(customDeleteHandler)}>
                                     Delete
                                 </Button>
                             )}
@@ -295,7 +295,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
     const postDelete = (id: number | string, result: DeleteResult) => {
         setData(data.filter((d) => d.id !== id));
         setSelected(undefined);
-        router.replace(``, undefined, { shallow: true });
+        void router.replace(``, undefined, { shallow: true });
         setDeleteResults(result);
         setError('');
         toast.success(`${type} deleted`);
@@ -316,7 +316,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
         setData(updated);
         setSelected(s);
         toast.success(`${type} Updated`);
-        router.replace(`?id=${s.id}`, undefined, { shallow: !reloadOnUpdate });
+        void router.replace(`?id=${s.id}`, undefined, { shallow: !reloadOnUpdate });
     };
 
     const formSubmit = async (fields: FormFields) => {
@@ -324,7 +324,7 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
             .then(() => {
                 form.reset();
             })
-            .catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
+            .catch((e: unknown) => setError(`Failed to save changes. ${String(e)}.`));
     };
 
     const renameCallback = async (e: RenameEvent): Promise<void> => {
@@ -334,11 +334,11 @@ const useAdmin = <T extends WithID, FormFields extends AdminFormFields<T>, Upser
             setError(msg);
             return;
         }
-        rename(selected, e, confirm)
+        await rename(selected, e, confirm)
             .then(async (u) => {
                 try {
                     const f = await updatedFormFields(u);
-                    formSubmit(f);
+                    void formSubmit(f);
                 } catch (e) {
                     console.error(e);
                 }

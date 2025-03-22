@@ -15,10 +15,11 @@ type Props = {
 
 type FormFields = AdminFormFields<PlaceNoTreeApi> & Omit<PlaceNoTreeApi, 'id' | 'name'>;
 
-const renamePlace = async (s: PlaceNoTreeApi, e: RenameEvent): Promise<PlaceNoTreeApi> => ({
-    ...s,
-    name: e.new,
-});
+const renamePlace = (s: PlaceNoTreeApi, e: RenameEvent): Promise<PlaceNoTreeApi> =>
+    Promise.resolve({
+        ...s,
+        name: e.new,
+    });
 
 const toUpsertFields = (fields: FormFields, name: string, id: number): PlaceNoTreeUpsertFields => {
     return {
@@ -28,22 +29,22 @@ const toUpsertFields = (fields: FormFields, name: string, id: number): PlaceNoTr
     };
 };
 
-const updatedFormFields = async (e: PlaceNoTreeApi | undefined): Promise<FormFields> => {
+const updatedFormFields = (e: PlaceNoTreeApi | undefined): Promise<FormFields> => {
     if (e != undefined) {
-        return {
+        return Promise.resolve({
             mainField: [e],
             code: e.code,
             type: e.type,
             del: false,
-        };
+        });
     }
 
-    return {
+    return Promise.resolve({
         mainField: [],
         code: '',
         type: '',
         del: false,
-    };
+    });
 };
 
 const createNewPlace = (name: string): PlaceNoTreeApi => ({
@@ -148,10 +149,10 @@ const PlaceAdmin = ({ id }: Props): JSX.Element => {
 };
 
 export const getServerSideProps: GetServerSideProps = async (context: { query: ParsedUrlQuery }) => {
-    return {
+    return Promise.resolve({
         props: {
             id: pipe(extractQueryParam(context.query, 'id'), O.getOrElse(constant(''))),
         },
-    };
+    });
 };
 export default PlaceAdmin;

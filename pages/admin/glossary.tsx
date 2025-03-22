@@ -18,10 +18,11 @@ type Props = {
     glossary: Entry[];
 };
 
-const renameEntry = async (s: Entry, e: RenameEvent): Promise<Entry> => ({
-    ...s,
-    word: e.new,
-});
+const renameEntry = (s: Entry, e: RenameEvent): Promise<Entry> =>
+    Promise.resolve({
+        ...s,
+        word: e.new,
+    });
 
 const toUpsertFields = (fields: FormFields, word: string, id: number): GlossaryEntryUpsertFields => {
     return {
@@ -31,22 +32,22 @@ const toUpsertFields = (fields: FormFields, word: string, id: number): GlossaryE
     };
 };
 
-const updatedFormFields = async (e: Entry | undefined): Promise<FormFields> => {
+const updatedFormFields = (e: Entry | undefined): Promise<FormFields> => {
     if (e != undefined) {
-        return {
+        return Promise.resolve({
             mainField: [e],
             definition: e.definition,
             urls: e.urls,
             del: false,
-        };
+        });
     }
 
-    return {
+    return Promise.resolve({
         mainField: [],
         definition: '',
         urls: '',
         del: false,
-    };
+    });
 };
 
 const createNewEntry = (word: string): Entry => ({

@@ -73,7 +73,7 @@ export function handleError(e: unknown): Error {
         return e;
     } else {
         // since in TS/JS you can throw anything, including caution to the wind... :) or really :(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
         return new Error(e as any);
     }
 }
@@ -139,8 +139,8 @@ export const serializeOption = <T>(o: O.Option<T>): string =>
     JSON.stringify(O.isNone(o) ? { type: 'None' } : { type: 'Some', value: o.value });
 
 export const deserializeOption = <T>(s: string): O.Option<T> => {
-    const o = JSON.parse(s);
-    return o.type === 'None' ? O.none : O.some(o.value);
+    const o = JSON.parse(s) as { type: string; value?: T };
+    return o.type === 'None' || o.value === undefined ? O.none : O.some(o.value as T);
 };
 
 /**

@@ -73,7 +73,7 @@ const UndescribedFlow = ({ show, onClose, genera, families }: Props): JSX.Elemen
             );
         }
 
-        axios.get<GallSimple[]>(`/api/gall?name=${name}`).then((res) => {
+        void axios.get<GallSimple[]>(`/api/gall?name=${name}`).then((res) => {
             if (res.data.filter((g) => g.name === name).length > 0) {
                 setErrMessage(
                     `The name you have chosen, (${name}), already exists in the database. Either chose a new name or Cancel out of this and edit the existing gall.`,

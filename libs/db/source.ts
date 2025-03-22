@@ -19,7 +19,7 @@ const adaptor = <T extends source>(source: T): SourceApi | SourceWithSpeciesSour
     isOfType(source, 'speciessource' as keyof SourceWithSpeciesSourceApi)
         ? {
               ...source,
-              speciessource: source.speciessource,
+              speciessource: source.speciessource as SourceWithSpeciesSourceApi['speciessource'],
           }
         : {
               ...source,
@@ -46,7 +46,6 @@ export const sourceById = (id: number): TaskEither<Error, SourceWithSpeciesApi[]
             where: { id: { equals: id } },
         });
 
-    // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(sources, handleError),
         TE.map((sources) =>
@@ -101,7 +100,6 @@ export const allSourcesWithSpecies = (): TaskEither<Error, SourceWithSpeciesApi[
 export const allSourceIds = (): TaskEither<Error, string[]> => {
     const ids = () => db.source.findMany({ select: { id: true } });
 
-    // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(ids, handleError),
         TE.map((i) => i.map(extractId).map((x) => x.toString())),
@@ -115,7 +113,6 @@ export const sourcesWithSpeciesSourceBySpeciesId = (speciesId: number): TaskEith
             where: { speciessource: { some: { species_id: speciesId } } },
         });
 
-    // eslint-disable-next-line prettier/prettier
     return pipe(
         TE.tryCatch(sources, handleError),
         TE.map(adaptMany),

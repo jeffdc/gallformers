@@ -31,7 +31,7 @@ export const tryBackoff = async <T>(
             return await retry();
         }
     } catch (e) {
-        console.log(`Attempt threw (${e}). Will retry in ${delay} ms.`);
+        console.log(`Attempt threw (${e as Error}). Will retry in ${delay} ms.`);
         return await retry(e as Error);
     }
 };

@@ -18,10 +18,11 @@ type Props = {
 
 type FormFields = AdminFormFields<SourceApi> & Omit<SourceApi, 'id' | 'title'>;
 
-const renameSource = async (s: SourceApi, e: RenameEvent) => ({
-    ...s,
-    title: e.new,
-});
+const renameSource = (s: SourceApi, e: RenameEvent) =>
+    Promise.resolve({
+        ...s,
+        title: e.new,
+    });
 
 const toUpsertFields = (fields: FormFields, name: string, id: number): SourceUpsertFields => {
     return {
@@ -31,9 +32,9 @@ const toUpsertFields = (fields: FormFields, name: string, id: number): SourceUps
     };
 };
 
-const updatedFormFields = async (s: SourceApi | undefined): Promise<FormFields> => {
+const updatedFormFields = (s: SourceApi | undefined): Promise<FormFields> => {
     if (s != undefined) {
-        return {
+        return Promise.resolve({
             mainField: [s],
             author: s.author,
             pubyear: s.pubyear,
@@ -43,10 +44,10 @@ const updatedFormFields = async (s: SourceApi | undefined): Promise<FormFields> 
             license: s.license,
             licenselink: s.licenselink,
             del: false,
-        };
+        });
     }
 
-    return {
+    return Promise.resolve({
         mainField: [],
         author: '',
         pubyear: '',
@@ -56,7 +57,7 @@ const updatedFormFields = async (s: SourceApi | undefined): Promise<FormFields> 
         license: '',
         licenselink: '',
         del: false,
-    };
+    });
 };
 
 const createNewSource = (title: string): SourceApi => ({
@@ -200,8 +201,11 @@ const Source = ({ id, sources }: Props): JSX.Element => {
                         <input
                             {...adminForm.form.register('licenselink', {
                                 validate: (v) =>
-                                    !(adminForm.form.getValues('license') === ImageLicenseValues.CC_BY && (!v || v.length < 1)) ||
-                                    'When using the CC BY license, you must provide a link to the license.',
+                                    !(
+                                        (adminForm.form.getValues('license') as ImageLicenseValues) ===
+                                            ImageLicenseValues.CC_BY &&
+                                        (!v || v.length < 1)
+                                    ) || 'When using the CC BY license, you must provide a link to the license.',
                             })}
                             type="text"
                             placeholder="License Link"

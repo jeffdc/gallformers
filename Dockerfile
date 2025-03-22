@@ -7,7 +7,7 @@
 # COPY package.json yarn.lock ./
 # RUN yarn set version berry && yarn install 
 
-FROM node:20-alpine as build
+FROM --platform=linux/amd64 node:20-alpine as build
 WORKDIR /usr/src/app
 COPY . .
 # COPY --from=deps /usr/src/app/node_modules ./node_modules
@@ -21,10 +21,17 @@ ENV NEXT_TELEMETRY_DISABLED 1
 # RUN 
 # mv ./node_modules ./node_modules.tmp \
 # && mv ./node_modules.tmp ./node_modules \
-RUN	yarn generate \
-	&& yarn add --dev typescript @types/node \
-	&& yarn build \
-	&& npm prune --production
+
+# RUN	yarn generate \
+# 	&& yarn add --dev typescript @types/node \
+# 	&& yarn build \
+# 	&& npm prune --omit=dev
+
+RUN	yarn generate
+RUN yarn add --dev typescript @types/node
+RUN yarn build
+# RUN npm prune --omit=dev 
+#--production
 
 # this gets huge and we do not need it for the final build
 RUN rm -rf .next/cache
@@ -34,7 +41,7 @@ RUN rm -rf .next/cache
 # RUN rm node_modules/@prisma/engines/prisma-fmt-linux-musl
 
 ## Shrink final image, copy built nextjs and startup the server
-FROM node:20-alpine
+FROM --platform=linux/amd64 node:20-alpine
 
 WORKDIR /usr/src/app
 ENV NODE_ENV production

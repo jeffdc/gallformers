@@ -16,7 +16,7 @@ export type UseAPIsType<T, U> = {
     doDeleteOrUpsert: <FF extends AdminFormFields<T>>(
         data: FF,
         postDelete: (id: string | number, result: DeleteResult) => void,
-        postUpdate: (res: Response) => void,
+        postUpdate: (res: Response) => Promise<void>,
         convertFieldsToUpsert: (fields: FF, keyFieldVal: string, id: number) => U,
     ) => Promise<void>;
 };
@@ -57,7 +57,7 @@ export const useAPIs = <T extends WithID, U>(
                 });
 
                 if (res.status === 200) {
-                    const result: DeleteResult = await res.json();
+                    const result = (await res.json()) as DeleteResult;
                     postDelete(value.id, result);
                 } else {
                     const txt = await res.text();
@@ -84,7 +84,7 @@ export const useAPIs = <T extends WithID, U>(
         } catch (e) {
             const err = `Failed with endpoint "${data.del ? 'delete: ' + delEndpoint : 'upsert: ' + upsertEndpoint}". ${
                 delQueryString ? 'delQueryString: ' + delEndpoint : ''
-            } ${e}`;
+            } ${String(e)}`;
 
             logger.error(err);
             throw new Error(

@@ -11,8 +11,8 @@ import { Button, Col, Modal, Row } from 'react-bootstrap';
 import { AsyncTypeahead } from 'react-bootstrap-typeahead';
 import DataTable, { TableColumn } from 'react-data-table-component';
 import { Controller, useForm } from 'react-hook-form';
-import AddImage from '../../components/addImage';
-import ImageEdit from '../../components/imageEdit';
+import AddImage from '../../components/addimage';
+import ImageEdit from '../../components/imageedit';
 import ImageGrid from '../../components/imageGrid';
 import { useConfirmation } from '../../hooks/useConfirmation';
 import { extractQueryParam } from '../../libs/api/apipage';
@@ -42,7 +42,6 @@ const linkFormatter = (link: string) => {
 const imageFormatter = (row: ImageApi) => {
     return (
         // I tried to use Next/Image but it chokes in production with non-static images for some reason.
-        // eslint-disable-next-line @next/next/no-img-element
         <img data-tag="allowRowEvents" src={row.small} width="100" />
         // <div className={'image-container'}>
         //     <Image data-tag="allowRowEvents" src={row.small} layout="fill" className={'image'} />
@@ -187,12 +186,12 @@ const Images = ({ sp }: Props): JSX.Element => {
                 return;
             }
 
-            axios
+            await axios
                 .get<ImageApi[]>(`/api/images?speciesid=${id}`)
                 .then((res) => {
                     setImages(res.data);
                 })
-                .catch((e) => {
+                .catch((e: Error) => {
                     console.error(e);
                     setError(e.toString());
                 });
@@ -205,10 +204,10 @@ const Images = ({ sp }: Props): JSX.Element => {
         setCopySource(undefined);
         setEdit(false);
 
-        fetchNewSelection(selected?.id);
+        void fetchNewSelection(selected?.id);
     }, [selected?.id]);
 
-    const addImages = async (newImages: ImageApi[]) => {
+    const addImages = (newImages: ImageApi[]) => {
         setImages([...(images !== undefined ? images : []), ...newImages]);
     };
 
@@ -226,7 +225,7 @@ const Images = ({ sp }: Props): JSX.Element => {
             lastchangedby: sessionUserOrUnknown(session?.user?.name),
         };
 
-        axios
+        await axios
             .post<ImageApi[]>(`/api/images`, body)
             .then((res) => setImages(res.data))
             .catch((e) => {
@@ -267,13 +266,13 @@ const Images = ({ sp }: Props): JSX.Element => {
                             caption: copySource.caption,
                         }))
                         .map((i) => {
-                            saveImage(i);
+                            void saveImage(i);
                         }),
-                ).catch((e: unknown) => setError(`Failed to save changes. ${e}.`));
+                ).catch((e: Error) => setError(`Failed to save changes. ${e}.`));
             })
             .catch(() => {
                 setShowCopy(false);
-                Promise.resolve();
+                Promise.resolve().catch(() => {});
             })
             .finally(() => {
                 setCurrentImage(undefined);
@@ -297,11 +296,11 @@ const Images = ({ sp }: Props): JSX.Element => {
                         message: `This will delete ALL ${selectedImages.length} currently selected images. Do you want to continue?`,
                     })
                         .then(async () => {
-                            axios
+                            await axios
                                 .delete(
                                     `/api/images?speciesid=${selected.id}&imageids=${[
                                         ...selectedImages.map((img) => img.id).values(),
-                                    ]}`,
+                                    ].join(',')}`,
                                 )
                                 .then(() => setImages(images?.filter((i) => !selectedImages.find((oi) => oi.id === i.id))));
 
@@ -310,11 +309,13 @@ const Images = ({ sp }: Props): JSX.Element => {
                         })
                         .catch(() => Promise.resolve());
                 }
-            } catch (e) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const err: any = e;
-                console.error(err);
-                setError(err.toString());
+            } catch (e: unknown) {
+                console.error(e);
+                if (e instanceof Error) {
+                    setError(e.toString());
+                } else {
+                    setError('An unknown error occurred.');
+                }
             }
         };
 
@@ -377,7 +378,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                                 setSelected={setSelectedForCopy}
                             />
                         )}
-                        <Button variant="primary" className="mt-4" onClick={doCopy}>
+                        <Button variant="primary" className="mt-4" onClick={void doCopy}>
                             Copy
                         </Button>
                         <Button variant="secondary" className="mt-4 ms-2" onClick={() => setShowCopy(false)}>
@@ -406,10 +407,10 @@ const Images = ({ sp }: Props): JSX.Element => {
                                         onChange={(s: species[]) => {
                                             if (s.length > 0) {
                                                 setSelected(s[0]);
-                                                router.push(`?speciesid=${s[0]?.id}`, undefined, { shallow: true });
+                                                void router.push(`?speciesid=${s[0]?.id}`, undefined, { shallow: true });
                                             } else {
                                                 setSelected(undefined);
-                                                router.push(``, undefined, { shallow: true });
+                                                void router.push(``, undefined, { shallow: true });
                                             }
                                         }}
                                         isLoading={isLoading}

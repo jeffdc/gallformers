@@ -4,7 +4,7 @@ import * as TA from 'fp-ts/lib/Task.js';
 import * as TE from 'fp-ts/lib/TaskEither';
 import { pipe } from 'fp-ts/lib/function';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getServerSession } from 'next-auth';
+import { AuthOptions, getServerSession } from 'next-auth';
 import { ParsedUrlQuery } from 'querystring';
 import authOptions from '../../pages/api/auth/[...nextauth]';
 import { logger } from '../utils/logger.ts';
@@ -22,7 +22,7 @@ export async function apiIdEndpoint<T>(
     fDelete: ((id: number) => TE.TaskEither<Error, DeleteResult>) | undefined = undefined,
     fGet: ((id: number) => TE.TaskEither<Error, T>) | undefined = undefined,
 ): Promise<void> {
-    const session = await getServerSession(req, res, authOptions);
+    const session = await getServerSession(req, res, authOptions as AuthOptions);
     if (!session) {
         res.status(401).end();
     }
@@ -63,7 +63,7 @@ export async function apiUpsertEndpoint<T, R>(
     fUpsert: (item: T) => TE.TaskEither<Error, R>,
     onComplete: (res: NextApiResponse) => (results: R) => TA.Task<never>,
 ): Promise<void> {
-    const session = await getServerSession(req, res, authOptions);
+    const session = await getServerSession(req, res, authOptions as AuthOptions);
     if (!session) {
         res.status(401).end();
     }
@@ -120,7 +120,7 @@ export async function apiSearchEndpoint<T>(
 export const onCompleteRedirect =
     (path: string) =>
     (res: NextApiResponse) =>
-    (pathEnd: unknown): TA.Task<never> => {
+    (pathEnd: string): TA.Task<never> => {
         res.status(200).redirect(`/${path}${pathEnd}`).end();
         return TA.never;
     };

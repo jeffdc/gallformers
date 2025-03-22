@@ -106,7 +106,7 @@ const PlacePage = ({ place }: Props): JSX.Element => {
 export const getStaticProps: GetStaticProps = async (context) => {
     try {
         const place = await getStaticPropsWithContext(context, placeById, 'place');
-        if (!place[0]) throw '404';
+        if (!place[0]) throw new Error('404');
 
         return {
             props: {
@@ -116,7 +116,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
             },
             revalidate: 1,
         };
-    } catch (e) {
+    } catch {
         return { notFound: true };
     }
 };

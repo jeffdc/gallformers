@@ -19,6 +19,7 @@ import {
 } from '../../libs/db/filterfield';
 import Admin from '../../libs/pages/admin';
 import { mightFailWithArray } from '../../libs/utils/util';
+import { ConfirmationOptions } from '../../components/confirmationdialog';
 
 type FormFields = AdminFormFields<FilterField> & {
     fieldType: string;
@@ -36,10 +37,21 @@ export type Props = {
     walls: FilterField[];
 };
 
-const renameField = async (s: FilterField, e: RenameEvent): Promise<FilterField> => ({
-    ...s,
-    field: e.new,
-});
+const renameField = async (
+    s: FilterField,
+    e: RenameEvent,
+    confirm: (options: ConfirmationOptions) => Promise<void>,
+): Promise<FilterField> => {
+    await confirm({
+        message: `Are you sure you want to rename ${s.field} to ${e.new}?`,
+        variant: 'danger',
+        title: '',
+    });
+    return {
+        ...s,
+        field: e.new,
+    };
+};
 
 const createNewFilterField = (field: string): FilterField => ({
     field: field,
@@ -75,22 +87,22 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
         }
     };
 
-    const updatedFormFields = async (e: FilterField | undefined): Promise<FormFields> => {
+    const updatedFormFields = (e: FilterField | undefined): Promise<FormFields> => {
         if (e != undefined) {
-            return {
+            return Promise.resolve({
                 mainField: [e],
                 description: O.getOrElse(constant(''))(e.description),
                 del: false,
                 fieldType: fieldType,
-            };
+            });
         }
 
-        return {
+        return Promise.resolve({
             mainField: [],
             description: '',
             del: false,
             fieldType: '',
-        };
+        });
     };
 
     const toUpsertFields = (fields: FormFields, field: string, id: number): FilterFieldWithType => {
@@ -104,13 +116,13 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
 
     const doDelete = async (fields: FormFields) => {
         if (fields.del) {
-            axios
+            await axios
                 .delete<DeleteResult>(`/api/filterfield/${fieldType}/${fields.mainField[0].id}`)
                 .then((res) => {
                     setSelected(undefined);
                     adminForm.setDeleteResults(res.data);
                 })
-                .catch((e) => {
+                .catch((e: Error) => {
                     console.error(e.toString());
                     adminForm.setError(e.toString());
                 });
@@ -151,7 +163,7 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
                     <Col>
                         <select
                             {...adminForm.form.register('fieldType', {
-                                onChange: (e) => {
+                                onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
                                     setSelected(undefined);
                                     setFieldType(asFilterType(e.currentTarget.value));
                                     setData(dataFromSelection(e.currentTarget.value));
@@ -201,7 +213,7 @@ const FilterTerms = ({ alignments, cells, colors, forms, locations, shapes, text
                         Description (required):
                         <textarea
                             {...adminForm.form.register('description', {
-                                onChange: (e) => {
+                                onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => {
                                     if (selected) {
                                         selected.description = O.some(e.currentTarget.value);
                                         setSelected({ ...selected });
