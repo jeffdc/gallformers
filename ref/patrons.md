@@ -2,8 +2,7 @@
 title: 'Gallformers Patrons'
 date: '2023-10-15'
 description: 'A list of all past and current Gallformers patrons through Patreon.'
-author:
-    name: Adam Kranz
+author: Adam Kranz
 ---
 
 Thank you to all our Patrons!
@@ -31,6 +30,7 @@ Thank you to all our Patrons!
 - Bird Bird
 - Tricia Bippus
 - Mimi Brown
+- Catherine Chang
 - Ruta Daugavietis
 - Andrew Forbes
 - Jennifer Flynn
