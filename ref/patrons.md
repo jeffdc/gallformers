@@ -23,6 +23,7 @@ Thank you to all our Patrons!
 - Andrew Deans
 - Leslie Flint
 - Ellen Martinson
+- Dale Ball
 
 # Eriophyid tier:
 
