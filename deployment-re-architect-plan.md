@@ -51,257 +51,111 @@ This document outlines the plan to migrate from Docker-based deployment to a PM2
    sudo npm install -g pm2
    ```
 
+3. **Document Current Integrations**
+   - Auth0 configuration and environment variables
+   - AWS S3 image storage configuration
+   - SSL certificate renewal process
+   - Existing monitoring systems (Lambda, DO alarms, Slack)
+   - Database migration system and process
+   - Current backup strategy and requirements
+
+4. **Development Environment Setup**
+   - Document Node.js version requirements (20.x)
+   - Document yarn version requirements (berry)
+   - Document required development dependencies:
+     ```json
+     {
+       "better-sqlite3": "^7.1.1",
+       "better-sqlite3-helper": "^3.1.1",
+       "sqlite": "^4.0.15"
+     }
+     ```
+   - Document nvm setup process
+   - Document corepack enable process
+   - Document yarn berry setup process
+
+5. **Domain and SSL Configuration**
+   - Document domain registration (namecheap)
+   - Document SSL certificate setup (Let's Encrypt)
+   - Document domain DNS configuration
+   - Document SSL certificate renewal process (3-month cycle)
+   - Document domain routing configuration:
+     - Primary domain: gallformers.org
+     - Secondary domain: gallformers.com
+     - DNS records:
+       - A record for @ pointing to server IP
+       - A record for www pointing to server IP
+       - CNAME record for www.gallformers.com pointing to www.gallformers.org
+     - SSL certificate configuration:
+       - Primary certificate for gallformers.org and www.gallformers.org
+       - Secondary certificate for gallformers.com and www.gallformers.com
+     - Nginx configuration for both domains
+     - HTTPS redirect configuration
+     - SSL certificate renewal hooks
+
 ## Phase 2: Create New Deployment Infrastructure
 
-1. **Create PM2 Configuration** (`ecosystem.config.js`):
-```javascript
-module.exports = {
-  apps: [{
-    name: 'gallformers',
-    script: 'yarn',
-    args: 'start',
-    env: {
-      NODE_ENV: 'production',
-      PORT: 3000,
-      DATABASE_URL: 'file:./gallformers.sqlite',
-      API_URL: 'https://www.gallformers.org',
-      NEXTAUTH_URL: 'https://www.gallformers.org'
-    },
-    max_memory_restart: '1G',
-    autorestart: true,
-    watch: false,
-    log_date_format: 'YYYY-MM-DD HH:mm:ss',
-    error_file: 'logs/error.log',
-    out_file: 'logs/out.log',
-    merge_logs: true,
-    instances: 1,
-    exec_mode: 'fork'
-  }]
-}
-```
+1. **Create PM2 Configuration** (`ecosystem.config.js`) ✅
+   - Created with specified settings
+   - ✅ Update ESLint configuration to include this file in TypeScript configuration
 
-2. **Create Enhanced Backup Script** (`scripts/backup.sh`):
-```bash
-#!/bin/bash
-set -e
+2. **Create Environment Configuration Files** ✅
+   - Created `.env.shared` with common configuration
+   - Created `.env.development.example` with development-specific settings
+   - Created `.env.production.example` with production-specific settings
+   - Created `.env.local.example` with sensitive information template
+   - Added `.env.local` to `.gitignore`
 
-# Variables
-APP_PATH="/path/to/your/app"
-BACKUP_PATH="/path/to/backups"
-DB_PATH="$APP_PATH/gallformers.sqlite"
-S3_BUCKET="your-backup-bucket"
-S3_PATH="gallformers/backups"
-EMAIL_TO="your-email@example.com"  # Will be provided later
+3. **Create Environment Loading Script** (`scripts/load_env.sh`) ✅
+   - Created with specified settings
+   - Made executable
+   - Loads variables from `.env.shared` first
+   - Then loads environment-specific `.env.$ENV` file
+   - Finally loads `.env.local` if it exists (for local overrides)
+   - Environment-specific values take precedence over shared values
+   - Validates required variables
+   - Sets up required directories and permissions
 
-# Create timestamp
-timestamp=$(date +%Y%m%d_%H%M%S)
+4. **Create Enhanced Backup Script** (`scripts/backup.sh`) ✅
+   - Created with specified settings
+   - Made executable
+   - Uses variables from .env files via load_env.sh
 
-# Function to send email notification
-send_notification() {
-    local message="$1"
-    local status="$2"
-    echo "[Gallformers Backup] $message - Status: $status" | mail -s "Gallformers Backup Notification" "$EMAIL_TO"
-}
+5. **Create Backup Monitoring Script** (`scripts/monitor_backups.sh`) ✅
+   - Created with specified settings
+   - Made executable
+   - Uses variables from .env files via load_env.sh
 
-# Create backup directory if it doesn't exist
-mkdir -p "$BACKUP_PATH"
+6. **Create Backup Restoration Script** (`scripts/restore.sh`) ✅
+   - Created with specified settings
+   - Made executable
+   - Uses variables from .env files via load_env.sh
 
-# Perform database maintenance
-echo "Running database maintenance..."
-sqlite3 "$DB_PATH" "VACUUM;"
-sqlite3 "$DB_PATH" "ANALYZE;"
+7. **Add AWS Configuration** (`scripts/setup_aws.sh`) ✅
+   - Created with specified settings
+   - Made executable
+   - Uses variables from .env files via load_env.sh
 
-# Backup database
-echo "Creating database backup..."
-cp "$DB_PATH" "$BACKUP_PATH/gallformers_$timestamp.sqlite"
+8. **Create Migration Helper Script** (`scripts/migrate.sh`) ✅
+   - Created with specified settings
+   - Made executable
+   - Uses variables from .env files via load_env.sh
 
-# Compress the backup
-gzip "$BACKUP_PATH/gallformers_$timestamp.sqlite"
+9. **Create Integration Verification Script** (`scripts/verify_integrations.sh`) ✅
+   - Created with specified settings
+   - Made executable
+   - Uses variables from .env files via load_env.sh
 
-# Upload to S3 with public-read ACL
-echo "Uploading to S3..."
-aws s3 cp "$BACKUP_PATH/gallformers_$timestamp.sqlite.gz" "s3://$S3_BUCKET/$S3_PATH/" --acl public-read
+10. **Create Development Environment Setup Script** (`scripts/setup_dev.sh`) ✅
+    - Created with specified settings
+    - Made executable
+    - Uses variables from .env files via load_env.sh
 
-# Verify S3 upload
-if aws s3 ls "s3://$S3_BUCKET/$S3_PATH/gallformers_$timestamp.sqlite.gz" > /dev/null; then
-    echo "S3 upload verified"
-    send_notification "Backup completed successfully" "SUCCESS"
-else
-    echo "S3 upload failed"
-    send_notification "S3 upload failed" "ERROR"
-    exit 1
-fi
-
-# Cleanup old backups (keep last 7 days)
-find "$BACKUP_PATH" -name "gallformers_*.sqlite.gz" -mtime +7 -delete
-
-# Cleanup old S3 backups (keep last 30 days)
-aws s3 ls "s3://$S3_BUCKET/$S3_PATH/" | \
-    awk '{print $4}' | \
-    grep "gallformers_.*\.sqlite\.gz" | \
-    sort -r | \
-    tail -n +31 | \
-    while read -r file; do
-        aws s3 rm "s3://$S3_BUCKET/$S3_PATH/$file"
-    done
-
-# Log backup completion
-echo "Backup completed: gallformers_$timestamp.sqlite.gz"
-```
-
-3. **Create Backup Monitoring Script** (`scripts/monitor_backups.sh`):
-```bash
-#!/bin/bash
-set -e
-
-# Variables
-BACKUP_PATH="/path/to/backups"
-S3_BUCKET="your-backup-bucket"
-S3_PATH="gallformers/backups"
-EMAIL_TO="your-email@example.com"  # Will be provided later
-
-# Function to send email notification
-send_notification() {
-    local message="$1"
-    echo "[Gallformers Backup Monitor] $message" | mail -s "Gallformers Backup Monitor Alert" "$EMAIL_TO"
-}
-
-# Check local backups
-latest_local=$(find "$BACKUP_PATH" -name "gallformers_*.sqlite.gz" -type f -printf '%T@ %p\n' | sort -n | tail -1 | cut -f2- -d" ")
-if [ -z "$latest_local" ]; then
-    send_notification "WARNING: No local backups found"
-else
-    local_time=$(stat -c %Y "$latest_local")
-    local_age=$(( $(date +%s) - local_time ))
-    if [ $local_age -gt 86400 ]; then  # 24 hours
-        send_notification "WARNING: Local backup is older than 24 hours"
-    fi
-fi
-
-# Check S3 backups
-latest_s3=$(aws s3 ls "s3://$S3_BUCKET/$S3_PATH/" | grep "gallformers_.*\.sqlite\.gz" | sort | tail -1 | awk '{print $4}')
-if [ -z "$latest_s3" ]; then
-    send_notification "WARNING: No S3 backups found"
-else
-    s3_time=$(aws s3 ls "s3://$S3_BUCKET/$S3_PATH/$latest_s3" | awk '{print $1" "$2}')
-    s3_age=$(( $(date +%s) - $(date -d "$s3_time" +%s) ))
-    if [ $s3_age -gt 86400 ]; then  # 24 hours
-        send_notification "WARNING: S3 backup is older than 24 hours"
-    fi
-fi
-
-# Check backup sizes
-local_size=$(du -h "$latest_local" | cut -f1)
-s3_size=$(aws s3 ls "s3://$S3_BUCKET/$S3_PATH/$latest_s3" | awk '{print $3}')
-if [ "$local_size" != "$s3_size" ]; then
-    send_notification "WARNING: Local and S3 backup sizes don't match"
-fi
-```
-
-4. **Create Backup Restoration Script** (`scripts/restore.sh`):
-```bash
-#!/bin/bash
-set -e
-
-# Variables
-APP_PATH="/path/to/your/app"
-BACKUP_PATH="/path/to/backups"
-S3_BUCKET="your-backup-bucket"
-S3_PATH="gallformers/backups"
-DB_PATH="$APP_PATH/gallformers.sqlite"
-EMAIL_TO="your-email@example.com"  # Will be provided later
-
-# Function to send email notification
-send_notification() {
-    local message="$1"
-    local status="$2"
-    echo "[Gallformers Restore] $message - Status: $status" | mail -s "Gallformers Restore Notification" "$EMAIL_TO"
-}
-
-# Stop the application
-pm2 stop gallformers
-
-# Create backup of current database
-timestamp=$(date +%Y%m%d_%H%M%S)
-cp "$DB_PATH" "$BACKUP_PATH/pre_restore_$timestamp.sqlite"
-
-# If backup file is provided, use it; otherwise, get latest from S3
-if [ -n "$1" ]; then
-    backup_file="$1"
-else
-    backup_file=$(aws s3 ls "s3://$S3_BUCKET/$S3_PATH/" | grep "gallformers_.*\.sqlite\.gz" | sort | tail -1 | awk '{print $4}')
-    aws s3 cp "s3://$S3_BUCKET/$S3_PATH/$backup_file" "$BACKUP_PATH/"
-    gunzip "$BACKUP_PATH/$backup_file"
-    backup_file="${backup_file%.gz}"
-fi
-
-# Restore database
-cp "$BACKUP_PATH/$backup_file" "$DB_PATH"
-
-# Verify database integrity
-if sqlite3 "$DB_PATH" "PRAGMA integrity_check;" | grep -q "ok"; then
-    echo "Database integrity verified"
-    send_notification "Database restored successfully" "SUCCESS"
-else
-    echo "Database integrity check failed"
-    send_notification "Database restore failed - integrity check failed" "ERROR"
-    exit 1
-fi
-
-# Start the application
-pm2 start gallformers
-
-# Cleanup
-rm -f "$BACKUP_PATH/$backup_file"
-```
-
-5. **Add AWS Configuration** (`scripts/setup_aws.sh`):
-```bash
-#!/bin/bash
-set -e
-
-# Variables
-AWS_ACCESS_KEY_ID="your-access-key"
-AWS_SECRET_ACCESS_KEY="your-secret-key"
-AWS_REGION="your-region"  # Same as used for image uploads
-S3_BUCKET="your-backup-bucket"
-
-# Configure AWS CLI
-aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID"
-aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY"
-aws configure set region "$AWS_REGION"
-
-# Create S3 bucket if it doesn't exist
-if ! aws s3 ls "s3://$S3_BUCKET" 2>&1 > /dev/null; then
-    aws s3 mb "s3://$S3_BUCKET"
-    # Make bucket public
-    aws s3api put-bucket-policy --bucket "$S3_BUCKET" --policy '{
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Sid": "PublicReadGetObject",
-                "Effect": "Allow",
-                "Principal": "*",
-                "Action": "s3:GetObject",
-                "Resource": "arn:aws:s3:::'$S3_BUCKET'/*"
-            }
-        ]
-    }'
-    aws s3api put-bucket-lifecycle-configuration \
-        --bucket "$S3_BUCKET" \
-        --lifecycle-configuration '{
-            "Rules": [
-                {
-                    "ID": "Delete old backups",
-                    "Status": "Enabled",
-                    "Expiration": {
-                        "Days": 30
-                    }
-                }
-            ]
-        }'
-fi
-```
+11. **Create Prisma Setup Script** (`scripts/setup_prisma.sh`) ✅
+    - Created with specified settings
+    - Made executable
+    - Uses variables from .env files via load_env.sh
+    - ℹ️ INFO: This script is used by both the development setup and migration processes
 
 ## Phase 3: Server Setup
 
@@ -348,6 +202,53 @@ EOF
 0 */6 * * * /path/to/your/app/scripts/monitor_backups.sh >> /path/to/your/app/logs/monitor.log 2>&1
 ```
 
+3. **Setup SSL Certificate Renewal**:
+```bash
+# Create certbot renewal hook
+sudo tee /etc/letsencrypt/renewal-hooks/post/01-restart-nginx << EOF
+#!/bin/bash
+systemctl restart nginx
+EOF
+
+sudo chmod +x /etc/letsencrypt/renewal-hooks/post/01-restart-nginx
+```
+
+4. **Setup Monitoring Integration**:
+```bash
+# Create monitoring configuration
+sudo tee /etc/pm2/conf.d/monitoring.json << EOF
+{
+  "apps": [{
+    "name": "gallformers",
+    "script": "yarn",
+    "args": "start",
+    "env": {
+      "NODE_ENV": "production"
+    },
+    "merge_logs": true,
+    "log_date_format": "YYYY-MM-DD HH:mm:ss",
+    "error_file": "logs/error.log",
+    "out_file": "logs/out.log",
+    "max_memory_restart": "1G",
+    "restart_delay": 4000,
+    "max_restarts": 10,
+    "min_uptime": "5s",
+    "listen_timeout": 8000,
+    "kill_timeout": 2000,
+    "wait_ready": true,
+    "listen_timeout": 10000
+  }]
+}
+EOF
+
+# Add PM2 monitoring to Digital Ocean alarms
+# Note: This will be configured through the Digital Ocean dashboard
+# - CPU Usage
+# - Memory Usage
+# - Disk Usage
+# - Process Status
+```
+
 ## Phase 4: Migration Process
 
 1. **Pre-Migration Steps**:
@@ -374,11 +275,24 @@ EOF
    sqlite3 ./gallformers.sqlite "PRAGMA integrity_check;"
    ```
 
-3. **Post-Migration Steps**:
-   - Verify all functionality
-   - Monitor logs for errors
-   - Keep Docker setup for 24 hours before removal
-   - Verify automated backups are working
+3. **Verify Integrations**:
+   - Test Auth0 login flow
+   - Verify image uploads to S3
+   - Check SSL certificate renewal process
+   - Verify all monitoring systems are working
+   - Test Slack notifications
+   - Run integration verification script
+   ```bash
+   ./scripts/verify_integrations.sh
+   ```
+
+4. **Domain and SSL Verification**:
+   - Verify domain DNS configuration
+   - Verify SSL certificate installation
+   - Test SSL certificate renewal process
+   - Verify domain routing (gallformers.org and gallformers.com)
+   - Test HTTPS redirects
+   - Verify SSL certificate auto-renewal daemon
 
 ## Phase 5: Cleanup
 
@@ -391,14 +305,24 @@ EOF
    ```
 
 2. **Update Documentation**:
+   - Document Auth0 configuration and environment variables
+   - Document AWS S3 setup for both images and backups
+   - Document SSL certificate renewal process
+   - Document monitoring system integration
+   - Document database migration process
    - Update README.md with new deployment process
    - Document PM2 commands and maintenance procedures
    - Document backup and restore procedures
    - Document database migration procedures
+   - Document development environment setup process
+   - Document domain configuration process:
+     - Domain registration and DNS setup
+     - SSL certificate installation and renewal
+     - Nginx configuration for multiple domains
+     - HTTPS redirect configuration
+     - SSL certificate renewal hooks
+     - Domain routing and fallback configuration
 
 ## Pending Questions
 
-1. What email address should be used for backup notifications?
-2. What AWS region should be used for S3 backups? (Should be the same as used for image uploads)
-3. Would you like to implement any additional backup verification steps?
-4. Should we add any specific database maintenance procedures beyond VACUUM and ANALYZE? 
+1. What email address should be used for backup notifications? 
