@@ -6,6 +6,8 @@ The gallformers site
 ## Getting Started
 You must have [npm](https://www.npmjs.com/get-npm) and yarn installed for any of this to work. Go do that. I highly recommend using a node version manager of some kind. Or you can download node and yarn from [here](https://nodejs.org/en/download/)
 
+You can use various setup scripts available in the scripts directory. [Scripts Documentation](scripts/README.md).
+
 The Easy Way™:
 Assumes you are on a Mac and have [homebrew](https://brew.sh/) installed.
 
@@ -66,12 +68,12 @@ All of the images are stored on AWS S3, currently under Jeff's personal account.
 
 The domains (gallformers.org and gallformers.com) are registered using namecheap and are currently in Jeff's personal account.
 
-The SSL certs are generated and auto-renewed via Let's Encrypt. There is a daemon process on the server that runs the auto-renewal process every 3 months.
+The SSL certs are generated and auto-renewed via Let's Encrypt. There is a daemon process on the server that runs the auto-renewal process.
 
 ### Monitoring
-There is a very simple [down detector](lambdas/gallformers_downdetector.js) implemented as an AWS Lambda. The lambda checks the site every 2 minutes to see if it responds with an HTTP 200 response. If the site responds negatively more than once in the span of 5 minutes then an alert is sent out via a message sent from the lambda to AWS SQS to AWS SNS/CloudWatch. The CloudWatch alarm triggers [another lambda](lambdas/snsToSlack.js) that posts a message to the [site-monitoring](https://gallformerdat-m1g8137.slack.com/archives/C01DGA0E9EX) Slack channel and then SNS is used to send an email to Jeff.
+There is a very simple [down detector](lambdas/gallformers_downdetector.js) implemented as an AWS Lambda. The lambda checks the site every 2 minutes to see if it responds with an HTTP 200 response. If the site responds negatively more than once in the span of 5 minutes then an alert is sent out via a message sent from the lambda to AWS SQS to AWS SNS/CloudWatch. The CloudWatch alarm triggers [another lambda](lambdas/snsToSlack.js) that uses SNS to send an email to Jeff.
 
-There are also several alarms configured on the DO Droplet that hosts the server. These are all resource utilization alarms and will send messages to the [site-monitoring](https://gallformerdat-m1g8137.slack.com/archives/C01DGA0E9EX) Slack channel if triggered.
+There are also several alarms configured on the DO Droplet that hosts the server. These are all resource utilization alarms and will send emails to Jeff.
 
 #### Database Schema Updates (Migrations)
 Changes to the schema must involve the following steps:
@@ -93,7 +95,7 @@ Because [yarn is a PITA](https://github.com/yarnpkg/yarn/issues/3630) you will h
 If you leave them in you will not be able to build with docker as `better-sqlite3` requires python to build and there is no python in the docker container.
 
 ### Backup Strategy
-TBD. For now manual snapshots of the block volume are all we have. All of the source is on github and the site can be re-created from scratch on a new instance from the files there. The only real back up needed is the database.
+For more detailed information about our backup scripts and automation, see the [Scripts Documentation](scripts/README.md).
 
 ### Front-End
 The front-end is mostly static pages as we expect most of this data to not change frequently.  next.js is built on [React](https://reactjs.org/) so you will need some familiarity with that to work on the site. The look-and-feel is built with [react-bootstrap](https://react-bootstrap.github.io/). Custom components are placed in the [pages/components](pages/components) directory and global layout components in [pages/layouts](pages/layouts). 

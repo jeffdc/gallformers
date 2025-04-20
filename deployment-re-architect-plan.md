@@ -67,7 +67,12 @@ This document outlines the plan to migrate from Docker-based deployment to a PM2
      {
        "better-sqlite3": "^7.1.1",
        "better-sqlite3-helper": "^3.1.1",
-       "sqlite": "^4.0.15"
+       "sqlite": "^4.0.15",
+       "@aws-sdk/client-s3": "^3.0.0",
+       "dotenv": "^16.0.0",
+       "@types/node": "^18.0.0",
+       "ts-node": "^10.9.1",
+       "typescript": "^5.0.0"
      }
      ```
    - Document nvm setup process
@@ -106,9 +111,8 @@ This document outlines the plan to migrate from Docker-based deployment to a PM2
    - Created `.env.local.example` with sensitive information template
    - Added `.env.local` to `.gitignore`
 
-3. **Create Environment Loading Script** (`scripts/load_env.sh`) ✅
+3. **Create Environment Loading Script** (`scripts/config/env.ts`) ✅
    - Created with specified settings
-   - Made executable
    - Loads variables from `.env.shared` first
    - Then loads environment-specific `.env.$ENV` file
    - Finally loads `.env.local` if it exists (for local overrides)
@@ -116,45 +120,55 @@ This document outlines the plan to migrate from Docker-based deployment to a PM2
    - Validates required variables
    - Sets up required directories and permissions
 
-4. **Create Enhanced Backup Script** (`scripts/backup.sh`) ✅
+4. **Create Enhanced Backup Script** (`scripts/tasks/backup.ts`) ✅
    - Created with specified settings
-   - Made executable
-   - Uses variables from .env files via load_env.sh
+   - Uses TypeScript for type safety and better maintainability
+   - Implements AWS S3 integration for backup storage
+   - Includes error handling and logging
+   - Returns structured backup results
 
-5. **Create Backup Monitoring Script** (`scripts/monitor_backups.sh`) ✅
+5. **Create Backup Monitoring Script** (`scripts/tasks/monitor.ts`) ✅
    - Created with specified settings
-   - Made executable
-   - Uses variables from .env files via load_env.sh
+   - Uses TypeScript for type safety and better maintainability
+   - Implements monitoring logic with proper error handling
+   - Includes structured logging
 
-6. **Create Backup Restoration Script** (`scripts/restore.sh`) ✅
+6. **Create Backup Restoration Script** (`scripts/tasks/restore.ts`) ✅
    - Created with specified settings
-   - Made executable
-   - Uses variables from .env files via load_env.sh
+   - Uses TypeScript for type safety and better maintainability
+   - Implements AWS S3 integration for backup retrieval
+   - Includes database verification
+   - Returns structured restore results
 
-7. **Add AWS Configuration** (`scripts/setup_aws.sh`) ✅
+7. **Add AWS Configuration** (`scripts/config/aws.ts`) ✅
    - Created with specified settings
-   - Made executable
-   - Uses variables from .env files via load_env.sh
+   - Uses TypeScript for type safety and better maintainability
+   - Implements AWS S3 client configuration
+   - Includes proper error handling
 
-8. **Create Migration Helper Script** (`scripts/migrate.sh`) ✅
+8. **Create Migration Helper Script** (`scripts/tasks/setup.ts`) ✅
    - Created with specified settings
-   - Made executable
-   - Uses variables from .env files via load_env.sh
+   - Uses TypeScript for type safety and better maintainability
+   - Implements environment setup and verification
+   - Returns structured setup results
 
-9. **Create Integration Verification Script** (`scripts/verify_integrations.sh`) ✅
+9. **Create Integration Verification Script** (`scripts/utils/logger.ts`) ✅
    - Created with specified settings
-   - Made executable
-   - Uses variables from .env files via load_env.sh
+   - Uses TypeScript for type safety and better maintainability
+   - Implements structured logging
+   - Includes error handling and log rotation
 
-10. **Create Development Environment Setup Script** (`scripts/setup_dev.sh`) ✅
+10. **Create Development Environment Setup Script** (`scripts/tasks/setup.ts`) ✅
     - Created with specified settings
-    - Made executable
-    - Uses variables from .env files via load_env.sh
+    - Uses TypeScript for type safety and better maintainability
+    - Implements development environment setup
+    - Returns structured setup results
 
-11. **Create Prisma Setup Script** (`scripts/setup_prisma.sh`) ✅
+11. **Create Prisma Setup Script** (`scripts/tasks/setup.ts`) ✅
     - Created with specified settings
-    - Made executable
-    - Uses variables from .env files via load_env.sh
+    - Uses TypeScript for type safety and better maintainability
+    - Implements Prisma setup and verification
+    - Returns structured setup results
     - ℹ️ INFO: This script is used by both the development setup and migration processes
 
 ## Phase 3: Server Setup
@@ -196,10 +210,10 @@ EOF
 ```bash
 # Add to /etc/cron.d/gallformers
 # Daily backup at 2 AM
-0 2 * * * /path/to/your/app/scripts/backup.sh >> /path/to/your/app/logs/backup.log 2>&1
+0 2 * * * cd /path/to/your/app && yarn backup >> /path/to/your/app/logs/backup.log 2>&1
 
 # Check backups every 6 hours
-0 */6 * * * /path/to/your/app/scripts/monitor_backups.sh >> /path/to/your/app/logs/monitor.log 2>&1
+0 */6 * * * cd /path/to/your/app && yarn monitor >> /path/to/your/app/logs/monitor.log 2>&1
 ```
 
 3. **Setup SSL Certificate Renewal**:
@@ -254,10 +268,10 @@ EOF
 1. **Pre-Migration Steps**:
    ```bash
    # 1. Create initial backup
-   ./scripts/backup.sh
+   yarn backup
 
    # 2. Verify backup
-   ./scripts/verify_backup.sh $(date +%Y%m%d_%H%M%S)
+   yarn restore --verify $(date +%Y%m%d_%H%M%S)
 
    # 3. Stop current Docker container
    docker-compose down
@@ -266,7 +280,7 @@ EOF
 2. **Migration Steps**:
    ```bash
    # 1. Deploy new version
-   ./scripts/deploy.sh
+   yarn setup
 
    # 2. Verify application
    curl -I https://www.gallformers.org
@@ -283,7 +297,7 @@ EOF
    - Test Slack notifications
    - Run integration verification script
    ```bash
-   ./scripts/verify_integrations.sh
+   yarn setup --verify-integrations
    ```
 
 4. **Domain and SSL Verification**:
