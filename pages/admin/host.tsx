@@ -222,7 +222,7 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                                     placeholder="Family"
                                     options={families}
                                     labelKey="name"
-                                    disabled={!selected || (selected && selected.id > 0)}
+                                    disabled={selected.id > 0}
                                     selected={selected?.fgs?.family && selected.fgs.family.id >= 0 ? [selected.fgs.family] : []}
                                     onChange={(f) => {
                                         if (!selected) return;
