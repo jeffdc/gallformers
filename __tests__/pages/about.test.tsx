@@ -164,7 +164,7 @@ describe('getStaticProps', () => {
         });
 
         // Call getStaticProps
-        const result = (await getStaticProps({})) as GetStaticPropsResult<{ stats: Stat[]; genTime: string }>;
+        const result = (await getStaticProps()) as GetStaticPropsResult<{ stats: Stat[]; genTime: string }>;
 
         // Check if the result has the correct structure
         expect(result).toHaveProperty('props');
