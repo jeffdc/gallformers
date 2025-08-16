@@ -1,6 +1,6 @@
 node_modules
 .next
-.DS_store
+.DS_Store
 gallformers.sqlite-wal
 gallformers.sqlite-shm
 .vscode
