@@ -12,7 +12,7 @@ import { ComposableMap, Geographies, Geography, ProjectionConfig, ZoomableGroup 
 import { Tooltip } from 'react-tooltip';
 import AliasTable from '../../components/aliastable';
 import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '../../hooks/useSpecies';
-import useAdmin from '../../hooks/useadmin';
+import useAdmin from '../../hooks/useAdmin';
 import { extractQueryParam } from '../../libs/api/apipage';
 import {
     AbundanceApi,
@@ -198,9 +198,9 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                                     options={genera}
                                     labelKey="name"
                                     disabled={true}
-                                    onChange={(g) => {
+                                    onChange={(g: TaxonomyEntry[]) => {
                                         if (selected) {
-                                            selected.fgs.genus = g[0] as TaxonomyEntry;
+                                            selected.fgs.genus = g[0];
                                             setSelected({ ...selected });
                                         }
                                     }}
@@ -287,9 +287,9 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                                               )
                                             : []
                                     }
-                                    onChange={(g) => {
+                                    onChange={(g: TaxonomyEntry[]) => {
                                         if (selected) {
-                                            selected.fgs.section = O.fromNullable(g[0] as TaxonomyEntry);
+                                            selected.fgs.section = O.fromNullable(g[0]);
                                             setSelected({ ...selected });
                                         }
                                     }}
@@ -318,9 +318,9 @@ const Host = ({ id, host, genera, families, sections, abundances, places }: Prop
                                               )
                                             : []
                                     }
-                                    onChange={(g) => {
+                                    onChange={(g: AbundanceApi[]) => {
                                         if (selected) {
-                                            selected.abundance = O.fromNullable(g[0] as AbundanceApi);
+                                            selected.abundance = O.fromNullable(g[0]);
                                             setSelected({ ...selected });
                                         }
                                     }}
@@ -465,7 +465,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
         id,
         O.map(parseInt),
         O.map((id) => mightFailWithArray<HostApi>()(hostById(id))),
-        O.getOrElse(constant(Promise.resolve(Array<HostApi>()))),
+        O.getOrElse(constant(Promise.resolve([] as HostApi[]))),
     );
 
     return {

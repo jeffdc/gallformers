@@ -4,7 +4,9 @@ node_modules
 gallformers.sqlite-wal
 gallformers.sqlite-shm
 .vscode
+.env
 .env.local
+prisma/.env
 .vercel
 log.log
 yarn-error.log
@@ -14,6 +16,10 @@ gallformers-docker.tar
 cspell.json
 tsconfig.tsbuildinfo
 
+# Testing and temporary directories
+dirs_for_testing/
+dirs_for_testing/**
+
 # yarn 2 related
 .yarn/**
 !.yarn/patches
@@ -22,6 +28,9 @@ tsconfig.tsbuildinfo
 !.yarn/sdks
 !.yarn/versions
 .pnp.*
+
+# generated tiles for maps
+flyio/tileserver-gl/boundaries.mbtiles
 
 # generated database
 usda_plants/plants.db

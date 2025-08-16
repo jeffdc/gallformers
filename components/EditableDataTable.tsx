@@ -1,8 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { Button } from 'react-bootstrap';
 import DataTable, { TableColumn, TableProps } from 'react-data-table-component';
-import { useConfirmation } from '../hooks/useConfirmation';
-import { WithID } from '../libs/utils/types';
+import { useConfirmation } from '@/hooks/useConfirmation';
+import { WithID } from '@/libs/utils/types';
 
 export type SelectEditorOptions = {
     value: string;

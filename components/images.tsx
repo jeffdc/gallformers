@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import { useState } from 'react';
 import { Button, ButtonGroup, ButtonToolbar, Col, Modal, OverlayTrigger, Popover, Row } from 'react-bootstrap';
 import useIsMounted from '../hooks/useIsMounted';
-import useWindowDimensions from '../hooks/usewindowdimension';
+import useWindowDimensions from '../hooks/useWindowDimensions';
 import { ImageApi, ImageLicenseValues, ImageNoSourceApi, SpeciesApi, TaxonCodeValues } from '../libs/api/apitypes';
 import { hasProp } from '../libs/utils/util';
 import NoImage from '../public/images/noimage.jpg';
@@ -76,16 +76,6 @@ const Images = ({ sp }: Props): JSX.Element => {
                 licenselink: image.licenselink,
             }) as CarouselImage,
     );
-
-    // Handle image click in the carousel
-    const handleImageClick = (_index: number, image: CarouselImage) => {
-        setCurrentImage(image);
-    };
-
-    // Handle slide change in the carousel
-    const handleSlideChange = (_index: number, image: CarouselImage) => {
-        setCurrentImage(image);
-    };
 
     // Render content for the carousel
     const renderImageForCarousel = (image: CarouselImage, isModal = false, handleImageClick?: (index: number) => void) => {
@@ -181,7 +171,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                             <div className="image-container">
                                 {}
                                 <img
-                                    src={currentImage ? currentImage.small : ''}
+                                    src={currentImage ? currentImage.original : ''}
                                     alt={`image of ${species.name}`}
                                     width={250}
                                     className={'image'}
@@ -246,8 +236,18 @@ const Images = ({ sp }: Props): JSX.Element => {
             <div className="border rounded pb-1">
                 <ImageCarousel
                     images={carouselImages}
-                    onImageClick={handleImageClick}
-                    onSlideChange={handleSlideChange}
+                    onImageClick={(index, image) => {
+                        // Only update if the image is different
+                        if (currentImage?.id !== image.id) {
+                            setCurrentImage(image);
+                        }
+                    }}
+                    onSlideChange={(index, image) => {
+                        // Only update if the image is different
+                        if (currentImage?.id !== image.id) {
+                            setCurrentImage(image);
+                        }
+                    }}
                     renderContent={renderImageForCarousel}
                 />
                 <ButtonToolbar className="pt-1 d-flex justify-content-center">

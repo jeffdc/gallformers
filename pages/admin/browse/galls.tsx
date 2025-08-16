@@ -3,8 +3,8 @@ import * as O from 'fp-ts/Option';
 import { GetStaticProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
-import React, { useMemo } from 'react';
-import { Card } from 'react-bootstrap';
+import React, { useMemo, useState } from 'react';
+import { Card, Form } from 'react-bootstrap';
 import DataTable from '../../../components/DataTable';
 import Edit from '../../../components/edit';
 import { GallApi } from '../../../libs/api/apitypes';
@@ -28,6 +28,36 @@ const linkGall = (s: GallApi) => {
 };
 
 const BrowseGalls = ({ galls }: Props): JSX.Element => {
+    const [filterText, setFilterText] = useState('');
+    const [filteredItems, setFilteredItems] = useState(galls);
+
+    const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setFilterText(value);
+
+        if (!value) {
+            setFilteredItems(galls);
+            return;
+        }
+
+        const filtered = galls.filter((item) => {
+            const searchValue = value.toLowerCase();
+            const nameMatch = item.name.toLowerCase().includes(searchValue);
+            const aliasMatch = item.aliases.some((alias) => alias.name.toLowerCase().includes(searchValue));
+            const abundanceMatch = pipe(
+                item.abundance,
+                O.fold(
+                    () => false,
+                    (abundance) => abundance.abundance.toLowerCase().includes(searchValue),
+                ),
+            );
+
+            return nameMatch || aliasMatch || abundanceMatch;
+        });
+
+        setFilteredItems(filtered);
+    };
+
     const columns = useMemo(
         () => [
             {
@@ -78,17 +108,32 @@ const BrowseGalls = ({ galls }: Props): JSX.Element => {
             <Card>
                 <Card.Body>
                     <Card.Title>Browse Galls</Card.Title>
-                    <DataTable
-                        keyField={'id'}
-                        data={galls}
-                        columns={columns}
-                        striped
-                        noHeader
-                        fixedHeader
-                        responsive={false}
-                        defaultSortFieldId="name"
-                        customStyles={TABLE_CUSTOM_STYLES}
-                    />
+                    <Form.Group className="mb-3">
+                        <Form.Label>Filter</Form.Label>
+                        <Form.Control
+                            type="text"
+                            placeholder="Search by name, aliases, or abundance..."
+                            value={filterText}
+                            onChange={handleFilterChange}
+                        />
+                    </Form.Group>
+                    <div style={{ minHeight: '400px' }}>
+                        <DataTable
+                            keyField={'id'}
+                            data={filteredItems}
+                            columns={columns}
+                            striped
+                            noHeader
+                            responsive={false}
+                            defaultSortFieldId="name"
+                            customStyles={TABLE_CUSTOM_STYLES}
+                            pagination
+                            paginationPerPage={25}
+                            paginationRowsPerPageOptions={[10, 25, 50, 100]}
+                            paginationServer={false}
+                            paginationTotalRows={galls.length}
+                        />
+                    </div>
                 </Card.Body>
             </Card>
         </>

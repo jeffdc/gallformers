@@ -63,6 +63,36 @@ const Gall = ({ species, taxonomy, relatedGalls }: Props): JSX.Element => {
                 <title>{species.name}</title>
                 <meta name="description" content={`${species.name} - ${createSummaryGall(species)}`} />
             </Head>
+
+            <Row className="mt-0 mb-1">
+                <Col>
+                    <div className="d-flex justify-content-center">
+                        <div className="text-center">
+                            <Link
+                                href="https://megachile.shinyapps.io/doycalc/"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-decoration-underline"
+                            >
+                                <div className="d-none d-md-block">
+                                    <span className="small">
+                                        Explore the seasonal timing of gall development and emergence with our phenology tool
+                                    </span>
+                                </div>
+                                <div className="d-md-none">
+                                    <span
+                                        className="small"
+                                        title="Explore the seasonal timing of gall development and emergence with our phenology tool"
+                                    >
+                                        🗓️ Phenology Tool
+                                    </span>
+                                </div>
+                            </Link>
+                        </div>
+                    </div>
+                </Col>
+            </Row>
+
             <Row className="mt-2">
                 {/* Details */}
                 <Col sm={12} md={8}>

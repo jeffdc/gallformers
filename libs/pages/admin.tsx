@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import { Alert, Col, Nav, Navbar, Row } from 'react-bootstrap';
-import { FieldErrors, FieldValues, UseFormReturn } from 'react-hook-form';
+import { FieldValues, UseFormReturn } from 'react-hook-form';
 import { Toaster } from 'react-hot-toast';
 import Auth from '../../components/auth';
 import EditName, { RenameEvent } from '../../components/editname';
@@ -112,16 +112,6 @@ const Admin = <T extends AdminType, V extends FieldValues>(props: AdminProps<T, 
         }
     };
 
-    const debugDumpValidation = (errors: FieldErrors): string => {
-        let s: string = '';
-        let key: keyof typeof errors;
-        for (key in errors) {
-            // eslint-disable-next-line @typescript-eslint/no-base-to-string, @typescript-eslint/restrict-template-expressions
-            s = `${s}\n${String(key)} -- ${errors[key]?.message}`;
-        }
-        return s;
-    };
-
     return (
         <Auth superAdmin={!!props.superAdmin}>
             <>
@@ -189,14 +179,6 @@ const Admin = <T extends AdminType, V extends FieldValues>(props: AdminProps<T, 
                 {props.form && (
                     <>
                         {/* <DevTool control={props.form.control} placement="top-right" /> */}
-                        <ul>
-                            <li>
-                                <code>{`IsValid: ${props.form.formState.isValid} -- isDirty: ${props.form.formState.isDirty}`}</code>
-                            </li>
-                            <li>
-                                <code>{`Err: ${debugDumpValidation(props.form.formState.errors)}`}</code>
-                            </li>
-                        </ul>
                         {props.formSubmit ? (
                             // eslint-disable-next-line @typescript-eslint/no-misused-promises
                             <form onSubmit={props.form.handleSubmit(props.formSubmit)} className="m-4 pe-4">

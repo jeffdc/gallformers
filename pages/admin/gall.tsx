@@ -8,11 +8,11 @@ import { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { AsyncTypeahead, Typeahead } from 'react-bootstrap-typeahead';
 import { Controller } from 'react-hook-form';
-import UndescribedFlow, { UndescribedData } from '../../components/UndescribedFlow';
-import AliasTable from '../../components/aliastable';
-import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '../../hooks/useSpecies';
-import useAdmin from '../../hooks/useadmin';
-import { extractQueryParam } from '../../libs/api/apipage';
+import UndescribedFlow, { UndescribedData } from '@/components/UndescribedFlow';
+import AliasTable from '@/components/aliastable';
+import useSpecies, { SpeciesFormFields, SpeciesNamingHelp, SpeciesProps } from '@/hooks/useSpecies';
+import useAdmin from '@/hooks/useAdmin';
+import { extractQueryParam } from '@/libs/api/apipage';
 import {
     AbundanceApi,
     AliasApi,
@@ -28,7 +28,7 @@ import {
     TaxonCodeValues,
     TaxonomyEntry,
     TaxonomyTypeValues,
-} from '../../libs/api/apitypes';
+} from '@/libs/api/apitypes';
 import {
     getAlignments,
     getCells,
@@ -39,12 +39,12 @@ import {
     getShapes,
     getTextures,
     getWalls,
-} from '../../libs/db/filterfield';
-import { gallById } from '../../libs/db/gall';
-import { getAbundances } from '../../libs/db/species';
-import { allFamilies, allGenera } from '../../libs/db/taxonomy';
-import Admin from '../../libs/pages/admin';
-import { mightFailWithArray } from '../../libs/utils/util';
+} from '@/libs/db/filterfield';
+import { gallById } from '@/libs/db/gall';
+import { getAbundances } from '@/libs/db/species';
+import { allFamilies, allGenera } from '@/libs/db/taxonomy';
+import Admin from '@/libs/pages/admin';
+import { mightFailWithArray } from '@/libs/utils/util';
 
 type Props = SpeciesProps & {
     gall: GallApi[];
@@ -59,7 +59,10 @@ type Props = SpeciesProps & {
     forms: FilterField[];
 };
 
-export type FormFields = SpeciesFormFields<GallApi> & GallPropertiesType;
+export type FormFields = SpeciesFormFields<GallApi> &
+    GallPropertiesType & {
+        gall_id: number;
+    };
 
 const keyFieldName = 'name';
 
@@ -94,57 +97,59 @@ const Gall = ({
         return {
             ...toSpeciesUpsertFields(fields, name, id),
             gallid: fields.mainField[0].gall_id,
-            alignments: fields.alignment.map((a) => a.id),
-            cells: fields.cells.map((c) => c.id),
-            colors: fields.color.map((c) => c.id),
-            seasons: fields.season.map((c) => c.id),
+            alignments: fields.alignment.map((a: FilterField) => a.id),
+            cells: fields.cells.map((c: FilterField) => c.id),
+            colors: fields.color.map((c: FilterField) => c.id),
+            seasons: fields.season.map((c: FilterField) => c.id),
             detachable: fields.detachable,
             fgs: selected.fgs,
-            hosts: fields.hosts.map((h) => h.id),
-            locations: fields.location.map((l) => l.id),
-            shapes: fields.shape.map((s) => s.id),
-            textures: fields.texture.map((t) => t.id),
+            hosts: fields.hosts.map((h: HostSimple) => h.id),
+            locations: fields.location.map((l: FilterField) => l.id),
+            shapes: fields.shape.map((s: FilterField) => s.id),
+            textures: fields.texture.map((t: FilterField) => t.id),
             undescribed: fields.undescribed,
-            walls: fields.walls.map((w) => w.id),
-            forms: fields.form.map((f) => f.id),
+            walls: fields.walls.map((w: FilterField) => w.id),
+            forms: fields.form.map((f: FilterField) => f.id),
         };
     };
 
     const updatedFormFields = (s: GallApi | undefined): Promise<FormFields> => {
-        const speciesFields = updatedSpeciesFormFields(s);
-
-        if (s != undefined) {
+        if (!s) {
+            const speciesFields = updatedSpeciesFormFields(undefined);
             return Promise.resolve({
                 ...speciesFields,
-                alignment: s.alignment,
-                cells: s.cells,
-                color: s.color,
-                detachable: s.detachable,
-                hosts: s.hosts,
-                location: s.location,
-                season: s.season,
-                shape: s.shape,
-                texture: s.texture,
-                undescribed: s.undescribed,
-                walls: s.walls,
-                form: s.form,
+                gall_id: -1,
+                alignment: [],
+                cells: [],
+                color: [],
+                detachable: DetachableNone,
+                hosts: [],
+                location: [],
+                season: [],
+                shape: [],
+                texture: [],
+                undescribed: false,
+                walls: [],
+                form: [],
             });
         }
 
+        const speciesFields = updatedSpeciesFormFields(s);
         return Promise.resolve({
             ...speciesFields,
-            alignment: [],
-            cells: [],
-            color: [],
-            detachable: DetachableNone,
-            hosts: [],
-            location: [],
-            season: [],
-            shape: [],
-            texture: [],
-            undescribed: false,
-            walls: [],
-            form: [],
+            gall_id: s.gall_id,
+            alignment: s.alignment,
+            cells: s.cells,
+            color: s.color,
+            detachable: s.detachable,
+            hosts: s.hosts,
+            location: s.location,
+            season: s.season,
+            shape: s.shape,
+            texture: s.texture,
+            undescribed: s.undescribed,
+            walls: s.walls,
+            form: s.form,
         });
     };
 
@@ -252,31 +257,34 @@ const Gall = ({
             });
     };
 
-    const createGallPropertyField = (name: keyof FormFields, items: FilterField[], multiple = true) => (
+    type FilterFieldProperty = Extract<
+        keyof GallPropertiesType,
+        'alignment' | 'cells' | 'color' | 'form' | 'season' | 'shape' | 'walls' | 'texture' | 'location'
+    >;
+
+    const createGallPropertyField = (name: FilterFieldProperty, items: FilterField[], multiple = true) => (
         <Controller
             control={adminForm.form.control}
             name={name}
             render={() => (
                 <Typeahead
                     id={name}
+                    placeholder={name}
                     options={items}
-                    labelKey="field"
+                    labelKey="name"
                     multiple={multiple}
+                    disabled={!selected}
                     clearButton
                     {...adminForm.form.register(name, {
                         disabled: areRequiredFieldsFilled(),
                     })}
                     onChange={(x) => {
                         if (selected) {
-                            // @ts-expect-error breaking type safety here as it is non-trivial (and not seemingly worth it)
-                            // to pass the property name in a type safe manner
-                            selected[name] = x as FilterField[];
-                            adminForm.setSelected({ ...selected });
+                            const updatedSelected = { ...selected };
+                            updatedSelected[name] = x as FilterField[];
+                            adminForm.setSelected(updatedSelected);
                         }
                     }}
-                    // @ts-expect-error breaking type safety here as it is non-trivial (and not seemingly worth it)
-                    // to pass the property name in a type safe manner
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                     selected={selected ? selected[name] : []}
                 />
             )}
@@ -473,9 +481,9 @@ const Gall = ({
                                     options={Detachables}
                                     labelKey="value"
                                     disabled={areRequiredFieldsFilled()}
-                                    onChange={(d) => {
+                                    onChange={(d: DetachableApi[]) => {
                                         if (selected?.detachable) {
-                                            selected.detachable = d[0] as DetachableApi;
+                                            selected.detachable = d[0];
                                             adminForm.setSelected({ ...selected });
                                         }
                                     }}
@@ -528,9 +536,9 @@ const Gall = ({
                                     options={abundances}
                                     labelKey="abundance"
                                     disabled={areRequiredFieldsFilled()}
-                                    onChange={(a) => {
+                                    onChange={(a: AbundanceApi[]) => {
                                         if (selected) {
-                                            selected.abundance = O.fromNullable(a[0] as AbundanceApi);
+                                            selected.abundance = O.fromNullable(a[0]);
                                             adminForm.setSelected({ ...selected });
                                         }
                                     }}
@@ -620,7 +628,7 @@ export const getServerSideProps: GetServerSideProps = async (context: { query: P
         id,
         O.map(parseInt),
         O.map((id) => mightFailWithArray<GallApi>()(gallById(id))),
-        O.getOrElse(constant(Promise.resolve(Array<GallApi>()))),
+        O.getOrElse(constant(Promise.resolve([] as GallApi[]))),
     );
     return {
         props: {

@@ -1,2 +1,6 @@
 /.yarn/releases/** binary
 /.yarn/plugins/** binary
+* text=auto eol=lf
+*.{cmd,[cC][mM][dD]} text eol=crlf
+*.{bat,[bB][aA][tT]} text eol=crlf
+*.{ts,tsx,js,jsx,json,yml,yaml,md,html,css,scss} text eol=lf

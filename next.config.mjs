@@ -28,6 +28,13 @@ export default (phase) => {
             forceSwcTransforms: true,
             esmExternals: false,
         },
+        webpack: (config) => {
+            config.resolve.alias = {
+                ...config.resolve.alias,
+                '@': '.',
+            };
+            return config;
+        },
         // strictMode: true,
         // this causes failures on Linux. Not sure why but for now disabling it.
         // i18n: {

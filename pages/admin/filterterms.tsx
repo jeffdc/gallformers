@@ -5,7 +5,7 @@ import { GetServerSideProps } from 'next';
 import { useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { RenameEvent } from '../../components/editname';
-import useAdmin, { AdminFormFields } from '../../hooks/useadmin';
+import useAdmin, { AdminFormFields } from '@/hooks/useAdmin';
 import { DeleteResult, FilterField, FilterFieldTypeValue, FilterFieldWithType, asFilterType } from '../../libs/api/apitypes';
 import {
     getAlignments,

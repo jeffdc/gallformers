@@ -17,7 +17,7 @@ import {
     TaxonomyTypeValues,
 } from '../libs/api/apitypes';
 import { extractGenus } from '../libs/utils/util';
-import { AdminFormFields } from './useadmin';
+import { AdminFormFields } from './useAdmin';
 
 export const SpeciesNamingHelp = (): JSX.Element => (
     <OverlayTrigger

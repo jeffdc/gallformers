@@ -8,7 +8,7 @@ import db from './db';
 import { connectIfNotNull } from './utils';
 
 export const updateAbundance = (id: number, abundance: string | undefined | null): PrismaPromise<number> => {
-    if (abundance == undefined || abundance == null) {
+    if (abundance == undefined) {
         const sql = `UPDATE species
             SET abundance_id = NULL
             WHERE id = ${id}`;

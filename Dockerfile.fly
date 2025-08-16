@@ -1,0 +1,83 @@
+FROM --platform=${BUILDPLATFORM:-linux/amd64} node:20-slim AS builder
+WORKDIR /usr/src/app
+
+# Install OpenSSL first
+RUN apt-get update && \
+    apt-get install -y openssl sqlite3 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy package files first for better caching
+COPY package.json yarn.lock .yarnrc.yml ./
+COPY .yarn ./.yarn
+
+# Enable Corepack and set up Yarn
+RUN corepack enable && corepack prepare yarn@4.9.1 --activate
+
+# Install dependencies
+RUN yarn install
+
+# Copy the rest of the application
+COPY . .
+
+# Create data directory and set DATABASE_URL for build
+RUN mkdir -p /data && \
+    cp prisma/gallformers.sqlite /data/gallformers.sqlite && \
+    chown -R node:node /data
+
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV DATABASE_URL="file:/data/gallformers.sqlite"
+
+# Build the application
+RUN yarn generate && \
+    yarn add --dev typescript @types/node && \
+    yarn build && \
+    # Remove development files and caches
+    rm -rf .next/cache && \
+    rm -rf node_modules/.cache && \
+    # Remove development dependencies and clean up
+    yarn workspaces focus --production && \
+    rm -rf node_modules/@prisma/engines/*linux-musl && \
+    rm -rf node_modules/.yarn && \
+    rm -rf node_modules/.cache && \
+    # Remove unnecessary npm files
+    find node_modules -name "*.md" -delete && \
+    find node_modules -name "*.ts" -delete && \
+    find node_modules -name "*.map" -delete && \
+    find node_modules -name "LICENSE" -delete && \
+    find node_modules -name "CHANGELOG.md" -delete && \
+    find node_modules -name "README.md" -delete
+
+## Final stage
+FROM --platform=${BUILDPLATFORM:-linux/amd64} node:20-slim
+
+# Install SQLite and other necessary dependencies
+RUN apt-get update && \
+    apt-get install -y sqlite3 openssl && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/src/app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Create directory for SQLite database
+RUN mkdir -p /data && chown -R node:node /data
+
+# Copy only the necessary files from build
+COPY --from=builder /usr/src/app/package.json ./package.json
+COPY --from=builder /usr/src/app/node_modules ./node_modules
+COPY --from=builder /usr/src/app/.next ./.next
+COPY --from=builder /usr/src/app/public ./public
+COPY --from=builder /usr/src/app/prisma ./prisma
+
+# Set proper permissions
+RUN chown -R node:node /usr/src/app
+
+# Switch to non-root user
+USER node
+
+# The SQLite database will be mounted at /data/gallformers.sqlite
+ENV DATABASE_URL="file:/data/gallformers.sqlite"
+
+EXPOSE 3000
+
+CMD ["node_modules/next/dist/bin/next", "start", "-p", "3000"] 

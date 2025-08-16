@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, Col, Row } from 'react-bootstrap';
 import { Controller, Path } from 'react-hook-form';
 import { RenameEvent } from '../../components/editname';
-import useAdmin, { AdminFormFields } from '../../hooks/useadmin';
+import useAdmin, { AdminFormFields } from '../../hooks/useAdmin';
 import { extractQueryParam } from '../../libs/api/apipage';
 import {
     SimpleSpecies,
@@ -203,7 +203,7 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
                             control={adminForm.form.control}
                             name="species"
                             rules={{
-                                validate: (s) => {
+                                validate: (s: SimpleSpecies[]) => {
                                     console.log(`JDC: ${JSON.stringify(s, null, '  ')}`);
                                     return s.length > 0 ? true : 'At least one species is required.';
                                 },
@@ -218,9 +218,9 @@ const Section = ({ id, sections, genera }: Props): JSX.Element => {
                                     clearButton
                                     disabled={!selected}
                                     multiple
-                                    onChange={(s) => {
-                                        setSpecies(s as SimpleSpecies[]);
-                                        adminForm.form.setValue('species' as Path<FormFields>, s as SimpleSpecies[]);
+                                    onChange={(s: SimpleSpecies[]) => {
+                                        setSpecies(s);
+                                        adminForm.form.setValue('species' as Path<FormFields>, s);
                                     }}
                                     selected={species ? species : []}
                                     isLoading={isLoading}

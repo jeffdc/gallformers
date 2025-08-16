@@ -1,15 +1,99 @@
 name: CI
-on: [push, pull_request]
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: ['**']
+
+env:
+    YARN_ENABLE_IMMUTABLE_INSTALLS: false
+    YARN_NODE_LINKER: node-modules
+    YARN_VERSION: '4.9.2'
+
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Install modules
-      run: yarn
-    - name: Gen DB Client
-      run: yarn generate 
-    - name: Run tests
-      run: yarn test
-    - name: Type Coverage
-      run: yarn type-coverage
+    test:
+        name: Test
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '21'
+                  cache: 'npm'
+
+            - name: Setup Yarn
+              run: |
+                  echo "Creating .yarn/releases directory..."
+                  mkdir -p .yarn/releases
+                  echo "Downloading Yarn binary..."
+                  curl -L --fail -o .yarn/releases/yarn-4.9.2.cjs https://repo.yarnpkg.com/${{ env.YARN_VERSION }}/packages/yarnpkg-cli/bin/yarn.js
+                  echo "Setting permissions..."
+                  chmod +x .yarn/releases/yarn-4.9.2.cjs
+                  echo "Verifying file exists and is executable..."
+                  ls -la .yarn/releases/yarn-4.9.2.cjs
+                  echo "Testing Yarn version..."
+                  node .yarn/releases/yarn-4.9.2.cjs --version
+                  echo "Verifying Yarn binary integrity..."
+                  if [ ! -s .yarn/releases/yarn-4.9.2.cjs ]; then
+                    echo "Error: Yarn binary is empty or not downloaded properly"
+                    exit 1
+                  fi
+
+            - name: Cache Yarn dependencies
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.cache/yarn
+                      node_modules
+                      .yarn/cache
+                      .yarn/unplugged
+                  key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-yarn-
+
+            - name: Install dependencies
+              run: |
+                  echo "Installing dependencies..."
+                  yarn install --immutable
+
+            - name: Type check
+              run: yarn tsc --project tsconfig.ci.json --noEmit
+
+            - name: Lint
+              run: |
+                  echo "Running lint..."
+                  yarn lint
+
+            - name: Generate Prisma Client
+              run: |
+                  echo "Generating Prisma client..."
+                  yarn generate
+
+            - name: Run database migrations
+              run: |
+                  echo "Running database migrations..."
+                  yarn migrate
+              env:
+                  DATABASE_URL: 'file:./test.db'
+
+            - name: Run tests
+              run: |
+                  echo "Running tests..."
+                  yarn test --coverage
+              env:
+                  CI: true
+                  DATABASE_URL: 'file:./test.db'
+
+            - name: Upload test coverage
+              uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: coverage
+                  path: .coverage/
+                  retention-days: 7

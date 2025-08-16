@@ -218,10 +218,10 @@ const About = ({ stats, genTime }: Props): JSX.Element => {
                     <h5>Citation</h5>
                     <span>
                         <div className="citation">
-                            "Gallformers Contributors." Www.gallformers.org, www.gallformers.org. Accessed [date]‌
+                            &quot;Gallformers Contributors.&quot; Www.gallformers.org, www.gallformers.org. Accessed [date]‌
                         </div>
                         <div className="citation">
-                            "Gallformers Contributors." &ldquo;[<i>Species name</i>]&rdquo; Notes on ID and Taxonomy,
+                            &quot;Gallformers Contributors.&quot; &ldquo;[<i>Species name</i>]&rdquo; Notes on ID and Taxonomy,
                             Www.gallformers.org/[url to specific species], www.gallformers.org. Accessed [date]‌
                         </div>
                     </span>

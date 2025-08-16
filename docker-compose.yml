@@ -1,11 +1,11 @@
-version: '3.7'
-
 services:
     gallformers:
-        platform: linux/amd64
+        platform: ${BUILD_PLATFORM:-linux/amd64}
         build:
             context: .
             dockerfile: ./Dockerfile
+            platforms:
+                - ${BUILD_PLATFORM:-linux/amd64}
         image: gallformers:latest
         container_name: gallformer_app
         restart: unless-stopped
@@ -14,5 +14,10 @@ services:
         command: yarn start
         x-bake:
             platforms:
-                - linux/amd64
+                - ${BUILD_PLATFORM:-linux/amd64}
+            output:
+                - type=docker
+                  dest=./gallformers-docker.tar
+                - type=docker
+                  dest=./gallformers:latest
     

@@ -34,7 +34,7 @@ export const genOptionsWithId = <T extends { id: number | string; name: string }
 
     return (
         <>
-            {includeEmpty ? <option key="none" value="" id=""></option> : undefined}
+            {includeEmpty ? <option key="none" value=""></option> : undefined}
             {opts.map((o) => {
                 return (
                     <option key={o.id} value={o.name} id={o.id.toString()}>

@@ -32,6 +32,7 @@ Thank you to all our Patrons!
 - Bird Bird
 - Tricia Bippus
 - Mimi Brown
+- Andrew Cameron
 - Catherine Chang
 - Ruta Daugavietis
 - Andrew Forbes

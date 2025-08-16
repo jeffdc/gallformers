@@ -50,6 +50,11 @@ function Home({ randomGall }: Props): JSX.Element {
                                 <li>
                                     <Link href="/explore">Explore the Data</Link>
                                 </li>
+                                <li>
+                                    <Link href="https://megachile.shinyapps.io/doycalc/" target="_blank" rel="noreferrer">
+                                        Explore the seasonal timing of gall development and emergence with our phenology tool
+                                    </Link>
+                                </li>
                             </ul>
                         </Card.Body>
                     </Card>

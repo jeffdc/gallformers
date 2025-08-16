@@ -33,13 +33,13 @@ const RangeMap = ({ range }: Props): JSX.Element => {
                         [1000, 1000],
                     ]}
                 >
-                    <Geographies geography="../usa-can-topo.json">
+                    <Geographies key="geography" geography="../usa-can-topo.json">
                         {({ geographies }) =>
                             geographies.map((geo: { id: string; properties: { postal: string; name: string } }) => {
                                 const code = geo.properties.postal;
                                 return (
                                     <Geography
-                                        key={geo.id}
+                                        key={`${geo.id}-${code}`}
                                         geography={geo}
                                         stroke={'Black'}
                                         fill={range.has(code) ? 'ForestGreen' : 'White'}

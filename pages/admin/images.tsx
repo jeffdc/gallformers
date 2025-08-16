@@ -224,7 +224,7 @@ const Images = ({ sp }: Props): JSX.Element => {
             ...img,
             lastchangedby: sessionUserOrUnknown(session?.user?.name),
         };
-
+        console.log('saveImage', body);
         await axios
             .post<ImageApi[]>(`/api/images`, body)
             .then((res) => setImages(res.data))
@@ -378,7 +378,7 @@ const Images = ({ sp }: Props): JSX.Element => {
                                 setSelected={setSelectedForCopy}
                             />
                         )}
-                        <Button variant="primary" className="mt-4" onClick={void doCopy}>
+                        <Button variant="primary" className="mt-4" onClick={() => void doCopy()}>
                             Copy
                         </Button>
                         <Button variant="secondary" className="mt-4 ms-2" onClick={() => setShowCopy(false)}>

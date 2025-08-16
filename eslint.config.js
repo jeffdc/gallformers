@@ -35,6 +35,9 @@ Object.keys(jestGlobals).forEach(key => {
 });
 
 export default [
+    {
+        ignores: ['.next/**/*', '__tests__/**/*', 'lambdas/**/*', 'eslint.config.js', 'scripts/**/*', '*.cjs', '*.json', 'next.config.mjs', '.yarn/releases/**/*', 'dbsetup.js', 'jest.polyfills.js', 'migrate.js', 'dist/**/*'],
+    },
     eslint.configs.recommended,
     ...compat.extends('plugin:@typescript-eslint/recommended'),
     ...compat.extends('plugin:@typescript-eslint/recommended-requiring-type-checking'),
@@ -87,8 +90,5 @@ export default [
         rules: {
             'react/prop-types': 'off',
         },
-    },
-    {
-        ignores: ['.next/**/*', '__tests__/**/*', 'lambdas/**/*', 'eslint.config.js'],
     },
 ];

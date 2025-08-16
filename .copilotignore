@@ -4,7 +4,14 @@ node_modules
 gallformers.sqlite-wal
 gallformers.sqlite-shm
 .vscode
+# Only ignore the local env file with secrets
 .env.local
+.env
+prisma/.env
+# But allow other env files to be visible
+!.env.development
+!.env.production
+!.env.local-docker
 .vercel
 log.log
 yarn-error.log

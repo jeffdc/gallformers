@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Carousel } from 'nuka-carousel';
+import React, { useRef, useState } from 'react';
+import { Carousel, SlideHandle } from 'nuka-carousel';
 import { Modal } from 'react-bootstrap';
 import { ImageApi } from '../libs/api/apitypes';
 
@@ -19,8 +19,14 @@ type ImageCarouselProps = {
 const ImageCarousel = ({ images, onImageClick, onSlideChange, renderContent }: ImageCarouselProps) => {
     const [showModal, setShowModal] = useState(false);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const mainCarouselRef = useRef<SlideHandle>(null);
+    const modalCarouselRef = useRef<SlideHandle>(null);
+    // Store the index to show in the modal
+    const modalIndexRef = useRef(0);
 
     const handleImageClick = (index: number) => {
+        // Store the index for the modal
+        modalIndexRef.current = index;
         setCurrentIndex(index);
         setShowModal(true);
         onImageClick(index, images[index]);
@@ -31,18 +37,27 @@ const ImageCarousel = ({ images, onImageClick, onSlideChange, renderContent }: I
     };
 
     const renderCarousel = (isModal = false) => {
+        // For the modal carousel, use the stored index
+        const initialPage = isModal ? modalIndexRef.current : currentIndex;
+
         return (
             <Carousel
+                ref={isModal ? modalCarouselRef : mainCarouselRef}
                 showArrows={true}
                 showDots={true}
                 wrapMode="wrap"
-                initialPage={currentIndex}
+                initialPage={initialPage}
                 keyboard={true}
+                swiping={true}
+                scrollDistance="slide"
                 autoplay={false}
                 beforeSlide={(_: number, endSlide: number) => {
-                    setCurrentIndex(endSlide);
-                    if (onSlideChange) {
-                        onSlideChange(endSlide, images[endSlide]);
+                    // Only update currentIndex for the main carousel
+                    if (!isModal) {
+                        setCurrentIndex(endSlide);
+                        if (onSlideChange) {
+                            onSlideChange(endSlide, images[endSlide]);
+                        }
                     }
                 }}
                 className="carousel-container"

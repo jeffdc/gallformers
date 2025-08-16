@@ -1,0 +1,89 @@
+{
+    "version": "1.0",
+    "rules": {
+        "typescript": {
+            "preferences": {
+                "functional": {
+                    "enforce": {
+                        "immutability": "preferred",
+                        "pure_functions": "preferred",
+                        "composition": "preferred"
+                    },
+                    "discourage": {
+                        "classes": "warning",
+                        "inheritance": "warning",
+                        "mutable_state": "warning"
+                    }
+                },
+                "types": {
+                    "strict_null_checks": "required",
+                    "no_any": "required",
+                    "explicit_return_types": "preferred"
+                }
+            }
+        },
+        "react": {
+            "preferences": {
+                "functional_components": "required",
+                "hooks": "required",
+                "discourage": {
+                    "class_components": "warning",
+                    "lifecycle_methods": "warning"
+                }
+            }
+        },
+        "database": {
+            "preferences": {
+                "sql": {
+                    "encourage": "preferred",
+                    "prisma": {
+                        "discourage": "warning",
+                        "migration_path": "gradual"
+                    }
+                }
+            }
+        },
+        "project_structure": {
+            "maintain_current": true,
+            "preferences": {
+                "file_organization": {
+                    "components": "components/",
+                    "hooks": "hooks/",
+                    "types": "types/",
+                    "libs": "libs/"
+                }
+            }
+        },
+        "code_quality": {
+            "principles": {
+                "simple_over_easy": "required",
+                "explicit_over_implicit": "preferred",
+                "composition_over_inheritance": "required"
+            },
+            "metrics": {
+                "function_length": {
+                    "warning_threshold": 30,
+                    "error_threshold": 50
+                },
+                "component_complexity": {
+                    "warning_threshold": 10,
+                    "error_threshold": 15
+                }
+            }
+        },
+        "testing": {
+            "preferences": {
+                "functional_tests": "preferred",
+                "unit_tests": "required",
+                "integration_tests": "preferred"
+            }
+        }
+    },
+    "exceptions": {
+        "allow": [
+            "prisma_migration_files",
+            "legacy_code",
+            "performance_critical_sections"
+        ]
+    }
+}

@@ -1,5 +1,6 @@
 import { memo, useEffect, useState } from 'react';
 import markdownStyles from './markdown-styles.module.css';
+import DOMPurify from 'dompurify';
 
 type Props = {
     content: string;
@@ -12,10 +13,7 @@ const PostBody = memo(({ content, className = '' }: Props) => {
     useEffect(() => {
         // Only run on client side
         if (typeof window !== 'undefined') {
-            // Dynamically import DOMPurify
-            void import('dompurify').then((DOMPurify) => {
-                setSanitizedContent(DOMPurify.default.sanitize(content));
-            });
+            setSanitizedContent(DOMPurify.sanitize(content));
         }
     }, [content]);
 

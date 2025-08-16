@@ -51,7 +51,7 @@ import {
     detachableFromId,
     taxonCodeAsStringToValue,
 } from '../api/apitypes';
-import { ORIGINAL, SMALL, deleteImagesBySpeciesId, makePath } from '../images/images';
+import { ORIGINAL, deleteImagesBySpeciesId, makePath } from '../images/images';
 import { defaultSource } from '../pages/renderhelpers';
 import { logger } from '../utils/logger.ts';
 import { ExtractTFromPromise } from '../utils/types';

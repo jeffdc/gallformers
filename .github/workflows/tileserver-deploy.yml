@@ -1,0 +1,60 @@
+name: Tileserver GL Deploy
+on:
+    push:
+        branches:
+            - main
+        paths:
+            - 'flyio/tileserver-gl/**'
+            - '.github/workflows/tileserver-deploy.yml'
+
+jobs:
+    deploy:
+        name: Deploy Tileserver GL
+        runs-on: ubuntu-latest
+        concurrency: tileserver-deploy-group
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Install system dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y \
+                      curl \
+                      unzip \
+                      gdal-bin \
+                      libgdal-dev \
+                      build-essential \
+                      cmake \
+                      libsqlite3-dev \
+                      zlib1g-dev
+
+            - name: Install Tippecanoe
+              run: |
+                  git clone https://github.com/mapbox/tippecanoe.git
+                  cd tippecanoe
+                  make -j
+                  sudo make install
+                  cd ..
+
+            - name: Build boundaries.mbtiles
+              working-directory: flyio/tileserver-gl
+              run: |
+                  chmod +x build_boundaries.sh
+                  ./build_boundaries.sh boundaries.mbtiles
+
+            - name: Build and push Docker image
+              working-directory: flyio/tileserver-gl
+              run: |
+                  docker build -t gftiles -f tileserver-gl.Dockerfile .
+
+            - name: Install flyctl
+              uses: superfly/flyctl-actions/setup-flyctl@master
+
+            - name: Deploy to fly.io
+              working-directory: flyio/tileserver-gl
+              run: flyctl deploy --remote-only
+              env:
+                  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

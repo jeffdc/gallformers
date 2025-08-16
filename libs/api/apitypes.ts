@@ -603,7 +603,7 @@ export const detachableFromString = (s: string): DetachableApi => {
 };
 
 export const detachableFromId = (id: null | undefined | number): DetachableApi => {
-    if (id == undefined || id == null) return DetachableNone;
+    if (id == undefined) return DetachableNone;
 
     const d = Detachables.find((d) => d.id === id);
     if (d == undefined) {

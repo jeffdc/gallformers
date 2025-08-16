@@ -333,11 +333,40 @@ const IDGall = (props: Props): JSX.Element => {
     };
 
     return (
-        <Container className="m-2" fluid>
+        <Container className="mt-0 mb-2" fluid>
             <Head>
                 <title>ID Galls</title>
                 <meta name="description" content="A tool for IDing galls on host plants." />
             </Head>
+
+            <Row className="mt-0 mb-1">
+                <Col>
+                    <div className="d-flex justify-content-center">
+                        <div className="text-center">
+                            <Link
+                                href="https://megachile.shinyapps.io/doycalc/"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-decoration-underline"
+                            >
+                                <div className="d-none d-md-block">
+                                    <span className="small">
+                                        Explore the seasonal timing of gall development and emergence with our phenology tool
+                                    </span>
+                                </div>
+                                <div className="d-md-none">
+                                    <span
+                                        className="small"
+                                        title="Explore the seasonal timing of gall development and emergence with our phenology tool"
+                                    >
+                                        🗓️ Phenology Tool
+                                    </span>
+                                </div>
+                            </Link>
+                        </div>
+                    </div>
+                </Col>
+            </Row>
 
             <Row className="">
                 <Col>
@@ -469,9 +498,9 @@ const IDGall = (props: Props): JSX.Element => {
                                                     <Link href="/filterguide">Gall Filter Term Guide</Link> for more details.
                                                 </p>
                                                 <p>
-                                                    Note: that leaving a field blank doesn’t exclude any galls, whether they have
-                                                    values in that field or not. Choosing one or more values in a field removes
-                                                    all galls that don’t include at least those values.
+                                                    Note: that leaving a field blank doesn&apos;t exclude any galls, whether they
+                                                    have values in that field or not. Choosing one or more values in a field
+                                                    removes all galls that don&apos;t include at least those values.
                                                 </p>
                                             </Popover.Body>
                                         </Popover>
@@ -905,8 +934,8 @@ const IDGall = (props: Props): JSX.Element => {
                             </Alert>
                         ) : (
                             <Alert variant="primary" className="small">
-                                There are no galls that match your filter. It’s possible there are no described species that fit
-                                this set of traits and your gall is undescribed. However, before giving up, try{' '}
+                                There are no galls that match your filter. It&apos;s possible there are no described species that
+                                fit this set of traits and your gall is undescribed. However, before giving up, try{' '}
                                 <Link href="ref/IDGuide#troubleshooting">altering your filter choices</Link>.{' '}
                                 {isHostComplete(hostOrTaxon) && (
                                     <span>

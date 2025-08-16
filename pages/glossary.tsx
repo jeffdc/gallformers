@@ -5,8 +5,8 @@ import { Col, Container, Row } from 'react-bootstrap';
 import DataTable from '../components/DataTable';
 import Edit from '../components/edit';
 import { Entry } from '../libs/api/apitypes';
-import { allGlossaryEntries } from '../libs/db/glossary.ts';
-import { EntryLinked, linkDefinitionToGlossary } from '../libs/pages/glossary.ts';
+import { allGlossaryEntries } from '../libs/db/glossary';
+import { EntryLinked, linkDefinitionToGlossary } from '../libs/pages/glossary';
 import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
 import { mightFailWithArray } from '../libs/utils/util';
 
@@ -85,9 +85,7 @@ const Glossary = ({ es }: Props): JSX.Element => {
         [],
     );
 
-    if (es == undefined || es == null) {
-        throw new Error('Invalid props passed to Glossary.');
-    }
+    // Props validation is guaranteed by TypeScript; no need for defensive checks.
     return (
         <Container className="pt-2" fluid>
             <Head>

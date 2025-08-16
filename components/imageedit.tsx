@@ -82,7 +82,12 @@ const ImageEdit = ({ image, show, onSave, onClose }: Props): JSX.Element => {
 
     return (
         <Modal show={show} onHide={onHide} size="lg">
-            <form onSubmit={void handleSubmit(onSubmit)}>
+            <form
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    void handleSubmit(onSubmit)(e);
+                }}
+            >
                 <Modal.Header closeButton>
                     <Modal.Title>Edit Image Details</Modal.Title>
                 </Modal.Header>

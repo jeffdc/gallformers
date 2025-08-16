@@ -7,14 +7,18 @@
 # COPY package.json yarn.lock ./
 # RUN yarn set version berry && yarn install 
 
-FROM --platform=linux/amd64 node:20-alpine as build
+FROM --platform=${BUILD_PLATFORM:-linux/amd64} node:20-slim AS builder
 WORKDIR /usr/src/app
 COPY . .
 # COPY --from=deps /usr/src/app/node_modules ./node_modules
 # COPY --from=deps /usr/src/app/.yarn ./.yarn
 # RUN ls -lA
 
-RUN yarn set version berry && yarn install 
+# Enable Corepack and set up Yarn
+RUN corepack enable && corepack prepare yarn@4.9.1 --activate
+
+# Install dependencies
+RUN yarn install 
 
 ENV NEXT_TELEMETRY_DISABLED 1
 # node modules will be r/o which can cause issues with React and the way it renames stuff at build time so...
@@ -27,31 +31,51 @@ ENV NEXT_TELEMETRY_DISABLED 1
 # 	&& yarn build \
 # 	&& npm prune --omit=dev
 
-RUN	yarn generate
-RUN yarn add --dev typescript @types/node
-RUN yarn build
-# RUN npm prune --omit=dev 
-#--production
+ENV DATABASE_URL="file:/usr/src/app/prisma/gallformers.sqlite"
 
-# this gets huge and we do not need it for the final build
-RUN rm -rf .next/cache
-# these are dev tools related to Prisma that are large and not needed in prod
-# RUN rm node_modules/@prisma/engines/introspection-engine-linux-musl
-# RUN rm node_modules/@prisma/engines/migration-engine-linux-musl
-# RUN rm node_modules/@prisma/engines/prisma-fmt-linux-musl
+# Build the application and run migrations
+RUN yarn generate && \
+    yarn add --dev typescript @types/node && \
+    yarn build && \
+    # Remove development files and caches
+    rm -rf .next/cache && \
+    rm -rf node_modules/.cache && \
+    # Remove development dependencies and clean up
+    yarn workspaces focus --production && \
+    rm -rf node_modules/@prisma/engines/*linux-musl && \
+    rm -rf node_modules/.yarn && \
+    rm -rf node_modules/.cache && \
+    # Remove unnecessary npm files
+    find node_modules -name "*.md" -delete && \
+    find node_modules -name "*.ts" -delete && \
+    find node_modules -name "*.map" -delete && \
+    find node_modules -name "LICENSE" -delete && \
+    find node_modules -name "CHANGELOG.md" -delete && \
+    find node_modules -name "README.md" -delete
 
-## Shrink final image, copy built nextjs and startup the server
-FROM --platform=linux/amd64 node:20-alpine
+## Final stage
+FROM --platform=${BUILD_PLATFORM:-linux/amd64} node:20-slim
+
+# Install SQLite and other necessary dependencies
+RUN apt-get update && \
+    apt-get install -y sqlite3 openssl && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/app
-ENV NODE_ENV production
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# copy from build image
-COPY --from=build /usr/src/app/package.json /usr/src/app/package.json
-COPY --from=build /usr/src/app/node_modules /usr/src/app/node_modules
-COPY --from=build /usr/src/app/.next /usr/src/app/.next
-COPY --from=build /usr/src/app/public /usr/src/app/public
+# Copy only the necessary files from build
+COPY --from=builder /usr/src/app/package.json ./package.json
+COPY --from=builder /usr/src/app/node_modules ./node_modules
+COPY --from=builder /usr/src/app/.next ./.next
+COPY --from=builder /usr/src/app/public ./public
+COPY --from=builder /usr/src/app/prisma ./prisma
+
+# Ensure proper permissions
+RUN chmod 644 /usr/src/app/prisma/gallformers.sqlite
 
 EXPOSE 3000
-CMD ["yarn", "start"]
+
+CMD ["node_modules/next/dist/bin/next", "start"]
 

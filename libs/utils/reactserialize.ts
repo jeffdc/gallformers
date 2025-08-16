@@ -51,7 +51,7 @@ export function serialize(element: ReactNode): string {
  * @returns {ReactNode}
  */
 export function deserialize(data: string | object | undefined | null): ReactNode {
-    if (data == null || data == undefined) {
+    if (data == null) {
         return undefined;
     }
 
@@ -70,7 +70,7 @@ type Element = {
 };
 
 function deserializeElement(element: object | [] | Element, key: string | number | undefined): ReactNode {
-    if (typeof element !== 'object' || element == null || element == undefined) {
+    if (typeof element !== 'object' || element == null) {
         return element;
     }
 

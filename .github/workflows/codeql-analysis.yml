@@ -3,60 +3,84 @@
 #
 # You may wish to alter this file to override the set of languages analyzed,
 # or to provide custom queries or build logic.
-name: "CodeQL"
+name: 'CodeQL'
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    # The branches below must be a subset of the branches above
-    branches: [main]
-  schedule:
-    - cron: '0 15 * * 5'
+    push:
+        branches: [main]
+    pull_request:
+        # The branches below must be a subset of the branches above
+        branches: [main]
+    schedule:
+        - cron: '0 15 * * 5'
+
+env:
+    YARN_ENABLE_IMMUTABLE_INSTALLS: false
+    YARN_NODE_LINKER: node-modules
 
 jobs:
-  analyze:
-    name: Analyze
-    runs-on: ubuntu-latest
+    analyze:
+        name: Analyze
+        runs-on: ubuntu-latest
+        permissions:
+            actions: read
+            contents: read
+            security-events: write
 
-    strategy:
-      fail-fast: false
-      matrix:
-        # Override automatic language detection by changing the below list
-        # Supported options are ['csharp', 'cpp', 'go', 'java', 'javascript', 'python']
-        language: ['javascript']
-        # Learn more...
-        # https://docs.github.com/en/github/finding-security-vulnerabilities-and-errors-in-your-code/configuring-code-scanning#overriding-automatic-language-detection
+        strategy:
+            fail-fast: false
+            matrix:
+                # Updated to include typescript for better analysis of your codebase
+                # CodeQL supports 'javascript' for both JavaScript and TypeScript
+                language: ['javascript']
 
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
 
-    # Initializes the CodeQL tools for scanning.
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v1
-      with:
-        languages: ${{ matrix.language }}
-        # If you wish to specify custom queries, you can do so here or in a config file.
-        # By default, queries listed here will override any specified in a config file.
-        # Prefix the list here with "+" to use these queries and those in the config file.
-        # queries: ./path/to/local/query, your-org/your-repo/queries@main
+            # Initializes the CodeQL tools for scanning.
+            - name: Initialize CodeQL
+              uses: github/codeql-action/init@v3
+              with:
+                  languages: ${{ matrix.language }}
+                  # Enable additional queries for better security analysis
+                  queries: security-extended,security-and-quality
 
-    # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
-    # If this step fails, then you should remove it and run the build manually (see below)
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v1
+            # Set up Node.js environment for proper TypeScript/Next.js analysis
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '21'
+                  cache: 'npm'
 
-    # ℹ️ Command-line programs to run using the OS shell.
-    # 📚 https://git.io/JvXDl
+            # Setup Yarn 4 (same approach as CI.yml)
+            - name: Setup Yarn
+              run: |
+                  echo "Creating .yarn/releases directory..."
+                  mkdir -p .yarn/releases
+                  echo "Downloading Yarn binary..."
+                  curl -L --fail -o .yarn/releases/yarn-4.9.2.cjs https://repo.yarnpkg.com/4.9.2/packages/yarnpkg-cli/bin/yarn.js
+                  echo "Setting permissions..."
+                  chmod +x .yarn/releases/yarn-4.9.2.cjs
+                  echo "Verifying file exists and is executable..."
+                  ls -la .yarn/releases/yarn-4.9.2.cjs
+                  echo "Testing Yarn version..."
+                  node .yarn/releases/yarn-4.9.2.cjs --version
 
-    # ✏️ If the Autobuild fails above, remove it and uncomment the following three lines
-    #    and modify them (or add more) to build your code if your project
-    #    uses a compiled language
+            # Install dependencies to help CodeQL understand the project structure
+            - name: Install dependencies
+              run: yarn install --immutable
 
-    #- run: |
-    #   make bootstrap
-    #   make release
+            # Generate Prisma client for proper analysis
+            - name: Generate Prisma client
+              run: yarn generate
 
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v1
+            # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
+            # For JavaScript/TypeScript, this step analyzes the code without building
+            - name: Autobuild
+              uses: github/codeql-action/autobuild@v3
+
+            - name: Perform CodeQL Analysis
+              uses: github/codeql-action/analyze@v3
+              with:
+                  category: '/language:${{matrix.language}}'

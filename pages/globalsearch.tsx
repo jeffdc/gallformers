@@ -10,11 +10,11 @@ import { Col, Container, Row } from 'react-bootstrap';
 import DataTable from '../components/DataTable';
 import { extractQueryParam } from '../libs/api/apipage';
 import { PlaceNoTreeApi, TaxonomyEntryNoParent } from '../libs/api/apitypes';
-import { GlobalSearchResults, TinySource, TinySpecies, globalSearch } from '../libs/db/search.ts';
-import { EntryLinked } from '../libs/pages/glossary.ts';
+import { GlobalSearchResults, TinySource, TinySpecies, globalSearch } from '../libs/db/search';
+import { EntryLinked } from '../libs/pages/glossary';
 import { formatWithDescription } from '../libs/pages/renderhelpers';
 import { TABLE_CUSTOM_STYLES } from '../libs/utils/DataTableConstants';
-import { logger } from '../libs/utils/logger.ts';
+import { logger } from '../libs/utils/logger';
 import { capitalizeFirstLetter, mightFail } from '../libs/utils/util';
 
 type SearchResultItem = {
