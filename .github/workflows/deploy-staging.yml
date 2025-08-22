@@ -1,0 +1,50 @@
+name: Deploy to Staging
+
+on:
+    pull_request:
+        types: [opened, synchronize, reopened]
+        branches: [main]
+
+env:
+    FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+jobs:
+    deploy-staging:
+        needs: []
+        runs-on: ubuntu-latest
+        outputs:
+            staging-url: ${{ steps.deploy.outputs.staging-url }}
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: superfly/flyctl-actions/setup-flyctl@master
+
+            - name: Deploy to staging
+              id: deploy
+              run: |
+                  flyctl deploy --config fly.staging.toml --app gallformers-staging
+
+                  # Ensure staging database directory exists and initialize if needed
+                  flyctl ssh console --app gallformers-staging --command "mkdir -p /data/staging"
+
+                  # Copy production DB to staging for testing (optional, or use test data)
+                  flyctl ssh console --app gallformers-staging --command "
+                    if [ ! -f /data/staging/gallformers.db ] && [ -f /data/production/gallformers.db ]; then
+                      cp /data/production/gallformers.db /data/staging/gallformers.db
+                      echo 'Copied production DB to staging for testing'
+                    fi
+                  "
+
+                  STAGING_URL="https://gallformers-staging.fly.dev"
+                  echo "staging-url=$STAGING_URL" >> $GITHUB_OUTPUT
+
+                  # Add comment to PR with staging URL
+                  gh pr comment ${{ github.event.number }} --body "🚀 **Staging deployment ready!**
+
+                  **Staging URL**: $STAGING_URL
+                  **Commit**: ${{ github.event.pull_request.head.sha }}
+                  **Database**: Isolated staging database in \`/data/staging/\`
+
+                  Test your changes and then promote to production when ready."
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

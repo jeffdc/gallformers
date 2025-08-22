@@ -1,0 +1,89 @@
+name: Deploy to Production
+
+on:
+    workflow_dispatch:
+        inputs:
+            staging_app:
+                description: 'Staging app to promote'
+                required: true
+                default: 'gallformers-staging'
+            confirm_promotion:
+                description: 'Type "PROMOTE" to confirm'
+                required: true
+
+env:
+    FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+jobs:
+    validate-promotion:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Validate promotion confirmation
+              run: |
+                  if [ "${{ github.event.inputs.confirm_promotion }}" != "PROMOTE" ]; then
+                    echo "❌ Promotion not confirmed. Please type 'PROMOTE' to proceed."
+                    exit 1
+                  fi
+
+    deploy-production:
+        needs: validate-promotion
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: superfly/flyctl-actions/setup-flyctl@master
+
+            - name: Deploy to production
+              run: |
+                  # Create a new production deployment
+                  flyctl deploy --config fly.toml --app gallformers-prod
+
+                  # Health check
+                  flyctl status --app gallformers-prod
+
+                  echo "✅ Production deployment completed successfully!"
+
+    cleanup-staging:
+        needs: deploy-production
+        runs-on: ubuntu-latest
+        steps:
+            - uses: superfly/flyctl-actions/setup-flyctl@master
+
+            - name: Scale down staging
+              run: |
+                  flyctl scale count 0 --app ${{ github.event.inputs.staging_app }}
+                  echo "🧹 Staging app scaled down to save resources"
+
+    notify-success:
+        needs: [deploy-production, cleanup-staging]
+        runs-on: ubuntu-latest
+        if: success()
+        steps:
+            - name: Notify successful production deployment
+              uses: 8398a7/action-slack@v3
+              with:
+                  status: success
+                  channel: '#site-monitoring'
+                  text: |
+                      🚀 **Production deployment successful!**
+
+                      **URL**: https://gallformers.org
+                      **Commit**: ${{ github.sha }}
+                      **Deployed by**: ${{ github.actor }}
+
+    notify-failure:
+        needs: deploy-production
+        runs-on: ubuntu-latest
+        if: failure()
+        steps:
+            - name: Notify failed production deployment
+              uses: 8398a7/action-slack@v3
+              with:
+                  status: failure
+                  channel: '#site-monitoring'
+                  text: |
+                      ❌ **Production deployment failed!**
+
+                      **Workflow**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+                      **Commit**: ${{ github.sha }}
+                      **Triggered by**: ${{ github.actor }}
