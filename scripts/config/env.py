@@ -10,21 +10,21 @@ class Env:
         self._loaded = False
         self._loaded_vars: Set[str] = set()
         self._env = os.getenv('NODE_ENV', 'development')
-        # Get the root directory (parent of scripts_py)
+        # Get the root directory (parent of scripts)
         self._root_dir = pathlib.Path.cwd().parent
 
     def load(self):
         if not self._loaded:
             # Load shared environment variables first
-            self._load_file(self._root_dir / '.env.shared')
+            self._load_file(self._root_dir / 'env/.env.shared')
 
             # Load environment-specific variables
             self._env = os.getenv('NODE_ENV', 'development')  # Refresh env value
-            self._load_file(self._root_dir / f'.env.{self._env}')
+            self._load_file(self._root_dir / f'env/.env.{self._env}')
 
             # Load local overrides last
-            if (self._root_dir / '.env.local').exists():
-                self._load_file(self._root_dir / '.env.local', override=True)
+            if (self._root_dir / 'env/.env.local').exists():
+                self._load_file(self._root_dir / 'env/.env.local', override=True)
 
             # Expand all environment variables that reference other environment variables
             self._expand_env_vars()

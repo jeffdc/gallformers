@@ -22,18 +22,13 @@ jobs:
             - name: Deploy to staging
               id: deploy
               run: |
-                  flyctl deploy --config fly.staging.toml --app gallformers-staging
+                  flyctl deploy --config stage/fly.toml --app gallformers-staging
 
-                  # Ensure staging database directory exists and initialize if needed
-                  flyctl ssh console --app gallformers-staging --command "mkdir -p /data/staging"
+                  # Install Python dependencies for refresh script
+                  flyctl ssh console --app gallformers-staging --command "cd /usr/src/app && pip install -r scripts/requirements.txt"
 
-                  # Copy production DB to staging for testing (optional, or use test data)
-                  flyctl ssh console --app gallformers-staging --command "
-                    if [ ! -f /data/staging/gallformers.db ] && [ -f /data/production/gallformers.db ]; then
-                      cp /data/production/gallformers.db /data/staging/gallformers.db
-                      echo 'Copied production DB to staging for testing'
-                    fi
-                  "
+                  # Refresh staging database from latest production backup
+                  flyctl ssh console --app gallformers-staging --command "cd /usr/src/app && python scripts/main.py refresh-staging-from-latest-backup"
 
                   STAGING_URL="https://gallformers-staging.fly.dev"
                   echo "staging-url=$STAGING_URL" >> $GITHUB_OUTPUT
@@ -43,7 +38,7 @@ jobs:
 
                   **Staging URL**: $STAGING_URL
                   **Commit**: ${{ github.event.pull_request.head.sha }}
-                  **Database**: Isolated staging database in \`/data/staging/\`
+                  **Database**: Refreshed with latest production data
 
                   Test your changes and then promote to production when ready."
               env:

@@ -1,0 +1,6 @@
+# Ignore all env files
+*.env
+
+# Allow specific env files
+!.env.shared
+!.env.*.example

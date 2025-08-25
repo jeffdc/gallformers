@@ -3,7 +3,7 @@ import { join, relative, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = join(__filename, '..');
+const __dirname = dirname(__filename);
 
 const EXTENSIONS = ['.ts', '.tsx'];
 const IMPORT_REGEX = /import\s+(?:{[^}]*}|\*\s+as\s+\w+|\w+)\s+from\s+['"]([^'"]+)['"]/g;
@@ -90,7 +90,7 @@ function checkImports(filePath) {
 }
 
 function main() {
-    const rootDir = join(__dirname, '..');
+    const rootDir = __dirname; // Now __dirname is the root directory
     const files = findFiles(rootDir);
     let hasErrors = false;
 
@@ -118,4 +118,4 @@ function main() {
     }
 }
 
-main(); 
+main();

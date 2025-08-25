@@ -1,0 +1,140 @@
+SERVICE_NAME := gallformers
+
+# Check for required env files
+.PHONY: env-check
+env-check:
+ifeq (,$(wildcard env/.env.local))
+	$(error You must have an env/.env.local file containing secrets!)
+endif
+
+# Set environment using Python env loader
+.PHONY: set-env
+set-env: env-check
+	@echo "Environment loaded via Python scripts"
+
+#############################################################################
+# Local Development (Yarn)
+#############################################################################
+
+.PHONY: dev
+dev: env-check
+ifeq (,$(wildcard env/.env.development))
+	$(error You must have an env/.env.development file!)
+endif
+	@echo "Starting development server..."
+	@echo "Environment will be loaded from env/.env.shared, env/.env.development, and env/.env.local"
+	NODE_ENV=development yarn dev
+
+#############################################################################
+# Local Docker (Production-like container for local testing)
+#############################################################################
+
+.PHONY: local-docker-build
+local-docker-build: env-check
+ifeq (,$(wildcard env/.env.local-docker))
+	$(error You must have an env/.env.local-docker file!)
+endif
+	@echo "Building local Docker container for testing..."
+	NODE_ENV=local-docker docker build -f Dockerfile.fly -t $(SERVICE_NAME):local .
+
+.PHONY: local-docker-run
+local-docker-run: env-check
+ifeq (,$(wildcard env/.env.local-docker))
+	$(error You must have an env/.env.local-docker file!)
+endif
+	@echo "Starting local Docker container..."
+	@echo "Environment will be loaded from env/.env.shared, env/.env.local-docker, and env/.env.local"
+	docker stop $(SERVICE_NAME)-local || true
+	docker rm $(SERVICE_NAME)-local || true
+	mkdir -p data
+	NODE_ENV=local-docker docker run \
+		-v $(PWD)/data:/data \
+		-v $(PWD)/ref:/usr/src/app/ref \
+		--env NODE_ENV=local-docker \
+		--name $(SERVICE_NAME)-local \
+		-p 3000:3000 \
+		-d $(SERVICE_NAME):local
+	docker start $(SERVICE_NAME)-local
+	@echo "✅ Local Docker container started at http://localhost:3000"
+	@echo "💡 Environment loaded from env/ directory"
+
+.PHONY: local-docker
+local-docker: local-docker-build local-docker-run
+
+.PHONY: local-docker-logs
+local-docker-logs:
+	docker logs -f $(SERVICE_NAME)-local
+
+.PHONY: local-docker-stop
+local-docker-stop:
+	docker stop $(SERVICE_NAME)-local || true
+	docker rm $(SERVICE_NAME)-local || true
+
+.PHONY: local-docker-restart
+local-docker-restart: local-docker-stop local-docker-run
+
+#############################################################################
+# Database Management
+#############################################################################
+
+.PHONY: backup
+backup: set-env
+	@echo "Creating database backup..."
+	cd scripts && python main.py backup
+
+.PHONY: restore
+restore: set-env
+	@if [ -z "$(S3_KEY)" ]; then \
+		echo "Error: S3_KEY is required"; \
+		echo "Usage: make restore S3_KEY=backups/gallformers_2025-01-01.zip"; \
+		exit 1; \
+	fi
+	@echo "Restoring database from S3..."
+	cd scripts && python main.py restore $(S3_KEY)
+
+#############################################################################
+# Fly.io Management (for local secret management)
+#############################################################################
+
+.PHONY: set-secrets-staging
+set-secrets-staging: set-env
+	@echo "Setting secrets for staging app..."
+	cd scripts && NODE_ENV=production python main.py set-secrets gallformers-staging
+
+.PHONY: set-secrets-prod
+set-secrets-prod: set-env
+	@echo "Setting secrets for production app..."
+	cd scripts && NODE_ENV=production python main.py set-secrets gallformers-prod
+
+#############################################################################
+# Utility Commands
+#############################################################################
+
+.PHONY: clean
+clean: local-docker-stop
+	docker rmi $(SERVICE_NAME):local || true
+	@echo "✅ Cleaned up local Docker resources"
+
+.PHONY: status
+status:
+	@echo "=== Service Status ==="
+	@docker ps --filter name=$(SERVICE_NAME)-local --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" || echo "No local containers running"
+	@echo ""
+	@echo "=== Available Commands ==="
+	@echo "Local Development:"
+	@echo "  make dev                    - Start yarn dev server"
+	@echo "  make local-docker          - Build and run local Docker container"
+	@echo "  make local-docker-logs     - View local Docker logs"
+	@echo ""
+	@echo "Database:"
+	@echo "  make backup                - Create database backup to S3"
+	@echo "  make restore S3_KEY=...    - Restore from S3 backup"
+	@echo ""
+	@echo "Fly.io:"
+	@echo "  make set-secrets-staging   - Set secrets for staging app"
+	@echo "  make set-secrets-prod      - Set secrets for production app"
+
+.PHONY: help
+help: status
+
+.DEFAULT_GOAL := help

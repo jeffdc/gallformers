@@ -10,7 +10,7 @@ NODE_ENV = "production"
 [http_service]
 internal_port = 3000
 force_https = true
-auto_stop_machines = true
+auto_stop_machines = 'stop'
 auto_start_machines = true
 min_machines_running = 0
 
@@ -28,7 +28,7 @@ User-Agent = "fly-health-check-staging"
 source = "gallformers_staging_data"
 destination = "/data"
 
-[vm]
-memory = "1gb"
-cpu_kind = "shared"
+[[vm]]
+cpu_kind = 'shared'
 cpus = 1
+memory_mb = 1024

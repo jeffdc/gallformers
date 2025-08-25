@@ -1,0 +1,43 @@
+name: Backup Production Database
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    # Allow manual triggering
+
+env:
+  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+jobs:
+  backup-production:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Create production backup
+        run: |
+          echo "🔄 Creating production database backup..."
+          
+          # Install Python dependencies and run backup on production app
+          flyctl ssh console --app gallformers-prod --command "cd /usr/src/app && pip install -r scripts/requirements.txt"
+          flyctl ssh console --app gallformers-prod --command "cd /usr/src/app && python scripts/main.py backup"
+          
+          echo "✅ Production backup completed"
+
+      - name: Notify backup status
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#site-monitoring'
+          text: |
+            📁 **Production Database Backup**
+            
+            **Status**: ${{ job.status == 'success' && '✅ Success' || '❌ Failed' }}
+            **Time**: ${{ github.run_number }}
+            **Trigger**: ${{ github.event_name == 'schedule' && 'Scheduled' || 'Manual' }}
+            
+            ${{ job.status == 'failure' && '**Action Required**: Check backup logs and verify S3 storage.' || 'Backup stored in S3 successfully.' }}

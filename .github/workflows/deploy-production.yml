@@ -36,7 +36,7 @@ jobs:
             - name: Deploy to production
               run: |
                   # Create a new production deployment
-                  flyctl deploy --config fly.toml --app gallformers-prod
+                  flyctl deploy --config prod/fly.toml --app gallformers-prod
 
                   # Health check
                   flyctl status --app gallformers-prod

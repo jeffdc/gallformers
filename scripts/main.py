@@ -5,6 +5,8 @@ from typing import Dict, Type, Any
 from tasks.backup import BackupTask
 from tasks.restore import RestoreTask
 from tasks.setup import SetupTask
+from tasks.refresh_staging import RefreshStagingTask
+from tasks.set_secrets import SetSecretsTask
 from utils.logger import logger
 
 # Task registry
@@ -12,6 +14,8 @@ tasks: Dict[str, Type[Any]] = {
     'backup': BackupTask,
     'restore': RestoreTask,
     'setup': SetupTask,
+    'refresh-staging-from-latest-backup': RefreshStagingTask,
+    'set-secrets': SetSecretsTask,
 }
 
 async def main() -> None:
