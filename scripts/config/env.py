@@ -32,6 +32,9 @@ class Env:
             self._validate_required()
             self._loaded = True
             logger.info("Environment variables loaded")
+            logger.info("Environment variables to be loaded:")
+            for key in self._loaded_vars:
+                logger.info(f"{key}={os.getenv(key)}")
 
     def _load_file(self, file_path: pathlib.Path, override: bool = False) -> None:
         logger.debug(f"Attempting to load {file_path.name} from {file_path}")

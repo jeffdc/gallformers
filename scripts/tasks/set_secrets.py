@@ -21,22 +21,16 @@ class SetSecretsTask:
 
     async def execute(self, app_name: str = None) -> SetSecretsResult:
         try:
-            # Load environment variables
-            env.load()
-
             if not app_name:
                 raise ValueError("App name is required (e.g., 'gallformers-staging' or 'gallformers-prod')")
 
             logger.info('Setting Fly.io secrets', app=app_name)
 
-            # Get all environment variables from the loaded env
-            env_vars = dict(os.environ)
-            
-            # Filter out system variables and empty values
-            secrets_to_set = self._filter_secrets(env_vars)
+            # Get only the variables loaded from our env/ files (not system env)
+            secrets_to_set = self._get_managed_env_vars()
             
             if not secrets_to_set:
-                logger.warning('No secrets found to set')
+                logger.warning('No secrets found in env/ files to set')
                 return SetSecretsResult(success=True, secrets_set=[])
 
             logger.info(f'Found {len(secrets_to_set)} secrets to set')
@@ -77,43 +71,26 @@ class SetSecretsTask:
             logger.error('Failed to set secrets', error=str(error))
             raise
 
-    def _filter_secrets(self, env_vars: Dict[str, str]) -> Dict[str, str]:
+    def _get_managed_env_vars(self) -> Dict[str, str]:
         """
-        Filter environment variables to only include secrets that should be set in Fly.io.
-        Excludes system variables, empty values, and development-only variables.
+        Get environment variables from our managed env/ files using the existing env loader.
+        Only returns variables explicitly defined in env/ files, not system environment.
         """
-        # Variables to exclude from secrets (system vars, development-only, etc.)
-        exclude_patterns = [
-            'PATH', 'HOME', 'USER', 'SHELL', 'PWD', 'OLDPWD', 'TERM', 'LANG', 'LC_',
-            'TMPDIR', 'XDG_', 'DISPLAY', 'SSH_', 'SUDO_', '_', 'SHLVL',
-            'GITHUB_', 'CI', 'RUNNER_', 'ACTIONS_',  # GitHub Actions vars
-            'NODE_', 'NPM_', 'YARN_',  # Node.js vars that shouldn't be secrets
-        ]
+        # Load environment variables using our existing env module
+        env.load()
         
-        # Variables that are definitely secrets/config (include these)
-        include_patterns = [
-            'DATABASE_URL', 'AWS_', 'S3_', 'AUTH0_', 'NEXTAUTH_', 'SECRET',
-            'EMAIL_', 'MONITOR_', 'APP_PATH', 'BACKUP_PATH', 'LOG_PATH', 'DB_PATH'
-        ]
+        # Get all the variables that were loaded from our env/ files
+        # The env module tracks loaded variables in _loaded_vars
+        managed_vars = {}
         
-        filtered = {}
+        for var_name in env._loaded_vars:
+            value = env.get(var_name)
+            if value and value.strip():  # Only include non-empty values
+                managed_vars[var_name] = value
+                logger.debug(f'Including managed env var: {var_name}')
         
-        for key, value in env_vars.items():
-            # Skip empty values
-            if not value or value.strip() == '':
-                continue
-                
-            # Skip system variables
-            if any(key.startswith(pattern) for pattern in exclude_patterns):
-                continue
-                
-            # Include if matches include patterns or doesn't match exclude patterns
-            if any(key.startswith(pattern) for pattern in include_patterns) or key.upper() == key:
-                # Only include uppercase variables or those matching include patterns
-                # This helps filter out local shell variables
-                filtered[key] = value
-                
-        return filtered
+        logger.info(f'Found {len(managed_vars)} managed environment variables from env/ files')
+        return managed_vars
 
 if __name__ == '__main__':
     import asyncio
