@@ -1,3 +1,8 @@
+import { loadEnvFiles } from './load-env.mjs';
+
+// Load environment variables from env/ directory before Next.js starts
+loadEnvFiles();
+
 export default (phase) => {
     const d = new Date();
     const buildid = `${d.getUTCFullYear()}${

@@ -7,10 +7,20 @@ ifeq (,$(wildcard env/.env.local))
 	$(error You must have an env/.env.local file containing secrets!)
 endif
 
-# Set environment using Python env loader
+# Set environment using Python env loader (for Python scripts only)
 .PHONY: set-env
 set-env: env-check
 	@echo "Environment loaded via Python scripts"
+
+# Build the Next.js application (env loaded automatically)
+.PHONY: build
+build: env-check
+ifeq (,$(wildcard env/.env.development))
+	$(error You must have an env/.env.development file!)
+endif
+	@echo "Building application..."
+	@echo "Environment will be loaded automatically from env/ directory"
+	yarn build
 
 #############################################################################
 # Local Development (Yarn)
@@ -22,8 +32,8 @@ ifeq (,$(wildcard env/.env.development))
 	$(error You must have an env/.env.development file!)
 endif
 	@echo "Starting development server..."
-	@echo "Environment will be loaded from env/.env.shared, env/.env.development, and env/.env.local"
-	NODE_ENV=development yarn dev
+	@echo "Environment will be loaded automatically from env/ directory"
+	yarn dev
 
 #############################################################################
 # Local Docker (Production-like container for local testing)

@@ -60,7 +60,7 @@ primary_region = "iad"
 
 [env]
   NODE_ENV = "production"
-  DATABASE_URL = "/data/gallformers.db"
+  DATABASE_URL = "/data/production/gallformers.db"
 
 [http_service]
   internal_port = 3000
@@ -116,7 +116,7 @@ primary_region = "iad"
 
 [env]
   NODE_ENV = "production"
-  DATABASE_URL = "/data/gallformers.db"
+  DATABASE_URL = "/data/staging/gallformers.db"
 
 [http_service]
   internal_port = 3000
@@ -126,7 +126,7 @@ primary_region = "iad"
   min_machines_running = 0
 
 [[mounts]]
-  source = "gallformers_staging_data"
+  source = "gallformers_data"
   destination = "/data"
 
 [vm]
@@ -150,7 +150,6 @@ AUTH0_CLIENT_ID        # Auth0 client ID
 AUTH0_CLIENT_SECRET    # Auth0 client secret
 AWS_ACCESS_KEY_ID      # For S3 access
 AWS_SECRET_ACCESS_KEY  # For S3 access
-SLACK_WEBHOOK_URL      # For deployment notifications
 ```
 
 ### 2.2 Workflow Files
@@ -207,6 +206,18 @@ jobs:
         id: deploy
         run: |
           flyctl deploy --config fly.staging.toml --app gallformers-staging
+          
+          # Ensure staging database directory exists and initialize if needed
+          flyctl ssh console --app gallformers-staging --command "mkdir -p /data/staging"
+          
+          # Copy production DB to staging for testing (optional, or use test data)
+          flyctl ssh console --app gallformers-staging --command "
+            if [ ! -f /data/staging/gallformers.db ] && [ -f /data/production/gallformers.db ]; then
+              cp /data/production/gallformers.db /data/staging/gallformers.db
+              echo 'Copied production DB to staging for testing'
+            fi
+          "
+          
           STAGING_URL="https://gallformers-staging.fly.dev"
           echo "staging-url=$STAGING_URL" >> $GITHUB_OUTPUT
           
@@ -215,6 +226,7 @@ jobs:
           
           **Staging URL**: $STAGING_URL
           **Commit**: ${{ github.event.pull_request.head.sha }}
+          **Database**: Isolated staging database in \`/data/staging/\`
           
           Test your changes and then promote to production when ready."
         env:
@@ -386,8 +398,8 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/prisma ./prisma
 
-# Create data directory for SQLite
-RUN mkdir -p /data && chown nextjs:nodejs /data
+# Create data directories for SQLite (both prod and staging)
+RUN mkdir -p /data/production /data/staging && chown -R nextjs:nodejs /data
 
 USER nextjs
 
@@ -423,14 +435,15 @@ fly certs show gallformers.org --app gallformers-prod
 ### 3.3 Database Migration
 
 ```bash
-# Create production volume
-fly volumes create gallformers_data --region iad --size 10 --app gallformers-prod
+# Create single shared volume for both environments
+fly volumes create gallformers_data --region iad --size 15 --app gallformers-prod
 
-# Create staging volume
-fly volumes create gallformers_staging_data --region iad --size 5 --app gallformers-staging
-
-# Copy existing database to Fly volume (manual step)
-# This would involve SCP/rsync from current DO droplet to local, then fly ssh console to copy to volume
+# Copy existing database to production directory
+# This would involve SCP/rsync from current DO droplet to local, then:
+# 1. fly ssh console --app gallformers-prod
+# 2. mkdir -p /data/production /data/staging
+# 3. Copy database file to /data/production/gallformers.db
+# 4. Optionally copy to staging: cp /data/production/gallformers.db /data/staging/gallformers.db
 ```
 
 ## Phase 4: Monitoring & Observability
