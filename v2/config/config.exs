@@ -60,6 +60,13 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# Configure Ueberauth for Auth0 authentication
+# Client ID and secret are set in runtime.exs from environment variables
+config :ueberauth, Ueberauth,
+  providers: [
+    auth0: {Ueberauth.Strategy.Auth0, []}
+  ]
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

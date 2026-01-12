@@ -240,7 +240,7 @@ defmodule GallformersWeb.Layouts do
       <div class="flex items-center justify-between px-4 py-2">
         <%!-- Login - left side (desktop only) --%>
         <a
-          href="/login"
+          href="/auth/auth0"
           class="hidden sm:block text-base font-medium !text-gf-maroon hover:underline"
         >
           Login
@@ -306,7 +306,7 @@ defmodule GallformersWeb.Layouts do
         id="footer-menu"
       >
         <a
-          href="/login"
+          href="/auth/auth0"
           class="block text-base font-medium !text-gf-maroon hover:underline py-1 px-4"
         >
           Login
@@ -349,6 +349,190 @@ defmodule GallformersWeb.Layouts do
 
   defp toggle_footer_menu do
     JS.toggle(to: "#footer-menu")
+  end
+
+  @doc """
+  Renders the admin layout with sidebar navigation.
+
+  ## Examples
+
+      <Layouts.admin flash={@flash} current_user={@current_user}>
+        <h1>Admin Content</h1>
+      </Layouts.admin>
+  """
+  attr :flash, :map, required: true, doc: "the map of flash messages"
+  attr :current_user, :map, required: true, doc: "the currently logged in user"
+  attr :page_title, :string, default: nil, doc: "the page title for the header"
+
+  slot :inner_block, required: true
+
+  def admin(assigns) do
+    admin_nav_links = [
+      %{href: "/admin", label: "Dashboard", icon: "hero-home"},
+      %{href: "/admin/species", label: "Species", icon: "hero-bug-ant"},
+      %{href: "/admin/hosts", label: "Hosts", icon: "hero-leaf"},
+      %{href: "/admin/taxonomy", label: "Taxonomy", icon: "hero-folder-tree"},
+      %{href: "/admin/sources", label: "Sources", icon: "hero-book-open"},
+      %{href: "/admin/images", label: "Images", icon: "hero-photo"},
+      %{href: "/admin/glossary", label: "Glossary", icon: "hero-book-open"}
+    ]
+
+    assigns = assign(assigns, :admin_nav_links, admin_nav_links)
+
+    ~H"""
+    <div class="flex min-h-screen">
+      <%!-- Admin Sidebar --%>
+      <aside class="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-gf-maroon">
+        <%!-- Logo/Brand --%>
+        <div class="flex items-center justify-center h-16 px-4 bg-gf-maroon/90">
+          <a href="/" class="flex items-center gap-2">
+            <img
+              src="/branding/Wide Logo Versions/gallformers_logo_wide_color.png"
+              alt="Gallformers"
+              class="h-10"
+            />
+          </a>
+        </div>
+
+        <%!-- Navigation --%>
+        <nav class="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+          <a
+            :for={link <- @admin_nav_links}
+            href={link.href}
+            class="flex items-center px-3 py-2 text-sm font-medium text-white/80 rounded-md hover:bg-white/10 hover:text-white group"
+          >
+            <.icon name={link.icon} class="mr-3 h-5 w-5" />
+            {link.label}
+          </a>
+        </nav>
+
+        <%!-- User Menu --%>
+        <div class="flex-shrink-0 p-4 border-t border-white/20">
+          <div class="flex items-center">
+            <div class="flex-shrink-0">
+              <%= if @current_user.picture do %>
+                <img class="h-8 w-8 rounded-full" src={@current_user.picture} alt="" />
+              <% else %>
+                <div class="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center">
+                  <.icon name="hero-user" class="h-5 w-5 text-white" />
+                </div>
+              <% end %>
+            </div>
+            <div class="ml-3 flex-1 min-w-0">
+              <p class="text-sm font-medium text-white truncate">
+                {Gallformers.Accounts.User.display_name(@current_user)}
+              </p>
+              <a
+                href="/auth/logout"
+                class="text-xs text-white/60 hover:text-white"
+              >
+                Sign out
+              </a>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <%!-- Mobile header --%>
+      <div class="lg:hidden fixed top-0 left-0 right-0 z-40 bg-gf-maroon">
+        <div class="flex items-center justify-between h-14 px-4">
+          <a href="/" class="flex items-center">
+            <img
+              src="/branding/Wide Logo Versions/gallformers_logo_wide_color.png"
+              alt="Gallformers"
+              class="h-8"
+            />
+          </a>
+          <button
+            type="button"
+            phx-click={toggle_admin_menu()}
+            class="p-2 text-white hover:bg-white/10 rounded-md"
+          >
+            <.icon name="hero-bars-3" class="h-6 w-6" />
+          </button>
+        </div>
+      </div>
+
+      <%!-- Mobile sidebar --%>
+      <div id="admin-mobile-menu" class="lg:hidden hidden fixed inset-0 z-50">
+        <div class="fixed inset-0 bg-black/50" phx-click={toggle_admin_menu()}></div>
+        <aside class="fixed inset-y-0 left-0 w-64 bg-gf-maroon">
+          <div class="flex items-center justify-between h-14 px-4 border-b border-white/20">
+            <a href="/" class="flex items-center">
+              <img
+                src="/branding/Wide Logo Versions/gallformers_logo_wide_color.png"
+                alt="Gallformers"
+                class="h-8"
+              />
+            </a>
+            <button
+              type="button"
+              phx-click={toggle_admin_menu()}
+              class="p-2 text-white hover:bg-white/10 rounded-md"
+            >
+              <.icon name="hero-x-mark" class="h-6 w-6" />
+            </button>
+          </div>
+
+          <nav class="px-2 py-4 space-y-1">
+            <a
+              :for={link <- @admin_nav_links}
+              href={link.href}
+              class="flex items-center px-3 py-2 text-sm font-medium text-white/80 rounded-md hover:bg-white/10 hover:text-white"
+            >
+              <.icon name={link.icon} class="mr-3 h-5 w-5" />
+              {link.label}
+            </a>
+          </nav>
+
+          <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-white/20">
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <%= if @current_user.picture do %>
+                  <img class="h-8 w-8 rounded-full" src={@current_user.picture} alt="" />
+                <% else %>
+                  <div class="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center">
+                    <.icon name="hero-user" class="h-5 w-5 text-white" />
+                  </div>
+                <% end %>
+              </div>
+              <div class="ml-3 flex-1 min-w-0">
+                <p class="text-sm font-medium text-white truncate">
+                  {Gallformers.Accounts.User.display_name(@current_user)}
+                </p>
+                <a href="/auth/logout" class="text-xs text-white/60 hover:text-white">
+                  Sign out
+                </a>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <%!-- Main content area --%>
+      <div class="flex-1 lg:pl-64">
+        <main class="pt-14 lg:pt-0">
+          <%!-- Page header --%>
+          <%= if @page_title do %>
+            <div class="bg-white border-b border-gray-200 px-4 py-4 sm:px-6 lg:px-8">
+              <h1 class="text-2xl font-bold text-gf-maroon">{@page_title}</h1>
+            </div>
+          <% end %>
+
+          <%!-- Page content --%>
+          <div class="px-4 py-6 sm:px-6 lg:px-8">
+            {render_slot(@inner_block)}
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <.flash_group flash={@flash} />
+    """
+  end
+
+  defp toggle_admin_menu do
+    JS.toggle(to: "#admin-mobile-menu")
   end
 
   @doc """

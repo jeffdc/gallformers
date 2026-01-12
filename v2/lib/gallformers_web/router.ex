@@ -1,6 +1,8 @@
 defmodule GallformersWeb.Router do
   use GallformersWeb, :router
 
+  alias GallformersWeb.Plugs.FetchCurrentUser
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -8,15 +10,41 @@ defmodule GallformersWeb.Router do
     plug :put_root_layout, html: {GallformersWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug :fetch_current_user
   end
 
   pipeline :api do
     plug :accepts, ["json"]
   end
 
+  pipeline :admin do
+    plug GallformersWeb.Plugs.RequireAdmin
+  end
+
+  defp fetch_current_user(conn, _opts) do
+    FetchCurrentUser.call(conn, [])
+  end
+
   # Health check for Fly.io (no pipeline needed)
   get "/health", GallformersWeb.HealthController, :check
 
+  # Auth routes (login/logout via Auth0)
+  scope "/auth", GallformersWeb do
+    pipe_through :browser
+
+    get "/logout", AuthController, :logout
+    get "/:provider", AuthController, :request
+    get "/:provider/callback", AuthController, :callback
+  end
+
+  # Admin routes (require authentication)
+  scope "/admin", GallformersWeb do
+    pipe_through [:browser, :admin]
+
+    live "/", AdminDashboardLive
+  end
+
+  # Public routes
   scope "/", GallformersWeb do
     pipe_through :browser
 

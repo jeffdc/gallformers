@@ -209,12 +209,12 @@ Build one page at a time, deploy after each, verify visual parity.
 
 ## 11. Admin Pages (LiveView)
 
-### 11.1 Admin Foundation
-- [ ] 11.1.1 Configure Auth0 with ueberauth_auth0
-- [ ] 11.1.2 Create `Gallformers.Accounts` context
-- [ ] 11.1.3 Create admin authentication plugs
-- [ ] 11.1.4 Create admin layout with navigation
-- [ ] 11.1.5 Create `AdminDashboardLive`
+### 11.1 Admin Foundation ✅
+- [x] 11.1.1 Configure Auth0 with ueberauth_auth0
+- [x] 11.1.2 Create `Gallformers.Accounts` context
+- [x] 11.1.3 Create admin authentication plugs
+- [x] 11.1.4 Create admin layout with navigation
+- [x] 11.1.5 Create `AdminDashboardLive`
 
 ### 11.2 Species Admin
 - [ ] 11.2.1 Create `Admin.SpeciesLive.Index` with listing and search

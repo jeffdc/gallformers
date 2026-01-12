@@ -23,6 +23,16 @@ end
 config :gallformers, GallformersWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+# Auth0 configuration
+# In development, these can be set in .env or config/dev.secret.exs
+# In production, these must be set as environment variables
+if auth0_domain = System.get_env("AUTH0_DOMAIN") do
+  config :ueberauth, Ueberauth.Strategy.Auth0.OAuth,
+    domain: auth0_domain,
+    client_id: System.get_env("AUTH0_CLIENT_ID"),
+    client_secret: System.get_env("AUTH0_SECRET")
+end
+
 if config_env() == :prod do
   database_path =
     System.get_env("DATABASE_PATH") ||
