@@ -29,7 +29,7 @@
     "eslint-plugin-storybook": "^10.1.11",
     "jsdom": "^27.4.0",
     "storybook": "^10.1.11",
-    "svelte": "^5.0.0",
+    "svelte": "^5.46.4",
     "vite": "^6.4.1",
     "vitest": "^3.2.4"
   },
