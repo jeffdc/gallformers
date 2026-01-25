@@ -24,6 +24,7 @@ Thank you to all our Patrons!
 - Leslie Flint
 - Ellen Martinson
 - Dale Ball
+- Sam Smith
 
 # Eriophyid tier:
 
