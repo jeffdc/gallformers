@@ -62,7 +62,13 @@ jobs:
           MIX_ENV=test mix ecto.load --quiet
           sqlite3 priv/gallformers_test.sqlite < priv/repo/test_seeds.sql
 
-      - name: Run precommit checks (format, compile, credo, migrations, tests)
+      - name: Setup ChromeDriver for E2E tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-chromedriver
+          chromedriver --version
+
+      - name: Run precommit checks (format, compile, credo, migrations, tests, exclusion check)
         run: mix precommit
 
   assets:

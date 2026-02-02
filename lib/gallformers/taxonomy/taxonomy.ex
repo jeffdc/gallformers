@@ -25,7 +25,9 @@ defmodule Gallformers.Taxonomy.Taxonomy do
 
   schema "taxonomy" do
     field :name, :string
-    field :description, :string, default: ""
+    # Description is optional - stores common names (e.g., "Oaks" for Quercus)
+    # or classification type (e.g., "Plant" vs "Wasp" for families)
+    field :description, :string
     field :type, :string
     field :is_placeholder, :boolean, default: false
 

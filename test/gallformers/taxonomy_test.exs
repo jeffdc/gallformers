@@ -150,6 +150,155 @@ defmodule Gallformers.TaxonomyTest do
     end
   end
 
+  describe "get_taxonomy_for_species" do
+    test "returns taxonomy info for species with genus only" do
+      # Create Family → Genus
+      {:ok, family} =
+        Taxonomy.create_taxonomy(%{
+          name: "TestSpeciesTaxFamily",
+          type: "family",
+          description: "Wasp"
+        })
+
+      {:ok, genus} =
+        Taxonomy.create_taxonomy(%{
+          name: "TestSpeciesTaxGenus",
+          type: "genus",
+          parent_id: family.id
+        })
+
+      # Create species and link to genus
+      {:ok, species} =
+        Repo.insert(%Species{
+          name: "TestSpeciesTaxGenus species",
+          taxoncode: "gall",
+          datacomplete: false
+        })
+
+      Taxonomy.link_species_to_taxonomy(species.id, genus.id)
+
+      # Get taxonomy info
+      result = Taxonomy.get_taxonomy_for_species(species.id)
+
+      assert result.genus == "TestSpeciesTaxGenus"
+      assert result.genus_id == genus.id
+      assert result.family == "TestSpeciesTaxFamily"
+      assert result.family_id == family.id
+      assert result.section == nil
+      assert result.section_id == nil
+    end
+
+    test "returns taxonomy info for species with genus and section" do
+      # Create Family → Genus → Section
+      {:ok, family} =
+        Taxonomy.create_taxonomy(%{
+          name: "TestSectionFamily",
+          type: "family",
+          description: "Plant"
+        })
+
+      {:ok, genus} =
+        Taxonomy.create_taxonomy(%{
+          name: "TestSectionGenus",
+          type: "genus",
+          parent_id: family.id
+        })
+
+      {:ok, section} =
+        Taxonomy.create_taxonomy(%{
+          name: "TestSection",
+          type: "section",
+          parent_id: genus.id
+        })
+
+      # Create species
+      {:ok, species} =
+        Repo.insert(%Species{
+          name: "TestSectionGenus alba",
+          taxoncode: "plant",
+          datacomplete: false
+        })
+
+      # Link to both genus and section
+      Taxonomy.link_species_to_taxonomy(species.id, genus.id)
+      Taxonomy.link_species_to_taxonomy(species.id, section.id)
+
+      # Get taxonomy info
+      result = Taxonomy.get_taxonomy_for_species(species.id)
+
+      assert result.genus == "TestSectionGenus"
+      assert result.genus_id == genus.id
+      assert result.section == "TestSection"
+      assert result.section_id == section.id
+      assert result.family == "TestSectionFamily"
+      assert result.family_id == family.id
+    end
+
+    test "returns nil for species with no taxonomy" do
+      {:ok, species} =
+        Repo.insert(%Species{
+          name: "Orphan species",
+          taxoncode: "gall",
+          datacomplete: false
+        })
+
+      result = Taxonomy.get_taxonomy_for_species(species.id)
+      assert result == nil
+    end
+  end
+
+  describe "taxonomy path" do
+    test "get_taxonomy_path returns path from root to leaf" do
+      # Create hierarchy: Family → Genus → Section
+      {:ok, family} =
+        Taxonomy.create_taxonomy(%{
+          name: "TestPathFamily",
+          type: "family",
+          description: "Test family"
+        })
+
+      {:ok, genus} =
+        Taxonomy.create_taxonomy(%{
+          name: "TestPathGenus",
+          type: "genus",
+          parent_id: family.id
+        })
+
+      {:ok, section} =
+        Taxonomy.create_taxonomy(%{
+          name: "TestPathSection",
+          type: "section",
+          parent_id: genus.id
+        })
+
+      # Get path from section (should include all three levels)
+      path = Taxonomy.get_taxonomy_path(section.id)
+
+      assert length(path) == 3
+      assert Enum.map(path, & &1.name) == ["TestPathFamily", "TestPathGenus", "TestPathSection"]
+      assert Enum.map(path, & &1.type) == ["family", "genus", "section"]
+    end
+
+    test "get_taxonomy_path returns single item for root taxonomy" do
+      {:ok, family} =
+        Taxonomy.create_taxonomy(%{
+          name: "RootFamily",
+          type: "family",
+          description: "Root test"
+        })
+
+      path = Taxonomy.get_taxonomy_path(family.id)
+
+      assert length(path) == 1
+      assert hd(path).name == "RootFamily"
+    end
+
+    test "get_taxonomy_path returns empty list for non-existent taxonomy" do
+      path = Taxonomy.get_taxonomy_path(99999)
+      assert path == []
+    end
+  end
+
   describe "Unknown genus handling" do
     test "creating a family auto-creates an Unknown genus" do
       {:ok, family} =
@@ -303,6 +452,70 @@ defmodule Gallformers.TaxonomyTest do
         Taxonomy.search_genera_and_sections("Unknown", 100, include_empty_unknown: true)
 
       assert length(results_all) >= length(results)
+    end
+
+    test "move_genera updates parent_id for selected genera" do
+      # Create two families
+      {:ok, old_family} =
+        Taxonomy.create_taxonomy(%{
+          name: "OldFamily",
+          type: "family",
+          description: "Original family"
+        })
+
+      {:ok, new_family} =
+        Taxonomy.create_taxonomy(%{
+          name: "NewFamily",
+          type: "family",
+          description: "Target family"
+        })
+
+      # Create genera under old family
+      {:ok, genus1} =
+        Taxonomy.create_taxonomy(%{
+          name: "Genus1",
+          type: "genus",
+          parent_id: old_family.id
+        })
+
+      {:ok, genus2} =
+        Taxonomy.create_taxonomy(%{
+          name: "Genus2",
+          type: "genus",
+          parent_id: old_family.id
+        })
+
+      {:ok, genus3} =
+        Taxonomy.create_taxonomy(%{
+          name: "Genus3",
+          type: "genus",
+          parent_id: old_family.id
+        })
+
+      # Move two genera to new family
+      {:ok, count} = Taxonomy.move_genera([genus1.id, genus2.id], old_family.id, new_family.id)
+
+      assert count == 2
+
+      # Verify genera were moved
+      moved_genus1 = Repo.get!(Taxonomy.Taxonomy, genus1.id)
+      moved_genus2 = Repo.get!(Taxonomy.Taxonomy, genus2.id)
+      unmoved_genus3 = Repo.get!(Taxonomy.Taxonomy, genus3.id)
+
+      assert moved_genus1.parent_id == new_family.id
+      assert moved_genus2.parent_id == new_family.id
+      assert unmoved_genus3.parent_id == old_family.id
+    end
+
+    test "move_genera with empty list returns error" do
+      {:ok, family} =
+        Taxonomy.create_taxonomy(%{
+          name: "TestFamily",
+          type: "family",
+          description: "Test"
+        })
+
+      assert {:error, :no_genera_selected} = Taxonomy.move_genera([], family.id, family.id)
     end
 
     test "search_genera_and_sections filters by taxoncode when provided" do

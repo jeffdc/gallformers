@@ -133,6 +133,12 @@ test-db:
 test: test-db
 	mix test
 
+# Check for unexpected test exclusions (non-E2E tests with @tag :skip, etc.)
+# Runs ALL tests including E2E - if output shows "X excluded", investigate
+test-check-exclusions:
+	$(call check_chromedriver)
+	mix test.check_exclusions
+
 # =============================================================================
 # E2E Testing (Wallaby/Chrome)
 # =============================================================================
