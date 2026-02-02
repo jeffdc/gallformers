@@ -24,12 +24,14 @@ defmodule Gallformers.Species.Alias do
     field :description, :string, default: ""
 
     many_to_many :species, Gallformers.Species.Species,
-      join_through: "aliasspecies",
+      join_through: "alias_species",
       join_keys: [alias_id: :id, species_id: :id]
 
     many_to_many :taxonomies, Gallformers.Taxonomy.Taxonomy,
-      join_through: "taxonomyalias",
+      join_through: "taxonomy_alias",
       join_keys: [alias_id: :id, taxonomy_id: :id]
+
+    timestamps(type: :utc_datetime)
   end
 
   @impl Gallformers.SchemaFields

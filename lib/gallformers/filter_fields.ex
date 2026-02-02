@@ -8,7 +8,7 @@ defmodule Gallformers.FilterFields do
   - Cells: internal cell structure
   - Color: visual color of galls
   - Form: overall form/type of gall
-  - Location: location on host plant
+  - PlantPart: location on host plant where gall forms
   - Shape: morphological shape
   - Texture: surface texture
   - Walls: wall thickness
@@ -23,7 +23,7 @@ defmodule Gallformers.FilterFields do
     Cells,
     Color,
     Form,
-    Location,
+    PlantPart,
     Shape,
     Texture,
     Walls
@@ -31,7 +31,7 @@ defmodule Gallformers.FilterFields do
 
   alias Gallformers.Repo
 
-  @filter_types ~w(alignment cells color form location shape texture walls)a
+  @filter_types ~w(alignment cells color form plant_part shape texture walls)a
 
   @doc """
   Returns the list of valid filter types.
@@ -46,7 +46,7 @@ defmodule Gallformers.FilterFields do
   def schema_for(:cells), do: Cells
   def schema_for(:color), do: Color
   def schema_for(:form), do: Form
-  def schema_for(:location), do: Location
+  def schema_for(:plant_part), do: PlantPart
   def schema_for(:shape), do: Shape
   def schema_for(:texture), do: Texture
   def schema_for(:walls), do: Walls
@@ -60,7 +60,7 @@ defmodule Gallformers.FilterFields do
   def field_name_for(:cells), do: :cells
   def field_name_for(:color), do: :color
   def field_name_for(:form), do: :form
-  def field_name_for(:location), do: :location
+  def field_name_for(:plant_part), do: :part
   def field_name_for(:shape), do: :shape
   def field_name_for(:texture), do: :texture
   def field_name_for(:walls), do: :walls
@@ -150,7 +150,7 @@ defmodule Gallformers.FilterFields do
   def type_label(:cells), do: "Cells"
   def type_label(:color), do: "Colors"
   def type_label(:form), do: "Forms"
-  def type_label(:location), do: "Locations"
+  def type_label(:plant_part), do: "Plant Parts"
   def type_label(:shape), do: "Shapes"
   def type_label(:texture), do: "Textures"
   def type_label(:walls), do: "Walls"
@@ -163,7 +163,7 @@ defmodule Gallformers.FilterFields do
   def singular_label(:cells), do: "Cells"
   def singular_label(:color), do: "Color"
   def singular_label(:form), do: "Form"
-  def singular_label(:location), do: "Location"
+  def singular_label(:plant_part), do: "Plant Part"
   def singular_label(:shape), do: "Shape"
   def singular_label(:texture), do: "Texture"
   def singular_label(:walls), do: "Walls"

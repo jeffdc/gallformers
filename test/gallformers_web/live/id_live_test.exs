@@ -156,10 +156,10 @@ defmodule GallformersWeb.IDLiveTest do
       if host do
         {:ok, view, _html} = live(conn, ~p"/id?h=#{URI.encode(host.name)}")
 
-        # This would need to interact with the location multi-select
+        # This would need to interact with the plant part multi-select
         # Just verify the page renders without error
         html = render(view)
-        assert html =~ "Location" or html =~ "location"
+        assert html =~ "Plant Part" or html =~ "plant part"
       end
     end
 

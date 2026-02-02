@@ -16,10 +16,6 @@ defmodule Gallformers.FilterFields.Texture do
   schema "texture" do
     field :texture, :string
     field :description, :string
-
-    many_to_many :galls, Gallformers.Species.Gall,
-      join_through: "galltexture",
-      join_keys: [texture_id: :id, gall_id: :id]
   end
 
   @doc false

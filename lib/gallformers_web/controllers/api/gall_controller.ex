@@ -9,7 +9,7 @@ defmodule GallformersWeb.API.GallController do
   import Ecto.Query
 
   alias Gallformers.{Hosts, Repo, Search, Species, Taxonomy}
-  alias Gallformers.Species.{Gall, GallSpecies, Image}
+  alias Gallformers.Species.{GallTraits, Image}
   alias Gallformers.Species.Species, as: SpeciesSchema
   alias GallformersWeb.Schemas
 
@@ -188,7 +188,7 @@ defmodule GallformersWeb.API.GallController do
               id: img.id,
               path: img.path,
               url: "#{base_url}/#{img.path}",
-              default: img.default,
+              default: Image.default?(img),
               creator: img.creator,
               attribution: img.attribution,
               sourcelink: img.sourcelink,
@@ -277,7 +277,6 @@ defmodule GallformersWeb.API.GallController do
     %{
       id: gall.id,
       name: gall.name,
-      gall_id: gall.gall_id,
       datacomplete: gall.datacomplete,
       abundance_id: gall.abundance_id,
       abundance: gall.abundance_name,
@@ -290,14 +289,13 @@ defmodule GallformersWeb.API.GallController do
   defp gall_to_full_response(gall) do
     aliases = Species.get_aliases_for_species(gall.id)
     hosts = Hosts.get_hosts_for_gall(gall.id)
-    filter_fields = Species.get_gall_filter_values(gall.gall_id)
+    filter_fields = Species.get_gall_filter_values(gall.id)
     places = Hosts.get_places_for_gall(gall.id)
     excluded_places = Hosts.get_excluded_places_for_gall(gall.id)
 
     %{
       id: gall.id,
       name: gall.name,
-      gall_id: gall.gall_id,
       datacomplete: gall.datacomplete,
       abundance_id: gall.abundance_id,
       abundance: gall.abundance_name,
@@ -308,7 +306,7 @@ defmodule GallformersWeb.API.GallController do
       colors: filter_fields.colors,
       shapes: filter_fields.shapes,
       textures: filter_fields.textures,
-      locations: filter_fields.locations,
+      plant_parts: filter_fields.plant_parts,
       alignments: filter_fields.alignments,
       walls: filter_fields.walls,
       cells: filter_fields.cells,
@@ -332,18 +330,16 @@ defmodule GallformersWeb.API.GallController do
     # Get all galls with basic info
     galls =
       from(s in SpeciesSchema,
-        join: gs in GallSpecies,
-        on: gs.species_id == s.id,
-        join: g in Gall,
-        on: gs.gall_id == g.id,
+        join: gt in GallTraits,
+        on: gt.species_id == s.id,
         where: s.taxoncode == "gall",
         order_by: s.name,
         select: %{
           id: s.id,
           name: s.name,
-          gall_id: g.id,
-          detachable: g.detachable,
-          undescribed: g.undescribed
+          gall_id: s.id,
+          detachable: gt.detachable,
+          undescribed: gt.undescribed
         }
       )
       |> Repo.all()
@@ -357,7 +353,7 @@ defmodule GallformersWeb.API.GallController do
 
     # Build the full response for each gall
     Enum.map(galls, fn gall ->
-      filter_fields = build_gall_filter_strings_for_api(gall.gall_id)
+      filter_fields = build_gall_filter_strings_for_api(gall.id)
       hosts = Hosts.get_hosts_for_gall(gall.id)
       places = Hosts.get_places_for_gall(gall.id)
       taxonomy = Taxonomy.get_taxonomy_for_species(gall.id)
@@ -377,7 +373,7 @@ defmodule GallformersWeb.API.GallController do
         cells: filter_fields.cells,
         colors: filter_fields.colors,
         forms: filter_fields.forms,
-        locations: filter_fields.locations,
+        plant_parts: filter_fields.plant_parts,
         seasons: filter_fields.seasons,
         shapes: filter_fields.shapes,
         textures: filter_fields.textures,
@@ -398,7 +394,7 @@ defmodule GallformersWeb.API.GallController do
       colors: Enum.map(filter_values.colors, & &1.field),
       shapes: Enum.map(filter_values.shapes, & &1.field),
       textures: Enum.map(filter_values.textures, & &1.field),
-      locations: Enum.map(filter_values.locations, & &1.field),
+      plant_parts: Enum.map(filter_values.plant_parts, & &1.field),
       alignments: Enum.map(filter_values.alignments, & &1.field),
       walls: Enum.map(filter_values.walls, & &1.field),
       cells: Enum.map(filter_values.cells, & &1.field),
@@ -407,11 +403,15 @@ defmodule GallformersWeb.API.GallController do
     }
   end
 
+  # Handle integers (legacy V1 data)
   defp detachable_to_string(nil), do: ""
   defp detachable_to_string(0), do: ""
   defp detachable_to_string(1), do: "integral"
   defp detachable_to_string(2), do: "detachable"
   defp detachable_to_string(3), do: "both"
+  # Handle strings (V2 data) - pass through
+  defp detachable_to_string("unknown"), do: ""
+  defp detachable_to_string(s) when is_binary(s), do: s
   defp detachable_to_string(_), do: ""
 
   defp parse_int(nil), do: nil

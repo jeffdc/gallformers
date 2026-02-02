@@ -283,7 +283,7 @@ defmodule GallformersWeb.Admin.GallLive.FormTest do
       gall = require_gall()
       {:ok, view, _html} = live(conn, ~p"/admin/galls/#{gall.id}")
 
-      filter_types = ~w(walls cells alignments colors shapes seasons forms locations textures)
+      filter_types = ~w(walls cells alignments colors shapes seasons forms plant_parts textures)
 
       for filter_type <- filter_types do
         html = render_click(view, "filter_search", %{"type" => filter_type, "value" => "test"})

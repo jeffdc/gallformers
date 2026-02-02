@@ -19,14 +19,14 @@ defmodule GallformersWeb.Admin.GallLive.Form do
   import GallformersWeb.Admin.FormComponents, only: [alias_editor: 1, form_actions: 1]
 
   @detachable_options [
-    {"", 0},
-    {"integral", 1},
-    {"detachable", 2},
-    {"both", 3}
+    {"Unknown", "unknown"},
+    {"Integral", "integral"},
+    {"Detachable", "detachable"},
+    {"Both", "both"}
   ]
 
   # Valid filter types for String.to_existing_atom safety
-  @valid_filter_types ~w(colors shapes textures alignments walls cells locations forms seasons)a
+  @valid_filter_types ~w(colors shapes textures alignments walls cells plant_parts forms seasons)a
 
   @impl true
   def mount(_params, session, socket) do
@@ -103,14 +103,14 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(DeferredChanges.init(:aliases, []))
     |> assign(DeferredChanges.init(:hosts, []))
     |> assign(:original_filter_values, empty_filter_values())
-    |> assign(:original_detachable, 0)
+    |> assign(:original_detachable, "unknown")
     |> assign(:original_undescribed, false)
     # Pending state (what user sees and edits)
     |> assign(:taxonomy, nil)
     |> assign(:genus_is_new, false)
     |> assign(:selected_family_id, nil)
     |> assign(:filter_values, empty_filter_values())
-    |> assign(:detachable, 0)
+    |> assign(:detachable, "unknown")
     |> assign(:undescribed, false)
     |> assign(:new_alias_name, "")
     |> assign(:new_alias_type, "common")
@@ -152,7 +152,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(DeferredChanges.init(:aliases, []))
     |> assign(DeferredChanges.init(:hosts, []))
     |> assign(:original_filter_values, empty_filter_values())
-    |> assign(:original_detachable, 0)
+    |> assign(:original_detachable, "unknown")
     |> assign(:original_undescribed, false)
     # Pending state
     |> assign(:taxonomy, taxonomy)
@@ -160,7 +160,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(:selected_family_id, selected_family_id)
     |> assign(:possible_families, possible_families)
     |> assign(:filter_values, empty_filter_values())
-    |> assign(:detachable, 0)
+    |> assign(:detachable, "unknown")
     |> assign(:undescribed, false)
     |> assign(:new_alias_name, "")
     |> assign(:new_alias_type, "common")
@@ -288,14 +288,14 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(DeferredChanges.init(:aliases, []))
     |> assign(DeferredChanges.init(:hosts, []))
     |> assign(:original_filter_values, empty_filter_values())
-    |> assign(:original_detachable, 0)
+    |> assign(:original_detachable, "unknown")
     |> assign(:original_undescribed, false)
     # Pending state - set undescribed to true
     |> assign(:taxonomy, taxonomy)
     |> assign(:genus_is_new, genus_is_new)
     |> assign(:selected_family_id, selected_family_id)
     |> assign(:filter_values, empty_filter_values())
-    |> assign(:detachable, 0)
+    |> assign(:detachable, "unknown")
     |> assign(:undescribed, true)
     |> assign(:new_alias_name, "")
     |> assign(:new_alias_type, "common")
@@ -366,7 +366,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
           hosts = Gallformers.Hosts.get_hosts_for_gall(species_id)
           taxonomy = Gallformers.Taxonomy.get_taxonomy_for_species(species_id)
           filter_values = gall_data.filter_values
-          detachable = gall_data.detachable || 0
+          detachable = gall_data.detachable || "unknown"
           undescribed = gall_data.undescribed || false
 
           socket
@@ -418,7 +418,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
       alignments: [],
       walls: [],
       cells: [],
-      locations: [],
+      plant_parts: [],
       forms: [],
       seasons: []
     }
@@ -432,7 +432,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
       alignments: "",
       walls: "",
       cells: "",
-      locations: "",
+      plant_parts: "",
       forms: "",
       seasons: ""
     }
@@ -653,8 +653,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
 
   @impl true
   def handle_event("update_detachable", %{"value" => value}, socket) do
-    detachable = String.to_integer(value)
-    {:noreply, socket |> assign(:detachable, detachable) |> mark_dirty()}
+    {:noreply, socket |> assign(:detachable, value) |> mark_dirty()}
   end
 
   @impl true
@@ -1099,7 +1098,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
       :alignments,
       :walls,
       :cells,
-      :locations,
+      :plant_parts,
       :forms,
       :seasons
     ]
@@ -1435,13 +1434,13 @@ defmodule GallformersWeb.Admin.GallLive.Form do
               <%!-- Row: Location | Texture | Abundance --%>
               <div class="grid grid-cols-3 gap-3 mb-3">
                 <.multi_select_dropdown
-                  id="locations"
+                  id="plant_parts"
                   label="Location(s):"
-                  type={:locations}
-                  options={@filter_options.locations}
-                  selected={@filter_values.locations}
-                  search_query={@filter_search.locations}
-                  dropdown_open={@filter_dropdown_open == :locations}
+                  type={:plant_parts}
+                  options={@filter_options.plant_parts}
+                  selected={@filter_values.plant_parts}
+                  search_query={@filter_search.plant_parts}
+                  dropdown_open={@filter_dropdown_open == :plant_parts}
                   item_label={:field}
                   on_search="filter_search"
                   on_add="add_filter"

@@ -9,7 +9,7 @@ defmodule Gallformers.GallSummaryTest do
         shapes: [%{id: 1, field: "spherical"}],
         colors: [%{id: 2, field: "red"}, %{id: 3, field: "brown"}],
         textures: [%{id: 4, field: "hairy"}],
-        locations: [%{id: 5, field: "leaf"}],
+        plant_parts: [%{id: 5, field: "leaf"}],
         seasons: [%{id: 6, field: "spring"}],
         alignments: [],
         walls: [],
@@ -23,7 +23,7 @@ defmodule Gallformers.GallSummaryTest do
       assert result.shapes == ["spherical"]
       assert result.colors == ["red", "brown"]
       assert result.textures == ["hairy"]
-      assert result.locations == ["leaf"]
+      assert result.plant_parts == ["leaf"]
       assert result.seasons == ["spring"]
       assert result.detachable == "detachable"
       assert result.forms == ["gall"]
@@ -34,7 +34,7 @@ defmodule Gallformers.GallSummaryTest do
         shapes: [],
         colors: [],
         textures: [],
-        locations: [],
+        plant_parts: [],
         seasons: [],
         alignments: [],
         walls: [],
@@ -53,7 +53,7 @@ defmodule Gallformers.GallSummaryTest do
       db_filters = %{
         shapes: [],
         colors: [],
-        locations: [],
+        plant_parts: [],
         textures: [],
         forms: [],
         seasons: [],
@@ -80,7 +80,7 @@ defmodule Gallformers.GallSummaryTest do
         shapes: ["spherical"],
         colors: ["red"],
         textures: ["hairy"],
-        locations: ["leaf"],
+        plant_parts: ["leaf"],
         seasons: ["spring"],
         detachable: "detachable",
         forms: ["gall"]
@@ -95,7 +95,7 @@ defmodule Gallformers.GallSummaryTest do
       filters = %{
         colors: ["red"],
         textures: ["hairy"],
-        locations: ["leaf"],
+        plant_parts: ["leaf"],
         seasons: ["spring"],
         detachable: nil,
         forms: []
@@ -109,7 +109,7 @@ defmodule Gallformers.GallSummaryTest do
     test "sparse data gracefully degrades - only location and texture" do
       filters = %{
         textures: ["hairy"],
-        locations: ["leaf"]
+        plant_parts: ["leaf"]
       }
 
       result = GallSummary.generate(filters)
@@ -119,7 +119,7 @@ defmodule Gallformers.GallSummaryTest do
 
     test "sparse data gracefully degrades - only location" do
       filters = %{
-        locations: ["leaf"]
+        plant_parts: ["leaf"]
       }
 
       result = GallSummary.generate(filters)
@@ -138,7 +138,7 @@ defmodule Gallformers.GallSummaryTest do
     test "non-gall form uses structure instead of gall" do
       filters = %{
         colors: ["red"],
-        locations: ["stem"],
+        plant_parts: ["stem"],
         forms: ["non-gall"]
       }
 
@@ -150,7 +150,7 @@ defmodule Gallformers.GallSummaryTest do
     test "erineum form uses erineum with correct article" do
       filters = %{
         colors: ["red"],
-        locations: ["leaf"],
+        plant_parts: ["leaf"],
         forms: ["erineum"]
       }
 
@@ -163,7 +163,7 @@ defmodule Gallformers.GallSummaryTest do
       # "oval" starts with vowel
       filters = %{
         shapes: ["oval"],
-        locations: ["leaf"]
+        plant_parts: ["leaf"]
       }
 
       result = GallSummary.generate(filters)
@@ -174,7 +174,7 @@ defmodule Gallformers.GallSummaryTest do
     test "multi-value attributes joined with slash" do
       filters = %{
         colors: ["red", "brown"],
-        locations: ["leaf", "stem"]
+        plant_parts: ["leaf", "stem"]
       }
 
       result = GallSummary.generate(filters)
@@ -194,7 +194,7 @@ defmodule Gallformers.GallSummaryTest do
 
     test "detachable phrase - integral" do
       filters = %{
-        locations: ["leaf"],
+        plant_parts: ["leaf"],
         detachable: "integral"
       }
 
@@ -205,7 +205,7 @@ defmodule Gallformers.GallSummaryTest do
 
     test "detachable phrase - both" do
       filters = %{
-        locations: ["leaf"],
+        plant_parts: ["leaf"],
         detachable: "both"
       }
 
@@ -219,7 +219,7 @@ defmodule Gallformers.GallSummaryTest do
         shapes: ["spherical"],
         colors: ["red"],
         textures: ["hairy"],
-        locations: ["leaf"],
+        plant_parts: ["leaf"],
         seasons: ["spring"],
         detachable: "detachable",
         forms: ["gall"]
@@ -236,7 +236,7 @@ defmodule Gallformers.GallSummaryTest do
         shapes: ["spherical"],
         colors: ["red"],
         textures: ["hairy"],
-        locations: ["leaf"],
+        plant_parts: ["leaf"],
         seasons: ["spring"],
         detachable: "detachable",
         alignments: ["erect"],
@@ -256,7 +256,7 @@ defmodule Gallformers.GallSummaryTest do
       filters = %{
         shapes: [""],
         colors: [],
-        locations: ["leaf"]
+        plant_parts: ["leaf"]
       }
 
       result = GallSummary.generate(filters)
@@ -266,7 +266,7 @@ defmodule Gallformers.GallSummaryTest do
 
     test "unknown form value defaults to gall" do
       filters = %{
-        locations: ["leaf"],
+        plant_parts: ["leaf"],
         forms: ["unknown-form-type"]
       }
 
@@ -281,7 +281,7 @@ defmodule Gallformers.GallSummaryTest do
       filters = %{
         shapes: ["spherical"],
         colors: ["red"],
-        locations: ["leaf"]
+        plant_parts: ["leaf"]
       }
 
       result = GallSummary.for_seo("Andricus quercuscalifornicus", filters)
@@ -297,7 +297,7 @@ defmodule Gallformers.GallSummaryTest do
         shapes: ["spherical"],
         colors: ["red", "brown", "green"],
         textures: ["hairy", "woolly"],
-        locations: ["leaf", "stem", "bud"],
+        plant_parts: ["leaf", "stem", "bud"],
         seasons: ["spring", "summer"],
         detachable: "detachable",
         alignments: ["erect"],

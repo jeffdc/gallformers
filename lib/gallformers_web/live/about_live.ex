@@ -51,10 +51,10 @@ defmodule GallformersWeb.AboutLive do
   end
 
   # Count distinct families for species with the given taxoncode.
-  # Joins: species -> speciestaxonomy -> taxonomy (genus) -> parent taxonomy (family)
+  # Joins: species -> species_taxonomy -> taxonomy (genus) -> parent taxonomy (family)
   defp count_families_for_taxoncode(taxoncode) do
     from(s in Gallformers.Species.Species,
-      join: st in "speciestaxonomy",
+      join: st in "species_taxonomy",
       on: st.species_id == s.id,
       join: g in Taxonomy,
       on: st.taxonomy_id == g.id,
@@ -67,10 +67,10 @@ defmodule GallformersWeb.AboutLive do
   end
 
   # Count distinct genera for species with the given taxoncode.
-  # Joins: species -> speciestaxonomy -> taxonomy (genus)
+  # Joins: species -> species_taxonomy -> taxonomy (genus)
   defp count_genera_for_taxoncode(taxoncode) do
     from(s in Gallformers.Species.Species,
-      join: st in "speciestaxonomy",
+      join: st in "species_taxonomy",
       on: st.species_id == s.id,
       join: g in Taxonomy,
       on: st.taxonomy_id == g.id,

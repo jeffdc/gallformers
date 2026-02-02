@@ -17,7 +17,8 @@ defmodule Gallformers.Taxonomy.Taxonomy do
           name: String.t() | nil,
           description: String.t() | nil,
           type: String.t() | nil,
-          parent_id: integer() | nil
+          parent_id: integer() | nil,
+          is_placeholder: boolean()
         }
 
   @taxonomy_types ~w(family genus section)
@@ -26,17 +27,20 @@ defmodule Gallformers.Taxonomy.Taxonomy do
     field :name, :string
     field :description, :string, default: ""
     field :type, :string
+    field :is_placeholder, :boolean, default: false
 
     belongs_to :parent, __MODULE__
     has_many :children, __MODULE__, foreign_key: :parent_id
 
     many_to_many :species, Gallformers.Species.Species,
-      join_through: "speciestaxonomy",
+      join_through: "species_taxonomy",
       join_keys: [taxonomy_id: :id, species_id: :id]
 
     many_to_many :aliases, Gallformers.Species.Alias,
-      join_through: "taxonomyalias",
+      join_through: "taxonomy_alias",
       join_keys: [taxonomy_id: :id, alias_id: :id]
+
+    timestamps(type: :utc_datetime)
   end
 
   @impl Gallformers.SchemaFields
@@ -47,11 +51,34 @@ defmodule Gallformers.Taxonomy.Taxonomy do
   """
   def changeset(taxonomy, attrs) do
     taxonomy
-    |> cast(attrs, [:name, :description, :type, :parent_id])
+    |> cast(attrs, [:name, :description, :type, :parent_id, :is_placeholder])
     |> validate_required(@required_fields)
     |> validate_inclusion(:type, @taxonomy_types)
     |> validate_length(:name, min: 1, max: 255)
-    |> unique_constraint(:name, name: :taxonomy_name_type_unique)
+    |> unique_constraint([:name, :parent_id],
+      name: :idx_taxonomy_name_parent,
+      message: "already exists for this parent"
+    )
+    |> foreign_key_constraint(:parent_id)
+  end
+
+  @doc """
+  Generates a display name for a placeholder "Unknown" taxonomy entry.
+
+  Examples:
+    - Unknown family → "Unknown"
+    - Unknown genus in Cynipidae → "Unknown (Cynipidae)"
+  """
+  def display_name(%__MODULE__{is_placeholder: true, parent: %{name: parent_name}}) do
+    "Unknown (#{parent_name})"
+  end
+
+  def display_name(%__MODULE__{is_placeholder: true}) do
+    "Unknown"
+  end
+
+  def display_name(%__MODULE__{name: name}) do
+    name
   end
 
   @doc """

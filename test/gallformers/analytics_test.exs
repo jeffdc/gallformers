@@ -441,7 +441,8 @@ defmodule Gallformers.AnalyticsTest do
       daily_stats = Analytics.daily_stats(two_days_ago, today)
 
       dates = Enum.map(daily_stats, & &1.date)
-      assert dates == Enum.sort(dates)
+      # Check chronological ordering using proper date comparison
+      assert dates == Enum.sort_by(dates, & &1, Date)
       assert List.first(dates) == two_days_ago
       assert List.last(dates) == today
     end

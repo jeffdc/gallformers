@@ -13,10 +13,10 @@ defmodule GallformersWeb.GallLive do
   @aliases_page_size 10
 
   @detachable_values %{
-    0 => "",
-    1 => "Integral",
-    2 => "Detachable",
-    3 => "Both"
+    "unknown" => "",
+    "integral" => "Integral",
+    "detachable" => "Detachable",
+    "both" => "Both"
   }
 
   # Gallformers Notes source ID (same as V1)
@@ -68,7 +68,7 @@ defmodule GallformersWeb.GallLive do
         taxonomy = get_taxonomy_info(gall_id)
         range = Hosts.get_places_for_gall(gall_id) |> MapSet.new()
         excluded_range = Hosts.get_excluded_places_for_gall(gall_id) |> MapSet.new()
-        gall_filters = Gallformers.Species.get_gall_filter_values(gall.gall_id)
+        gall_filters = Gallformers.Species.get_gall_filter_values(gall_id)
         related_galls = Species.get_related_galls(gall)
 
         # Separate common names from scientific synonyms
@@ -381,7 +381,7 @@ defmodule GallformersWeb.GallLive do
                     <div class="space-y-1">
                       <div><strong>Alignment:</strong> {format_fields(@gall_filters.alignments)}</div>
                       <div><strong>Walls:</strong> {format_fields(@gall_filters.walls)}</div>
-                      <div><strong>Location:</strong> {format_fields(@gall_filters.locations)}</div>
+                      <div><strong>Location:</strong> {format_fields(@gall_filters.plant_parts)}</div>
                       <div><strong>Form:</strong> {format_fields(@gall_filters.forms)}</div>
                       <div><strong>Cells:</strong> {format_fields(@gall_filters.cells)}</div>
                     </div>

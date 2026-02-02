@@ -13,7 +13,7 @@ defmodule Gallformers.IDTool do
     Cells,
     Color,
     Form,
-    Location,
+    PlantPart,
     Season,
     Shape,
     Texture,
@@ -23,7 +23,7 @@ defmodule Gallformers.IDTool do
   alias Gallformers.Hosts.Host
   alias Gallformers.Repo
   alias Gallformers.Species
-  alias Gallformers.Species.{Gall, GallSpecies, Image}
+  alias Gallformers.Species.{GallTraits, Image}
   alias Gallformers.Species.Species, as: SpeciesSchema
   alias Gallformers.Taxonomy.Taxonomy
 
@@ -39,7 +39,7 @@ defmodule Gallformers.IDTool do
       cells: list_cells(),
       colors: list_colors(),
       forms: list_forms(),
-      locations: list_locations(),
+      plant_parts: list_plant_parts(),
       seasons: list_seasons(),
       shapes: list_shapes(),
       textures: list_textures(),
@@ -52,7 +52,7 @@ defmodule Gallformers.IDTool do
 
   Accepts a map with optional keys:
     - :host_ids - list of host species IDs
-    - :location_ids - list of location IDs
+    - :plant_part_ids - list of plant part IDs
     - :color_ids - list of color IDs
     - :shape_ids - list of shape IDs
     - :texture_ids - list of texture IDs
@@ -61,7 +61,7 @@ defmodule Gallformers.IDTool do
     - :walls_ids - list of walls IDs
     - :form_ids - list of form IDs
     - :season_ids - list of season IDs
-    - :detachable - 0, 1, or 2 (unknown)
+    - :detachable - "unknown", "integral", "detachable", or "both"
     - :place_codes - list of place codes (states/provinces)
 
   Returns a list of matching gall species.
@@ -72,7 +72,7 @@ defmodule Gallformers.IDTool do
     |> apply_host_filter(filters[:host_ids])
     |> apply_genus_filter(filters[:genus_id])
     |> apply_family_filter(filters[:family_id])
-    |> apply_location_filter(filters[:location_ids], filters[:location_logic] || :or)
+    |> apply_plant_part_filter(filters[:plant_part_ids], filters[:plant_part_logic] || :or)
     |> apply_color_filter(filters[:color_ids])
     |> apply_shape_filter(filters[:shape_ids])
     |> apply_texture_filter(filters[:texture_ids], filters[:texture_logic] || :or)
@@ -124,10 +124,10 @@ defmodule Gallformers.IDTool do
     |> Enum.into(%{})
   end
 
-  defp get_gall_detachable(gall_id) do
-    from(g in Gall, where: g.id == ^gall_id, select: g.detachable)
+  defp get_gall_detachable(species_id) do
+    from(gt in GallTraits, where: gt.species_id == ^species_id, select: gt.detachable)
     |> Repo.one()
-    |> Kernel.||(0)
+    |> Kernel.||("unknown")
   end
 
   @doc """
@@ -137,7 +137,7 @@ defmodule Gallformers.IDTool do
   def count_filtered_galls(filters \\ %{}) do
     base_query()
     |> apply_host_filter(filters[:host_ids])
-    |> apply_location_filter(filters[:location_ids], filters[:location_logic] || :or)
+    |> apply_plant_part_filter(filters[:plant_part_ids], filters[:plant_part_logic] || :or)
     |> apply_color_filter(filters[:color_ids])
     |> apply_shape_filter(filters[:shape_ids])
     |> apply_texture_filter(filters[:texture_ids], filters[:texture_logic] || :or)
@@ -148,7 +148,7 @@ defmodule Gallformers.IDTool do
     |> apply_season_filter(filters[:season_ids])
     |> apply_detachable_filter(filters[:detachable])
     |> apply_place_filter(filters[:place_codes])
-    |> select([s, _gs, _g], count(s.id, :distinct))
+    |> select([s, gt], count(s.id, :distinct))
     |> Repo.one()
   end
 
@@ -162,7 +162,7 @@ defmodule Gallformers.IDTool do
     # Get gall species IDs matching the filters
     gall_ids =
       base_query()
-      |> apply_location_filter(filters[:location_ids], filters[:location_logic] || :or)
+      |> apply_plant_part_filter(filters[:plant_part_ids], filters[:plant_part_logic] || :or)
       |> apply_color_filter(filters[:color_ids])
       |> apply_shape_filter(filters[:shape_ids])
       |> apply_texture_filter(filters[:texture_ids], filters[:texture_logic] || :or)
@@ -173,7 +173,7 @@ defmodule Gallformers.IDTool do
       |> apply_season_filter(filters[:season_ids])
       |> apply_detachable_filter(filters[:detachable])
       |> apply_place_filter(filters[:place_codes])
-      |> select([s, _gs, _g], s.id)
+      |> select([s, gt], s.id)
       |> Repo.all()
 
     if Enum.empty?(gall_ids) do
@@ -208,18 +208,18 @@ defmodule Gallformers.IDTool do
   @spec list_forms() :: [Form.t()]
   def list_forms, do: Repo.all(from f in Form, order_by: f.form)
 
-  @spec list_locations() :: [Location.t()]
-  def list_locations, do: Repo.all(from l in Location, order_by: l.location)
+  @spec list_plant_parts() :: [PlantPart.t()]
+  def list_plant_parts, do: Repo.all(from pp in PlantPart, order_by: pp.part)
 
   @doc """
   Returns location IDs for all locations containing "leaf" in their name.
   Used for the "leaf (anywhere)" virtual filter option.
   """
-  @spec leaf_location_ids() :: [integer()]
-  def leaf_location_ids do
-    from(l in Location,
-      where: like(l.location, "%leaf%"),
-      select: l.id
+  @spec leaf_plant_part_ids() :: [integer()]
+  def leaf_plant_part_ids do
+    from(pp in PlantPart,
+      where: like(pp.part, "%leaf%"),
+      select: pp.id
     )
     |> Repo.all()
   end
@@ -240,23 +240,21 @@ defmodule Gallformers.IDTool do
 
   defp base_query do
     from s in SpeciesSchema,
-      join: gs in GallSpecies,
-      on: gs.species_id == s.id,
-      join: g in Gall,
-      on: gs.gall_id == g.id,
+      join: gt in GallTraits,
+      on: gt.species_id == s.id,
       where: s.taxoncode == "gall",
       distinct: true
   end
 
   defp select_gall_fields(query) do
-    from [s, gs, g] in query,
+    from [s, gt] in query,
       order_by: s.name,
       select: %{
         id: s.id,
         name: s.name,
-        gall_id: g.id,
-        undescribed: g.undescribed,
-        detachable: g.detachable
+        gall_id: s.id,
+        undescribed: gt.undescribed,
+        detachable: gt.detachable
       }
   end
 
@@ -264,47 +262,47 @@ defmodule Gallformers.IDTool do
   defp apply_host_filter(query, []), do: query
 
   defp apply_host_filter(query, host_ids) do
-    from [s, _gs, _g] in query,
+    from [s, gt] in query,
       join: h in Host,
       on: h.gall_species_id == s.id,
       where: h.host_species_id in ^host_ids
   end
 
-  defp apply_location_filter(query, nil, _logic), do: query
-  defp apply_location_filter(query, [], _logic), do: query
+  defp apply_plant_part_filter(query, nil, _logic), do: query
+  defp apply_plant_part_filter(query, [], _logic), do: query
 
-  # OR logic: gall must have ANY of the selected locations
-  defp apply_location_filter(query, location_ids, :or) do
-    from [s, _gs, g] in query,
-      join: gl in "galllocation",
-      on: gl.gall_id == g.id,
-      where: gl.location_id in ^location_ids
+  # OR logic: gall must have ANY of the selected plant parts
+  defp apply_plant_part_filter(query, plant_part_ids, :or) do
+    from [s, gt] in query,
+      join: gpp in "gall_plant_part",
+      on: gpp.species_id == s.id,
+      where: gpp.plant_part_id in ^plant_part_ids
   end
 
-  # AND logic: gall must have ALL of the selected locations
-  defp apply_location_filter(query, location_ids, :and) do
-    required_count = length(location_ids)
+  # AND logic: gall must have ALL of the selected plant parts
+  defp apply_plant_part_filter(query, plant_part_ids, :and) do
+    required_count = length(plant_part_ids)
 
-    # Subquery to find gall IDs that have ALL required locations
-    matching_galls =
-      from(gl in "galllocation",
-        where: gl.location_id in ^location_ids,
-        group_by: gl.gall_id,
-        having: count(fragment("DISTINCT ?", gl.location_id)) == ^required_count,
-        select: gl.gall_id
+    # Subquery to find species IDs that have ALL required plant parts
+    matching_species =
+      from(gpp in "gall_plant_part",
+        where: gpp.plant_part_id in ^plant_part_ids,
+        group_by: gpp.species_id,
+        having: count(fragment("DISTINCT ?", gpp.plant_part_id)) == ^required_count,
+        select: gpp.species_id
       )
 
-    from [s, _gs, g] in query,
-      where: g.id in subquery(matching_galls)
+    from [s, gt] in query,
+      where: s.id in subquery(matching_species)
   end
 
   defp apply_color_filter(query, nil), do: query
   defp apply_color_filter(query, []), do: query
 
   defp apply_color_filter(query, color_ids) do
-    from [s, _gs, g] in query,
-      join: gc in "gallcolor",
-      on: gc.gall_id == g.id,
+    from [s, gt] in query,
+      join: gc in "gall_color",
+      on: gc.species_id == s.id,
       where: gc.color_id in ^color_ids
   end
 
@@ -312,9 +310,9 @@ defmodule Gallformers.IDTool do
   defp apply_shape_filter(query, []), do: query
 
   defp apply_shape_filter(query, shape_ids) do
-    from [s, _gs, g] in query,
-      join: gsh in "gallshape",
-      on: gsh.gall_id == g.id,
+    from [s, gt] in query,
+      join: gsh in "gall_shape",
+      on: gsh.species_id == s.id,
       where: gsh.shape_id in ^shape_ids
   end
 
@@ -323,36 +321,36 @@ defmodule Gallformers.IDTool do
 
   # OR logic: gall must have ANY of the selected textures
   defp apply_texture_filter(query, texture_ids, :or) do
-    from [s, _gs, g] in query,
-      join: gt in "galltexture",
-      on: gt.gall_id == g.id,
-      where: gt.texture_id in ^texture_ids
+    from [s, gt] in query,
+      join: gtex in "gall_texture",
+      on: gtex.species_id == s.id,
+      where: gtex.texture_id in ^texture_ids
   end
 
   # AND logic: gall must have ALL of the selected textures
   defp apply_texture_filter(query, texture_ids, :and) do
     required_count = length(texture_ids)
 
-    # Subquery to find gall IDs that have ALL required textures
-    matching_galls =
-      from(gt in "galltexture",
-        where: gt.texture_id in ^texture_ids,
-        group_by: gt.gall_id,
-        having: count(fragment("DISTINCT ?", gt.texture_id)) == ^required_count,
-        select: gt.gall_id
+    # Subquery to find species IDs that have ALL required textures
+    matching_species =
+      from(gtex in "gall_texture",
+        where: gtex.texture_id in ^texture_ids,
+        group_by: gtex.species_id,
+        having: count(fragment("DISTINCT ?", gtex.texture_id)) == ^required_count,
+        select: gtex.species_id
       )
 
-    from [s, _gs, g] in query,
-      where: g.id in subquery(matching_galls)
+    from [s, gt] in query,
+      where: s.id in subquery(matching_species)
   end
 
   defp apply_alignment_filter(query, nil), do: query
   defp apply_alignment_filter(query, []), do: query
 
   defp apply_alignment_filter(query, alignment_ids) do
-    from [s, _gs, g] in query,
-      join: ga in "gallalignment",
-      on: ga.gall_id == g.id,
+    from [s, gt] in query,
+      join: ga in "gall_alignment",
+      on: ga.species_id == s.id,
       where: ga.alignment_id in ^alignment_ids
   end
 
@@ -360,19 +358,19 @@ defmodule Gallformers.IDTool do
   defp apply_cells_filter(query, []), do: query
 
   defp apply_cells_filter(query, cells_ids) do
-    from [s, _gs, g] in query,
-      join: gc in "gallcells",
-      on: gc.gall_id == g.id,
-      where: gc.cells_id in ^cells_ids
+    from [s, gt] in query,
+      join: gce in "gall_cells",
+      on: gce.species_id == s.id,
+      where: gce.cells_id in ^cells_ids
   end
 
   defp apply_walls_filter(query, nil), do: query
   defp apply_walls_filter(query, []), do: query
 
   defp apply_walls_filter(query, walls_ids) do
-    from [s, _gs, g] in query,
-      join: gw in "gallwalls",
-      on: gw.gall_id == g.id,
+    from [s, gt] in query,
+      join: gw in "gall_walls",
+      on: gw.species_id == s.id,
       where: gw.walls_id in ^walls_ids
   end
 
@@ -380,9 +378,9 @@ defmodule Gallformers.IDTool do
   defp apply_form_filter(query, []), do: query
 
   defp apply_form_filter(query, form_ids) do
-    from [s, _gs, g] in query,
-      join: gf in "gallform",
-      on: gf.gall_id == g.id,
+    from [s, gt] in query,
+      join: gf in "gall_form",
+      on: gf.species_id == s.id,
       where: gf.form_id in ^form_ids
   end
 
@@ -390,50 +388,49 @@ defmodule Gallformers.IDTool do
   defp apply_season_filter(query, []), do: query
 
   defp apply_season_filter(query, season_ids) do
-    from [s, _gs, g] in query,
-      join: gse in "gallseason",
-      on: gse.gall_id == g.id,
+    from [s, gt] in query,
+      join: gse in "gall_season",
+      on: gse.species_id == s.id,
       where: gse.season_id in ^season_ids
   end
 
   defp apply_detachable_filter(query, nil), do: query
-  # 0 = unknown
-  defp apply_detachable_filter(query, 0), do: query
+  # "unknown" - don't filter
+  defp apply_detachable_filter(query, "unknown"), do: query
 
-  # 3 = both (exact match only)
-  defp apply_detachable_filter(query, 3) do
-    from [s, _gs, g] in query,
-      where: g.detachable == 3
+  # "both" - exact match only
+  defp apply_detachable_filter(query, "both") do
+    from [s, gt] in query,
+      where: gt.detachable == "both"
   end
 
-  # 1 = integral, 2 = detachable
-  # Also match galls marked as "both" (3)
-  defp apply_detachable_filter(query, detachable) do
-    from [s, _gs, g] in query,
-      where: g.detachable == ^detachable or g.detachable == 3
+  # "integral" or "detachable" - also match galls marked as "both"
+  defp apply_detachable_filter(query, detachable) when detachable in ~w(integral detachable) do
+    from [s, gt] in query,
+      where: gt.detachable == ^detachable or gt.detachable == "both"
   end
 
   defp apply_place_filter(query, nil), do: query
   defp apply_place_filter(query, []), do: query
 
   defp apply_place_filter(query, place_codes) do
-    # Filter by places where host plants are found, excluding explicit exclusions
-    from [s, _gs, _g] in query,
+    # Filter by places where host plants are found, excluding explicit gall exclusions
+    from [s, gt] in query,
       join: h in Host,
       on: h.gall_species_id == s.id,
-      join: sp in "speciesplace",
-      on: sp.species_id == h.host_species_id,
+      join: hr in "host_range",
+      on: hr.species_id == h.host_species_id,
       join: p in "place",
-      on: sp.place_id == p.id,
+      on: hr.place_id == p.id,
       where: p.code in ^place_codes,
       # Exclude galls that are explicitly marked as not in these places
       where:
         s.id not in subquery(
-          from sp2 in "speciesplace",
+          from gre in "gall_range_exclusion",
             join: p2 in "place",
-            on: sp2.place_id == p2.id,
+            on: gre.place_id == p2.id,
             where: p2.code in ^place_codes,
-            select: sp2.species_id
+            select: gre.species_id
         )
   end
 
@@ -443,12 +440,12 @@ defmodule Gallformers.IDTool do
   # The selected genus_id is the taxonomy ID of a host plant genus/section,
   # so we need to find galls that occur on hosts belonging to that taxonomy
   defp apply_genus_filter(query, genus_id) do
-    from [s, _gs, _g] in query,
+    from [s, gt] in query,
       join: h in Host,
       on: h.gall_species_id == s.id,
       join: host_species in SpeciesSchema,
       on: h.host_species_id == host_species.id,
-      join: st in "speciestaxonomy",
+      join: st in "species_taxonomy",
       on: st.species_id == host_species.id,
       where: st.taxonomy_id == ^genus_id
   end
@@ -456,8 +453,8 @@ defmodule Gallformers.IDTool do
   defp apply_family_filter(query, nil), do: query
 
   defp apply_family_filter(query, family_id) do
-    from [s, _gs, _g] in query,
-      join: st in "speciestaxonomy",
+    from [s, gt] in query,
+      join: st in "species_taxonomy",
       on: st.species_id == s.id,
       join: t in Taxonomy,
       on: st.taxonomy_id == t.id,
@@ -468,41 +465,41 @@ defmodule Gallformers.IDTool do
   defp apply_undescribed_filter(query, false), do: query
 
   defp apply_undescribed_filter(query, true) do
-    from [s, _gs, g] in query,
-      where: g.undescribed == true
+    from [s, gt] in query,
+      where: gt.undescribed == true
   end
 
   defp apply_exclude_non_gall_filter(query, nil), do: query
   defp apply_exclude_non_gall_filter(query, false), do: query
 
   defp apply_exclude_non_gall_filter(query, true) do
-    non_gall_gall_ids =
-      from(gf in "gallform",
+    non_gall_species_ids =
+      from(gf in "gall_form",
         join: f in Form,
         on: f.id == gf.form_id,
         where: f.form == "non-gall",
-        select: gf.gall_id
+        select: gf.species_id
       )
 
-    from [s, _gs, g] in query,
-      where: g.id not in subquery(non_gall_gall_ids)
+    from [s, gt] in query,
+      where: s.id not in subquery(non_gall_species_ids)
   end
 
   defp attach_non_gall_flag(galls) do
     gall_ids = Enum.map(galls, & &1.gall_id)
 
-    non_gall_gall_ids =
-      from(gf in "gallform",
+    non_gall_species_ids =
+      from(gf in "gall_form",
         join: f in Form,
         on: f.id == gf.form_id,
-        where: gf.gall_id in ^gall_ids and f.form == "non-gall",
-        select: gf.gall_id
+        where: gf.species_id in ^gall_ids and f.form == "non-gall",
+        select: gf.species_id
       )
       |> Repo.all()
       |> MapSet.new()
 
     Enum.map(galls, fn gall ->
-      Map.put(gall, :non_gall, MapSet.member?(non_gall_gall_ids, gall.gall_id))
+      Map.put(gall, :non_gall, MapSet.member?(non_gall_species_ids, gall.gall_id))
     end)
   end
 

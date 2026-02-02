@@ -12,7 +12,7 @@ defmodule Gallformers.Search do
   alias Gallformers.Repo
   alias Gallformers.Search.Ranking
   alias Gallformers.Sources.Source
-  alias Gallformers.Species.{Alias, Gall, GallSpecies, Species}
+  alias Gallformers.Species.{Alias, GallTraits, Species}
   alias Gallformers.Taxonomy.Taxonomy
 
   @doc """
@@ -24,10 +24,8 @@ defmodule Gallformers.Search do
     search_term = "%#{String.downcase(query)}%"
 
     from(s in Species,
-      join: gs in GallSpecies,
-      on: gs.species_id == s.id,
-      join: g in Gall,
-      on: gs.gall_id == g.id,
+      join: gt in GallTraits,
+      on: gt.species_id == s.id,
       left_join: a in Gallformers.Species.Abundance,
       on: s.abundance_id == a.id,
       where: s.taxoncode == "gall" and fragment("lower(?) LIKE ?", s.name, ^search_term),
@@ -39,9 +37,8 @@ defmodule Gallformers.Search do
         datacomplete: s.datacomplete,
         abundance_id: s.abundance_id,
         abundance_name: a.abundance,
-        gall_id: g.id,
-        detachable: g.detachable,
-        undescribed: g.undescribed
+        detachable: gt.detachable,
+        undescribed: gt.undescribed
       }
     )
     |> Repo.all()
@@ -56,10 +53,8 @@ defmodule Gallformers.Search do
     search_term = "%#{String.downcase(query)}%"
 
     from(s in Species,
-      join: gs in GallSpecies,
-      on: gs.species_id == s.id,
-      join: g in Gall,
-      on: gs.gall_id == g.id,
+      join: gt in GallTraits,
+      on: gt.species_id == s.id,
       left_join: a in Gallformers.Species.Abundance,
       on: s.abundance_id == a.id,
       where: s.taxoncode == "gall" and fragment("lower(?) LIKE ?", s.name, ^search_term),
@@ -73,9 +68,8 @@ defmodule Gallformers.Search do
         datacomplete: s.datacomplete,
         abundance_id: s.abundance_id,
         abundance_name: a.abundance,
-        gall_id: g.id,
-        detachable: g.detachable,
-        undescribed: g.undescribed
+        detachable: gt.detachable,
+        undescribed: gt.undescribed
       }
     )
     |> Repo.all()
@@ -89,8 +83,6 @@ defmodule Gallformers.Search do
     search_term = "%#{String.downcase(query)}%"
 
     from(s in Species,
-      join: gs in GallSpecies,
-      on: gs.species_id == s.id,
       where: s.taxoncode == "gall" and fragment("lower(?) LIKE ?", s.name, ^search_term),
       select: count(s.id)
     )
@@ -183,8 +175,6 @@ defmodule Gallformers.Search do
   @spec get_related_galls(integer(), String.t()) :: [map()]
   def get_related_galls(exclude_id, name_prefix) do
     from(s in Species,
-      join: gs in GallSpecies,
-      on: gs.species_id == s.id,
       where:
         s.taxoncode == "gall" and
           like(s.name, ^"#{name_prefix}%") and
@@ -271,11 +261,10 @@ defmodule Gallformers.Search do
         |> Enum.map_join(" ", &"#{&1}*")
 
       sql = """
-      SELECT f.species_id, s.name, g.undescribed
+      SELECT s.id, s.name, gt.undescribed
       FROM species_fts f
       JOIN species s ON s.id = f.species_id
-      JOIN gallspecies gs ON gs.species_id = s.id
-      JOIN gall g ON g.id = gs.gall_id
+      JOIN gall_traits gt ON gt.species_id = s.id
       WHERE s.taxoncode = 'gall' AND species_fts MATCH ?
       ORDER BY bm25(species_fts)
       LIMIT 100
@@ -304,17 +293,15 @@ defmodule Gallformers.Search do
     # Search by species name
     name_results =
       from(s in Species,
-        join: gs in GallSpecies,
-        on: gs.species_id == s.id,
-        join: g in Gall,
-        on: gs.gall_id == g.id,
+        join: gt in GallTraits,
+        on: gt.species_id == s.id,
         where: s.taxoncode == "gall" and fragment("lower(?) LIKE ?", s.name, ^search_term),
         order_by: s.name,
         select: %{
           id: s.id,
           name: s.name,
           type: "gall",
-          undescribed: g.undescribed
+          undescribed: gt.undescribed
         }
       )
       |> Repo.all()
@@ -323,17 +310,15 @@ defmodule Gallformers.Search do
     alias_results =
       from(a in Alias,
         join: s in assoc(a, :species),
-        join: gs in GallSpecies,
-        on: gs.species_id == s.id,
-        join: g in Gall,
-        on: gs.gall_id == g.id,
+        join: gt in GallTraits,
+        on: gt.species_id == s.id,
         where: s.taxoncode == "gall" and fragment("lower(?) LIKE ?", a.name, ^search_term),
         order_by: s.name,
         select: %{
           id: s.id,
           name: s.name,
           type: "gall",
-          undescribed: g.undescribed
+          undescribed: gt.undescribed
         }
       )
       |> Repo.all()
@@ -493,8 +478,9 @@ defmodule Gallformers.Search do
   @doc """
   Searches taxonomy entries (genus, family, section) by name or description.
 
-  Excludes "Unknown" entries (placeholder family and genera) since users
-  searching are looking for real taxonomic names, not placeholders.
+  Excludes placeholder entries (is_placeholder = true) that have no children,
+  since empty placeholders serve no purpose in search results. Placeholders
+  with children are kept so users can find species under them.
   """
   @spec search_taxonomy(String.t()) :: [map()]
   def search_taxonomy(query) do
@@ -502,11 +488,15 @@ defmodule Gallformers.Search do
 
     from(t in Taxonomy,
       left_join: parent in assoc(t, :parent),
+      left_join: st in "species_taxonomy",
+      on: st.taxonomy_id == t.id,
+      # Exclude placeholders with no species (handle NULL/0 as false)
       where:
         t.type in ["genus", "family", "section"] and
-          t.name != "Unknown" and
           (fragment("lower(?) LIKE ?", t.name, ^search_term) or
-             fragment("lower(coalesce(?, '')) LIKE ?", t.description, ^search_term)),
+             fragment("lower(coalesce(?, '')) LIKE ?", t.description, ^search_term)) and
+          not (fragment("coalesce(?, 0)", t.is_placeholder) == 1 and is_nil(st.species_id)),
+      group_by: [t.id, parent.id],
       order_by: [t.type, t.name],
       select: %{
         id: t.id,
@@ -547,10 +537,10 @@ defmodule Gallformers.Search do
   defp load_all_aliases_for_species(results) do
     species_ids = Enum.map(results, & &1.id)
 
-    # Fetch all aliases for these species via the aliasspecies join table
+    # Fetch all aliases for these species via the alias_species join table
     alias_map =
       from(a in Alias,
-        join: as in "aliasspecies",
+        join: as in "alias_species",
         on: as.alias_id == a.id,
         where: as.species_id in ^species_ids,
         select: {as.species_id, a.name}

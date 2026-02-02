@@ -145,41 +145,13 @@ defmodule Gallformers.Images do
 
   @doc """
   Updates an image record.
-
-  If the image is being set as default, clears the default flag
-  from all other images for the same species.
   """
   @spec update_image(ImageSchema.t(), map()) ::
           {:ok, ImageSchema.t()} | {:error, Ecto.Changeset.t()}
   def update_image(%ImageSchema{} = image, attrs) do
-    changeset = image_changeset(image, attrs)
-
-    if Ecto.Changeset.get_change(changeset, :default) == true do
-      update_image_with_default(image, changeset)
-    else
-      Repo.update(changeset)
-    end
-  end
-
-  defp update_image_with_default(image, changeset) do
-    Repo.transaction(fn ->
-      clear_other_defaults(image)
-      do_update_in_transaction(changeset)
-    end)
-  end
-
-  defp clear_other_defaults(image) do
-    from(i in ImageSchema,
-      where: i.species_id == ^image.species_id and i.id != ^image.id
-    )
-    |> Repo.update_all(set: [default: false])
-  end
-
-  defp do_update_in_transaction(changeset) do
-    case Repo.update(changeset) do
-      {:ok, updated} -> updated
-      {:error, cs} -> Repo.rollback(cs)
-    end
+    image
+    |> image_changeset(attrs)
+    |> Repo.update()
   end
 
   @doc """
@@ -297,11 +269,40 @@ defmodule Gallformers.Images do
   @doc """
   Sets an image as the default for its species.
 
-  Clears the default flag from all other images for the same species.
+  The default image is the one with sort_order = 1.
+  This reorders all images for the species, moving the target to position 1.
   """
   @spec set_default(ImageSchema.t()) :: {:ok, ImageSchema.t()} | {:error, Ecto.Changeset.t()}
   def set_default(%ImageSchema{} = image) do
-    update_image(image, %{default: true})
+    Repo.transaction(fn ->
+      # Temporarily set target image to sort_order 0
+      from(i in ImageSchema, where: i.id == ^image.id)
+      |> Repo.update_all(set: [sort_order: 0])
+
+      # Get all images for this species, ordered by sort_order
+      # (target will be first since it's at 0)
+      images =
+        from(i in ImageSchema,
+          where: i.species_id == ^image.species_id,
+          order_by: [asc: i.sort_order, asc: i.id]
+        )
+        |> Repo.all()
+
+      # Renumber all images: target gets 1, others get 2, 3, 4...
+      images
+      |> Enum.with_index(1)
+      |> Enum.each(fn {img, index} ->
+        from(i in ImageSchema, where: i.id == ^img.id)
+        |> Repo.update_all(set: [sort_order: index])
+      end)
+
+      # Return the updated target image
+      Repo.get!(ImageSchema, image.id)
+    end)
+    |> case do
+      {:ok, updated} -> {:ok, updated}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   @doc """
@@ -373,7 +374,6 @@ defmodule Gallformers.Images do
       :species_id,
       :source_id,
       :path,
-      :default,
       :sort_order,
       :creator,
       :attribution,

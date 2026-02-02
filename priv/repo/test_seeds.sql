@@ -1,4 +1,4 @@
--- Test seed data for gallformers test database
+-- Test seed data for gallformers test database (V2 Schema)
 -- This file is loaded after structure.sql to provide minimal data for tests
 --
 -- Keep this minimal - only add data that tests actually need
@@ -6,11 +6,6 @@
 -- =============================================================================
 -- Reference Data (required by foreign keys)
 -- =============================================================================
-
--- Taxon types (referenced by species and gall)
-INSERT INTO taxontype (taxoncode, description) VALUES
-  ('gall', 'Gall-forming species'),
-  ('plant', 'Host plant species');
 
 -- Abundances (referenced by species)
 INSERT INTO abundance (id, abundance) VALUES
@@ -36,17 +31,12 @@ INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id) VALUES
   (101, 'Amphibolips confluenta', 'gall', 0, 2),
   (102, 'Callirhytis quercuspunctata', 'gall', 0, 3);
 
--- Gall records (linked to gall species)
-INSERT INTO gall (id, taxoncode, detachable, undescribed) VALUES
-  (1, 'gall', 1, 0),
-  (2, 'gall', 0, 0),
-  (3, 'gall', 1, 1);
-
--- Link gall species to gall records
-INSERT INTO gallspecies (gall_id, species_id) VALUES
-  (1, 100),
-  (2, 101),
-  (3, 102);
+-- Gall traits (1:1 with gall species, species_id is PK+FK)
+-- Note: detachable is now a string enum: 'unknown', 'integral', 'detachable', 'both'
+INSERT INTO gall_traits (species_id, detachable, undescribed) VALUES
+  (100, 'integral', 0),
+  (101, 'unknown', 0),
+  (102, 'integral', 1);
 
 -- =============================================================================
 -- Aliases (for search tests)
@@ -58,7 +48,8 @@ INSERT INTO alias (id, name, type, description) VALUES
   (2, 'Red Oak', 'common', ''),
   (3, 'Oak Apple Gall Wasp', 'common', '');
 
-INSERT INTO aliasspecies (alias_id, species_id) VALUES
+-- V2: Snake-case junction table name
+INSERT INTO alias_species (alias_id, species_id) VALUES
   (1, 1),
   (2, 2),
   (3, 100);

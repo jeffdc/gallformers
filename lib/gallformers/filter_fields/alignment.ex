@@ -16,10 +16,6 @@ defmodule Gallformers.FilterFields.Alignment do
   schema "alignment" do
     field :alignment, :string
     field :description, :string
-
-    many_to_many :galls, Gallformers.Species.Gall,
-      join_through: "gallalignment",
-      join_keys: [alignment_id: :id, gall_id: :id]
   end
 
   @doc false

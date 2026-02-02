@@ -2,7 +2,7 @@ defmodule GallformersWeb.IDLive do
   @moduledoc """
   LiveView for the gall identification tool.
 
-  Allows users to filter galls by various characteristics (host, genus, location,
+  Allows users to filter galls by various characteristics (host, genus, plant part,
   color, shape, etc.) with URL-based state preservation for back/forward navigation.
   """
   use GallformersWeb, :live_view
@@ -58,9 +58,9 @@ defmodule GallformersWeb.IDLive do
     filter_options = IDTool.get_filter_options()
     places = Places.list_places()
 
-    # Add "leaf (anywhere)" virtual option to locations, sorted alphabetically
-    locations_with_virtual = add_leaf_anywhere_option(filter_options.locations)
-    filter_options = Map.put(filter_options, :locations, locations_with_virtual)
+    # Add "leaf (anywhere)" virtual option to plant_parts, sorted alphabetically
+    plant_parts_with_virtual = add_leaf_anywhere_option(filter_options.plant_parts)
+    filter_options = Map.put(filter_options, :plant_parts, plant_parts_with_virtual)
 
     {:ok,
      assign(socket,
@@ -84,8 +84,8 @@ defmodule GallformersWeb.IDLive do
        genus_results: [],
        selected_genus: nil,
        # Multi-select typeahead state
-       location_query: "",
-       location_focused: false,
+       plant_part_query: "",
+       plant_part_focused: false,
        texture_query: "",
        texture_focused: false,
        # Results
@@ -118,14 +118,14 @@ defmodule GallformersWeb.IDLive do
   # Parse URL parameters into filter map
   defp parse_url_params(params) do
     %{
-      locations: parse_list(params[@url_params.locations]),
-      location_logic: parse_logic(params[@url_params.location_logic]),
+      plant_parts: parse_list(params[@url_params.locations]),
+      plant_part_logic: parse_logic(params[@url_params.location_logic]),
       color: parse_int(params[@url_params.color]),
       shape: parse_int(params[@url_params.shape]),
       textures: parse_list(params[@url_params.textures]),
       texture_logic: parse_logic(params[@url_params.texture_logic]),
       alignment: parse_int(params[@url_params.alignment]),
-      detachable: params[@url_params.detachable],
+      detachable: parse_detachable(params[@url_params.detachable]),
       place: params[@url_params.place],
       family: parse_int(params[@url_params.family]),
       form: parse_int(params[@url_params.form]),
@@ -165,6 +165,17 @@ defmodule GallformersWeb.IDLive do
       _ -> nil
     end
   end
+
+  # Parse detachable param - converts V1 integer values to V2 strings for backwards compatibility
+  defp parse_detachable(nil), do: nil
+  defp parse_detachable(""), do: nil
+  defp parse_detachable("0"), do: "unknown"
+  defp parse_detachable("1"), do: "integral"
+  defp parse_detachable("2"), do: "detachable"
+  defp parse_detachable("3"), do: "both"
+  # V2 string values pass through
+  defp parse_detachable(val) when val in ["unknown", "integral", "detachable", "both"], do: val
+  defp parse_detachable(_), do: nil
 
   # Apply filters from URL and load host/genus if specified
   defp apply_url_filters(socket, filters, params) do
@@ -229,8 +240,8 @@ defmodule GallformersWeb.IDLive do
 
   defp default_filters do
     %{
-      locations: [],
-      location_logic: :or,
+      plant_parts: [],
+      plant_part_logic: :or,
       color: nil,
       shape: nil,
       textures: [],
@@ -337,62 +348,62 @@ defmodule GallformersWeb.IDLive do
     {:noreply, socket}
   end
 
-  # Location multi-select handlers
+  # Plant part multi-select handlers
   @impl true
-  def handle_event("location_search", %{"value" => query}, socket) do
-    {:noreply, assign(socket, location_query: query)}
+  def handle_event("plant_part_search", %{"value" => query}, socket) do
+    {:noreply, assign(socket, plant_part_query: query)}
   end
 
   @impl true
-  def handle_event("location_focus", _params, socket) do
-    {:noreply, assign(socket, location_focused: true)}
+  def handle_event("plant_part_focus", _params, socket) do
+    {:noreply, assign(socket, plant_part_focused: true)}
   end
 
   @impl true
-  def handle_event("location_blur", _params, socket) do
-    {:noreply, assign(socket, location_focused: false)}
+  def handle_event("plant_part_blur", _params, socket) do
+    {:noreply, assign(socket, plant_part_focused: false)}
   end
 
   @impl true
-  def handle_event("location_select", %{"id" => id}, socket) do
-    location_id = parse_location_id(id)
-    locations = socket.assigns.filters.locations
+  def handle_event("plant_part_select", %{"id" => id}, socket) do
+    plant_part_id = parse_plant_part_id(id)
+    plant_parts = socket.assigns.filters.plant_parts
 
-    new_locations =
-      if location_id in locations do
-        locations
+    new_plant_parts =
+      if plant_part_id in plant_parts do
+        plant_parts
       else
-        [location_id | locations]
+        [plant_part_id | plant_parts]
       end
 
     socket =
       socket
-      |> update_filter(:locations, new_locations)
-      |> assign(location_query: "")
+      |> update_filter(:plant_parts, new_plant_parts)
+      |> assign(plant_part_query: "")
       |> push_filter_patch()
 
     {:noreply, socket}
   end
 
   @impl true
-  def handle_event("location_remove", %{"id" => id}, socket) do
-    location_id = parse_location_id(id)
-    new_locations = List.delete(socket.assigns.filters.locations, location_id)
+  def handle_event("plant_part_remove", %{"id" => id}, socket) do
+    plant_part_id = parse_plant_part_id(id)
+    new_plant_parts = List.delete(socket.assigns.filters.plant_parts, plant_part_id)
 
     socket =
       socket
-      |> update_filter(:locations, new_locations)
+      |> update_filter(:plant_parts, new_plant_parts)
       |> push_filter_patch()
 
     {:noreply, socket}
   end
 
   @impl true
-  def handle_event("location_clear", _params, socket) do
+  def handle_event("plant_part_clear", _params, socket) do
     socket =
       socket
-      |> update_filter(:locations, [])
-      |> assign(location_query: "", location_focused: false)
+      |> update_filter(:plant_parts, [])
+      |> assign(plant_part_query: "", plant_part_focused: false)
       |> push_filter_patch()
 
     {:noreply, socket}
@@ -461,12 +472,12 @@ defmodule GallformersWeb.IDLive do
 
   # Logic toggle handlers
   @impl true
-  def handle_event("toggle_location_logic", _params, socket) do
-    new_logic = if socket.assigns.filters.location_logic == :or, do: :and, else: :or
+  def handle_event("toggle_plant_part_logic", _params, socket) do
+    new_logic = if socket.assigns.filters.plant_part_logic == :or, do: :and, else: :or
 
     socket =
       socket
-      |> update_filter(:location_logic, new_logic)
+      |> update_filter(:plant_part_logic, new_logic)
       |> push_filter_patch()
 
     {:noreply, socket}
@@ -560,8 +571,8 @@ defmodule GallformersWeb.IDLive do
         params
       end
 
-    params = maybe_add_list_param(params, @url_params.locations, filters.locations)
-    params = maybe_add_logic_param(params, @url_params.location_logic, filters.location_logic)
+    params = maybe_add_list_param(params, @url_params.locations, filters.plant_parts)
+    params = maybe_add_logic_param(params, @url_params.location_logic, filters.plant_part_logic)
     params = maybe_add_param(params, @url_params.color, filters.color)
     params = maybe_add_param(params, @url_params.shape, filters.shape)
     params = maybe_add_list_param(params, @url_params.textures, filters.textures)
@@ -648,14 +659,14 @@ defmodule GallformersWeb.IDLive do
   defp build_filter_params(socket) do
     filters = socket.assigns.filters
 
-    # Expand "leaf (anywhere)" to actual leaf location IDs
-    expanded_locations = expand_location_ids(filters.locations)
+    # Expand "leaf (anywhere)" to actual leaf plant part IDs
+    expanded_plant_parts = expand_plant_part_ids(filters.plant_parts)
 
     %{
       host_ids: wrap_in_list(socket.assigns.selected_host, & &1.id),
       genus_id: maybe_get(socket.assigns.selected_genus, :id),
-      location_ids: non_empty_list(expanded_locations),
-      location_logic: filters.location_logic,
+      location_ids: non_empty_list(expanded_plant_parts),
+      location_logic: filters.plant_part_logic,
       color_ids: wrap_value(filters.color),
       shape_ids: wrap_value(filters.shape),
       texture_ids: non_empty_list(filters.textures),
@@ -685,33 +696,27 @@ defmodule GallformersWeb.IDLive do
   defp non_empty_list([]), do: nil
   defp non_empty_list(list), do: list
 
-  defp parse_detachable(nil), do: nil
-  defp parse_detachable("integral"), do: 1
-  defp parse_detachable("detachable"), do: 2
-  defp parse_detachable("both"), do: 3
-  defp parse_detachable(_), do: nil
-
   # Add "leaf (anywhere)" virtual option to locations list, sorted alphabetically
-  defp add_leaf_anywhere_option(locations) do
-    virtual_option = %{id: @leaf_anywhere_id, location: "leaf (anywhere)"}
+  defp add_leaf_anywhere_option(plant_parts) do
+    virtual_option = %{id: @leaf_anywhere_id, part: "leaf (anywhere)"}
 
-    [virtual_option | locations]
-    |> Enum.sort_by(& &1.location)
+    [virtual_option | plant_parts]
+    |> Enum.sort_by(& &1.part)
   end
 
-  # Parse location ID - handles both integer IDs and "leaf_anywhere" string
-  defp parse_location_id(@leaf_anywhere_id), do: @leaf_anywhere_id
-  defp parse_location_id(id) when is_binary(id), do: String.to_integer(id)
-  defp parse_location_id(id) when is_integer(id), do: id
+  # Parse plant part ID - handles both integer IDs and "leaf_anywhere" string
+  defp parse_plant_part_id(@leaf_anywhere_id), do: @leaf_anywhere_id
+  defp parse_plant_part_id(id) when is_binary(id), do: String.to_integer(id)
+  defp parse_plant_part_id(id) when is_integer(id), do: id
 
-  # Expand location IDs, replacing "leaf_anywhere" marker with actual leaf location IDs
-  defp expand_location_ids(location_ids) do
-    if @leaf_anywhere_id in location_ids do
-      leaf_ids = IDTool.leaf_location_ids()
-      other_ids = Enum.reject(location_ids, &(&1 == @leaf_anywhere_id))
+  # Expand plant part IDs, replacing "leaf_anywhere" marker with actual leaf plant part IDs
+  defp expand_plant_part_ids(plant_part_ids) do
+    if @leaf_anywhere_id in plant_part_ids do
+      leaf_ids = IDTool.leaf_plant_part_ids()
+      other_ids = Enum.reject(plant_part_ids, &(&1 == @leaf_anywhere_id))
       Enum.uniq(leaf_ids ++ other_ids)
     else
-      location_ids
+      plant_part_ids
     end
   end
 
@@ -801,20 +806,20 @@ defmodule GallformersWeb.IDLive do
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <.multi_select_typeahead
-                id="locations"
-                name="location"
-                label="Location(s) on Plant:"
-                placeholder="Locations"
-                options={@filter_options.locations}
-                selected={@filters.locations}
-                option_label={:location}
-                query={@location_query}
-                focused={@location_focused}
+                id="plant_parts"
+                name="plant_part"
+                label="Plant Part(s):"
+                placeholder="Plant Parts"
+                options={@filter_options.plant_parts}
+                selected={@filters.plant_parts}
+                option_label={:part}
+                query={@plant_part_query}
+                focused={@plant_part_focused}
               />
               <.logic_toggle
-                :if={length(@filters.locations) > 1}
-                logic={@filters.location_logic}
-                toggle_event="toggle_location_logic"
+                :if={length(@filters.plant_parts) > 1}
+                logic={@filters.plant_part_logic}
+                toggle_event="toggle_plant_part_logic"
               />
             </div>
             <.detachable_filter value={@filters.detachable} />

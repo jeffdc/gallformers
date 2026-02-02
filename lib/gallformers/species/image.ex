@@ -19,7 +19,6 @@ defmodule Gallformers.Species.Image do
           species_id: integer() | nil,
           source_id: integer() | nil,
           path: String.t() | nil,
-          default: boolean(),
           sort_order: integer(),
           creator: String.t() | nil,
           attribution: String.t() | nil,
@@ -33,7 +32,6 @@ defmodule Gallformers.Species.Image do
 
   schema "image" do
     field :path, :string
-    field :default, :boolean, default: false
     field :sort_order, :integer, default: 0
     field :creator, :string
     field :attribution, :string
@@ -99,7 +97,6 @@ defmodule Gallformers.Species.Image do
       :species_id,
       :source_id,
       :path,
-      :default,
       :sort_order,
       :creator,
       :attribution,
@@ -114,4 +111,10 @@ defmodule Gallformers.Species.Image do
     |> foreign_key_constraint(:species_id)
     |> foreign_key_constraint(:source_id)
   end
+
+  @doc """
+  Returns true if this is the default image (sort_order = 1).
+  """
+  def default?(%__MODULE__{sort_order: 1}), do: true
+  def default?(_), do: false
 end

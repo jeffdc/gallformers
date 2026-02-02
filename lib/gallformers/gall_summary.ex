@@ -22,7 +22,7 @@ defmodule Gallformers.GallSummary do
 
   ## Examples
 
-      iex> GallSummary.generate(%{shapes: ["spherical"], colors: ["red"], locations: ["leaf"]})
+      iex> GallSummary.generate(%{shapes: ["spherical"], colors: ["red"], plant_parts: ["leaf"]})
       "A spherical, red gall found on the leaf."
 
       iex> GallSummary.generate(%{forms: ["non-gall"], colors: ["red"]})
@@ -110,7 +110,7 @@ defmodule Gallformers.GallSummary do
       shapes: extract_field_values(db_filters[:shapes]),
       colors: extract_field_values(db_filters[:colors]),
       textures: extract_field_values(db_filters[:textures]),
-      locations: extract_field_values(db_filters[:locations]),
+      plant_parts: extract_field_values(db_filters[:plant_parts]),
       seasons: extract_field_values(db_filters[:seasons]),
       alignments: extract_field_values(db_filters[:alignments]),
       walls: extract_field_values(db_filters[:walls]),
@@ -125,10 +125,13 @@ defmodule Gallformers.GallSummary do
   defp extract_field_values(nil), do: []
   defp extract_field_values(list), do: Enum.map(list, & &1.field)
 
+  # Handle integers (legacy V1 data)
   defp detachable_to_string(0), do: nil
   defp detachable_to_string(1), do: "integral"
   defp detachable_to_string(2), do: "detachable"
   defp detachable_to_string(3), do: "both"
+  # Handle strings (V2 data) - pass through unchanged
+  defp detachable_to_string(s) when is_binary(s), do: s
   defp detachable_to_string(_), do: nil
 
   defp determine_form_noun(filters) do
@@ -158,7 +161,7 @@ defmodule Gallformers.GallSummary do
   end
 
   defp build_location_phrase(filters) do
-    case format_multi_value(get_values(filters, :locations)) do
+    case format_multi_value(get_values(filters, :plant_parts)) do
       nil -> nil
       location -> "found on the #{location}"
     end

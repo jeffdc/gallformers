@@ -113,9 +113,9 @@ defmodule GallformersWeb.API.PlaceController do
 
   defp get_hosts_for_place(place_id) do
     from(s in Species,
-      join: sp in "speciesplace",
-      on: sp.species_id == s.id,
-      where: sp.place_id == ^place_id and s.taxoncode == "plant",
+      join: hr in "host_range",
+      on: hr.species_id == s.id,
+      where: hr.place_id == ^place_id and s.taxoncode == "plant",
       order_by: s.name,
       select: %{
         id: s.id,

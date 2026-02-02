@@ -33,7 +33,7 @@ defmodule GallformersWeb.API.FilterFieldController do
       cells: format_filter_field(options.cells, :cells),
       colors: format_filter_field(options.colors, :color),
       forms: format_filter_field(options.forms, :form),
-      locations: format_filter_field(options.locations, :location),
+      plant_parts: format_filter_field(options.plant_parts, :part),
       seasons: format_filter_field(options.seasons, :season),
       shapes: format_filter_field(options.shapes, :shape),
       textures: format_filter_field(options.textures, :texture),

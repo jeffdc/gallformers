@@ -26,7 +26,6 @@ defmodule GallformersWeb.API.GallControllerTest do
         gall = hd(response["data"])
         assert Map.has_key?(gall, "id")
         assert Map.has_key?(gall, "name")
-        assert Map.has_key?(gall, "gall_id")
       end
     end
 
@@ -175,7 +174,7 @@ defmodule GallformersWeb.API.GallControllerTest do
         # Should have filter fields as arrays
         assert Map.has_key?(gall, "colors")
         assert Map.has_key?(gall, "shapes")
-        assert Map.has_key?(gall, "locations")
+        assert Map.has_key?(gall, "plant_parts")
         assert Map.has_key?(gall, "hosts")
         assert is_list(gall["colors"])
         assert is_list(gall["hosts"])

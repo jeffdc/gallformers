@@ -1,6 +1,6 @@
 defmodule Gallformers.Species.SpeciesSource do
   @moduledoc """
-  Ecto schema for the speciessource table.
+  Ecto schema for the species_source table.
 
   Links species to sources with additional metadata about the reference.
   """
@@ -21,7 +21,7 @@ defmodule Gallformers.Species.SpeciesSource do
           alias_id: integer() | nil
         }
 
-  schema "speciessource" do
+  schema "species_source" do
     field :description, :string, default: ""
     field :useasdefault, :integer, default: 0
     field :externallink, :string, default: ""
@@ -49,7 +49,7 @@ defmodule Gallformers.Species.SpeciesSource do
     ])
     |> validate_required(@required_fields)
     |> unique_constraint([:species_id, :source_id],
-      name: :speciessource_species_id_source_id,
+      name: :species_source_species_id_source_id,
       message: "this species is already linked to this source"
     )
     |> foreign_key_constraint(:species_id)

@@ -6,7 +6,7 @@ defmodule Gallformers.SpeciesTest do
 
   alias Gallformers.Repo
   alias Gallformers.Species
-  alias Gallformers.Species.{Gall, GallSpecies}
+  alias Gallformers.Species.GallTraits
 
   describe "list_species/0" do
     test "returns a list of species" do
@@ -375,19 +375,15 @@ defmodule Gallformers.SpeciesTest do
   end
 
   describe "delete_species/1" do
-    test "deletes the species and associated gall record" do
-      # Species 100 is "Andricus quercuscalifornicus" linked to gall 1
+    test "deletes the species and associated gall_traits record" do
+      # Species 100 is "Andricus quercuscalifornicus" with gall traits
       species = Species.get_species!(100)
       assert species != nil
 
-      # Verify gall record exists
+      # Verify gall_traits record exists (1:1 relationship with species)
       import Ecto.Query
-      gall_link = Repo.one(from gs in GallSpecies, where: gs.species_id == 100)
-      assert gall_link != nil
-      gall_id = gall_link.gall_id
-
-      gall = Repo.get(Gall, gall_id)
-      assert gall != nil
+      gall_traits = Repo.one(from gt in GallTraits, where: gt.species_id == 100)
+      assert gall_traits != nil
 
       # Delete the species
       assert {:ok, deleted} = Species.delete_species(species)
@@ -396,11 +392,8 @@ defmodule Gallformers.SpeciesTest do
       # Verify species is gone
       assert nil == Species.get_species(100)
 
-      # Verify gall record is gone (the fix!)
-      assert nil == Repo.get(Gall, gall_id)
-
-      # Verify gallspecies join record is gone
-      assert nil == Repo.one(from gs in GallSpecies, where: gs.species_id == 100)
+      # Verify gall_traits record is gone (cascade delete)
+      assert nil == Repo.one(from gt in GallTraits, where: gt.species_id == 100)
     end
 
     test "raises for non-existent species" do

@@ -213,6 +213,9 @@ defmodule Gallformers.Analytics do
         unique_visitors: 0
       })
     end)
+    # Explicitly sort by date to ensure chronological order
+    # (Enum.sort doesn't work correctly on Date structs due to term ordering)
+    |> Enum.sort_by(& &1.date, Date)
   end
 
   @doc """

@@ -16,8 +16,8 @@ defmodule GallformersWeb.FilterGuideLive do
         IDTool.list_alignments() |> Enum.map(&%{field: &1.alignment, description: &1.description}),
       cells: IDTool.list_cells() |> Enum.map(&%{field: &1.cells, description: &1.description}),
       form: IDTool.list_forms() |> Enum.map(&%{field: &1.form, description: &1.description}),
-      location:
-        IDTool.list_locations() |> Enum.map(&%{field: &1.location, description: &1.description}),
+      plant_part:
+        IDTool.list_plant_parts() |> Enum.map(&%{field: &1.part, description: &1.description}),
       shape: IDTool.list_shapes() |> Enum.map(&%{field: &1.shape, description: &1.description}),
       texture:
         IDTool.list_textures() |> Enum.map(&%{field: &1.texture, description: &1.description}),
@@ -28,7 +28,7 @@ defmodule GallformersWeb.FilterGuideLive do
      assign(socket,
        page_title: "Filter Guide",
        page_description:
-         "Guide to the filter terms used in the Gallformers gall identification tool - explanations of alignment, cells, forms, location, shape, texture, and walls.",
+         "Guide to the filter terms used in the Gallformers gall identification tool - explanations of alignment, cells, forms, plant part, shape, texture, and walls.",
        page_url: "/filterguide",
        page_image: nil,
        page_json_ld: nil,
@@ -56,7 +56,7 @@ defmodule GallformersWeb.FilterGuideLive do
           <.jump_link href="#cells">Cells</.jump_link>
           <.jump_link href="#detachable">Detachable</.jump_link>
           <.jump_link href="#forms">Forms</.jump_link>
-          <.jump_link href="#location">Location</.jump_link>
+          <.jump_link href="#plant_part">Plant Part</.jump_link>
           <.jump_link href="#shape">Shape</.jump_link>
           <.jump_link href="#texture">Texture</.jump_link>
           <.jump_link href="#walls">Walls</.jump_link>
@@ -107,11 +107,11 @@ defmodule GallformersWeb.FilterGuideLive do
           <%!-- Forms --%>
           <.filter_section id="forms" title="Forms" items={sort_by_field(@filter_fields.form)} />
 
-          <%!-- Location --%>
+          <%!-- Plant Part --%>
           <.filter_section
-            id="location"
-            title="Location"
-            items={sort_by_field(@filter_fields.location)}
+            id="plant_part"
+            title="Plant Part"
+            items={sort_by_field(@filter_fields.plant_part)}
           />
 
           <%!-- Shape --%>

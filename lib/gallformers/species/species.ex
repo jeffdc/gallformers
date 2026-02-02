@@ -8,6 +8,8 @@ defmodule Gallformers.Species.Species do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias Gallformers.Species.GallTraits
+
   @behaviour Gallformers.SchemaFields
 
   @required_fields [:name, :taxoncode]
@@ -27,13 +29,8 @@ defmodule Gallformers.Species.Species do
 
     belongs_to :abundance, Gallformers.Species.Abundance
 
-    belongs_to :taxontype, Gallformers.Species.TaxonType,
-      foreign_key: :taxoncode,
-      references: :taxoncode,
-      define_field: false
-
     has_many :images, Gallformers.Species.Image
-    has_many :gall_species, Gallformers.Species.GallSpecies
+    has_one :gall_traits, Gallformers.Species.GallTraits, foreign_key: :species_id
     has_many :species_sources, Gallformers.Species.SpeciesSource
 
     # Host relationships - this species as a gall
@@ -43,17 +40,34 @@ defmodule Gallformers.Species.Species do
     has_many :gall_relations, Gallformers.Hosts.Host, foreign_key: :host_species_id
 
     many_to_many :aliases, Gallformers.Species.Alias,
-      join_through: "aliasspecies",
+      join_through: "alias_species",
       join_keys: [species_id: :id, alias_id: :id]
 
     many_to_many :taxonomies, Gallformers.Taxonomy.Taxonomy,
-      join_through: "speciestaxonomy",
+      join_through: "species_taxonomy",
       join_keys: [species_id: :id, taxonomy_id: :id]
 
-    many_to_many :places, Gallformers.Places.Place,
-      join_through: "speciesplace",
+    # Host range (where host plants exist)
+    many_to_many :host_ranges, Gallformers.Places.Place,
+      join_through: "host_range",
       join_keys: [species_id: :id, place_id: :id]
+
+    # Gall range exclusions (places excluded from gall's range)
+    many_to_many :gall_range_exclusions, Gallformers.Places.Place,
+      join_through: "gall_range_exclusion",
+      join_keys: [species_id: :id, place_id: :id]
+
+    timestamps(type: :utc_datetime)
   end
+
+  @doc """
+  Returns the appropriate range association based on taxoncode.
+  For plants: host_ranges
+  For galls: gall_range_exclusions (places to EXCLUDE)
+  """
+  def range_association(%__MODULE__{taxoncode: "plant"}), do: :host_ranges
+  def range_association(%__MODULE__{taxoncode: "gall"}), do: :gall_range_exclusions
+  def range_association(_), do: nil
 
   @impl Gallformers.SchemaFields
   def required_fields, do: @required_fields
@@ -68,6 +82,15 @@ defmodule Gallformers.Species.Species do
     |> validate_length(:name, min: 1, max: 500)
     |> validate_inclusion(:taxoncode, taxoncodes())
     |> unique_constraint(:name)
+  end
+
+  @doc """
+  Creates a changeset for a gall species, including gall_traits.
+  """
+  def gall_changeset(species, attrs) do
+    species
+    |> changeset(attrs)
+    |> cast_assoc(:gall_traits, with: &GallTraits.changeset/2)
   end
 
   @doc """

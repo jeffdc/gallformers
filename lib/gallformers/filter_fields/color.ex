@@ -14,10 +14,6 @@ defmodule Gallformers.FilterFields.Color do
 
   schema "color" do
     field :color, :string
-
-    many_to_many :galls, Gallformers.Species.Gall,
-      join_through: "gallcolor",
-      join_keys: [color_id: :id, gall_id: :id]
   end
 
   @doc false

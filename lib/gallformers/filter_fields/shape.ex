@@ -16,10 +16,6 @@ defmodule Gallformers.FilterFields.Shape do
   schema "shape" do
     field :shape, :string
     field :description, :string
-
-    many_to_many :galls, Gallformers.Species.Gall,
-      join_through: "gallshape",
-      join_keys: [shape_id: :id, gall_id: :id]
   end
 
   @doc false

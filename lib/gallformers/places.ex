@@ -8,6 +8,7 @@ defmodule Gallformers.Places do
   import Ecto.Query
   alias Gallformers.Places.Place
   alias Gallformers.Repo
+  alias Gallformers.Species.Species
 
   @doc """
   Returns all places (states/provinces) ordered by name.
@@ -92,6 +93,52 @@ defmodule Gallformers.Places do
     )
     |> Repo.all()
   end
+
+  # Range management - semantic wrappers for V2 schema
+
+  @doc """
+  Gets host ranges for a species (places where the host plant exists).
+  """
+  @spec get_host_ranges(integer()) :: [Place.t()]
+  def get_host_ranges(species_id) do
+    from(p in Place,
+      join: hr in "host_range",
+      on: hr.place_id == p.id,
+      where: hr.species_id == ^species_id,
+      order_by: p.name
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets gall range exclusions for a species (places excluded from gall's range).
+  """
+  @spec get_gall_range_exclusions(integer()) :: [Place.t()]
+  def get_gall_range_exclusions(species_id) do
+    from(p in Place,
+      join: gre in "gall_range_exclusion",
+      on: gre.place_id == p.id,
+      where: gre.species_id == ^species_id,
+      order_by: p.name
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets the range for a species based on its taxoncode.
+  For plants: returns places where the host exists
+  For galls: returns places EXCLUDED from the gall's range
+  """
+  @spec get_species_range(Species.t()) :: [Place.t()]
+  def get_species_range(%Species{taxoncode: "plant", id: id}) do
+    get_host_ranges(id)
+  end
+
+  def get_species_range(%Species{taxoncode: "gall", id: id}) do
+    get_gall_range_exclusions(id)
+  end
+
+  def get_species_range(_), do: []
 
   # Admin functions
 

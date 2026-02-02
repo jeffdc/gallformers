@@ -9,7 +9,7 @@ defmodule Gallformers.Hosts do
 
   alias Gallformers.Hosts.Host
   alias Gallformers.Repo
-  alias Gallformers.Species.{Abundance, Gall, GallSpecies, Species}
+  alias Gallformers.Species.{Abundance, GallTraits, Species}
 
   @doc """
   Returns all host species ordered by name.
@@ -129,15 +129,13 @@ defmodule Gallformers.Hosts do
     from(h in Host,
       join: s in Species,
       on: h.gall_species_id == s.id,
-      join: gs in GallSpecies,
-      on: gs.species_id == s.id,
-      join: g in Gall,
-      on: gs.gall_id == g.id,
+      left_join: gt in GallTraits,
+      on: gt.species_id == s.id,
       where: h.host_species_id == ^host_species_id,
       select: %{
         id: s.id,
         name: s.name,
-        undescribed: g.undescribed,
+        undescribed: gt.undescribed,
         datacomplete: s.datacomplete
       }
     )
@@ -149,13 +147,13 @@ defmodule Gallformers.Hosts do
   """
   def get_hosts_for_place(place_id) do
     from(s in Species,
-      join: sp in "speciesplace",
-      on: sp.species_id == s.id,
-      left_join: als in "aliasspecies",
+      join: hr in "host_range",
+      on: hr.species_id == s.id,
+      left_join: als in "alias_species",
       on: als.species_id == s.id,
       left_join: a in "alias",
       on: a.id == als.alias_id,
-      where: sp.place_id == ^place_id and s.taxoncode == "plant",
+      where: hr.place_id == ^place_id and s.taxoncode == "plant",
       group_by: [s.id, s.name],
       order_by: s.name,
       select: %{
@@ -172,10 +170,10 @@ defmodule Gallformers.Hosts do
   """
   @spec get_places_for_host(integer()) :: [String.t()]
   def get_places_for_host(host_species_id) do
-    from(sp in "speciesplace",
+    from(hr in "host_range",
       join: p in "place",
-      on: sp.place_id == p.id,
-      where: sp.species_id == ^host_species_id,
+      on: hr.place_id == p.id,
+      where: hr.species_id == ^host_species_id,
       select: p.code
     )
     |> Repo.all()
@@ -187,10 +185,10 @@ defmodule Gallformers.Hosts do
   @spec get_places_for_gall(integer()) :: [String.t()]
   def get_places_for_gall(gall_species_id) do
     from(p in "place",
-      join: sp in "speciesplace",
-      on: sp.place_id == p.id,
+      join: hr in "host_range",
+      on: hr.place_id == p.id,
       join: h in Host,
-      on: h.host_species_id == sp.species_id,
+      on: h.host_species_id == hr.species_id,
       where: h.gall_species_id == ^gall_species_id,
       distinct: true,
       select: p.code
@@ -209,9 +207,9 @@ defmodule Gallformers.Hosts do
 
   def get_places_for_host_species_ids(host_species_ids) do
     from(p in "place",
-      join: sp in "speciesplace",
-      on: sp.place_id == p.id,
-      where: sp.species_id in ^host_species_ids,
+      join: hr in "host_range",
+      on: hr.place_id == p.id,
+      where: hr.species_id in ^host_species_ids,
       distinct: true,
       select: p.code
     )
@@ -224,9 +222,9 @@ defmodule Gallformers.Hosts do
   @spec get_excluded_places_for_gall(integer()) :: [String.t()]
   def get_excluded_places_for_gall(gall_species_id) do
     from(p in "place",
-      join: sp in "speciesplace",
-      on: sp.place_id == p.id,
-      where: sp.species_id == ^gall_species_id,
+      join: gre in "gall_range_exclusion",
+      on: gre.place_id == p.id,
+      where: gre.species_id == ^gall_species_id,
       distinct: true,
       select: p.code
     )
@@ -260,7 +258,7 @@ defmodule Gallformers.Hosts do
   defp search_hosts_with_terms(terms, limit) do
     base_query =
       from(s in Species,
-        left_join: als in "aliasspecies",
+        left_join: als in "alias_species",
         on: als.species_id == s.id,
         left_join: a in "alias",
         on: a.id == als.alias_id,
@@ -297,7 +295,7 @@ defmodule Gallformers.Hosts do
 
     aliases_by_host =
       from(a in "alias",
-        join: als in "aliasspecies",
+        join: als in "alias_species",
         on: als.alias_id == a.id,
         where: als.species_id in ^host_ids,
         select: {als.species_id, a.name}
@@ -316,7 +314,7 @@ defmodule Gallformers.Hosts do
   @spec get_aliases_for_host(integer()) :: [String.t()]
   def get_aliases_for_host(host_id) do
     from(a in "alias",
-      join: als in "aliasspecies",
+      join: als in "alias_species",
       on: als.alias_id == a.id,
       where: als.species_id == ^host_id,
       select: a.name
@@ -455,9 +453,9 @@ defmodule Gallformers.Hosts do
   """
   @spec get_place_ids_for_host(integer()) :: [integer()]
   def get_place_ids_for_host(host_species_id) do
-    from(sp in "speciesplace",
-      where: sp.species_id == ^host_species_id,
-      select: sp.place_id
+    from(hr in "host_range",
+      where: hr.species_id == ^host_species_id,
+      select: hr.place_id
     )
     |> Repo.all()
   end
@@ -468,7 +466,7 @@ defmodule Gallformers.Hosts do
   @spec add_place_to_host(integer(), integer()) :: {:ok, map()}
   def add_place_to_host(host_species_id, place_id) do
     Repo.insert_all(
-      "speciesplace",
+      "host_range",
       [%{species_id: host_species_id, place_id: place_id}],
       on_conflict: :nothing
     )
@@ -481,8 +479,8 @@ defmodule Gallformers.Hosts do
   """
   @spec remove_place_from_host(integer(), integer()) :: {:ok, map()}
   def remove_place_from_host(host_species_id, place_id) do
-    from(sp in "speciesplace",
-      where: sp.species_id == ^host_species_id and sp.place_id == ^place_id
+    from(hr in "host_range",
+      where: hr.species_id == ^host_species_id and hr.place_id == ^place_id
     )
     |> Repo.delete_all()
 
@@ -496,8 +494,8 @@ defmodule Gallformers.Hosts do
   @spec toggle_place_for_host(integer(), integer()) :: {:added | :removed, integer()}
   def toggle_place_for_host(host_species_id, place_id) do
     existing =
-      from(sp in "speciesplace",
-        where: sp.species_id == ^host_species_id and sp.place_id == ^place_id,
+      from(hr in "host_range",
+        where: hr.species_id == ^host_species_id and hr.place_id == ^place_id,
         select: count()
       )
       |> Repo.one()
@@ -518,15 +516,15 @@ defmodule Gallformers.Hosts do
   def update_host_places(host_species_id, place_ids) do
     Repo.transaction(fn ->
       # Delete existing
-      from(sp in "speciesplace",
-        where: sp.species_id == ^host_species_id
+      from(hr in "host_range",
+        where: hr.species_id == ^host_species_id
       )
       |> Repo.delete_all()
 
       # Insert new
       if place_ids != [] do
         entries = Enum.map(place_ids, &%{species_id: host_species_id, place_id: &1})
-        Repo.insert_all("speciesplace", entries)
+        Repo.insert_all("host_range", entries)
       end
 
       :ok
@@ -545,7 +543,7 @@ defmodule Gallformers.Hosts do
   @spec get_aliases_for_host_full(integer()) :: [map()]
   def get_aliases_for_host_full(host_id) do
     from(a in "alias",
-      join: als in "aliasspecies",
+      join: als in "alias_species",
       on: als.alias_id == a.id,
       where: als.species_id == ^host_id,
       select: %{id: a.id, name: a.name, type: a.type}
@@ -742,9 +740,9 @@ defmodule Gallformers.Hosts do
   # Gall Range Exclusion Management
   # ============================================
   #
-  # NOTE: For galls, the speciesplace table stores EXCLUSIONS (places where
+  # NOTE: For galls, the gall_range_exclusion table stores EXCLUSIONS (places where
   # the gall does NOT occur even though hosts exist there). This is different
-  # from hosts, where speciesplace stores places where the host EXISTS.
+  # from hosts, where the host_range table stores places where the host EXISTS.
   #
   # Gall effective range = (union of all host places) - (excluded places)
   #
@@ -754,9 +752,9 @@ defmodule Gallformers.Hosts do
   """
   @spec get_excluded_place_ids_for_gall(integer()) :: [integer()]
   def get_excluded_place_ids_for_gall(gall_species_id) do
-    from(sp in "speciesplace",
-      where: sp.species_id == ^gall_species_id,
-      select: sp.place_id
+    from(gre in "gall_range_exclusion",
+      where: gre.species_id == ^gall_species_id,
+      select: gre.place_id
     )
     |> Repo.all()
   end
@@ -770,15 +768,15 @@ defmodule Gallformers.Hosts do
   def set_range_exclusions_for_gall(gall_species_id, place_ids) do
     Repo.transaction(fn ->
       # Delete existing exclusions
-      from(sp in "speciesplace",
-        where: sp.species_id == ^gall_species_id
+      from(gre in "gall_range_exclusion",
+        where: gre.species_id == ^gall_species_id
       )
       |> Repo.delete_all()
 
       # Insert new exclusions
       if place_ids != [] do
         entries = Enum.map(place_ids, &%{species_id: gall_species_id, place_id: &1})
-        Repo.insert_all("speciesplace", entries)
+        Repo.insert_all("gall_range_exclusion", entries)
       end
 
       :ok
@@ -796,16 +794,16 @@ defmodule Gallformers.Hosts do
   @spec toggle_exclusion_for_gall(integer(), integer()) :: {:added | :removed, integer()}
   def toggle_exclusion_for_gall(gall_species_id, place_id) do
     existing =
-      from(sp in "speciesplace",
-        where: sp.species_id == ^gall_species_id and sp.place_id == ^place_id,
+      from(gre in "gall_range_exclusion",
+        where: gre.species_id == ^gall_species_id and gre.place_id == ^place_id,
         select: count()
       )
       |> Repo.one()
 
     if existing > 0 do
       # Remove exclusion (place is now in range)
-      from(sp in "speciesplace",
-        where: sp.species_id == ^gall_species_id and sp.place_id == ^place_id
+      from(gre in "gall_range_exclusion",
+        where: gre.species_id == ^gall_species_id and gre.place_id == ^place_id
       )
       |> Repo.delete_all()
 
@@ -813,7 +811,7 @@ defmodule Gallformers.Hosts do
     else
       # Add exclusion (place is now excluded)
       Repo.insert_all(
-        "speciesplace",
+        "gall_range_exclusion",
         [%{species_id: gall_species_id, place_id: place_id}],
         on_conflict: :nothing
       )
@@ -828,12 +826,12 @@ defmodule Gallformers.Hosts do
   """
   @spec get_host_place_ids_for_gall(integer()) :: [integer()]
   def get_host_place_ids_for_gall(gall_species_id) do
-    from(sp in "speciesplace",
+    from(hr in "host_range",
       join: h in Host,
-      on: h.host_species_id == sp.species_id,
+      on: h.host_species_id == hr.species_id,
       where: h.gall_species_id == ^gall_species_id,
       distinct: true,
-      select: sp.place_id
+      select: hr.place_id
     )
     |> Repo.all()
   end

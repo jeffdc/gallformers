@@ -753,15 +753,15 @@ defmodule GallformersWeb.FormComponents do
   ## Examples
 
       <.multi_select_typeahead
-        id="locations"
-        name="location"
-        label="Location(s):"
-        placeholder="Locations"
-        options={@filter_options.locations}
-        selected={@filters.locations}
-        option_label={:location}
-        query={@location_query}
-        focused={@location_focused}
+        id="plant_parts"
+        name="plant_part"
+        label="Plant Part(s):"
+        placeholder="Plant Parts"
+        options={@filter_options.plant_parts}
+        selected={@filters.plant_parts}
+        option_label={:plant_part}
+        query={@plant_part_query}
+        focused={@plant_part_focused}
       />
   """
   attr :id, :string, required: true, doc: "unique identifier for the component"

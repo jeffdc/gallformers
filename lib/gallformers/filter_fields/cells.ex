@@ -16,10 +16,6 @@ defmodule Gallformers.FilterFields.Cells do
   schema "cells" do
     field :cells, :string
     field :description, :string
-
-    many_to_many :galls, Gallformers.Species.Gall,
-      join_through: "gallcells",
-      join_keys: [cells_id: :id, gall_id: :id]
   end
 
   @doc false

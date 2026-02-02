@@ -12,11 +12,42 @@ defmodule Gallformers.Taxonomy do
   alias Gallformers.Taxonomy.Taxonomy
 
   @doc """
-  Returns all taxonomies.
+  Returns all non-placeholder taxonomies.
   """
   @spec list_taxonomies() :: [Taxonomy.t()]
   def list_taxonomies do
-    Repo.all(Taxonomy)
+    from(t in Taxonomy, where: t.is_placeholder == false)
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets the "Unknown" placeholder for a given parent.
+  Returns nil if not found.
+  """
+  @spec get_unknown_placeholder(integer()) :: Taxonomy.t() | nil
+  def get_unknown_placeholder(parent_id) do
+    from(t in Taxonomy,
+      where: t.is_placeholder == true and t.parent_id == ^parent_id
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Gets or creates an "Unknown" placeholder genus for a family.
+  Alias for find_or_create_unknown_genus/1.
+  """
+  @spec get_or_create_unknown_genus(integer()) ::
+          {:ok, Taxonomy.t()} | {:error, Ecto.Changeset.t()}
+  def get_or_create_unknown_genus(family_id) do
+    find_or_create_unknown_genus(family_id)
+  end
+
+  @doc """
+  Returns the display name for a taxonomy, handling placeholders.
+  """
+  @spec display_name(Taxonomy.t()) :: String.t()
+  def display_name(taxonomy) do
+    Taxonomy.display_name(Repo.preload(taxonomy, :parent))
   end
 
   @doc """
@@ -68,7 +99,7 @@ defmodule Gallformers.Taxonomy do
       where: t.type == "genus" and t.name == "Unknown",
       where:
         fragment(
-          "NOT EXISTS (SELECT 1 FROM speciestaxonomy st WHERE st.taxonomy_id = ?)",
+          "NOT EXISTS (SELECT 1 FROM species_taxonomy st WHERE st.taxonomy_id = ?)",
           t.id
         ),
       select: t.id
@@ -346,7 +377,7 @@ defmodule Gallformers.Taxonomy do
   @spec link_species_to_taxonomy(integer(), integer()) :: {:ok, any()} | {:error, term()}
   def link_species_to_taxonomy(species_id, taxonomy_id) do
     Repo.insert_all(
-      "speciestaxonomy",
+      "species_taxonomy",
       [%{species_id: species_id, taxonomy_id: taxonomy_id}],
       on_conflict: :nothing
     )
@@ -374,7 +405,7 @@ defmodule Gallformers.Taxonomy do
 
     # Remove any existing genus links for this species
     # (SQLite doesn't support JOINs in DELETE, so we use a subquery)
-    from(st in "speciestaxonomy",
+    from(st in "species_taxonomy",
       where: st.species_id == ^species_id and st.taxonomy_id in subquery(genus_ids_query)
     )
     |> Repo.delete_all()
@@ -459,7 +490,7 @@ defmodule Gallformers.Taxonomy do
 
   The data model has:
   - Family → Genus → Section (hierarchy via parent_id)
-  - Species links directly to both genus AND section via speciestaxonomy
+  - Species links directly to both genus AND section via species_taxonomy
 
   Descriptions contain common names (e.g., "Oaks" for Quercus, "Beeches" for Fagus).
   """
@@ -467,7 +498,7 @@ defmodule Gallformers.Taxonomy do
   def get_taxonomy_for_species(species_id) do
     # Get the genus link - genus's parent is the family
     genus_query =
-      from st in "speciestaxonomy",
+      from st in "species_taxonomy",
         join: g in Taxonomy,
         on: st.taxonomy_id == g.id and g.type == "genus",
         left_join: family in Taxonomy,
@@ -485,7 +516,7 @@ defmodule Gallformers.Taxonomy do
 
     # Get the section link (if any) - species may be directly linked to a section
     section_query =
-      from st in "speciestaxonomy",
+      from st in "species_taxonomy",
         join: s in Taxonomy,
         on: st.taxonomy_id == s.id and s.type == "section",
         where: st.species_id == ^species_id,
@@ -522,7 +553,7 @@ defmodule Gallformers.Taxonomy do
   """
   @spec get_species_ids_for_genus(integer()) :: [integer()]
   def get_species_ids_for_genus(genus_id) do
-    from(st in "speciestaxonomy",
+    from(st in "species_taxonomy",
       where: st.taxonomy_id == ^genus_id,
       select: st.species_id
     )
@@ -534,7 +565,7 @@ defmodule Gallformers.Taxonomy do
   """
   @spec get_species_ids_for_family(integer()) :: [integer()]
   def get_species_ids_for_family(family_id) do
-    from(st in "speciestaxonomy",
+    from(st in "species_taxonomy",
       join: g in Taxonomy,
       on: st.taxonomy_id == g.id,
       where: g.parent_id == ^family_id,
@@ -598,7 +629,7 @@ defmodule Gallformers.Taxonomy do
     base_query =
       if taxoncode do
         from(t in base_query,
-          join: st in "speciestaxonomy",
+          join: st in "species_taxonomy",
           on: st.taxonomy_id == t.id,
           join: s in Gallformers.Species.Species,
           on: st.species_id == s.id,
@@ -618,7 +649,7 @@ defmodule Gallformers.Taxonomy do
           where:
             not (t.name == "Unknown" and t.type == "genus" and
                    fragment(
-                     "NOT EXISTS (SELECT 1 FROM speciestaxonomy st WHERE st.taxonomy_id = ?)",
+                     "NOT EXISTS (SELECT 1 FROM species_taxonomy st WHERE st.taxonomy_id = ?)",
                      t.id
                    ))
         )
@@ -647,7 +678,7 @@ defmodule Gallformers.Taxonomy do
     from(f in Taxonomy,
       join: g in Taxonomy,
       on: g.parent_id == f.id,
-      join: st in "speciestaxonomy",
+      join: st in "species_taxonomy",
       on: st.taxonomy_id == g.id,
       join: s in Gallformers.Species.Species,
       on: st.species_id == s.id,
@@ -814,7 +845,7 @@ defmodule Gallformers.Taxonomy do
 
     case Repo.insert(alias_changeset) do
       {:ok, new_alias} ->
-        Repo.insert_all("aliasspecies", [%{alias_id: new_alias.id, species_id: species_id}])
+        Repo.insert_all("alias_species", [%{alias_id: new_alias.id, species_id: species_id}])
 
       {:error, _} ->
         nil
@@ -851,6 +882,7 @@ defmodule Gallformers.Taxonomy do
           name: "Unknown",
           type: "genus",
           parent_id: family_id,
+          is_placeholder: true,
           description: "Placeholder genus for undescribed species"
         })
 
@@ -922,7 +954,7 @@ defmodule Gallformers.Taxonomy do
           where:
             not (t.name == "Unknown" and t.type == "genus" and
                    fragment(
-                     "NOT EXISTS (SELECT 1 FROM speciestaxonomy st WHERE st.taxonomy_id = ?)",
+                     "NOT EXISTS (SELECT 1 FROM species_taxonomy st WHERE st.taxonomy_id = ?)",
                      t.id
                    ))
         )
@@ -1046,7 +1078,7 @@ defmodule Gallformers.Taxonomy do
   """
   def get_species_for_section(section_id) do
     from(s in Gallformers.Species.Species,
-      join: st in "speciestaxonomy",
+      join: st in "species_taxonomy",
       on: st.species_id == s.id,
       where: st.taxonomy_id == ^section_id,
       order_by: s.name,
@@ -1067,7 +1099,7 @@ defmodule Gallformers.Taxonomy do
     from(s in Taxonomy,
       left_join: g in Taxonomy,
       on: s.parent_id == g.id,
-      left_join: st in "speciestaxonomy",
+      left_join: st in "species_taxonomy",
       on: st.taxonomy_id == s.id,
       where: s.type == "section",
       group_by: [s.id, s.name, s.description, g.id, g.name],
@@ -1094,7 +1126,7 @@ defmodule Gallformers.Taxonomy do
     from(s in Taxonomy,
       left_join: g in Taxonomy,
       on: s.parent_id == g.id,
-      left_join: st in "speciestaxonomy",
+      left_join: st in "species_taxonomy",
       on: st.taxonomy_id == s.id,
       where: s.type == "section",
       where: fragment("lower(?) LIKE ?", s.name, ^search_pattern),
@@ -1125,7 +1157,7 @@ defmodule Gallformers.Taxonomy do
   def update_section_species(section_id, species_ids) when is_list(species_ids) do
     Repo.transaction(fn ->
       # Remove existing species links
-      from(st in "speciestaxonomy",
+      from(st in "species_taxonomy",
         where: st.taxonomy_id == ^section_id
       )
       |> Repo.delete_all()
@@ -1153,7 +1185,7 @@ defmodule Gallformers.Taxonomy do
         %{species_id: species_id, taxonomy_id: section_id}
       end)
 
-    Repo.insert_all("speciestaxonomy", new_links)
+    Repo.insert_all("species_taxonomy", new_links)
 
     # Update section's parent genus based on first species
     update_section_parent_genus(section_id, hd(species_ids))
@@ -1241,8 +1273,8 @@ defmodule Gallformers.Taxonomy do
 
   This operation:
   1. Updates the parent_id for all specified genera
-  2. Removes old family-genus mappings from taxonomytaxonomy
-  3. Creates new family-genus mappings in taxonomytaxonomy
+  2. Removes old family-genus mappings from taxonomy_taxonomy
+  3. Creates new family-genus mappings in taxonomy_taxonomy
 
   Returns {:ok, count} on success where count is the number of genera moved.
   """
@@ -1257,7 +1289,7 @@ defmodule Gallformers.Taxonomy do
         |> Repo.update_all(set: [parent_id: new_family_id])
 
       # Delete old family-genus mappings
-      from(tt in "taxonomytaxonomy",
+      from(tt in "taxonomy_taxonomy",
         where: tt.child_id in ^genus_ids and tt.taxonomy_id == ^old_family_id
       )
       |> Repo.delete_all()
@@ -1268,7 +1300,7 @@ defmodule Gallformers.Taxonomy do
           %{taxonomy_id: new_family_id, child_id: genus_id}
         end)
 
-      Repo.insert_all("taxonomytaxonomy", new_mappings, on_conflict: :nothing)
+      Repo.insert_all("taxonomy_taxonomy", new_mappings, on_conflict: :nothing)
 
       updated_count
     end)

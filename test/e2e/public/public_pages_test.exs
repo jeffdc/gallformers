@@ -43,14 +43,6 @@ defmodule GallformersWeb.E2E.PublicPagesTest do
     end
   end
 
-  describe "resources page" do
-    test "loads successfully", %{session: session} do
-      session
-      |> visit("/resources")
-      |> assert_has(css(".phx-connected"))
-    end
-  end
-
   describe "filter guide page" do
     test "loads successfully", %{session: session} do
       session

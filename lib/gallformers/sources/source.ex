@@ -37,6 +37,8 @@ defmodule Gallformers.Sources.Source do
 
     has_many :images, Gallformers.Species.Image
     has_many :species_sources, Gallformers.Species.SpeciesSource
+
+    timestamps(type: :utc_datetime)
   end
 
   @impl Gallformers.SchemaFields

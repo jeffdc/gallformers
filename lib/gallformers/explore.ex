@@ -8,7 +8,7 @@ defmodule Gallformers.Explore do
 
   import Ecto.Query
   alias Gallformers.Repo
-  alias Gallformers.Species.{Gall, GallSpecies, Species}
+  alias Gallformers.Species.{GallTraits, Species}
   alias Gallformers.Taxonomy.Taxonomy
 
   @type key_style :: :short | :long
@@ -62,14 +62,12 @@ defmodule Gallformers.Explore do
       from f in Taxonomy,
         join: g in Taxonomy,
         on: g.parent_id == f.id and g.type == "genus",
-        join: st in "speciestaxonomy",
+        join: st in "species_taxonomy",
         on: st.taxonomy_id == g.id,
         join: s in Species,
         on: s.id == st.species_id,
-        join: gs in GallSpecies,
-        on: gs.species_id == s.id,
-        join: gall in Gall,
-        on: gs.gall_id == gall.id,
+        join: gt in GallTraits,
+        on: gt.species_id == s.id,
         where: f.type == "family" and f.description != "Plant" and s.taxoncode == "gall",
         order_by: [f.name, g.name, s.name],
         select: %{
@@ -81,13 +79,13 @@ defmodule Gallformers.Explore do
           genus_description: g.description,
           species_id: s.id,
           species_name: s.name,
-          undescribed: gall.undescribed
+          undescribed: gt.undescribed
         }
 
     query =
       if undescribed_only do
-        from [f, g, st, s, gs, gall] in base_query,
-          where: gall.undescribed == true
+        from [f, g, st, s, gt] in base_query,
+          where: gt.undescribed == true
       else
         base_query
       end
@@ -99,7 +97,7 @@ defmodule Gallformers.Explore do
     from(f in Taxonomy,
       join: g in Taxonomy,
       on: g.parent_id == f.id and g.type == "genus",
-      join: st in "speciestaxonomy",
+      join: st in "species_taxonomy",
       on: st.taxonomy_id == g.id,
       join: s in Species,
       on: s.id == st.species_id,

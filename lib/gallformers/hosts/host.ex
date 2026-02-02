@@ -1,6 +1,6 @@
 defmodule Gallformers.Hosts.Host do
   @moduledoc """
-  Ecto schema for the host table.
+  Ecto schema for the gallhost table.
 
   Represents the relationship between a gall species and a host plant species.
   This is the join table that links gall-forming organisms to their host plants.
@@ -18,9 +18,11 @@ defmodule Gallformers.Hosts.Host do
           gall_species_id: integer() | nil
         }
 
-  schema "host" do
+  schema "gallhost" do
     belongs_to :host_species, Gallformers.Species.Species, foreign_key: :host_species_id
     belongs_to :gall_species, Gallformers.Species.Species, foreign_key: :gall_species_id
+
+    timestamps(type: :utc_datetime)
   end
 
   @impl Gallformers.SchemaFields

@@ -58,7 +58,7 @@ defmodule Gallformers.TaxonomyTest do
       # Verify synonym was created
       aliases =
         from(a in Alias,
-          join: as in "aliasspecies",
+          join: as in "alias_species",
           on: as.alias_id == a.id,
           where: as.species_id == ^species.id,
           select: a
@@ -104,7 +104,7 @@ defmodule Gallformers.TaxonomyTest do
       # Both should have synonyms
       for sp <- [species2.id, species3.id] do
         alias_count =
-          from(as in "aliasspecies", where: as.species_id == ^sp, select: count())
+          from(as in "alias_species", where: as.species_id == ^sp, select: count())
           |> Repo.one()
 
         assert alias_count == 1
@@ -121,7 +121,7 @@ defmodule Gallformers.TaxonomyTest do
 
       # No synonyms should be created
       alias_count =
-        from(as in "aliasspecies", where: as.species_id == ^species.id, select: count())
+        from(as in "alias_species", where: as.species_id == ^species.id, select: count())
         |> Repo.one()
 
       assert alias_count == 0
@@ -137,7 +137,7 @@ defmodule Gallformers.TaxonomyTest do
 
       # No synonyms should be created
       alias_count =
-        from(as in "aliasspecies", where: as.species_id == ^species.id, select: count())
+        from(as in "alias_species", where: as.species_id == ^species.id, select: count())
         |> Repo.one()
 
       assert alias_count == 0
@@ -221,7 +221,7 @@ defmodule Gallformers.TaxonomyTest do
       # Both should be linked to the same Unknown genus
       links =
         Repo.all(
-          from(st in "speciestaxonomy",
+          from(st in "species_taxonomy",
             where: st.taxonomy_id == ^unknown_genus.id,
             select: st.species_id
           )
@@ -289,7 +289,7 @@ defmodule Gallformers.TaxonomyTest do
       for result <- empty_unknown_results do
         species_count =
           Repo.one(
-            from(st in "speciestaxonomy",
+            from(st in "species_taxonomy",
               where: st.taxonomy_id == ^result.id,
               select: count()
             )

@@ -9,7 +9,7 @@ defmodule Gallformers.Species do
   alias Gallformers.Hosts.Host
   alias Gallformers.Repo
   alias Gallformers.Search.Ranking
-  alias Gallformers.Species.{Abundance, Alias, Gall, GallSpecies, Image, Species}
+  alias Gallformers.Species.{Abundance, Alias, GallTraits, Image, Species}
   require Logger
 
   @doc """
@@ -28,20 +28,19 @@ defmodule Gallformers.Species do
   @spec random_gall() :: map() | nil
   def random_gall do
     query =
-      from g in Gall,
-        join: gs in GallSpecies,
-        on: gs.gall_id == g.id,
-        join: s in Species,
-        on: gs.species_id == s.id,
+      from s in Species,
+        join: gt in GallTraits,
+        on: gt.species_id == s.id,
         join: i in Image,
         on: i.species_id == s.id,
-        where: i.sort_order == 0,
+        where: s.taxoncode == "gall",
+        where: i.sort_order == 1,
         order_by: fragment("RANDOM()"),
         limit: 1,
         select: %{
           id: s.id,
           name: s.name,
-          undescribed: g.undescribed,
+          undescribed: gt.undescribed,
           image_path: i.path,
           image_creator: i.creator,
           image_license: i.license,
@@ -72,10 +71,8 @@ defmodule Gallformers.Species do
   @spec list_galls() :: [map()]
   def list_galls do
     from(s in Species,
-      join: gs in GallSpecies,
-      on: gs.species_id == s.id,
-      join: g in Gall,
-      on: gs.gall_id == g.id,
+      left_join: gt in GallTraits,
+      on: gt.species_id == s.id,
       left_join: a in Abundance,
       on: s.abundance_id == a.id,
       where: s.taxoncode == "gall",
@@ -87,9 +84,8 @@ defmodule Gallformers.Species do
         datacomplete: s.datacomplete,
         abundance_id: s.abundance_id,
         abundance_name: a.abundance,
-        gall_id: g.id,
-        detachable: g.detachable,
-        undescribed: g.undescribed
+        detachable: gt.detachable,
+        undescribed: gt.undescribed
       }
     )
     |> Repo.all()
@@ -101,10 +97,8 @@ defmodule Gallformers.Species do
   @spec list_galls_paginated(integer(), integer()) :: [map()]
   def list_galls_paginated(limit, offset) do
     from(s in Species,
-      join: gs in GallSpecies,
-      on: gs.species_id == s.id,
-      join: g in Gall,
-      on: gs.gall_id == g.id,
+      left_join: gt in GallTraits,
+      on: gt.species_id == s.id,
       left_join: a in Abundance,
       on: s.abundance_id == a.id,
       where: s.taxoncode == "gall",
@@ -118,9 +112,8 @@ defmodule Gallformers.Species do
         datacomplete: s.datacomplete,
         abundance_id: s.abundance_id,
         abundance_name: a.abundance,
-        gall_id: g.id,
-        detachable: g.detachable,
-        undescribed: g.undescribed
+        detachable: gt.detachable,
+        undescribed: gt.undescribed
       }
     )
     |> Repo.all()
@@ -143,11 +136,9 @@ defmodule Gallformers.Species do
   """
   def count_undescribed_galls do
     from(s in Species,
-      join: gs in GallSpecies,
-      on: gs.species_id == s.id,
-      join: g in Gall,
-      on: gs.gall_id == g.id,
-      where: g.undescribed == true,
+      join: gt in GallTraits,
+      on: gt.species_id == s.id,
+      where: gt.undescribed == true,
       select: count(s.id)
     )
     |> Repo.one()
@@ -176,10 +167,8 @@ defmodule Gallformers.Species do
   def get_gall_by_id(id) do
     query =
       from s in Species,
-        join: gs in GallSpecies,
-        on: gs.species_id == s.id,
-        join: g in Gall,
-        on: gs.gall_id == g.id,
+        left_join: gt in GallTraits,
+        on: gt.species_id == s.id,
         left_join: a in Abundance,
         on: s.abundance_id == a.id,
         where: s.id == ^id and s.taxoncode == "gall",
@@ -187,12 +176,12 @@ defmodule Gallformers.Species do
           id: s.id,
           name: s.name,
           taxoncode: s.taxoncode,
+          gall_id: s.id,
           datacomplete: s.datacomplete,
           abundance_id: s.abundance_id,
           abundance_name: a.abundance,
-          gall_id: g.id,
-          detachable: g.detachable,
-          undescribed: g.undescribed
+          detachable: gt.detachable,
+          undescribed: gt.undescribed
         }
 
     Repo.one(query)
@@ -224,10 +213,8 @@ defmodule Gallformers.Species do
   def get_gall_by_name(name) do
     query =
       from s in Species,
-        join: gs in GallSpecies,
-        on: gs.species_id == s.id,
-        join: g in Gall,
-        on: gs.gall_id == g.id,
+        left_join: gt in GallTraits,
+        on: gt.species_id == s.id,
         left_join: a in Abundance,
         on: s.abundance_id == a.id,
         where: s.name == ^name and s.taxoncode == "gall",
@@ -238,9 +225,8 @@ defmodule Gallformers.Species do
           datacomplete: s.datacomplete,
           abundance_id: s.abundance_id,
           abundance_name: a.abundance,
-          gall_id: g.id,
-          detachable: g.detachable,
-          undescribed: g.undescribed
+          detachable: gt.detachable,
+          undescribed: gt.undescribed
         }
 
     Repo.one(query)
@@ -258,7 +244,6 @@ defmodule Gallformers.Species do
       select: %{
         id: i.id,
         path: i.path,
-        default: i.default,
         sort_order: i.sort_order,
         creator: i.creator,
         attribution: i.attribution,
@@ -316,7 +301,7 @@ defmodule Gallformers.Species do
   @spec get_aliases_for_species(integer()) :: [map()]
   def get_aliases_for_species(species_id) do
     from(a in Alias,
-      join: als in "aliasspecies",
+      join: als in "alias_species",
       on: als.alias_id == a.id,
       where: als.species_id == ^species_id,
       select: %{
@@ -416,7 +401,7 @@ defmodule Gallformers.Species do
   defp search_species_with_terms(terms, limit) do
     base_query =
       from(s in Species,
-        left_join: als in "aliasspecies",
+        left_join: als in "alias_species",
         on: als.species_id == s.id,
         left_join: a in "alias",
         on: a.id == als.alias_id,
@@ -539,7 +524,7 @@ defmodule Gallformers.Species do
              INSERT INTO species_fts(species_id, name, aliases)
              SELECT s.id, s.name, COALESCE(GROUP_CONCAT(a.name, ' '), '')
              FROM species s
-             LEFT JOIN aliasspecies als ON als.species_id = s.id
+             LEFT JOIN alias_species als ON als.species_id = s.id
              LEFT JOIN alias a ON a.id = als.alias_id
              WHERE s.id = ?
              GROUP BY s.id
@@ -577,7 +562,7 @@ defmodule Gallformers.Species do
              INSERT INTO species_fts(species_id, name, aliases)
              SELECT s.id, s.name, COALESCE(GROUP_CONCAT(a.name, ' '), '')
              FROM species s
-             LEFT JOIN aliasspecies als ON als.species_id = s.id
+             LEFT JOIN alias_species als ON als.species_id = s.id
              LEFT JOIN alias a ON a.id = als.alias_id
              GROUP BY s.id
              """,
@@ -795,7 +780,7 @@ defmodule Gallformers.Species do
 
     case Repo.insert(alias_changeset) do
       {:ok, new_alias} ->
-        Repo.insert_all("aliasspecies", [%{alias_id: new_alias.id, species_id: species_id}])
+        Repo.insert_all("alias_species", [%{alias_id: new_alias.id, species_id: species_id}])
 
       {:error, _} ->
         nil
@@ -819,8 +804,8 @@ defmodule Gallformers.Species do
       # 1. Delete S3 images first (before DB records are cascade deleted)
       Gallformers.Images.delete_images_from_s3_for_species(species.id)
 
-      # 2. Delete the gall record(s) for this species
-      # This cascades to all filter associations (gallcolor, gallshape, etc.)
+      # 2. Delete the gall_traits record for this species
+      # This cascades to all filter associations (gall_shape, gall_texture, etc.)
       delete_galls_for_species(species.id)
 
       # 3. Delete from FTS index
@@ -836,16 +821,9 @@ defmodule Gallformers.Species do
   end
 
   defp delete_galls_for_species(species_id) do
-    # Get gall IDs linked to this species via the join table
-    gall_ids =
-      from(gs in GallSpecies, where: gs.species_id == ^species_id, select: gs.gall_id)
-      |> Repo.all()
-
-    # Delete each gall (cascades to filter associations)
-    if gall_ids != [] do
-      from(g in Gall, where: g.id in ^gall_ids)
-      |> Repo.delete_all()
-    end
+    # Delete gall_traits record for this species (cascades to filter associations)
+    from(gt in GallTraits, where: gt.species_id == ^species_id)
+    |> Repo.delete_all()
   end
 
   # Alias management
@@ -867,7 +845,7 @@ defmodule Gallformers.Species do
         case Repo.insert(alias_changeset) do
           {:ok, new_alias} ->
             # Link to species
-            Repo.insert_all("aliasspecies", [
+            Repo.insert_all("alias_species", [
               %{alias_id: new_alias.id, species_id: species_id}
             ])
 
@@ -893,7 +871,7 @@ defmodule Gallformers.Species do
   @spec remove_alias_from_species(integer(), integer()) ::
           {:ok, map()} | {:error, Ecto.Changeset.t()}
   def remove_alias_from_species(species_id, alias_id) do
-    from(als in "aliasspecies",
+    from(als in "alias_species",
       where: als.species_id == ^species_id and als.alias_id == ^alias_id
     )
     |> Repo.delete_all()
@@ -970,9 +948,8 @@ defmodule Gallformers.Species do
     gall_data = get_gall_by_id(species_id)
 
     if gall_data do
-      # Get all current filter field values for this gall
-      gall_id = gall_data.gall_id
-      filter_values = get_gall_filter_values(gall_id)
+      # Get all current filter field values for this gall (using species_id)
+      filter_values = get_gall_filter_values(species_id)
 
       Map.merge(gall_data, %{
         filter_values: filter_values
@@ -984,78 +961,80 @@ defmodule Gallformers.Species do
 
   @doc """
   Gets all filter field values for a gall as maps with :id and :field keys.
+  All traits return lists (may be empty).
   """
   @spec get_gall_filter_values(integer()) :: map()
-  def get_gall_filter_values(gall_id) do
+  def get_gall_filter_values(species_id) do
     %{
+      # All traits are multi-value (lists)
       colors:
         get_filter_values_for_gall(
-          gall_id,
-          "gallcolor",
+          species_id,
+          "gall_color",
           :color_id,
           Gallformers.FilterFields.Color,
           :color
         ),
-      shapes:
-        get_filter_values_for_gall(
-          gall_id,
-          "gallshape",
-          :shape_id,
-          Gallformers.FilterFields.Shape,
-          :shape
-        ),
-      textures:
-        get_filter_values_for_gall(
-          gall_id,
-          "galltexture",
-          :texture_id,
-          Gallformers.FilterFields.Texture,
-          :texture
-        ),
-      alignments:
-        get_filter_values_for_gall(
-          gall_id,
-          "gallalignment",
-          :alignment_id,
-          Gallformers.FilterFields.Alignment,
-          :alignment
-        ),
       walls:
         get_filter_values_for_gall(
-          gall_id,
-          "gallwalls",
+          species_id,
+          "gall_walls",
           :walls_id,
           Gallformers.FilterFields.Walls,
           :walls
         ),
       cells:
         get_filter_values_for_gall(
-          gall_id,
-          "gallcells",
+          species_id,
+          "gall_cells",
           :cells_id,
           Gallformers.FilterFields.Cells,
           :cells
         ),
-      locations:
+      shapes:
         get_filter_values_for_gall(
-          gall_id,
-          "galllocation",
-          :location_id,
-          Gallformers.FilterFields.Location,
-          :location
+          species_id,
+          "gall_shape",
+          :shape_id,
+          Gallformers.FilterFields.Shape,
+          :shape
+        ),
+      textures:
+        get_filter_values_for_gall(
+          species_id,
+          "gall_texture",
+          :texture_id,
+          Gallformers.FilterFields.Texture,
+          :texture
+        ),
+      alignments:
+        get_filter_values_for_gall(
+          species_id,
+          "gall_alignment",
+          :alignment_id,
+          Gallformers.FilterFields.Alignment,
+          :alignment
+        ),
+      plant_parts:
+        get_filter_values_for_gall(
+          species_id,
+          "gall_plant_part",
+          :plant_part_id,
+          Gallformers.FilterFields.PlantPart,
+          :part
         ),
       forms:
         get_filter_values_for_gall(
-          gall_id,
-          "gallform",
+          species_id,
+          "gall_form",
           :form_id,
           Gallformers.FilterFields.Form,
           :form
         ),
       seasons:
         get_filter_values_for_gall(
-          gall_id,
-          "gallseason",
+          species_id,
+          "gall_season",
           :season_id,
           Gallformers.FilterFields.Season,
           :season
@@ -1063,12 +1042,12 @@ defmodule Gallformers.Species do
     }
   end
 
-  defp get_filter_values_for_gall(gall_id, join_table, fk_col, schema, field)
+  defp get_filter_values_for_gall(species_id, join_table, fk_col, schema, field)
        when is_atom(fk_col) do
     from(j in join_table,
       join: s in ^schema,
       on: field(j, ^fk_col) == s.id,
-      where: j.gall_id == ^gall_id,
+      where: j.species_id == ^species_id,
       select: %{id: s.id, field: field(s, ^field)}
     )
     |> Repo.all()
@@ -1077,15 +1056,16 @@ defmodule Gallformers.Species do
   @doc """
   Updates gall properties (detachable, undescribed).
   """
-  @spec update_gall_properties(integer(), map()) :: {:ok, Gall.t()} | {:error, Ecto.Changeset.t()}
-  def update_gall_properties(gall_id, attrs) do
-    case Repo.get(Gall, gall_id) do
+  @spec update_gall_properties(integer(), map()) ::
+          {:ok, GallTraits.t()} | {:error, Ecto.Changeset.t() | :not_found}
+  def update_gall_properties(species_id, attrs) do
+    case Repo.get(GallTraits, species_id) do
       nil ->
         {:error, :not_found}
 
-      gall ->
-        gall
-        |> Ecto.Changeset.change(attrs)
+      gall_traits ->
+        gall_traits
+        |> GallTraits.changeset(attrs)
         |> Repo.update()
     end
   end
@@ -1094,9 +1074,9 @@ defmodule Gallformers.Species do
   Adds a filter field to a gall.
   """
   @spec add_filter_field_to_gall(integer(), atom(), integer()) :: {:ok, any()} | {:error, any()}
-  def add_filter_field_to_gall(gall_id, filter_type, filter_id) do
+  def add_filter_field_to_gall(species_id, filter_type, filter_id) do
     {join_table, fk_col} = get_join_table_info(filter_type)
-    row = Map.new([{:gall_id, gall_id}, {fk_col, filter_id}])
+    row = Map.new([{:species_id, species_id}, {fk_col, filter_id}])
 
     try do
       Repo.insert_all(join_table, [row])
@@ -1111,27 +1091,27 @@ defmodule Gallformers.Species do
   Removes a filter field from a gall.
   """
   @spec remove_filter_field_from_gall(integer(), atom(), integer()) :: {:ok, integer()}
-  def remove_filter_field_from_gall(gall_id, filter_type, filter_id) do
+  def remove_filter_field_from_gall(species_id, filter_type, filter_id) do
     {join_table, fk_col} = get_join_table_info(filter_type)
 
     {count, _} =
       from(j in join_table,
-        where: j.gall_id == ^gall_id and field(j, ^fk_col) == ^filter_id
+        where: j.species_id == ^species_id and field(j, ^fk_col) == ^filter_id
       )
       |> Repo.delete_all()
 
     {:ok, count}
   end
 
-  defp get_join_table_info(:colors), do: {"gallcolor", :color_id}
-  defp get_join_table_info(:shapes), do: {"gallshape", :shape_id}
-  defp get_join_table_info(:textures), do: {"galltexture", :texture_id}
-  defp get_join_table_info(:alignments), do: {"gallalignment", :alignment_id}
-  defp get_join_table_info(:walls), do: {"gallwalls", :walls_id}
-  defp get_join_table_info(:cells), do: {"gallcells", :cells_id}
-  defp get_join_table_info(:locations), do: {"galllocation", :location_id}
-  defp get_join_table_info(:forms), do: {"gallform", :form_id}
-  defp get_join_table_info(:seasons), do: {"gallseason", :season_id}
+  defp get_join_table_info(:colors), do: {"gall_color", :color_id}
+  defp get_join_table_info(:walls), do: {"gall_walls", :walls_id}
+  defp get_join_table_info(:cells), do: {"gall_cells", :cells_id}
+  defp get_join_table_info(:shapes), do: {"gall_shape", :shape_id}
+  defp get_join_table_info(:textures), do: {"gall_texture", :texture_id}
+  defp get_join_table_info(:alignments), do: {"gall_alignment", :alignment_id}
+  defp get_join_table_info(:plant_parts), do: {"gall_plant_part", :plant_part_id}
+  defp get_join_table_info(:forms), do: {"gall_form", :form_id}
+  defp get_join_table_info(:seasons), do: {"gall_season", :season_id}
 
   @doc """
   Returns all filter field options for gall admin.
@@ -1152,9 +1132,8 @@ defmodule Gallformers.Species do
         Gallformers.FilterFields.list_all(:walls) |> Enum.map(&%{id: &1.id, field: &1.walls}),
       cells:
         Gallformers.FilterFields.list_all(:cells) |> Enum.map(&%{id: &1.id, field: &1.cells}),
-      locations:
-        Gallformers.FilterFields.list_all(:location)
-        |> Enum.map(&%{id: &1.id, field: &1.location}),
+      plant_parts:
+        Gallformers.FilterFields.list_all(:plant_part) |> Enum.map(&%{id: &1.id, field: &1.part}),
       forms: Gallformers.FilterFields.list_all(:form) |> Enum.map(&%{id: &1.id, field: &1.form}),
       seasons: get_all_seasons()
     }
@@ -1200,29 +1179,16 @@ defmodule Gallformers.Species do
   end
 
   @doc """
-  Creates a gall record for a species.
+  Creates a gall_traits record for a species.
 
-  This creates both the gall record and the gallspecies join record.
   Should be called after creating a species with taxoncode "gall".
 
-  Returns {:ok, gall} on success, {:error, changeset} on failure.
+  Returns {:ok, gall_traits} on success, {:error, changeset} on failure.
   """
-  @spec create_gall_for_species(integer()) :: {:ok, Gall.t()} | {:error, Ecto.Changeset.t()}
+  @spec create_gall_for_species(integer()) :: {:ok, GallTraits.t()} | {:error, Ecto.Changeset.t()}
   def create_gall_for_species(species_id) do
-    # Create the gall record
-    gall_result =
-      %Gall{}
-      |> Ecto.Changeset.change(%{taxoncode: "gall", detachable: 0, undescribed: false})
-      |> Repo.insert()
-
-    case gall_result do
-      {:ok, gall} ->
-        # Create the gallspecies join record
-        Repo.insert_all("gallspecies", [%{species_id: species_id, gall_id: gall.id}])
-        {:ok, gall}
-
-      {:error, changeset} ->
-        {:error, changeset}
-    end
+    %GallTraits{species_id: species_id}
+    |> GallTraits.changeset(%{detachable: "unknown", undescribed: false})
+    |> Repo.insert()
   end
 end
