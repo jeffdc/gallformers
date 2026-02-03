@@ -294,7 +294,7 @@ defmodule Gallformers.TaxonomyTest do
     end
 
     test "get_taxonomy_path returns empty list for non-existent taxonomy" do
-      path = Taxonomy.get_taxonomy_path(99999)
+      path = Taxonomy.get_taxonomy_path(99_999)
       assert path == []
     end
   end
