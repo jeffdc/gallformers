@@ -665,8 +665,8 @@ defmodule GallformersWeb.IDLive do
     %{
       host_ids: wrap_in_list(socket.assigns.selected_host, & &1.id),
       genus_id: maybe_get(socket.assigns.selected_genus, :id),
-      location_ids: non_empty_list(expanded_plant_parts),
-      location_logic: filters.plant_part_logic,
+      plant_part_ids: non_empty_list(expanded_plant_parts),
+      plant_part_logic: filters.plant_part_logic,
       color_ids: wrap_value(filters.color),
       shape_ids: wrap_value(filters.shape),
       texture_ids: non_empty_list(filters.textures),
