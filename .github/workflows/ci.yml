@@ -1,4 +1,4 @@
-name: CI V2
+name: CI
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
       - 'test/**'
       - 'mix.exs'
       - 'mix.lock'
-      - '.github/workflows/ci-v2.yml'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]  # Only run CI on PRs targeting main
     paths:
@@ -22,11 +22,11 @@ on:
       - 'test/**'
       - 'mix.exs'
       - 'mix.lock'
-      - '.github/workflows/ci-v2.yml'
+      - '.github/workflows/ci.yml'
   workflow_dispatch:
 
 concurrency:
-  group: ci-v2-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

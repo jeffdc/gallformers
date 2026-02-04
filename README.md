@@ -72,9 +72,6 @@ The database file is not committed. To get started:
 ```bash
 # Download from S3 (recommended - daily snapshot from production)
 make download-db
-
-# Or copy from V1 if you have it locally
-cp v1/prisma/gallformers.sqlite priv/gallformers.sqlite
 ```
 
 ## Development
@@ -162,13 +159,8 @@ gallformers/
 ├── priv/                # Static files, migrations, database
 ├── test/                # Tests
 ├── config/              # Phoenix configuration
-├── services/            # Auxiliary services (tileserver, usda_plants)
-└── v1/                  # Legacy Next.js app (see v1/README.md)
+└── services/            # Auxiliary services (tileserver, usda_plants)
 ```
-
-## Legacy V1
-
-The original Next.js implementation is in `v1/`. It runs on Digital Ocean and is in maintenance mode (bug fixes only). See [v1/README.md](v1/README.md) for V1-specific documentation.
 
 ## Deployment
 

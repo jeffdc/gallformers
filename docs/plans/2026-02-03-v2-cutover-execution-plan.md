@@ -815,6 +815,7 @@ fly logs -a gallformers | grep -i error
 # Acceptable: occasional 404s, old bookmarks
 # Not acceptable: 500s, database errors, auth failures
 ```
+[x] DONE at 1038AM ET Feb 4 - No errors or 5xx in logs
 
 **6. Verify CloudFront caching behavior**
 ```bash
@@ -826,6 +827,7 @@ curl -sI https://gallformers.org/assets/app.css | grep -i "x-cache"
 curl -sI https://gallformers.org/ | grep -i "x-cache"
 # Should show "Miss from cloudfront" or no x-cache header
 ```
+[x] DONE at 1038AM ET Feb 4 - Static assets cached (Hit), dynamic pages not cached (private, must-revalidate)
 
 ### 1-hour checkpoint
 

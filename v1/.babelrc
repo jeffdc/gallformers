@@ -1,4 +1,0 @@
-// Used by jest only.
-{
-    "presets": ["next/babel", "@babel/preset-typescript"]
-}

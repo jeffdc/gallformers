@@ -35,7 +35,7 @@ The task list must be created BEFORE making any changes.
 ### Questions Over Assumptions
 
 If you're unsure about scope, ASK. Examples:
-- "V1 has 26 icon files - should I copy all of them or just the essential ones?"
+- "There are 26 icon files - should I update all of them or just the essential ones?"
 - "I found 3 places this bug could originate - should I investigate all of them?"
 - "This fix touches the database - should I also check the related API endpoints?"
 
@@ -175,8 +175,6 @@ Gallformers (gallformers.org) is a comprehensive online database and reference g
 - **Tailwind CSS v4** - Styling
 - **Fly.io** - Production hosting
 
-**Legacy V1**: The original Next.js implementation is archived in `v1/`. See [v1/CLAUDE.md](v1/CLAUDE.md) for all V1-specific documentation.
-
 ## Project Structure
 
 ```
@@ -194,8 +192,7 @@ gallformers/
 │   ├── tileserver-gl/   # Map tile server
 │   └── usda_plants/     # USDA plants data (Rust)
 ├── .beads/              # Beads issue tracking
-├── .github/             # CI workflows
-└── v1/                  # Legacy Next.js app (see v1/CLAUDE.md)
+└── .github/             # CI workflows
 ```
 
 ## Development Commands
