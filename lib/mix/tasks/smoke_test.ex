@@ -54,7 +54,7 @@ defmodule Mix.Tasks.SmokeTest do
         results,
         client,
         "Discover gall ID",
-        "/api/v2/galls",
+        "/api/v2/galls?limit=1",
         &discover_gall_id/1
       )
 

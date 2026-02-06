@@ -6,7 +6,9 @@ defmodule GallformersWeb.IntegrationTest do
   import Phoenix.LiveViewTest
 
   alias Gallformers.Accounts.Auth0User
-  alias Gallformers.{Hosts, Species}
+  alias Gallformers.GallHosts
+  alias Gallformers.Galls
+  alias Gallformers.Plants
 
   describe "Public page load flows" do
     test "home page loads successfully", %{conn: conn} do
@@ -57,7 +59,7 @@ defmodule GallformersWeb.IntegrationTest do
 
   describe "Entity page load flows" do
     test "gall page loads for valid ID", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
         gall = hd(galls)
@@ -67,7 +69,7 @@ defmodule GallformersWeb.IntegrationTest do
     end
 
     test "host page loads for valid ID", %{conn: conn} do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
         host = hd(hosts)
@@ -105,11 +107,11 @@ defmodule GallformersWeb.IntegrationTest do
     end
 
     test "can navigate from gall to host", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       gall_with_host =
         Enum.find(galls, fn g ->
-          length(Hosts.get_hosts_for_gall(g.id)) > 0
+          length(GallHosts.get_hosts_for_gall(g.id)) > 0
         end)
 
       if gall_with_host do

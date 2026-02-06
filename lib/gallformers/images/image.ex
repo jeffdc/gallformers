@@ -1,4 +1,4 @@
-defmodule Gallformers.Species.Image do
+defmodule Gallformers.Images.Image do
   @moduledoc """
   Ecto schema for the image table.
 

@@ -7,7 +7,8 @@ defmodule GallformersWeb.SourceLive do
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.{Images, Sources, Species}
+  alias Gallformers.{Images, Sources}
+  alias Gallformers.Images.Image
 
   @page_size 20
 
@@ -90,7 +91,7 @@ defmodule GallformersWeb.SourceLive do
   end
 
   defp format_images(images) do
-    base_url = Species.Image.base_url()
+    base_url = Image.base_url()
 
     Enum.map(images, fn img ->
       # Replace "original" with size name in the path
@@ -156,7 +157,7 @@ defmodule GallformersWeb.SourceLive do
                 />
               </div>
 
-              <%= if @source.link do %>
+              <%= if @source.link not in [nil, ""] do %>
                 <.link
                   href={@source.link}
                   target="_blank"
@@ -179,7 +180,7 @@ defmodule GallformersWeb.SourceLive do
                   </div>
                   <div>
                     <span class="font-semibold text-gray-700">License:</span>
-                    <%= if @source.licenselink do %>
+                    <%= if @source.licenselink not in [nil, ""] do %>
                       <.link
                         href={@source.licenselink}
                         target="_blank"

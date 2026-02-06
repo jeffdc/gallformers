@@ -222,6 +222,29 @@ The `users` table contains personally identifiable information:
 
 Fly.io also sends automatic email alerts on OOM (out-of-memory) events.
 
+## Request Logs
+
+HTTP requests are logged to daily JSON Lines files for incident investigation:
+
+- **Production**: `/data/logs/requests-YYYY-MM-DD.log`
+- **Development**: `priv/logs/requests-YYYY-MM-DD.log`
+
+Retrieve logs from production:
+```bash
+fly ssh sftp get /data/logs/requests-2026-02-05.log
+```
+
+Analyze with jq:
+```bash
+# Find slow requests
+cat requests-*.log | jq -c 'select(.duration_ms > 1000)'
+
+# Find errors
+cat requests-*.log | jq -c 'select(.status >= 500)'
+```
+
+Logs are automatically cleaned up after 30 days. See [CLAUDE.md](CLAUDE.md#request-logging) for detailed usage.
+
 ## Contributing
 
 See [CLAUDE.md](CLAUDE.md) for detailed development guidelines.

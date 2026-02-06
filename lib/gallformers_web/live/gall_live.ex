@@ -7,7 +7,8 @@ defmodule GallformersWeb.GallLive do
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.{GallSummary, Hosts, Markdown, Sources, Species, Taxonomy}
+  alias Gallformers.{GallHosts, Galls, Markdown, Ranges, Sources, Species, Taxonomy}
+  alias Gallformers.Images.Image
   alias GallformersWeb.SEO
 
   @aliases_page_size 10
@@ -46,7 +47,7 @@ defmodule GallformersWeb.GallLive do
   end
 
   defp load_gall(socket, gall_id) do
-    case Species.get_gall_by_id(gall_id) do
+    case Galls.get_gall(gall_id) do
       nil ->
         {:ok,
          assign(socket,
@@ -62,15 +63,15 @@ defmodule GallformersWeb.GallLive do
          )}
 
       gall ->
-        hosts = Hosts.get_hosts_for_gall(gall_id) |> Enum.sort_by(& &1.host_name)
+        hosts = GallHosts.get_hosts_for_gall(gall_id) |> Enum.sort_by(& &1.host_name)
         images = Species.get_images_for_species(gall_id) |> format_images()
         sources = Sources.get_sources_for_species(gall_id)
         aliases = Species.get_aliases_for_species(gall_id)
         taxonomy = get_taxonomy_info(gall_id)
-        range = Hosts.get_places_for_gall(gall_id) |> MapSet.new()
-        excluded_range = Hosts.get_excluded_places_for_gall(gall_id) |> MapSet.new()
-        gall_filters = Gallformers.Species.get_gall_filter_values(gall_id)
-        related_galls = Species.get_related_galls(gall)
+        range = Ranges.get_places_for_gall(gall_id) |> MapSet.new()
+        excluded_range = Ranges.get_excluded_places_for_gall(gall_id) |> MapSet.new()
+        gall_filters = Galls.get_gall_filter_values(gall_id)
+        related_galls = Galls.get_related_galls(gall)
 
         # Separate common names from scientific synonyms
         common_names = Enum.filter(aliases, &(&1.type == "common"))
@@ -84,8 +85,8 @@ defmodule GallformersWeb.GallLive do
         page_url = "/gall/#{gall_id}"
 
         # Generate SEO description using gall filter data
-        summary_filters = GallSummary.from_db_filters(gall_filters, gall.detachable)
-        page_description = GallSummary.for_seo(gall.name, summary_filters)
+        summary_filters = Galls.Summary.from_db_filters(gall_filters, gall.detachable)
+        page_description = Galls.Summary.for_seo(gall.name, summary_filters)
 
         page_image =
           case images do
@@ -146,7 +147,7 @@ defmodule GallformersWeb.GallLive do
   end
 
   defp format_images(images) do
-    base_url = Species.Image.base_url()
+    base_url = Image.base_url()
 
     Enum.map(images, fn img ->
       # Replace "original" with size name in the path
@@ -165,12 +166,21 @@ defmodule GallformersWeb.GallLive do
   defp get_detachable_display(value), do: Map.get(@detachable_values, value, "")
   defp format_fields(fields), do: Enum.map_join(fields, ", ", & &1.field)
 
-  # Extract the gallformers code from the species name by removing the genus and any trailing parenthetical
+  # Extract the gallformers code from the species name by removing the genus and any trailing parenthetical.
+  # For "Unknown" genera (e.g., "Unknown (Cynipidae)"), the species name uses a different format
+  # like "Unknown-cynipidae ..." so we strip the "Unknown-family" or "Unknown" prefix instead.
   defp get_gallformers_code(species_name, genus_name) when is_binary(genus_name) do
-    species_name
-    |> String.replace(genus_name, "")
-    |> String.trim()
-    |> String.replace(~r/ \([^)]+\)$/, "")
+    if String.starts_with?(genus_name, "Unknown") do
+      # Strip "Unknown-family " or "Unknown " prefix from species name
+      species_name
+      |> String.replace(~r/^Unknown(?:-[a-z]+)?\s+/, "")
+      |> String.replace(~r/ \([^)]+\)$/, "")
+    else
+      species_name
+      |> String.replace(genus_name, "")
+      |> String.trim()
+      |> String.replace(~r/ \([^)]+\)$/, "")
+    end
   end
 
   defp get_gallformers_code(species_name, _), do: species_name
@@ -634,7 +644,7 @@ defmodule GallformersWeb.GallLive do
         id="source-detail-modal"
         show={true}
         on_cancel={JS.push("close_source_modal")}
-        style="max-width: 48rem;"
+        class="max-w-3xl"
       >
         <:header>
           <div class="flex items-center justify-between w-full pr-8">
@@ -675,7 +685,7 @@ defmodule GallformersWeb.GallLive do
             </div>
             <div :if={@selected_source.license} class="text-sm text-gray-500 pt-2 border-t">
               License:
-              <%= if @selected_source.licenselink do %>
+              <%= if @selected_source.licenselink not in [nil, ""] do %>
                 <.link
                   href={@selected_source.licenselink}
                   target="_blank"
@@ -693,7 +703,7 @@ defmodule GallformersWeb.GallLive do
         <:footer>
           <div class="flex justify-between items-center w-full">
             <.link
-              :if={@selected_source.externallink}
+              :if={@selected_source.externallink not in [nil, ""]}
               href={@selected_source.externallink}
               target="_blank"
               rel="noopener noreferrer"
@@ -701,7 +711,7 @@ defmodule GallformersWeb.GallLive do
             >
               View external link →
             </.link>
-            <span :if={!@selected_source.externallink}></span>
+            <span :if={@selected_source.externallink in [nil, ""]}></span>
             <.link
               href={"/source/#{@selected_source.id}"}
               class="text-gf-maroon hover:underline"

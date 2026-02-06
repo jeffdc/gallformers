@@ -5,11 +5,12 @@ defmodule GallformersWeb.GallLiveTest do
   use GallformersWeb.ConnCase
   import Phoenix.LiveViewTest
 
+  alias Gallformers.Galls
   alias Gallformers.Species
 
   describe "Gall page rendering" do
     test "renders gall details for valid ID", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
         gall = hd(galls)
@@ -32,12 +33,12 @@ defmodule GallformersWeb.GallLiveTest do
     end
 
     test "displays hosts for gall with hosts", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       # Find a gall that has hosts
       gall_with_host =
         Enum.find(galls, fn g ->
-          length(Gallformers.Hosts.get_hosts_for_gall(g.id)) > 0
+          length(Gallformers.GallHosts.get_hosts_for_gall(g.id)) > 0
         end)
 
       if gall_with_host do
@@ -48,7 +49,7 @@ defmodule GallformersWeb.GallLiveTest do
     end
 
     test "displays morphology fields", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
         gall = hd(galls)
@@ -60,7 +61,7 @@ defmodule GallformersWeb.GallLiveTest do
     end
 
     test "displays sources section", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
         gall = hd(galls)
@@ -72,7 +73,7 @@ defmodule GallformersWeb.GallLiveTest do
     end
 
     test "displays external links (See Also)", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
         gall = hd(galls)
@@ -84,7 +85,7 @@ defmodule GallformersWeb.GallLiveTest do
     end
 
     test "displays range map component", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
         gall = hd(galls)
@@ -96,7 +97,7 @@ defmodule GallformersWeb.GallLiveTest do
     end
 
     test "displays completion status badge", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
         gall = hd(galls)
@@ -108,7 +109,7 @@ defmodule GallformersWeb.GallLiveTest do
     end
 
     test "displays undescribed indicator for undescribed galls", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       # Find an undescribed gall
       undescribed_gall = Enum.find(galls, fn g -> g.undescribed == true end)
@@ -121,7 +122,7 @@ defmodule GallformersWeb.GallLiveTest do
     end
 
     test "displays aliases when present", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       # Find a gall with aliases
       gall_with_alias =
@@ -140,7 +141,7 @@ defmodule GallformersWeb.GallLiveTest do
 
   describe "Page title" do
     test "sets page title to gall name", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
         gall = hd(galls)
@@ -160,11 +161,11 @@ defmodule GallformersWeb.GallLiveTest do
 
   describe "Host links" do
     test "host names are clickable links", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       gall_with_host =
         Enum.find(galls, fn g ->
-          length(Gallformers.Hosts.get_hosts_for_gall(g.id)) > 0
+          length(Gallformers.GallHosts.get_hosts_for_gall(g.id)) > 0
         end)
 
       if gall_with_host do
@@ -178,7 +179,7 @@ defmodule GallformersWeb.GallLiveTest do
 
   describe "Source links" do
     test "source titles are clickable links", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       gall_with_source =
         Enum.find(galls, fn g ->
@@ -196,7 +197,7 @@ defmodule GallformersWeb.GallLiveTest do
 
   describe "Image display" do
     test "displays image when available", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       gall_with_image =
         Enum.find(galls, fn g ->
@@ -211,7 +212,7 @@ defmodule GallformersWeb.GallLiveTest do
     end
 
     test "shows no image message when none available", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       gall_without_image =
         Enum.find(galls, fn g ->
@@ -226,7 +227,7 @@ defmodule GallformersWeb.GallLiveTest do
     end
 
     test "displays image credit when available", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       gall_with_image =
         Enum.find(galls, fn g ->

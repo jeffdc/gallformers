@@ -6,39 +6,46 @@ defmodule GallformersWeb.API.TaxonomyController do
   use GallformersWeb, :controller
   use OpenApiSpex.ControllerSpecs
 
-  import Ecto.Query
-
-  alias Gallformers.Repo
-  alias Gallformers.Species.Species
+  alias Gallformers.Species
   alias Gallformers.Taxonomy
   alias GallformersWeb.Schemas
 
   tags(["Taxonomy"])
 
-  operation(:show,
-    summary: "Get a taxonomy entry",
-    description: "Gets a single taxonomy entry by ID",
+  operation(:genera,
+    summary: "List genera",
+    description: "Lists all genera with optional search and pagination",
     parameters: [
-      id: [in: :path, type: :integer, description: "Taxonomy ID", required: true]
+      q: [in: :query, type: :string, description: "Search query (prefix match)"],
+      limit: [in: :query, type: :integer, description: "Maximum number of results"],
+      offset: [in: :query, type: :integer, description: "Number of results to skip"]
     ],
     responses: [
-      ok: {"Taxonomy details", "application/json", Schemas.Taxonomy},
-      not_found: {"Taxonomy not found", "application/json", Schemas.Error}
+      ok: {"List of genera", "application/json", Schemas.GeneraListResponse}
     ]
   )
 
   @doc """
-  GET /api/v2/taxonomy/:id
-  Gets a single taxonomy entry by ID.
+  GET /api/v2/genera
+  Lists all genera with optional search and pagination.
   """
-  def show(conn, %{"id" => id}) do
-    with {:ok, id} <- parse_id(id),
-         {:ok, taxonomy} <- fetch_taxonomy(id) do
-      json(conn, taxonomy_to_map(taxonomy))
-    else
-      {:error, :invalid_id} -> bad_request(conn, "Invalid taxonomy ID")
-      {:error, :not_found} -> not_found(conn, "Taxonomy not found")
-    end
+  def genera(conn, params) do
+    limit = parse_int(params["limit"])
+    offset = parse_int(params["offset"]) || 0
+    query = params["q"]
+
+    empty_unknown_ids = MapSet.new(Taxonomy.empty_unknown_genus_ids())
+
+    all_genera = fetch_genera(query, limit, empty_unknown_ids)
+    total = length(all_genera)
+    paginated = paginate(all_genera, offset, limit)
+
+    json(conn, %{
+      data: Enum.map(paginated, &taxonomy_to_map/1),
+      total: total,
+      limit: limit,
+      offset: offset
+    })
   end
 
   operation(:families,
@@ -172,17 +179,24 @@ defmodule GallformersWeb.API.TaxonomyController do
 
   # Private functions
 
+  defp fetch_genera(nil, _limit, empty_unknown_ids) do
+    Taxonomy.list_genera()
+    |> Enum.reject(fn g -> MapSet.member?(empty_unknown_ids, g.id) end)
+  end
+
+  defp fetch_genera(query, limit, empty_unknown_ids) do
+    Taxonomy.search_genera_and_sections(query, limit || 100)
+    |> Enum.filter(fn g -> g.type == "genus" end)
+    |> Enum.reject(fn g -> MapSet.member?(empty_unknown_ids, g.id) end)
+  end
+
+  defp paginate(list, offset, nil), do: Enum.drop(list, offset)
+  defp paginate(list, offset, limit), do: list |> Enum.drop(offset) |> Enum.take(limit)
+
   defp parse_id(id) do
     case parse_int(id) do
       nil -> {:error, :invalid_id}
       id -> {:ok, id}
-    end
-  end
-
-  defp fetch_taxonomy(id) do
-    case Taxonomy.get_taxonomy(id) do
-      nil -> {:error, :not_found}
-      taxonomy -> {:ok, taxonomy}
     end
   end
 
@@ -222,10 +236,12 @@ defmodule GallformersWeb.API.TaxonomyController do
   defp get_families_with_genera do
     families = Taxonomy.list_families()
     empty_unknown_ids = MapSet.new(Taxonomy.empty_unknown_genus_ids())
+    family_ids = Enum.map(families, & &1.id)
+    children_map = Taxonomy.get_children_for_parents(family_ids)
 
     Enum.map(families, fn family ->
       genera =
-        Taxonomy.get_children(family.id)
+        Map.get(children_map, family.id, [])
         |> Enum.reject(fn g -> MapSet.member?(empty_unknown_ids, g.id) end)
 
       %{
@@ -239,19 +255,7 @@ defmodule GallformersWeb.API.TaxonomyController do
   end
 
   defp get_species_by_ids([]), do: []
-
-  defp get_species_by_ids(ids) do
-    from(s in Species,
-      where: s.id in ^ids,
-      order_by: s.name,
-      select: %{
-        id: s.id,
-        name: s.name,
-        taxoncode: s.taxoncode
-      }
-    )
-    |> Repo.all()
-  end
+  defp get_species_by_ids(ids), do: Species.list_species_by_ids(ids)
 
   defp parse_int(nil), do: nil
 

@@ -54,7 +54,7 @@ defmodule GallformersWeb.AuthController do
         conn
         |> Accounts.put_user_in_session(auth0_user)
         |> put_flash(:info, "Welcome back, #{Auth0User.display_name(auth0_user)}!")
-        |> redirect(to: get_return_to(conn))
+        |> redirect(to: ~p"/admin")
 
       {:error, changeset} ->
         require Logger
@@ -64,7 +64,7 @@ defmodule GallformersWeb.AuthController do
         conn
         |> Accounts.put_user_in_session(auth0_user)
         |> put_flash(:info, "Welcome back, #{Auth0User.display_name(auth0_user)}!")
-        |> redirect(to: get_return_to(conn))
+        |> redirect(to: ~p"/admin")
     end
   end
 
@@ -88,13 +88,5 @@ defmodule GallformersWeb.AuthController do
     conn
     |> Accounts.clear_session()
     |> redirect(external: logout_url)
-  end
-
-  # Get the return URL from session or default to admin dashboard
-  defp get_return_to(conn) do
-    case get_session(conn, :return_to) do
-      nil -> ~p"/admin"
-      path -> path
-    end
   end
 end

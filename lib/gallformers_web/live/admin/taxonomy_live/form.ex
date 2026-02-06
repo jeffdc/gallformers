@@ -8,6 +8,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
   use GallformersWeb.Admin.FormHelpers, crud_helpers: true, include_delete: false
 
   import GallformersWeb.Admin.FormComponents, only: [form_actions: 1]
+  import GallformersWeb.FormComponents, only: [cascade_delete_modal: 1]
 
   alias Gallformers.Taxonomy
 
@@ -60,7 +61,11 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
     taxonomy = socket.assigns[:taxonomy]
 
     if taxonomy do
-      assign(socket, :parent_options, load_parent_options(taxonomy.type))
+      socket
+      |> assign(:parent_options, load_parent_options(taxonomy.type))
+      |> assign(:show_delete_modal, false)
+      |> assign(:deletion_impact, nil)
+      |> assign(:delete_confirmation, "")
     else
       socket
     end
@@ -111,21 +116,88 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
 
   @impl true
   def handle_event("delete", _params, socket) do
-    # Taxonomy deletion is disabled until soft delete is implemented
-    # Deleting taxonomy entries can cascade to hundreds of downstream records
+    # Show cascade delete confirmation modal with impact assessment
+    taxonomy = socket.assigns.taxonomy
+    impact = Taxonomy.get_deletion_impact(taxonomy)
+
     {:noreply,
-     put_flash(
-       socket,
-       :error,
-       "Taxonomy deletion is temporarily disabled. Deleting a family or genus can cascade to " <>
-         "hundreds of species records. This will be re-enabled once soft delete is implemented."
-     )}
+     socket
+     |> assign(:deletion_impact, impact)
+     |> assign(:show_delete_modal, true)
+     |> assign(:delete_confirmation, "")}
+  end
+
+  @impl true
+  def handle_event("update_delete_confirmation", %{"value" => value}, socket) do
+    {:noreply, assign(socket, :delete_confirmation, value)}
+  end
+
+  @impl true
+  def handle_event("confirm_cascade_delete", %{"confirmation" => confirmation}, socket) do
+    taxonomy = socket.assigns.taxonomy
+    expected_name = taxonomy.name
+
+    if String.trim(confirmation) == expected_name do
+      case Taxonomy.delete_taxonomy_cascade(taxonomy) do
+        {:ok, impact} ->
+          message = build_delete_success_message(taxonomy, impact)
+
+          {:noreply,
+           socket
+           |> put_flash(:info, message)
+           |> push_navigate(to: ~p"/admin/taxonomy")}
+
+        {:error, reason} ->
+          {:noreply,
+           socket
+           |> assign(:show_delete_modal, false)
+           |> put_flash(:error, "Delete failed: #{inspect(reason)}")}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "Name does not match. Please type the exact name.")}
+    end
+  end
+
+  @impl true
+  def handle_event("cancel_cascade_delete", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_delete_modal, false)
+     |> assign(:deletion_impact, nil)
+     |> assign(:delete_confirmation, "")}
   end
 
   @impl true
   def handle_event(event, params, socket)
       when event in ~w(request_cancel cancel_discard confirm_discard) do
     handle_form_event(event, params, socket)
+  end
+
+  # Handle impact map (for family/genus cascade delete)
+  defp build_delete_success_message(
+         taxonomy,
+         %{genera_count: _, sections_count: _, species_count: _} = impact
+       ) do
+    base = "Deleted #{taxonomy.type} \"#{taxonomy.name}\""
+
+    details =
+      [
+        if(impact.genera_count > 0, do: "#{impact.genera_count} genera"),
+        if(impact.sections_count > 0, do: "#{impact.sections_count} sections"),
+        if(impact.species_count > 0, do: "#{impact.species_count} species")
+      ]
+      |> Enum.filter(& &1)
+
+    if details == [] do
+      base
+    else
+      base <> " and #{Enum.join(details, ", ")}"
+    end
+  end
+
+  # Handle simple taxonomy struct (for section delete - no cascade)
+  defp build_delete_success_message(_taxonomy, %Taxonomy.Taxonomy{} = deleted) do
+    "Deleted #{deleted.type} \"#{deleted.name}\""
   end
 
   defp taxonomy_public_url(%{type: "family", id: id}), do: ~p"/family/#{id}"
@@ -247,6 +319,14 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
         </.form>
 
         <.discard_confirm_modal show={@show_discard_confirm} />
+
+        <%!-- Cascade Delete Confirmation Modal --%>
+        <.cascade_delete_modal
+          :if={@mode == :edit}
+          show={@show_delete_modal}
+          impact={@deletion_impact}
+          confirmation_value={@delete_confirmation}
+        />
 
         <%!-- Help Card --%>
         <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">

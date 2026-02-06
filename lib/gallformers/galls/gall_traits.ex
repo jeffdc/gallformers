@@ -1,4 +1,4 @@
-defmodule Gallformers.Species.GallTraits do
+defmodule Gallformers.Galls.GallTraits do
   @moduledoc """
   Ecto schema for the gall_traits table (1:1 extension of species).
 

@@ -27,11 +27,11 @@ defmodule Gallformers.Places.Place do
     field :type, :string
 
     many_to_many :children, __MODULE__,
-      join_through: "placeplace",
+      join_through: "place_hierarchy",
       join_keys: [parent_id: :id, place_id: :id]
 
     many_to_many :parents, __MODULE__,
-      join_through: "placeplace",
+      join_through: "place_hierarchy",
       join_keys: [place_id: :id, parent_id: :id]
 
     # Host species that grow in this place

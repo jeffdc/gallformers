@@ -1,14 +1,15 @@
 defmodule Gallformers.HostsTest do
   @moduledoc """
-  Unit tests for the Hosts context.
+  Unit tests for the Plants, GallHosts, and Ranges contexts (formerly Hosts).
   """
   use Gallformers.DataCase, async: false
 
-  alias Gallformers.{Hosts, Species, Taxonomy}
+  alias Gallformers.{GallHosts, Galls, Ranges, Species, Taxonomy}
+  alias Gallformers.Plants
 
   describe "list_hosts/0" do
     test "returns hosts with expected fields" do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
       assert is_list(hosts)
 
       if length(hosts) > 0 do
@@ -21,7 +22,7 @@ defmodule Gallformers.HostsTest do
     end
 
     test "returns hosts ordered by name" do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 1 do
         names = Enum.map(hosts, & &1.name)
@@ -32,16 +33,16 @@ defmodule Gallformers.HostsTest do
 
   describe "list_hosts_paginated/2" do
     test "returns limited number of hosts" do
-      hosts = Hosts.list_hosts_paginated(5, 0)
+      hosts = Plants.list_hosts_paginated(5, 0)
       assert length(hosts) <= 5
     end
 
     test "respects offset parameter" do
-      all_hosts = Hosts.list_hosts()
+      all_hosts = Plants.list_hosts()
 
       if length(all_hosts) > 5 do
-        first_page = Hosts.list_hosts_paginated(5, 0)
-        second_page = Hosts.list_hosts_paginated(5, 5)
+        first_page = Plants.list_hosts_paginated(5, 0)
+        second_page = Plants.list_hosts_paginated(5, 5)
 
         first_ids = MapSet.new(Enum.map(first_page, & &1.id))
         second_ids = MapSet.new(Enum.map(second_page, & &1.id))
@@ -52,28 +53,28 @@ defmodule Gallformers.HostsTest do
 
   describe "count_hosts/0" do
     test "returns a non-negative integer" do
-      count = Hosts.count_hosts()
+      count = Plants.count_hosts()
       assert is_integer(count)
       assert count >= 0
     end
 
     test "count matches length of list_hosts" do
-      count = Hosts.count_hosts()
-      hosts = Hosts.list_hosts()
+      count = Plants.count_hosts()
+      hosts = Plants.list_hosts()
       assert count == length(hosts)
     end
   end
 
   describe "get_host/1" do
     test "returns nil for non-existent ID" do
-      assert nil == Hosts.get_host(999_999_999)
+      assert nil == Plants.get_host(999_999_999)
     end
 
     test "returns host with expected fields for valid ID" do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
-        host = Hosts.get_host(hd(hosts).id)
+        host = Plants.get_host(hd(hosts).id)
         assert host != nil
         assert Map.has_key?(host, :id)
         assert Map.has_key?(host, :name)
@@ -85,14 +86,14 @@ defmodule Gallformers.HostsTest do
 
   describe "get_host_by_name/1" do
     test "returns nil for non-existent name" do
-      assert nil == Hosts.get_host_by_name("Nonexistent host name xyz")
+      assert nil == Plants.get_host_by_name("Nonexistent host name xyz")
     end
 
     test "returns host for valid name" do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
-        host = Hosts.get_host_by_name(hd(hosts).name)
+        host = Plants.get_host_by_name(hd(hosts).name)
         assert host != nil
         assert host.name == hd(hosts).name
       end
@@ -101,21 +102,21 @@ defmodule Gallformers.HostsTest do
 
   describe "get_hosts_for_gall/1" do
     test "returns empty list for non-existent gall" do
-      hosts = Hosts.get_hosts_for_gall(999_999_999)
+      hosts = GallHosts.get_hosts_for_gall(999_999_999)
       assert hosts == []
     end
 
     test "returns hosts with expected fields" do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       # Find a gall with hosts
       gall_with_host =
         Enum.find(galls, fn g ->
-          length(Hosts.get_hosts_for_gall(g.id)) > 0
+          length(GallHosts.get_hosts_for_gall(g.id)) > 0
         end)
 
       if gall_with_host do
-        hosts = Hosts.get_hosts_for_gall(gall_with_host.id)
+        hosts = GallHosts.get_hosts_for_gall(gall_with_host.id)
         assert length(hosts) > 0
         host = hd(hosts)
         assert Map.has_key?(host, :host_relation_id)
@@ -127,21 +128,21 @@ defmodule Gallformers.HostsTest do
 
   describe "get_galls_for_host/1" do
     test "returns empty list for non-existent host" do
-      galls = Hosts.get_galls_for_host(999_999_999)
+      galls = GallHosts.get_galls_for_host(999_999_999)
       assert galls == []
     end
 
     test "returns galls with expected fields" do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       # Find a host with galls
       host_with_gall =
         Enum.find(hosts, fn h ->
-          length(Hosts.get_galls_for_host(h.id)) > 0
+          length(GallHosts.get_galls_for_host(h.id)) > 0
         end)
 
       if host_with_gall do
-        galls = Hosts.get_galls_for_host(host_with_gall.id)
+        galls = GallHosts.get_galls_for_host(host_with_gall.id)
         assert length(galls) > 0
         gall = hd(galls)
         assert Map.has_key?(gall, :id)
@@ -153,15 +154,15 @@ defmodule Gallformers.HostsTest do
 
   describe "get_places_for_host/1" do
     test "returns empty list for non-existent host" do
-      places = Hosts.get_places_for_host(999_999_999)
+      places = Ranges.get_places_for_host(999_999_999)
       assert places == []
     end
 
     test "returns list of place codes" do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
-        places = Hosts.get_places_for_host(hd(hosts).id)
+        places = Ranges.get_places_for_host(hd(hosts).id)
         assert is_list(places)
 
         if length(places) > 0 do
@@ -174,15 +175,15 @@ defmodule Gallformers.HostsTest do
 
   describe "get_places_for_gall/1" do
     test "returns empty list for non-existent gall" do
-      places = Hosts.get_places_for_gall(999_999_999)
+      places = Ranges.get_places_for_gall(999_999_999)
       assert places == []
     end
 
     test "returns list of place codes" do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
-        places = Hosts.get_places_for_gall(hd(galls).id)
+        places = Ranges.get_places_for_gall(hd(galls).id)
         assert is_list(places)
       end
     end
@@ -190,10 +191,10 @@ defmodule Gallformers.HostsTest do
 
   describe "get_excluded_places_for_gall/1" do
     test "returns a list" do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
-        excluded = Hosts.get_excluded_places_for_gall(hd(galls).id)
+        excluded = Ranges.get_excluded_places_for_gall(hd(galls).id)
         assert is_list(excluded)
       end
     end
@@ -201,23 +202,23 @@ defmodule Gallformers.HostsTest do
 
   describe "search_hosts/2" do
     test "returns empty list for empty query" do
-      results = Hosts.search_hosts("")
+      results = Plants.search_hosts("")
       assert results == []
     end
 
     test "returns empty list for whitespace query" do
-      results = Hosts.search_hosts("   ")
+      results = Plants.search_hosts("   ")
       assert results == []
     end
 
     test "returns matching hosts for valid query" do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
         # Search for part of first host's name
         host_name = hd(hosts).name
         search_term = String.slice(host_name, 0, 3)
-        results = Hosts.search_hosts(search_term)
+        results = Plants.search_hosts(search_term)
 
         assert is_list(results)
         # Results should include hosts matching the search term
@@ -225,13 +226,13 @@ defmodule Gallformers.HostsTest do
     end
 
     test "search is case-insensitive" do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
         host_name = hd(hosts).name
         search_term = String.slice(host_name, 0, 3)
-        upper_results = Hosts.search_hosts(String.upcase(search_term))
-        lower_results = Hosts.search_hosts(String.downcase(search_term))
+        upper_results = Plants.search_hosts(String.upcase(search_term))
+        lower_results = Plants.search_hosts(String.downcase(search_term))
 
         # Both should return results (may not be identical due to aliases)
         assert is_list(upper_results)
@@ -240,17 +241,17 @@ defmodule Gallformers.HostsTest do
     end
 
     test "respects limit parameter" do
-      results = Hosts.search_hosts("a", 3)
+      results = Plants.search_hosts("a", 3)
       assert length(results) <= 3
     end
 
     test "results have aliases field" do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
         host_name = hd(hosts).name
         search_term = String.slice(host_name, 0, 3)
-        results = Hosts.search_hosts(search_term, 5)
+        results = Plants.search_hosts(search_term, 5)
 
         if length(results) > 0 do
           result = hd(results)
@@ -263,12 +264,12 @@ defmodule Gallformers.HostsTest do
     test "batch-loaded aliases match individually loaded aliases" do
       # This test verifies the N+1 optimization (attach_aliases_batch)
       # returns the same results as individual get_aliases_for_host calls
-      results = Hosts.search_hosts("a", 10)
+      results = Plants.search_hosts("a", 10)
 
       if length(results) > 1 do
         # For each result, verify batch-loaded aliases match individual lookup
         for result <- results do
-          individual_aliases = Hosts.get_aliases_for_host(result.id)
+          individual_aliases = Plants.get_aliases_for_host(result.id)
           batch_aliases = result.aliases
 
           # Both should be lists with the same contents (order may differ)
@@ -281,15 +282,15 @@ defmodule Gallformers.HostsTest do
 
   describe "get_aliases_for_host/1" do
     test "returns empty list for non-existent host" do
-      aliases = Hosts.get_aliases_for_host(999_999_999)
+      aliases = Plants.get_aliases_for_host(999_999_999)
       assert aliases == []
     end
 
     test "returns list of alias names" do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
-        aliases = Hosts.get_aliases_for_host(hd(hosts).id)
+        aliases = Plants.get_aliases_for_host(hd(hosts).id)
         assert is_list(aliases)
       end
     end
@@ -298,22 +299,22 @@ defmodule Gallformers.HostsTest do
   describe "delete_host/1" do
     test "deletes the host species" do
       # Species 1 is "Quercus alba" - a host plant
-      host = Hosts.get_host(1)
+      host = Plants.get_host(1)
       assert host != nil
 
       # Delete the host
-      assert {:ok, deleted} = Hosts.delete_host(1)
+      assert {:ok, deleted} = Plants.delete_host(1)
       assert deleted.id == 1
 
       # Verify host is gone
-      assert nil == Hosts.get_host(1)
+      assert nil == Plants.get_host(1)
 
       # Verify species is gone
       assert nil == Species.get_species(1)
     end
 
     test "returns error for non-existent host" do
-      assert {:error, :not_found} = Hosts.delete_host(999_999_999)
+      assert {:error, :not_found} = Plants.delete_host(999_999_999)
     end
   end
 
@@ -346,11 +347,11 @@ defmodule Gallformers.HostsTest do
 
     test "renames host without genus change" do
       # Rename within same genus: Quercus alba -> Quercus stellata
-      assert {:ok, updated} = Hosts.rename_host(1, "Quercus stellata")
+      assert {:ok, updated} = Plants.rename_host(1, "Quercus stellata")
       assert updated.name == "Quercus stellata"
 
       # Verify the change persisted
-      host = Hosts.get_host(1)
+      host = Plants.get_host(1)
       assert host.name == "Quercus stellata"
     end
 
@@ -358,26 +359,26 @@ defmodule Gallformers.HostsTest do
       original_name = "Quercus alba"
       new_name = "Quercus stellata"
 
-      assert {:ok, updated} = Hosts.rename_host(1, new_name, true)
+      assert {:ok, updated} = Plants.rename_host(1, new_name, true)
       assert updated.name == new_name
 
       # Verify alias was created
-      aliases = Hosts.get_aliases_for_host(1)
+      aliases = Plants.get_aliases_for_host(1)
       assert original_name in aliases
     end
 
     test "returns error when new name already exists" do
       # Try to rename Quercus alba to Quercus rubra (which exists as id=2)
-      assert {:error, :name_exists} = Hosts.rename_host(1, "Quercus rubra")
+      assert {:error, :name_exists} = Plants.rename_host(1, "Quercus rubra")
     end
 
     test "returns error for non-existent host" do
-      assert {:error, :not_found} = Hosts.rename_host(999_999_999, "New name")
+      assert {:error, :not_found} = Plants.rename_host(999_999_999, "New name")
     end
 
     test "updates genus link when renaming to existing genus", %{acer: acer} do
       # Rename Quercus alba -> Acer newspecies (Acer genus exists)
-      assert {:ok, updated} = Hosts.rename_host(1, "Acer newspecies")
+      assert {:ok, updated} = Plants.rename_host(1, "Acer newspecies")
       assert updated.name == "Acer newspecies"
 
       # Verify taxonomy was updated to Acer
@@ -390,7 +391,7 @@ defmodule Gallformers.HostsTest do
       fagaceae: fagaceae
     } do
       # Rename Quercus alba -> Betula papyrifera (Betula genus doesn't exist)
-      result = Hosts.rename_host(1, "Betula papyrifera")
+      result = Plants.rename_host(1, "Betula papyrifera")
 
       assert {:needs_genus_confirmation, info} = result
       assert info.new_genus == "Betula"
@@ -418,7 +419,7 @@ defmodule Gallformers.HostsTest do
     test "creates new genus and renames host", %{fagaceae: fagaceae} do
       # Confirm genus creation for Betula under Fagaceae
       assert {:ok, updated} =
-               Hosts.rename_host_with_new_genus(
+               Plants.rename_host_with_new_genus(
                  1,
                  "Betula papyrifera",
                  "Betula",
@@ -443,7 +444,7 @@ defmodule Gallformers.HostsTest do
       original_name = "Quercus alba"
 
       assert {:ok, _updated} =
-               Hosts.rename_host_with_new_genus(
+               Plants.rename_host_with_new_genus(
                  1,
                  "Betula papyrifera",
                  "Betula",
@@ -452,19 +453,25 @@ defmodule Gallformers.HostsTest do
                )
 
       # Verify alias was created
-      aliases = Hosts.get_aliases_for_host(1)
+      aliases = Plants.get_aliases_for_host(1)
       assert original_name in aliases
     end
 
     test "returns error when new name already exists", %{fagaceae: fagaceae} do
       # Try to rename to a name that already exists
       assert {:error, :name_exists} =
-               Hosts.rename_host_with_new_genus(1, "Quercus rubra", "Quercus", fagaceae.id, false)
+               Plants.rename_host_with_new_genus(
+                 1,
+                 "Quercus rubra",
+                 "Quercus",
+                 fagaceae.id,
+                 false
+               )
     end
 
     test "returns error for non-existent host", %{fagaceae: fagaceae} do
       assert {:error, :not_found} =
-               Hosts.rename_host_with_new_genus(
+               Plants.rename_host_with_new_genus(
                  999_999_999,
                  "New species",
                  "NewGenus",

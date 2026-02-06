@@ -8,6 +8,7 @@ defmodule GallformersWeb.Admin.SectionLive.Form do
   use GallformersWeb, :live_view
   use GallformersWeb.Admin.FormHelpers
 
+  alias Gallformers.Plants
   alias Gallformers.Taxonomy
   alias Gallformers.Taxonomy.Taxonomy, as: TaxonomySchema
 
@@ -83,7 +84,7 @@ defmodule GallformersWeb.Admin.SectionLive.Form do
       selected_ids = Enum.map(socket.assigns.species, & &1.id)
 
       results =
-        Taxonomy.search_hosts_for_section(query, 20)
+        Plants.search_hosts_for_section(query, 20)
         |> Enum.reject(fn s -> s.id in selected_ids end)
 
       {:noreply,

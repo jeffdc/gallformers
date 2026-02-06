@@ -1,7 +1,7 @@
-defmodule Gallformers.GallSummaryTest do
+defmodule Gallformers.Galls.SummaryTest do
   use ExUnit.Case, async: false
 
-  alias Gallformers.GallSummary
+  alias Gallformers.Galls.Summary
 
   describe "from_db_filters/2" do
     test "converts database filter format to summary format" do
@@ -18,7 +18,7 @@ defmodule Gallformers.GallSummaryTest do
       }
 
       # Detachable is stored as integer in gall: 0=unknown, 1=integral, 2=detachable, 3=both
-      result = GallSummary.from_db_filters(db_filters, 2)
+      result = Summary.from_db_filters(db_filters, 2)
 
       assert result.shapes == ["spherical"]
       assert result.colors == ["red", "brown"]
@@ -42,7 +42,7 @@ defmodule Gallformers.GallSummaryTest do
         forms: []
       }
 
-      result = GallSummary.from_db_filters(db_filters, 0)
+      result = Summary.from_db_filters(db_filters, 0)
 
       assert result.shapes == []
       assert result.colors == []
@@ -62,14 +62,14 @@ defmodule Gallformers.GallSummaryTest do
         cells: []
       }
 
-      assert GallSummary.from_db_filters(db_filters, 0).detachable == nil
-      assert GallSummary.from_db_filters(db_filters, 1).detachable == "integral"
-      assert GallSummary.from_db_filters(db_filters, 2).detachable == "detachable"
-      assert GallSummary.from_db_filters(db_filters, 3).detachable == "both"
+      assert Summary.from_db_filters(db_filters, 0).detachable == nil
+      assert Summary.from_db_filters(db_filters, 1).detachable == "integral"
+      assert Summary.from_db_filters(db_filters, 2).detachable == "detachable"
+      assert Summary.from_db_filters(db_filters, 3).detachable == "both"
     end
 
     test "handles nil db_filters" do
-      result = GallSummary.from_db_filters(nil, 2)
+      result = Summary.from_db_filters(nil, 2)
       assert result == %{}
     end
   end
@@ -86,7 +86,7 @@ defmodule Gallformers.GallSummaryTest do
         forms: ["gall"]
       }
 
-      result = GallSummary.generate(filters)
+      result = Summary.generate(filters)
 
       assert result == "A spherical, red, hairy gall found on the leaf in spring. Detachable."
     end
@@ -101,7 +101,7 @@ defmodule Gallformers.GallSummaryTest do
         forms: []
       }
 
-      result = GallSummary.generate(filters)
+      result = Summary.generate(filters)
 
       assert result == "A red, hairy gall found on the leaf in spring."
     end
@@ -112,7 +112,7 @@ defmodule Gallformers.GallSummaryTest do
         plant_parts: ["leaf"]
       }
 
-      result = GallSummary.generate(filters)
+      result = Summary.generate(filters)
 
       assert result == "A hairy gall found on the leaf."
     end
@@ -122,17 +122,17 @@ defmodule Gallformers.GallSummaryTest do
         plant_parts: ["leaf"]
       }
 
-      result = GallSummary.generate(filters)
+      result = Summary.generate(filters)
 
       assert result == "A gall found on the leaf."
     end
 
     test "empty input returns minimal fallback" do
-      assert GallSummary.generate(%{}) == "A gall."
+      assert Summary.generate(%{}) == "A gall."
     end
 
     test "nil input returns minimal fallback" do
-      assert GallSummary.generate(nil) == "A gall."
+      assert Summary.generate(nil) == "A gall."
     end
 
     test "non-gall form uses structure instead of gall" do
@@ -142,7 +142,7 @@ defmodule Gallformers.GallSummaryTest do
         forms: ["non-gall"]
       }
 
-      result = GallSummary.generate(filters)
+      result = Summary.generate(filters)
 
       assert result == "A red structure found on the stem."
     end
@@ -154,7 +154,7 @@ defmodule Gallformers.GallSummaryTest do
         forms: ["erineum"]
       }
 
-      result = GallSummary.generate(filters)
+      result = Summary.generate(filters)
 
       assert result == "A red erineum found on the leaf."
     end
@@ -166,7 +166,7 @@ defmodule Gallformers.GallSummaryTest do
         plant_parts: ["leaf"]
       }
 
-      result = GallSummary.generate(filters)
+      result = Summary.generate(filters)
 
       assert result == "An oval gall found on the leaf."
     end
@@ -177,7 +177,7 @@ defmodule Gallformers.GallSummaryTest do
         plant_parts: ["leaf", "stem"]
       }
 
-      result = GallSummary.generate(filters)
+      result = Summary.generate(filters)
 
       assert result == "A red/brown gall found on the leaf/stem."
     end
@@ -187,7 +187,7 @@ defmodule Gallformers.GallSummaryTest do
         colors: ["red", "brown", "green", "yellow"]
       }
 
-      result = GallSummary.generate(filters)
+      result = Summary.generate(filters)
 
       assert result == "A red/brown/green/... gall."
     end
@@ -198,7 +198,7 @@ defmodule Gallformers.GallSummaryTest do
         detachable: "integral"
       }
 
-      result = GallSummary.generate(filters)
+      result = Summary.generate(filters)
 
       assert result == "A gall found on the leaf. Integral to host."
     end
@@ -209,7 +209,7 @@ defmodule Gallformers.GallSummaryTest do
         detachable: "both"
       }
 
-      result = GallSummary.generate(filters)
+      result = Summary.generate(filters)
 
       assert result == "A gall found on the leaf. May be detachable or integral."
     end
@@ -225,7 +225,7 @@ defmodule Gallformers.GallSummaryTest do
         forms: ["gall"]
       }
 
-      result = GallSummary.generate(filters, mode: :short)
+      result = Summary.generate(filters, mode: :short)
 
       # Short mode: location, shape, color only - ~50 chars target
       assert result == "A spherical, red gall on the leaf."
@@ -245,7 +245,7 @@ defmodule Gallformers.GallSummaryTest do
         forms: ["gall"]
       }
 
-      result = GallSummary.generate(filters, mode: :full)
+      result = Summary.generate(filters, mode: :full)
 
       # Full mode includes alignment, walls, cells
       assert result =~
@@ -259,7 +259,7 @@ defmodule Gallformers.GallSummaryTest do
         plant_parts: ["leaf"]
       }
 
-      result = GallSummary.generate(filters)
+      result = Summary.generate(filters)
 
       assert result == "A gall found on the leaf."
     end
@@ -270,7 +270,7 @@ defmodule Gallformers.GallSummaryTest do
         forms: ["unknown-form-type"]
       }
 
-      result = GallSummary.generate(filters)
+      result = Summary.generate(filters)
 
       assert result == "A gall found on the leaf."
     end
@@ -284,7 +284,7 @@ defmodule Gallformers.GallSummaryTest do
         plant_parts: ["leaf"]
       }
 
-      result = GallSummary.for_seo("Andricus quercuscalifornicus", filters)
+      result = Summary.for_seo("Andricus quercuscalifornicus", filters)
 
       assert result =~ "Andricus quercuscalifornicus"
       assert result =~ "spherical"
@@ -306,19 +306,19 @@ defmodule Gallformers.GallSummaryTest do
         forms: ["gall"]
       }
 
-      result = GallSummary.for_seo("Andricus quercuscalifornicus", filters)
+      result = Summary.for_seo("Andricus quercuscalifornicus", filters)
 
       assert String.length(result) <= 160
     end
 
     test "handles empty filters gracefully" do
-      result = GallSummary.for_seo("Andricus quercuscalifornicus", %{})
+      result = Summary.for_seo("Andricus quercuscalifornicus", %{})
 
       assert result == "Andricus quercuscalifornicus - A gall species documented on Gallformers."
     end
 
     test "handles nil filters" do
-      result = GallSummary.for_seo("Unknown Species", nil)
+      result = Summary.for_seo("Unknown Species", nil)
 
       assert result == "Unknown Species - A gall species documented on Gallformers."
     end

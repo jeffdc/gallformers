@@ -1,9 +1,9 @@
-defmodule Gallformers.IDTool do
+defmodule Gallformers.Galls.Identification do
   @moduledoc """
-  The IDTool context.
+  Composable filter pipeline for gall identification.
 
-  Provides functions for the gall identification tool, which allows users
-  to filter galls by various characteristics (host, location, color, shape, etc.).
+  Internal module of the Galls context — provides the filter engine used by
+  the ID tool. All public access goes through `Gallformers.Galls`.
   """
 
   import Ecto.Query
@@ -20,30 +20,29 @@ defmodule Gallformers.IDTool do
     Walls
   }
 
-  alias Gallformers.Hosts.Host
+  alias Gallformers.GallHosts.GallHost
+  alias Gallformers.Galls
+  alias Gallformers.Galls.GallTraits
+  alias Gallformers.Images.Image
   alias Gallformers.Repo
-  alias Gallformers.Species
-  alias Gallformers.Species.{GallTraits, Image}
   alias Gallformers.Species.Species, as: SpeciesSchema
   alias Gallformers.Taxonomy.Taxonomy
 
   @doc """
   Returns all filter field options for the ID tool.
-
-  Returns a map with all available filter options.
   """
   @spec get_filter_options() :: map()
   def get_filter_options do
     %{
-      alignments: list_alignments(),
-      cells: list_cells(),
-      colors: list_colors(),
-      forms: list_forms(),
-      plant_parts: list_plant_parts(),
-      seasons: list_seasons(),
-      shapes: list_shapes(),
-      textures: list_textures(),
-      walls: list_walls()
+      alignments: Repo.all(from(a in Alignment, order_by: a.alignment)),
+      cells: Repo.all(from(c in Cells, order_by: c.cells)),
+      colors: Repo.all(from(c in Color, order_by: c.color)),
+      forms: Repo.all(from(f in Form, order_by: f.form)),
+      plant_parts: Repo.all(from(pp in PlantPart, order_by: pp.part)),
+      seasons: Repo.all(from(s in Season, order_by: s.season)),
+      shapes: Repo.all(from(s in Shape, order_by: s.shape)),
+      textures: Repo.all(from(t in Texture, order_by: t.texture)),
+      walls: Repo.all(from(w in Walls, order_by: w.walls))
     }
   end
 
@@ -52,10 +51,14 @@ defmodule Gallformers.IDTool do
 
   Accepts a map with optional keys:
     - :host_ids - list of host species IDs
+    - :genus_id - taxonomy ID of a host plant genus/section
+    - :family_id - taxonomy ID of a gall family
     - :plant_part_ids - list of plant part IDs
+    - :plant_part_logic - :or (default) or :and
     - :color_ids - list of color IDs
     - :shape_ids - list of shape IDs
     - :texture_ids - list of texture IDs
+    - :texture_logic - :or (default) or :and
     - :alignment_ids - list of alignment IDs
     - :cells_ids - list of cells IDs
     - :walls_ids - list of walls IDs
@@ -63,8 +66,10 @@ defmodule Gallformers.IDTool do
     - :season_ids - list of season IDs
     - :detachable - "unknown", "integral", "detachable", or "both"
     - :place_codes - list of place codes (states/provinces)
+    - :undescribed - boolean
+    - :exclude_non_galls - boolean
 
-  Returns a list of matching gall species.
+  Returns a list of matching gall species maps.
   """
   @spec filter_galls(map()) :: [map()]
   def filter_galls(filters \\ %{}) do
@@ -89,45 +94,6 @@ defmodule Gallformers.IDTool do
     |> Repo.all()
     |> attach_images()
     |> attach_non_gall_flag()
-  end
-
-  @doc """
-  Fetches filter data for multiple galls by gall_id, for summary generation.
-
-  Returns a map of gall_id => filter_data:
-  ```
-  %{
-    123 => %{
-      shapes: ["spherical"],
-      colors: ["red", "brown"],
-      textures: ["hairy"],
-      locations: ["leaf"],
-      seasons: ["spring"],
-      detachable: "detachable",
-      forms: ["gall"]
-    }
-  }
-  ```
-  """
-  @spec get_summary_data([integer()]) :: %{integer() => map()}
-  def get_summary_data([]), do: %{}
-
-  def get_summary_data(gall_ids) when is_list(gall_ids) do
-    # Fetch all filter values for the given gall IDs in bulk
-    gall_ids
-    |> Enum.map(fn gall_id ->
-      filters = Species.get_gall_filter_values(gall_id)
-      detachable = get_gall_detachable(gall_id)
-      summary_data = Gallformers.GallSummary.from_db_filters(filters, detachable)
-      {gall_id, summary_data}
-    end)
-    |> Enum.into(%{})
-  end
-
-  defp get_gall_detachable(species_id) do
-    from(gt in GallTraits, where: gt.species_id == ^species_id, select: gt.detachable)
-    |> Repo.one()
-    |> Kernel.||("unknown")
   end
 
   @doc """
@@ -159,7 +125,6 @@ defmodule Gallformers.IDTool do
   """
   @spec get_hosts_for_filters(map()) :: [map()]
   def get_hosts_for_filters(filters \\ %{}) do
-    # Get gall species IDs matching the filters
     gall_ids =
       base_query()
       |> apply_plant_part_filter(filters[:plant_part_ids], filters[:plant_part_logic] || :or)
@@ -179,8 +144,8 @@ defmodule Gallformers.IDTool do
     if Enum.empty?(gall_ids) do
       []
     else
-      from(h in Host,
-        join: host_species in Species,
+      from(h in GallHost,
+        join: host_species in SpeciesSchema,
         on: h.host_species_id == host_species.id,
         where: h.gall_species_id in ^gall_ids,
         group_by: [host_species.id, host_species.name],
@@ -195,21 +160,24 @@ defmodule Gallformers.IDTool do
     end
   end
 
-  # Filter field list functions
-  @spec list_alignments() :: [Alignment.t()]
-  def list_alignments, do: Repo.all(from a in Alignment, order_by: a.alignment)
+  @doc """
+  Fetches filter data for multiple galls by gall_id, for summary generation.
 
-  @spec list_cells() :: [Cells.t()]
-  def list_cells, do: Repo.all(from c in Cells, order_by: c.cells)
+  Returns a map of gall_id => filter_data.
+  """
+  @spec get_summary_data([integer()]) :: %{integer() => map()}
+  def get_summary_data([]), do: %{}
 
-  @spec list_colors() :: [Color.t()]
-  def list_colors, do: Repo.all(from c in Color, order_by: c.color)
-
-  @spec list_forms() :: [Form.t()]
-  def list_forms, do: Repo.all(from f in Form, order_by: f.form)
-
-  @spec list_plant_parts() :: [PlantPart.t()]
-  def list_plant_parts, do: Repo.all(from pp in PlantPart, order_by: pp.part)
+  def get_summary_data(gall_ids) when is_list(gall_ids) do
+    gall_ids
+    |> Enum.map(fn gall_id ->
+      filters = Galls.get_gall_filter_values(gall_id)
+      detachable = get_gall_detachable(gall_id)
+      summary_data = Galls.Summary.from_db_filters(filters, detachable)
+      {gall_id, summary_data}
+    end)
+    |> Enum.into(%{})
+  end
 
   @doc """
   Returns location IDs for all locations containing "leaf" in their name.
@@ -224,19 +192,13 @@ defmodule Gallformers.IDTool do
     |> Repo.all()
   end
 
-  @spec list_seasons() :: [Season.t()]
-  def list_seasons, do: Repo.all(from s in Season, order_by: s.season)
+  # Private helpers
 
-  @spec list_shapes() :: [Shape.t()]
-  def list_shapes, do: Repo.all(from s in Shape, order_by: s.shape)
-
-  @spec list_textures() :: [Texture.t()]
-  def list_textures, do: Repo.all(from t in Texture, order_by: t.texture)
-
-  @spec list_walls() :: [Walls.t()]
-  def list_walls, do: Repo.all(from w in Walls, order_by: w.walls)
-
-  # Private query building functions
+  defp get_gall_detachable(species_id) do
+    from(gt in GallTraits, where: gt.species_id == ^species_id, select: gt.detachable)
+    |> Repo.one()
+    |> Kernel.||("unknown")
+  end
 
   defp base_query do
     from s in SpeciesSchema,
@@ -258,20 +220,45 @@ defmodule Gallformers.IDTool do
       }
   end
 
+  # Filter pipeline functions
+
   defp apply_host_filter(query, nil), do: query
   defp apply_host_filter(query, []), do: query
 
   defp apply_host_filter(query, host_ids) do
     from [s, gt] in query,
-      join: h in Host,
+      join: h in GallHost,
       on: h.gall_species_id == s.id,
       where: h.host_species_id in ^host_ids
+  end
+
+  defp apply_genus_filter(query, nil), do: query
+
+  defp apply_genus_filter(query, genus_id) do
+    from [s, gt] in query,
+      join: h in GallHost,
+      on: h.gall_species_id == s.id,
+      join: host_species in SpeciesSchema,
+      on: h.host_species_id == host_species.id,
+      join: st in "species_taxonomy",
+      on: st.species_id == host_species.id,
+      where: st.taxonomy_id == ^genus_id
+  end
+
+  defp apply_family_filter(query, nil), do: query
+
+  defp apply_family_filter(query, family_id) do
+    from [s, gt] in query,
+      join: st in "species_taxonomy",
+      on: st.species_id == s.id,
+      join: t in Taxonomy,
+      on: st.taxonomy_id == t.id,
+      where: t.parent_id == ^family_id
   end
 
   defp apply_plant_part_filter(query, nil, _logic), do: query
   defp apply_plant_part_filter(query, [], _logic), do: query
 
-  # OR logic: gall must have ANY of the selected plant parts
   defp apply_plant_part_filter(query, plant_part_ids, :or) do
     from [s, gt] in query,
       join: gpp in "gall_plant_part",
@@ -279,11 +266,9 @@ defmodule Gallformers.IDTool do
       where: gpp.plant_part_id in ^plant_part_ids
   end
 
-  # AND logic: gall must have ALL of the selected plant parts
   defp apply_plant_part_filter(query, plant_part_ids, :and) do
     required_count = length(plant_part_ids)
 
-    # Subquery to find species IDs that have ALL required plant parts
     matching_species =
       from(gpp in "gall_plant_part",
         where: gpp.plant_part_id in ^plant_part_ids,
@@ -319,7 +304,6 @@ defmodule Gallformers.IDTool do
   defp apply_texture_filter(query, nil, _logic), do: query
   defp apply_texture_filter(query, [], _logic), do: query
 
-  # OR logic: gall must have ANY of the selected textures
   defp apply_texture_filter(query, texture_ids, :or) do
     from [s, gt] in query,
       join: gtex in "gall_texture",
@@ -327,11 +311,9 @@ defmodule Gallformers.IDTool do
       where: gtex.texture_id in ^texture_ids
   end
 
-  # AND logic: gall must have ALL of the selected textures
   defp apply_texture_filter(query, texture_ids, :and) do
     required_count = length(texture_ids)
 
-    # Subquery to find species IDs that have ALL required textures
     matching_species =
       from(gtex in "gall_texture",
         where: gtex.texture_id in ^texture_ids,
@@ -395,16 +377,13 @@ defmodule Gallformers.IDTool do
   end
 
   defp apply_detachable_filter(query, nil), do: query
-  # "unknown" - don't filter
   defp apply_detachable_filter(query, "unknown"), do: query
 
-  # "both" - exact match only
   defp apply_detachable_filter(query, "both") do
     from [s, gt] in query,
       where: gt.detachable == "both"
   end
 
-  # "integral" or "detachable" - also match galls marked as "both"
   defp apply_detachable_filter(query, detachable) when detachable in ~w(integral detachable) do
     from [s, gt] in query,
       where: gt.detachable == ^detachable or gt.detachable == "both"
@@ -414,16 +393,14 @@ defmodule Gallformers.IDTool do
   defp apply_place_filter(query, []), do: query
 
   defp apply_place_filter(query, place_codes) do
-    # Filter by places where host plants are found, excluding explicit gall exclusions
     from [s, gt] in query,
-      join: h in Host,
+      join: h in GallHost,
       on: h.gall_species_id == s.id,
       join: hr in "host_range",
       on: hr.species_id == h.host_species_id,
       join: p in "place",
       on: hr.place_id == p.id,
       where: p.code in ^place_codes,
-      # Exclude galls that are explicitly marked as not in these places
       where:
         s.id not in subquery(
           from gre in "gall_range_exclusion",
@@ -432,33 +409,6 @@ defmodule Gallformers.IDTool do
             where: p2.code in ^place_codes,
             select: gre.species_id
         )
-  end
-
-  defp apply_genus_filter(query, nil), do: query
-
-  # Filter galls by host plant taxonomy (genus or section)
-  # The selected genus_id is the taxonomy ID of a host plant genus/section,
-  # so we need to find galls that occur on hosts belonging to that taxonomy
-  defp apply_genus_filter(query, genus_id) do
-    from [s, gt] in query,
-      join: h in Host,
-      on: h.gall_species_id == s.id,
-      join: host_species in SpeciesSchema,
-      on: h.host_species_id == host_species.id,
-      join: st in "species_taxonomy",
-      on: st.species_id == host_species.id,
-      where: st.taxonomy_id == ^genus_id
-  end
-
-  defp apply_family_filter(query, nil), do: query
-
-  defp apply_family_filter(query, family_id) do
-    from [s, gt] in query,
-      join: st in "species_taxonomy",
-      on: st.species_id == s.id,
-      join: t in Taxonomy,
-      on: st.taxonomy_id == t.id,
-      where: t.parent_id == ^family_id
   end
 
   defp apply_undescribed_filter(query, nil), do: query
@@ -504,9 +454,8 @@ defmodule Gallformers.IDTool do
   end
 
   defp attach_images(galls) do
-    # Get all default images for gall species
     image_map =
-      Species.get_default_gall_images()
+      Galls.get_default_gall_images()
       |> Enum.into(%{}, fn %{species_id: id, path: path} -> {id, path} end)
 
     base_url = Image.base_url()
@@ -517,7 +466,6 @@ defmodule Gallformers.IDTool do
           Map.put(gall, :image_url, nil)
 
         path ->
-          # Replace "original" with "small" in the path for thumbnail images
           small_path = String.replace(path, "original", "small")
           Map.put(gall, :image_url, "#{base_url}/#{small_path}")
       end

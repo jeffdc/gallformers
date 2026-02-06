@@ -64,13 +64,7 @@ defmodule GallformersWeb.Admin.SourceLive.Form do
   def handle_event("save", params, socket), do: handle_save(params, socket)
 
   @impl true
-  def handle_event("delete", params, socket) do
-    if Gallformers.Accounts.superadmin?(socket.assigns.current_user) do
-      handle_delete(params, socket)
-    else
-      {:noreply, put_flash(socket, :error, "Only super admins can delete sources")}
-    end
-  end
+  def handle_event("delete", params, socket), do: handle_delete(params, socket)
 
   @impl true
   def handle_event(event, params, socket)
@@ -224,7 +218,7 @@ defmodule GallformersWeb.Admin.SourceLive.Form do
           <div class="flex justify-between pt-4 border-t border-gray-200">
             <div>
               <button
-                :if={@mode == :edit && Gallformers.Accounts.superadmin?(@current_user)}
+                :if={@mode == :edit}
                 type="button"
                 phx-click="delete"
                 data-confirm="Are you sure you want to delete this source? This will also remove all species-source mappings."

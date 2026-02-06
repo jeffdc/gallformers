@@ -7,7 +7,8 @@ defmodule GallformersWeb.IDLiveTest do
   use GallformersWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
 
-  alias Gallformers.Hosts
+  alias Gallformers.GallHosts
+  alias Gallformers.Plants
 
   describe "ID Tool page rendering" do
     test "renders ID tool page", %{conn: conn} do
@@ -42,7 +43,7 @@ defmodule GallformersWeb.IDLiveTest do
     test "search_host event returns results", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/id")
 
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
         # Search for part of first host's name
@@ -59,7 +60,7 @@ defmodule GallformersWeb.IDLiveTest do
     end
 
     test "select_host event selects host and shows filters", %{conn: conn} do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
         host = hd(hosts)
@@ -72,7 +73,7 @@ defmodule GallformersWeb.IDLiveTest do
     end
 
     test "clear_host event clears selection", %{conn: conn} do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
         host = hd(hosts)
@@ -92,7 +93,7 @@ defmodule GallformersWeb.IDLiveTest do
 
   describe "URL parameter handling" do
     test "host parameter loads host from URL", %{conn: conn} do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
         host = hd(hosts)
@@ -111,7 +112,7 @@ defmodule GallformersWeb.IDLiveTest do
     end
 
     test "multiple parameters work together", %{conn: conn} do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
         host = hd(hosts)
@@ -125,7 +126,7 @@ defmodule GallformersWeb.IDLiveTest do
 
   describe "Filter events" do
     setup %{conn: conn} do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
         host = hd(hosts)
@@ -179,9 +180,9 @@ defmodule GallformersWeb.IDLiveTest do
       end
     end
 
-    test "clear_all event resets all filters", %{conn: conn, host: host} do
+    test "clear_all event resets filters but preserves host selection", %{conn: conn, host: host} do
       if host do
-        # Start with some filters
+        # Start with a host and some filters
         {:ok, view, _html} = live(conn, ~p"/id?h=#{URI.encode(host.name)}&de=integral&lo=1")
 
         # Click clear all
@@ -189,21 +190,22 @@ defmodule GallformersWeb.IDLiveTest do
         |> element("button[phx-click='clear_all']")
         |> render_click()
 
-        # Should redirect to clean URL
+        # Host should still be selected, but filters cleared
         html = render(view)
-        assert html =~ "Select a Host" or html =~ "Search hosts"
+        assert html =~ host.name
+        refute html =~ "de=integral"
       end
     end
   end
 
   describe "Results display" do
     test "shows results when host selected", %{conn: conn} do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       # Find a host with galls
       host_with_galls =
         Enum.find(hosts, fn h ->
-          length(Hosts.get_galls_for_host(h.id)) > 0
+          length(GallHosts.get_galls_for_host(h.id)) > 0
         end)
 
       if host_with_galls do
@@ -215,11 +217,11 @@ defmodule GallformersWeb.IDLiveTest do
     end
 
     test "result cards link to gall pages", %{conn: conn} do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       host_with_galls =
         Enum.find(hosts, fn h ->
-          length(Hosts.get_galls_for_host(h.id)) > 0
+          length(GallHosts.get_galls_for_host(h.id)) > 0
         end)
 
       if host_with_galls do
@@ -231,7 +233,7 @@ defmodule GallformersWeb.IDLiveTest do
     end
 
     test "shows incomplete host warning when applicable", %{conn: conn} do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       # Find an incomplete host
       incomplete_host = Enum.find(hosts, fn h -> h.datacomplete == false end)
@@ -245,7 +247,7 @@ defmodule GallformersWeb.IDLiveTest do
     end
 
     test "shows troubleshooting link when no results", %{conn: conn} do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
         # Use filters that likely produce no results

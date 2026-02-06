@@ -131,20 +131,6 @@ defmodule GallformersWeb.AuthControllerTest do
       # But nickname should be updated
       assert user.nickname == "newnick"
     end
-
-    test "redirects to return_to if set in session", %{conn: conn} do
-      auth0_id = unique_auth0_id()
-      auth = build_ueberauth_auth(auth0_id, "user@test.com", "Test User", "testuser")
-
-      conn =
-        conn
-        |> init_test_session(%{return_to: "/admin/galls"})
-        |> assign(:ueberauth_auth, auth)
-        |> get(~p"/auth/auth0/callback")
-
-      # Should redirect to the stored return_to path
-      assert redirected_to(conn) == "/admin/galls"
-    end
   end
 
   describe "callback/2 - failure handling" do

@@ -24,7 +24,7 @@ defmodule Gallformers.Images.AuditCache do
 
   require Logger
 
-  alias Gallformers.Images
+  alias Gallformers.Images.Audit
 
   # Default TTL of 1 hour
   @default_ttl_ms :timer.hours(1)
@@ -230,10 +230,10 @@ defmodule Gallformers.Images.AuditCache do
   defp do_scan do
     Logger.info("Starting image audit cache scan...")
 
-    case Images.list_all_s3_gall_paths() do
+    case Audit.list_all_s3_gall_paths() do
       {:ok, s3_objects} ->
         Logger.info("Listed #{length(s3_objects)} S3 gall images, finding orphans...")
-        orphans = Images.find_orphan_paths(s3_objects)
+        orphans = Audit.find_orphan_paths(s3_objects)
         {:ok, orphans}
 
       {:error, reason} ->

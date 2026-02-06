@@ -48,11 +48,11 @@ defmodule GallformersWeb.PlaceLive do
          )}
 
       place ->
-        # Get parent place via placeplace join table
+        # Get parent place via place_hierarchy join table
         parent = Gallformers.Places.get_parent_place(place_id)
 
         # Get hosts for this place
-        hosts = Gallformers.Hosts.get_hosts_for_place(place_id)
+        hosts = Gallformers.Ranges.get_hosts_for_place(place_id)
 
         {:ok,
          assign(socket,

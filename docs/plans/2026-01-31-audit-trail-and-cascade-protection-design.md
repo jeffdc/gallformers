@@ -1,7 +1,7 @@
 # Audit Trail and Cascade Delete Protection - Design Document
 
-**Date:** 2026-01-31 (Initial), 2026-02-01 (Comprehensive CASCADE Analysis)
-**Status:** Comprehensive CASCADE analysis complete - Design updated - Ready for schema refactor planning
+**Date:** 2026-01-31 (Initial), 2026-02-01 (CASCADE Analysis), 2026-02-04 (Phase reorganization)
+**Status:** CASCADE fixes complete - Phase 1 (Informed Delete) ready for implementation planning
 **Author:** Claude + Jeff
 
 ---
@@ -19,29 +19,34 @@ The Gallformers team has experienced **significant data loss trauma** from casca
 
 ### Current State
 
-**Database Analysis:**
-- 43 total foreign key constraints
-- **39 have `ON DELETE CASCADE`** (91%)
-- 4 have `RESTRICT` or `NO ACTION`
+**Database Protection (completed 2026-02):**
 
-**Database structure:**
-- **Critical data tables:** `gall`, `species`, `host`, `source`, `taxonomy`
-- **Join tables (many-to-many):** `gallspecies`, `speciessource`, `speciesplace`, `speciestaxonomy`, etc.
-- **Lookup tables:** `place`, `alias`, `abundance`, gall trait tables (color, shape, etc.)
+Critical CASCADE fixes have been applied during schema migration:
 
-**Actual problems identified:**
-1. `taxonomy.parent_id → taxonomy (CASCADE)` - Deleting parent deletes child taxa
-2. `image.source_id → source (CASCADE)` - Should SET NULL instead (lose metadata, keep image)
-3. No application-level validation prevents deleting entities with dependencies
+| FK Constraint | Status | Behavior |
+|---------------|--------|----------|
+| `taxonomy.parent_id → taxonomy` | ✅ RESTRICT | Cannot delete taxonomy with children |
+| `species_taxonomy.taxonomy_id → taxonomy` | ✅ RESTRICT | Cannot delete taxonomy used by species |
+| `image.source_id → source` | ✅ SET NULL | Deleting source preserves images (nulls reference) |
+| `taxonomy.type_id → taxontype` | N/A | No FK - `type` is TEXT field |
+
+**Remaining problem:**
+- No application-level validation shows admins what will be affected before deletion
+- Admins delete "blind" without seeing dependencies
+- Taxonomy deletion currently blocked entirely in UI (temporary measure)
 
 ### Requirements
 
-✅ **Must prevent data loss from cascade deletes**
-✅ **Must track who deleted what for accountability**
-✅ **Must be able to restore deleted data**
-✅ **Team must feel confident the system protects them**
-✅ **Must handle race conditions safely**
-✅ **Must require explanations for sensitive deletions**
+**Phase 1 - Informed Delete (primary goal):**
+- ✅ Must prevent data loss from cascade deletes (done via RESTRICT constraints)
+- ⬚ Must show admins what will be affected before deletion
+- ⬚ Team must feel confident the system protects them
+- ✅ Must handle race conditions safely (done via RESTRICT constraints)
+
+**Phase 2 - Audit Trail (future):**
+- ⬚ Must track who deleted what for accountability
+- ⬚ Must be able to restore deleted data
+- ⬚ Must require explanations for sensitive deletions
 
 ---
 
@@ -77,38 +82,66 @@ The Gallformers team has experienced **significant data loss trauma** from casca
 
 ## Chosen Architecture
 
-### Core Strategy: Three-Part Solution
+### Core Strategy: Two-Phase Solution
 
-1. **ex_audit** - Transparent audit tracking
-2. **Targeted CASCADE fixes** - Fix 2 specific dangerous cascades
-3. **Application validation** - Prevent deleting entities with dependencies
+**Phase 1 - Informed Delete (current focus):**
+- Application validation shows dependencies before deletion
+- Admins see exactly what will be affected
+- Database RESTRICT constraints provide safety net
 
-### Why This Works
+**Phase 2 - Audit Trail (future):**
+- ex_audit for transparent tracking
+- Who deleted what, when
+- Restore capability
 
-**Most cascades are actually correct:**
-- Join table cascades (speciestaxonomy, gallspecies, etc.) are cleanup ✅
-- Gall trait cascades (gallcolor, gallshape, etc.) are cleanup ✅
-- `image.species_id → species CASCADE` is intentional (with S3 cleanup) ✅
+### Completed: CASCADE Fixes
 
-**Cascades requiring fixes (updated 2026-02-01):**
-1. `taxonomy.parent_id → taxonomy` - Change to RESTRICT (prevent deleting parent with children)
-2. `image.source_id → source` - Change to RESTRICT (prevent deletion if images reference source) - **Updated from original SET NULL plan**
-3. `speciestaxonomy.taxonomy_id → taxonomy` - Change to RESTRICT (force handling species before taxonomy deletion)
-4. `taxonomy.type_id → taxontype` - Change to RESTRICT (prevent deletion of types in use)
+**Most cascades are correct** (join table cleanup, trait cleanup, etc.)
 
-**Application validation provides safety:**
-- Shows dependencies before deletion (e.g., "This Genus has 25 Species")
-- Forces user to handle dependencies explicitly
-- Requires deletion reasons for critical entities
-- Prevents race conditions (user checks, database enforces)
+**Critical fixes applied (2026-02):**
+- `taxonomy.parent_id → taxonomy` - RESTRICT ✅
+- `species_taxonomy.taxonomy_id → taxonomy` - RESTRICT ✅
+- `image.source_id → source` - SET NULL ✅ (preserves images, nulls reference)
+
+### Phase 1: Informed Delete
+
+**Coordinated cascade deletion with full transparency:**
+- Shows ALL data that will be deleted (not just direct children)
+- User sees impact summary + expandable details
+- "Type name to confirm" safety mechanism
+- Performs deletion in correct order (leaves first) within a transaction
+- Database RESTRICT constraints serve as safety net for race conditions
+
+**Scope for Phase 1:**
+- Tracer bullet: Taxonomy (Family and Genus deletion)
+- Sections do not cascade, so not included
+- Future: extend pattern to other entities with large cascades
 
 ---
 
 ## Design Details
 
-### Database Schema
+### Completed: Foreign Key Changes (2026-02)
 
-**New `versions` table:**
+These changes were applied during the V2 schema migration:
+
+| FK | Change | Status |
+|----|--------|--------|
+| `taxonomy.parent_id → taxonomy` | CASCADE → RESTRICT | ✅ Done |
+| `species_taxonomy.taxonomy_id → taxonomy` | CASCADE → RESTRICT | ✅ Done |
+| `image.source_id → source` | CASCADE → SET NULL | ✅ Done |
+| `taxonomy.type_id → taxontype` | N/A (no FK, TEXT field) | N/A |
+
+**All other cascades are correct:**
+- ✅ Join table cascades (cleanup relationships)
+- ✅ Gall trait cascades (cleanup characteristics)
+- ✅ `image.species_id → species CASCADE` (intentional, with S3 cleanup)
+- ✅ Alias cascades
+- ✅ Lookup table SET NULL
+
+### Phase 2: Database Schema (Future)
+
+**New `versions` table for ex_audit:**
 
 ```sql
 CREATE TABLE versions (
@@ -136,52 +169,254 @@ CREATE INDEX idx_versions_recorded_at ON versions(recorded_at);
 CREATE INDEX idx_versions_action ON versions(action);
 ```
 
-### Foreign Key Changes
-
-**Updated analysis (2026-02-01) - 4 database changes needed:**
-
-**1. `taxonomy.parent_id → taxonomy`**
-```sql
--- Change from CASCADE to RESTRICT
--- Prevents: Delete Family → cascade delete child Genera → cascade delete all Species
--- Critical protection against catastrophic data loss
-```
-
-**2. `image.source_id → source`**
-```sql
--- Change from CASCADE to RESTRICT (updated from original SET NULL plan)
--- Prevents: Delete source → cascade delete images
--- Behavior: Blocks deletion; user must reassign images or delete them first
-```
-
-**3. `speciestaxonomy.taxonomy_id → taxonomy`**
-```sql
--- Change from CASCADE to RESTRICT
--- Prevents: Delete taxonomy → orphan species taxonomic classifications
--- Forces: Explicit reassignment or deletion of species before taxonomy deletion
-```
-
-**4. `taxonomy.type_id → taxontype`**
-```sql
--- Add RESTRICT constraint
--- Prevents: Delete taxonomy type (e.g., "genus") while records of that type exist
--- Safety: Fundamental classification data protected
-```
-
-**All other cascades are correct and should remain:**
-- ✅ Join table cascades (cleanup relationships when either side deleted)
-- ✅ Gall trait cascades (cleanup characteristics)
-- ✅ `image.species_id → species CASCADE` (intentional, with S3 cleanup)
-- ✅ Alias cascades (two-level from owner, one-level from alias)
-- ✅ Lookup table SET NULL (abundance, detachable, walls, cells, form)
-
 **See Appendix B for complete cascade constraint analysis.**
 
 ---
 
 ## Application Code Changes
 
-### 1. ex_audit Setup
+### Phase 1: Informed Delete (Coordinated Cascade)
+
+#### 1. Cascade Impact Gathering
+
+**Recursively gather all data that will be deleted:**
+```elixir
+# lib/gallformers/taxonomy.ex
+
+@doc """
+Gathers all data that would be deleted if this taxonomy is deleted.
+Returns counts and lists for UI display.
+"""
+def get_deletion_impact(%Taxonomy{id: id, type: "family"} = taxonomy) do
+  genera = list_child_genera(id)
+  genera_ids = Enum.map(genera, & &1.id)
+
+  sections = list_child_sections(id)
+  section_ids = Enum.map(sections, & &1.id)
+
+  # Species linked to this family, its genera, or its sections
+  all_taxonomy_ids = [id | genera_ids] ++ section_ids
+  species_count = count_species_for_taxonomies(all_taxonomy_ids)
+
+  %{
+    taxonomy: taxonomy,
+    genera: genera,
+    genera_count: length(genera),
+    sections: sections,
+    sections_count: length(sections),
+    species_count: species_count,
+    has_impact: length(genera) > 0 or length(sections) > 0 or species_count > 0
+  }
+end
+
+def get_deletion_impact(%Taxonomy{id: id, type: "genus"} = taxonomy) do
+  sections = list_child_sections(id)
+  section_ids = Enum.map(sections, & &1.id)
+
+  all_taxonomy_ids = [id | section_ids]
+  species_count = count_species_for_taxonomies(all_taxonomy_ids)
+
+  %{
+    taxonomy: taxonomy,
+    genera: [],
+    genera_count: 0,
+    sections: sections,
+    sections_count: length(sections),
+    species_count: species_count,
+    has_impact: length(sections) > 0 or species_count > 0
+  }
+end
+
+def get_deletion_impact(%Taxonomy{} = taxonomy) do
+  # Section or other types - no cascade concern
+  %{
+    taxonomy: taxonomy,
+    genera: [],
+    genera_count: 0,
+    sections: [],
+    sections_count: 0,
+    species_count: 0,
+    has_impact: false
+  }
+end
+```
+
+#### 2. Coordinated Cascade Delete (Transaction)
+
+**Delete in correct order to satisfy RESTRICT constraints:**
+```elixir
+# lib/gallformers/taxonomy.ex
+
+@doc """
+Deletes taxonomy and all dependent data in a single transaction.
+Deletes leaves first (species), then sections, then genera, then family.
+Returns {:ok, impact} or {:error, reason}.
+"""
+def delete_taxonomy_cascade(%Taxonomy{id: id, type: "family"}) do
+  impact = get_deletion_impact(taxonomy)
+
+  Repo.transaction(fn ->
+    # 1. Delete all species linked to this family tree
+    #    (cascades: images, aliases, sources, places, host associations)
+    delete_species_for_taxonomies(impact.all_taxonomy_ids)
+
+    # 2. Delete sections (now safe - no species references)
+    Enum.each(impact.sections, &Repo.delete/1)
+
+    # 3. Delete genera (now safe - no species or section references)
+    Enum.each(impact.genera, &Repo.delete/1)
+
+    # 4. Delete the family itself
+    Repo.delete!(taxonomy)
+
+    impact
+  end)
+end
+
+def delete_taxonomy_cascade(%Taxonomy{id: id, type: "genus"} = taxonomy) do
+  impact = get_deletion_impact(taxonomy)
+
+  Repo.transaction(fn ->
+    # 1. Delete all species linked to this genus or its sections
+    delete_species_for_taxonomies(impact.all_taxonomy_ids)
+
+    # 2. Delete sections
+    Enum.each(impact.sections, &Repo.delete/1)
+
+    # 3. Delete the genus itself
+    Repo.delete!(taxonomy)
+
+    impact
+  end)
+end
+
+defp delete_species_for_taxonomies(taxonomy_ids) do
+  # Get species IDs first for S3 cleanup
+  species_ids = from(st in SpeciesTaxonomy,
+    where: st.taxonomy_id in ^taxonomy_ids,
+    select: st.species_id)
+    |> Repo.all()
+
+  # Delete images from S3 (before DB delete)
+  cleanup_species_images(species_ids)
+
+  # Delete species (cascades: speciestaxonomy, speciessource,
+  #                speciesplace, images, aliases, host associations)
+  from(s in Species, where: s.id in ^species_ids)
+  |> Repo.delete_all()
+end
+```
+
+#### 3. LiveView Handler
+
+```elixir
+def handle_event("initiate_delete", _params, socket) do
+  taxonomy = socket.assigns.taxonomy
+  impact = Taxonomy.get_deletion_impact(taxonomy)
+
+  {:noreply, assign(socket, deletion_impact: impact, show_delete_modal: true)}
+end
+
+def handle_event("confirm_delete", %{"confirmation" => name}, socket) do
+  taxonomy = socket.assigns.taxonomy
+
+  if String.trim(name) == taxonomy.name do
+    case Taxonomy.delete_taxonomy_cascade(taxonomy) do
+      {:ok, impact} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Deleted #{taxonomy.name} and all dependent data")
+         |> push_navigate(to: ~p"/admin/taxonomy")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Delete failed: #{inspect(reason)}")}
+    end
+  else
+    {:noreply, put_flash(socket, :error, "Name does not match")}
+  end
+end
+
+def handle_event("cancel_delete", _params, socket) do
+  {:noreply, assign(socket, deletion_impact: nil, show_delete_modal: false)}
+end
+```
+
+#### 4. UI: Cascade Delete Confirmation Modal
+
+```heex
+<.modal :if={@show_delete_modal} id="cascade-delete-modal" show>
+  <:title>Delete <%= @deletion_impact.taxonomy.name %>?</:title>
+
+  <div class="space-y-4">
+    <p class="text-red-700 font-medium">
+      To delete <%= @deletion_impact.taxonomy.name %>, all dependent data will be permanently deleted.
+    </p>
+
+    <%!-- Impact Summary --%>
+    <div class="bg-red-50 border border-red-200 rounded p-4">
+      <p class="font-medium mb-2">This will delete:</p>
+      <ul class="list-disc list-inside space-y-1">
+        <li :if={@deletion_impact.genera_count > 0}>
+          <strong><%= @deletion_impact.genera_count %></strong> genera
+        </li>
+        <li :if={@deletion_impact.sections_count > 0}>
+          <strong><%= @deletion_impact.sections_count %></strong> sections
+        </li>
+        <li :if={@deletion_impact.species_count > 0}>
+          <strong><%= @deletion_impact.species_count %></strong> species
+        </li>
+        <li :if={@deletion_impact.species_count > 0} class="text-sm text-gray-600">
+          All related data: images, aliases, sources, host associations
+        </li>
+      </ul>
+    </div>
+
+    <%!-- Expandable Details --%>
+    <details :if={@deletion_impact.genera_count > 0 or @deletion_impact.sections_count > 0}>
+      <summary class="cursor-pointer text-blue-600 hover:text-blue-800">
+        Show details
+      </summary>
+      <div class="mt-2 pl-4 text-sm space-y-2">
+        <div :if={@deletion_impact.genera_count > 0}>
+          <p class="font-medium">Genera:</p>
+          <ul class="list-disc list-inside">
+            <li :for={genus <- @deletion_impact.genera}><%= genus.name %></li>
+          </ul>
+        </div>
+        <div :if={@deletion_impact.sections_count > 0}>
+          <p class="font-medium">Sections:</p>
+          <ul class="list-disc list-inside">
+            <li :for={section <- @deletion_impact.sections}><%= section.name %></li>
+          </ul>
+        </div>
+      </div>
+    </details>
+
+    <%!-- Type to Confirm --%>
+    <.simple_form for={%{}} phx-submit="confirm_delete" class="mt-4">
+      <p class="text-sm text-gray-700 mb-2">
+        Type <strong><%= @deletion_impact.taxonomy.name %></strong> to confirm:
+      </p>
+      <.input name="confirmation" type="text" autocomplete="off" required />
+
+      <:actions>
+        <.button type="submit" class="bg-red-600 hover:bg-red-700">
+          Delete Forever
+        </.button>
+        <.button type="button" phx-click="cancel_delete">
+          Cancel
+        </.button>
+      </:actions>
+    </.simple_form>
+  </div>
+</.modal>
+```
+
+---
+
+### Phase 2: Audit Trail (Future)
+
+#### 1. ex_audit Setup
 
 **Dependencies:**
 ```elixir
@@ -216,7 +451,7 @@ config :ex_audit,
   ]
 ```
 
-### 2. User Context Tracking
+#### 2. User Context Tracking
 
 **Plug to capture current user:**
 ```elixir
@@ -240,112 +475,22 @@ defmodule GallformersWeb.Plugs.AuditContext do
 end
 ```
 
-**Add to router:**
-```elixir
-# lib/gallformers_web/router.ex
-pipeline :browser do
-  # ... existing plugs
-  plug GallformersWeb.Plugs.AuditContext
-end
-```
+#### 3. Deletion Reason Collection (Phase 2 UI Enhancement)
 
-### 3. Dependency Validation
-
-**Context pattern:**
-```elixir
-# lib/gallformers/taxonomy.ex
-def delete_taxonomy(%Taxonomy{} = taxonomy, opts \\ []) do
-  reason = Keyword.get(opts, :reason)
-
-  with :ok <- validate_dependencies(taxonomy),
-       :ok <- validate_reason_if_required(taxonomy, reason),
-       {:ok, deleted} <- do_delete(taxonomy, reason) do
-    {:ok, deleted}
-  end
-end
-
-defp validate_dependencies(%Taxonomy{id: id}) do
-  cond do
-    has_children?(id) ->
-      {:error, {:has_children, count_children(id)}}
-
-    has_species?(id) ->
-      {:error, {:has_species, count_species(id)}}
-
-    true ->
-      :ok
-  end
-end
-
-defp validate_reason_if_required(%{type: "family"}, nil) do
-  {:error, :reason_required}
-end
-defp validate_reason_if_required(_, _), do: :ok
-
-defp do_delete(taxonomy, reason) do
-  custom = if reason, do: %{deletion_reason: reason}, else: %{}
-  Repo.delete(taxonomy, ex_audit_custom: custom)
-end
-```
-
-**Error handling:**
-```elixir
-case delete_taxonomy(taxonomy, reason: reason) do
-  {:ok, _} ->
-    {:noreply, put_flash(socket, :info, "Deleted")}
-
-  {:error, {:has_children, count}} ->
-    {:noreply, put_flash(socket, :error,
-      "Cannot delete: has #{count} child genera. Reassign or delete them first.")}
-
-  {:error, {:has_species, count}} ->
-    {:noreply, put_flash(socket, :error,
-      "Cannot delete: has #{count} associated species.")}
-
-  {:error, :reason_required} ->
-    {:noreply, put_flash(socket, :error,
-      "Deletion reason required for Family-level taxonomy.")}
-
-  {:error, %Ecto.Changeset{} = changeset} ->
-    # Database RESTRICT caught something we missed
-    {:noreply, assign(socket, :errors, translate_errors(changeset))}
-end
-```
-
-### 4. UI Enhancements
-
-**Deletion workflow:**
 ```heex
-<.modal id="delete-genus-modal">
-  <:title>Delete Genus: <%= @taxonomy.name %></:title>
+<.modal :if={@pending_delete_deps == %{}} id="delete-confirm-modal" show>
+  <:title>Delete <%= @taxonomy.name %>?</:title>
 
-  <.alert :if={@dependencies != []}>
-    This genus has dependencies that must be handled first:
-
-    <ul>
-      <li :for={dep <- @dependencies}>
-        <%= dep.count %> <%= dep.type %>
-      </li>
-    </ul>
-
-    Choose an action:
-    <.button phx-click="reassign">Reassign to another Genus</.button>
-    <.button phx-click="show_children">Review and delete individually</.button>
-  </.alert>
-
-  <.simple_form :if={@dependencies == []} for={@form} phx-submit="confirm_delete">
+  <.simple_form for={@form} phx-submit="confirm_delete">
     <.input
       field={@form[:reason]}
       type="textarea"
-      label="Reason for deletion (required for accountability):"
-      required
+      label="Reason for deletion (for audit trail):"
     />
 
     <:actions>
       <.button type="submit" class="danger">Delete</.button>
-      <.button type="button" phx-click={hide_modal("delete-genus-modal")}>
-        Cancel
-      </.button>
+      <.button type="button" phx-click="cancel_delete">Cancel</.button>
     </:actions>
   </.simple_form>
 </.modal>
@@ -353,263 +498,235 @@ end
 
 ---
 
-## Migration Strategy
+## Implementation Strategy
 
-### Phase 1: Setup (No User Impact)
+### Completed: CASCADE Fixes (2026-02)
 
-**1. Add ex_audit dependency**
-- Add to mix.exs
-- Run `mix deps.get`
-
-**2. Create versions table**
-- Generate migration
-- Run `mix ecto.migrate`
-
-**3. Configure ex_audit**
-- Update Repo module
-- Configure tracked schemas
-- Add audit context plug
-
-**4. Deploy**
-- No user-facing changes yet
-- Audit tracking begins silently
-
-### Phase 2: Fix 2 Dangerous Cascades
-
-**Migration 1: taxonomy.parent_id RESTRICT**
-```elixir
-defmodule Gallformers.Repo.Migrations.ProtectTaxonomyHierarchy do
-  use Ecto.Migration
-
-  def up do
-    execute "PRAGMA foreign_keys = OFF"
-
-    # Rebuild taxonomy with RESTRICT on parent_id
-    create table(:taxonomy_new) do
-      add :name, :string, null: false
-      add :description, :string, default: ""
-      add :type, :string, null: false
-      add :parent_id, references(:taxonomy_new, on_delete: :restrict)
-    end
-
-    execute "INSERT INTO taxonomy_new SELECT * FROM taxonomy"
-    execute "DROP TABLE taxonomy"
-    execute "ALTER TABLE taxonomy_new RENAME TO taxonomy"
-
-    # Recreate indexes
-    create index(:taxonomy, [:parent_id])
-    create unique_index(:taxonomy, [:name, :type])
-
-    execute "PRAGMA foreign_keys = ON"
-    execute "PRAGMA foreign_key_check"
-  end
-end
-```
-
-**Migration 2: image.source_id RESTRICT**
-```elixir
-defmodule Gallformers.Repo.Migrations.ImageSourceRestrict do
-  use Ecto.Migration
-
-  def up do
-    execute "PRAGMA foreign_keys = OFF"
-
-    # Rebuild image with RESTRICT on source_id (updated from original SET NULL plan)
-    create table(:image_new) do
-      add :species_id, references(:species, on_delete: :cascade), null: false
-      add :source_id, references(:source, on_delete: :restrict)
-      # ... other columns
-    end
-
-    execute "INSERT INTO image_new SELECT * FROM image"
-    execute "DROP TABLE image"
-    execute "ALTER TABLE image_new RENAME TO image"
-
-    # Recreate indexes
-    create index(:image, [:species_id])
-    create index(:image, [:source_id])
-
-    execute "PRAGMA foreign_keys = ON"
-    execute "PRAGMA foreign_key_check"
-  end
-end
-```
-
-**Migration 3: speciestaxonomy.taxonomy_id RESTRICT**
-```elixir
-defmodule Gallformers.Repo.Migrations.SpeciesTaxonomyRestrict do
-  use Ecto.Migration
-
-  def up do
-    execute "PRAGMA foreign_keys = OFF"
-
-    # Rebuild speciestaxonomy with RESTRICT on taxonomy_id
-    create table(:speciestaxonomy_new) do
-      add :species_id, references(:species, on_delete: :cascade), null: false
-      add :taxonomy_id, references(:taxonomy, on_delete: :restrict), null: false
-      # ... other columns
-    end
-
-    execute "INSERT INTO speciestaxonomy_new SELECT * FROM speciestaxonomy"
-    execute "DROP TABLE speciestaxonomy"
-    execute "ALTER TABLE speciestaxonomy_new RENAME TO speciestaxonomy"
-
-    # Recreate indexes
-    create index(:speciestaxonomy, [:species_id])
-    create index(:speciestaxonomy, [:taxonomy_id])
-    create unique_index(:speciestaxonomy, [:species_id, :taxonomy_id])
-
-    execute "PRAGMA foreign_keys = ON"
-    execute "PRAGMA foreign_key_check"
-  end
-end
-```
-
-**Migration 4: taxonomy.type_id RESTRICT**
-```elixir
-defmodule Gallformers.Repo.Migrations.TaxonomyTypeRestrict do
-  use Ecto.Migration
-
-  def up do
-    execute "PRAGMA foreign_keys = OFF"
-
-    # Rebuild taxonomy with RESTRICT on type_id
-    create table(:taxonomy_new) do
-      add :name, :string, null: false
-      add :description, :string, default: ""
-      add :type_id, references(:taxontype, on_delete: :restrict), null: false
-      add :parent_id, references(:taxonomy_new, on_delete: :restrict)
-      # ... other columns
-    end
-
-    execute "INSERT INTO taxonomy_new SELECT * FROM taxonomy"
-    execute "DROP TABLE taxonomy"
-    execute "ALTER TABLE taxonomy_new RENAME TO taxonomy"
-
-    # Recreate indexes
-    create index(:taxonomy, [:parent_id])
-    create index(:taxonomy, [:type_id])
-    create unique_index(:taxonomy, [:name, :type_id])
-
-    execute "PRAGMA foreign_keys = ON"
-    execute "PRAGMA foreign_key_check"
-  end
-end
-```
-
-### Phase 3: Application Validation
-
-**Add dependency validation for critical tables:**
-
-- Taxonomy (Genus, Family, Section)
-- Species
-- Gall
-- Host
-- Source
-
-**UI enhancements:**
-- Dependency warning screens
-- Deletion reason prompts
-- "Reassign or delete children first" workflows
-
-### Phase 4: Rollout
-
-**Week 1:** Deploy ex_audit (silent, starts tracking)
-**Week 2:** Deploy 2 CASCADE fix migrations
-**Week 3:** Deploy application validation + UI
-**Week 4:** Monitor, gather feedback
+Database constraints updated during V2 schema migration. No further migration work needed.
 
 ---
 
-## Restore Capability
+### Phase 1: Informed Delete (Current Focus)
 
-### Design
+**Goal:** Admins see what will be affected before confirming deletion.
 
-Since cascades are prevented, restore is simpler than originally thought:
+**Phase 1 Scope (Tracer Bullet):**
 
-**Single record restore:**
+| Entity | What to Show | Cascade Concern |
+|--------|--------------|-----------------|
+| **Taxonomy (Family)** | Genera, Sections, Species count | ✅ Yes - large cascade |
+| **Taxonomy (Genus)** | Sections, Species count | ✅ Yes - large cascade |
+| **Taxonomy (Section)** | N/A | ❌ No cascade concern |
+
+**Future scope** (after tracer bullet validated):
+- Source → Images (SET NULL, but user should know)
+- Gall → Species, Images, Host associations
+- Host → Gall associations
+
+**Implementation pattern:**
+1. `get_deletion_impact/1` - recursively gather ALL dependent data
+2. Modal shows summary + expandable details
+3. "Type name to confirm" safety mechanism
+4. `delete_taxonomy_cascade/1` - atomic transaction, deletes leaves first
+5. Database RESTRICT serves as safety net for race conditions
+
+**UI workflow:**
+- Click delete → Modal shows full impact
+- Summary: "X genera, Y sections, Z species"
+- "Show details" expands to list genera/sections by name
+- Type taxonomy name to confirm
+- Transaction deletes everything or nothing
+
+---
+
+### Phase 2: Audit Trail (Future)
+
+**Goal:** Track who deleted what, when, with ability to restore.
+
+**Components:**
+1. Add ex_audit dependency
+2. Create `versions` table
+3. Configure Repo and tracked schemas
+4. Add user context plug
+5. (Optional) Build restore capability
+
+**Restore capability:**
 ```elixir
 def restore_from_version(version_id) do
   version = Repo.get!(Version, version_id)
-
-  # Deserialize the original record
   original_record = ExAudit.Tracking.deserialize_patch(version.patch)
-
-  # Re-insert with original ID
   Repo.insert(original_record)
 end
 ```
 
-**No cascade restore needed** because records are never cascade-deleted!
+**No cascade restore needed** because RESTRICT prevents cascade deletes.
+
+See "Application Code Changes" section below for full ex_audit implementation details.
 
 ---
 
 ## Testing Strategy
 
-### Unit Tests
+### Phase 1: Coordinated Cascade Delete Tests
 
+**Unit tests - impact gathering:**
 ```elixir
-describe "delete_taxonomy/1 with RESTRICT constraints" do
-  test "prevents deletion when children exist" do
-    genus = insert_genus_with_species(species_count: 5)
+describe "get_deletion_impact/1" do
+  test "family shows genera, sections, and species counts" do
+    family = insert_family()
+    genus1 = insert_genus(parent: family)
+    genus2 = insert_genus(parent: family)
+    section = insert_section(parent: genus1)
+    insert_species(taxonomy: genus1)
+    insert_species(taxonomy: genus1)
+    insert_species(taxonomy: section)
 
-    assert {:error, {:has_species, 5}} = delete_taxonomy(genus)
-    assert Repo.get(Taxonomy, genus.id) # Still exists
+    impact = Taxonomy.get_deletion_impact(family)
+
+    assert impact.genera_count == 2
+    assert impact.sections_count == 1
+    assert impact.species_count == 3
+    assert impact.has_impact == true
   end
 
-  test "allows deletion when no dependencies" do
-    genus = insert_genus()  # No species
-
-    assert {:ok, _} = delete_taxonomy(genus)
-    refute Repo.get(Taxonomy, genus.id)
-  end
-
-  test "creates audit version on successful delete" do
+  test "genus shows sections and species counts" do
     genus = insert_genus()
-    {:ok, deleted} = delete_taxonomy(genus, reason: "Test cleanup")
+    section = insert_section(parent: genus)
+    insert_species(taxonomy: genus)
+    insert_species(taxonomy: section)
 
-    version = Repo.one!(from v in Version,
-      where: v.entity_schema == "taxonomy" and v.entity_id == ^genus.id)
+    impact = Taxonomy.get_deletion_impact(genus)
 
-    assert version.action == "deleted"
-    assert version.deletion_reason == "Test cleanup"
+    assert impact.genera_count == 0
+    assert impact.sections_count == 1
+    assert impact.species_count == 2
+  end
+
+  test "section has no cascade impact" do
+    section = insert_section()
+
+    impact = Taxonomy.get_deletion_impact(section)
+
+    assert impact.has_impact == false
   end
 end
 ```
 
-### Integration Tests
-
+**Unit tests - cascade delete:**
 ```elixir
-test "race condition prevented by database", %{conn: conn} do
-  genus = insert_genus()
+describe "delete_taxonomy_cascade/1" do
+  test "deletes family and all descendants in transaction" do
+    family = insert_family()
+    genus = insert_genus(parent: family)
+    species = insert_species(taxonomy: genus)
+    image = insert_image(species: species)
 
-  # Simulate concurrent operations
-  task = Task.async(fn ->
-    # Add species after check
-    Process.sleep(10)
-    insert_species(genus_id: genus.id)
-  end)
+    assert {:ok, impact} = Taxonomy.delete_taxonomy_cascade(family)
 
-  # Try to delete (will fail due to RESTRICT)
-  assert {:error, _} = delete_taxonomy(genus)
+    assert impact.species_count == 1
+    refute Repo.get(Taxonomy, family.id)
+    refute Repo.get(Taxonomy, genus.id)
+    refute Repo.get(Species, species.id)
+    refute Repo.get(Image, image.id)
+  end
 
-  Task.await(task)
-  assert Repo.get(Taxonomy, genus.id) # Still exists
-  assert Repo.aggregate(Species, :count) == 1 # Species safe
+  test "rolls back on failure - all or nothing" do
+    family = insert_family()
+    genus = insert_genus(parent: family)
+
+    # Simulate failure mid-transaction (mock or constraint violation)
+
+    assert {:error, _} = Taxonomy.delete_taxonomy_cascade(family)
+
+    # Everything still exists
+    assert Repo.get(Taxonomy, family.id)
+    assert Repo.get(Taxonomy, genus.id)
+  end
+
+  test "cleans up S3 images during cascade" do
+    genus = insert_genus()
+    species = insert_species(taxonomy: genus)
+    image = insert_image(species: species, path: "images/test.jpg")
+
+    expect(S3Mock, :delete_object, fn "images/test.jpg" -> :ok end)
+
+    assert {:ok, _} = Taxonomy.delete_taxonomy_cascade(genus)
+  end
 end
 ```
 
-### E2E Tests
+### E2E Tests (Phase 1)
 
 ```elixir
-test "delete genus with dependencies shows helpful error", %{session: session} do
-  genus = insert_genus_with_species(species_count: 3)
+test "delete family shows full cascade impact", %{session: session} do
+  family = insert_family(name: "Fagaceae")
+  genus = insert_genus(parent: family, name: "Quercus")
+  insert_species(taxonomy: genus)
+  insert_species(taxonomy: genus)
 
   session
-  |> visit("/admin/taxonomy/#{genus.id}")
+  |> visit("/admin/taxonomy/#{family.id}")
   |> click(Query.button("Delete"))
-  |> assert_has(Query.text("has 3 associated species"))
-  |> assert_has(Query.link("Reassign to another Genus"))
+  |> assert_has(Query.text("1 genera"))
+  |> assert_has(Query.text("2 species"))
+  |> assert_has(Query.text("All related data"))
+end
+
+test "show details expands to list genera", %{session: session} do
+  family = insert_family(name: "Fagaceae")
+  insert_genus(parent: family, name: "Quercus")
+  insert_genus(parent: family, name: "Castanea")
+
+  session
+  |> visit("/admin/taxonomy/#{family.id}")
+  |> click(Query.button("Delete"))
+  |> click(Query.text("Show details"))
+  |> assert_has(Query.text("Quercus"))
+  |> assert_has(Query.text("Castanea"))
+end
+
+test "requires typing name to confirm deletion", %{session: session} do
+  family = insert_family(name: "Fagaceae")
+
+  session
+  |> visit("/admin/taxonomy/#{family.id}")
+  |> click(Query.button("Delete"))
+  |> fill_in(Query.text_field("confirmation"), with: "Wrong Name")
+  |> click(Query.button("Delete Forever"))
+  |> assert_has(Query.text("Name does not match"))
+
+  # Still exists
+  assert Repo.get(Taxonomy, family.id)
+end
+
+test "successful cascade delete with correct confirmation", %{session: session} do
+  family = insert_family(name: "Fagaceae")
+  genus = insert_genus(parent: family)
+
+  session
+  |> visit("/admin/taxonomy/#{family.id}")
+  |> click(Query.button("Delete"))
+  |> fill_in(Query.text_field("confirmation"), with: "Fagaceae")
+  |> click(Query.button("Delete Forever"))
+  |> assert_has(Query.text("Deleted Fagaceae"))
+
+  refute Repo.get(Taxonomy, family.id)
+  refute Repo.get(Taxonomy, genus.id)
+end
+```
+
+### Phase 2: Audit Trail Tests (Future)
+
+```elixir
+test "creates audit version on successful delete" do
+  genus = insert_genus()
+  {:ok, deleted} = delete_taxonomy(genus, reason: "Test cleanup")
+
+  version = Repo.one!(from v in Version,
+    where: v.entity_schema == "taxonomy" and v.entity_id == ^genus.id)
+
+  assert version.action == "deleted"
+  assert version.deletion_reason == "Test cleanup"
 end
 ```
 
@@ -617,47 +734,75 @@ end
 
 ## Success Metrics
 
-**Safety:**
-- ✅ Zero accidental cascade deletes
-- ✅ Zero race condition data loss
-- ✅ 100% of deletes tracked in audit log
+### Phase 1: Coordinated Cascade Delete
 
-**Accountability:**
-- ✅ Every deletion has user_id and timestamp
-- ✅ Sensitive deletions have required reasons
-- ✅ Audit log queryable by entity, user, time
+**Safety:**
+- ✅ Zero accidental cascade deletes (RESTRICT constraints as safety net)
+- ✅ Zero race condition data loss (RESTRICT + transactions)
+- ⬚ Admins see FULL impact before confirming delete
+- ⬚ "Type name to confirm" prevents accidental clicks
 
 **Team Confidence:**
-- ✅ Team reports feeling safe to delete data
-- ✅ Reduction in support requests about "how do I delete X"
-- ✅ Reduction in manual backup restoration requests
+- ⬚ Team reports feeling safe to delete data
+- ⬚ Admins can delete families/genera without fear
+- ⬚ Taxonomy deletion re-enabled (currently blocked)
 
 **Technical:**
-- ✅ 2 dangerous CASCADE constraints fixed
-- ✅ ex_audit capturing all CRUD operations
-- ✅ Application validation for critical deletes
+- ✅ CASCADE constraints fixed (safety net)
+- ⬚ Recursive impact gathering for taxonomy
+- ⬚ Atomic transaction for cascade delete
+- ⬚ S3 image cleanup during cascade
+- ⬚ Delete confirmation UI with full impact display
+
+### Phase 2: Audit Trail (Future)
+
+**Accountability:**
+- ⬚ Every deletion has user_id and timestamp
+- ⬚ Sensitive deletions have required reasons
+- ⬚ Audit log queryable by entity, user, time
+- ⬚ 100% of deletes tracked in audit log
 
 ---
 
 ## Open Questions
 
-1. **Restore UI:** Should we build an admin UI for browsing/restoring versions, or keep it iex-only initially?
-2. **Retention:** How long to keep audit records? Forever, or prune after N years?
-3. **Backup coordination:** How does this interact with Litestream backups?
-4. **Performance:** Will audit logging impact performance on high-volume operations?
+### Phase 1 (Resolved)
+1. ✅ **Which entities first?** Taxonomy (Family, Genus) as tracer bullet
+2. ✅ **UI pattern:** Modal with impact summary + expandable details + type-to-confirm
+3. ✅ **Cascade approach:** Show full impact, then perform coordinated delete in transaction
+
+### Phase 1 (Open)
+1. **S3 cleanup timing:** Delete images before or after DB transaction? (Before = orphans on rollback, After = orphan DB refs on S3 failure)
+2. **Large cascades:** Should we add a threshold (e.g., >100 species) that requires extra confirmation?
+3. **Progress feedback:** For very large cascades, show progress indicator?
+
+### Phase 2 (Future)
+1. **Restore UI:** Admin UI for browsing/restoring versions, or iex-only?
+2. **Retention:** How long to keep audit records?
+3. **Performance:** Will audit logging impact high-volume operations?
 
 ---
 
 ## Next Steps
 
-1. ✅ Design complete (this document)
-2. ⏭️ Create detailed implementation plan (use superpowers:writing-plans)
-3. ⏭️ Write migrations for 2 CASCADE fixes
-4. ⏭️ Implement ex_audit setup
-5. ⏭️ Build dependency validation
-6. ⏭️ Update UI for deletion workflows
-7. ⏭️ Write tests
-8. ⏭️ Deploy in phases
+### Completed
+1. ✅ Design document (this document)
+2. ✅ CASCADE constraint fixes (done in V2 schema migration)
+
+### Phase 1: Coordinated Cascade Delete (Taxonomy Tracer Bullet)
+3. ⏭️ Create Phase 1 implementation plan
+4. ⏭️ `get_deletion_impact/1` - recursive impact gathering for Family/Genus
+5. ⏭️ `delete_taxonomy_cascade/1` - atomic transaction delete
+6. ⏭️ S3 image cleanup integration
+7. ⏭️ Cascade delete confirmation modal UI
+8. ⏭️ Write tests (unit + E2E)
+9. ⏭️ Re-enable taxonomy deletion in admin UI
+
+### Phase 2: Audit Trail (Future)
+8. ⏭️ Add ex_audit dependency and configuration
+9. ⏭️ Create versions table migration
+10. ⏭️ Add user context tracking
+11. ⏭️ (Optional) Build restore capability
 
 ---
 
@@ -695,17 +840,17 @@ User deletes GALL →
 ## Appendix B: Complete CASCADE Constraint Analysis
 
 **Date analyzed:** 2026-02-01
-**Status:** Comprehensive review completed for schema refactor planning
+**Updated:** 2026-02-04 (changes applied)
+**Status:** Critical changes applied during V2 schema migration
 
-### Summary of Changes Required
+### Summary of Changes (Applied)
 
-| Foreign Key | Current | Required | Rationale |
-|-------------|---------|----------|-----------|
-| `taxonomy.parent_id → taxonomy` | CASCADE | **RESTRICT** | Prevent catastrophic deletion (Family → Genera → Species) |
-| `image.source_id → source` | CASCADE | **RESTRICT** | Prevent image loss when source deleted (updated from original SET NULL plan) |
-| `speciestaxonomy.taxonomy_id → taxonomy` | CASCADE | **RESTRICT** | Force explicit handling of species before taxonomy deletion |
-| `taxonomy.type_id → taxontype` | ??? | **RESTRICT** | Prevent deletion of taxonomy types in use |
-| `placeplace.parent_id → place` | ??? | **CASCADE** | Geographic hierarchy can cascade delete |
+| Foreign Key | Was | Now | Rationale |
+|-------------|-----|-----|-----------|
+| `taxonomy.parent_id → taxonomy` | CASCADE | **RESTRICT** ✅ | Prevent catastrophic deletion |
+| `species_taxonomy.taxonomy_id → taxonomy` | CASCADE | **RESTRICT** ✅ | Force explicit handling of species |
+| `image.source_id → source` | CASCADE | **SET NULL** ✅ | Preserve images, null the reference |
+| `taxonomy.type_id → taxontype` | N/A | N/A | No FK exists - `type` is TEXT field |
 
 All other constraints remain CASCADE or SET NULL as designed.
 

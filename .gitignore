@@ -74,6 +74,9 @@ npm-debug.log
 # Dialyzer PLT files (large, environment-specific)
 /priv/plts/
 
+# Request logs (development only, production uses /data/logs)
+/priv/logs/
+
 # API compiled binaries
 api/bin/
 

@@ -4,13 +4,13 @@ defmodule GallformersWeb.Admin.HostLive.Index do
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.Hosts
+  alias Gallformers.Plants
 
   @impl true
   def mount(_params, session, socket) do
     current_user = session["current_user"]
 
-    if connected?(socket), do: Hosts.subscribe()
+    if connected?(socket), do: Plants.subscribe()
 
     socket =
       socket
@@ -40,7 +40,7 @@ defmodule GallformersWeb.Admin.HostLive.Index do
 
   @impl true
   def handle_event("delete", %{"id" => id}, socket) do
-    case Hosts.delete_host(String.to_integer(id)) do
+    case Plants.delete_host(String.to_integer(id)) do
       {:ok, _} ->
         {:noreply,
          socket
@@ -59,8 +59,8 @@ defmodule GallformersWeb.Admin.HostLive.Index do
     {:noreply, assign(socket, hosts: hosts)}
   end
 
-  defp list_hosts(""), do: Hosts.list_hosts_paginated(100, 0)
-  defp list_hosts(query), do: Hosts.search_hosts(query, 100)
+  defp list_hosts(""), do: Plants.list_hosts_paginated(100, 0)
+  defp list_hosts(query), do: Plants.search_hosts(query, 100)
 
   @impl true
   def render(assigns) do

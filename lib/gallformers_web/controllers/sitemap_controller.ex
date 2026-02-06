@@ -44,6 +44,7 @@ defmodule GallformersWeb.SitemapController do
   end
 
   # Static pages with high priority
+  # Note: /id is excluded - it's an interactive tool, not content for indexing
   defp static_urls do
     [
       %{loc: @base_url, changefreq: "daily", priority: "1.0"},
@@ -51,8 +52,7 @@ defmodule GallformersWeb.SitemapController do
       %{loc: "#{@base_url}/glossary", changefreq: "weekly", priority: "0.8"},
       %{loc: "#{@base_url}/filterguide", changefreq: "monthly", priority: "0.7"},
       %{loc: "#{@base_url}/articles", changefreq: "weekly", priority: "0.7"},
-      %{loc: "#{@base_url}/explore", changefreq: "weekly", priority: "0.8"},
-      %{loc: "#{@base_url}/id", changefreq: "weekly", priority: "0.9"}
+      %{loc: "#{@base_url}/explore", changefreq: "weekly", priority: "0.8"}
     ]
   end
 

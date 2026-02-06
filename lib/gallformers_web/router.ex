@@ -10,6 +10,7 @@ defmodule GallformersWeb.Router do
     plug :put_root_layout, html: {GallformersWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug GallformersWeb.Plugs.ContentSecurityPolicy
     plug :fetch_current_user
     plug GallformersWeb.Plugs.Analytics
   end
@@ -17,6 +18,7 @@ defmodule GallformersWeb.Router do
   pipeline :api do
     plug :accepts, ["json"]
     plug GallformersWeb.Plugs.CORS
+    plug GallformersWeb.Plugs.ApiCache
     plug OpenApiSpex.Plug.PutApiSpec, module: GallformersWeb.ApiSpec
   end
 
@@ -188,24 +190,20 @@ defmodule GallformersWeb.Router do
   scope "/api/v2", GallformersWeb.API do
     pipe_through [:api, GallformersWeb.Plugs.RateLimiter]
 
-    # Species endpoints
-    get "/species", SpeciesController, :index
-    get "/species/:id", SpeciesController, :show
-
     # Gall endpoints
     get "/galls", GallController, :index
-    get "/galls/random", GallController, :random
-    get "/galls/id", GallController, :id_tool
     get "/galls/:id", GallController, :show
     get "/galls/:id/images", GallController, :images
-    get "/galls/:id/related", GallController, :related
+    get "/galls/:id/sources", GallController, :sources
 
     # Host endpoints
     get "/hosts", HostController, :index
     get "/hosts/:id", HostController, :show
+    get "/hosts/:id/images", HostController, :images
+    get "/hosts/:id/galls", HostController, :galls
 
     # Taxonomy endpoints
-    get "/taxonomy/:id", TaxonomyController, :show
+    get "/genera", TaxonomyController, :genera
     get "/families", TaxonomyController, :families
     get "/families/:id", TaxonomyController, :family
     get "/genera/:id", TaxonomyController, :genus
@@ -217,21 +215,15 @@ defmodule GallformersWeb.Router do
 
     # Glossary endpoints
     get "/glossary", GlossaryController, :index
-    get "/glossary/:id", GlossaryController, :show
     get "/glossary/by-word/:word", GlossaryController, :by_word
 
     # Place endpoints
     get "/places", PlaceController, :index
-    get "/places/:id", PlaceController, :show
 
-    # Search endpoints
+    # Search
     get "/search", SearchController, :search
-    get "/explore", ExploreController, :explore
 
-    # Filter fields for ID tool
-    get "/filter-fields", FilterFieldController, :index
-
-    # Stats endpoint
+    # Stats
     get "/stats", StatsController, :index
   end
 

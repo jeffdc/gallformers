@@ -1,4 +1,4 @@
-defmodule Gallformers.GallSummary do
+defmodule Gallformers.Galls.Summary do
   @moduledoc """
   Generates human-readable summaries of gall characteristics.
 
@@ -22,10 +22,10 @@ defmodule Gallformers.GallSummary do
 
   ## Examples
 
-      iex> GallSummary.generate(%{shapes: ["spherical"], colors: ["red"], plant_parts: ["leaf"]})
+      iex> Galls.Summary.generate(%{shapes: ["spherical"], colors: ["red"], plant_parts: ["leaf"]})
       "A spherical, red gall found on the leaf."
 
-      iex> GallSummary.generate(%{forms: ["non-gall"], colors: ["red"]})
+      iex> Galls.Summary.generate(%{forms: ["non-gall"], colors: ["red"]})
       "A red structure."
   """
   @spec generate(map() | nil, keyword()) :: String.t()
@@ -55,7 +55,7 @@ defmodule Gallformers.GallSummary do
 
   ## Examples
 
-      iex> GallSummary.for_seo("Andricus quercuscalifornicus", %{shapes: ["spherical"]})
+      iex> Galls.Summary.for_seo("Andricus quercuscalifornicus", %{shapes: ["spherical"]})
       "Andricus quercuscalifornicus - A spherical gall."
   """
   @spec for_seo(String.t(), map() | nil) :: String.t()
@@ -92,14 +92,14 @@ defmodule Gallformers.GallSummary do
   @doc """
   Converts database filter format to summary generator format.
 
-  Database format (from Species.get_gall_filter_values/1):
+  Database format (from Galls.get_gall_filter_values/1):
     %{colors: [%{id: 1, field: "red"}], shapes: [...], ...}
 
   Summary format:
     %{colors: ["red"], shapes: [...], detachable: "detachable", ...}
 
   ## Parameters
-    - `db_filters` - Map from Species.get_gall_filter_values/1
+    - `db_filters` - Map from Galls.get_gall_filter_values/1
     - `detachable` - Integer from gall.detachable (0=unknown, 1=integral, 2=detachable, 3=both)
   """
   @spec from_db_filters(map() | nil, integer()) :: map()

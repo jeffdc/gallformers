@@ -4,7 +4,7 @@ defmodule GallformersWeb.API.HostControllerTest do
   """
   use GallformersWeb.ConnCase
 
-  alias Gallformers.Hosts
+  alias Gallformers.{Plants, Species}
 
   describe "GET /api/v2/hosts" do
     test "returns list of hosts", %{conn: conn} do
@@ -68,7 +68,7 @@ defmodule GallformersWeb.API.HostControllerTest do
 
   describe "GET /api/v2/hosts/:id" do
     test "returns host details for valid ID", %{conn: conn} do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
         host = hd(hosts)
@@ -97,7 +97,7 @@ defmodule GallformersWeb.API.HostControllerTest do
     end
 
     test "returns host with gall count", %{conn: conn} do
-      hosts = Hosts.list_hosts()
+      hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
         host = hd(hosts)
@@ -107,6 +107,96 @@ defmodule GallformersWeb.API.HostControllerTest do
         # Should include galls or gall_count
         assert Map.has_key?(response, "galls") or Map.has_key?(response, "gall_count")
       end
+    end
+  end
+
+  describe "GET /api/v2/hosts/:id/images" do
+    test "returns images for host", %{conn: conn} do
+      hosts = Plants.list_hosts()
+
+      if length(hosts) > 0 do
+        host = hd(hosts)
+        conn = get(conn, ~p"/api/v2/hosts/#{host.id}/images")
+
+        response = json_response(conn, 200)
+        assert is_list(response)
+      end
+    end
+
+    test "images have expected fields", %{conn: conn} do
+      hosts = Plants.list_hosts()
+
+      host_with_images =
+        Enum.find(hosts, fn h ->
+          length(Species.get_images_for_species(h.id)) > 0
+        end)
+
+      if host_with_images do
+        conn = get(conn, ~p"/api/v2/hosts/#{host_with_images.id}/images")
+
+        response = json_response(conn, 200)
+        image = hd(response)
+        assert Map.has_key?(image, "id")
+        assert Map.has_key?(image, "path")
+        assert Map.has_key?(image, "url")
+      end
+    end
+
+    test "returns 400 for invalid ID", %{conn: conn} do
+      conn = get(conn, ~p"/api/v2/hosts/invalid/images")
+
+      assert json_response(conn, 400)
+    end
+
+    test "returns 404 for non-existent host", %{conn: conn} do
+      conn = get(conn, ~p"/api/v2/hosts/999999999/images")
+
+      assert json_response(conn, 404)
+    end
+  end
+
+  describe "GET /api/v2/hosts/:id/galls" do
+    test "returns galls for host", %{conn: conn} do
+      hosts = Plants.list_hosts()
+
+      if length(hosts) > 0 do
+        host = hd(hosts)
+        conn = get(conn, ~p"/api/v2/hosts/#{host.id}/galls")
+
+        response = json_response(conn, 200)
+        assert is_list(response)
+      end
+    end
+
+    test "galls have expected fields", %{conn: conn} do
+      hosts = Plants.list_hosts()
+
+      if length(hosts) > 0 do
+        host = hd(hosts)
+        conn = get(conn, ~p"/api/v2/hosts/#{host.id}/galls")
+
+        response = json_response(conn, 200)
+
+        if length(response) > 0 do
+          gall = hd(response)
+          assert Map.has_key?(gall, "id")
+          assert Map.has_key?(gall, "name")
+          assert Map.has_key?(gall, "undescribed")
+          assert Map.has_key?(gall, "datacomplete")
+        end
+      end
+    end
+
+    test "returns 400 for invalid ID", %{conn: conn} do
+      conn = get(conn, ~p"/api/v2/hosts/invalid/galls")
+
+      assert json_response(conn, 400)
+    end
+
+    test "returns 404 for non-existent host", %{conn: conn} do
+      conn = get(conn, ~p"/api/v2/hosts/999999999/galls")
+
+      assert json_response(conn, 404)
     end
   end
 end

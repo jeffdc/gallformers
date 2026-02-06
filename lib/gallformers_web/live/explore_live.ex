@@ -11,7 +11,8 @@ defmodule GallformersWeb.ExploreLive do
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.Explore
+  alias Gallformers.Galls
+  alias Gallformers.Plants
   alias GallformersWeb.TreeComponents
 
   @tabs ~w(galls undescribed hosts)
@@ -23,9 +24,9 @@ defmodule GallformersWeb.ExploreLive do
   @impl true
   def mount(_params, _session, socket) do
     # Load all tree data on mount
-    galls_tree = Explore.get_galls_tree()
-    undescribed_tree = Explore.get_undescribed_tree()
-    hosts_tree = Explore.get_hosts_tree()
+    galls_tree = Galls.get_galls_tree()
+    undescribed_tree = Galls.get_undescribed_tree()
+    hosts_tree = Plants.get_hosts_tree()
 
     {:ok,
      assign(socket,

@@ -7,6 +7,7 @@ defmodule GallformersWeb.SectionLive do
   """
   use GallformersWeb, :live_view
 
+  alias Gallformers.Species
   alias Gallformers.Taxonomy
 
   @impl true
@@ -60,7 +61,9 @@ defmodule GallformersWeb.SectionLive do
            )}
         else
           # Get enriched species for this section
-          species = Taxonomy.get_enriched_species_for_section(section_id)
+          species =
+            Taxonomy.get_species_for_section(section_id)
+            |> Species.enrich_with_common_names_and_counts()
 
           {:ok,
            assign(socket,

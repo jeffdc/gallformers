@@ -8,7 +8,9 @@ defmodule GallformersWeb.FormComponents do
   use Phoenix.Component
   use Gettext, backend: GallformersWeb.Gettext
 
-  import GallformersWeb.CoreComponents, only: [icon: 1]
+  import GallformersWeb.CoreComponents, only: [icon: 1, modal: 1]
+
+  alias Phoenix.LiveView.JS
 
   @doc """
   Renders a multi-select component with pill-style toggle buttons.
@@ -884,9 +886,14 @@ defmodule GallformersWeb.FormComponents do
   The modal allows renaming a species and optionally adding an alias for the old name.
   All events are emitted to the parent LiveView which handles the actual rename logic.
 
+  Backdrop click, ESC, and X button are routed through `on_cancel` to allow the
+  parent LiveView to guard against accidental dismiss when the form has changes.
+  The Cancel button always fires `close_rename_modal` directly.
+
   ## Events emitted
 
-  - `close_rename_modal` - when user clicks Cancel, backdrop, or presses Escape
+  - `request_close_rename` - when user clicks backdrop, presses ESC, or clicks X (via on_cancel)
+  - `close_rename_modal` - when user clicks Cancel (always closes)
   - `update_rename_value` - when user types in the input (params: `value`)
   - `toggle_add_alias_on_rename` - when user toggles the checkbox
   - `do_rename` - when user clicks Save Changes
@@ -913,82 +920,207 @@ defmodule GallformersWeb.FormComponents do
 
   def rename_modal(assigns) do
     ~H"""
-    <%= if @show do %>
-      <div
-        class="fixed inset-0 z-50 overflow-y-auto"
-        phx-window-keydown="close_rename_modal"
-        phx-key="Escape"
-      >
-        <div class="flex min-h-full items-center justify-center p-4">
-          <%!-- Backdrop --%>
-          <div
-            class="fixed inset-0 bg-black/50 transition-opacity"
-            phx-click="close_rename_modal"
-          >
-          </div>
+    <.modal
+      :if={@show}
+      id="rename-modal"
+      show
+      on_cancel={JS.push("request_close_rename")}
+      class="gf-modal-md"
+    >
+      <:header>Edit {@entity_type} Name</:header>
+      <:body>
+        <input
+          type="text"
+          value={@value}
+          phx-keyup="update_rename_value"
+          class="w-full px-4 py-3 border border-gray-300 rounded text-lg focus:ring-gf-maroon focus:border-gf-maroon"
+          autofocus
+        />
 
-          <%!-- Modal --%>
-          <div class="relative bg-white rounded-lg shadow-xl w-full max-w-2xl">
-            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 class="text-xl font-semibold text-gray-900">Edit {@entity_type} Name</h3>
-              <button
-                type="button"
-                phx-click="close_rename_modal"
-                class="text-gray-400 hover:text-gray-600"
-              >
-                <.icon name="ph-x" class="h-6 w-6" />
-              </button>
-            </div>
-
-            <div class="p-6">
-              <input
-                type="text"
-                value={@value}
-                phx-keyup="update_rename_value"
-                phx-key="Enter"
-                class="w-full px-4 py-3 border border-gray-300 rounded text-lg focus:ring-gf-maroon focus:border-gf-maroon"
-                autofocus
-              />
-
-              <div class="mt-5">
-                <label class="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={@add_alias_checked}
-                    phx-click="toggle_add_alias_on_rename"
-                    class="w-5 h-5 rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon"
-                  />
-                  <span class="text-base text-gray-700">Add Alias for old name?</span>
-                </label>
-              </div>
-
-              <div class="mt-4 text-sm text-gray-500">
-                If you want to reassign the species to a different genus, enter the new name
-                with the new genus. If the genus doesn't exist, it will be created under the same family.
-                If it exists, the species will be reassigned to that genus.
-              </div>
-            </div>
-
-            <div class="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
-              <button
-                type="button"
-                phx-click="close_rename_modal"
-                class="px-5 py-2.5 text-base text-gray-600 hover:text-gray-800"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                phx-click="do_rename"
-                class="px-5 py-2.5 bg-gf-maroon text-white text-base rounded hover:bg-gf-maroon/90"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
+        <div class="mt-5">
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={@add_alias_checked}
+              phx-click="toggle_add_alias_on_rename"
+              class="w-5 h-5 rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon"
+            />
+            <span class="text-base text-gray-700">Add Alias for old name?</span>
+          </label>
         </div>
-      </div>
-    <% end %>
+
+        <div class="mt-4 text-sm text-gray-500">
+          If you want to reassign the species to a different genus, enter the new name
+          with the new genus. If the genus doesn't exist, it will be created under the same family.
+          If it exists, the species will be reassigned to that genus.
+        </div>
+      </:body>
+      <:footer>
+        <button
+          type="button"
+          phx-click="close_rename_modal"
+          class="px-5 py-2.5 text-base text-gray-600 hover:text-gray-800"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          phx-click="do_rename"
+          class="px-5 py-2.5 bg-gf-maroon text-white text-base rounded hover:bg-gf-maroon/90"
+        >
+          Save Changes
+        </button>
+      </:footer>
+    </.modal>
+    """
+  end
+
+  @doc """
+  Renders a cascade delete confirmation modal.
+
+  Shows the impact of deleting an entity with cascading relationships:
+  - Summary of what will be deleted (counts)
+  - Expandable details showing specific items
+  - Type-to-confirm input for safety
+  - Red/warning styling to indicate destructive action
+
+  ## Events
+
+  The modal sends these events to the parent LiveView:
+  - `confirm_cascade_delete` with `%{"confirmation" => value}` on submit
+  - `cancel_cascade_delete` when cancelled (including backdrop click, ESC, X button)
+
+  ## Example
+
+      <.cascade_delete_modal
+        show={@show_delete_modal}
+        impact={@deletion_impact}
+        confirmation_value={@delete_confirmation}
+      />
+
+  Where `@deletion_impact` has the structure:
+      %{
+        taxonomy: %{name: "Cynipidae", type: "family"},
+        genera: [%{name: "Andricus"}, ...],
+        genera_count: 5,
+        sections: [%{name: "Lobatae"}, ...],
+        sections_count: 2,
+        species_count: 150,
+        has_impact: true
+      }
+  """
+  attr :show, :boolean, required: true, doc: "whether to show the modal"
+  attr :impact, :map, required: true, doc: "deletion impact data from get_deletion_impact/1"
+  attr :confirmation_value, :string, default: "", doc: "current value in the confirmation input"
+
+  def cascade_delete_modal(assigns) do
+    ~H"""
+    <.modal
+      :if={@show and @impact}
+      id="cascade-delete-modal"
+      show
+      on_cancel={JS.push("cancel_cascade_delete")}
+      class="gf-modal-sm"
+    >
+      <:header>
+        <span class="text-red-800">
+          <.icon name="ph-warning" class="h-5 w-5 inline mr-1" /> Delete {@impact.taxonomy.name}?
+        </span>
+      </:header>
+      <:body>
+        <div class="space-y-4">
+          <p class="text-red-700 font-medium">
+            To delete this {@impact.taxonomy.type}, all dependent data will be permanently deleted.
+          </p>
+
+          <%!-- Impact Summary --%>
+          <div :if={@impact.has_impact} class="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p class="font-medium text-red-800 mb-2">This will delete:</p>
+            <ul class="list-disc list-inside space-y-1 text-red-700">
+              <li :if={@impact.genera_count > 0}>
+                <strong>{@impact.genera_count}</strong> genera
+              </li>
+              <li :if={@impact.sections_count > 0}>
+                <strong>{@impact.sections_count}</strong> sections
+              </li>
+              <li :if={@impact.species_count > 0}>
+                <strong>{@impact.species_count}</strong> species
+              </li>
+              <li :if={@impact.species_count > 0} class="text-sm text-red-600 mt-1">
+                Plus all related data: images, aliases, sources, host associations
+              </li>
+            </ul>
+          </div>
+
+          <div
+            :if={not @impact.has_impact}
+            class="bg-gray-50 border border-gray-200 rounded-lg p-4"
+          >
+            <p class="text-gray-700">
+              This {@impact.taxonomy.type} has no dependent data and can be safely deleted.
+            </p>
+          </div>
+
+          <%!-- Expandable Details --%>
+          <details :if={@impact.genera_count > 0 or @impact.sections_count > 0} class="group">
+            <summary class="cursor-pointer text-blue-600 hover:text-blue-800 font-medium">
+              <.icon
+                name="ph-caret-right"
+                class="h-4 w-4 inline group-open:rotate-90 transition-transform"
+              /> Show details
+            </summary>
+            <div class="mt-3 pl-4 text-sm space-y-3 border-l-2 border-gray-200">
+              <div :if={@impact.genera_count > 0}>
+                <p class="font-medium text-gray-700">Genera:</p>
+                <ul class="list-disc list-inside text-gray-600 max-h-32 overflow-y-auto">
+                  <li :for={genus <- @impact.genera}>{genus.name}</li>
+                </ul>
+              </div>
+              <div :if={@impact.sections_count > 0}>
+                <p class="font-medium text-gray-700">Sections:</p>
+                <ul class="list-disc list-inside text-gray-600 max-h-32 overflow-y-auto">
+                  <li :for={section <- @impact.sections}>{section.name}</li>
+                </ul>
+              </div>
+            </div>
+          </details>
+
+          <%!-- Type to Confirm --%>
+          <form id="cascade-delete-form" phx-submit="confirm_cascade_delete" class="mt-4">
+            <label for="delete-confirmation" class="block text-sm text-gray-700 mb-1">
+              Type <strong class="text-red-700">{@impact.taxonomy.name}</strong> to confirm:
+            </label>
+            <input
+              type="text"
+              id="delete-confirmation"
+              name="confirmation"
+              value={@confirmation_value}
+              phx-keyup="update_delete_confirmation"
+              autocomplete="off"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-red-500 focus:border-red-500"
+              autofocus
+            />
+          </form>
+        </div>
+      </:body>
+      <:footer>
+        <button
+          type="button"
+          phx-click="cancel_cascade_delete"
+          class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          form="cascade-delete-form"
+          class="px-4 py-2 bg-red-600 text-white font-medium rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={@confirmation_value != @impact.taxonomy.name}
+        >
+          <.icon name="ph-trash" class="h-4 w-4 inline mr-1" /> Delete Forever
+        </button>
+      </:footer>
+    </.modal>
     """
   end
 end

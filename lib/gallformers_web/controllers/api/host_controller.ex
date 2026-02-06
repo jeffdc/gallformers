@@ -6,7 +6,9 @@ defmodule GallformersWeb.API.HostController do
   use GallformersWeb, :controller
   use OpenApiSpex.ControllerSpecs
 
-  alias Gallformers.{Hosts, Search}
+  alias Gallformers.{GallHosts, Ranges, Search, Species}
+  alias Gallformers.Images.Image
+  alias Gallformers.Plants
   alias GallformersWeb.Schemas
 
   tags(["Hosts"])
@@ -39,12 +41,12 @@ defmodule GallformersWeb.API.HostController do
     {hosts, total} =
       case {query, limit} do
         {nil, nil} ->
-          all = Hosts.list_hosts()
+          all = Plants.list_hosts()
           {all, length(all)}
 
         {nil, limit} ->
-          total = Hosts.count_hosts()
-          paginated = Hosts.list_hosts_paginated(limit, offset)
+          total = Plants.count_hosts()
+          paginated = Plants.list_hosts_paginated(limit, offset)
           {paginated, total}
 
         {query, nil} ->
@@ -59,7 +61,7 @@ defmodule GallformersWeb.API.HostController do
 
     response =
       if simple do
-        Enum.map(hosts, &host_to_simple_response/1)
+        hosts_with_places(hosts)
       else
         Enum.map(hosts, &host_to_response/1)
       end
@@ -102,6 +104,95 @@ defmodule GallformersWeb.API.HostController do
     end
   end
 
+  operation(:images,
+    summary: "Get host images",
+    description: "Returns all images for a host plant species",
+    parameters: [
+      id: [in: :path, type: :integer, description: "Host species ID", required: true]
+    ],
+    responses: [
+      ok:
+        {"List of images", "application/json",
+         %OpenApiSpex.Schema{type: :array, items: Schemas.Image}},
+      bad_request: {"Invalid ID", "application/json", Schemas.Error},
+      not_found: {"Host not found", "application/json", Schemas.Error}
+    ]
+  )
+
+  @doc """
+  GET /api/v2/hosts/:id/images
+  Returns all images for a host plant species.
+  """
+  def images(conn, %{"id" => id}) do
+    with {:ok, id} <- parse_id(id),
+         {:ok, _host} <- fetch_host(id) do
+      images = Species.get_images_for_species(id)
+      base_url = Image.base_url()
+
+      response =
+        Enum.map(images, fn img ->
+          %{
+            id: img.id,
+            path: img.path,
+            url: "#{base_url}/#{img.path}",
+            default: Image.default?(img),
+            creator: img.creator,
+            attribution: img.attribution,
+            sourcelink: img.sourcelink,
+            license: img.license,
+            licenselink: img.licenselink,
+            caption: img.caption
+          }
+        end)
+
+      json(conn, response)
+    else
+      {:error, :invalid_id} -> bad_request(conn, "Invalid host ID")
+      {:error, :not_found} -> not_found(conn, "Host not found")
+    end
+  end
+
+  operation(:galls,
+    summary: "Get galls for a host",
+    description: "Returns all galls that form on a host plant",
+    parameters: [
+      id: [in: :path, type: :integer, description: "Host species ID", required: true]
+    ],
+    responses: [
+      ok:
+        {"List of galls", "application/json",
+         %OpenApiSpex.Schema{type: :array, items: Schemas.GallListItem}},
+      bad_request: {"Invalid ID", "application/json", Schemas.Error},
+      not_found: {"Host not found", "application/json", Schemas.Error}
+    ]
+  )
+
+  @doc """
+  GET /api/v2/hosts/:id/galls
+  Returns all galls that form on a host plant.
+  """
+  def galls(conn, %{"id" => id}) do
+    with {:ok, id} <- parse_id(id),
+         {:ok, _host} <- fetch_host(id) do
+      galls = GallHosts.get_galls_for_host(id)
+
+      response =
+        Enum.map(galls, fn g ->
+          %{
+            id: g.id,
+            name: g.name,
+            undescribed: g.undescribed,
+            datacomplete: g.datacomplete
+          }
+        end)
+
+      json(conn, response)
+    else
+      {:error, :invalid_id} -> bad_request(conn, "Invalid host ID")
+      {:error, :not_found} -> not_found(conn, "Host not found")
+    end
+  end
+
   defp parse_id(id) do
     case parse_int(id) do
       nil -> {:error, :invalid_id}
@@ -110,7 +201,7 @@ defmodule GallformersWeb.API.HostController do
   end
 
   defp fetch_host(id) do
-    case Hosts.get_host(id) do
+    case Plants.get_host(id) do
       nil -> {:error, :not_found}
       host -> {:ok, host}
     end
@@ -142,8 +233,23 @@ defmodule GallformersWeb.API.HostController do
     }
   end
 
+  defp hosts_with_places(hosts) do
+    ids = Enum.map(hosts, & &1.id)
+    places_map = Ranges.get_places_for_hosts(ids)
+
+    Enum.map(hosts, fn host ->
+      %{
+        id: host.id,
+        name: host.name,
+        taxoncode: host.taxoncode,
+        datacomplete: host.datacomplete,
+        places: Map.get(places_map, host.id, [])
+      }
+    end)
+  end
+
   defp host_to_simple_response(host) do
-    places = Hosts.get_places_for_host(host.id)
+    places = Ranges.get_places_for_host(host.id)
 
     %{
       id: host.id,
@@ -155,8 +261,8 @@ defmodule GallformersWeb.API.HostController do
   end
 
   defp host_to_full_response(host) do
-    places = Hosts.get_places_for_host(host.id)
-    galls = Hosts.get_galls_for_host(host.id)
+    places = Ranges.get_places_for_host(host.id)
+    galls = GallHosts.get_galls_for_host(host.id)
 
     %{
       id: host.id,

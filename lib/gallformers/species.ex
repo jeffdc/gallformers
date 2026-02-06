@@ -2,60 +2,18 @@ defmodule Gallformers.Species do
   @moduledoc """
   The Species context.
 
-  Provides functions for working with species, including galls and hosts.
+  Provides shared functions for working with species records regardless of type.
+  For gall-specific logic, see `Gallformers.Galls`.
+  For host/plant-specific logic, see `Gallformers.Plants`.
   """
 
   import Ecto.Query
-  alias Gallformers.Hosts.Host
+
+  alias Gallformers.Images.Image
   alias Gallformers.Repo
   alias Gallformers.Search.Ranking
-  alias Gallformers.Species.{Abundance, Alias, GallTraits, Image, Species}
+  alias Gallformers.Species.{Abundance, Alias, Species}
   require Logger
-
-  @doc """
-  Returns a random gall that has a default image.
-
-  Used on the home page to show a featured gall. Returns a map with:
-    - id: species ID
-    - name: species name
-    - undescribed: whether the gall is undescribed
-    - image_url: full CloudFront URL
-    - image_creator: photographer credit
-    - image_license: license name
-
-  Returns `nil` if no galls with images are found.
-  """
-  @spec random_gall() :: map() | nil
-  def random_gall do
-    query =
-      from s in Species,
-        join: gt in GallTraits,
-        on: gt.species_id == s.id,
-        join: i in Image,
-        on: i.species_id == s.id,
-        where: s.taxoncode == "gall",
-        where: i.sort_order == 1,
-        order_by: fragment("RANDOM()"),
-        limit: 1,
-        select: %{
-          id: s.id,
-          name: s.name,
-          undescribed: gt.undescribed,
-          image_path: i.path,
-          image_creator: i.creator,
-          image_license: i.license,
-          image_sourcelink: i.sourcelink,
-          image_licenselink: i.licenselink
-        }
-
-    case Repo.one(query) do
-      nil ->
-        nil
-
-      result ->
-        Map.put(result, :image_url, Image.base_url() <> "/" <> result.image_path)
-    end
-  end
 
   @doc """
   Returns all species.
@@ -63,85 +21,6 @@ defmodule Gallformers.Species do
   @spec list_species() :: [Species.t()]
   def list_species do
     Repo.all(Species)
-  end
-
-  @doc """
-  Returns all gall species ordered by name.
-  """
-  @spec list_galls() :: [map()]
-  def list_galls do
-    from(s in Species,
-      left_join: gt in GallTraits,
-      on: gt.species_id == s.id,
-      left_join: a in Abundance,
-      on: s.abundance_id == a.id,
-      where: s.taxoncode == "gall",
-      order_by: s.name,
-      select: %{
-        id: s.id,
-        name: s.name,
-        taxoncode: s.taxoncode,
-        datacomplete: s.datacomplete,
-        abundance_id: s.abundance_id,
-        abundance_name: a.abundance,
-        detachable: gt.detachable,
-        undescribed: gt.undescribed
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Returns paginated gall species.
-  """
-  @spec list_galls_paginated(integer(), integer()) :: [map()]
-  def list_galls_paginated(limit, offset) do
-    from(s in Species,
-      left_join: gt in GallTraits,
-      on: gt.species_id == s.id,
-      left_join: a in Abundance,
-      on: s.abundance_id == a.id,
-      where: s.taxoncode == "gall",
-      order_by: s.name,
-      limit: ^limit,
-      offset: ^offset,
-      select: %{
-        id: s.id,
-        name: s.name,
-        taxoncode: s.taxoncode,
-        datacomplete: s.datacomplete,
-        abundance_id: s.abundance_id,
-        abundance_name: a.abundance,
-        detachable: gt.detachable,
-        undescribed: gt.undescribed
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Returns the count of all gall species.
-  """
-  @spec count_galls() :: integer()
-  def count_galls do
-    from(s in Species,
-      where: s.taxoncode == "gall",
-      select: count(s.id)
-    )
-    |> Repo.one()
-  end
-
-  @doc """
-  Gets the count of galls that are undescribed.
-  """
-  def count_undescribed_galls do
-    from(s in Species,
-      join: gt in GallTraits,
-      on: gt.species_id == s.id,
-      where: gt.undescribed == true,
-      select: count(s.id)
-    )
-    |> Repo.one()
   end
 
   @doc """
@@ -158,35 +37,6 @@ defmodule Gallformers.Species do
   @spec get_species!(integer()) :: Species.t()
   def get_species!(id) do
     Repo.get!(Species, id)
-  end
-
-  @doc """
-  Gets a gall by species ID with all related data.
-  """
-  @spec get_gall_by_id(integer()) :: map() | nil
-  def get_gall_by_id(id) do
-    query =
-      from s in Species,
-        left_join: gt in GallTraits,
-        on: gt.species_id == s.id,
-        left_join: a in Abundance,
-        on: s.abundance_id == a.id,
-        where: s.id == ^id and s.taxoncode == "gall",
-        select: %{
-          id: s.id,
-          name: s.name,
-          taxoncode: s.taxoncode,
-          gall_id: s.id,
-          datacomplete: s.datacomplete,
-          abundance_id: s.abundance_id,
-          abundance_name: a.abundance,
-          detachable: gt.detachable,
-          undescribed: gt.undescribed,
-          inserted_at: s.inserted_at,
-          updated_at: s.updated_at
-        }
-
-    Repo.one(query)
   end
 
   @doc """
@@ -209,29 +59,41 @@ defmodule Gallformers.Species do
   end
 
   @doc """
-  Gets a gall by species name.
-  """
-  @spec get_gall_by_name(String.t()) :: map() | nil
-  def get_gall_by_name(name) do
-    query =
-      from s in Species,
-        left_join: gt in GallTraits,
-        on: gt.species_id == s.id,
-        left_join: a in Abundance,
-        on: s.abundance_id == a.id,
-        where: s.name == ^name and s.taxoncode == "gall",
-        select: %{
-          id: s.id,
-          name: s.name,
-          taxoncode: s.taxoncode,
-          datacomplete: s.datacomplete,
-          abundance_id: s.abundance_id,
-          abundance_name: a.abundance,
-          detachable: gt.detachable,
-          undescribed: gt.undescribed
-        }
+  Enriches a list of species maps with common names and host/gall counts.
 
-    Repo.one(query)
+  Takes a list of maps with at least :id, :name, :taxoncode keys.
+  Returns the same list with :common_name and :count added to each.
+
+  Uses batch queries to avoid N+1 (3 queries total regardless of list size).
+  """
+  @spec enrich_with_common_names_and_counts([map()]) :: [map()]
+  def enrich_with_common_names_and_counts([]), do: []
+
+  def enrich_with_common_names_and_counts(species_list) do
+    species_ids = Enum.map(species_list, & &1.id)
+
+    # Batch fetch all aliases (1 query)
+    aliases_map = get_aliases_for_species_batch(species_ids)
+
+    # Separate galls from hosts for counting
+    {galls, hosts} = Enum.split_with(species_list, fn s -> s.taxoncode == "gall" end)
+    gall_ids = Enum.map(galls, & &1.id)
+    host_ids = Enum.map(hosts, & &1.id)
+
+    # Batch fetch counts (2 queries)
+    host_counts = Gallformers.GallHosts.get_host_counts_for_galls(gall_ids)
+    gall_counts = Gallformers.GallHosts.get_gall_counts_for_hosts(host_ids)
+
+    counts = Map.merge(host_counts, gall_counts)
+
+    Enum.map(species_list, fn species ->
+      aliases = Map.get(aliases_map, species.id, [])
+      common_alias = Enum.find(aliases, fn a -> a.type == "common" end)
+
+      species
+      |> Map.put(:common_name, common_alias && common_alias.name)
+      |> Map.put(:count, Map.get(counts, species.id, 0))
+    end)
   end
 
   @doc """
@@ -262,42 +124,6 @@ defmodule Gallformers.Species do
   end
 
   @doc """
-  Gets default images for all gall species (used by ID tool).
-
-  Returns the first image (by sort_order) for each gall species.
-  """
-  @spec get_default_gall_images() :: [map()]
-  def get_default_gall_images do
-    # Get the first image (lowest sort_order) for each gall species
-    # Use a subquery to get the minimum sort_order per species
-    first_image_ids =
-      from(i in Image,
-        join: s in Species,
-        on: i.species_id == s.id,
-        where: s.taxoncode == "gall",
-        group_by: i.species_id,
-        select: %{
-          species_id: i.species_id,
-          min_sort_order: min(i.sort_order)
-        }
-      )
-      |> Repo.all()
-
-    # Get the actual image records for those sort_orders
-    Enum.flat_map(first_image_ids, fn %{species_id: species_id, min_sort_order: min_order} ->
-      from(i in Image,
-        where: i.species_id == ^species_id and i.sort_order == ^min_order,
-        select: %{
-          species_id: i.species_id,
-          path: i.path
-        },
-        limit: 1
-      )
-      |> Repo.all()
-    end)
-  end
-
-  @doc """
   Gets aliases for a species.
   """
   @spec get_aliases_for_species(integer()) :: [map()]
@@ -317,6 +143,33 @@ defmodule Gallformers.Species do
   end
 
   @doc """
+  Gets aliases for multiple species in a single query (batch version).
+
+  Returns a map of species_id => [%{id, name, type, description}].
+  """
+  @spec get_aliases_for_species_batch([integer()]) :: %{integer() => [map()]}
+  def get_aliases_for_species_batch([]), do: %{}
+
+  def get_aliases_for_species_batch(species_ids) do
+    from(a in Alias,
+      join: als in "alias_species",
+      on: als.alias_id == a.id,
+      where: als.species_id in ^species_ids,
+      select: %{
+        species_id: als.species_id,
+        id: a.id,
+        name: a.name,
+        type: a.type,
+        description: a.description
+      }
+    )
+    |> Repo.all()
+    |> Enum.group_by(& &1.species_id, fn row ->
+      %{id: row.id, name: row.name, type: row.type, description: row.description}
+    end)
+  end
+
+  @doc """
   Returns all abundance options.
   """
   @spec list_abundances() :: [Abundance.t()]
@@ -332,39 +185,9 @@ defmodule Gallformers.Species do
     Repo.get(Abundance, id)
   end
 
-  # Admin functions
-
-  @doc """
-  Lists all species with basic info for admin listing.
-  Includes species name, taxoncode, abundance, and datacomplete status.
-  """
-  @spec list_species_admin(integer(), integer()) :: [map()]
-  def list_species_admin(limit, offset) do
-    from(s in Species,
-      left_join: a in Abundance,
-      on: s.abundance_id == a.id,
-      order_by: s.name,
-      limit: ^limit,
-      offset: ^offset,
-      select: %{
-        id: s.id,
-        name: s.name,
-        taxoncode: s.taxoncode,
-        datacomplete: s.datacomplete,
-        abundance_name: a.abundance
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Counts all species.
-  """
-  @spec count_species() :: integer()
-  def count_species do
-    from(s in Species, select: count(s.id))
-    |> Repo.one()
-  end
+  # ============================================
+  # Search Functions
+  # ============================================
 
   @doc """
   Searches species by name or alias using FTS5 for fast prefix matching.
@@ -660,28 +483,9 @@ defmodule Gallformers.Species do
     Repo.all(query)
   end
 
-  @doc """
-  Gets a species for editing with all related data.
-  """
-  @spec get_species_for_edit(integer()) :: map() | nil
-  def get_species_for_edit(id) do
-    species = get_species(id)
-
-    if species do
-      aliases = get_aliases_for_species(id)
-      hosts = Gallformers.Hosts.get_hosts_for_gall(id)
-      taxonomy = Gallformers.Taxonomy.get_taxonomy_for_species(id)
-
-      %{
-        species: species,
-        aliases: aliases,
-        hosts: hosts,
-        taxonomy: taxonomy
-      }
-    else
-      nil
-    end
-  end
+  # ============================================
+  # Species Edit / Admin
+  # ============================================
 
   @doc """
   Returns a changeset for tracking species changes.
@@ -790,11 +594,53 @@ defmodule Gallformers.Species do
   end
 
   @doc """
+  Renames a species for a genus change.
+
+  Called by Taxonomy when a genus is renamed. For each species linked to
+  that genus, this function:
+  1. Creates a "scientific synonym" alias with the old species name
+  2. Updates the species name by replacing the old genus with the new genus
+
+  This is called within a Taxonomy transaction, so no additional transaction
+  is created here.
+
+  ## Examples
+
+      iex> rename_for_genus_change(species, "Quercus", "Oakus")
+      :ok  # "Quercus alba" becomes "Oakus alba", synonym "Quercus alba" created
+  """
+  @spec rename_for_genus_change(Species.t(), String.t(), String.t()) :: :ok
+  def rename_for_genus_change(%Species{} = species, old_genus_name, new_genus_name) do
+    old_species_name = species.name
+    new_species_name = replace_genus_in_name(old_species_name, old_genus_name, new_genus_name)
+
+    # Create synonym alias with the old name (best-effort, don't fail transaction)
+    add_rename_alias(species.id, old_species_name)
+
+    # Update the species name
+    species
+    |> Species.changeset(%{name: new_species_name})
+    |> Repo.update!()
+
+    :ok
+  end
+
+  # Replaces the genus portion (first word) of a species name.
+  defp replace_genus_in_name(species_name, old_genus, new_genus) do
+    case String.split(species_name, " ", parts: 2) do
+      [^old_genus, epithet] -> "#{new_genus} #{epithet}"
+      [^old_genus] -> new_genus
+      [_other_genus, epithet] -> "#{new_genus} #{epithet}"
+      _ -> species_name
+    end
+  end
+
+  @doc """
   Deletes a species and all associated data.
 
   Performs a complete cleanup in the correct order:
   1. Deletes S3 images (before DB cascade removes image paths)
-  2. Deletes gall record(s) (cascades to filter associations)
+  2. Deletes gall record(s) via Galls context (cascades to filter associations)
   3. Deletes FTS index entry
   4. Deletes the species (cascades to image rows, hosts, aliases, etc.)
 
@@ -808,7 +654,7 @@ defmodule Gallformers.Species do
 
       # 2. Delete the gall_traits record for this species
       # This cascades to all filter associations (gall_shape, gall_texture, etc.)
-      delete_galls_for_species(species.id)
+      Gallformers.Galls.delete_gall_traits(species.id)
 
       # 3. Delete from FTS index
       delete_species_fts(species.id)
@@ -820,12 +666,6 @@ defmodule Gallformers.Species do
       end
     end)
     |> broadcast(:species_deleted)
-  end
-
-  defp delete_galls_for_species(species_id) do
-    # Delete gall_traits record for this species (cascades to filter associations)
-    from(gt in GallTraits, where: gt.species_id == ^species_id)
-    |> Repo.delete_all()
   end
 
   # Alias management
@@ -884,42 +724,6 @@ defmodule Gallformers.Species do
     broadcast({:ok, %{id: species_id}}, :species_updated)
   end
 
-  # Host association management
-
-  @doc """
-  Associates a host with a gall species.
-  """
-  @spec add_host_to_species(integer(), integer()) ::
-          {:ok, Gallformers.Hosts.Host.t()} | {:error, Ecto.Changeset.t()}
-  def add_host_to_species(gall_species_id, host_species_id) do
-    attrs = %{gall_species_id: gall_species_id, host_species_id: host_species_id}
-
-    case %Host{} |> Host.changeset(attrs) |> Repo.insert() do
-      {:ok, host_relation} ->
-        broadcast({:ok, %{id: gall_species_id}}, :species_updated)
-        {:ok, host_relation}
-
-      {:error, changeset} ->
-        {:error, changeset}
-    end
-  end
-
-  @doc """
-  Removes a host association from a gall species.
-  """
-  @spec remove_host_from_species(integer()) :: {:ok, map()} | {:error, :not_found}
-  def remove_host_from_species(host_relation_id) do
-    case Repo.get(Host, host_relation_id) do
-      nil ->
-        {:error, :not_found}
-
-      host_relation ->
-        species_id = host_relation.gall_species_id
-        Repo.delete(host_relation)
-        broadcast({:ok, %{id: species_id}}, :species_updated)
-    end
-  end
-
   @doc """
   Subscribes to species changes.
   """
@@ -935,262 +739,5 @@ defmodule Gallformers.Species do
 
   defp broadcast({:error, changeset}, _event) do
     {:error, changeset}
-  end
-
-  # ============================================
-  # Gall-specific functions for admin
-  # ============================================
-
-  @doc """
-  Gets a gall for editing with all filter field values.
-  Returns a map with gall data and current filter selections.
-  """
-  @spec get_gall_for_admin_edit(integer()) :: map() | nil
-  def get_gall_for_admin_edit(species_id) do
-    gall_data = get_gall_by_id(species_id)
-
-    if gall_data do
-      # Get all current filter field values for this gall (using species_id)
-      filter_values = get_gall_filter_values(species_id)
-
-      Map.merge(gall_data, %{
-        filter_values: filter_values
-      })
-    else
-      nil
-    end
-  end
-
-  @doc """
-  Gets all filter field values for a gall as maps with :id and :field keys.
-  All traits return lists (may be empty).
-  """
-  @spec get_gall_filter_values(integer()) :: map()
-  def get_gall_filter_values(species_id) do
-    %{
-      # All traits are multi-value (lists)
-      colors:
-        get_filter_values_for_gall(
-          species_id,
-          "gall_color",
-          :color_id,
-          Gallformers.FilterFields.Color,
-          :color
-        ),
-      walls:
-        get_filter_values_for_gall(
-          species_id,
-          "gall_walls",
-          :walls_id,
-          Gallformers.FilterFields.Walls,
-          :walls
-        ),
-      cells:
-        get_filter_values_for_gall(
-          species_id,
-          "gall_cells",
-          :cells_id,
-          Gallformers.FilterFields.Cells,
-          :cells
-        ),
-      shapes:
-        get_filter_values_for_gall(
-          species_id,
-          "gall_shape",
-          :shape_id,
-          Gallformers.FilterFields.Shape,
-          :shape
-        ),
-      textures:
-        get_filter_values_for_gall(
-          species_id,
-          "gall_texture",
-          :texture_id,
-          Gallformers.FilterFields.Texture,
-          :texture
-        ),
-      alignments:
-        get_filter_values_for_gall(
-          species_id,
-          "gall_alignment",
-          :alignment_id,
-          Gallformers.FilterFields.Alignment,
-          :alignment
-        ),
-      plant_parts:
-        get_filter_values_for_gall(
-          species_id,
-          "gall_plant_part",
-          :plant_part_id,
-          Gallformers.FilterFields.PlantPart,
-          :part
-        ),
-      forms:
-        get_filter_values_for_gall(
-          species_id,
-          "gall_form",
-          :form_id,
-          Gallformers.FilterFields.Form,
-          :form
-        ),
-      seasons:
-        get_filter_values_for_gall(
-          species_id,
-          "gall_season",
-          :season_id,
-          Gallformers.FilterFields.Season,
-          :season
-        )
-    }
-  end
-
-  defp get_filter_values_for_gall(species_id, join_table, fk_col, schema, field)
-       when is_atom(fk_col) do
-    from(j in join_table,
-      join: s in ^schema,
-      on: field(j, ^fk_col) == s.id,
-      where: j.species_id == ^species_id,
-      select: %{id: s.id, field: field(s, ^field)}
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Updates gall properties (detachable, undescribed).
-  """
-  @spec update_gall_properties(integer(), map()) ::
-          {:ok, GallTraits.t()} | {:error, Ecto.Changeset.t() | :not_found}
-  def update_gall_properties(species_id, attrs) do
-    case Repo.get(GallTraits, species_id) do
-      nil ->
-        {:error, :not_found}
-
-      gall_traits ->
-        gall_traits
-        |> GallTraits.changeset(attrs)
-        |> Repo.update()
-    end
-  end
-
-  @doc """
-  Adds a filter field to a gall.
-  """
-  @spec add_filter_field_to_gall(integer(), atom(), integer()) :: {:ok, any()} | {:error, any()}
-  def add_filter_field_to_gall(species_id, filter_type, filter_id) do
-    {join_table, fk_col} = get_join_table_info(filter_type)
-    row = Map.new([{:species_id, species_id}, {fk_col, filter_id}])
-
-    try do
-      Repo.insert_all(join_table, [row])
-      {:ok, :inserted}
-    rescue
-      e in Ecto.ConstraintError ->
-        {:error, e}
-    end
-  end
-
-  @doc """
-  Removes a filter field from a gall.
-  """
-  @spec remove_filter_field_from_gall(integer(), atom(), integer()) :: {:ok, integer()}
-  def remove_filter_field_from_gall(species_id, filter_type, filter_id) do
-    {join_table, fk_col} = get_join_table_info(filter_type)
-
-    {count, _} =
-      from(j in join_table,
-        where: j.species_id == ^species_id and field(j, ^fk_col) == ^filter_id
-      )
-      |> Repo.delete_all()
-
-    {:ok, count}
-  end
-
-  defp get_join_table_info(:colors), do: {"gall_color", :color_id}
-  defp get_join_table_info(:walls), do: {"gall_walls", :walls_id}
-  defp get_join_table_info(:cells), do: {"gall_cells", :cells_id}
-  defp get_join_table_info(:shapes), do: {"gall_shape", :shape_id}
-  defp get_join_table_info(:textures), do: {"gall_texture", :texture_id}
-  defp get_join_table_info(:alignments), do: {"gall_alignment", :alignment_id}
-  defp get_join_table_info(:plant_parts), do: {"gall_plant_part", :plant_part_id}
-  defp get_join_table_info(:forms), do: {"gall_form", :form_id}
-  defp get_join_table_info(:seasons), do: {"gall_season", :season_id}
-
-  @doc """
-  Returns all filter field options for gall admin.
-  """
-  @spec get_all_filter_options() :: map()
-  def get_all_filter_options do
-    %{
-      colors:
-        Gallformers.FilterFields.list_all(:color) |> Enum.map(&%{id: &1.id, field: &1.color}),
-      shapes:
-        Gallformers.FilterFields.list_all(:shape) |> Enum.map(&%{id: &1.id, field: &1.shape}),
-      textures:
-        Gallformers.FilterFields.list_all(:texture) |> Enum.map(&%{id: &1.id, field: &1.texture}),
-      alignments:
-        Gallformers.FilterFields.list_all(:alignment)
-        |> Enum.map(&%{id: &1.id, field: &1.alignment}),
-      walls:
-        Gallformers.FilterFields.list_all(:walls) |> Enum.map(&%{id: &1.id, field: &1.walls}),
-      cells:
-        Gallformers.FilterFields.list_all(:cells) |> Enum.map(&%{id: &1.id, field: &1.cells}),
-      plant_parts:
-        Gallformers.FilterFields.list_all(:plant_part) |> Enum.map(&%{id: &1.id, field: &1.part}),
-      forms: Gallformers.FilterFields.list_all(:form) |> Enum.map(&%{id: &1.id, field: &1.form}),
-      seasons: get_all_seasons()
-    }
-  end
-
-  defp get_all_seasons do
-    from(s in Gallformers.FilterFields.Season,
-      order_by: s.id,
-      select: %{id: s.id, field: s.season}
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Returns related galls - other galls that share the same genus and species name prefix.
-
-  For a gall like "Callirhytis seminator leaf gall", this finds other galls starting with
-  "Callirhytis seminator " (note the trailing space to ensure it's not a prefix match
-  of a different species like "Callirhytis seminatoris").
-
-  Returns a list of maps with :id and :name keys, excluding the passed-in gall.
-  """
-  @spec get_related_galls(map()) :: [map()]
-  def get_related_galls(gall) when is_map(gall) do
-    name = gall.name || ""
-    name_parts = String.split(name, " ", parts: 3)
-
-    if length(name_parts) >= 2 do
-      # Match on "Genus species " with trailing space to avoid false positives
-      prefix = "#{Enum.at(name_parts, 0)} #{Enum.at(name_parts, 1)} "
-
-      from(s in Species,
-        where: fragment("? LIKE ?", s.name, ^"#{prefix}%"),
-        where: s.id != ^gall.id,
-        where: s.taxoncode == "gall",
-        order_by: s.name,
-        select: %{id: s.id, name: s.name}
-      )
-      |> Repo.all()
-    else
-      []
-    end
-  end
-
-  @doc """
-  Creates a gall_traits record for a species.
-
-  Should be called after creating a species with taxoncode "gall".
-
-  Returns {:ok, gall_traits} on success, {:error, changeset} on failure.
-  """
-  @spec create_gall_for_species(integer()) :: {:ok, GallTraits.t()} | {:error, Ecto.Changeset.t()}
-  def create_gall_for_species(species_id) do
-    %GallTraits{species_id: species_id}
-    |> GallTraits.changeset(%{detachable: "unknown", undescribed: false})
-    |> Repo.insert()
   end
 end

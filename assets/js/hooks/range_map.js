@@ -195,7 +195,7 @@ const RangeMap = {
       pathEl.setAttribute('data-name', name)
 
       if (this.editable) {
-        pathEl.style.cursor = 'pointer'
+        pathEl.classList.add('cursor-pointer')
       }
 
       // Hover effects - use provided container or default
@@ -235,9 +235,7 @@ const RangeMap = {
   createModal() {
     const modal = document.createElement('dialog')
     modal.className = 'range-map-modal p-0 rounded-lg shadow-xl backdrop:bg-black/50'
-    modal.style.width = '90vw'
-    modal.style.height = '80vh'
-    modal.style.maxWidth = '1200px'
+    modal.classList.add('w-[90vw]', 'h-[80vh]', 'max-w-[1200px]')
     modal.id = `${this.el.id}-modal`
 
     const modalContent = document.createElement('div')

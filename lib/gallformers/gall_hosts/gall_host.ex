@@ -1,9 +1,12 @@
-defmodule Gallformers.Hosts.Host do
+defmodule Gallformers.GallHosts.GallHost do
   @moduledoc """
   Ecto schema for the gallhost table.
 
-  Represents the relationship between a gall species and a host plant species.
-  This is the join table that links gall-forming organisms to their host plants.
+  Represents the many-to-many relationship between gall species and host plant species.
+  A gall (gall_species_id) forms on a host plant (host_species_id).
+
+  Note: Both sides reference Species - galls are Species with taxoncode='gall',
+  hosts are Species with taxoncode='plant'.
   """
   use Ecto.Schema
   import Ecto.Changeset
@@ -29,10 +32,10 @@ defmodule Gallformers.Hosts.Host do
   def required_fields, do: @required_fields
 
   @doc """
-  Creates a changeset for a host relationship.
+  Creates a changeset for a gall-host relationship.
   """
-  def changeset(host, attrs) do
-    host
+  def changeset(gall_host, attrs) do
+    gall_host
     |> cast(attrs, [:host_species_id, :gall_species_id])
     |> validate_required(@required_fields)
     |> unique_constraint([:host_species_id, :gall_species_id])

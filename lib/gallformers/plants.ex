@@ -1,18 +1,72 @@
-defmodule Gallformers.Hosts do
+defmodule Gallformers.Plants do
   @moduledoc """
-  The Hosts context.
+  The Plants context.
 
-  Provides functions for working with host plants and their relationships to galls.
+  Manages plant species (Species with taxoncode='plant'). In the gall domain,
+  these are referred to as "hosts" since galls form on them, but this context
+  treats them as a type of Species.
+
+  For gall↔host relationships, see `Gallformers.GallHosts`.
+  For geographic range data, see `Gallformers.Ranges`.
   """
 
   import Ecto.Query
 
-  alias Gallformers.Hosts.Host
+  alias Gallformers.Ranges
   alias Gallformers.Repo
-  alias Gallformers.Species.{Abundance, GallTraits, Species}
+  alias Gallformers.Species.{Abundance, Species}
+  alias Gallformers.Taxonomy
+  alias Gallformers.Taxonomy.TreeBuilder
+
+  @topic "hosts"
+
+  # ============================================
+  # Explore Tree
+  # ============================================
 
   @doc """
-  Returns all host species ordered by name.
+  Returns a hierarchical tree of host species organized by Family → Genus → Species.
+
+  ## Options
+  - `:key_style` - `:short` for `f-123` format (default), `:long` for `family-123` format
+  """
+  @spec get_hosts_tree(keyword()) :: [map()]
+  def get_hosts_tree(opts \\ []) do
+    fetch_host_tree_data()
+    |> TreeBuilder.build_tree("/host/", opts)
+  end
+
+  defp fetch_host_tree_data do
+    from(f in Taxonomy.Taxonomy,
+      join: g in Taxonomy.Taxonomy,
+      on: g.parent_id == f.id and g.type == "genus",
+      join: st in "species_taxonomy",
+      on: st.taxonomy_id == g.id,
+      join: s in Species,
+      on: s.id == st.species_id,
+      where: f.type == "family" and f.description == "Plant" and s.taxoncode == "plant",
+      order_by: [f.name, g.name, s.name],
+      select: %{
+        family_id: f.id,
+        family_name: f.name,
+        family_description: f.description,
+        genus_id: g.id,
+        genus_name: g.name,
+        genus_description: g.description,
+        species_id: s.id,
+        species_name: s.name,
+        undescribed: false
+      }
+    )
+    |> Repo.all()
+  end
+
+  # ============================================
+  # Query Functions
+  # ============================================
+
+  @doc """
+  Returns all host (plant) species ordered by name.
   """
   @spec list_hosts() :: [map()]
   def list_hosts do
@@ -102,142 +156,21 @@ defmodule Gallformers.Hosts do
   end
 
   @doc """
-  Gets all hosts for a gall species.
-
-  Returns a list of maps with host_relation_id, host_species_id, and host_name.
+  Gets a host species by ID as a Species struct (for changesets).
   """
-  @spec get_hosts_for_gall(integer()) :: [map()]
-  def get_hosts_for_gall(gall_species_id) do
-    from(h in Host,
-      join: s in Species,
-      on: h.host_species_id == s.id,
-      where: h.gall_species_id == ^gall_species_id,
-      select: %{
-        host_relation_id: h.id,
-        host_species_id: s.id,
-        host_name: s.name
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets all galls for a host species.
-
-  Returns a list of maps with gall info.
-  """
-  @spec get_galls_for_host(integer()) :: [map()]
-  def get_galls_for_host(host_species_id) do
-    from(h in Host,
-      join: s in Species,
-      on: h.gall_species_id == s.id,
-      left_join: gt in GallTraits,
-      on: gt.species_id == s.id,
-      where: h.host_species_id == ^host_species_id,
-      select: %{
-        id: s.id,
-        name: s.name,
-        undescribed: gt.undescribed,
-        datacomplete: s.datacomplete
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets hosts for a Place with their aliases.
-  """
-  def get_hosts_for_place(place_id) do
+  @spec get_host_species(integer()) :: Species.t() | nil
+  def get_host_species(id) do
     from(s in Species,
-      join: hr in "host_range",
-      on: hr.species_id == s.id,
-      left_join: als in "alias_species",
-      on: als.species_id == s.id,
-      left_join: a in "alias",
-      on: a.id == als.alias_id,
-      where: hr.place_id == ^place_id and s.taxoncode == "plant",
-      group_by: [s.id, s.name],
-      order_by: s.name,
-      select: %{
-        id: s.id,
-        name: s.name,
-        aliases: fragment("GROUP_CONCAT(?, ', ')", a.name)
-      }
+      where: s.id == ^id and s.taxoncode == "plant"
     )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets place codes for a host species (range data).
-  """
-  @spec get_places_for_host(integer()) :: [String.t()]
-  def get_places_for_host(host_species_id) do
-    from(hr in "host_range",
-      join: p in "place",
-      on: hr.place_id == p.id,
-      where: hr.species_id == ^host_species_id,
-      select: p.code
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets place codes for a gall species via its hosts.
-  """
-  @spec get_places_for_gall(integer()) :: [String.t()]
-  def get_places_for_gall(gall_species_id) do
-    from(p in "place",
-      join: hr in "host_range",
-      on: hr.place_id == p.id,
-      join: h in Host,
-      on: h.host_species_id == hr.species_id,
-      where: h.gall_species_id == ^gall_species_id,
-      distinct: true,
-      select: p.code
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets place codes for a list of host species IDs.
-
-  Returns the union of all places where any of the hosts occur.
-  Used for computing gall range from a local/pending list of hosts.
-  """
-  @spec get_places_for_host_species_ids([integer()]) :: [String.t()]
-  def get_places_for_host_species_ids([]), do: []
-
-  def get_places_for_host_species_ids(host_species_ids) do
-    from(p in "place",
-      join: hr in "host_range",
-      on: hr.place_id == p.id,
-      where: hr.species_id in ^host_species_ids,
-      distinct: true,
-      select: p.code
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets excluded place codes for a gall species (direct range exclusions).
-  """
-  @spec get_excluded_places_for_gall(integer()) :: [String.t()]
-  def get_excluded_places_for_gall(gall_species_id) do
-    from(p in "place",
-      join: gre in "gall_range_exclusion",
-      on: gre.place_id == p.id,
-      where: gre.species_id == ^gall_species_id,
-      distinct: true,
-      select: p.code
-    )
-    |> Repo.all()
+    |> Repo.one()
   end
 
   @doc """
   Searches for host species by name (case-insensitive).
 
-  Supports multi-word queries where each word must match somewhere in the name.
-  For example, "q alba" matches "Quercus alba".
+  Supports multi-word queries where each word must match somewhere in the name
+  or aliases. For example, "q alba" matches "Quercus alba".
 
   Used for typeahead/autocomplete functionality.
   Returns up to `limit` results ordered by name.
@@ -311,15 +244,22 @@ defmodule Gallformers.Hosts do
   end
 
   @doc """
-  Gets aliases for a host species.
+  Searches host species by name for section assignment.
+  Returns hosts that match the query.
   """
-  @spec get_aliases_for_host(integer()) :: [String.t()]
-  def get_aliases_for_host(host_id) do
-    from(a in "alias",
-      join: als in "alias_species",
-      on: als.alias_id == a.id,
-      where: als.species_id == ^host_id,
-      select: a.name
+  @spec search_hosts_for_section(String.t(), integer()) :: [map()]
+  def search_hosts_for_section(query, limit \\ 20) do
+    search_pattern = "%#{String.downcase(query)}%"
+
+    from(s in Species,
+      where: s.taxoncode == "plant",
+      where: fragment("lower(?) LIKE ?", s.name, ^search_pattern),
+      order_by: s.name,
+      limit: ^limit,
+      select: %{
+        id: s.id,
+        name: s.name
+      }
     )
     |> Repo.all()
   end
@@ -332,8 +272,8 @@ defmodule Gallformers.Hosts do
     host = get_host(id)
 
     if host do
-      taxonomy = Gallformers.Taxonomy.get_taxonomy_for_species(id)
-      places = get_places_for_host(id)
+      taxonomy = Taxonomy.get_taxonomy_for_species(id)
+      places = Ranges.get_places_for_host(id)
       aliases = get_aliases_for_host(id)
 
       host
@@ -345,12 +285,16 @@ defmodule Gallformers.Hosts do
     end
   end
 
+  # ============================================
+  # PubSub
+  # ============================================
+
   @doc """
   Subscribes to host changes.
   """
   @spec subscribe() :: :ok | {:error, term()}
   def subscribe do
-    Phoenix.PubSub.subscribe(Gallformers.PubSub, "hosts")
+    Phoenix.PubSub.subscribe(Gallformers.PubSub, @topic)
   end
 
   @doc """
@@ -358,8 +302,17 @@ defmodule Gallformers.Hosts do
   """
   @spec broadcast_change(map(), atom()) :: {:ok, map()}
   def broadcast_change(host, event) do
-    Phoenix.PubSub.broadcast(Gallformers.PubSub, "hosts", {event, host})
+    Phoenix.PubSub.broadcast(Gallformers.PubSub, @topic, {event, host})
     {:ok, host}
+  end
+
+  defp broadcast({:ok, host}, event) do
+    Phoenix.PubSub.broadcast(Gallformers.PubSub, @topic, {event, host})
+    {:ok, host}
+  end
+
+  defp broadcast({:error, changeset}, _event) do
+    {:error, changeset}
   end
 
   # ============================================
@@ -396,17 +349,6 @@ defmodule Gallformers.Hosts do
     |> Species.changeset(attrs)
     |> Repo.update()
     |> broadcast(:host_updated)
-  end
-
-  @doc """
-  Gets a host species by ID as a Species struct (for changesets).
-  """
-  @spec get_host_species(integer()) :: Species.t() | nil
-  def get_host_species(id) do
-    from(s in Species,
-      where: s.id == ^id and s.taxoncode == "plant"
-    )
-    |> Repo.one()
   end
 
   @doc """
@@ -447,97 +389,22 @@ defmodule Gallformers.Hosts do
   end
 
   # ============================================
-  # Place/Range Management
+  # Alias Management
   # ============================================
 
   @doc """
-  Gets place IDs (not codes) for a host species.
+  Gets aliases for a host species (names only).
   """
-  @spec get_place_ids_for_host(integer()) :: [integer()]
-  def get_place_ids_for_host(host_species_id) do
-    from(hr in "host_range",
-      where: hr.species_id == ^host_species_id,
-      select: hr.place_id
+  @spec get_aliases_for_host(integer()) :: [String.t()]
+  def get_aliases_for_host(host_id) do
+    from(a in "alias",
+      join: als in "alias_species",
+      on: als.alias_id == a.id,
+      where: als.species_id == ^host_id,
+      select: a.name
     )
     |> Repo.all()
   end
-
-  @doc """
-  Adds a place to a host's range.
-  """
-  @spec add_place_to_host(integer(), integer()) :: {:ok, map()}
-  def add_place_to_host(host_species_id, place_id) do
-    Repo.insert_all(
-      "host_range",
-      [%{species_id: host_species_id, place_id: place_id}],
-      on_conflict: :nothing
-    )
-
-    broadcast({:ok, %{id: host_species_id}}, :host_updated)
-  end
-
-  @doc """
-  Removes a place from a host's range.
-  """
-  @spec remove_place_from_host(integer(), integer()) :: {:ok, map()}
-  def remove_place_from_host(host_species_id, place_id) do
-    from(hr in "host_range",
-      where: hr.species_id == ^host_species_id and hr.place_id == ^place_id
-    )
-    |> Repo.delete_all()
-
-    broadcast({:ok, %{id: host_species_id}}, :host_updated)
-  end
-
-  @doc """
-  Toggles a place in a host's range (add if not present, remove if present).
-  Returns {:added, place_id} or {:removed, place_id}.
-  """
-  @spec toggle_place_for_host(integer(), integer()) :: {:added | :removed, integer()}
-  def toggle_place_for_host(host_species_id, place_id) do
-    existing =
-      from(hr in "host_range",
-        where: hr.species_id == ^host_species_id and hr.place_id == ^place_id,
-        select: count()
-      )
-      |> Repo.one()
-
-    if existing > 0 do
-      remove_place_from_host(host_species_id, place_id)
-      {:removed, place_id}
-    else
-      add_place_to_host(host_species_id, place_id)
-      {:added, place_id}
-    end
-  end
-
-  @doc """
-  Bulk updates all places for a host (replaces existing).
-  """
-  @spec update_host_places(integer(), [integer()]) :: {:ok, map()}
-  def update_host_places(host_species_id, place_ids) do
-    Repo.transaction(fn ->
-      # Delete existing
-      from(hr in "host_range",
-        where: hr.species_id == ^host_species_id
-      )
-      |> Repo.delete_all()
-
-      # Insert new
-      if place_ids != [] do
-        entries = Enum.map(place_ids, &%{species_id: host_species_id, place_id: &1})
-        Repo.insert_all("host_range", entries)
-      end
-
-      :ok
-    end)
-
-    broadcast({:ok, %{id: host_species_id}}, :host_updated)
-  end
-
-  # ============================================
-  # Alias Management (wrappers for convenience)
-  # ============================================
 
   @doc """
   Gets aliases for a host with full details (id, name, type).
@@ -576,8 +443,6 @@ defmodule Gallformers.Hosts do
   # ============================================
   # Rename Support
   # ============================================
-
-  alias Gallformers.Taxonomy
 
   @doc """
   Renames a host species, optionally adding the old name as an alias.
@@ -728,125 +593,4 @@ defmodule Gallformers.Hosts do
   end
 
   defp maybe_add_alias(_host_id, _old_name, false), do: :ok
-
-  defp broadcast({:ok, host}, event) do
-    Phoenix.PubSub.broadcast(Gallformers.PubSub, "hosts", {event, host})
-    {:ok, host}
-  end
-
-  defp broadcast({:error, changeset}, _event) do
-    {:error, changeset}
-  end
-
-  # ============================================
-  # Gall Range Exclusion Management
-  # ============================================
-  #
-  # NOTE: For galls, the gall_range_exclusion table stores EXCLUSIONS (places where
-  # the gall does NOT occur even though hosts exist there). This is different
-  # from hosts, where the host_range table stores places where the host EXISTS.
-  #
-  # Gall effective range = (union of all host places) - (excluded places)
-  #
-
-  @doc """
-  Gets excluded place IDs (not codes) for a gall species.
-  """
-  @spec get_excluded_place_ids_for_gall(integer()) :: [integer()]
-  def get_excluded_place_ids_for_gall(gall_species_id) do
-    from(gre in "gall_range_exclusion",
-      where: gre.species_id == ^gall_species_id,
-      select: gre.place_id
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Bulk updates all range exclusions for a gall (replaces existing).
-
-  Takes a list of place IDs that should be excluded from the gall's range.
-  """
-  @spec set_range_exclusions_for_gall(integer(), [integer()]) :: :ok
-  def set_range_exclusions_for_gall(gall_species_id, place_ids) do
-    Repo.transaction(fn ->
-      # Delete existing exclusions
-      from(gre in "gall_range_exclusion",
-        where: gre.species_id == ^gall_species_id
-      )
-      |> Repo.delete_all()
-
-      # Insert new exclusions
-      if place_ids != [] do
-        entries = Enum.map(place_ids, &%{species_id: gall_species_id, place_id: &1})
-        Repo.insert_all("gall_range_exclusion", entries)
-      end
-
-      :ok
-    end)
-
-    :ok
-  end
-
-  @doc """
-  Toggles a place exclusion for a gall (add if not excluded, remove if excluded).
-  Returns {:added, place_id} or {:removed, place_id}.
-
-  Note: "added" means the place is now EXCLUDED from the gall's range.
-  """
-  @spec toggle_exclusion_for_gall(integer(), integer()) :: {:added | :removed, integer()}
-  def toggle_exclusion_for_gall(gall_species_id, place_id) do
-    existing =
-      from(gre in "gall_range_exclusion",
-        where: gre.species_id == ^gall_species_id and gre.place_id == ^place_id,
-        select: count()
-      )
-      |> Repo.one()
-
-    if existing > 0 do
-      # Remove exclusion (place is now in range)
-      from(gre in "gall_range_exclusion",
-        where: gre.species_id == ^gall_species_id and gre.place_id == ^place_id
-      )
-      |> Repo.delete_all()
-
-      {:removed, place_id}
-    else
-      # Add exclusion (place is now excluded)
-      Repo.insert_all(
-        "gall_range_exclusion",
-        [%{species_id: gall_species_id, place_id: place_id}],
-        on_conflict: :nothing
-      )
-
-      {:added, place_id}
-    end
-  end
-
-  @doc """
-  Gets the union of all host places for a gall as place IDs (not codes).
-  Used for computing which places can potentially be excluded.
-  """
-  @spec get_host_place_ids_for_gall(integer()) :: [integer()]
-  def get_host_place_ids_for_gall(gall_species_id) do
-    from(hr in "host_range",
-      join: h in Host,
-      on: h.host_species_id == hr.species_id,
-      where: h.gall_species_id == ^gall_species_id,
-      distinct: true,
-      select: hr.place_id
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets a place ID by its code.
-  """
-  @spec get_place_id_by_code(String.t()) :: integer() | nil
-  def get_place_id_by_code(code) do
-    from(p in "place",
-      where: p.code == ^code,
-      select: p.id
-    )
-    |> Repo.one()
-  end
 end

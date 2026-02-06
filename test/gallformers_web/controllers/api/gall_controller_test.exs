@@ -4,6 +4,7 @@ defmodule GallformersWeb.API.GallControllerTest do
   """
   use GallformersWeb.ConnCase
 
+  alias Gallformers.Galls
   alias Gallformers.Species
 
   describe "GET /api/v2/galls" do
@@ -70,7 +71,7 @@ defmodule GallformersWeb.API.GallControllerTest do
 
   describe "GET /api/v2/galls/:id" do
     test "returns gall details for valid ID", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
         gall = hd(galls)
@@ -83,7 +84,7 @@ defmodule GallformersWeb.API.GallControllerTest do
     end
 
     test "returns full gall details with related data", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
         gall = hd(galls)
@@ -115,87 +116,9 @@ defmodule GallformersWeb.API.GallControllerTest do
     end
   end
 
-  describe "GET /api/v2/galls/random" do
-    test "returns random gall with image", %{conn: conn} do
-      conn = get(conn, ~p"/api/v2/galls/random")
-
-      # May return 200 with gall or 404 if no galls with images
-      status = conn.status
-      assert status in [200, 404]
-
-      if status == 200 do
-        response = json_response(conn, 200)
-        assert Map.has_key?(response, "id")
-        assert Map.has_key?(response, "name")
-        assert Map.has_key?(response, "image_url")
-      end
-    end
-
-    test "returns different results on subsequent calls", %{conn: conn} do
-      # Call multiple times and check we get some variation
-      results =
-        Enum.map(1..5, fn _ ->
-          conn = get(conn, ~p"/api/v2/galls/random")
-
-          if conn.status == 200 do
-            json_response(conn, 200)["id"]
-          else
-            nil
-          end
-        end)
-
-      # Filter out nils and check for uniqueness
-      valid_results = Enum.reject(results, &is_nil/1)
-
-      # If we got multiple valid results, they shouldn't all be the same
-      # (statistically very unlikely for a truly random function)
-      if length(valid_results) >= 3 do
-        # Just verify the function doesn't error - randomness is hard to test
-        assert is_list(valid_results)
-      end
-    end
-  end
-
-  describe "GET /api/v2/galls/id" do
-    test "returns all galls for ID tool", %{conn: conn} do
-      conn = get(conn, ~p"/api/v2/galls/id")
-
-      response = json_response(conn, 200)
-      assert is_list(response)
-    end
-
-    test "returns galls with filter fields", %{conn: conn} do
-      conn = get(conn, ~p"/api/v2/galls/id")
-
-      response = json_response(conn, 200)
-
-      if length(response) > 0 do
-        gall = hd(response)
-        # Should have filter fields as arrays
-        assert Map.has_key?(gall, "colors")
-        assert Map.has_key?(gall, "shapes")
-        assert Map.has_key?(gall, "plant_parts")
-        assert Map.has_key?(gall, "hosts")
-        assert is_list(gall["colors"])
-        assert is_list(gall["hosts"])
-      end
-    end
-
-    test "returns galls with image URLs", %{conn: conn} do
-      conn = get(conn, ~p"/api/v2/galls/id")
-
-      response = json_response(conn, 200)
-
-      if length(response) > 0 do
-        gall = hd(response)
-        assert Map.has_key?(gall, "imageUrl")
-      end
-    end
-  end
-
   describe "GET /api/v2/galls/:id/images" do
     test "returns images for gall", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
         gall = hd(galls)
@@ -207,7 +130,7 @@ defmodule GallformersWeb.API.GallControllerTest do
     end
 
     test "images have expected fields", %{conn: conn} do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       # Find a gall with images
       gall_with_images =
@@ -233,21 +156,44 @@ defmodule GallformersWeb.API.GallControllerTest do
     end
   end
 
-  describe "GET /api/v2/galls/:id/related" do
-    test "returns related galls", %{conn: conn} do
-      galls = Species.list_galls()
+  describe "GET /api/v2/galls/:id/sources" do
+    test "returns sources for gall", %{conn: conn} do
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
         gall = hd(galls)
-        conn = get(conn, ~p"/api/v2/galls/#{gall.id}/related")
+        conn = get(conn, ~p"/api/v2/galls/#{gall.id}/sources")
 
         response = json_response(conn, 200)
         assert is_list(response)
       end
     end
 
-    test "returns 404 for non-existent ID", %{conn: conn} do
-      conn = get(conn, ~p"/api/v2/galls/999999999/related")
+    test "sources have expected fields", %{conn: conn} do
+      galls = Galls.list_galls()
+
+      if length(galls) > 0 do
+        gall = hd(galls)
+        conn = get(conn, ~p"/api/v2/galls/#{gall.id}/sources")
+
+        response = json_response(conn, 200)
+
+        if length(response) > 0 do
+          source = hd(response)
+          assert Map.has_key?(source, "id")
+          assert Map.has_key?(source, "title")
+        end
+      end
+    end
+
+    test "returns 400 for invalid ID", %{conn: conn} do
+      conn = get(conn, ~p"/api/v2/galls/invalid/sources")
+
+      assert json_response(conn, 400)
+    end
+
+    test "returns 404 for non-existent gall", %{conn: conn} do
+      conn = get(conn, ~p"/api/v2/galls/999999999/sources")
 
       assert json_response(conn, 404)
     end

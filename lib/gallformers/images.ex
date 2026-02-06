@@ -2,28 +2,19 @@ defmodule Gallformers.Images do
   @moduledoc """
   The Images context.
 
-  Provides functions for managing species images including S3 uploads,
-  presigned URLs, image processing, and database operations.
+  Provides functions for managing species images including CRUD operations,
+  audit functions, and attribution checking. S3 operations are in
+  `Gallformers.Storage`.
   """
 
   require Logger
 
   import Ecto.Query
+  alias Gallformers.Images.Image, as: ImageSchema
   alias Gallformers.Licenses
   alias Gallformers.Repo
-  alias Gallformers.Species.Image, as: ImageSchema
   alias Gallformers.Species.Species
-
-  # Image processing library (vix-based)
-  alias Image, as: ImageLib
-
-  # Image sizes for resizing (width in pixels)
-  @sizes %{
-    small: 300,
-    medium: 800,
-    large: 1200,
-    xlarge: 2000
-  }
+  alias Gallformers.Storage
 
   # Accepted MIME types for upload
   @accepted_types ~w(image/jpeg image/png image/jpg)
@@ -34,53 +25,9 @@ defmodule Gallformers.Images do
   @spec accepted_types() :: [String.t()]
   def accepted_types, do: @accepted_types
 
-  @doc """
-  Returns the CDN base URL for images.
-  """
-  @spec cdn_url() :: String.t()
-  def cdn_url do
-    Application.get_env(:gallformers, :images)[:cdn_url]
-  end
-
-  @doc """
-  Returns the S3 bucket name.
-  """
-  @spec bucket() :: String.t()
-  def bucket do
-    Application.get_env(:gallformers, :images)[:bucket]
-  end
-
-  @doc """
-  Generates the S3 path for an image.
-
-  Format: gall/{species_id}/{species_id}_{timestamp}_original.{ext}
-  """
-  @spec generate_path(integer(), String.t()) :: String.t()
-  def generate_path(species_id, extension) do
-    timestamp = System.system_time(:millisecond)
-    ext = String.trim_leading(extension, ".")
-    "gall/#{species_id}/#{species_id}_#{timestamp}_original.#{ext}"
-  end
-
-  @doc """
-  Generates a presigned URL for uploading an image to S3.
-
-  Returns {:ok, presigned_url} or {:error, reason}.
-  """
-  @spec presigned_upload_url(String.t(), String.t()) :: {:ok, String.t()} | {:error, term()}
-  def presigned_upload_url(path, content_type) do
-    expiry = Application.get_env(:gallformers, :images)[:presign_expiry] || 300
-
-    config = ExAws.Config.new(:s3)
-
-    case ExAws.S3.presigned_url(config, :put, bucket(), path,
-           expires_in: expiry,
-           query_params: [{"Content-Type", content_type}]
-         ) do
-      {:ok, url} -> {:ok, url}
-      {:error, reason} -> {:error, reason}
-    end
-  end
+  # =============================================================================
+  # Image CRUD Operations
+  # =============================================================================
 
   @doc """
   Gets all images for a species, ordered by sort_order.
@@ -199,7 +146,7 @@ defmodule Gallformers.Images do
   @spec delete_image(ImageSchema.t()) :: {:ok, ImageSchema.t()} | {:error, term()}
   def delete_image(%ImageSchema{} = image) do
     # Delete from S3 first
-    case delete_image_from_s3(image.path) do
+    case Storage.delete_image(image.path) do
       :ok ->
         Repo.delete(image)
 
@@ -224,7 +171,7 @@ defmodule Gallformers.Images do
       |> Repo.all()
 
     Enum.each(images, fn path ->
-      case delete_image_from_s3(path) do
+      case Storage.delete_image(path) do
         :ok ->
           :ok
 
@@ -250,7 +197,7 @@ defmodule Gallformers.Images do
     # Delete from S3 first
     s3_results =
       images
-      |> Enum.map(fn image -> delete_image_from_s3(image.path) end)
+      |> Enum.map(fn image -> Storage.delete_image(image.path) end)
       |> Enum.filter(fn result -> result != :ok end)
 
     if s3_results == [] do
@@ -263,45 +210,6 @@ defmodule Gallformers.Images do
       {:ok, count}
     else
       {:error, {:s3_errors, s3_results}}
-    end
-  end
-
-  @doc """
-  Sets an image as the default for its species.
-
-  The default image is the one with sort_order = 1.
-  This reorders all images for the species, moving the target to position 1.
-  """
-  @spec set_default(ImageSchema.t()) :: {:ok, ImageSchema.t()} | {:error, Ecto.Changeset.t()}
-  def set_default(%ImageSchema{} = image) do
-    Repo.transaction(fn ->
-      # Temporarily set target image to sort_order 0
-      from(i in ImageSchema, where: i.id == ^image.id)
-      |> Repo.update_all(set: [sort_order: 0])
-
-      # Get all images for this species, ordered by sort_order
-      # (target will be first since it's at 0)
-      images =
-        from(i in ImageSchema,
-          where: i.species_id == ^image.species_id,
-          order_by: [asc: i.sort_order, asc: i.id]
-        )
-        |> Repo.all()
-
-      # Renumber all images: target gets 1, others get 2, 3, 4...
-      images
-      |> Enum.with_index(1)
-      |> Enum.each(fn {img, index} ->
-        from(i in ImageSchema, where: i.id == ^img.id)
-        |> Repo.update_all(set: [sort_order: index])
-      end)
-
-      # Return the updated target image
-      Repo.get!(ImageSchema, image.id)
-    end)
-    |> case do
-      {:ok, updated} -> {:ok, updated}
-      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -328,44 +236,6 @@ defmodule Gallformers.Images do
     end
   end
 
-  @doc """
-  Generates image size variants and uploads them to S3.
-
-  This is called after the original image has been uploaded.
-  The function downloads the original, resizes it, and uploads
-  the variants asynchronously.
-  """
-  @spec generate_size_variants(String.t()) :: :ok | {:error, term()}
-  def generate_size_variants(original_path) do
-    original_url = cdn_url() <> "/" <> original_path
-
-    case fetch_original_image(original_url) do
-      {:ok, body} ->
-        spawn_resize_tasks(body, original_path)
-        :ok
-
-      {:error, reason} ->
-        Logger.error("Failed to generate size variants for #{original_path}: #{inspect(reason)}")
-        {:error, reason}
-    end
-  end
-
-  defp fetch_original_image(url) do
-    case Req.get(url) do
-      {:ok, %{status: 200, body: body}} -> {:ok, body}
-      {:ok, %{status: status}} -> {:error, {:fetch_failed, status}}
-      {:error, reason} -> {:error, {:fetch_failed, reason}}
-    end
-  end
-
-  defp spawn_resize_tasks(body, original_path) do
-    Enum.each(@sizes, fn {size_name, width} ->
-      Gallformers.Async.run(fn -> resize_and_upload(body, original_path, size_name, width) end)
-    end)
-  end
-
-  # Private functions
-
   defp image_changeset(image, attrs) do
     import Ecto.Changeset
 
@@ -387,59 +257,9 @@ defmodule Gallformers.Images do
     |> validate_required([:species_id, :path])
   end
 
-  defp delete_image_from_s3(path) when is_binary(path) do
-    # Generate all size variant keys
-    keys =
-      [:original, :small, :medium, :large, :xlarge]
-      |> Enum.map(fn size ->
-        size_str = Atom.to_string(size)
-        String.replace(path, "original", size_str)
-      end)
-
-    # Delete all variants - pass keys directly as strings
-    case ExAws.S3.delete_multiple_objects(bucket(), keys) |> ExAws.request() do
-      {:ok, _} -> :ok
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  defp delete_image_from_s3(_), do: :ok
-
-  defp resize_and_upload(image_data, original_path, size_name, target_width) do
-    size_str = Atom.to_string(size_name)
-    new_path = String.replace(original_path, "original", size_str)
-    format = get_image_format(original_path)
-    content_type = format_to_content_type(format)
-
-    with {:ok, img} <- ImageLib.open(image_data),
-         {:ok, resized} <- ImageLib.thumbnail(img, target_width),
-         {:ok, output_data} <- ImageLib.write(resized, :memory, suffix: ".#{format}"),
-         {:ok, _response} <- upload_to_s3(new_path, output_data, content_type) do
-      {:ok, new_path}
-    else
-      {:error, reason} ->
-        Logger.error(
-          "Failed to process #{size_name} variant for #{original_path}: #{inspect(reason)}"
-        )
-
-        {:error, {:resize_failed, reason}}
-    end
-  end
-
-  defp get_image_format(path) do
-    if String.ends_with?(path, ".png"), do: :png, else: :jpeg
-  end
-
-  defp format_to_content_type(:png), do: "image/png"
-  defp format_to_content_type(:jpeg), do: "image/jpeg"
-
-  defp upload_to_s3(path, data, content_type) do
-    ExAws.S3.put_object(bucket(), path, data,
-      content_type: content_type
-      # Note: No ACL needed - bucket has public read policy
-    )
-    |> ExAws.request()
-  end
+  # =============================================================================
+  # Query Functions
+  # =============================================================================
 
   @doc """
   Gets all images for a source, ordered by species name.
@@ -508,304 +328,9 @@ defmodule Gallformers.Images do
     |> Repo.all()
   end
 
-  # Article Image Functions
-
-  @doc """
-  Generates the S3 path for an article image.
-
-  Format: articles/{article_id}/{timestamp}.{ext}
-
-  Uses article ID instead of slug since slugs can change but IDs are stable.
-  """
-  @spec generate_article_path(integer(), String.t()) :: String.t()
-  def generate_article_path(article_id, extension) when is_integer(article_id) do
-    timestamp = System.system_time(:millisecond)
-    ext = String.trim_leading(extension, ".")
-    "articles/#{article_id}/#{timestamp}.#{ext}"
-  end
-
-  @doc """
-  Returns the full CDN URL for an article image path.
-  """
-  @spec article_image_url(String.t()) :: String.t()
-  def article_image_url(path) do
-    "#{cdn_url()}/#{path}"
-  end
-
-  @doc """
-  Lists all images in the articles folder on S3.
-
-  Returns a list of maps with :path, :url, :name, :folder, and :article_id keys.
-  """
-  @spec list_article_images() :: [map()]
-  def list_article_images do
-    list_article_images_with_prefix("articles/")
-  end
-
-  @doc """
-  Lists images for a specific article by ID.
-  """
-  @spec list_article_images_for_article(integer()) :: [map()]
-  def list_article_images_for_article(article_id) do
-    list_article_images_with_prefix("articles/#{article_id}/")
-  end
-
-  # Lists images in a specific articles subfolder on S3.
-  @spec list_article_images_with_prefix(String.t()) :: [map()]
-  defp list_article_images_with_prefix(prefix) do
-    case ExAws.S3.list_objects(bucket(), prefix: prefix) |> ExAws.request() do
-      {:ok, %{body: body}} ->
-        # contents may be missing, nil, or a list depending on S3 response
-        contents = Map.get(body, :contents) || []
-        contents = if is_list(contents), do: contents, else: []
-
-        contents
-        |> Enum.filter(&image_file?/1)
-        |> Enum.map(&transform_s3_object/1)
-        |> Enum.sort_by(& &1.last_modified, :desc)
-
-      {:error, reason} ->
-        Logger.warning("Failed to list article images: #{inspect(reason)}")
-        []
-    end
-  end
-
-  defp image_file?(obj) do
-    String.ends_with?(obj.key, [".jpg", ".jpeg", ".png", ".gif", ".webp"])
-  end
-
-  defp transform_s3_object(obj) do
-    path = obj.key
-    parts = String.split(path, "/")
-    folder = extract_folder(parts)
-
-    %{
-      path: path,
-      url: article_image_url(path),
-      name: List.last(parts),
-      folder: folder,
-      article_id: parse_article_id(folder),
-      last_modified: obj.last_modified,
-      size: obj.size
-    }
-  end
-
-  defp extract_folder(parts) when length(parts) >= 2, do: Enum.at(parts, 1)
-  defp extract_folder(_parts), do: ""
-
-  defp parse_article_id(folder) do
-    case Integer.parse(folder) do
-      {id, ""} -> id
-      _ -> nil
-    end
-  end
-
-  @doc """
-  Deletes an article image from S3.
-
-  Takes the full S3 path (e.g., "articles/123/1234567890.jpg").
-  Returns :ok on success or {:error, reason} on failure.
-  """
-  @spec delete_article_image(String.t()) :: :ok | {:error, term()}
-  def delete_article_image(path) when is_binary(path) do
-    Logger.info("Attempting to delete article image: #{path} from bucket: #{bucket()}")
-
-    case ExAws.S3.delete_object(bucket(), path) |> ExAws.request() do
-      {:ok, _} ->
-        Logger.info("Successfully deleted article image: #{path}")
-        :ok
-
-      {:error, reason} ->
-        Logger.error("Failed to delete article image: #{path}, reason: #{inspect(reason)}")
-        {:error, reason}
-    end
-  end
-
   # =============================================================================
-  # Image Audit Functions
+  # Attribution Functions
   # =============================================================================
-
-  @doc """
-  Lists all image paths from S3 under the gall/ prefix.
-
-  Returns a list of S3 object maps with :key, :last_modified, and :size.
-  This can be slow for large buckets - consider using the AuditCache for cached results.
-  """
-  @spec list_all_s3_gall_paths() :: {:ok, [map()]} | {:error, term()}
-  def list_all_s3_gall_paths do
-    if Application.get_env(:gallformers, :s3_enabled, true) do
-      list_s3_gall_paths_recursive("gall/", nil, [])
-    else
-      # Return empty list in test environment to avoid real S3 calls
-      {:ok, []}
-    end
-  end
-
-  defp list_s3_gall_paths_recursive(prefix, continuation_token, acc) do
-    opts =
-      [prefix: prefix]
-      |> maybe_add_continuation_token(continuation_token)
-
-    case ExAws.S3.list_objects_v2(bucket(), opts) |> ExAws.request() do
-      {:ok, %{body: body}} ->
-        contents = body[:contents] || []
-        # Filter to only original images (not size variants)
-        new_paths =
-          contents
-          |> Enum.filter(&original_gall_image?/1)
-          |> Enum.map(&extract_s3_object_info/1)
-
-        all_paths = acc ++ new_paths
-
-        # Check for more pages
-        if body[:is_truncated] == "true" && body[:next_continuation_token] do
-          list_s3_gall_paths_recursive(prefix, body[:next_continuation_token], all_paths)
-        else
-          {:ok, all_paths}
-        end
-
-      {:error, reason} ->
-        Logger.error("Failed to list S3 gall paths: #{inspect(reason)}")
-        {:error, reason}
-    end
-  end
-
-  defp maybe_add_continuation_token(opts, nil), do: opts
-
-  defp maybe_add_continuation_token(opts, token),
-    do: Keyword.put(opts, :continuation_token, token)
-
-  defp original_gall_image?(obj) do
-    String.contains?(obj[:key], "_original.") && image_extension?(obj[:key])
-  end
-
-  defp image_extension?(path) do
-    String.ends_with?(path, [".jpg", ".jpeg", ".png", ".gif", ".webp"])
-  end
-
-  defp extract_s3_object_info(obj) do
-    %{
-      key: obj[:key],
-      last_modified: obj[:last_modified],
-      size: obj[:size]
-    }
-  end
-
-  @doc """
-  Parses the species ID from an S3 gall image path.
-
-  ## Examples
-
-      iex> parse_species_id_from_path("gall/123/123_1234567890_original.jpg")
-      {:ok, 123}
-
-      iex> parse_species_id_from_path("gall/abc/image.jpg")
-      {:error, :invalid_path}
-
-      iex> parse_species_id_from_path("articles/1/image.jpg")
-      {:error, :invalid_path}
-  """
-  @spec parse_species_id_from_path(String.t()) :: {:ok, integer()} | {:error, :invalid_path}
-  def parse_species_id_from_path(path) when is_binary(path) do
-    case String.split(path, "/") do
-      ["gall", species_id_str | _rest] ->
-        case Integer.parse(species_id_str) do
-          {id, ""} -> {:ok, id}
-          _ -> {:error, :invalid_path}
-        end
-
-      _ ->
-        {:error, :invalid_path}
-    end
-  end
-
-  @doc """
-  Finds orphan paths from a list of S3 paths.
-
-  An orphan is a path where either:
-  1. The species_id parsed from the path doesn't exist in the database
-  2. No image record exists with that exact path
-
-  Returns a list of orphan paths with metadata.
-  """
-  @spec find_orphan_paths([map()]) :: [map()]
-  def find_orphan_paths(s3_objects) when is_list(s3_objects) do
-    # Get all paths for batch DB query
-    paths = Enum.map(s3_objects, & &1.key)
-
-    # Query DB for existing image paths
-    existing_paths =
-      from(i in ImageSchema, where: i.path in ^paths, select: i.path)
-      |> Repo.all()
-      |> MapSet.new()
-
-    # Get all valid species IDs
-    valid_species_ids =
-      from(s in Species, select: s.id)
-      |> Repo.all()
-      |> MapSet.new()
-
-    # Filter to orphans
-    s3_objects
-    |> Enum.filter(&orphan?(&1.key, existing_paths, valid_species_ids))
-    |> Enum.map(fn obj ->
-      species_info = get_species_info(obj.key, valid_species_ids)
-      Map.merge(obj, species_info)
-    end)
-  end
-
-  defp get_species_info(path, valid_species_ids) do
-    case parse_species_id_from_path(path) do
-      {:ok, id} ->
-        %{species_id: id, species_exists: MapSet.member?(valid_species_ids, id)}
-
-      {:error, _} ->
-        %{species_id: nil, species_exists: false}
-    end
-  end
-
-  defp orphan?(path, existing_paths, valid_species_ids) do
-    # If path exists in DB, it's not an orphan
-    if MapSet.member?(existing_paths, path),
-      do: false,
-      else: check_species_orphan(path, valid_species_ids)
-  end
-
-  defp check_species_orphan(path, valid_species_ids) do
-    case parse_species_id_from_path(path) do
-      {:ok, species_id} -> !MapSet.member?(valid_species_ids, species_id)
-      {:error, _} -> true
-    end
-  end
-
-  @doc """
-  Deletes an orphan image from S3 (not in database).
-
-  Deletes all size variants (original, small, medium, large, xlarge).
-  This is for images that exist on S3 but have no database record.
-  """
-  @spec delete_s3_orphan(String.t()) :: :ok | {:error, term()}
-  def delete_s3_orphan(path) when is_binary(path) do
-    Logger.info("Deleting S3 orphan image: #{path}")
-    delete_image_from_s3(path)
-  end
-
-  @doc """
-  Creates a database record for an orphan S3 image, assigning it to a species.
-
-  The path must already exist on S3. This creates the database record
-  to "adopt" the orphan image.
-  """
-  @spec create_image_from_orphan(String.t(), integer(), map()) ::
-          {:ok, ImageSchema.t()} | {:error, Ecto.Changeset.t()}
-  def create_image_from_orphan(path, species_id, attrs \\ %{}) do
-    attrs =
-      attrs
-      |> Map.put(:path, path)
-      |> Map.put(:species_id, species_id)
-
-    create_image(attrs)
-  end
 
   @doc """
   Checks if a license requires attribution (creator must be specified).

@@ -16,8 +16,9 @@ defmodule GallformersWeb.Admin.GallHostLive do
   use GallformersWeb, :live_view
   use GallformersWeb.Admin.FormHelpers
 
-  alias Gallformers.Hosts
+  alias Gallformers.GallHosts
   alias Gallformers.Places
+  alias Gallformers.Ranges
   alias Gallformers.Repo
   alias Gallformers.Species
   alias GallformersWeb.Admin.DeferredChanges
@@ -300,16 +301,16 @@ defmodule GallformersWeb.Admin.GallHostLive do
         Repo.transaction(fn ->
           # Remove hosts
           for relation_id <- hosts_to_remove do
-            Species.remove_host_from_species(relation_id)
+            GallHosts.remove_host_from_gall(relation_id)
           end
 
           # Add hosts
           for host <- hosts_to_add do
-            Species.add_host_to_species(gall.id, host.host_species_id)
+            GallHosts.add_host_to_gall(gall.id, host.host_species_id)
           end
 
           # Set exclusions (replaces existing)
-          Hosts.set_range_exclusions_for_gall(gall.id, socket.assigns.excluded_place_ids)
+          Ranges.set_range_exclusions_for_gall(gall.id, socket.assigns.excluded_place_ids)
 
           :ok
         end)
@@ -351,9 +352,9 @@ defmodule GallformersWeb.Admin.GallHostLive do
         if gall.taxoncode != "gall" do
           put_flash(socket, :error, "Selected species is not a gall")
         else
-          hosts = Hosts.get_hosts_for_gall(gall_id)
-          host_places = Hosts.get_places_for_gall(gall_id)
-          excluded_place_ids = Hosts.get_excluded_place_ids_for_gall(gall_id)
+          hosts = GallHosts.get_hosts_for_gall(gall_id)
+          host_places = Ranges.get_places_for_gall(gall_id)
+          excluded_place_ids = Ranges.get_excluded_place_ids_for_gall(gall_id)
           excluded_places = place_ids_to_codes(socket.assigns.all_places, excluded_place_ids)
 
           socket
@@ -390,7 +391,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
   defp recompute_host_places_and_range(socket) do
     hosts = socket.assigns.hosts
     host_species_ids = Enum.map(hosts, & &1.host_species_id)
-    host_places = Hosts.get_places_for_host_species_ids(host_species_ids)
+    host_places = Ranges.get_places_for_host_species_ids(host_species_ids)
 
     # Clean up excluded_place_ids that no longer apply (host was removed)
     excluded_place_ids = socket.assigns.excluded_place_ids

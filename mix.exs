@@ -81,6 +81,9 @@ defmodule Gallformers.MixProject do
       # Dev/Test tools
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      # Security scanning
+      {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
+      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       # E2E browser testing (separate from regular test suite)
       {:wallaby, "~> 0.30", only: :test, runtime: false}
     ]

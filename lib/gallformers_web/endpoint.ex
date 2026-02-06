@@ -1,19 +1,21 @@
 defmodule GallformersWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :gallformers
 
-  # The session will be stored in the cookie and signed,
-  # this means its contents can be read but not tampered with.
-  # Set :encryption_salt if you would also like to encrypt it.
+  # The session is stored in the cookie, signed and encrypted.
+  # secure: true is set in production only (dev/test use HTTP).
   @session_options [
     store: :cookie,
     key: "_gallformers_key",
     signing_salt: "Z2Zo8q/D",
-    same_site: "Lax"
+    encryption_salt: "pP9YsGAhNA8=",
+    same_site: "Lax",
+    secure: Application.compile_env(:gallformers, :env) == :prod
   ]
 
+  # log: :debug suppresses "CONNECTED TO Phoenix.LiveView.Socket" noise in prod logs
   socket "/live", Phoenix.LiveView.Socket,
-    websocket: [connect_info: [session: @session_options]],
-    longpoll: [connect_info: [session: @session_options]]
+    websocket: [connect_info: [session: @session_options], log: :debug],
+    longpoll: [connect_info: [session: @session_options], log: :debug]
 
   # Serve at "/" the static files from "priv/static" directory.
   #

@@ -10,14 +10,15 @@ defmodule GallformersWeb.HomeLive do
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.{Hosts, Images, Sources, Species}
+  alias Gallformers.{Galls, Images, Sources}
+  alias Gallformers.Plants
 
   @impl true
   def mount(_params, _session, socket) do
     # Only fetch data when connected to avoid fetching twice
     {random_gall, stats} =
       if connected?(socket) do
-        {Species.random_gall(), fetch_stats()}
+        {Galls.random_gall(), fetch_stats()}
       else
         {nil, %{galls: 0, hosts: 0, sources: 0, images: 0}}
       end
@@ -41,8 +42,8 @@ defmodule GallformersWeb.HomeLive do
 
   defp fetch_stats do
     %{
-      galls: Species.count_galls(),
-      hosts: Hosts.count_hosts(),
+      galls: Galls.count_galls(),
+      hosts: Plants.count_hosts(),
       sources: Sources.count_sources(),
       images: Images.count_images()
     }
@@ -73,7 +74,7 @@ defmodule GallformersWeb.HomeLive do
   def handle_event("search_host", %{"value" => query}, socket) do
     results =
       if String.length(query) >= 2 do
-        Hosts.search_hosts(query, 8)
+        Plants.search_hosts(query, 8)
       else
         []
       end
@@ -83,7 +84,7 @@ defmodule GallformersWeb.HomeLive do
 
   @impl true
   def handle_event("select_host", %{"id" => id_str}, socket) do
-    host = Hosts.get_host(String.to_integer(id_str))
+    host = Plants.get_host(String.to_integer(id_str))
 
     # On home page, selecting a host immediately navigates to ID page
     {:noreply, push_navigate(socket, to: ~p"/id?h=#{host.name}")}
@@ -266,7 +267,7 @@ defmodule GallformersWeb.HomeLive do
             <%= if @random_gall.image_creator do %>
               <p class="text-xs text-gray-500 mt-2">
                 Photo:
-                <%= if @random_gall.image_sourcelink do %>
+                <%= if @random_gall.image_sourcelink not in [nil, ""] do %>
                   <a
                     href={@random_gall.image_sourcelink}
                     target="_blank"
@@ -281,7 +282,7 @@ defmodule GallformersWeb.HomeLive do
                 <%= if @random_gall.image_license do %>
                   <span class="ml-1">
                     ©
-                    <%= if @random_gall.image_licenselink do %>
+                    <%= if @random_gall.image_licenselink not in [nil, ""] do %>
                       <a
                         href={@random_gall.image_licenselink}
                         target="_blank"

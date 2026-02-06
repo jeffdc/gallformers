@@ -6,23 +6,22 @@ defmodule GallformersWeb.FilterGuideLive do
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.IDTool
+  alias Gallformers.FilterFields
   alias Gallformers.Markdown
 
   @impl true
   def mount(_params, _session, socket) do
-    filter_fields = %{
-      alignment:
-        IDTool.list_alignments() |> Enum.map(&%{field: &1.alignment, description: &1.description}),
-      cells: IDTool.list_cells() |> Enum.map(&%{field: &1.cells, description: &1.description}),
-      form: IDTool.list_forms() |> Enum.map(&%{field: &1.form, description: &1.description}),
-      plant_part:
-        IDTool.list_plant_parts() |> Enum.map(&%{field: &1.part, description: &1.description}),
-      shape: IDTool.list_shapes() |> Enum.map(&%{field: &1.shape, description: &1.description}),
-      texture:
-        IDTool.list_textures() |> Enum.map(&%{field: &1.texture, description: &1.description}),
-      walls: IDTool.list_walls() |> Enum.map(&%{field: &1.walls, description: &1.description})
-    }
+    filter_fields =
+      for type <- [:alignment, :cells, :form, :plant_part, :shape, :texture, :walls],
+          into: %{} do
+        field_name = FilterFields.field_name_for(type)
+
+        items =
+          FilterFields.list_all(type)
+          |> Enum.map(&%{field: Map.get(&1, field_name), description: &1.description})
+
+        {type, items}
+      end
 
     {:ok,
      assign(socket,

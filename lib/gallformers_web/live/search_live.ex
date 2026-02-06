@@ -5,6 +5,7 @@ defmodule GallformersWeb.SearchLive do
   Provides a unified search experience with:
   - Debounced search input
   - Results grouped by type (galls, hosts, sources, glossary, taxonomy, places)
+  - Pagination (50 results per page)
   - Sortable results table
   - Keyboard navigation
   - URL sync via push_patch
@@ -14,6 +15,7 @@ defmodule GallformersWeb.SearchLive do
   alias Gallformers.Search
 
   @valid_sort_columns ~w(type name relevance)
+  @page_size 50
 
   @impl true
   def mount(_params, _session, socket) do
@@ -29,6 +31,8 @@ defmodule GallformersWeb.SearchLive do
        query: "",
        results: [],
        total_count: 0,
+       current_page: 1,
+       page_size: @page_size,
        sort_by: :relevance,
        sort_dir: :asc,
        selected_index: -1,
@@ -71,6 +75,12 @@ defmodule GallformersWeb.SearchLive do
   end
 
   @impl true
+  def handle_event("page", %{"page" => page}, socket) do
+    page = max(1, min(page, total_pages(socket.assigns.results, socket.assigns.page_size)))
+    {:noreply, assign(socket, current_page: page, selected_index: -1)}
+  end
+
+  @impl true
   def handle_event("sort", %{"column" => column}, socket) when column in @valid_sort_columns do
     column_atom = String.to_atom(column)
 
@@ -82,12 +92,18 @@ defmodule GallformersWeb.SearchLive do
         {column_atom, :asc}
       end
 
-    {:noreply, assign(socket, sort_by: new_sort_by, sort_dir: new_sort_dir, selected_index: -1)}
+    {:noreply,
+     assign(socket,
+       sort_by: new_sort_by,
+       sort_dir: new_sort_dir,
+       current_page: 1,
+       selected_index: -1
+     )}
   end
 
   @impl true
   def handle_event("keydown", %{"key" => "ArrowDown"}, socket) do
-    max_index = length(socket.assigns.results) - 1
+    max_index = current_page_count(socket.assigns) - 1
     new_index = min(socket.assigns.selected_index + 1, max_index)
     {:noreply, assign(socket, selected_index: new_index)}
   end
@@ -103,10 +119,12 @@ defmodule GallformersWeb.SearchLive do
     selected_index = socket.assigns.selected_index
 
     if selected_index >= 0 do
-      sorted =
-        sorted_results(socket.assigns.results, socket.assigns.sort_by, socket.assigns.sort_dir)
+      page_results =
+        socket.assigns.results
+        |> sorted_results(socket.assigns.sort_by, socket.assigns.sort_dir)
+        |> paginated_results(socket.assigns.current_page, socket.assigns.page_size)
 
-      case Enum.at(sorted, selected_index) do
+      case Enum.at(page_results, selected_index) do
         nil ->
           {:noreply, socket}
 
@@ -136,6 +154,7 @@ defmodule GallformersWeb.SearchLive do
       assign(socket,
         results: [],
         total_count: 0,
+        current_page: 1,
         selected_index: -1
       )
     else
@@ -145,6 +164,7 @@ defmodule GallformersWeb.SearchLive do
       assign(socket,
         results: results,
         total_count: length(results),
+        current_page: 1,
         selected_index: -1
       )
     end
@@ -186,6 +206,22 @@ defmodule GallformersWeb.SearchLive do
     do: {result.match_score || 2, String.downcase(result.name || "")}
 
   defp sort_key(result, _), do: String.downcase(result.name || "")
+
+  defp paginated_results(results, current_page, page_size) do
+    results
+    |> Enum.drop((current_page - 1) * page_size)
+    |> Enum.take(page_size)
+  end
+
+  defp total_pages(results, page_size) do
+    max(1, ceil(length(results) / page_size))
+  end
+
+  defp current_page_count(assigns) do
+    total = length(assigns.results)
+    page_start = (assigns.current_page - 1) * assigns.page_size
+    max(0, min(assigns.page_size, total - page_start))
+  end
 
   @type_icons %{
     "gall" => "gf-gall",
@@ -254,7 +290,12 @@ defmodule GallformersWeb.SearchLive do
   @impl true
   def render(assigns) do
     sorted = sorted_results(assigns.results, assigns.sort_by, assigns.sort_dir)
-    assigns = assign(assigns, :sorted_results, sorted)
+    page_results = paginated_results(sorted, assigns.current_page, assigns.page_size)
+
+    assigns =
+      assigns
+      |> assign(:page_results, page_results)
+      |> assign(:total_pages_count, total_pages(assigns.results, assigns.page_size))
 
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
@@ -321,7 +362,7 @@ defmodule GallformersWeb.SearchLive do
                   </thead>
                   <tbody>
                     <tr
-                      :for={{result, index} <- Enum.with_index(@sorted_results)}
+                      :for={{result, index} <- Enum.with_index(@page_results)}
                       id={"result-#{index}"}
                       class={[
                         "cursor-pointer",
@@ -360,6 +401,16 @@ defmodule GallformersWeb.SearchLive do
                   </tbody>
                 </table>
               </div>
+
+              <.pagination
+                :if={@total_pages_count > 1}
+                page={@current_page}
+                total_pages={@total_pages_count}
+                total_items={@total_count}
+                page_size={@page_size}
+                on_page_change={fn page -> JS.push("page", value: %{page: page}) end}
+                class="mt-4"
+              />
 
               <div class="mt-4 text-xs text-gray-500 flex items-center gap-1">
                 <kbd class="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded">↑</kbd>

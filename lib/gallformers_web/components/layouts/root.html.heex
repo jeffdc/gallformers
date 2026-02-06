@@ -33,7 +33,13 @@
     <link rel="apple-touch-icon" href={~p"/apple-touch-icon.png"} />
     <link rel="manifest" href={~p"/manifest.json"} />
     <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
-    <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
+    <script
+      defer
+      phx-track-static
+      type="text/javascript"
+      src={~p"/assets/js/app.js"}
+      nonce={assigns[:csp_nonce]}
+    >
     </script>
   </head>
   <body class="min-h-screen">

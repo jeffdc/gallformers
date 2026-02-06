@@ -26,7 +26,9 @@ config :logger, level: :info
 # This overrides the default behavior of using the request's host
 config :ueberauth, Ueberauth,
   providers: [
-    auth0: {Ueberauth.Strategy.Auth0, [callback_url: "https://www.gallformers.org/auth/auth0/callback"]}
+    auth0:
+      {Ueberauth.Strategy.Auth0,
+       [callback_url: "https://www.gallformers.org/auth/auth0/callback"]}
   ]
 
 # Runtime production configuration, including reading

@@ -5,9 +5,9 @@ defmodule Gallformers.Taxonomy do
   Provides functions for working with taxonomic classifications.
   """
 
+  require Logger
   import Ecto.Query
   alias Gallformers.Repo
-  alias Gallformers.Species.Alias
   alias Gallformers.Species.Species
   alias Gallformers.Taxonomy.Taxonomy
 
@@ -135,6 +135,23 @@ defmodule Gallformers.Taxonomy do
   end
 
   @doc """
+  Gets multiple taxonomies by IDs in a single query (batch version).
+
+  Returns a map of id => %{id, name, type, description}.
+  """
+  @spec get_taxonomies_batch([integer()]) :: %{integer() => map()}
+  def get_taxonomies_batch([]), do: %{}
+
+  def get_taxonomies_batch(ids) do
+    from(t in Taxonomy,
+      where: t.id in ^ids,
+      select: {t.id, %{id: t.id, name: t.name, type: t.type, description: t.description}}
+    )
+    |> Repo.all()
+    |> Enum.into(%{})
+  end
+
+  @doc """
   Gets a taxonomy by name and type.
   """
   @spec get_taxonomy_by_name(String.t(), String.t()) :: Taxonomy.t() | nil
@@ -181,6 +198,23 @@ defmodule Gallformers.Taxonomy do
       order_by: t.name
     )
     |> Repo.all()
+  end
+
+  @doc """
+  Gets children for multiple parent taxonomy IDs in a single query.
+
+  Returns a map of parent_id => [children].
+  """
+  @spec get_children_for_parents([integer()]) :: %{integer() => [Taxonomy.t()]}
+  def get_children_for_parents([]), do: %{}
+
+  def get_children_for_parents(parent_ids) do
+    from(t in Taxonomy,
+      where: t.parent_id in ^parent_ids,
+      order_by: t.name
+    )
+    |> Repo.all()
+    |> Enum.group_by(& &1.parent_id)
   end
 
   @doc """
@@ -566,6 +600,29 @@ defmodule Gallformers.Taxonomy do
   end
 
   @doc """
+  Gets taxonomy (genus/family) for multiple species in a single query (batch version).
+
+  Returns a map of species_id => %{genus: name, family: name}.
+  This is a simplified version that only fetches genus and family names,
+  suitable for API responses where the full taxonomy details aren't needed.
+  """
+  @spec get_taxonomy_for_species_batch([integer()]) :: %{integer() => map()}
+  def get_taxonomy_for_species_batch([]), do: %{}
+
+  def get_taxonomy_for_species_batch(species_ids) do
+    from(st in "species_taxonomy",
+      join: g in Taxonomy,
+      on: st.taxonomy_id == g.id and g.type == "genus",
+      left_join: family in Taxonomy,
+      on: g.parent_id == family.id,
+      where: st.species_id in ^species_ids,
+      select: {st.species_id, %{genus: g.name, family: family.name}}
+    )
+    |> Repo.all()
+    |> Enum.into(%{})
+  end
+
+  @doc """
   Gets species IDs associated with a genus.
   """
   @spec get_species_ids_for_genus(integer()) :: [integer()]
@@ -575,6 +632,23 @@ defmodule Gallformers.Taxonomy do
       select: st.species_id
     )
     |> Repo.all()
+  end
+
+  @doc """
+  Gets species IDs for multiple genera in a single query (batch version).
+
+  Returns a map of genus_id => [species_ids].
+  """
+  @spec get_species_ids_for_genera([integer()]) :: %{integer() => [integer()]}
+  def get_species_ids_for_genera([]), do: %{}
+
+  def get_species_ids_for_genera(genus_ids) do
+    from(st in "species_taxonomy",
+      where: st.taxonomy_id in ^genus_ids,
+      select: {st.taxonomy_id, st.species_id}
+    )
+    |> Repo.all()
+    |> Enum.group_by(fn {genus_id, _} -> genus_id end, fn {_, species_id} -> species_id end)
   end
 
   @doc """
@@ -749,7 +823,7 @@ defmodule Gallformers.Taxonomy do
       on: st.taxonomy_id == g.id,
       join: s in Gallformers.Species.Species,
       on: st.species_id == s.id,
-      join: h in Gallformers.Hosts.Host,
+      join: h in Gallformers.GallHosts.GallHost,
       on: h.gall_species_id == s.id,
       where: s.taxoncode == "gall" and f.type == "family" and h.host_species_id == ^host_id,
       group_by: [f.id, f.name],
@@ -858,14 +932,25 @@ defmodule Gallformers.Taxonomy do
     end
   end
 
-  # Updates a genus and syncs all linked species names, adding synonyms for old names.
+  # Updates a genus and syncs all linked species names via the Species context.
   defp update_genus_with_species_sync(%Taxonomy{} = taxonomy, attrs) do
     old_genus_name = taxonomy.name
     new_genus_name = attrs["name"] || attrs[:name]
 
     Repo.transaction(fn ->
-      # Update species names and create synonyms
-      sync_species_names_on_genus_rename(taxonomy.id, old_genus_name, new_genus_name)
+      # Delegate species rename to Species context
+      species_list =
+        from(s in Species,
+          join: st in "species_taxonomy",
+          on: st.species_id == s.id,
+          where: st.taxonomy_id == ^taxonomy.id,
+          select: s
+        )
+        |> Repo.all()
+
+      for species <- species_list do
+        Gallformers.Species.rename_for_genus_change(species, old_genus_name, new_genus_name)
+      end
 
       # Update the genus itself
       taxonomy
@@ -875,70 +960,6 @@ defmodule Gallformers.Taxonomy do
     |> broadcast(:taxonomy_updated)
   end
 
-  # Updates all species linked to a genus when the genus is renamed.
-  # For each species:
-  # 1. Creates a "scientific synonym" alias with the old species name
-  # 2. Updates the species name by replacing the old genus with the new genus
-  defp sync_species_names_on_genus_rename(genus_id, old_genus_name, new_genus_name) do
-    species_ids = get_species_ids_for_genus(genus_id)
-
-    for species_id <- species_ids do
-      species = Repo.get!(Species, species_id)
-      old_species_name = species.name
-
-      # Create the new name by replacing the genus portion
-      new_species_name = replace_genus_in_name(old_species_name, old_genus_name, new_genus_name)
-
-      # Create synonym alias with the old name
-      create_rename_synonym(species_id, old_species_name)
-
-      # Update the species name
-      species
-      |> Species.changeset(%{name: new_species_name})
-      |> Repo.update!()
-    end
-  end
-
-  # Replaces the genus portion (first word) of a species name.
-  # Example: replace_genus_in_name("Quercus alba", "Quercus", "Oakus") -> "Oakus alba"
-  defp replace_genus_in_name(species_name, old_genus, new_genus) do
-    case String.split(species_name, " ", parts: 2) do
-      [^old_genus, epithet] -> "#{new_genus} #{epithet}"
-      [^old_genus] -> new_genus
-      # If the species name doesn't start with the expected genus, just replace first word
-      [_other_genus, epithet] -> "#{new_genus} #{epithet}"
-      _ -> species_name
-    end
-  end
-
-  # Creates a scientific synonym alias for a species rename.
-  # Returns {:ok, alias} on success or {:error, changeset} on failure.
-  defp create_rename_synonym(species_id, old_name) do
-    require Logger
-
-    alias_changeset =
-      %Alias{}
-      |> Ecto.Changeset.cast(
-        %{name: old_name, type: "scientific", description: "Previous name"},
-        [:name, :type, :description]
-      )
-
-    case Repo.insert(alias_changeset) do
-      {:ok, new_alias} ->
-        Repo.insert_all("alias_species", [%{alias_id: new_alias.id, species_id: species_id}])
-        {:ok, new_alias}
-
-      {:error, changeset} = error ->
-        # Log the error but don't fail the transaction - we still want the genus rename to succeed
-        # even if synonym creation fails (e.g., due to duplicate name constraint)
-        Logger.warning(
-          "Failed to create rename synonym for species #{species_id} (#{old_name}): #{inspect(changeset.errors)}"
-        )
-
-        error
-    end
-  end
-
   @doc """
   Deletes a taxonomy entry.
   """
@@ -946,6 +967,278 @@ defmodule Gallformers.Taxonomy do
   def delete_taxonomy(%Taxonomy{} = taxonomy) do
     Repo.delete(taxonomy)
     |> broadcast(:taxonomy_deleted)
+  end
+
+  # =====================================================================
+  # Deletion Impact Assessment
+  # =====================================================================
+
+  @doc """
+  Gathers all data that would be deleted if this taxonomy is deleted.
+  Returns counts and lists for UI display.
+
+  For family: returns all child genera, sections (via genera), and species count.
+  For genus: returns all child sections and species count.
+  For section/other: returns has_impact: false (no cascade concern).
+  """
+  @spec get_deletion_impact(Taxonomy.t()) :: map()
+  def get_deletion_impact(%Taxonomy{id: id, type: "family"} = taxonomy) do
+    genera = list_child_genera(id)
+    genera_ids = Enum.map(genera, & &1.id)
+
+    sections = list_sections_for_family_tree(id)
+    section_ids = Enum.map(sections, & &1.id)
+
+    # Species linked to this family's genera or sections
+    all_taxonomy_ids = genera_ids ++ section_ids
+    species_count = count_species_for_taxonomies(all_taxonomy_ids)
+
+    %{
+      taxonomy: taxonomy,
+      genera: genera,
+      genera_count: length(genera),
+      sections: sections,
+      sections_count: length(sections),
+      species_count: species_count,
+      has_impact: genera != [] or sections != [] or species_count > 0
+    }
+  end
+
+  def get_deletion_impact(%Taxonomy{id: id, type: "genus"} = taxonomy) do
+    sections = list_child_sections(id)
+    section_ids = Enum.map(sections, & &1.id)
+
+    # Species linked to this genus or its sections
+    all_taxonomy_ids = [id | section_ids]
+    species_count = count_species_for_taxonomies(all_taxonomy_ids)
+
+    %{
+      taxonomy: taxonomy,
+      genera: [],
+      genera_count: 0,
+      sections: sections,
+      sections_count: length(sections),
+      species_count: species_count,
+      has_impact: sections != [] or species_count > 0
+    }
+  end
+
+  def get_deletion_impact(%Taxonomy{} = taxonomy) do
+    # Section or other types - no cascade concern
+    %{
+      taxonomy: taxonomy,
+      genera: [],
+      genera_count: 0,
+      sections: [],
+      sections_count: 0,
+      species_count: 0,
+      has_impact: false
+    }
+  end
+
+  # =====================================================================
+  # Cascade Delete
+  # =====================================================================
+
+  @doc """
+  Deletes taxonomy and all dependent data in a single transaction.
+
+  For family: Deletes leaves first (species → sections → genera → family).
+  For genus: Deletes species → sections → genus.
+
+  Returns {:ok, impact} or {:error, reason}.
+
+  Note: Species deletion includes S3 image cleanup via `Gallformers.Images`.
+  """
+  @spec delete_taxonomy_cascade(Taxonomy.t()) ::
+          {:ok, map()} | {:error, Ecto.Changeset.t() | term()}
+  def delete_taxonomy_cascade(%Taxonomy{id: id, type: "family"} = taxonomy) do
+    Logger.info("Cascade delete starting for family #{taxonomy.name} (id=#{id})")
+
+    genera = list_child_genera(id)
+    genera_ids = Enum.map(genera, & &1.id)
+
+    sections = list_sections_for_family_tree(id)
+    section_ids = Enum.map(sections, & &1.id)
+
+    # All taxonomy IDs that could have species linked (genera + sections)
+    all_taxonomy_ids = genera_ids ++ section_ids
+    species_count = count_species_for_taxonomies(all_taxonomy_ids)
+
+    Logger.info(
+      "Family #{taxonomy.name}: deleting #{length(genera)} genera, #{length(sections)} sections, #{species_count} species"
+    )
+
+    result =
+      Repo.transaction(fn ->
+        # 1. Delete all species linked to this family tree
+        #    (includes S3 cleanup, gall_traits, FTS, cascades to images, aliases, hosts, etc.)
+        delete_species_for_cascade(all_taxonomy_ids)
+
+        # 2. Delete sections (now safe - no species references)
+        Enum.each(sections, &Repo.delete!/1)
+
+        # 3. Delete genera (now safe - no species or section references)
+        Enum.each(genera, &Repo.delete!/1)
+
+        # 4. Delete the family itself
+        Repo.delete!(taxonomy)
+
+        # Return impact summary
+        %{
+          taxonomy: taxonomy,
+          genera: genera,
+          genera_count: length(genera),
+          sections: sections,
+          sections_count: length(sections),
+          species_count: species_count
+        }
+      end)
+
+    log_cascade_result(result, taxonomy)
+    broadcast(result, :taxonomy_deleted)
+  end
+
+  def delete_taxonomy_cascade(%Taxonomy{id: id, type: "genus"} = taxonomy) do
+    Logger.info("Cascade delete starting for genus #{taxonomy.name} (id=#{id})")
+
+    sections = list_child_sections(id)
+    section_ids = Enum.map(sections, & &1.id)
+
+    # Species linked to this genus or its sections
+    all_taxonomy_ids = [id | section_ids]
+    species_count = count_species_for_taxonomies(all_taxonomy_ids)
+
+    Logger.info(
+      "Genus #{taxonomy.name}: deleting #{length(sections)} sections, #{species_count} species"
+    )
+
+    result =
+      Repo.transaction(fn ->
+        # 1. Delete all species linked to this genus or its sections
+        delete_species_for_cascade(all_taxonomy_ids)
+
+        # 2. Delete sections (now safe - no species references)
+        Enum.each(sections, &Repo.delete!/1)
+
+        # 3. Delete the genus itself
+        Repo.delete!(taxonomy)
+
+        # Return impact summary
+        %{
+          taxonomy: taxonomy,
+          genera: [],
+          genera_count: 0,
+          sections: sections,
+          sections_count: length(sections),
+          species_count: species_count
+        }
+      end)
+
+    log_cascade_result(result, taxonomy)
+    broadcast(result, :taxonomy_deleted)
+  end
+
+  def delete_taxonomy_cascade(%Taxonomy{} = taxonomy) do
+    # Section or other types - simple delete, no cascade needed
+    Logger.info("Simple delete for #{taxonomy.type} #{taxonomy.name} (id=#{taxonomy.id})")
+
+    result = Repo.delete(taxonomy)
+    log_cascade_result(result, taxonomy)
+    broadcast(result, :taxonomy_deleted)
+  end
+
+  # Deletes all species linked to the given taxonomy IDs.
+  # Delegates to owning contexts (Galls/Plants) for full cleanup.
+  defp delete_species_for_cascade([]), do: :ok
+
+  defp delete_species_for_cascade(taxonomy_ids) do
+    # Load species with taxoncodes so we can route to the right context
+    species_list =
+      from(s in Species,
+        join: st in "species_taxonomy",
+        on: st.species_id == s.id,
+        where: st.taxonomy_id in ^taxonomy_ids,
+        distinct: true,
+        select: s
+      )
+      |> Repo.all()
+
+    for species <- species_list do
+      case species.taxoncode do
+        "gall" -> Gallformers.Galls.delete_gall(species.id)
+        "plant" -> Gallformers.Plants.delete_host(species.id)
+      end
+    end
+
+    :ok
+  end
+
+  @doc """
+  Gets species IDs linked to any of the given taxonomy IDs.
+  """
+  @spec get_species_ids_for_taxonomies([integer()]) :: [integer()]
+  def get_species_ids_for_taxonomies([]), do: []
+
+  def get_species_ids_for_taxonomies(taxonomy_ids) do
+    from(st in "species_taxonomy",
+      where: st.taxonomy_id in ^taxonomy_ids,
+      select: st.species_id,
+      distinct: true
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Lists all genera that are direct children of a family.
+  """
+  @spec list_child_genera(integer()) :: [Taxonomy.t()]
+  def list_child_genera(family_id) do
+    from(t in Taxonomy,
+      where: t.parent_id == ^family_id and t.type == "genus",
+      order_by: t.name
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Lists all sections that are direct children of a genus.
+  """
+  @spec list_child_sections(integer()) :: [Taxonomy.t()]
+  def list_child_sections(genus_id) do
+    from(t in Taxonomy,
+      where: t.parent_id == ^genus_id and t.type == "section",
+      order_by: t.name
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Lists all sections under a family tree (sections whose parent genus is a child of this family).
+  """
+  @spec list_sections_for_family_tree(integer()) :: [Taxonomy.t()]
+  def list_sections_for_family_tree(family_id) do
+    from(s in Taxonomy,
+      join: g in Taxonomy,
+      on: s.parent_id == g.id,
+      where: s.type == "section" and g.type == "genus" and g.parent_id == ^family_id,
+      order_by: s.name
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Counts species linked to any of the given taxonomy IDs.
+  """
+  @spec count_species_for_taxonomies([integer()]) :: non_neg_integer()
+  def count_species_for_taxonomies([]), do: 0
+
+  def count_species_for_taxonomies(taxonomy_ids) do
+    from(st in "species_taxonomy",
+      where: st.taxonomy_id in ^taxonomy_ids,
+      select: count(st.species_id, :distinct)
+    )
+    |> Repo.one()
   end
 
   @doc """
@@ -1179,64 +1472,6 @@ defmodule Gallformers.Taxonomy do
   end
 
   @doc """
-  Gets enriched species list for a genus with common names and counts.
-
-  Returns list of maps with:
-  - id, name, taxoncode (from species)
-  - common_name (first common alias, or nil)
-  - count (number of hosts for galls, number of galls for hosts)
-  """
-  @spec get_enriched_species_for_genus(integer()) :: [map()]
-  def get_enriched_species_for_genus(genus_id) do
-    species_ids = get_species_ids_for_genus(genus_id)
-
-    if species_ids == [] do
-      []
-    else
-      species = Gallformers.Species.list_species_by_ids(species_ids)
-      enrich_species_with_common_names_and_counts(species)
-    end
-  end
-
-  @doc """
-  Gets enriched species list for a section with common names and gall counts.
-
-  Returns list of maps with the same structure as get_enriched_species_for_genus/1.
-  """
-  @spec get_enriched_species_for_section(integer()) :: [map()]
-  def get_enriched_species_for_section(section_id) do
-    species = get_species_for_section(section_id)
-    enrich_species_with_common_names_and_counts(species)
-  end
-
-  # Enriches a list of species with common names and host/gall counts.
-  defp enrich_species_with_common_names_and_counts(species_list) do
-    Enum.map(species_list, fn species ->
-      # Get common name (first common alias)
-      aliases = Gallformers.Species.get_aliases_for_species(species.id)
-
-      common_name =
-        aliases
-        |> Enum.find(fn a -> a.type == "common" end)
-        |> case do
-          nil -> nil
-          alias_record -> alias_record.name
-        end
-
-      # Get count based on type
-      count =
-        case species.taxoncode do
-          "gall" -> length(Gallformers.Hosts.get_hosts_for_gall(species.id))
-          _ -> length(Gallformers.Hosts.get_galls_for_host(species.id))
-        end
-
-      species
-      |> Map.put(:common_name, common_name)
-      |> Map.put(:count, count)
-    end)
-  end
-
-  @doc """
   Lists all sections with their parent genus and species count.
   """
   @spec list_sections_with_details() :: [map()]
@@ -1349,27 +1584,6 @@ defmodule Gallformers.Taxonomy do
   end
 
   @doc """
-  Searches host species by name for section assignment.
-  Returns hosts that match the query.
-  """
-  @spec search_hosts_for_section(String.t(), integer()) :: [map()]
-  def search_hosts_for_section(query, limit \\ 20) do
-    search_pattern = "%#{String.downcase(query)}%"
-
-    from(s in Species,
-      where: s.taxoncode == "plant",
-      where: fragment("lower(?) LIKE ?", s.name, ^search_pattern),
-      order_by: s.name,
-      limit: ^limit,
-      select: %{
-        id: s.id,
-        name: s.name
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
   Returns genera for use in typeahead/select components.
   Each result includes the parent family ID for auto-population.
   Excludes genera named "Unknown" as those are created automatically.
@@ -1453,6 +1667,18 @@ defmodule Gallformers.Taxonomy do
   @spec subscribe() :: :ok | {:error, term()}
   def subscribe do
     Phoenix.PubSub.subscribe(Gallformers.PubSub, "taxonomy")
+  end
+
+  defp log_cascade_result({:ok, _}, taxonomy) do
+    Logger.info(
+      "Cascade delete SUCCEEDED for #{taxonomy.type} #{taxonomy.name} (id=#{taxonomy.id})"
+    )
+  end
+
+  defp log_cascade_result({:error, reason}, taxonomy) do
+    Logger.error(
+      "Cascade delete FAILED for #{taxonomy.type} #{taxonomy.name} (id=#{taxonomy.id}): #{inspect(reason)}"
+    )
   end
 
   defp broadcast({:ok, taxonomy}, event) do

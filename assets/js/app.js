@@ -106,7 +106,7 @@ const AutoDismiss = {
         // This avoids triggering phx-click-away on any open modals
         this.pushEvent("lv:clear-flash", {key: kind})
         // Hide the element client-side (server will also remove it on next render)
-        this.el.style.display = "none"
+        this.el.classList.add("hidden")
       } else {
         // Fallback to click if kind not available (shouldn't happen)
         this.el.click()

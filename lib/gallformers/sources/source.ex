@@ -35,7 +35,7 @@ defmodule Gallformers.Sources.Source do
     field :license, :string
     field :licenselink, :string
 
-    has_many :images, Gallformers.Species.Image
+    has_many :images, Gallformers.Images.Image
     has_many :species_sources, Gallformers.Species.SpeciesSource
 
     timestamps(type: :utc_datetime)

@@ -20,10 +20,11 @@ defmodule GallformersWeb.Plugs.CORSTest do
       assert length(headers) > 0
       allowed = hd(headers)
       assert allowed =~ "GET"
-      assert allowed =~ "POST"
-      assert allowed =~ "PUT"
-      assert allowed =~ "DELETE"
+      assert allowed =~ "HEAD"
       assert allowed =~ "OPTIONS"
+      refute allowed =~ "POST"
+      refute allowed =~ "PUT"
+      refute allowed =~ "DELETE"
     end
 
     test "sets Access-Control-Allow-Headers header", %{conn: conn} do
@@ -33,7 +34,6 @@ defmodule GallformersWeb.Plugs.CORSTest do
       assert length(headers) > 0
       allowed = hd(headers)
       assert allowed =~ "content-type"
-      assert allowed =~ "authorization"
     end
 
     test "sets Access-Control-Max-Age header", %{conn: conn} do

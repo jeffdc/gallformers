@@ -13,10 +13,12 @@ defmodule GallformersWeb.Admin.ImageAuditLive do
   use GallformersWeb, :live_view
 
   alias Gallformers.Images
+  alias Gallformers.Images.Audit
   alias Gallformers.Images.AuditCache
+  alias Gallformers.Images.Image
   alias Gallformers.Licenses
   alias Gallformers.Sources
-  alias Gallformers.Species.Image
+  alias Gallformers.Storage
 
   @per_page 50
 
@@ -745,7 +747,7 @@ defmodule GallformersWeb.Admin.ImageAuditLive do
 
   @impl true
   def handle_event("delete_orphan", %{"path" => path}, socket) do
-    case Images.delete_s3_orphan(path) do
+    case Audit.delete_s3_orphan(path) do
       :ok ->
         # Refresh the cache in background (for future page loads)
         AuditCache.refresh()
@@ -862,7 +864,7 @@ defmodule GallformersWeb.Admin.ImageAuditLive do
       lastchangedby: uploader
     }
 
-    case Images.create_image_from_orphan(path, species_id, attrs) do
+    case Audit.create_image_from_orphan(path, species_id, attrs) do
       {:ok, _image} ->
         # Refresh cache in background (for future page loads)
         AuditCache.refresh()
@@ -1072,7 +1074,7 @@ defmodule GallformersWeb.Admin.ImageAuditLive do
   defp orphan_thumbnail_url(path) do
     # Orphans don't have size variants (those are generated on proper upload),
     # so always use the original
-    cdn_url = Images.cdn_url()
+    cdn_url = Storage.cdn_url()
     "#{cdn_url}/#{path}"
   end
 

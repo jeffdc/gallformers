@@ -184,6 +184,7 @@ defmodule GallformersWeb.DataDisplayComponents do
               <div>
                 <strong>{gettext("Source:")}</strong>{" "}
                 <a
+                  :if={get_img_field(@first_image, :sourcelink) != ""}
                   data-info-source
                   href={get_img_field(@first_image, :sourcelink)}
                   target="_blank"
@@ -193,6 +194,9 @@ defmodule GallformersWeb.DataDisplayComponents do
                   {get_img_field(@first_image, :source_title) ||
                     get_img_field(@first_image, :sourcelink)}
                 </a>
+                <span :if={get_img_field(@first_image, :sourcelink) == ""} data-info-source>
+                  {get_img_field(@first_image, :source_title)}
+                </span>
               </div>
               <div>
                 <strong>{gettext("License:")}</strong>{" "}
@@ -266,6 +270,7 @@ defmodule GallformersWeb.DataDisplayComponents do
           <%!-- Lightbox attribution --%>
           <div class="mt-2 text-sm text-white/80" data-lightbox-attribution>
             <a
+              :if={get_img_field(@first_image, :sourcelink) != ""}
               data-lightbox-source-link
               href={get_img_field(@first_image, :sourcelink)}
               target="_blank"
@@ -274,6 +279,9 @@ defmodule GallformersWeb.DataDisplayComponents do
             >
               Image
             </a>
+            <span :if={get_img_field(@first_image, :sourcelink) == ""} data-lightbox-source-link>
+              Image
+            </span>
             {" "}by{" "}
             <span data-lightbox-creator>{get_img_field(@first_image, :creator)}</span>
             <span :if={get_img_field(@first_image, :license) != ""}>{" © "}</span>

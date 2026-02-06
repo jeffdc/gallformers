@@ -4,9 +4,10 @@ defmodule Gallformers.SpeciesTest do
   """
   use Gallformers.DataCase, async: false
 
+  alias Gallformers.Galls
+  alias Gallformers.Galls.GallTraits
   alias Gallformers.Repo
   alias Gallformers.Species
-  alias Gallformers.Species.GallTraits
 
   describe "list_species/0" do
     test "returns a list of species" do
@@ -17,7 +18,7 @@ defmodule Gallformers.SpeciesTest do
 
   describe "list_galls/0" do
     test "returns galls with expected fields" do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
       assert is_list(galls)
 
       if length(galls) > 0 do
@@ -30,7 +31,7 @@ defmodule Gallformers.SpeciesTest do
     end
 
     test "returns galls ordered by name" do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 1 do
         names = Enum.map(galls, & &1.name)
@@ -41,16 +42,16 @@ defmodule Gallformers.SpeciesTest do
 
   describe "list_galls_paginated/2" do
     test "returns limited number of galls" do
-      galls = Species.list_galls_paginated(5, 0)
+      galls = Galls.list_galls_paginated(5, 0)
       assert length(galls) <= 5
     end
 
     test "respects offset parameter" do
-      all_galls = Species.list_galls()
+      all_galls = Galls.list_galls()
 
       if length(all_galls) > 5 do
-        first_page = Species.list_galls_paginated(5, 0)
-        second_page = Species.list_galls_paginated(5, 5)
+        first_page = Galls.list_galls_paginated(5, 0)
+        second_page = Galls.list_galls_paginated(5, 5)
 
         # Ensure no overlap
         first_ids = MapSet.new(Enum.map(first_page, & &1.id))
@@ -62,14 +63,14 @@ defmodule Gallformers.SpeciesTest do
 
   describe "count_galls/0" do
     test "returns a non-negative integer" do
-      count = Species.count_galls()
+      count = Galls.count_galls()
       assert is_integer(count)
       assert count >= 0
     end
 
     test "count matches length of list_galls" do
-      count = Species.count_galls()
-      galls = Species.list_galls()
+      count = Galls.count_galls()
+      galls = Galls.list_galls()
       assert count == length(galls)
     end
   end
@@ -80,7 +81,7 @@ defmodule Gallformers.SpeciesTest do
     end
 
     test "returns species for valid ID" do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
         species = Species.get_species(hd(galls).id)
@@ -100,14 +101,14 @@ defmodule Gallformers.SpeciesTest do
 
   describe "get_gall_by_id/1" do
     test "returns nil for non-existent gall" do
-      assert nil == Species.get_gall_by_id(999_999_999)
+      assert nil == Galls.get_gall(999_999_999)
     end
 
     test "returns gall with expected fields for valid ID" do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
-        gall = Species.get_gall_by_id(hd(galls).id)
+        gall = Galls.get_gall(hd(galls).id)
         assert gall != nil
         assert Map.has_key?(gall, :id)
         assert Map.has_key?(gall, :name)
@@ -120,14 +121,14 @@ defmodule Gallformers.SpeciesTest do
 
   describe "get_gall_by_name/1" do
     test "returns nil for non-existent name" do
-      assert nil == Species.get_gall_by_name("Nonexistent species name xyz")
+      assert nil == Galls.get_gall_by_name("Nonexistent species name xyz")
     end
 
     test "returns gall for valid name" do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
-        gall = Species.get_gall_by_name(hd(galls).name)
+        gall = Galls.get_gall_by_name(hd(galls).name)
         assert gall != nil
         assert gall.name == hd(galls).name
       end
@@ -141,7 +142,7 @@ defmodule Gallformers.SpeciesTest do
     end
 
     test "returns images with expected fields" do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       if length(galls) > 0 do
         images = Species.get_images_for_species(hd(galls).id)
@@ -164,7 +165,7 @@ defmodule Gallformers.SpeciesTest do
     end
 
     test "returns aliases with expected fields" do
-      galls = Species.list_galls()
+      galls = Galls.list_galls()
 
       # Find a gall with aliases
       gall_with_alias =
@@ -184,7 +185,7 @@ defmodule Gallformers.SpeciesTest do
 
   describe "random_gall/0" do
     test "returns a gall with image or nil" do
-      result = Species.random_gall()
+      result = Galls.random_gall()
 
       if result != nil do
         assert Map.has_key?(result, :id)
@@ -197,7 +198,7 @@ defmodule Gallformers.SpeciesTest do
 
   describe "get_default_gall_images/0" do
     test "returns a list of image maps" do
-      images = Species.get_default_gall_images()
+      images = Galls.get_default_gall_images()
       assert is_list(images)
 
       if length(images) > 0 do

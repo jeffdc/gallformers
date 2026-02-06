@@ -24,6 +24,16 @@ defmodule GallformersWeb.ApiSpec do
         - Glossary terms
         - Geographic places
         - Search and explore functionality
+
+        ## Caching
+
+        All successful API responses include HTTP caching headers:
+        - `Cache-Control: public, max-age=3600` (1 hour TTL)
+        - `ETag` header with a content hash
+
+        Clients can send `If-None-Match` with a previously received ETag value to get
+        a `304 Not Modified` response if the data hasn't changed, saving bandwidth.
+        Error responses (4xx/5xx) are not cached (`Cache-Control: no-store`).
         """
       },
       servers: servers_for_env(),

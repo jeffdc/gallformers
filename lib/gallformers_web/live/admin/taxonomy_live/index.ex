@@ -219,10 +219,20 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Index do
   end
 
   defp search_and_filter(query, type, hide_empty_unknown) do
+    taxonomies = Taxonomy.search_taxonomies(query, type, 500)
+
+    # Batch fetch all parent records (1 query instead of up to 500)
+    parent_ids =
+      taxonomies
+      |> Enum.map(& &1.parent_id)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    parents_map = Taxonomy.get_taxonomies_batch(parent_ids)
+
     results =
-      Taxonomy.search_taxonomies(query, type, 500)
-      |> Enum.map(fn t ->
-        parent = if t.parent_id, do: Taxonomy.get_taxonomy(t.parent_id), else: nil
+      Enum.map(taxonomies, fn t ->
+        parent = Map.get(parents_map, t.parent_id)
 
         %{
           id: t.id,

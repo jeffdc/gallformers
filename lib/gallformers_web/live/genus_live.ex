@@ -6,6 +6,7 @@ defmodule GallformersWeb.GenusLive do
   """
   use GallformersWeb, :live_view
 
+  alias Gallformers.Species
   alias Gallformers.Taxonomy
 
   @impl true
@@ -57,7 +58,16 @@ defmodule GallformersWeb.GenusLive do
 
   defp assign_genus_data(socket, genus, genus_id) do
     family = if genus.parent_id, do: Taxonomy.get_taxonomy(genus.parent_id), else: nil
-    species = Taxonomy.get_enriched_species_for_genus(genus_id)
+    species_ids = Taxonomy.get_species_ids_for_genus(genus_id)
+
+    species =
+      if species_ids == [] do
+        []
+      else
+        species_ids
+        |> Species.list_species_by_ids()
+        |> Species.enrich_with_common_names_and_counts()
+      end
 
     # Don't index empty Unknown genera (placeholder genera with no species)
     is_empty_unknown = genus.name == "Unknown" && species == []

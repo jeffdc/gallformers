@@ -170,7 +170,7 @@ Gallformers (gallformers.org) is a comprehensive online database and reference g
 ## Tech Stack
 
 - **Phoenix 1.8** with LiveView - Full-stack web framework
-- **Ecto** with ecto_sqlite3 - Database ORM
+- **Ecto** with ecto_sqlite3 - Database ORM (see "Ecto & Query Patterns" for usage guidelines)
 - **SQLite** - Database
 - **Tailwind CSS v4** - Styling
 - **Fly.io** - Production hosting
@@ -256,6 +256,26 @@ mix test path/to/test.exs:42  # Run specific test at line 42
 
 Tests use Ecto's SQL Sandbox for isolation - each test runs in a transaction that's rolled back.
 
+### S3 Isolation in Tests
+
+**CRITICAL**: Tests must NEVER make real AWS/S3 calls. This is enforced by:
+
+1. **Config flag**: `config :gallformers, s3_enabled: false` in `config/test.exs`
+2. **Wrapper module**: All S3 operations go through `Gallformers.S3.request/1` instead of `ExAws.request/1`
+
+When adding new S3 operations, always use the wrapper:
+
+```elixir
+# WRONG - will fail in CI (no AWS credentials)
+ExAws.S3.put_object(bucket, path, data) |> ExAws.request()
+
+# CORRECT - respects s3_enabled config
+ExAws.S3.put_object(bucket, path, data) |> Gallformers.S3.request()
+```
+
+The wrapper returns `{:ok, %{body: %{contents: []}}}` in test mode, which satisfies both
+list operations (need `body.contents`) and mutate operations (just check `{:ok, _}`).
+
 ### E2E Tests (Browser-based)
 
 E2E tests use [Wallaby](https://github.com/elixir-wallaby/wallaby) with Chrome. They're **excluded
@@ -325,6 +345,7 @@ end
 
 - **Local dev**: `priv/gallformers.sqlite` (not committed)
 - **Production**: Fly.io volume at `/data/gallformers.sqlite`
+- **Query patterns**: See "Ecto & Query Patterns" section below
 
 ### Getting the Database
 
@@ -521,6 +542,77 @@ distinct: t.id
 group_by: [t.id, t.name]
 ```
 
+## Ecto & Query Patterns
+
+**For refactoring or new DB code**: Load `prompts/ecto-refactor.md` for full guidance with mandatory checkpoints.
+
+### Core Principles
+
+1. **Use preloads, not manual joins** - Schema associations exist; use `Repo.preload/2`
+2. **Return structs, not maps** - Maps lose preloadability; transform at boundaries (controller/view)
+3. **No parallel single/batch functions** - If you need `get_x/1` AND `get_x_batch/1`, the design is wrong
+4. **Count your queries** - Know the query count before and after any change
+5. **Contexts own domains, not tables** - Gall-specific logic belongs in a Galls context, not Species
+
+### Schema Associations (USE THESE)
+
+**Species** (`lib/gallformers/species/species.ex`):
+```elixir
+has_many :images                    # Species.Image
+has_one :gall_traits                # Species.GallTraits
+has_many :host_relations            # Hosts.Host (this species as gall)
+has_many :gall_relations            # Hosts.Host (this species as host)
+many_to_many :aliases               # via alias_species
+many_to_many :taxonomies            # via species_taxonomy
+many_to_many :host_ranges           # via host_range (places)
+```
+
+**Taxonomy** (`lib/gallformers/taxonomy/taxonomy.ex`):
+```elixir
+belongs_to :parent                  # Self-referential
+has_many :children                  # Self-referential
+many_to_many :species               # via species_taxonomy
+```
+
+### Red Flags - STOP and Discuss
+
+| Pattern | Problem |
+|---------|---------|
+| `Enum.map(items, &get_X(&1.id))` | N+1 - must batch or preload |
+| `from(x in "table_name", ...)` | Missing schema - should use association |
+| Function returns map with `:id` | Loses preloadability |
+| `get_X/1` and `get_X_batch/1` both exist | Design smell - preloads should unify |
+| Manual join on junction table | Association likely exists |
+| 1000+ line context module | God context - needs splitting |
+
+### Known Issues (Technical Debt)
+
+- `Species` context is 1300+ lines - gall logic should extract to `Galls` context
+- `get_gall_filter_values/1` runs 9 queries - should consolidate
+- `GallController.gall_to_response/1` has N+1 on aliases
+- Many functions return maps instead of preloadable structs
+
+### Query Pattern Examples
+
+```elixir
+# WRONG: Manual assembly (4 queries)
+def get_host_for_edit(id) do
+  host = get_host(id)
+  taxonomy = Taxonomy.get_taxonomy_for_species(id)
+  places = get_places_for_host(id)
+  aliases = get_aliases_for_host(id)
+  Map.merge(host, %{taxonomy: taxonomy, places: places, aliases: aliases})
+end
+
+# RIGHT: Preload (1-2 queries)
+def get_host_for_edit(id) do
+  Species
+  |> where([s], s.id == ^id and s.taxoncode == "plant")
+  |> preload([:aliases, :host_ranges, taxonomies: :parent])
+  |> Repo.one()
+end
+```
+
 ## PubSub / Real-time Updates
 
 The admin interface uses Phoenix PubSub for real-time updates. Pattern:
@@ -565,9 +657,14 @@ fly auth login
 ```bash
 fly deploy              # Deploy to production
 fly status              # Check deployment status
-fly logs                # View application logs
+fly logs                # View application logs (STREAMS - see note below)
 fly ssh console         # SSH into running machine
 ```
+
+**Note on `fly logs`**: This command streams logs continuously and never terminates. Do NOT run it in the background or pipe to `tail`. To check recent errors, either:
+- Run interactively and Ctrl+C after seeing what you need
+- Use `fly logs 2>&1 | timeout 5 cat` to get a 5-second snapshot
+- Check the request logger files via SFTP (see Request Logging section)
 
 ### Configuration
 
@@ -612,6 +709,50 @@ This task:
 **Prerequisites**: flyctl, sqlite3, jq, aws CLI
 
 **See**: `lib/mix/tasks/gallformers/update_prod_db.ex` for implementation
+
+## Request Logging
+
+The app logs all HTTP requests to JSON Lines files for incident investigation.
+
+**Location:**
+- **Production**: `/data/logs/requests-YYYY-MM-DD.log` (persistent volume)
+- **Development**: `priv/logs/requests-YYYY-MM-DD.log` (gitignored)
+
+**Log format** (one JSON object per line):
+```json
+{"ts":"2026-02-05T14:32:01Z","method":"GET","path":"/species/123","query":"tab=hosts","status":200,"duration_ms":45,"ip":"1.2.3.4","ua":"Mozilla/5.0..."}
+```
+
+**Retention**: Logs older than 30 days are automatically deleted.
+
+**Retrieving logs from production:**
+```bash
+fly ssh sftp get /data/logs/requests-2026-02-05.log
+```
+
+**Analyzing logs locally:**
+```bash
+# All 500 errors
+cat requests-2026-02-05.log | jq -c 'select(.status >= 500)'
+
+# Slowest requests
+cat requests-2026-02-05.log | jq -s 'sort_by(.duration_ms) | reverse | .[0:10]'
+
+# Requests to a specific path
+cat requests-2026-02-05.log | jq -c 'select(.path | startswith("/api/gall"))'
+
+# Requests from a specific IP
+cat requests-2026-02-05.log | jq -c 'select(.ip == "1.2.3.4")'
+
+# Error rate by path
+cat requests-2026-02-05.log | jq -s 'group_by(.path) | map({path: .[0].path, total: length, errors: [.[] | select(.status >= 400)] | length})'
+```
+
+**Configuration:**
+- `config :gallformers, :request_log_dir` - Override log directory
+- `config :gallformers, :request_logger_enabled` - Disable logging (set `false` in test.exs)
+
+**Implementation**: `lib/gallformers/request_logger.ex` - Attaches to Phoenix telemetry events.
 
 ## Beads Workflow
 

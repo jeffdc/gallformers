@@ -1,5 +1,23 @@
 # See https://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file
-#
-# To ban all spiders from the entire site uncomment the next two lines:
-# User-agent: *
-# Disallow: /
+
+User-agent: *
+# Interactive tools - not useful for indexing
+Disallow: /id
+Disallow: /globalsearch
+
+# Admin area
+Disallow: /admin
+
+# API - use programmatically, not for crawling
+Disallow: /api
+
+# Auth flows
+Disallow: /auth
+
+# Health checks
+Disallow: /health
+
+# Allow everything else (galls, hosts, species, sources, places, etc.)
+Allow: /
+
+Sitemap: https://www.gallformers.org/sitemap.xml

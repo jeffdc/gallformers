@@ -4,6 +4,7 @@ defmodule GallformersWeb.Admin.GallLive.Index do
   """
   use GallformersWeb, :live_view
 
+  alias Gallformers.Galls
   alias Gallformers.Species
 
   @impl true
@@ -62,8 +63,7 @@ defmodule GallformersWeb.Admin.GallLive.Index do
   end
 
   defp list_galls("") do
-    Species.list_species_admin(100, 0)
-    |> Enum.filter(&(&1.taxoncode == "gall"))
+    Galls.list_galls_paginated(100, 0)
   end
 
   defp list_galls(query) do

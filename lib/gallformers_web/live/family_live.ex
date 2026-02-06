@@ -89,15 +89,22 @@ defmodule GallformersWeb.FamilyLive do
   end
 
   defp build_tree_data(genera) do
+    # Batch fetch all species IDs for all genera (1 query instead of N)
+    genus_ids = Enum.map(genera, & &1.id)
+    species_ids_map = Taxonomy.get_species_ids_for_genera(genus_ids)
+
+    # Batch fetch all species info (1 query)
+    all_species_ids = species_ids_map |> Map.values() |> List.flatten() |> Enum.uniq()
+    all_species = get_species_info(all_species_ids)
+    species_map = Enum.into(all_species, %{}, fn s -> {s.id, s} end)
+
     Enum.map(genera, fn genus ->
-      # Get species for this genus
-      species_ids = Taxonomy.get_species_ids_for_genus(genus.id)
+      species_ids = Map.get(species_ids_map, genus.id, [])
 
       species =
-        case species_ids do
-          [] -> []
-          ids -> get_species_info(ids)
-        end
+        species_ids
+        |> Enum.map(&Map.get(species_map, &1))
+        |> Enum.reject(&is_nil/1)
 
       %{
         key: "g-#{genus.id}",

@@ -1,0 +1,1 @@
+[exit: false, format: "txt", ignore_files: [], ignore: ["Config.HTTPS"], out: nil, private: true, router: nil, skip: false, threshold: :medium, verbose: false, version: false]

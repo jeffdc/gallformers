@@ -72,42 +72,6 @@ defmodule GallformersWeb.API.GlossaryController do
     })
   end
 
-  operation(:show,
-    summary: "Get a glossary entry",
-    description: "Gets a single glossary entry by ID",
-    parameters: [
-      id: [in: :path, type: :integer, description: "Glossary ID", required: true]
-    ],
-    responses: [
-      ok: {"Glossary entry", "application/json", Schemas.Glossary},
-      not_found: {"Glossary entry not found", "application/json", Schemas.Error}
-    ]
-  )
-
-  @doc """
-  GET /api/v2/glossary/:id
-  Gets a single glossary entry by ID.
-  """
-  def show(conn, %{"id" => id}) do
-    case parse_int(id) do
-      nil ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "Invalid glossary ID"})
-
-      id ->
-        case Glossaries.get_glossary(id) do
-          nil ->
-            conn
-            |> put_status(:not_found)
-            |> json(%{error: "Glossary entry not found"})
-
-          entry ->
-            json(conn, glossary_to_map(entry))
-        end
-    end
-  end
-
   operation(:by_word,
     summary: "Get glossary entry by word",
     description: "Gets a glossary entry by word",

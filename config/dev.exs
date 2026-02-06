@@ -9,7 +9,9 @@ config :gallformers, Gallformers.Repo,
   database: System.get_env("DATABASE_PATH", Path.expand("../priv/gallformers.sqlite", __DIR__)),
   pool_size: 5,
   stacktrace: true,
-  show_sensitive_data_on_connection_error: true
+  show_sensitive_data_on_connection_error: true,
+  # Match test.exs settings for SQLite consistency
+  busy_timeout: 5000
 
 # For development, we disable any cache and enable
 # debugging and code reloading.
@@ -90,3 +92,6 @@ config :phoenix_live_view,
 
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
+
+# Request logger writes to priv/logs in development (gitignored)
+config :gallformers, :request_log_dir, Path.expand("../priv/logs", __DIR__)

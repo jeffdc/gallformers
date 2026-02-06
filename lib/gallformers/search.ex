@@ -7,12 +7,13 @@ defmodule Gallformers.Search do
 
   import Ecto.Query
 
+  alias Gallformers.Galls.GallTraits
   alias Gallformers.Glossaries.Glossary
   alias Gallformers.Places.Place
   alias Gallformers.Repo
   alias Gallformers.Search.Ranking
   alias Gallformers.Sources.Source
-  alias Gallformers.Species.{Alias, GallTraits, Species}
+  alias Gallformers.Species.{Alias, Species}
   alias Gallformers.Taxonomy.Taxonomy
 
   @doc """

@@ -6,8 +6,9 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   use GallformersWeb, :live_view
   use GallformersWeb.Admin.FormHelpers
 
-  alias Gallformers.Hosts
   alias Gallformers.Places
+  alias Gallformers.Plants
+  alias Gallformers.Ranges
   alias Gallformers.Repo
   alias Gallformers.Species
   alias Gallformers.Species.Species, as: SpeciesSchema
@@ -81,7 +82,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   defp apply_action(socket, :edit, %{"id" => id}) do
     host_id = String.to_integer(id)
 
-    case Hosts.get_host_species(host_id) do
+    case Plants.get_host_species(host_id) do
       nil ->
         socket
         |> put_flash(:error, "Host not found")
@@ -100,9 +101,9 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
   defp load_host_for_edit(socket, host) do
     host_id = host.id
-    changeset = Hosts.change_host(host)
-    aliases = Hosts.get_aliases_for_host_full(host_id)
-    places = Hosts.get_places_for_host(host_id)
+    changeset = Plants.change_host(host)
+    aliases = Plants.get_aliases_for_host_full(host_id)
+    places = Ranges.get_places_for_host(host_id)
     taxonomy = Taxonomy.get_taxonomy_for_species(host_id)
 
     # Load sections for the host's genus (if genus exists)
@@ -165,7 +166,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   def handle_event("validate", %{"species" => params}, socket) do
     changeset =
       socket.assigns.host
-      |> Hosts.change_host(params)
+      |> Plants.change_host(params)
       |> Map.put(:action, :validate)
 
     {:noreply, socket |> assign(:form, to_form(changeset)) |> mark_dirty()}
@@ -395,6 +396,15 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   end
 
   @impl true
+  def handle_event("request_close_rename", _params, socket) do
+    if socket.assigns.rename_value == socket.assigns.host.name do
+      {:noreply, assign(socket, :show_rename_modal, false)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_event("update_rename_value", %{"value" => value}, socket) do
     {:noreply, assign(socket, :rename_value, value)}
   end
@@ -406,19 +416,15 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
   @impl true
   def handle_event("delete", _params, socket) do
-    if Gallformers.Accounts.superadmin?(socket.assigns.current_user) do
-      case Hosts.delete_host(socket.assigns.host.id) do
-        {:ok, _} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Host deleted successfully")
-           |> push_navigate(to: ~p"/admin/hosts")}
+    case Plants.delete_host(socket.assigns.host.id) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Host deleted successfully")
+         |> push_navigate(to: ~p"/admin/hosts")}
 
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to delete host")}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "Only super admins can delete hosts")}
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to delete host")}
     end
   end
 
@@ -438,7 +444,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
         {:noreply, put_flash(socket, :error, "Name must be a valid species name (Genus species)")}
 
       true ->
-        case Hosts.rename_host(
+        case Plants.rename_host(
                socket.assigns.host.id,
                new_name,
                socket.assigns.add_alias_on_rename
@@ -477,7 +483,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   def handle_event("confirm_genus_creation", _params, socket) do
     info = socket.assigns.pending_genus_info
 
-    case Hosts.rename_host_with_new_genus(
+    case Plants.rename_host_with_new_genus(
            info.host_id,
            info.new_name,
            info.new_genus,
@@ -507,7 +513,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     # Reload aliases if we added one
     aliases =
       if socket.assigns.add_alias_on_rename do
-        Hosts.get_aliases_for_host_full(socket.assigns.host.id)
+        Plants.get_aliases_for_host_full(socket.assigns.host.id)
       else
         socket.assigns.aliases
       end
@@ -544,7 +550,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   # Initialize state for a new host (user typed new name in typeahead)
   defp init_new_host_state(socket, name) do
     host = %SpeciesSchema{taxoncode: "plant", name: name}
-    changeset = Hosts.change_host(host)
+    changeset = Plants.change_host(host)
     # Look up taxonomy from the genus name - this always returns a result
     # with genus_is_new: true/false to indicate if genus needs to be created
     raw_taxonomy = Taxonomy.lookup_taxonomy_for_new_species(name)
@@ -659,14 +665,14 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
     transaction_result =
       Repo.transaction(fn ->
-        case Hosts.create_host(params) do
+        case Plants.create_host(params) do
           {:ok, host} ->
             # Handle taxonomy: create genus if new, or link to existing
             Taxonomy.link_species_taxonomy(host.id, taxonomy, genus_is_new, parent_id)
 
             # Add any aliases entered before save
             for a <- aliases_to_add do
-              Hosts.create_alias_for_host(host.id, %{name: a.name, type: a.type})
+              Plants.create_alias_for_host(host.id, %{name: a.name, type: a.type})
             end
 
             host
@@ -701,7 +707,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     # Wrap all saves in a transaction for atomicity
     transaction_result =
       Repo.transaction(fn ->
-        case Hosts.update_host(socket.assigns.host, params) do
+        case Plants.update_host(socket.assigns.host, params) do
           {:ok, updated_host} ->
             # Save aliases
             save_alias_changes(host_id, aliases_to_add, aliases_to_remove)
@@ -727,8 +733,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     case transaction_result do
       {:ok, updated_host} ->
         # Reload data from DB to get actual IDs for new records
-        aliases = Hosts.get_aliases_for_host_full(host_id)
-        places = Hosts.get_places_for_host(host_id)
+        aliases = Plants.get_aliases_for_host_full(host_id)
+        places = Ranges.get_places_for_host(host_id)
 
         # Stay on page, update state to reflect saved data
         {:noreply,
@@ -752,12 +758,12 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   defp save_alias_changes(host_id, to_add, to_remove) do
     # Delete removed aliases
     for alias_id <- to_remove do
-      Hosts.remove_alias_from_host(host_id, alias_id)
+      Plants.remove_alias_from_host(host_id, alias_id)
     end
 
     # Add new aliases
     for alias <- to_add do
-      Hosts.create_alias_for_host(host_id, %{name: alias.name, type: alias.type})
+      Plants.create_alias_for_host(host_id, %{name: alias.name, type: alias.type})
     end
   end
 
@@ -774,7 +780,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
       place_ids =
         Enum.map(current_places, &Map.get(place_code_to_id, &1)) |> Enum.reject(&is_nil/1)
 
-      Hosts.update_host_places(host_id, place_ids)
+      Ranges.update_host_places(host_id, place_ids)
     end
   end
 
@@ -1052,7 +1058,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
             <div class="flex justify-between pt-3 border-t border-gray-200">
               <div>
                 <button
-                  :if={@mode == :edit && Gallformers.Accounts.superadmin?(@current_user)}
+                  :if={@mode == :edit}
                   type="button"
                   phx-click="delete"
                   data-confirm="Are you sure you want to delete this host? This will remove all associated gall mappings and range data."

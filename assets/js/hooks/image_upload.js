@@ -254,7 +254,7 @@ const ImageUpload = {
             <span class="text-gray-500" data-percent>0%</span>
           </div>
           <div class="w-full bg-gray-200 rounded-full h-2">
-            <div class="bg-gf-maroon h-2 rounded-full transition-all duration-200" style="width: 0%" data-bar></div>
+            <div class="bg-gf-maroon h-2 rounded-full transition-all duration-200 w-0" data-bar></div>
           </div>
         </div>
       `).join("")

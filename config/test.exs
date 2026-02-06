@@ -42,6 +42,9 @@ config :swoosh, :api_client, false
 # Disable real S3 calls in tests - functions return mock/empty data instead
 config :gallformers, s3_enabled: false
 
+# Disable request logger in tests (no /data/logs in test env)
+config :gallformers, request_logger_enabled: false
+
 # Print only warnings and errors during test
 config :logger, level: :warning
 

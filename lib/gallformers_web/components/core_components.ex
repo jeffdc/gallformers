@@ -639,7 +639,6 @@ defmodule GallformersWeb.CoreComponents do
   attr :show, :boolean, default: false
   attr :on_cancel, JS, default: %JS{}, doc: "JS command to run when the modal is cancelled"
   attr :class, :any, default: nil, doc: "additional CSS classes for the modal container"
-  attr :style, :string, default: nil, doc: "inline styles for the modal container"
 
   slot :header, doc: "optional header content displayed at the top of the modal"
   slot :body, required: true, doc: "the main content of the modal"
@@ -674,7 +673,6 @@ defmodule GallformersWeb.CoreComponents do
             phx-key="escape"
             phx-click-away={JS.exec("data-cancel", to: "##{@id}")}
             class={["gf-modal shadow-xl transition", @class]}
-            style={@style}
           >
             <div :if={@header != []} class="gf-modal-header">
               <h3 id={"#{@id}-title"} class="text-xl font-semibold text-gray-900">

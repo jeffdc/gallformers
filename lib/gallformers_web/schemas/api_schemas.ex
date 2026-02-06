@@ -131,62 +131,6 @@ defmodule GallformersWeb.Schemas do
     })
   end
 
-  defmodule RandomGall do
-    @moduledoc false
-    require OpenApiSpex
-
-    OpenApiSpex.schema(%{
-      title: "RandomGall",
-      description: "A random gall with image for the home page",
-      type: :object,
-      properties: %{
-        id: %Schema{type: :integer},
-        name: %Schema{type: :string},
-        undescribed: %Schema{type: :boolean},
-        image_path: %Schema{type: :string},
-        image_url: %Schema{type: :string},
-        image_creator: %Schema{type: :string, nullable: true},
-        image_license: %Schema{type: :string, nullable: true}
-      },
-      required: [:id, :name, :undescribed, :image_url]
-    })
-  end
-
-  defmodule IDGall do
-    @moduledoc false
-    require OpenApiSpex
-
-    OpenApiSpex.schema(%{
-      title: "IDGall",
-      description: "Gall optimized for the ID tool with filter fields as strings",
-      type: :object,
-      properties: %{
-        id: %Schema{type: :integer},
-        name: %Schema{type: :string},
-        undescribed: %Schema{type: :boolean},
-        detachable: %Schema{
-          type: :string,
-          enum: ["unknown", "integral", "detachable", "both"]
-        },
-        alignments: %Schema{type: :array, items: %Schema{type: :string}},
-        cells: %Schema{type: :array, items: %Schema{type: :string}},
-        colors: %Schema{type: :array, items: %Schema{type: :string}},
-        forms: %Schema{type: :array, items: %Schema{type: :string}},
-        plant_parts: %Schema{type: :array, items: %Schema{type: :string}},
-        seasons: %Schema{type: :array, items: %Schema{type: :string}},
-        shapes: %Schema{type: :array, items: %Schema{type: :string}},
-        textures: %Schema{type: :array, items: %Schema{type: :string}},
-        walls: %Schema{type: :array, items: %Schema{type: :string}},
-        places: %Schema{type: :array, items: %Schema{type: :string}},
-        family: %Schema{type: :string},
-        genus: %Schema{type: :string},
-        hosts: %Schema{type: :array, items: GallformersWeb.Schemas.Host},
-        imageUrl: %Schema{type: :string, nullable: true}
-      },
-      required: [:id, :name, :undescribed]
-    })
-  end
-
   defmodule Image do
     @moduledoc false
     require OpenApiSpex
@@ -208,22 +152,6 @@ defmodule GallformersWeb.Schemas do
         caption: %Schema{type: :string, nullable: true}
       },
       required: [:id, :path, :url]
-    })
-  end
-
-  defmodule RelatedGall do
-    @moduledoc false
-    require OpenApiSpex
-
-    OpenApiSpex.schema(%{
-      title: "RelatedGall",
-      description: "A related gall (same binomial name)",
-      type: :object,
-      properties: %{
-        id: %Schema{type: :integer},
-        name: %Schema{type: :string}
-      },
-      required: [:id, :name]
     })
   end
 
@@ -315,6 +243,64 @@ defmodule GallformersWeb.Schemas do
     })
   end
 
+  defmodule SourceDetail do
+    @moduledoc false
+    require OpenApiSpex
+
+    OpenApiSpex.schema(%{
+      title: "SourceDetail",
+      description: "A scientific source with species-specific context",
+      type: :object,
+      properties: %{
+        id: %Schema{type: :integer},
+        title: %Schema{type: :string},
+        author: %Schema{type: :string, nullable: true},
+        pubyear: %Schema{type: :integer, nullable: true},
+        link: %Schema{type: :string, nullable: true},
+        citation: %Schema{type: :string, nullable: true},
+        description: %Schema{type: :string, nullable: true},
+        externallink: %Schema{type: :string, nullable: true}
+      },
+      required: [:id, :title]
+    })
+  end
+
+  defmodule GallListItem do
+    @moduledoc false
+    require OpenApiSpex
+
+    OpenApiSpex.schema(%{
+      title: "GallListItem",
+      description: "A gall species summary",
+      type: :object,
+      properties: %{
+        id: %Schema{type: :integer},
+        name: %Schema{type: :string},
+        undescribed: %Schema{type: :boolean, nullable: true},
+        datacomplete: %Schema{type: :boolean, nullable: true}
+      },
+      required: [:id, :name]
+    })
+  end
+
+  defmodule GeneraListResponse do
+    @moduledoc false
+    require OpenApiSpex
+
+    OpenApiSpex.schema(%{
+      title: "GeneraListResponse",
+      description: "Paginated list of genera",
+      type: :object,
+      properties: %{
+        data: %Schema{type: :array, items: GallformersWeb.Schemas.Taxonomy},
+        total: %Schema{type: :integer},
+        limit: %Schema{type: :integer, nullable: true},
+        offset: %Schema{type: :integer}
+      },
+      required: [:data, :total, :offset]
+    })
+  end
+
   defmodule Glossary do
     @moduledoc false
     require OpenApiSpex
@@ -367,62 +353,6 @@ defmodule GallformersWeb.Schemas do
         sources: %Schema{type: :array, items: %Schema{type: :object}},
         taxonomy: %Schema{type: :array, items: %Schema{type: :object}},
         places: %Schema{type: :array, items: %Schema{type: :object}}
-      }
-    })
-  end
-
-  defmodule TreeNode do
-    @moduledoc false
-    require OpenApiSpex
-
-    OpenApiSpex.schema(%{
-      title: "TreeNode",
-      description: "A node in the explore tree",
-      type: :object,
-      properties: %{
-        key: %Schema{type: :string},
-        label: %Schema{type: :string},
-        url: %Schema{type: :string, nullable: true},
-        nodes: %Schema{type: :array, items: %Schema{type: :object}}
-      },
-      required: [:key, :label]
-    })
-  end
-
-  defmodule ExploreResponse do
-    @moduledoc false
-    require OpenApiSpex
-
-    OpenApiSpex.schema(%{
-      title: "ExploreResponse",
-      description: "Hierarchical tree data for exploring galls and hosts",
-      type: :object,
-      properties: %{
-        galls: %Schema{type: :array, items: GallformersWeb.Schemas.TreeNode},
-        undescribed: %Schema{type: :array, items: GallformersWeb.Schemas.TreeNode},
-        hosts: %Schema{type: :array, items: GallformersWeb.Schemas.TreeNode}
-      }
-    })
-  end
-
-  defmodule FilterFields do
-    @moduledoc false
-    require OpenApiSpex
-
-    OpenApiSpex.schema(%{
-      title: "FilterFields",
-      description: "All available filter field options for the ID tool",
-      type: :object,
-      properties: %{
-        alignments: %Schema{type: :array, items: GallformersWeb.Schemas.FilterField},
-        cells: %Schema{type: :array, items: GallformersWeb.Schemas.FilterField},
-        colors: %Schema{type: :array, items: GallformersWeb.Schemas.FilterField},
-        forms: %Schema{type: :array, items: GallformersWeb.Schemas.FilterField},
-        plant_parts: %Schema{type: :array, items: GallformersWeb.Schemas.FilterField},
-        seasons: %Schema{type: :array, items: GallformersWeb.Schemas.FilterField},
-        shapes: %Schema{type: :array, items: GallformersWeb.Schemas.FilterField},
-        textures: %Schema{type: :array, items: GallformersWeb.Schemas.FilterField},
-        walls: %Schema{type: :array, items: GallformersWeb.Schemas.FilterField}
       }
     })
   end

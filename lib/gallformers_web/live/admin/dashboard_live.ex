@@ -5,7 +5,8 @@ defmodule GallformersWeb.Admin.DashboardLive do
 
   use GallformersWeb, :live_view
 
-  alias Gallformers.{Hosts, Images, Sources, Species}
+  alias Gallformers.{Galls, Images, Sources}
+  alias Gallformers.Plants
 
   @impl true
   def mount(_params, session, socket) do
@@ -149,8 +150,8 @@ defmodule GallformersWeb.Admin.DashboardLive do
 
   defp assign_stats(socket) do
     stats = %{
-      gall_count: Species.count_galls(),
-      host_count: Hosts.count_hosts(),
+      gall_count: Galls.count_galls(),
+      host_count: Plants.count_hosts(),
       source_count: Sources.count_sources(),
       image_count: Images.count_images()
     }
