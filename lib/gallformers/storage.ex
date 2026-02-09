@@ -46,13 +46,14 @@ defmodule Gallformers.Storage do
   @doc """
   Generates the S3 path for a species image.
 
-  Format: gall/{species_id}/{species_id}_{timestamp}_original.{ext}
+  Format: gall/{species_id}/{species_id}_{timestamp}_{unique}_original.{ext}
   """
   @spec generate_path(integer(), String.t()) :: String.t()
   def generate_path(species_id, extension) do
     timestamp = System.system_time(:millisecond)
+    unique = System.unique_integer([:positive])
     ext = String.trim_leading(extension, ".")
-    "gall/#{species_id}/#{species_id}_#{timestamp}_original.#{ext}"
+    "gall/#{species_id}/#{species_id}_#{timestamp}_#{unique}_original.#{ext}"
   end
 
   @doc """
