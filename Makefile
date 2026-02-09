@@ -11,6 +11,7 @@ DB_URL ?= https://gallformers-backups.s3.amazonaws.com/public/gallformers.sqlite
 download-db:
 	@echo "Downloading database from S3..."
 	@mkdir -p priv
+	@rm -f priv/gallformers.sqlite-wal priv/gallformers.sqlite-shm
 	curl -L -o priv/gallformers.sqlite $(DB_URL)
 	@echo "Database downloaded to priv/gallformers.sqlite"
 
