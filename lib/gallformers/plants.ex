@@ -334,10 +334,19 @@ defmodule Gallformers.Plants do
   def create_host(attrs) do
     attrs = Map.put(attrs, "taxoncode", "plant")
 
-    %Species{}
-    |> Species.changeset(attrs)
-    |> Repo.insert()
-    |> broadcast(:host_created)
+    result =
+      %Species{}
+      |> Species.changeset(attrs)
+      |> Repo.insert()
+
+    case result do
+      {:ok, species} ->
+        Gallformers.Species.update_species_fts(species.id)
+        broadcast(result, :host_created)
+
+      {:error, _} ->
+        result
+    end
   end
 
   @doc """
@@ -345,10 +354,19 @@ defmodule Gallformers.Plants do
   """
   @spec update_host(Species.t(), map()) :: {:ok, Species.t()} | {:error, Ecto.Changeset.t()}
   def update_host(%Species{} = host, attrs) do
-    host
-    |> Species.changeset(attrs)
-    |> Repo.update()
-    |> broadcast(:host_updated)
+    result =
+      host
+      |> Species.changeset(attrs)
+      |> Repo.update()
+
+    case result do
+      {:ok, updated_host} ->
+        Gallformers.Species.update_species_fts(updated_host.id)
+        broadcast(result, :host_updated)
+
+      {:error, _} ->
+        result
+    end
   end
 
   @doc """
