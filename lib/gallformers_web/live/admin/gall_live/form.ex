@@ -1097,6 +1097,9 @@ defmodule GallformersWeb.Admin.GallLive.Form do
       detachable: assigns.detachable,
       undescribed: assigns.undescribed
     })
+
+    # Touch species updated_at so gall-specific changes are reflected in the timestamp
+    Species.touch(gall_id)
   end
 
   defp save_alias_changes(species_id, to_add, to_remove) do

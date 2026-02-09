@@ -536,6 +536,17 @@ defmodule Gallformers.Species do
   end
 
   @doc """
+  Updates the `updated_at` timestamp on a species without changing any other fields.
+  """
+  @spec touch(integer()) :: {:ok, Species.t()} | {:error, Ecto.Changeset.t()}
+  def touch(species_id) do
+    Species
+    |> Repo.get!(species_id)
+    |> Ecto.Changeset.change(%{updated_at: DateTime.utc_now() |> DateTime.truncate(:second)})
+    |> Repo.update()
+  end
+
+  @doc """
   Checks if a species name already exists.
   """
   @spec species_name_exists?(String.t()) :: boolean()
