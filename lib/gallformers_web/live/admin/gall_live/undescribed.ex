@@ -15,8 +15,9 @@ defmodule GallformersWeb.Admin.GallLive.Undescribed do
   alias Gallformers.{Species, Taxonomy}
 
   @impl true
-  def mount(_params, session, socket) do
+  def mount(params, session, socket) do
     current_user = session["current_user"]
+    prefilled_description = Map.get(params, "description", "")
 
     socket =
       socket
@@ -34,9 +35,8 @@ defmodule GallformersWeb.Admin.GallLive.Undescribed do
       |> assign(:host_query, "")
       |> assign(:host_results, [])
       |> assign(:selected_host, nil)
-      |> assign(:description, "")
+      |> assign(:description, prefilled_description)
       |> assign(:name, "")
-      |> assign(:name_edited, false)
       |> assign(:error, nil)
       |> assign(:validating, false)
 
@@ -151,31 +151,28 @@ defmodule GallformersWeb.Admin.GallLive.Undescribed do
             <div>
               <.input
                 type="text"
+                id="undescribed-description"
                 name="description"
                 value={@description}
                 label="Description"
                 placeholder="e.g., red-bead-gall"
-                phx-keyup="update_description"
-                phx-debounce="200"
+                phx-hook="InputEvent"
+                data-event="update_description"
               />
               <p class="mt-1 text-sm text-gray-500">
                 2 or 3 adjectives separated by dashes, e.g., red-bead-gall
               </p>
             </div>
 
-            <%!-- Generated Name --%>
+            <%!-- Generated Name (read-only) --%>
             <div>
-              <.input
+              <label class="gf-label">Name</label>
+              <input
                 type="text"
-                name="name"
                 value={@name}
-                label="Name"
-                phx-keyup="update_name"
-                phx-debounce="200"
+                disabled
+                class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded text-gray-700 text-sm"
               />
-              <p class="mt-1 text-sm text-gray-500">
-                You can edit this, but it's suggested to accept the computed value.
-              </p>
             </div>
 
             <%!-- Action Buttons --%>
@@ -370,44 +367,28 @@ defmodule GallformersWeb.Admin.GallLive.Undescribed do
      |> maybe_regenerate_name()}
   end
 
-  # Name update (manual edit)
-  @impl true
-  def handle_event("update_name", %{"value" => value}, socket) do
-    {:noreply,
-     socket
-     |> assign(:name, value)
-     |> assign(:name_edited, true)
-     |> assign(:error, nil)}
-  end
-
   # Continue - validate and navigate
   @impl true
   def handle_event("continue", _params, socket) do
     socket = assign(socket, :validating, true)
-
     name = String.trim(socket.assigns.name)
 
-    if Species.species_name_exists?(name) do
-      {:noreply,
-       socket
-       |> assign(:validating, false)
-       |> assign(
-         :error,
-         "The name \"#{name}\" already exists. Please choose a different name or cancel and edit the existing gall."
-       )}
-    else
-      params = build_navigation_params(socket)
-
+    with :ok <- validate_name_not_taken(name),
+         :ok <- validate_genus_in_name(name, socket.assigns) do
       query_string =
-        params
-        |> Enum.filter(fn {_k, v} -> v != nil end)
-        |> Enum.map(fn {k, v} -> {to_string(k), to_string(v)} end)
-        |> URI.encode_query()
+        URI.encode_query(%{
+          species_name: name,
+          host_id: to_string(socket.assigns.selected_host.id),
+          undescribed: "true"
+        })
 
       {:noreply,
        socket
        |> assign(:validating, false)
        |> push_navigate(to: "/admin/galls/new?#{query_string}")}
+    else
+      {:error, message} ->
+        {:noreply, socket |> assign(:validating, false) |> assign(:error, message)}
     end
   end
 
@@ -429,11 +410,7 @@ defmodule GallformersWeb.Admin.GallLive.Undescribed do
   end
 
   defp maybe_regenerate_name(socket) do
-    if socket.assigns.name_edited do
-      socket
-    else
-      assign(socket, :name, generate_name(socket.assigns))
-    end
+    assign(socket, :name, generate_name(socket.assigns))
   end
 
   defp generate_name(assigns) do
@@ -447,7 +424,7 @@ defmodule GallformersWeb.Admin.GallLive.Undescribed do
   defp extract_genus_name(%{genus_known: true, selected_genus: %{name: name}}), do: name
 
   defp extract_genus_name(%{genus_known: false, selected_family: family}) when family != nil,
-    do: "Unknown"
+    do: "Unknown (#{family.name})"
 
   defp extract_genus_name(_), do: nil
 
@@ -478,22 +455,31 @@ defmodule GallformersWeb.Admin.GallLive.Undescribed do
     end
   end
 
-  defp build_navigation_params(socket) do
-    assigns = socket.assigns
+  defp validate_name_not_taken(name) do
+    if Species.species_name_exists?(name) do
+      {:error,
+       "The name \"#{name}\" already exists. Please choose a different name or cancel and edit the existing gall."}
+    else
+      :ok
+    end
+  end
 
-    {genus_id, family_id} =
-      if assigns.genus_known do
-        {assigns.selected_genus.id, assigns.selected_genus.family_id}
-      else
-        {nil, assigns.selected_family.id}
-      end
+  defp validate_genus_in_name(name, %{genus_known: false, selected_family: family}) do
+    expected_prefix = "Unknown (#{family.name})"
 
-    %{
-      species_name: String.trim(assigns.name),
-      genus_id: genus_id,
-      family_id: family_id,
-      host_id: assigns.selected_host.id,
-      undescribed: true
-    }
+    if String.starts_with?(name, expected_prefix) do
+      :ok
+    else
+      {:error,
+       "Name must start with \"#{expected_prefix}\" for an undescribed gall in this family."}
+    end
+  end
+
+  defp validate_genus_in_name(name, %{genus_known: true, selected_genus: genus}) do
+    if String.starts_with?(name, genus.name <> " ") or name == genus.name do
+      :ok
+    else
+      {:error, "Name must start with the selected genus \"#{genus.name}\"."}
+    end
   end
 end

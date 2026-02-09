@@ -218,12 +218,58 @@ defmodule GallformersWeb.Admin.FormHelpers do
       end
 
       @doc """
+      Performs a combined reclassify (genus change) and/or rename (epithet change).
+
+      Returns `{:ok, species}` or `{:error, reason}`.
+      """
+      def do_reclassify_and_rename(species_id, genus_id, new_name, old_name, opts) do
+        genus_changed? = opts[:genus_changed?]
+        name_changed? = opts[:name_changed?]
+        add_alias? = opts[:add_alias?]
+
+        cond do
+          genus_changed? ->
+            reclassify_then_rename(species_id, genus_id, new_name, old_name, add_alias?)
+
+          name_changed? ->
+            Gallformers.Species.rename_species(species_id, new_name, add_alias?)
+
+          true ->
+            {:ok, Gallformers.Repo.get!(Gallformers.Species.Species, species_id)}
+        end
+      end
+
+      defp reclassify_then_rename(species_id, genus_id, new_name, _old_name, add_alias?) do
+        # Pass add_alias? to reassign so it controls alias creation in one place
+        case Gallformers.Taxonomy.reassign_species_taxonomy(species_id, genus_id,
+               add_alias?: add_alias?
+             ) do
+          {:ok, updated_species} ->
+            maybe_apply_epithet_rename(updated_species, species_id, new_name)
+
+          error ->
+            error
+        end
+      end
+
+      defp maybe_apply_epithet_rename(updated_species, species_id, new_name) do
+        if updated_species.name != new_name do
+          # User also changed the epithet — rename without alias since
+          # reassign_species_taxonomy already handled alias for the original name
+          Gallformers.Species.rename_species(species_id, new_name, false)
+        else
+          {:ok, updated_species}
+        end
+      end
+
+      @doc """
       Returns dropdown options for alias types.
       """
       def alias_type_options do
         [
           {"Common Name", "common name"},
           {"Scientific Synonym", "scientific synonym"},
+          {"Former Undescribed Name", "former_undescribed"},
           {"Other", "other"}
         ]
       end

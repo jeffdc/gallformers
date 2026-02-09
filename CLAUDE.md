@@ -347,6 +347,19 @@ end
 - **Production**: Fly.io volume at `/data/gallformers.sqlite`
 - **Query patterns**: See "Ecto & Query Patterns" section below
 
+### Schema Changes: Use Ecto Migrations
+
+All schema and data changes go through **Ecto migrations** (`mix ecto.gen.migration`).
+The `priv/repo/structure.sql` file was a one-time bootstrap from V1 — it is not the
+source of truth for ongoing changes. Never edit it directly.
+
+### Table Naming: V2 Uses snake_case
+
+V2 table names use **snake_case** (e.g., `species_source`, `gall_traits`, `host_range`).
+The legacy V1 codebase used concatenated names without separators (e.g., `speciessource`,
+`galltraits`). **When writing raw SQL in migrations, always check `priv/repo/structure.sql`
+or the Ecto schema's `schema "table_name"` declaration for the correct table name.**
+
 ### Getting the Database
 
 ```bash

@@ -530,10 +530,14 @@ defmodule Gallformers.Galls do
 
   @doc """
   Updates gall properties (detachable, undescribed).
+
+  Silently enforces `undescribed: true` when the species is linked to an Unknown genus.
   """
   @spec update_gall_properties(integer(), map()) ::
           {:ok, GallTraits.t()} | {:error, Ecto.Changeset.t() | :not_found}
   def update_gall_properties(species_id, attrs) do
+    attrs = enforce_unknown_genus_floor(species_id, attrs)
+
     case Repo.get(GallTraits, species_id) do
       nil ->
         {:error, :not_found}
@@ -542,6 +546,32 @@ defmodule Gallformers.Galls do
         gall_traits
         |> GallTraits.changeset(attrs)
         |> Repo.update()
+    end
+  end
+
+  # If the caller is trying to set undescribed=false but the species has an Unknown genus,
+  # silently correct to undescribed=true.
+  defp enforce_unknown_genus_floor(species_id, attrs) do
+    undescribed = Map.get(attrs, :undescribed, Map.get(attrs, "undescribed"))
+
+    if undescribed == false and has_unknown_genus?(species_id) do
+      force_undescribed(attrs)
+    else
+      attrs
+    end
+  end
+
+  defp has_unknown_genus?(species_id) do
+    taxonomy = Gallformers.Taxonomy.get_taxonomy_for_species(species_id)
+    taxonomy && Gallformers.Taxonomy.placeholder_genus_name?(taxonomy.genus)
+  end
+
+  # Preserve the key type (atom or string) used by the caller
+  defp force_undescribed(attrs) do
+    if Map.has_key?(attrs, :undescribed) do
+      Map.put(attrs, :undescribed, true)
+    else
+      Map.put(attrs, "undescribed", true)
     end
   end
 

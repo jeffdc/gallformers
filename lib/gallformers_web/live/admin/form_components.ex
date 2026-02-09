@@ -85,6 +85,7 @@ defmodule GallformersWeb.Admin.FormComponents do
 
   defp alias_type_label("common"), do: "common name"
   defp alias_type_label("scientific"), do: "scientific synonym"
+  defp alias_type_label("former_undescribed"), do: "former undescribed name"
   defp alias_type_label(other), do: other
 
   defp species_path("gall", id), do: "/gall/#{id}"
@@ -190,10 +191,10 @@ defmodule GallformersWeb.Admin.FormComponents do
   end
 
   defp alias_type_options do
-    # Database constraint: type = 'common' OR type = 'scientific'
     [
       {"Common Name", "common"},
-      {"Scientific Synonym", "scientific"}
+      {"Scientific Synonym", "scientific"},
+      {"Former Undescribed Name", "former_undescribed"}
     ]
   end
 end

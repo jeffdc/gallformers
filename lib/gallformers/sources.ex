@@ -381,6 +381,15 @@ defmodule Gallformers.Sources do
   end
 
   @doc """
+  Returns whether a species has any sources linked to it.
+  """
+  @spec has_sources?(integer()) :: boolean()
+  def has_sources?(species_id) do
+    from(ss in SpeciesSource, where: ss.species_id == ^species_id)
+    |> Repo.exists?()
+  end
+
+  @doc """
   Checks if a species is already linked to a source.
   """
   @spec species_source_exists?(integer(), integer()) :: boolean()

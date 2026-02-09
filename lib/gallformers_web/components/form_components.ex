@@ -891,122 +891,6 @@ defmodule GallformersWeb.FormComponents do
   end
 
   @doc """
-  Renders a rename modal for species (galls or hosts).
-
-  The modal allows renaming a species and optionally adding an alias for the old name.
-  All events are emitted to the parent LiveView which handles the actual rename logic.
-
-  Backdrop click, ESC, and X button are routed through `on_cancel` to allow the
-  parent LiveView to guard against accidental dismiss when the form has changes.
-  The Cancel button always fires `close_rename_modal` directly.
-
-  ## Events emitted
-
-  - `request_close_rename` - when user clicks backdrop, presses ESC, or clicks X (via on_cancel)
-  - `close_rename_modal` - when user clicks Cancel (always closes)
-  - `update_rename_value` - when user types in the input (params: `value`)
-  - `toggle_add_alias_on_rename` - when user toggles the checkbox
-  - `do_rename` - when user clicks Save Changes
-
-  ## Examples
-
-      <.rename_modal
-        show={@show_rename_modal}
-        value={@rename_value}
-        add_alias_checked={@add_alias_on_rename}
-        entity_type="Gall"
-      />
-  """
-  attr :show, :boolean, required: true, doc: "whether to show the modal"
-  attr :value, :string, required: true, doc: "current value in the rename input"
-
-  attr :add_alias_checked, :boolean,
-    required: true,
-    doc: "whether the add alias checkbox is checked"
-
-  attr :entity_type, :string,
-    required: true,
-    doc: "entity type for display (e.g., 'Gall' or 'Host')"
-
-  attr :rename_collisions, :list,
-    default: [],
-    doc: "alias collisions for the rename value (from Species.find_species_with_alias/1)"
-
-  def rename_modal(assigns) do
-    ~H"""
-    <.modal
-      :if={@show}
-      id="rename-modal"
-      show
-      on_cancel={JS.push("request_close_rename")}
-      class="gf-modal-md"
-    >
-      <:header>Edit {@entity_type} Name</:header>
-      <:body>
-        <input
-          id="rename-modal-input"
-          type="text"
-          value={@value}
-          phx-keyup="update_rename_value"
-          phx-hook="InputEvent"
-          data-event="update_rename_value"
-          phx-debounce="300"
-          class="w-full px-4 py-3 border border-gray-300 rounded text-lg focus:ring-gf-maroon focus:border-gf-maroon"
-          autofocus
-        />
-
-        <.alert :if={@rename_collisions != []} variant="warning" class="mt-3">
-          <:title>Alias collision</:title>
-          <div :for={c <- @rename_collisions}>
-            This name is a {rename_collision_type_label(c.alias_type)} of
-            <.link
-              navigate={rename_collision_species_path(c.taxoncode, c.species_id)}
-              class="underline font-medium"
-            >
-              {c.species_name}
-            </.link>
-          </div>
-        </.alert>
-
-        <div class="mt-5">
-          <label class="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={@add_alias_checked}
-              phx-click="toggle_add_alias_on_rename"
-              class="w-5 h-5 rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon"
-            />
-            <span class="text-base text-gray-700">Add Alias for old name?</span>
-          </label>
-        </div>
-
-        <div class="mt-4 text-sm text-gray-500">
-          If you want to reassign the species to a different genus, enter the new name
-          with the new genus. If the genus doesn't exist, it will be created under the same family.
-          If it exists, the species will be reassigned to that genus.
-        </div>
-      </:body>
-      <:footer>
-        <button
-          type="button"
-          phx-click="close_rename_modal"
-          class="px-5 py-2.5 text-base text-gray-600 hover:text-gray-800"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          phx-click="do_rename"
-          class="px-5 py-2.5 bg-gf-maroon text-white text-base rounded hover:bg-gf-maroon/90"
-        >
-          Save Changes
-        </button>
-      </:footer>
-    </.modal>
-    """
-  end
-
-  @doc """
   Renders a cascade delete confirmation modal.
 
   Shows the impact of deleting an entity with cascading relationships:
@@ -1150,6 +1034,185 @@ defmodule GallformersWeb.FormComponents do
         >
           <.icon name="ph-trash" class="h-4 w-4 inline mr-1" /> Delete Forever
         </button>
+      </:footer>
+    </.modal>
+    """
+  end
+
+  @doc """
+  Renders a combined rename/reclassify modal for changing a species' name and/or taxonomy.
+
+  Provides family/genus typeahead pickers, an epithet text input, alias checkbox,
+  and collision warnings. Saves immediately on confirm.
+
+  ## Events
+
+  - `reclassify_search_family` / `reclassify_select_family` / `reclassify_clear_family`
+  - `reclassify_search_genus` / `reclassify_select_genus` / `reclassify_clear_genus`
+  - `update_reclassify_epithet` with `%{"value" => epithet}` on epithet input
+  - `toggle_add_alias_on_rename` on checkbox toggle
+  - `do_reclassify` on save
+  - `close_reclassify_modal` on cancel
+  """
+  attr :show, :boolean, required: true, doc: "whether the modal is visible"
+
+  attr :entity_type, :string,
+    required: true,
+    doc: "entity type for display (e.g., 'Gall' or 'Host')"
+
+  attr :family_query, :string, default: "", doc: "current family search query"
+  attr :family_results, :list, default: [], doc: "family search results"
+  attr :selected_family, :map, default: nil, doc: "selected family %{id, name}"
+
+  attr :genus_query, :string, default: "", doc: "current genus search query"
+  attr :genus_results, :list, default: [], doc: "genus search results"
+  attr :selected_genus, :map, default: nil, doc: "selected genus %{id, name, is_placeholder}"
+
+  attr :epithet, :string, default: "", doc: "the specific epithet (species part of the name)"
+
+  attr :add_alias_checked, :boolean,
+    default: true,
+    doc: "whether the add-alias checkbox is checked"
+
+  attr :rename_collisions, :list,
+    default: [],
+    doc: "alias collisions for the computed name"
+
+  attr :is_gall, :boolean,
+    default: false,
+    doc: "whether this is a gall (enables Unknown genus warnings)"
+
+  def reclassify_modal(assigns) do
+    ~H"""
+    <.modal :if={@show} id="reclassify-modal" show on_cancel={JS.push("close_reclassify_modal")}>
+      <:header>Rename and/or Reclassify {@entity_type}</:header>
+      <:body>
+        <%!-- Family search --%>
+        <div class="mb-4">
+          <.typeahead
+            id="reclassify-family-picker"
+            label="Family:"
+            placeholder="Search families..."
+            search_event="reclassify_search_family"
+            select_event="reclassify_select_family"
+            clear_event="reclassify_clear_family"
+            query={@family_query}
+            results={@family_results}
+            selected={@selected_family}
+            display_fn={fn f -> f.name end}
+          />
+        </div>
+
+        <%!-- Genus search (only enabled when family is selected) --%>
+        <div class={["mb-4", !@selected_family && "opacity-50 pointer-events-none"]}>
+          <.typeahead
+            id="reclassify-genus-picker"
+            label="Genus:"
+            placeholder={
+              if @selected_family,
+                do: "Search genera in #{@selected_family.name}...",
+                else: "Select a family first"
+            }
+            search_event="reclassify_search_genus"
+            select_event="reclassify_select_genus"
+            clear_event="reclassify_clear_genus"
+            query={@genus_query}
+            results={@genus_results}
+            selected={@selected_genus}
+            display_fn={fn g -> g.name end}
+          >
+            <:result :let={item}>
+              <span class="italic">{item.name}</span>
+              <span :if={item.is_placeholder} class="text-amber-600 text-xs ml-2">
+                (Unknown/undescribed)
+              </span>
+            </:result>
+          </.typeahead>
+        </div>
+
+        <%!-- Epithet (specific name) input --%>
+        <div class="mb-4">
+          <label class="gf-label" for="reclassify-epithet">Specific epithet:</label>
+          <input
+            id="reclassify-epithet"
+            type="text"
+            value={@epithet}
+            phx-keyup="update_reclassify_epithet"
+            phx-hook="InputEvent"
+            data-event="update_reclassify_epithet"
+            phx-debounce="300"
+            class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-gf-maroon focus:border-gf-maroon"
+          />
+        </div>
+
+        <%!-- Alias collision warnings --%>
+        <.alert :if={@rename_collisions != []} variant="warning" class="mt-3">
+          <:title>Name collision</:title>
+          <div :for={c <- @rename_collisions}>
+            This name is a {rename_collision_type_label(c.alias_type)} of
+            <.link
+              navigate={rename_collision_species_path(c.taxoncode, c.species_id)}
+              class="underline font-medium"
+            >
+              {c.species_name}
+            </.link>
+          </div>
+        </.alert>
+
+        <%!-- Add alias checkbox --%>
+        <div class="mt-4">
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={@add_alias_checked}
+              phx-click="toggle_add_alias_on_rename"
+              class="w-5 h-5 rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon"
+            />
+            <span class="text-sm text-gray-700">Add scientific synonym alias for old name</span>
+          </label>
+        </div>
+
+        <%!-- Warning about undescribed lock --%>
+        <div
+          :if={@selected_genus && @selected_genus.is_placeholder && @is_gall}
+          class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800"
+        >
+          <.icon name="ph-warning" class="h-4 w-4 inline mr-1" />
+          Moving to an Unknown genus will mark this gall as undescribed.
+        </div>
+
+        <%!-- Note about creating families/genera --%>
+        <p class="mt-4 text-xs text-gray-500">
+          If the destination family or genus doesn't exist yet,
+          <.link navigate="/admin/taxonomy" class="underline text-gf-maroon hover:text-gf-maroon/80">
+            create it in the taxonomy manager
+          </.link>
+          first.
+        </p>
+      </:body>
+      <:footer>
+        <div class="w-full">
+          <p class="text-sm font-medium text-red-600 mb-3">
+            <.icon name="ph-warning" class="h-4 w-4 inline mr-0.5" /> Changes save immediately.
+          </p>
+          <div class="flex justify-end gap-3">
+            <button
+              type="button"
+              phx-click="close_reclassify_modal"
+              class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              phx-click="do_reclassify"
+              disabled={is_nil(@selected_genus) or @epithet == ""}
+              class="px-4 py-2 text-sm font-medium text-white bg-gf-maroon border border-transparent rounded-md hover:bg-gf-maroon/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Save
+            </button>
+          </div>
+        </div>
       </:footer>
     </.modal>
     """

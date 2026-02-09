@@ -69,8 +69,8 @@ defmodule GallformersWeb.GenusLive do
         |> Species.enrich_with_common_names_and_counts()
       end
 
-    # Don't index empty Unknown genera (placeholder genera with no species)
-    is_empty_unknown = genus.name == "Unknown" && species == []
+    # Don't index empty placeholder genera (no species)
+    is_empty_unknown = genus.is_placeholder && species == []
 
     # Determine column header based on species type in this genus
     count_header =

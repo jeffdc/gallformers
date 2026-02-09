@@ -308,15 +308,16 @@ defmodule Gallformers.TaxonomyTest do
           description: "Wasp"
         })
 
-      # Verify Unknown genus was auto-created
+      # Verify Unknown genus was auto-created with proper naming
       unknown_genus =
         Repo.one(
           from(t in Taxonomy.Taxonomy,
-            where: t.name == "Unknown" and t.type == "genus" and t.parent_id == ^family.id
+            where: t.is_placeholder == true and t.type == "genus" and t.parent_id == ^family.id
           )
         )
 
       assert unknown_genus != nil
+      assert unknown_genus.name == "Unknown (TestAutoUnknownFamily)"
       assert unknown_genus.description == "Placeholder genus for undescribed species"
     end
 
@@ -332,7 +333,7 @@ defmodule Gallformers.TaxonomyTest do
       unknown_genus =
         Repo.one(
           from(t in Taxonomy.Taxonomy,
-            where: t.name == "Unknown" and t.type == "genus" and t.parent_id == ^family.id
+            where: t.is_placeholder == true and t.type == "genus" and t.parent_id == ^family.id
           )
         )
 
@@ -402,7 +403,7 @@ defmodule Gallformers.TaxonomyTest do
       unknown_count =
         Repo.one(
           from(t in Taxonomy.Taxonomy,
-            where: t.name == "Unknown" and t.type == "genus" and t.parent_id == ^family.id,
+            where: t.is_placeholder == true and t.type == "genus" and t.parent_id == ^family.id,
             select: count()
           )
         )
@@ -535,6 +536,235 @@ defmodule Gallformers.TaxonomyTest do
         })
 
       assert {:error, :no_genera_selected} = Taxonomy.move_genera([], family.id, family.id)
+    end
+  end
+
+  describe "reassign_species_taxonomy/2" do
+    alias Gallformers.Galls.GallTraits
+
+    setup do
+      {:ok, family1} =
+        Taxonomy.create_taxonomy(%{
+          name: "ReclassifyFamily1",
+          type: "family",
+          description: "Wasp"
+        })
+
+      {:ok, genus1} =
+        Taxonomy.create_taxonomy(%{
+          name: "ReclassifyGenus1",
+          type: "genus",
+          parent_id: family1.id
+        })
+
+      {:ok, family2} =
+        Taxonomy.create_taxonomy(%{
+          name: "ReclassifyFamily2",
+          type: "family",
+          description: "Midge"
+        })
+
+      {:ok, genus2} =
+        Taxonomy.create_taxonomy(%{
+          name: "ReclassifyGenus2",
+          type: "genus",
+          parent_id: family2.id
+        })
+
+      {:ok, species} =
+        Repo.insert(%Species{
+          name: "ReclassifyGenus1 testsp",
+          taxoncode: "gall",
+          datacomplete: false
+        })
+
+      Taxonomy.link_species_to_taxonomy(species.id, genus1.id)
+
+      {:ok, _gall_traits} =
+        Repo.insert(%GallTraits{
+          species_id: species.id,
+          undescribed: false,
+          detachable: "unknown"
+        })
+
+      {:ok, family1: family1, genus1: genus1, family2: family2, genus2: genus2, species: species}
+    end
+
+    test "moves species to a different genus and renames", %{species: species, genus2: genus2} do
+      assert {:ok, updated} = Taxonomy.reassign_species_taxonomy(species.id, genus2.id)
+
+      taxonomy = Taxonomy.get_taxonomy_for_species(species.id)
+      assert taxonomy.genus == "ReclassifyGenus2"
+      assert taxonomy.family == "ReclassifyFamily2"
+
+      # Species name should reflect the new genus
+      assert updated.name == "ReclassifyGenus2 testsp"
+    end
+
+    test "forces undescribed=true when moving to Unknown genus", %{
+      species: species,
+      family2: family2
+    } do
+      {:ok, unknown_genus} = Taxonomy.find_or_create_unknown_genus(family2.id)
+
+      assert {:ok, updated} = Taxonomy.reassign_species_taxonomy(species.id, unknown_genus.id)
+
+      # Verify genus changed to a placeholder
+      taxonomy = Taxonomy.get_taxonomy_for_species(species.id)
+      assert Taxonomy.placeholder_genus_name?(taxonomy.genus)
+
+      # Species name should reflect the Unknown genus
+      assert updated.name == "Unknown (ReclassifyFamily2) testsp"
+
+      # Verify undescribed was forced to true
+      gall_traits = Repo.get!(GallTraits, species.id)
+      assert gall_traits.undescribed == true
+    end
+
+    test "does not force undescribed when moving to a real genus", %{
+      species: species,
+      genus2: genus2
+    } do
+      assert {:ok, _updated} = Taxonomy.reassign_species_taxonomy(species.id, genus2.id)
+
+      # undescribed should remain false
+      gall_traits = Repo.get!(GallTraits, species.id)
+      assert gall_traits.undescribed == false
+    end
+
+    test "renames correctly from Unknown genus to real genus", %{
+      species: species,
+      family2: family2,
+      genus2: genus2
+    } do
+      # First move to Unknown genus
+      {:ok, unknown_genus} = Taxonomy.find_or_create_unknown_genus(family2.id)
+      assert {:ok, updated} = Taxonomy.reassign_species_taxonomy(species.id, unknown_genus.id)
+      assert updated.name == "Unknown (ReclassifyFamily2) testsp"
+
+      # Now reclassify from Unknown to a real genus
+      assert {:ok, updated2} = Taxonomy.reassign_species_taxonomy(updated.id, genus2.id)
+      assert updated2.name == "ReclassifyGenus2 testsp"
+    end
+
+    test "creates former_undescribed alias when moving from Unknown to real genus", %{
+      species: species,
+      family2: family2,
+      genus2: genus2
+    } do
+      # Move to Unknown genus first
+      {:ok, unknown_genus} = Taxonomy.find_or_create_unknown_genus(family2.id)
+      assert {:ok, _updated} = Taxonomy.reassign_species_taxonomy(species.id, unknown_genus.id)
+
+      # Now move from Unknown to a real genus
+      assert {:ok, _updated2} = Taxonomy.reassign_species_taxonomy(species.id, genus2.id)
+
+      # Verify alias with type "former_undescribed" was created
+      aliases =
+        from(a in Alias,
+          join: as in "alias_species",
+          on: as.alias_id == a.id,
+          where: as.species_id == ^species.id and a.type == "former_undescribed",
+          select: a
+        )
+        |> Repo.all()
+
+      assert length(aliases) == 1
+      [former] = aliases
+      assert former.name == "Unknown (ReclassifyFamily2) testsp"
+    end
+
+    test "creates scientific alias (not former_undescribed) for Known→Known genus change", %{
+      species: species,
+      genus2: genus2
+    } do
+      # Move from one real genus to another
+      assert {:ok, _updated} = Taxonomy.reassign_species_taxonomy(species.id, genus2.id)
+
+      # Verify alias is "scientific", not "former_undescribed"
+      aliases =
+        from(a in Alias,
+          join: as in "alias_species",
+          on: as.alias_id == a.id,
+          where: as.species_id == ^species.id,
+          select: a
+        )
+        |> Repo.all()
+
+      assert length(aliases) == 1
+      [synonym] = aliases
+      assert synonym.type == "scientific"
+      assert synonym.name == "ReclassifyGenus1 testsp"
+    end
+
+    test "only keeps first former_undescribed alias per species", %{
+      species: species,
+      family1: family1,
+      family2: family2,
+      genus1: genus1,
+      genus2: genus2
+    } do
+      # Move to Unknown genus
+      {:ok, unknown1} = Taxonomy.find_or_create_unknown_genus(family2.id)
+      assert {:ok, _} = Taxonomy.reassign_species_taxonomy(species.id, unknown1.id)
+
+      # Move to real genus (creates former_undescribed alias)
+      assert {:ok, _} = Taxonomy.reassign_species_taxonomy(species.id, genus2.id)
+
+      # Move back to Unknown
+      {:ok, unknown2} = Taxonomy.find_or_create_unknown_genus(family1.id)
+      assert {:ok, _} = Taxonomy.reassign_species_taxonomy(species.id, unknown2.id)
+
+      # Move to real genus again (should NOT create a second former_undescribed)
+      assert {:ok, _} = Taxonomy.reassign_species_taxonomy(species.id, genus1.id)
+
+      former_aliases =
+        from(a in Alias,
+          join: as in "alias_species",
+          on: as.alias_id == a.id,
+          where: as.species_id == ^species.id and a.type == "former_undescribed",
+          select: a
+        )
+        |> Repo.all()
+
+      assert length(former_aliases) == 1
+    end
+  end
+
+  describe "search_genera/1" do
+    setup do
+      {:ok, family} =
+        Taxonomy.create_taxonomy(%{
+          name: "SearchGeneraFamily",
+          type: "family",
+          description: "Test"
+        })
+
+      {:ok, genus} =
+        Taxonomy.create_taxonomy(%{
+          name: "Searchablegenus",
+          type: "genus",
+          parent_id: family.id
+        })
+
+      {:ok, family: family, genus: genus}
+    end
+
+    test "finds genera by name prefix", %{genus: genus, family: family} do
+      results = Taxonomy.search_genera("Search")
+      ids = Enum.map(results, & &1.id)
+      assert genus.id in ids
+
+      # Verify result structure
+      result = Enum.find(results, &(&1.id == genus.id))
+      assert result.name == "Searchablegenus"
+      assert result.family_name == "SearchGeneraFamily"
+      assert result.family_id == family.id
+    end
+
+    test "returns empty list for non-matching query" do
+      results = Taxonomy.search_genera("Zzzznotagenus")
+      assert results == []
     end
   end
 

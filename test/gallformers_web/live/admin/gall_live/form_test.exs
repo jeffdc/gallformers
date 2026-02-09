@@ -319,6 +319,36 @@ defmodule GallformersWeb.Admin.GallLive.FormTest do
 
     test "toggle_undescribed marks form as dirty", %{conn: conn} do
       gall = require_gall()
+
+      # The undescribed checkbox is locked when the gall has no sources or has a
+      # placeholder genus. Add a genus and source so the checkbox is unlocked.
+      {:ok, genus} =
+        Gallformers.Repo.insert(%Gallformers.Taxonomy.Taxonomy{
+          name: "Andricus",
+          description: "",
+          type: "genus",
+          is_placeholder: false
+        })
+
+      Gallformers.Repo.insert_all("species_taxonomy", [
+        [species_id: gall.id, taxonomy_id: genus.id]
+      ])
+
+      {:ok, source} =
+        Gallformers.Sources.create_source(%{
+          title: "Test Source",
+          author: "Test Author",
+          pubyear: "2026",
+          link: "https://example.com",
+          citation: "Test citation",
+          license: "CC0"
+        })
+
+      Gallformers.Sources.create_species_source(%{
+        species_id: gall.id,
+        source_id: source.id
+      })
+
       {:ok, view, _html} = live(conn, ~p"/admin/galls/#{gall.id}")
 
       # Initially form should not be dirty (save button disabled)
@@ -332,51 +362,42 @@ defmodule GallformersWeb.Admin.GallLive.FormTest do
     end
   end
 
-  describe "Rename modal" do
+  describe "Rename/Reclassify modal" do
     setup %{conn: conn} do
       {:ok, conn: setup_admin_session(conn)}
     end
 
-    test "open_rename_modal shows the modal", %{conn: conn} do
+    test "open_reclassify_modal shows the modal", %{conn: conn} do
       gall = require_gall()
       {:ok, view, _html} = live(conn, ~p"/admin/galls/#{gall.id}")
 
-      html = render_click(view, "open_rename_modal", %{})
+      html = render_click(view, "open_reclassify_modal", %{})
 
-      assert html =~ "Edit Gall Name"
-      assert html =~ "Add Alias for old name"
+      assert html =~ "Rename and/or Reclassify Gall"
+      assert html =~ "Specific epithet"
+      assert html =~ "Add scientific synonym alias"
     end
 
-    test "close_rename_modal hides the modal", %{conn: conn} do
+    test "close_reclassify_modal hides the modal", %{conn: conn} do
       gall = require_gall()
       {:ok, view, _html} = live(conn, ~p"/admin/galls/#{gall.id}")
 
-      render_click(view, "open_rename_modal", %{})
-      html = render_click(view, "close_rename_modal", %{})
+      render_click(view, "open_reclassify_modal", %{})
+      html = render_click(view, "close_reclassify_modal", %{})
 
-      refute html =~ "Edit Gall Name"
+      refute html =~ "Rename and/or Reclassify Gall"
     end
 
-    test "do_rename with empty name shows error", %{conn: conn} do
+    test "do_reclassify without genus selected shows error", %{conn: conn} do
       gall = require_gall()
       {:ok, view, _html} = live(conn, ~p"/admin/galls/#{gall.id}")
 
-      render_click(view, "open_rename_modal", %{})
-      render_click(view, "update_rename_value", %{"value" => ""})
-      html = render_click(view, "do_rename", %{})
+      render_click(view, "open_reclassify_modal", %{})
+      # Clear genus selection to test guard
+      render_click(view, "reclassify_clear_genus", %{})
+      html = render_click(view, "do_reclassify", %{})
 
-      assert html =~ "cannot be empty"
-    end
-
-    test "do_rename with invalid name format shows error", %{conn: conn} do
-      gall = require_gall()
-      {:ok, view, _html} = live(conn, ~p"/admin/galls/#{gall.id}")
-
-      render_click(view, "open_rename_modal", %{})
-      render_click(view, "update_rename_value", %{"value" => "invalidname"})
-      html = render_click(view, "do_rename", %{})
-
-      assert html =~ "valid species name"
+      assert html =~ "select a genus"
     end
   end
 

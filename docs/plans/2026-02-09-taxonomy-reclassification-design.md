@@ -61,8 +61,9 @@ Pick "Unknown" in genus field -> pick "Unknown" in family dropdown -> links to
 ### Scope
 
 - Available on both gall and host edit forms (built as a reusable component)
-- Host plants have no Unknown genera, so the "Unknown -> pick family" flow only appears
-  for galls. For hosts the genus typeahead is the only option.
+- **Hosts do not use Unknown genera or families.** The "Unknown -> pick family" flow
+  only appears for galls. For hosts the genus typeahead is the only option, and there
+  is no undescribed flag to manage.
 
 ### Backend
 
@@ -132,24 +133,41 @@ picker), not Case 3 (new genus creation).
 
 The `undescribed` boolean on `gall_traits` must respect taxonomy state.
 
-### Rule: Enforced Floor
+### Rule 1: Unknown Genus Floor
 
 - **Unknown genus -> `undescribed` is locked true.** The UI disables the checkbox and
   shows a brief explanation ("Undescribed is required for species with unknown genus").
-- **Real genus -> admin controls `undescribed`.** Can be either true or false. True is
-  valid for species placed in a genus but not yet formally described (e.g.,
-  "Contarinia h-virginiana-circular-leaf-blister").
-- **Reclassify from Unknown -> real genus:** unlocks the checkbox, leaves value as true
-  (admin can then change it if the species is now described).
 - **Reclassify from real genus -> Unknown:** forces undescribed to true, locks checkbox.
 - **Creation:** if the selected genus is any `Unknown (*)` flavor, `undescribed` is
   auto-set true and locked.
 
-### Enforcement layer
+### Rule 2: Described Galls Require Sources
 
-This is enforced at the **context level**, not just UI. The `Galls` context validates
-on save: if the species is linked to an Unknown genus, `undescribed` must be true.
-This prevents bypass via direct DB operations or future API endpoints.
+- **Real genus + `undescribed=false` -> must have at least one source.** A formally
+  described species must have a citation.
+- **Real genus + no sources -> `undescribed` toggle is locked true.** The UI disables
+  the checkbox and shows: "A source is required to mark a species as described."
+- **Reclassify from Unknown -> real genus:** the checkbox stays locked at true until
+  the admin attaches a source. Only then can they toggle undescribed to false.
+- **Real genus + has sources -> admin controls `undescribed`.** Can be either true or
+  false. True is valid for species placed in a genus but not yet formally described
+  (e.g., "Contarinia h-virginiana-circular-leaf-blister").
+
+### Scope: Galls Only
+
+These invariants apply **only to galls**. Hosts (plants) do not have an `undescribed`
+flag, and Unknown genera/families are not used with hosts.
+
+### Enforcement layers
+
+**Unknown genus floor** — enforced at the **context level**. The `Galls` context
+validates on save: if the species is linked to an Unknown genus, `undescribed` must
+be true. This prevents bypass via direct DB operations or future API endpoints.
+
+**Source requirement** — enforced as a **UI warning** for now. The toggle is locked
+in the UI, but no context-level validation blocks saves. Many existing galls will
+fail this check and the fixes are non-trivial (finding the correct source for each).
+This can be promoted to a context-level validation later once the backlog is cleared.
 
 ---
 
@@ -162,7 +180,14 @@ Investigation found 21 data inconsistencies:
 - **19 real-genus galls with undescribed naming pattern but undescribed=false** — tracked
   in bead `gallformers-nvve` with fix query
 
-These inconsistencies motivated the enforced-floor invariant above.
+Additionally, the new source requirement will flag more galls:
+
+- **Described galls with no sources** — any gall with `undescribed=false` and zero
+  entries in `species_source` should be flipped to `undescribed=true`. This is a bulk
+  update that can run before the UI enforcement ships, preventing the new lock from
+  surprising admins with galls they can't edit without first attaching sources.
+
+These inconsistencies motivated the enforced invariants above.
 
 ---
 
