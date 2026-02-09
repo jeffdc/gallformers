@@ -7,9 +7,22 @@ defmodule Gallformers.Taxonomy do
 
   require Logger
   import Ecto.Query
+  alias Gallformers.Galls.GallTraits
   alias Gallformers.Repo
   alias Gallformers.Species.Species
   alias Gallformers.Taxonomy.Taxonomy
+
+  @doc """
+  Returns true if the given genus name represents a placeholder (Unknown) genus.
+
+  Works with both the genus name string from a taxonomy map (e.g., "Unknown (Cynipidae)")
+  and the bare "Unknown" for the root unknown family's genus.
+  """
+  @spec placeholder_genus_name?(String.t() | nil) :: boolean()
+  def placeholder_genus_name?(nil), do: false
+  def placeholder_genus_name?("Unknown"), do: true
+  def placeholder_genus_name?("Unknown " <> _), do: true
+  def placeholder_genus_name?(_), do: false
 
   @doc """
   Returns all non-placeholder taxonomies.
@@ -107,7 +120,7 @@ defmodule Gallformers.Taxonomy do
   @spec empty_unknown_genus_ids() :: [integer()]
   def empty_unknown_genus_ids do
     from(t in Taxonomy,
-      where: t.type == "genus" and t.name == "Unknown",
+      where: t.type == "genus" and t.is_placeholder == true,
       where:
         fragment(
           "NOT EXISTS (SELECT 1 FROM species_taxonomy st WHERE st.taxonomy_id = ?)",
@@ -132,6 +145,69 @@ defmodule Gallformers.Taxonomy do
   @spec get_taxonomy!(integer()) :: Taxonomy.t()
   def get_taxonomy!(id) do
     Repo.get!(Taxonomy, id)
+  end
+
+  @doc """
+  Resolves taxonomy from a species name by parsing the genus portion.
+
+  Handles two patterns:
+  - "Unknown (Family) ..." — finds or creates the Unknown genus under that family
+  - "Genus ..." — looks up the genus by name
+
+  Returns `{:ok, taxonomy_map}` or `{:error, reason}`.
+  """
+  @spec resolve_taxonomy_from_name(String.t()) :: {:ok, map()} | {:error, String.t()}
+  def resolve_taxonomy_from_name(name) do
+    case parse_genus_from_name(name) do
+      {"Unknown", family_name} -> resolve_unknown_genus(family_name)
+      {genus_name, nil} -> resolve_known_genus(genus_name)
+      nil -> {:error, "Could not parse genus from name: #{name}"}
+    end
+  end
+
+  defp parse_genus_from_name(name) do
+    case Regex.run(~r/^Unknown \(([^)]+)\)/, name) do
+      [_, family_name] -> {"Unknown", family_name}
+      nil -> parse_simple_genus(name)
+    end
+  end
+
+  defp parse_simple_genus(name) do
+    case String.split(name, " ", parts: 2) do
+      [genus | _] when genus != "" -> {genus, nil}
+      _ -> nil
+    end
+  end
+
+  defp resolve_unknown_genus(family_name) do
+    case get_family_by_name(family_name) do
+      nil ->
+        {:error, "Family '#{family_name}' not found"}
+
+      family ->
+        {:ok, genus} = find_or_create_unknown_genus(family.id)
+        taxonomy = build_taxonomy_from_genus(genus)
+        # Display the genus as "Unknown (Family)" to match species name convention
+        {:ok, %{taxonomy | genus: "Unknown (#{family_name})"}}
+    end
+  end
+
+  defp resolve_known_genus(genus_name) do
+    case get_genera_by_name(genus_name) do
+      [] ->
+        {:error, "Genus '#{genus_name}' not found"}
+
+      [genus] ->
+        {:ok, build_taxonomy_from_genus(genus)}
+
+      _multiple ->
+        {:error, "Multiple genera named '#{genus_name}' — use the full form to disambiguate"}
+    end
+  end
+
+  defp get_family_by_name(name) do
+    from(t in Taxonomy, where: t.name == ^name and t.type == "family")
+    |> Repo.one()
   end
 
   @doc """
@@ -395,16 +471,17 @@ defmodule Gallformers.Taxonomy do
   Returns :ok on success.
   """
   @spec link_species_taxonomy(integer(), map() | nil, boolean(), integer() | nil) :: :ok
-  def link_species_taxonomy(species_id, %{genus: "Unknown"} = _taxonomy, true, family_id) do
-    # For Unknown genus, use find_or_create to avoid duplicates per family
-    {:ok, genus} = find_or_create_unknown_genus(family_id)
-    link_species_to_taxonomy(species_id, genus.id)
-    :ok
-  end
+  def link_species_taxonomy(species_id, %{genus: genus_name} = _taxonomy, true, parent_id)
+      when is_binary(genus_name) do
+    if placeholder_genus_name?(genus_name) do
+      # For Unknown genus, use find_or_create to avoid duplicates per family
+      {:ok, genus} = find_or_create_unknown_genus(parent_id)
+      link_species_to_taxonomy(species_id, genus.id)
+    else
+      # New genus - create it under the parent (section or family)
+      {:ok, _genus} = create_genus_for_species(genus_name, parent_id, species_id)
+    end
 
-  def link_species_taxonomy(species_id, taxonomy, true = _genus_is_new, parent_id) do
-    # parent_id can be either a section ID or family ID - genus is created under it
-    {:ok, _genus} = create_genus_for_species(taxonomy.genus, parent_id, species_id)
     :ok
   end
 
@@ -460,6 +537,184 @@ defmodule Gallformers.Taxonomy do
       {:ok, _} -> :ok
       error -> error
     end
+  end
+
+  @doc """
+  Reassigns a species to a different genus.
+
+  Wraps `update_species_genus/2` in a transaction. Also renames the species to
+  reflect the new genus (e.g., "Andricus quercuslanigera" → "Callirhytis quercuslanigera"),
+  adding a scientific synonym alias for the old name. If the new genus is an Unknown
+  placeholder and the species has gall_traits, forces `undescribed=true`.
+
+  Returns `{:ok, updated_species}` on success or `{:error, reason}` on failure.
+  """
+  @spec reassign_species_taxonomy(integer(), integer(), keyword()) ::
+          {:ok, Species.t()} | {:error, term()}
+  def reassign_species_taxonomy(species_id, new_genus_id, opts \\ []) do
+    add_alias? = Keyword.get(opts, :add_alias?, true)
+
+    Repo.transaction(fn ->
+      case update_species_genus(species_id, new_genus_id) do
+        :ok ->
+          maybe_force_undescribed(species_id, new_genus_id)
+          rename_species_for_reclassification(species_id, new_genus_id, add_alias?)
+
+        {:error, reason} ->
+          Repo.rollback(reason)
+      end
+    end)
+    |> case do
+      {:ok, species} -> {:ok, species}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # Renames a species to reflect its new genus after reclassification.
+  # For placeholder genera, builds "Unknown (Family) epithet".
+  # For regular genera, builds "NewGenus epithet".
+  # Optionally adds a scientific synonym alias for the old name.
+  # When moving from Unknown→Known genus, uses "former_undescribed" alias type
+  # to preserve the Gallformers Code for iNaturalist observation links.
+  defp rename_species_for_reclassification(species_id, new_genus_id, add_alias?) do
+    species = Repo.get!(Species, species_id)
+    genus = get_taxonomy!(new_genus_id) |> Repo.preload(:parent)
+    new_genus_display = Taxonomy.display_name(genus)
+
+    epithet = extract_epithet(species.name)
+    new_name = build_reclassified_name(new_genus_display, epithet)
+
+    if new_name != species.name do
+      old_genus_display = extract_genus_display(species.name)
+      # Detect Unknown→Known transition for former_undescribed alias
+      alias_type =
+        if placeholder_genus_name?(old_genus_display) && !genus.is_placeholder,
+          do: "former_undescribed",
+          else: "scientific"
+
+      Gallformers.Species.rename_for_genus_change(
+        species,
+        old_genus_display,
+        new_genus_display,
+        add_alias?,
+        alias_type: alias_type
+      )
+
+      # Return the updated species
+      Repo.get!(Species, species_id)
+    else
+      species
+    end
+  end
+
+  @doc """
+  Extracts the epithet (everything after the genus portion) from a species name.
+  Handles "Unknown (Family) epithet" and "Genus epithet" formats.
+  """
+  def extract_epithet(name) do
+    case Regex.run(~r/^Unknown \([^)]+\)\s*(.*)$/, name) do
+      [_, epithet] ->
+        epithet
+
+      nil ->
+        case String.split(name, " ", parts: 2) do
+          [_, epithet] -> epithet
+          _ -> ""
+        end
+    end
+  end
+
+  # Extracts the genus display portion from a species name.
+  # For "Unknown (Family) epithet" returns "Unknown (Family)".
+  # For "Genus epithet" returns "Genus".
+  defp extract_genus_display(name) do
+    case Regex.run(~r/^(Unknown \([^)]+\))/, name) do
+      [_, genus_display] ->
+        genus_display
+
+      nil ->
+        case String.split(name, " ", parts: 2) do
+          [genus | _] -> genus
+          _ -> name
+        end
+    end
+  end
+
+  defp build_reclassified_name(genus_display, "") do
+    genus_display
+  end
+
+  defp build_reclassified_name(genus_display, epithet) do
+    "#{genus_display} #{epithet}"
+  end
+
+  # If the new genus is Unknown and the species has gall_traits, force undescribed=true.
+  defp maybe_force_undescribed(species_id, genus_id) do
+    genus = get_taxonomy(genus_id)
+
+    if genus && genus.is_placeholder do
+      case Repo.get(GallTraits, species_id) do
+        nil -> :ok
+        gall_traits -> GallTraits.changeset(gall_traits, %{undescribed: true}) |> Repo.update!()
+      end
+    end
+  end
+
+  @doc """
+  Searches families by name prefix (case-insensitive).
+
+  Used by the reclassify modal family typeahead.
+  Returns maps with id and name.
+  """
+  @spec search_families(String.t(), integer()) :: [map()]
+  def search_families(query, limit \\ 20) do
+    name_pattern = "#{String.downcase(query)}%"
+
+    from(f in Taxonomy,
+      where: f.type == "family",
+      where: fragment("lower(?) LIKE ?", f.name, ^name_pattern),
+      order_by: f.name,
+      limit: ^limit,
+      select: %{id: f.id, name: f.name}
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Searches genera by name, returning genus with parent family info.
+
+  Used by the reclassify modal typeahead. When `family_id` is provided,
+  constrains results to genera within that family.
+  """
+  @spec search_genera(String.t(), integer() | nil, integer()) :: [map()]
+  def search_genera(query, family_id \\ nil, limit \\ 20) do
+    name_pattern = "#{String.downcase(query)}%"
+
+    base =
+      from(g in Taxonomy,
+        left_join: f in Taxonomy,
+        on: g.parent_id == f.id,
+        where: g.type == "genus",
+        where: fragment("lower(?) LIKE ?", g.name, ^name_pattern),
+        order_by: g.name,
+        limit: ^limit,
+        select: %{
+          id: g.id,
+          name: g.name,
+          family_name: f.name,
+          family_id: f.id,
+          is_placeholder: g.is_placeholder
+        }
+      )
+
+    base =
+      if family_id do
+        from([g, f] in base, where: g.parent_id == ^family_id)
+      else
+        base
+      end
+
+    Repo.all(base)
   end
 
   @doc """
@@ -789,10 +1044,10 @@ defmodule Gallformers.Taxonomy do
       if include_empty_unknown do
         base_query
       else
-        # Exclude Unknown genera that have no species
+        # Exclude placeholder genera that have no species
         from(t in base_query,
           where:
-            not (t.name == "Unknown" and t.type == "genus" and
+            not (t.is_placeholder == true and t.type == "genus" and
                    fragment(
                      "NOT EXISTS (SELECT 1 FROM species_taxonomy st WHERE st.taxonomy_id = ?)",
                      t.id
@@ -1257,7 +1512,7 @@ defmodule Gallformers.Taxonomy do
   end
 
   @doc """
-  Finds or creates an "Unknown" genus under the given family.
+  Finds or creates an "Unknown (Family)" placeholder genus under the given family.
 
   Used for undescribed galls where the genus is not known.
   Returns {:ok, genus} or {:error, changeset}.
@@ -1265,16 +1520,17 @@ defmodule Gallformers.Taxonomy do
   @spec find_or_create_unknown_genus(integer()) ::
           {:ok, Taxonomy.t()} | {:error, Ecto.Changeset.t()}
   def find_or_create_unknown_genus(family_id) do
-    # Check if an Unknown genus already exists under this family
+    # Look for an existing placeholder genus under this family
     case Repo.one(
            from(t in Taxonomy,
-             where: t.name == "Unknown" and t.type == "genus" and t.parent_id == ^family_id
+             where: t.is_placeholder == true and t.type == "genus" and t.parent_id == ^family_id
            )
          ) do
       nil ->
-        # Create a new Unknown genus under the family
+        family = get_taxonomy!(family_id)
+
         create_taxonomy(%{
-          name: "Unknown",
+          name: "Unknown (#{family.name})",
           type: "genus",
           parent_id: family_id,
           is_placeholder: true,
@@ -1347,7 +1603,7 @@ defmodule Gallformers.Taxonomy do
       if hide_empty_unknown do
         from([t, p] in query_with_type,
           where:
-            not (t.name == "Unknown" and t.type == "genus" and
+            not (t.is_placeholder == true and t.type == "genus" and
                    fragment(
                      "NOT EXISTS (SELECT 1 FROM species_taxonomy st WHERE st.taxonomy_id = ?)",
                      t.id

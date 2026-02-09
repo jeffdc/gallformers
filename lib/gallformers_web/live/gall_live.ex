@@ -93,9 +93,14 @@ defmodule GallformersWeb.GallLive do
         {base_name, generation_term, glossary_word, generation_definition} =
           parse_generation_term(gall.name)
 
-        # Separate common names from scientific synonyms
+        # Separate common names from scientific synonyms (former_undescribed are internal, not shown in synonymy)
         common_names = Enum.filter(aliases, &(&1.type == "common"))
-        scientific_aliases = Enum.reject(aliases, &(&1.type == "common"))
+
+        scientific_aliases =
+          Enum.filter(aliases, &(&1.type not in ["common", "former_undescribed"]))
+
+        {gallformers_code, former_undescribed_alias} =
+          compute_gallformers_code(aliases, gall, taxonomy)
 
         # Check if Gallformers notes exist for this species
         gallformers_notes = Enum.find(sources, fn s -> s.id == @gallformers_notes_source_id end)
@@ -139,6 +144,8 @@ defmodule GallformersWeb.GallLive do
            related_galls: related_galls,
            common_names: common_names,
            scientific_aliases: scientific_aliases,
+           gallformers_code: gallformers_code,
+           former_undescribed_name: former_undescribed_alias && former_undescribed_alias.name,
            has_gallformers_notes: has_gallformers_notes,
            notes_alert_dismissed: false,
            aliases_page: 1,
@@ -189,6 +196,30 @@ defmodule GallformersWeb.GallLive do
 
   defp get_detachable_display(value), do: Map.get(@detachable_values, value, "")
   defp format_fields(fields), do: Enum.map_join(fields, ", ", & &1.field)
+
+  # Compute gallformers code for iNat link:
+  # 1. Check for former_undescribed alias (gall was reclassified from Unknown→Known)
+  # 2. Else if currently undescribed, derive from species name
+  # 3. Otherwise nil (described galls don't have a gallformers code)
+  defp compute_gallformers_code(aliases, gall, taxonomy) do
+    former_undescribed_alias = Enum.find(aliases, &(&1.type == "former_undescribed"))
+
+    code =
+      cond do
+        former_undescribed_alias ->
+          former_undescribed_alias.name
+          |> String.replace(~r/^Unknown(?:\s*\([^)]+\))?\s+/, "")
+          |> String.replace(~r/ \([^)]+\)$/, "")
+
+        gall.undescribed ->
+          get_gallformers_code(gall.name, taxonomy && taxonomy[:genus])
+
+        true ->
+          nil
+      end
+
+    {code, former_undescribed_alias}
+  end
 
   # Extract the gallformers code from the species name by removing the genus and any trailing parenthetical.
   # For "Unknown" genera (e.g., "Unknown (Cynipidae)"), the species name uses a different format
@@ -377,11 +408,11 @@ defmodule GallformersWeb.GallLive do
                   <button
                     id="copy-gallformers-code"
                     phx-hook="CopyToClipboard"
-                    data-copy-text={get_gallformers_code(@gall.name, @taxonomy && @taxonomy.genus)}
+                    data-copy-text={@gallformers_code}
                     class="ml-1 cursor-pointer hover:opacity-70"
                   >
                     <code class="px-2 py-0.5 bg-white border border-amber-200 rounded font-mono text-amber-800">
-                      {get_gallformers_code(@gall.name, @taxonomy && @taxonomy.genus)}
+                      {@gallformers_code}
                     </code>
                     <span class="ml-2 text-xs hover:underline">
                       Click to Copy
@@ -390,7 +421,7 @@ defmodule GallformersWeb.GallLive do
                 </p>
                 <p class="text-sm text-gray-600">
                   <a
-                    href={"https://www.inaturalist.org/observations?verifiable=any&place_id=any&field:Gallformers%20Code=#{URI.encode(get_gallformers_code(@gall.name, @taxonomy && @taxonomy.genus))}"}
+                    href={"https://www.inaturalist.org/observations?verifiable=any&place_id=any&field:Gallformers%20Code=#{URI.encode(@gallformers_code)}"}
                     target="_blank"
                     rel="noreferrer"
                     class="text-gf-maroon hover:underline"
@@ -401,6 +432,22 @@ defmodule GallformersWeb.GallLive do
                     Learn more about how it works and how you can help.
                   </.link>
                 </p>
+              </div>
+
+              <div
+                :if={!@gall.undescribed && @former_undescribed_name}
+                class="text-sm text-gray-600"
+              >
+                Formerly tracked as <em>{@former_undescribed_name}</em>
+                —
+                <a
+                  href={"https://www.inaturalist.org/observations?verifiable=any&place_id=any&field:Gallformers%20Code=#{URI.encode(@gallformers_code)}"}
+                  target="_blank"
+                  rel="noreferrer"
+                  class="text-gf-maroon hover:underline"
+                >
+                  view iNat observations linked under that former name
+                </a>
               </div>
 
               <div class="flex flex-col md:flex-row md:items-start gap-4">

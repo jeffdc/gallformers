@@ -325,84 +325,62 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
     end
   end
 
-  describe "Rename modal" do
+  describe "Rename/Reclassify modal" do
     setup %{conn: conn} do
       {:ok, conn: setup_admin_session(conn)}
     end
 
-    test "open_rename_modal shows the modal", %{conn: conn} do
+    test "open_reclassify_modal shows the modal", %{conn: conn} do
       host = require_host()
       {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
 
-      html = render_click(view, "open_rename_modal", %{})
+      html = render_click(view, "open_reclassify_modal", %{})
 
-      assert html =~ "Edit Host Name"
-      assert html =~ "Add Alias for old name"
+      assert html =~ "Rename and/or Reclassify Host"
+      assert html =~ "Specific epithet"
+      assert html =~ "Add scientific synonym alias"
     end
 
-    test "close_rename_modal hides the modal", %{conn: conn} do
+    test "close_reclassify_modal hides the modal", %{conn: conn} do
       host = require_host()
       {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
 
-      render_click(view, "open_rename_modal", %{})
-      html = render_click(view, "close_rename_modal", %{})
+      render_click(view, "open_reclassify_modal", %{})
+      html = render_click(view, "close_reclassify_modal", %{})
 
-      refute html =~ "Edit Host Name"
-    end
-
-    test "update_rename_value updates the input", %{conn: conn} do
-      host = require_host()
-      {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
-
-      render_click(view, "open_rename_modal", %{})
-      html = render_click(view, "update_rename_value", %{"value" => "Quercus newname"})
-
-      assert html =~ "Quercus newname"
+      refute html =~ "Rename and/or Reclassify Host"
     end
 
     test "toggle_add_alias_on_rename toggles checkbox", %{conn: conn} do
       host = require_host()
       {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
 
-      render_click(view, "open_rename_modal", %{})
+      render_click(view, "open_reclassify_modal", %{})
       html = render_click(view, "toggle_add_alias_on_rename", %{})
 
       # Just verify it doesn't crash
-      assert html =~ "Add Alias"
+      assert html =~ "alias"
     end
 
-    test "do_rename with empty name shows error", %{conn: conn} do
+    test "do_reclassify without genus selected shows error", %{conn: conn} do
       host = require_host()
       {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
 
-      render_click(view, "open_rename_modal", %{})
-      render_click(view, "update_rename_value", %{"value" => ""})
-      html = render_click(view, "do_rename", %{})
+      render_click(view, "open_reclassify_modal", %{})
+      render_click(view, "reclassify_clear_genus", %{})
+      html = render_click(view, "do_reclassify", %{})
 
-      assert html =~ "cannot be empty"
+      assert html =~ "select a genus"
     end
 
-    test "do_rename with invalid name format shows error", %{conn: conn} do
+    test "update_reclassify_epithet updates the input", %{conn: conn} do
       host = require_host()
       {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
 
-      render_click(view, "open_rename_modal", %{})
-      render_click(view, "update_rename_value", %{"value" => "invalidname"})
-      html = render_click(view, "do_rename", %{})
+      render_click(view, "open_reclassify_modal", %{})
+      html = render_click(view, "update_reclassify_epithet", %{"value" => "newepithet"})
 
-      assert html =~ "valid species name"
-    end
-
-    test "do_rename with same name closes modal", %{conn: conn} do
-      host = require_host()
-      {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
-
-      render_click(view, "open_rename_modal", %{})
-      # Keep the same name
-      html = render_click(view, "do_rename", %{})
-
-      # Modal should close
-      refute html =~ "Edit Host Name"
+      assert html =~ "newepithet"
     end
   end
 
