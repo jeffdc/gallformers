@@ -708,4 +708,60 @@ defmodule GallformersWeb.UIComponents do
   def format_date(datetime, :short) do
     Calendar.strftime(datetime, "%b %d, %Y")
   end
+
+  @doc """
+  Renders a glossary term with hover tooltip showing its definition.
+
+  Displays the term inline with a dotted underline and help cursor.
+  On hover, shows the first sentence of the definition with a link
+  to the full glossary entry.
+
+  ## Examples
+
+      <.glossary_tooltip term="agamic" definition="The agamic generation consists of only female wasps..." />
+  """
+  attr :term, :string, required: true, doc: "the glossary term to display (e.g., \"agamic\")"
+
+  attr :glossary_word, :string,
+    default: nil,
+    doc: "the glossary word to link to, if different from term (e.g., \"sexgen\" for \"sexual\")"
+
+  attr :definition, :string, default: nil, doc: "the full glossary definition"
+  attr :class, :any, default: nil, doc: "additional CSS classes"
+
+  def glossary_tooltip(assigns) do
+    assigns =
+      assigns
+      |> assign(:short_definition, first_sentence(assigns.definition))
+      |> assign_new(:link_word, fn -> assigns.glossary_word || assigns.term end)
+
+    ~H"""
+    <span class={["relative inline-flex group", @class]}>
+      <span class="cursor-help border-b border-dotted border-gray-400">({@term})</span>
+      <span
+        class="absolute z-50 hidden group-hover:block top-full left-1/2 -translate-x-1/2 mt-2 w-80 px-3 py-2 text-sm font-normal not-italic text-white bg-gray-900 rounded-md shadow-lg"
+        role="tooltip"
+      >
+        <span class="absolute bottom-full left-1/2 -translate-x-1/2 w-0 h-0 border-4 border-t-transparent border-x-transparent border-b-gray-900" />
+        <span class="font-semibold">{@link_word}:</span>
+        <span :if={@short_definition != ""}>{@short_definition}</span>
+        <a
+          href={"/glossary##{String.downcase(@link_word)}"}
+          class="block mt-1 text-blue-300 hover:text-blue-200 text-xs"
+        >
+          View in glossary &rarr;
+        </a>
+      </span>
+    </span>
+    """
+  end
+
+  defp first_sentence(text) when is_binary(text) do
+    case String.split(text, ~r/(?<=\.)\s/, parts: 2) do
+      [sentence | _] -> String.trim(sentence)
+      _ -> text
+    end
+  end
+
+  defp first_sentence(_), do: ""
 end

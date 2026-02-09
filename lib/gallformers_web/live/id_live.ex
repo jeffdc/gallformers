@@ -106,8 +106,42 @@ defmodule GallformersWeb.IDLive do
     {:noreply, socket}
   end
 
-  # Convert V1 URL param names to V2 short codes
+  # Convert V1 URL param names to V2 short codes.
+  # V1 used a single hostOrTaxon + type pair; V2 has separate host (h) and genus (g) params.
+  # V1 used "true"/"false" for undescribed; V2 uses "1".
   defp normalize_v1_params(params) do
+    params
+    |> normalize_v1_host_or_taxon()
+    |> normalize_v1_undescribed()
+    |> rename_v1_keys()
+  end
+
+  defp normalize_v1_host_or_taxon(params) do
+    case {Map.get(params, "hostOrTaxon"), Map.get(params, "type")} do
+      {nil, _} ->
+        Map.delete(params, "type")
+
+      {name, type} when type in ["genus", "section"] ->
+        params
+        |> Map.delete("hostOrTaxon")
+        |> Map.delete("type")
+        |> Map.put("g", name)
+        |> Map.put("gt", type)
+
+      {_name, _} ->
+        # "host" or nil — rename_v1_keys will convert hostOrTaxon → h
+        Map.delete(params, "type")
+    end
+  end
+
+  defp normalize_v1_undescribed(params) do
+    case Map.get(params, "undescribed") do
+      "true" -> Map.put(params, "undescribed", "1")
+      _ -> params
+    end
+  end
+
+  defp rename_v1_keys(params) do
     Enum.reduce(@v1_param_mapping, params, fn {v1_key, v2_key}, acc ->
       case Map.get(acc, v1_key) do
         nil -> acc
@@ -184,12 +218,30 @@ defmodule GallformersWeb.IDLive do
     selected_genus = load_genus_from_params(params)
     families = load_families_for_selection(selected_host, selected_genus)
 
+    # V1 URLs used place names ("Quebec"); V2 uses codes ("QC"). Resolve name → code.
+    filters = resolve_place_name(filters, socket.assigns.places)
+
     socket
     |> assign(filters: filters)
     |> assign(selected_host: selected_host)
     |> assign(selected_genus: selected_genus)
     |> assign(families: families)
     |> maybe_load_results()
+  end
+
+  defp resolve_place_name(%{place: nil} = filters, _places), do: filters
+
+  defp resolve_place_name(%{place: place_value} = filters, places) do
+    if Enum.any?(places, &(&1.code == place_value)) do
+      # Already a valid code
+      filters
+    else
+      # Try matching by name (case-insensitive for V1 compatibility)
+      case Enum.find(places, &(String.downcase(&1.name) == String.downcase(place_value))) do
+        nil -> filters
+        place -> %{filters | place: place.code}
+      end
+    end
   end
 
   defp load_host_from_params(params) do
@@ -228,10 +280,7 @@ defmodule GallformersWeb.IDLive do
   end
 
   defp load_families_for_selection(nil, genus) do
-    case Taxonomy.get_family_for_genus(genus.id) do
-      nil -> []
-      family -> [family]
-    end
+    Taxonomy.list_gall_families_for_host_genus(genus.id)
   end
 
   defp load_families_for_selection(host, _genus) do

@@ -126,7 +126,7 @@ defmodule GallformersWeb.ArticleLive do
       }
     }
 
-    Phoenix.HTML.raw(~s(<script type="application/ld+json">#{Jason.encode!(json_ld)}</script>))
+    Jason.encode!(json_ld)
   end
 
   # Returns the date to display (published_at if available, otherwise inserted_at)

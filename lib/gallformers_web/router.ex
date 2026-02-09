@@ -161,6 +161,10 @@ defmodule GallformersWeb.Router do
       # ID Tool
       live "/id", IDLive
 
+      # Identification Keys
+      live "/keys", KeysLive
+      live "/keys/:slug", KeyLive
+
       # Entity pages
       live "/gall/:id", GallLive
       live "/host/:id", HostLive

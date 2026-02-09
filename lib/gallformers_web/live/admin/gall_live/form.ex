@@ -18,7 +18,8 @@ defmodule GallformersWeb.Admin.GallLive.Form do
   alias Gallformers.Species.Species, as: SpeciesSchema
   alias GallformersWeb.Admin.DeferredChanges
 
-  import GallformersWeb.Admin.FormComponents, only: [alias_editor: 1, form_actions: 1]
+  import GallformersWeb.Admin.FormComponents,
+    only: [alias_collision_warning: 1, alias_editor: 1, form_actions: 1]
 
   @detachable_options [
     {"Unknown", "unknown"},
@@ -125,6 +126,9 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(:show_rename_modal, false)
     |> assign(:rename_value, "")
     |> assign(:add_alias_on_rename, false)
+    |> assign(:rename_alias_collisions, [])
+    # Alias collision warnings
+    |> assign(:alias_collisions, [])
     # Genus disambiguation modal state
     |> assign(:show_genus_disambiguation, false)
     |> assign(:possible_families, [])
@@ -142,6 +146,9 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     # Handle genus disambiguation: filter to non-plant families only
     {taxonomy, genus_is_new, selected_family_id, possible_families} =
       resolve_taxonomy_for_gall(raw_taxonomy, socket.assigns.families)
+
+    # Check for alias collisions
+    alias_collisions = Species.find_species_with_alias(name)
 
     socket
     |> assign(:mode, :new)
@@ -174,6 +181,9 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(:show_rename_modal, false)
     |> assign(:rename_value, "")
     |> assign(:add_alias_on_rename, false)
+    |> assign(:rename_alias_collisions, [])
+    # Alias collision warnings
+    |> assign(:alias_collisions, alias_collisions)
     # Genus disambiguation modal state
     |> assign(:show_genus_disambiguation, false)
     # Clear search
@@ -779,12 +789,16 @@ defmodule GallformersWeb.Admin.GallLive.Form do
      socket
      |> assign(:show_rename_modal, true)
      |> assign(:rename_value, socket.assigns.gall.name)
-     |> assign(:add_alias_on_rename, false)}
+     |> assign(:add_alias_on_rename, false)
+     |> assign(:rename_alias_collisions, [])}
   end
 
   @impl true
   def handle_event("close_rename_modal", _params, socket) do
-    {:noreply, assign(socket, :show_rename_modal, false)}
+    {:noreply,
+     socket
+     |> assign(:show_rename_modal, false)
+     |> assign(:rename_alias_collisions, [])}
   end
 
   @impl true
@@ -798,7 +812,15 @@ defmodule GallformersWeb.Admin.GallLive.Form do
 
   @impl true
   def handle_event("update_rename_value", %{"value" => value}, socket) do
-    {:noreply, assign(socket, :rename_value, value)}
+    collisions =
+      if String.length(String.trim(value)) >= 2,
+        do: Species.find_species_with_alias(value),
+        else: []
+
+    {:noreply,
+     socket
+     |> assign(:rename_value, value)
+     |> assign(:rename_alias_collisions, collisions)}
   end
 
   @impl true
@@ -1231,6 +1253,8 @@ defmodule GallformersWeb.Admin.GallLive.Form do
             <% end %>
           </div>
 
+          <.alias_collision_warning collisions={@alias_collisions} />
+
           <%!-- Rest of form - disabled until gall selected/created --%>
           <fieldset disabled={@mode == :search} class={[@mode == :search && "opacity-50"]}>
             <.form
@@ -1546,6 +1570,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
           value={@rename_value}
           add_alias_checked={@add_alias_on_rename}
           entity_type="Gall"
+          rename_collisions={@rename_alias_collisions}
         />
 
         <%!-- Genus disambiguation modal --%>

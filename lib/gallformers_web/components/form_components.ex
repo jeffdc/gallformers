@@ -9,6 +9,7 @@ defmodule GallformersWeb.FormComponents do
   use Gettext, backend: GallformersWeb.Gettext
 
   import GallformersWeb.CoreComponents, only: [icon: 1, modal: 1]
+  import GallformersWeb.UIComponents, only: [alert: 1]
 
   alias Phoenix.LiveView.JS
 
@@ -473,7 +474,7 @@ defmodule GallformersWeb.FormComponents do
             class={["gf-multi-select-dropdown", @is_md && "gf-multi-select-dropdown-md"]}
           >
             <button
-              :for={opt <- Enum.take(@available, 10)}
+              :for={opt <- @available}
               type="button"
               data-typeahead-option
               phx-click={@on_add}
@@ -568,7 +569,7 @@ defmodule GallformersWeb.FormComponents do
 
   When `allow_new` is true, a "Create '{query}'" option appears when:
   - The query has at least 2 characters
-  - There are no matching results
+  - No result name exactly matches the query (case-insensitive)
 
   This is useful for admin forms where users need to either select existing
   items or create new ones with the same input.
@@ -633,11 +634,20 @@ defmodule GallformersWeb.FormComponents do
 
   def typeahead(assigns) do
     # Determine if we should show the "create new" option
+    # Show when no result name exactly matches the query (e.g., alias matches show
+    # the owning species but the typed name is still new and creatable)
+    query_lower = String.downcase(assigns.query)
+
+    exact_match? =
+      Enum.any?(assigns.results, fn item ->
+        String.downcase(assigns.display_fn.(item)) == query_lower
+      end)
+
     show_create_option =
       assigns.allow_new &&
         assigns.create_event &&
         String.length(assigns.query) >= 2 &&
-        assigns.results == []
+        not exact_match?
 
     assigns = assign(assigns, :show_create_option, show_create_option)
 
@@ -918,6 +928,10 @@ defmodule GallformersWeb.FormComponents do
     required: true,
     doc: "entity type for display (e.g., 'Gall' or 'Host')"
 
+  attr :rename_collisions, :list,
+    default: [],
+    doc: "alias collisions for the rename value (from Species.find_species_with_alias/1)"
+
   def rename_modal(assigns) do
     ~H"""
     <.modal
@@ -930,12 +944,29 @@ defmodule GallformersWeb.FormComponents do
       <:header>Edit {@entity_type} Name</:header>
       <:body>
         <input
+          id="rename-modal-input"
           type="text"
           value={@value}
           phx-keyup="update_rename_value"
+          phx-hook="InputEvent"
+          data-event="update_rename_value"
+          phx-debounce="300"
           class="w-full px-4 py-3 border border-gray-300 rounded text-lg focus:ring-gf-maroon focus:border-gf-maroon"
           autofocus
         />
+
+        <.alert :if={@rename_collisions != []} variant="warning" class="mt-3">
+          <:title>Alias collision</:title>
+          <div :for={c <- @rename_collisions}>
+            This name is a {rename_collision_type_label(c.alias_type)} of
+            <.link
+              navigate={rename_collision_species_path(c.taxoncode, c.species_id)}
+              class="underline font-medium"
+            >
+              {c.species_name}
+            </.link>
+          </div>
+        </.alert>
 
         <div class="mt-5">
           <label class="flex items-center gap-3 cursor-pointer">
@@ -1123,4 +1154,11 @@ defmodule GallformersWeb.FormComponents do
     </.modal>
     """
   end
+
+  defp rename_collision_type_label("common"), do: "common name"
+  defp rename_collision_type_label("scientific"), do: "scientific synonym"
+  defp rename_collision_type_label(other), do: other
+
+  defp rename_collision_species_path("gall", id), do: "/gall/#{id}"
+  defp rename_collision_species_path(_taxoncode, id), do: "/host/#{id}"
 end

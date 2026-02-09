@@ -267,6 +267,116 @@ defmodule GallformersWeb.IDLiveTest do
     end
   end
 
+  describe "V1 backwards compatibility" do
+    setup %{conn: conn} do
+      # Create a genus taxonomy entry for V1 genus URL tests
+      genus =
+        Gallformers.Repo.insert!(%Gallformers.Taxonomy.Taxonomy{
+          name: "Quercus",
+          type: "genus",
+          description: "Oaks"
+        })
+
+      section =
+        Gallformers.Repo.insert!(%Gallformers.Taxonomy.Taxonomy{
+          name: "Quercus",
+          type: "section",
+          parent_id: genus.id,
+          description: "Section Quercus"
+        })
+
+      {:ok, conn: conn, genus: genus, section: section}
+    end
+
+    test "V1 host URL loads host correctly", %{conn: conn} do
+      hosts = Plants.list_hosts()
+
+      if length(hosts) > 0 do
+        host = hd(hosts)
+
+        {:ok, _view, html} =
+          live(conn, "/id?hostOrTaxon=#{URI.encode(host.name)}&type=host")
+
+        assert html =~ host.name
+      end
+    end
+
+    test "V1 genus URL loads genus correctly", %{conn: conn, genus: genus} do
+      {:ok, _view, html} =
+        live(conn, "/id?hostOrTaxon=#{URI.encode(genus.name)}&type=genus")
+
+      # Genus should be displayed as selected
+      assert html =~ genus.name
+    end
+
+    test "V1 section URL loads section correctly", %{conn: conn, section: section} do
+      {:ok, _view, html} =
+        live(conn, "/id?hostOrTaxon=#{URI.encode(section.name)}&type=section")
+
+      assert html =~ section.name
+    end
+
+    test "V1 URL with empty filter params loads without error", %{conn: conn} do
+      hosts = Plants.list_hosts()
+
+      if length(hosts) > 0 do
+        host = hd(hosts)
+
+        # Mimics V1 URL with all empty filter params
+        url =
+          "/id?hostOrTaxon=#{URI.encode(host.name)}&type=host" <>
+            "&detachable=&alignment=&cells=&color=&locations=" <>
+            "&season=&shape=&textures=&walls=&form=&undescribed=false&place="
+
+        {:ok, _view, html} = live(conn, url)
+        assert html =~ host.name
+      end
+    end
+
+    test "V1 undescribed=true maps to V2 format", %{conn: conn} do
+      hosts = Plants.list_hosts()
+
+      if length(hosts) > 0 do
+        host = hd(hosts)
+
+        {:ok, view, _html} =
+          live(conn, "/id?hostOrTaxon=#{URI.encode(host.name)}&type=host&undescribed=true")
+
+        # The undescribed filter should be active (mapped from "true" to "1")
+        html = render(view)
+        assert html =~ "un=1" or html =~ "undescribed"
+      end
+    end
+
+    test "V1 URL without type defaults to host lookup", %{conn: conn} do
+      hosts = Plants.list_hosts()
+
+      if length(hosts) > 0 do
+        host = hd(hosts)
+
+        {:ok, _view, html} =
+          live(conn, "/id?hostOrTaxon=#{URI.encode(host.name)}")
+
+        assert html =~ host.name
+      end
+    end
+
+    test "V1 place name is resolved to place code in dropdown", %{conn: conn} do
+      hosts = Plants.list_hosts()
+
+      if length(hosts) > 0 do
+        host = hd(hosts)
+
+        # V1 used place names ("California"); V2 uses codes ("CA")
+        {:ok, _view, html} =
+          live(conn, "/id?hostOrTaxon=#{URI.encode(host.name)}&type=host&place=California")
+
+        # The dropdown should have California selected (code "CA" resolved from name)
+        assert html =~ ~r/<option[^>]*selected[^>]*value="CA"/
+      end
+    end
+  end
+
   describe "Page title" do
     test "sets appropriate page title", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/id")

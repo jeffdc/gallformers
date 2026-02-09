@@ -82,7 +82,7 @@ defmodule GallformersWeb.Admin.SpeciesSourceLive.AddFromSource do
           source_id: socket.assigns.selected_source.id,
           description: existing_mapping.description || "",
           externallink: existing_mapping.externallink || "",
-          useasdefault: existing_mapping.useasdefault || 0
+          useasdefault: existing_mapping.useasdefault || false
         }
       else
         %SpeciesSource{
@@ -90,7 +90,7 @@ defmodule GallformersWeb.Admin.SpeciesSourceLive.AddFromSource do
           source_id: socket.assigns.selected_source.id,
           description: "",
           externallink: "",
-          useasdefault: 0
+          useasdefault: false
         }
       end
 
@@ -304,12 +304,6 @@ defmodule GallformersWeb.Admin.SpeciesSourceLive.AddFromSource do
     params
     |> Map.put("species_id", socket.assigns.selected_species.id)
     |> Map.put("source_id", socket.assigns.selected_source.id)
-    |> Map.update("useasdefault", 0, fn
-      "true" -> 1
-      true -> 1
-      "1" -> 1
-      _ -> 0
-    end)
   end
 
   defp get_species_name(species_id) do

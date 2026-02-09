@@ -16,14 +16,14 @@ defmodule Gallformers.Species.SpeciesSource do
           species_id: integer() | nil,
           source_id: integer() | nil,
           description: String.t() | nil,
-          useasdefault: integer(),
+          useasdefault: boolean(),
           externallink: String.t() | nil,
           alias_id: integer() | nil
         }
 
   schema "species_source" do
     field :description, :string, default: ""
-    field :useasdefault, :integer, default: 0
+    field :useasdefault, :boolean, default: false
     field :externallink, :string, default: ""
 
     belongs_to :species, Gallformers.Species.Species

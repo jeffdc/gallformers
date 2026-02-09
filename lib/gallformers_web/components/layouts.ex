@@ -66,6 +66,7 @@ defmodule GallformersWeb.Layouts do
       %{href: "/filterguide", label: "Filter Terms"},
       %{href: "/glossary", label: "Glossary"},
       %{href: "/articles", label: "Articles"},
+      %{href: "/keys", label: "Keys"},
       %{href: "/analytics", label: "Analytics"}
     ]
 

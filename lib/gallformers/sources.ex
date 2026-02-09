@@ -125,11 +125,10 @@ defmodule Gallformers.Sources do
   end
 
   # Sort sources: default first, Gallformers Notes second, then alphabetically
-  # Note: useasdefault comes as integer 0/1 from SQLite, not boolean
   defp sort_sources_with_priority(sources) do
     Enum.sort_by(sources, fn source ->
       cond do
-        source.useasdefault == 1 or source.useasdefault == true -> {0, source.title}
+        source.useasdefault -> {0, source.title}
         source.id == @gallformers_notes_source_id -> {1, source.title}
         true -> {2, source.title}
       end
@@ -336,10 +335,9 @@ defmodule Gallformers.Sources do
     end
   end
 
-  # Checks if attrs are setting useasdefault to 1/true
   defp setting_as_default?(attrs) do
     useasdefault = attrs["useasdefault"] || attrs[:useasdefault]
-    useasdefault in [1, "1", true, "true"]
+    useasdefault in [true, "true"]
   end
 
   # Gets species_id from attrs (handles both string and atom keys)
@@ -357,7 +355,7 @@ defmodule Gallformers.Sources do
   defp clear_other_defaults(species_id, exclude_id) when not is_nil(species_id) do
     query =
       from(ss in SpeciesSource,
-        where: ss.species_id == ^species_id and ss.useasdefault == 1
+        where: ss.species_id == ^species_id and ss.useasdefault == true
       )
 
     query =
@@ -367,7 +365,7 @@ defmodule Gallformers.Sources do
         query
       end
 
-    Repo.update_all(query, set: [useasdefault: 0])
+    Repo.update_all(query, set: [useasdefault: false])
   end
 
   defp clear_other_defaults(_, _), do: :ok

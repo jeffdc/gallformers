@@ -15,7 +15,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   alias Gallformers.Taxonomy
   alias GallformersWeb.Admin.DeferredChanges
 
-  import GallformersWeb.Admin.FormComponents, only: [alias_editor: 1, form_actions: 1]
+  import GallformersWeb.Admin.FormComponents,
+    only: [alias_collision_warning: 1, alias_editor: 1, form_actions: 1]
 
   @impl true
   def mount(_params, session, socket) do
@@ -67,6 +68,9 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> assign(:show_rename_modal, false)
     |> assign(:rename_value, "")
     |> assign(:add_alias_on_rename, false)
+    |> assign(:rename_alias_collisions, [])
+    # Alias collision warnings
+    |> assign(:alias_collisions, [])
     # Genus confirmation modal state
     |> assign(:show_genus_confirm, false)
     |> assign(:pending_genus_info, nil)
@@ -131,6 +135,9 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> assign(:show_rename_modal, false)
     |> assign(:rename_value, host.name)
     |> assign(:add_alias_on_rename, false)
+    |> assign(:rename_alias_collisions, [])
+    # Alias collision warnings
+    |> assign(:alias_collisions, [])
     # Genus confirmation modal state
     |> assign(:show_genus_confirm, false)
     |> assign(:pending_genus_info, nil)
@@ -387,12 +394,16 @@ defmodule GallformersWeb.Admin.HostLive.Form do
      socket
      |> assign(:show_rename_modal, true)
      |> assign(:rename_value, socket.assigns.host.name)
-     |> assign(:add_alias_on_rename, false)}
+     |> assign(:add_alias_on_rename, false)
+     |> assign(:rename_alias_collisions, [])}
   end
 
   @impl true
   def handle_event("close_rename_modal", _params, socket) do
-    {:noreply, assign(socket, :show_rename_modal, false)}
+    {:noreply,
+     socket
+     |> assign(:show_rename_modal, false)
+     |> assign(:rename_alias_collisions, [])}
   end
 
   @impl true
@@ -406,7 +417,15 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
   @impl true
   def handle_event("update_rename_value", %{"value" => value}, socket) do
-    {:noreply, assign(socket, :rename_value, value)}
+    collisions =
+      if String.length(String.trim(value)) >= 2,
+        do: Species.find_species_with_alias(value),
+        else: []
+
+    {:noreply,
+     socket
+     |> assign(:rename_value, value)
+     |> assign(:rename_alias_collisions, collisions)}
   end
 
   @impl true
@@ -568,6 +587,9 @@ defmodule GallformersWeb.Admin.HostLive.Form do
         []
       end
 
+    # Check for alias collisions
+    alias_collisions = Species.find_species_with_alias(name)
+
     socket
     |> assign(:mode, :new)
     |> assign(:page_title, "New Host")
@@ -589,6 +611,9 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> assign(:show_rename_modal, false)
     |> assign(:rename_value, "")
     |> assign(:add_alias_on_rename, false)
+    |> assign(:rename_alias_collisions, [])
+    # Alias collision warnings
+    |> assign(:alias_collisions, alias_collisions)
     # Genus disambiguation modal state
     |> assign(:show_genus_disambiguation, false)
     # Clear search state
@@ -895,6 +920,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
           <% end %>
         </div>
 
+        <.alias_collision_warning collisions={@alias_collisions} />
+
         <%!-- Rest of form - disabled until host selected/created --%>
         <fieldset disabled={@mode == :search} class={[@mode == :search && "opacity-50"]}>
           <.form :if={@form} for={@form} id="host-form" phx-change="validate" phx-submit="save">
@@ -1092,6 +1119,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
         value={@rename_value}
         add_alias_checked={@add_alias_on_rename}
         entity_type="Host"
+        rename_collisions={@rename_alias_collisions}
       />
 
       <%!-- Genus disambiguation modal --%>

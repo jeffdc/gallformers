@@ -738,9 +738,10 @@ defmodule Gallformers.Taxonomy do
   defp parse_datetime(datetime), do: datetime
 
   @doc """
-  Searches for genera and sections by name prefix (case-insensitive).
+  Searches for genera and sections by name or common name (case-insensitive).
 
-  Used for typeahead/autocomplete functionality in the ID tool.
+  Matches scientific names by prefix and common names (description field)
+  by substring. Used for typeahead/autocomplete functionality in the ID tool.
   Returns up to `limit` results ordered by name.
 
   By default, filters out empty Unknown genera (placeholder genera with
@@ -748,14 +749,17 @@ defmodule Gallformers.Taxonomy do
   """
   @spec search_genera_and_sections(String.t(), integer(), keyword()) :: [map()]
   def search_genera_and_sections(query, limit \\ 20, opts \\ []) when is_binary(query) do
-    search_pattern = "#{String.downcase(query)}%"
+    name_pattern = "#{String.downcase(query)}%"
+    description_pattern = "%#{String.downcase(query)}%"
     include_empty_unknown = Keyword.get(opts, :include_empty_unknown, false)
     taxoncode = Keyword.get(opts, :taxoncode)
 
     base_query =
       from(t in Taxonomy,
         where: t.type in ["genus", "section"],
-        where: fragment("lower(?) LIKE ?", t.name, ^search_pattern),
+        where:
+          fragment("lower(?) LIKE ?", t.name, ^name_pattern) or
+            fragment("lower(?) LIKE ?", t.description, ^description_pattern),
         order_by: [t.type, t.name],
         limit: ^limit,
         select: %{
@@ -837,20 +841,31 @@ defmodule Gallformers.Taxonomy do
   end
 
   @doc """
-  Gets the family for a given genus.
+  Lists families for galls that occur on hosts in a given host genus/section.
   """
-  @spec get_family_for_genus(integer()) :: map() | nil
-  def get_family_for_genus(genus_id) do
+  @spec list_gall_families_for_host_genus(integer()) :: [map()]
+  def list_gall_families_for_host_genus(host_genus_id) do
     from(f in Taxonomy,
-      join: g in Taxonomy,
-      on: g.parent_id == f.id,
-      where: g.id == ^genus_id and f.type == "family",
-      select: %{
-        id: f.id,
-        name: f.name
-      }
+      join: galler_genus in Taxonomy,
+      on: galler_genus.parent_id == f.id,
+      join: st in "species_taxonomy",
+      on: st.taxonomy_id == galler_genus.id,
+      join: s in Gallformers.Species.Species,
+      on: st.species_id == s.id,
+      join: h in Gallformers.GallHosts.GallHost,
+      on: h.gall_species_id == s.id,
+      join: host in Gallformers.Species.Species,
+      on: h.host_species_id == host.id,
+      join: host_tax in "species_taxonomy",
+      on: host_tax.species_id == host.id,
+      where:
+        s.taxoncode == "gall" and f.type == "family" and
+          host_tax.taxonomy_id == ^host_genus_id,
+      group_by: [f.id, f.name],
+      order_by: f.name,
+      select: %{id: f.id, name: f.name}
     )
-    |> Repo.one()
+    |> Repo.all()
   end
 
   # Admin functions

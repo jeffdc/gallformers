@@ -7,7 +7,7 @@ defmodule GallformersWeb.GallLive do
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.{GallHosts, Galls, Markdown, Ranges, Sources, Species, Taxonomy}
+  alias Gallformers.{GallHosts, Galls, Glossaries, Markdown, Ranges, Sources, Species, Taxonomy}
   alias Gallformers.Images.Image
   alias GallformersWeb.SEO
 
@@ -23,6 +23,9 @@ defmodule GallformersWeb.GallLive do
 
   # Gallformers Notes source ID (same as V1)
   @gallformers_notes_source_id 58
+
+  # Regex to extract generation qualifier from species names like "Callirhytis furva (agamic)"
+  @generation_re ~r/^(.+?)\s+\((agamic|sexgen|sexual)\)$/
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -45,6 +48,19 @@ defmodule GallformersWeb.GallLive do
          )}
     end
   end
+
+  @impl true
+  def handle_params(%{"source" => source_id_str}, _uri, socket) do
+    with {source_id, ""} <- Integer.parse(source_id_str),
+         source when not is_nil(source) <-
+           Enum.find(socket.assigns[:sources] || [], fn s -> s.id == source_id end) do
+      {:noreply, assign(socket, selected_source: source, sources_expanded: true)}
+    else
+      _ -> {:noreply, socket}
+    end
+  end
+
+  def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
   defp load_gall(socket, gall_id) do
     case Galls.get_gall(gall_id) do
@@ -72,6 +88,10 @@ defmodule GallformersWeb.GallLive do
         excluded_range = Ranges.get_excluded_places_for_gall(gall_id) |> MapSet.new()
         gall_filters = Galls.get_gall_filter_values(gall_id)
         related_galls = Galls.get_related_galls(gall)
+
+        # Parse generation qualifier (agamic/sexgen/sexual) and fetch glossary definition
+        {base_name, generation_term, glossary_word, generation_definition} =
+          parse_generation_term(gall.name)
 
         # Separate common names from scientific synonyms
         common_names = Enum.filter(aliases, &(&1.type == "common"))
@@ -106,6 +126,10 @@ defmodule GallformersWeb.GallLive do
            page_json_ld: json_ld,
            page_noindex: false,
            gall: Map.merge(gall, %{hosts: hosts, aliases: aliases}),
+           base_name: base_name,
+           generation_term: generation_term,
+           glossary_word: glossary_word,
+           generation_definition: generation_definition,
            gall_filters: gall_filters,
            images: images,
            sources: sources,
@@ -139,7 +163,7 @@ defmodule GallformersWeb.GallLive do
 
     json_ld = if image, do: Map.put(json_ld, "image", image), else: json_ld
 
-    Phoenix.HTML.raw(~s(<script type="application/ld+json">#{Jason.encode!(json_ld)}</script>))
+    Jason.encode!(json_ld)
   end
 
   defp get_taxonomy_info(species_id) do
@@ -185,6 +209,21 @@ defmodule GallformersWeb.GallLive do
 
   defp get_gallformers_code(species_name, _), do: species_name
 
+  # Parses generation qualifier from species name and fetches glossary definition.
+  # Returns {base_name, term, glossary_word, definition} or {full_name, nil, nil, nil}.
+  defp parse_generation_term(name) do
+    case Regex.run(@generation_re, name) do
+      [_full, base_name, term] ->
+        # "sexgen" and "sexual" both refer to the glossary entry "sexgen"
+        glossary_word = if term == "sexual", do: "sexgen", else: term
+        defs = Glossaries.get_definitions([glossary_word])
+        {base_name, term, glossary_word, Map.get(defs, glossary_word)}
+
+      _ ->
+        {name, nil, nil, nil}
+    end
+  end
+
   @impl true
   def handle_event("dismiss_notes_alert", _params, socket) do
     {:noreply, assign(socket, notes_alert_dismissed: true)}
@@ -192,7 +231,7 @@ defmodule GallformersWeb.GallLive do
 
   @impl true
   def handle_event("clipboard_copy_success", _params, socket) do
-    {:noreply, put_flash(socket, :info, "Code copied to clipboard")}
+    {:noreply, put_flash(socket, :info, "Copied to clipboard")}
   end
 
   @impl true
@@ -302,7 +341,17 @@ defmodule GallformersWeb.GallLive do
             <div class="lg:col-span-2 space-y-2">
               <div class="flex items-start justify-between gap-4">
                 <div class="flex items-center gap-2">
-                  <h2 class="text-2xl font-bold"><em>{@gall.name}</em></h2>
+                  <h2 class="text-2xl font-bold">
+                    <em>
+                      {@base_name}
+                      <.glossary_tooltip
+                        :if={@generation_term}
+                        term={@generation_term}
+                        glossary_word={@glossary_word}
+                        definition={@generation_definition}
+                      />
+                    </em>
+                  </h2>
                   <.link
                     :if={@current_user}
                     href={~p"/admin/galls/#{@gall.id}"}
@@ -568,14 +617,25 @@ defmodule GallformersWeb.GallLive do
                   {if source.author, do: " - #{source.author}"}
                   {if source.pubyear, do: " (#{source.pubyear})"}
                   <.link
-                    :if={source.externallink}
+                    :if={source.externallink not in [nil, ""]}
                     href={source.externallink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="ml-2 hover:underline"
+                    class="ml-2 text-gray-500 hover:text-gf-maroon"
+                    title="View external source"
                   >
-                    [Link]
+                    <.icon name="ph-arrow-square-out" class="h-4 w-4 inline-block align-text-bottom" />
                   </.link>
+                  <button
+                    id={"copy-source-link-#{source.id}"}
+                    phx-hook="CopyToClipboard"
+                    data-copy-text={"/gall/#{@gall.id}?source=#{source.id}"}
+                    data-copy-url
+                    class="ml-2 text-gray-500 hover:text-gf-maroon cursor-pointer"
+                    title="Copy link to this description"
+                  >
+                    <.icon name="ph-link" class="h-4 w-4 inline-block align-text-bottom" />
+                  </button>
                   <.link
                     :if={@current_user}
                     href={
@@ -701,23 +761,34 @@ defmodule GallformersWeb.GallLive do
           </div>
         </:body>
         <:footer>
-          <div class="flex justify-between items-center w-full">
-            <.link
-              :if={@selected_source.externallink not in [nil, ""]}
-              href={@selected_source.externallink}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-gf-maroon hover:underline"
+          <div class="flex items-center justify-between w-full">
+            <div class="flex items-center gap-4">
+              <.link
+                :if={@selected_source.externallink not in [nil, ""]}
+                href={@selected_source.externallink}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-gf-maroon hover:underline"
+              >
+                View external link →
+              </.link>
+              <.link
+                href={"/source/#{@selected_source.id}"}
+                class="text-gf-maroon hover:underline"
+              >
+                View source page →
+              </.link>
+            </div>
+            <button
+              id="copy-source-link"
+              phx-hook="CopyToClipboard"
+              data-copy-text={"/gall/#{@gall.id}?source=#{@selected_source.id}"}
+              data-copy-url
+              class="flex items-center gap-1 text-sm text-gray-500 hover:text-gf-maroon cursor-pointer"
+              title="Copy link to this description"
             >
-              View external link →
-            </.link>
-            <span :if={@selected_source.externallink in [nil, ""]}></span>
-            <.link
-              href={"/source/#{@selected_source.id}"}
-              class="text-gf-maroon hover:underline"
-            >
-              View source page →
-            </.link>
+              <.icon name="ph-copy" class="h-4 w-4" /> Copy link
+            </button>
           </div>
         </:footer>
       </.modal>

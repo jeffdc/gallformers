@@ -294,11 +294,15 @@ const ImageGallery = {
 }
 
 // CopyToClipboard hook for copying text to clipboard
+// Set data-copy-url to make it prepend window.location.origin (for path-only values)
 const CopyToClipboard = {
   mounted() {
     this.el.addEventListener("click", () => {
-      const text = this.el.dataset.copyText
+      let text = this.el.dataset.copyText
       if (text) {
+        if (this.el.dataset.copyUrl !== undefined) {
+          text = window.location.origin + text
+        }
         navigator.clipboard.writeText(text).then(() => {
           this.pushEvent("clipboard_copy_success", {})
         }).catch(() => {
@@ -350,6 +354,13 @@ const Typeahead = {
     if (this.input && !this.input._typeaheadListener) {
       this.input._typeaheadListener = true
       this.input.addEventListener("keydown", this.inputHandler)
+      // Listen for paste/autofill via the input event (phx-keyup misses these)
+      this.input.addEventListener("input", () => {
+        const searchEvent = this.el.dataset.searchEvent
+        if (searchEvent) {
+          this.pushEvent(searchEvent, {value: this.input.value})
+        }
+      })
     }
 
     // Attach selected container listener if not already attached
@@ -453,11 +464,41 @@ const Typeahead = {
   }
 }
 
+// Generic hook that pushes an event on the DOM "input" event (catches paste, autofill, etc.)
+// Usage: <input phx-hook="InputEvent" data-event="update_rename_value" />
+const InputEvent = {
+  mounted() {
+    this.el.addEventListener("input", () => {
+      const event = this.el.dataset.event
+      if (event) {
+        this.pushEvent(event, {value: this.el.value})
+      }
+    })
+  }
+}
+
+// ScrollToCouplet hook for dichotomous key navigation
+const ScrollToCouplet = {
+  mounted() {
+    this.handleEvent("scroll_to_couplet", ({id}) => {
+      requestAnimationFrame(() => {
+        const el = document.getElementById(id)
+        if (el) {
+          // Account for sticky header (~78px) and path tracker (~40px)
+          const offset = 130
+          const top = el.getBoundingClientRect().top + window.scrollY - offset
+          window.scrollTo({ top, behavior: "smooth" })
+        }
+      })
+    })
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {Tabs, ImageGallery, RangeMap, ImageUpload, SortableImages, AutoDismiss, Typeahead, ArticleImageUpload, CopyToClipboard, DailyChart},
+  hooks: {Tabs, ImageGallery, RangeMap, ImageUpload, SortableImages, AutoDismiss, Typeahead, ArticleImageUpload, CopyToClipboard, DailyChart, InputEvent, ScrollToCouplet},
 })
 
 // Show progress bar on live navigation and form submits

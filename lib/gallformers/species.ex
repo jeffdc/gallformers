@@ -545,6 +545,27 @@ defmodule Gallformers.Species do
   end
 
   @doc """
+  Finds species that have an alias matching the given name (case-insensitive).
+
+  Returns a list of maps with species info and alias type, useful for warning
+  admins when a new species name collides with an existing alias.
+  """
+  @spec find_species_with_alias(String.t()) :: [map()]
+  def find_species_with_alias(name) do
+    from(a in Alias,
+      join: s in assoc(a, :species),
+      where: fragment("lower(?) = lower(?)", a.name, ^name),
+      select: %{
+        species_id: s.id,
+        species_name: s.name,
+        taxoncode: s.taxoncode,
+        alias_type: a.type
+      }
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Renames a species, optionally adding the old name as a scientific synonym alias.
 
   This handles the complex rename logic including potential genus reassignment.

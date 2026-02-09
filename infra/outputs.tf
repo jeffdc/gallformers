@@ -12,3 +12,13 @@ output "v2_acm_validation_records" {
   description = "DNS records needed to validate the ACM certificate"
   value       = aws_acm_certificate.v2.domain_validation_options
 }
+
+output "nameservers_org" {
+  description = "Route53 nameservers for gallformers.org — set these at Namecheap"
+  value       = aws_route53_zone.org.name_servers
+}
+
+output "nameservers_com" {
+  description = "Route53 nameservers for gallformers.com — set these at Namecheap"
+  value       = aws_route53_zone.com.name_servers
+}

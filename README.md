@@ -174,6 +174,18 @@ fly status              # Check status
 
 See [runbooks/](runbooks/) for operational procedures.
 
+### Creating Releases
+
+The full release workflow:
+
+1. **Commit and push to main** — `git push origin main`
+2. **Wait for CI** — The "CI V2" workflow runs format, compile, credo, and tests
+3. **Wait for deploy** — On CI success, "Deploy V2" automatically deploys to Fly.io and runs smoke tests
+4. **Verify deploy** — Check that the site is working: `fly status` or visit [gallformers.org](https://gallformers.org)
+5. **Create the release** — Run `/release` in Claude Code, review the generated notes, and approve
+
+The `/release` skill handles tag naming, commit collection, and release note generation. Tags use CalVer format: `v2026.2.6`, with `.2`, `.3` suffixes for multiple same-day releases. Release notes are published at [github.com/jeffdc/gallformers/releases](https://github.com/jeffdc/gallformers/releases).
+
 ## Backup Strategy
 
 The database is backed up using two complementary approaches:

@@ -232,7 +232,7 @@ defmodule GallformersWeb.SourceLive do
                       <tr :for={species <- paginated_species(@species, @current_page, @page_size)}>
                         <td>
                           <.link
-                            href={"#{if species.taxoncode == "gall", do: "/gall", else: "/host"}/#{species.id}"}
+                            href={"#{if species.taxoncode == "gall", do: "/gall", else: "/host"}/#{species.id}?source=#{@source.id}"}
                             class="hover:underline"
                           >
                             <em>{species.name}</em>

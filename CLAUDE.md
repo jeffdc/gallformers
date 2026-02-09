@@ -794,6 +794,23 @@ This project uses **watchmen** for time tracking. A hook automatically starts th
 
 CRITICAL: Never push to main without explicit approval.
 
+## Releases
+
+Use the `/release` skill to create GitHub Releases with categorized release notes.
+
+**Before running `/release`, verify the full deploy pipeline has completed:**
+1. Changes pushed to main
+2. CI passed ("CI V2" workflow)
+3. Deploy completed ("Deploy V2" workflow)
+4. Production verified (site is working)
+
+**Always confirm with the user that these steps are done before proceeding.** Creating a release before deploy means the release won't match what's running in production.
+
+- **Version format**: `YYYY.M.D` (CalVer, no git hash)
+- **Tag format**: `vYYYY.M.D`, with `.2`, `.3` suffixes for multiple same-day releases
+- **Release notes**: Generated from commits since the last release, categorized into "What's New" (user-facing) and "Technical Changes" (developer-facing)
+- The skill shows a draft for approval before creating anything
+
 ## Multi-Agent Workflow
 
 Multiple agents can work in parallel using separate git worktrees.

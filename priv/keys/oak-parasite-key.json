@@ -1,0 +1,390 @@
+{
+  "slug": "oak-parasite-key",
+  "title": "Key to parasitic wasps associated with oak gall wasps",
+  "subtitle": "Hymenoptera: Cynipini",
+  "authors": [],
+  "citation": null,
+  "citation_url": null,
+  "description": "Detailed taxon treatments including diagnoses and notes on ecology, apparent rarity, and diversity are given below the key for members of Chalcidoidea and Cynipoidea; these superfamilies represent the vast majorities of parasitic wasps reared from oak galls.",
+  "version": "2026-02-05",
+  "couplets": {
+    "1": {
+      "leads": [
+        {
+          "text": "Wings fully developed.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "2"}
+        },
+        {
+          "text": "Wings reduced (brachypterous specimens) or absent (apterous specimens).",
+          "images": [],
+          "destination": {"type": "couplet", "number": "26"}
+        }
+      ]
+    },
+    "2": {
+      "leads": [
+        {
+          "text": "Fore wing with complex venation, with two or more cells defined by veins (Figs 1\u20132).",
+          "images": [],
+          "destination": {"type": "couplet", "number": "3"}
+        },
+        {
+          "text": "Fore wing with simple venation, usually with only a single branched series of veins; usually with one defined cell along basal anterior wing margin (Fig. 3).",
+          "images": [],
+          "destination": {"type": "couplet", "number": "9"}
+        }
+      ]
+    },
+    "3": {
+      "leads": [
+        {
+          "text": "Fore wing with conspicuous stigma (Fig. 1, stg). Basal fore wing with vein along anterior margin (Fig. 1, C+R). Metasoma generally elongate and cylindrical (Fig. 4).",
+          "images": [],
+          "destination": {"type": "couplet", "number": "4", "label": "Ichneumonoidea"}
+        },
+        {
+          "text": "Fore wing without stigma (Fig. 2). Basal fore wing without vein along anterior margin (Fig. 2, arrow). Metasoma ovate (Fig. 5); often somewhat laterally compressed.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "5", "label": "Cynipoidea"}
+        }
+      ]
+    },
+    "4": {
+      "leads": [
+        {
+          "text": "Fore wing vein 2m-cu present (Fig. 6, arrows). Second and third metasomal tergites clearly separated (Fig. 8, arrow).",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Ichneumonidae"}
+        },
+        {
+          "text": "Fore wing vein 2m-cu absent (Fig. 7, arrows). Second and third metasomal tergites fused (Fig. 9, arrow).",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Braconidae"}
+        }
+      ]
+    },
+    "5": {
+      "leads": [
+        {
+          "text": "Pronotum very narrow medially, about 1/7 as long as lateral width (Fig. 10, pmh). Fore wing marginal cell almost always (>99%) open (Fig. 11).",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Cynipini", "context": "Cynipidae"}
+        },
+        {
+          "text": "Pronotum broader medially, about 1/3 as long as lateral width (Fig. 12, pmh). Fore wing marginal cell almost always (>99%) closed (Fig. 12), although veins often light or faint.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "6"}
+        }
+      ]
+    },
+    "6": {
+      "leads": [
+        {
+          "text": "Second and third metasomal tergites entirely fused (Fig. 13). Base of metasoma without conspicuous patch of dense setae (Fig. 13).",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Synergus", "context": "Cynipidae: Synergini"}
+        },
+        {
+          "text": "Second and third metasomal tergites clearly separated by suture (Fig. 14). Base of metasoma with or without patch of dense setae (Fig. 14).",
+          "images": [],
+          "destination": {"type": "couplet", "number": "7"}
+        }
+      ]
+    },
+    "7": {
+      "leads": [
+        {
+          "text": "Second tergite at least as long as third (Fig. 15); both similarly shaped. Base of metasoma with only a few sparse setae. Pronotal lateral carinae strongly developed (Fig. 16, arrow).",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Euceroptres", "context": "Figitidae: Euceroptresinae"}
+        },
+        {
+          "text": "Second tergite much shorter than third, appearing saddle-shaped (Fig. 14, T2). Base of metasoma with patch of dense setae (Fig. 14). Pronotal lateral carinae absent.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "8", "label": "Cynipidae: Ceroptresini"}
+        }
+      ]
+    },
+    "8": {
+      "leads": [
+        {
+          "text": "First metasomal tergite very small and scale-like, without defined sculpture. Face below toruli with depressed area filled with abundant setae, usually surrounded by raised carinae.",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Ceroptres"}
+        },
+        {
+          "text": "First metasomal tergite larger and ring-like, with conspicuous striate sculpture (cf. Fig. 17, arrow). Face below toruli without depressed area and without abundant setae.",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Buffingtonella"}
+        }
+      ]
+    },
+    "9": {
+      "leads": [
+        {
+          "text": "Basal fore wing with vein along anterior margin (Fig. 18, arrow). First visible metasomal tergite very large, occupying at least half of metasoma.",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Ceraphronoidea"}
+        },
+        {
+          "text": "Basal fore wing without vein along anterior margin. First visible metasomal tergite usually smaller.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "10"}
+        }
+      ]
+    },
+    "10": {
+      "leads": [
+        {
+          "text": "Pronotum reaching tegula laterally (Fig. 19). Base of metasoma usually with strongly angled corners (Fig. 21, arrow). Body always darkly colored and nonmetallic; usually black.",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Platygastridae", "context": "Platygastroidea"}
+        },
+        {
+          "text": "Pronotum not reaching tegula laterally, separated by prepectus (Fig. 20, pr). Base of metasoma without strongly angled corners. Body often with bright, metallic coloration.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "11", "label": "Chalcidoidea"}
+        }
+      ]
+    },
+    "11": {
+      "leads": [
+        {
+          "text": "Legs each with five tarsomeres (Fig. 21). Protibia with apical spur curved and bifurcate. Antenna often with more than 12 antennomeres including anelli and clavomeres.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "12"}
+        },
+        {
+          "text": "Legs each with only three (Fig. 22) or four (Fig. 23) tarsomeres. Protibia with apical spur straight, needle-like, and not bifurcate. Antenna with no more than 12 antennomeres.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "26"}
+        }
+      ]
+    },
+    "12": {
+      "leads": [
+        {
+          "text": "Metafemur with large teeth or strong serration along ventral margin (Fig. 24). Body coloration usually nonmetallic; usually yellow, orange, and/or black.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "13"}
+        },
+        {
+          "text": "Metafemur without teeth or serration along ventral margin. Body coloration usually metallic.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "14"}
+        }
+      ]
+    },
+    "13": {
+      "leads": [
+        {
+          "text": "Prepectus small and mostly concealed by surrounding sclerites (Fig. 25, arrow). Eyes with inner margins more or less straight and parallel (Fig. 26, dotted line). Body coloration nonmetallic.",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Chalcididae"}
+        },
+        {
+          "text": "Prepectus large and exposed (Fig. 27). Eyes with inner margins strongly divergent ventrally (Fig. 28). Body coloration metallic.",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Chalcedectes", "context": "Chalcedectidae"}
+        }
+      ]
+    },
+    "14": {
+      "leads": [
+        {
+          "text": "Mesopleuron large and convex, occupying much more than half of lateral mesosoma (Figs 29\u201330). Mesotarsus usually with rows of distinct peg-like projections along ventral surface (Fig. 31) or with dense, foam-like setae on basal tarsomere.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "15"}
+        },
+        {
+          "text": "Mesopleuron not especially enlarged or convex, occupying half or less of lateral mesosoma. Mesotarsus unmodified, without rows of peg-like projections or dense setae.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "19"}
+        }
+      ]
+    },
+    "15": {
+      "leads": [
+        {
+          "text": "Mesocoxa anterior margin positioned at or anterior to midline of mesopleuron (Fig. 32, dotted line). Metasomal cerci advanced anteriorly (Figs 34\u201335, arrows); posterior tergites warped, appearing V- or M-shaped around cerci.",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Encyrtidae"}
+        },
+        {
+          "text": "Mesocoxa anterior margin positioned near posterior of mesopleuron (Fig. 33, dotted line). Metasomal cerci, if visible, restricted to typical posterior position; posterior tergites not modified.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "16", "label": "Eupelmidae"}
+        }
+      ]
+    },
+    "16": {
+      "leads": [
+        {
+          "text": "Last gastral tergite tapered to rounded apically. Mesotibia with peg-like setae restricted to small area on tibia over base of mesotibial spur. Fore wing uniformly setose throughout, without linea calva (Fig. 38).",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Brasema"}
+        },
+        {
+          "text": "Last gastral tergite broadly emarginate apically. Mesotibia with peg-like setae, when present, present on base of tarsus. Fore wing often with a narrow linea calva (bare, asetose area) beneath marginal vein (Figs 36\u201337).",
+          "images": [],
+          "destination": {"type": "couplet", "number": "17"}
+        }
+      ]
+    },
+    "17": {
+      "leads": [
+        {
+          "text": "Fore wing with a narrow linea calva beneath marginal vein (Figs 36\u201337). Gaster with penultimate (spiracle-bearing) tergite deeply divided basally and mostly concealed medially under preceding tergite.",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Eupelmus"}
+        },
+        {
+          "text": "Fore wing uniformly setose throughout, without linea calva (Fig. 38). Gaster with penultimate tergite not divided or concealed medially under preceding tergite.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "18", "label": "Merostenus"}
+        }
+      ]
+    },
+    "18": {
+      "leads": [
+        {
+          "text": "Flagellum entirely darkly colored.",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Merostenus (Reikosiella)"}
+        },
+        {
+          "text": "Flagellum with one or more segments white.",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Merostenus (Hirticauda)"}
+        }
+      ]
+    },
+    "19": {
+      "leads": [
+        {
+          "text": "Head, mesoscutum, and scutellum with sculpture primarily umbilicate, composed of large foveae each containing a single seta and usually with dense sculpture between foveae (Fig. 39). Pronotum in dorsal view large and rectangular (Fig. 39), at least half as long as mesoscutum. Female metasoma usually ovate and laterally compressed (Fig. 40); male metasoma usually with long petiole (Fig. 41). Body coloration always nonmetallic.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "20", "label": "Eurytomidae"}
+        },
+        {
+          "text": "Head, mesoscutum, and scutellum with different sculpture. Pronotum in dorsal view shorter and usually not rectangular, usually less than half as long as mesoscutum. Female and male metasomata variable but usually not as described above. Body coloration usually metallic.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "22"}
+        }
+      ]
+    },
+    "20": {
+      "leads": [
+        {
+          "text": "Fore wing with marginal vein large and semicircular, usually with conspicuous infuscation below stigmal vein (Fig. 42).",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Sycophila"}
+        },
+        {
+          "text": "Fore wing with marginal vein narrow and linear and entirely clear, without infuscation (Fig. 43).",
+          "images": [],
+          "destination": {"type": "couplet", "number": "21"}
+        }
+      ]
+    },
+    "21": {
+      "leads": [
+        {
+          "text": "Female with fourth visible gastral tergite (measured dorsally) less than half as long as entire metasoma and no longer than combined length of preceding tergites (Fig. 44). Propodeum in lateral view often slanted relative to scutellum and forming an obtuse angle >90\u00b0.",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Eurytoma"}
+        },
+        {
+          "text": "Female with fourth visible gastral tergite (measured dorsally) about half as long as entire metasoma and longer than combined length of preceding tergites (Fig. 45, t4). Propodeum in lateral view perpendicular to scutellum, together forming an approximately 90\u00b0 angle (Fig. 45, prp).",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Phylloxeroxenus"}
+        }
+      ]
+    },
+    "22": {
+      "leads": [
+        {
+          "text": "Gastral tergites with well-developed foveate or crenulate, cusp-like sculpture (Fig. 46) and/or mesoscutellum in lateral view extending posteriorly over metanotum (Fig. 47, arrow) (almost always with both characters).",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Ormyrus", "context": "Ormyridae"}
+        },
+        {
+          "text": "Gastral tergites without well-developed foveate or crenulate sculpture and mesoscutellum in lateral view not extending posteriorly over metanotum.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "23"}
+        }
+      ]
+    },
+    "23": {
+      "leads": [
+        {
+          "text": "Fore wing with stigmal vein enlarged, much broader than thickness of marginal vein (Fig. 48, arrow). Body usually with yellow markings at least laterally (Figs 50\u201351).",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Bootanomyia", "context": "Megastigmidae"}
+        },
+        {
+          "text": "Fore wing with stigmal vein narrow, no longer than thickness of marginal vein (Fig. 49, arrow). Body entirely metallic, usually green or blue, and without yellow markings.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "24"}
+        }
+      ]
+    },
+    "24": {
+      "leads": [
+        {
+          "text": "Metapleuron with anterior margin strongly curved medially (Fig. 52). Female ovipositor long, extending far beyond posterior gastral segment (Fig. 54, arrow).",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Torymus", "context": "Torymidae"}
+        },
+        {
+          "text": "Metapleuron with anterior margin more or less straight (Fig. 53). Female ovipositor short, entirely concealed or extending for only a short distance (Fig. 55, arrow).",
+          "images": [],
+          "destination": {"type": "couplet", "number": "25"}
+        }
+      ]
+    },
+    "25": {
+      "leads": [
+        {
+          "text": "Antenna with 2 or 3 anelli (ring-like segments much shorter than adjacent antennomeres). Eyes with inner margins subparallel (cf. Fig. 26).",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Pteromalidae"}
+        },
+        {
+          "text": "Antenna with only 1 anellus. Eyes with inner margins divergent ventrally (cf. Fig. 28).",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Eupelminae (males only)", "context": "Eupelmidae"}
+        }
+      ]
+    },
+    "26": {
+      "leads": [
+        {
+          "text": "Each leg with three tarsomeres (Fig. 22). Fore wing often with setae arranged in conspicuous lines (Fig. 57).",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Trichogrammatidae"}
+        },
+        {
+          "text": "Each leg with four tarsomeres (Fig. 23). Fore wing without setae arranged in conspicuous lines.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "27"}
+        }
+      ]
+    },
+    "27": {
+      "leads": [
+        {
+          "text": "Mesopleuron large and convex, occupying much more than half of lateral mesosoma (Fig. 58). Metasoma somewhat cylindrical and not conspicuously laterally compressed (Fig. 60).",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Eupelmus", "context": "Eupelmidae"}
+        },
+        {
+          "text": "Mesopleuron not especially enlarged or convex, occupying about half or less of lateral mesosoma (Fig. 59). Metasoma ovate and strongly laterally compressed (Fig. 59).",
+          "images": [],
+          "destination": {"type": "taxon", "name": "Cynipini"}
+        }
+      ]
+    }
+  }
+}

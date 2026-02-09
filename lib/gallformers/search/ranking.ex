@@ -6,6 +6,7 @@ defmodule Gallformers.Search.Ranking do
   For "q alba", "Quercus alba" ranks higher than "q-alba-gall".
   """
 
+  @score_exact -1
   @score_best 0
   @score_good 1
   @score_ok 2
@@ -59,6 +60,9 @@ defmodule Gallformers.Search.Ranking do
     cond do
       name_words == [] ->
         @score_ok
+
+      name_words == search_terms ->
+        @score_exact
 
       String.starts_with?(hd(name_words), hd(search_terms)) ->
         @score_best

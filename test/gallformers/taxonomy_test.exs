@@ -787,6 +787,43 @@ defmodule Gallformers.TaxonomyTest do
       gall_as_plant_names = Enum.map(results_gall_as_plant, & &1.name)
       refute "Gallgenus" in gall_as_plant_names
     end
+
+    test "search_genera_and_sections matches common names in description" do
+      {:ok, family} =
+        Taxonomy.create_taxonomy(%{
+          name: "TestCommonNameFamily",
+          type: "family",
+          description: "Test family"
+        })
+
+      {:ok, genus} =
+        Taxonomy.create_taxonomy(%{
+          name: "Quercustestgenus",
+          type: "genus",
+          description: "Oak",
+          parent_id: family.id
+        })
+
+      # Create a species so the genus isn't filtered as empty
+      {:ok, species} =
+        Repo.insert(%Species{
+          name: "Quercustestgenus alba",
+          taxoncode: "plant",
+          datacomplete: false
+        })
+
+      Taxonomy.link_species_to_taxonomy(species.id, genus.id)
+
+      # Search by common name should find the genus
+      results = Taxonomy.search_genera_and_sections("oak", 100)
+      names = Enum.map(results, & &1.name)
+      assert "Quercustestgenus" in names
+
+      # Search by scientific name still works
+      results = Taxonomy.search_genera_and_sections("quercustest", 100)
+      names = Enum.map(results, & &1.name)
+      assert "Quercustestgenus" in names
+    end
   end
 
   describe "delete_taxonomy_cascade/1" do

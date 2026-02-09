@@ -17,10 +17,6 @@ RUN mix local.hex --force && \
 # Set build ENV
 ENV MIX_ENV=prod
 
-# Build args for version info (passed from CI/deploy)
-ARG GIT_SHA=unknown
-ENV GIT_SHA=${GIT_SHA}
-
 # Install mix dependencies
 COPY mix.exs mix.lock ./
 RUN mix deps.get --only $MIX_ENV

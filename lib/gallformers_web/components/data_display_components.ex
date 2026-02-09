@@ -146,7 +146,7 @@ defmodule GallformersWeb.DataDisplayComponents do
         </button>
         <.link
           :if={@current_user && @species_id}
-          href={"/admin/images?speciesid=#{@species_id}"}
+          href={"/admin/images?species_id=#{@species_id}"}
           class="px-2 py-1 text-sm border border-gray-300 rounded bg-white hover:bg-gray-50"
           aria-label={gettext("Edit images")}
         >

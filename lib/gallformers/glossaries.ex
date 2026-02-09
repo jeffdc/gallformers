@@ -41,6 +41,21 @@ defmodule Gallformers.Glossaries do
   end
 
   @doc """
+  Returns a map of word => definition for the given words.
+  """
+  @spec get_definitions(list(String.t())) :: %{String.t() => String.t()}
+  def get_definitions(words) when is_list(words) and words != [] do
+    from(g in Glossary,
+      where: g.word in ^words,
+      select: {g.word, g.definition}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
+  def get_definitions(_), do: %{}
+
+  @doc """
   Searches glossary entries by word (case-insensitive partial match).
   """
   @spec search_glossary(String.t()) :: [Glossary.t()]

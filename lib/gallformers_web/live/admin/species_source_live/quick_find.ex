@@ -22,6 +22,7 @@ defmodule GallformersWeb.Admin.SpeciesSourceLive.QuickFind do
       |> assign(:current_user, current_user)
       |> assign(:page_title, "Quick Find Species-Source Mappings")
       |> assign(:search_query, "")
+      |> assign(:species_id, nil)
       |> assign(:results, [])
       |> assign(:searched, false)
       |> assign(:editing_id, nil)
@@ -47,13 +48,14 @@ defmodule GallformersWeb.Admin.SpeciesSourceLive.QuickFind do
               source_id: mapping.source_id,
               description: mapping.description || "",
               externallink: mapping.externallink || "",
-              useasdefault: mapping.useasdefault || 0
+              useasdefault: mapping.useasdefault || false
             }
 
             changeset = Sources.change_species_source(species_source)
 
             socket
             |> assign(:search_query, mapping.species_name)
+            |> assign(:species_id, mapping.species_id)
             |> assign(:results, [mapping])
             |> assign(:searched, true)
             |> assign(:editing_id, mapping_id)
@@ -70,6 +72,7 @@ defmodule GallformersWeb.Admin.SpeciesSourceLive.QuickFind do
 
             socket
             |> assign(:search_query, species.name)
+            |> assign(:species_id, species_id)
             |> assign(:results, results)
             |> assign(:searched, true)
           else
@@ -127,7 +130,7 @@ defmodule GallformersWeb.Admin.SpeciesSourceLive.QuickFind do
         source_id: mapping.source_id,
         description: mapping.description || "",
         externallink: mapping.externallink || "",
-        useasdefault: mapping.useasdefault || 0
+        useasdefault: mapping.useasdefault || false
       }
 
       changeset = Sources.change_species_source(species_source)
@@ -179,23 +182,29 @@ defmodule GallformersWeb.Admin.SpeciesSourceLive.QuickFind do
       params
       |> Map.put("species_id", existing.species_id)
       |> Map.put("source_id", existing.source_id)
-      |> Map.update("useasdefault", 0, fn
-        "true" -> 1
-        true -> 1
-        "1" -> 1
-        _ -> 0
-      end)
 
     case Sources.update_species_source(existing, params) do
       {:ok, _} ->
-        # Re-run the search to update results
-        results = Sources.search_species_source_mappings(socket.assigns.search_query)
+        results = refetch_results(socket)
+
+        # Rebuild the form with fresh data so the user can keep editing
+        mapping = Sources.get_species_source_for_edit(socket.assigns.editing_id)
+
+        species_source = %SpeciesSource{
+          id: mapping.id,
+          species_id: mapping.species_id,
+          source_id: mapping.source_id,
+          description: mapping.description || "",
+          externallink: mapping.externallink || "",
+          useasdefault: mapping.useasdefault || false
+        }
+
+        changeset = Sources.change_species_source(species_source)
 
         {:noreply,
          socket
          |> assign(:results, results)
-         |> assign(:editing_id, nil)
-         |> assign(:form, nil)
+         |> assign(:form, to_form(changeset))
          |> put_flash(:info, "Mapping updated")}
 
       {:error, %Ecto.Changeset{} = changeset} ->
@@ -209,8 +218,7 @@ defmodule GallformersWeb.Admin.SpeciesSourceLive.QuickFind do
 
     case Sources.delete_species_source(existing) do
       {:ok, _} ->
-        # Re-run the search to update results
-        results = Sources.search_species_source_mappings(socket.assigns.search_query)
+        results = refetch_results(socket)
 
         {:noreply,
          socket
@@ -221,6 +229,13 @@ defmodule GallformersWeb.Admin.SpeciesSourceLive.QuickFind do
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Failed to delete mapping")}
+    end
+  end
+
+  defp refetch_results(socket) do
+    case socket.assigns.species_id do
+      nil -> Sources.search_species_source_mappings(socket.assigns.search_query)
+      species_id -> Sources.get_species_source_mappings_for_species(species_id)
     end
   end
 
@@ -333,7 +348,7 @@ defmodule GallformersWeb.Admin.SpeciesSourceLive.QuickFind do
                         </div>
                         <div class="flex items-center gap-2 ml-4">
                           <span
-                            :if={result.useasdefault == 1}
+                            :if={result.useasdefault}
                             class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded"
                           >
                             default

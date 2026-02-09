@@ -87,7 +87,7 @@ defmodule Gallformers.Galls.Identification do
     |> apply_form_filter(filters[:form_ids])
     |> apply_season_filter(filters[:season_ids])
     |> apply_detachable_filter(filters[:detachable])
-    |> apply_place_filter(filters[:place_codes])
+    |> apply_place_filter(filters[:place_codes], filters[:host_ids], filters[:genus_id])
     |> apply_undescribed_filter(filters[:undescribed])
     |> apply_exclude_non_gall_filter(filters[:exclude_non_galls])
     |> select_gall_fields()
@@ -113,7 +113,7 @@ defmodule Gallformers.Galls.Identification do
     |> apply_form_filter(filters[:form_ids])
     |> apply_season_filter(filters[:season_ids])
     |> apply_detachable_filter(filters[:detachable])
-    |> apply_place_filter(filters[:place_codes])
+    |> apply_place_filter(filters[:place_codes], filters[:host_ids], nil)
     |> select([s, gt], count(s.id, :distinct))
     |> Repo.one()
   end
@@ -137,7 +137,7 @@ defmodule Gallformers.Galls.Identification do
       |> apply_form_filter(filters[:form_ids])
       |> apply_season_filter(filters[:season_ids])
       |> apply_detachable_filter(filters[:detachable])
-      |> apply_place_filter(filters[:place_codes])
+      |> apply_place_filter(filters[:place_codes], nil, nil)
       |> select([s, gt], s.id)
       |> Repo.all()
 
@@ -389,26 +389,61 @@ defmodule Gallformers.Galls.Identification do
       where: gt.detachable == ^detachable or gt.detachable == "both"
   end
 
-  defp apply_place_filter(query, nil), do: query
-  defp apply_place_filter(query, []), do: query
+  defp apply_place_filter(query, nil, _host_ids, _genus_id), do: query
+  defp apply_place_filter(query, [], _host_ids, _genus_id), do: query
 
-  defp apply_place_filter(query, place_codes) do
-    from [s, gt] in query,
-      join: h in GallHost,
-      on: h.gall_species_id == s.id,
-      join: hr in "host_range",
-      on: hr.species_id == h.host_species_id,
-      join: p in "place",
-      on: hr.place_id == p.id,
-      where: p.code in ^place_codes,
-      where:
-        s.id not in subquery(
-          from gre in "gall_range_exclusion",
-            join: p2 in "place",
-            on: gre.place_id == p2.id,
-            where: p2.code in ^place_codes,
-            select: gre.species_id
-        )
+  defp apply_place_filter(query, place_codes, host_ids, genus_id) do
+    host_scope = resolve_host_scope(host_ids, genus_id)
+
+    case host_scope do
+      nil ->
+        from [s, gt] in query,
+          join: h in GallHost,
+          on: h.gall_species_id == s.id,
+          join: hr in "host_range",
+          on: hr.species_id == h.host_species_id,
+          join: p in "place",
+          on: hr.place_id == p.id,
+          where: p.code in ^place_codes,
+          where: s.id not in subquery(exclusion_subquery(place_codes))
+
+      ids ->
+        from [s, gt] in query,
+          join: h in GallHost,
+          on: h.gall_species_id == s.id,
+          join: hr in "host_range",
+          on: hr.species_id == h.host_species_id,
+          join: p in "place",
+          on: hr.place_id == p.id,
+          where: p.code in ^place_codes,
+          where: h.host_species_id in ^ids,
+          where: s.id not in subquery(exclusion_subquery(place_codes))
+    end
+  end
+
+  defp resolve_host_scope(nil, nil), do: nil
+  defp resolve_host_scope([], nil), do: nil
+
+  defp resolve_host_scope(host_ids, _genus_id) when is_list(host_ids) and host_ids != [] do
+    host_ids
+  end
+
+  defp resolve_host_scope(_host_ids, genus_id) when not is_nil(genus_id) do
+    from(st in "species_taxonomy",
+      join: sp in SpeciesSchema,
+      on: sp.id == st.species_id,
+      where: st.taxonomy_id == ^genus_id and sp.taxoncode == "plant",
+      select: sp.id
+    )
+    |> Repo.all()
+  end
+
+  defp exclusion_subquery(place_codes) do
+    from gre in "gall_range_exclusion",
+      join: p2 in "place",
+      on: gre.place_id == p2.id,
+      where: p2.code in ^place_codes,
+      select: gre.species_id
   end
 
   defp apply_undescribed_filter(query, nil), do: query

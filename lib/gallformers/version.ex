@@ -2,7 +2,7 @@ defmodule Gallformers.Version do
   @moduledoc """
   Provides version information for the Gallformers application.
 
-  - **App Version**: CalVer format (YYYY.MM.DD) plus git short hash
+  - **App Version**: CalVer format (YYYY.M.D)
   - **API Version**: SemVer read from API_VERSION file
   """
 
@@ -17,37 +17,13 @@ defmodule Gallformers.Version do
 
   @app_version (
                  date = Date.utc_today()
-                 date_str = "#{date.year}.#{date.month}.#{date.day}"
-
-                 # Check GIT_SHA env var first (set during Docker build),
-                 # fall back to git command for local development
-                 git_hash =
-                   case System.get_env("GIT_SHA") do
-                     nil ->
-                       case System.cmd("git", ["rev-parse", "--short", "HEAD"],
-                              stderr_to_stdout: true
-                            ) do
-                         {hash, 0} -> String.trim(hash)
-                         _ -> "unknown"
-                       end
-
-                     "" ->
-                       "unknown"
-
-                     "unknown" ->
-                       "unknown"
-
-                     hash ->
-                       String.trim(hash)
-                   end
-
-                 "#{date_str}+#{git_hash}"
+                 "#{date.year}.#{date.month}.#{date.day}"
                )
 
   @doc """
-  Returns the application version in CalVer format with git hash.
+  Returns the application version in CalVer format.
 
-  Example: "2026.1.18+abc1234"
+  Example: "2026.2.6"
   """
   @spec app_version() :: String.t()
   def app_version, do: @app_version

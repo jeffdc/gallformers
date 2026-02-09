@@ -27,7 +27,9 @@
     </.live_title>
 
     <%!-- JSON-LD Structured Data (passed from LiveViews) --%>
-    {assigns[:page_json_ld]}
+    <script :if={assigns[:page_json_ld]} type="application/ld+json" nonce={assigns[:csp_nonce]}>
+      {Phoenix.HTML.raw(assigns[:page_json_ld])}
+    </script>
 
     <link rel="icon" href={~p"/favicon.ico"} />
     <link rel="apple-touch-icon" href={~p"/apple-touch-icon.png"} />

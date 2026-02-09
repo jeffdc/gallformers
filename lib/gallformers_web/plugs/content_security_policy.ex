@@ -21,7 +21,7 @@ defmodule GallformersWeb.Plugs.ContentSecurityPolicy do
   @base_directives [
     "default-src 'none'",
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' #{@cdn_url} data:",
+    "img-src 'self' #{@cdn_url} https://s.gravatar.com https://cdn.auth0.com data:",
     "font-src 'self'",
     "connect-src 'self' https://*.s3.amazonaws.com",
     "form-action 'self'",

@@ -39,6 +39,19 @@ defmodule GallformersWeb.HostLive do
     end
   end
 
+  @impl true
+  def handle_params(%{"source" => source_id_str}, _uri, socket) do
+    with {source_id, ""} <- Integer.parse(source_id_str),
+         source when not is_nil(source) <-
+           Enum.find(socket.assigns[:sources] || [], fn s -> s.id == source_id end) do
+      {:noreply, assign(socket, selected_source: source)}
+    else
+      _ -> {:noreply, socket}
+    end
+  end
+
+  def handle_params(_params, _uri, socket), do: {:noreply, socket}
+
   defp load_host(socket, host_id) do
     case Plants.get_host(host_id) do
       nil ->
@@ -122,7 +135,7 @@ defmodule GallformersWeb.HostLive do
 
     json_ld = if image, do: Map.put(json_ld, "image", image), else: json_ld
 
-    Phoenix.HTML.raw(~s(<script type="application/ld+json">#{Jason.encode!(json_ld)}</script>))
+    Jason.encode!(json_ld)
   end
 
   defp get_taxonomy_info(species_id) do
@@ -198,6 +211,16 @@ defmodule GallformersWeb.HostLive do
   @impl true
   def handle_event("close_source_modal", _params, socket) do
     {:noreply, assign(socket, selected_source: nil, modal_font_size: :base)}
+  end
+
+  @impl true
+  def handle_event("clipboard_copy_success", _params, socket) do
+    {:noreply, put_flash(socket, :info, "Copied to clipboard")}
+  end
+
+  @impl true
+  def handle_event("clipboard_copy_error", _params, socket) do
+    {:noreply, put_flash(socket, :error, "Failed to copy to clipboard")}
   end
 
   @font_sizes [:sm, :base, :lg, :xl]
@@ -587,14 +610,25 @@ defmodule GallformersWeb.HostLive do
                   {if source.author, do: " - #{source.author}"}
                   {if source.pubyear, do: " (#{source.pubyear})"}
                   <.link
-                    :if={source.externallink}
+                    :if={source.externallink not in [nil, ""]}
                     href={source.externallink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="ml-2 hover:underline"
+                    class="ml-2 text-gray-500 hover:text-gf-maroon"
+                    title="View external source"
                   >
-                    [Link]
+                    <.icon name="ph-arrow-square-out" class="h-4 w-4 inline-block align-text-bottom" />
                   </.link>
+                  <button
+                    id={"copy-source-link-#{source.id}"}
+                    phx-hook="CopyToClipboard"
+                    data-copy-text={"/host/#{@host.id}?source=#{source.id}"}
+                    data-copy-url
+                    class="ml-2 text-gray-500 hover:text-gf-maroon cursor-pointer"
+                    title="Copy link to this description"
+                  >
+                    <.icon name="ph-link" class="h-4 w-4 inline-block align-text-bottom" />
+                  </button>
                   <.link
                     :if={@current_user}
                     href={
@@ -711,23 +745,34 @@ defmodule GallformersWeb.HostLive do
           </div>
         </:body>
         <:footer>
-          <div class="flex justify-between items-center w-full">
-            <.link
-              :if={@selected_source.externallink not in [nil, ""]}
-              href={@selected_source.externallink}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-gf-maroon hover:underline"
+          <div class="flex items-center justify-between w-full">
+            <div class="flex items-center gap-4">
+              <.link
+                :if={@selected_source.externallink not in [nil, ""]}
+                href={@selected_source.externallink}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-gf-maroon hover:underline"
+              >
+                View external link →
+              </.link>
+              <.link
+                href={"/source/#{@selected_source.id}"}
+                class="text-gf-maroon hover:underline"
+              >
+                View source page →
+              </.link>
+            </div>
+            <button
+              id="copy-source-link"
+              phx-hook="CopyToClipboard"
+              data-copy-text={"/host/#{@host.id}?source=#{@selected_source.id}"}
+              data-copy-url
+              class="flex items-center gap-1 text-sm text-gray-500 hover:text-gf-maroon cursor-pointer"
+              title="Copy link to this description"
             >
-              View external link →
-            </.link>
-            <span :if={@selected_source.externallink in [nil, ""]}></span>
-            <.link
-              href={"/source/#{@selected_source.id}"}
-              class="text-gf-maroon hover:underline"
-            >
-              View source page →
-            </.link>
+              <.icon name="ph-copy" class="h-4 w-4" /> Copy link
+            </button>
           </div>
         </:footer>
       </.modal>

@@ -66,7 +66,7 @@ defmodule GallformersWeb.HomeLive do
       }
     }
 
-    Phoenix.HTML.raw(~s(<script type="application/ld+json">#{Jason.encode!(json_ld)}</script>))
+    Jason.encode!(json_ld)
   end
 
   # Quick ID tool events

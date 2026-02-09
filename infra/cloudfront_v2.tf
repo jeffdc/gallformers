@@ -32,13 +32,10 @@ resource "aws_acm_certificate" "v2" {
   }
 }
 
-# DNS validation records must be created manually in Namecheap.
-# See runbooks/cloudfront-v2-cutover.md for the procedure.
-#
-# After creating the DNS records, run `tofu apply` again and this
-# resource will wait for validation to complete.
+# DNS validation is automated via Route53 records in dns.tf.
 resource "aws_acm_certificate_validation" "v2" {
-  certificate_arn = aws_acm_certificate.v2.arn
+  certificate_arn         = aws_acm_certificate.v2.arn
+  validation_record_fqdns = [for r in aws_route53_record.acm_validation : r.fqdn]
 }
 
 # -----------------------------------------------------------------------------

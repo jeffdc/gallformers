@@ -64,9 +64,54 @@ INSERT INTO species_fts (species_id, name, aliases) VALUES
   (3, 'Quercus velutina', ''),
   (4, 'Acer rubrum', ''),
   (5, 'Acer saccharum', ''),
+  (6, 'Thymus alpinus', ''),
+  (7, 'Thymus serpyllum', ''),
+  (8, 'Mentha arvensis', ''),
   (100, 'Andricus quercuscalifornicus', 'Oak Apple Gall Wasp'),
   (101, 'Amphibolips confluenta', ''),
   (102, 'Callirhytis quercuspunctata', '');
+
+-- =============================================================================
+-- ID filter test data (genus+place interaction)
+-- =============================================================================
+-- Uses dedicated host species (6-8) and genera to avoid collisions with
+-- hosts_test.exs and id_live_test.exs which create their own taxonomy links
+-- for species 1-5.
+
+-- Dedicated host plants for ID filter tests
+INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id) VALUES
+  (6, 'Thymus alpinus', 'plant', 0, 1),
+  (7, 'Thymus serpyllum', 'plant', 0, 1),
+  (8, 'Mentha arvensis', 'plant', 0, 1);
+
+-- Synthetic genera (unique names to avoid collisions)
+INSERT INTO taxonomy (id, name, description, type, parent_id, is_placeholder, inserted_at, updated_at) VALUES
+  (10, 'GenusAlpha', 'test genus alpha', 'genus', NULL, 0, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (11, 'GenusBeta', 'test genus beta', 'genus', NULL, 0, '2026-01-01T00:00:00', '2026-01-01T00:00:00');
+
+-- Link dedicated hosts to their genera
+INSERT INTO species_taxonomy (species_id, taxonomy_id) VALUES
+  (6, 10),   -- Thymus alpinus → GenusAlpha
+  (7, 10),   -- Thymus serpyllum → GenusAlpha
+  (8, 11);   -- Mentha arvensis → GenusBeta
+
+-- Gall-host relationships using dedicated hosts
+INSERT INTO gallhost (id, host_species_id, gall_species_id, inserted_at, updated_at) VALUES
+  (1, 6, 100, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),  -- gall 100 → T. alpinus (GenusAlpha)
+  (2, 8, 100, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),  -- gall 100 → M. arvensis (GenusBeta) — cross-genus!
+  (3, 7, 101, '2026-01-01T00:00:00', '2026-01-01T00:00:00');   -- gall 101 → T. serpyllum (GenusAlpha only)
+
+-- Places
+INSERT INTO place (id, name, code, type) VALUES
+  (1, 'Alberta', 'AB', 'province'),
+  (2, 'California', 'CA', 'state');
+
+-- Host ranges: which hosts occur in which places
+INSERT INTO host_range (species_id, place_id) VALUES
+  (6, 2),   -- T. alpinus in California
+  (8, 1),   -- M. arvensis in Alberta
+  (8, 2),   -- M. arvensis in California
+  (7, 2);   -- T. serpyllum in California
 
 -- =============================================================================
 -- Articles

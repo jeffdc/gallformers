@@ -6,6 +6,7 @@ defmodule GallformersWeb.Admin.FormComponents do
   use Phoenix.Component
 
   import GallformersWeb.CoreComponents, only: [icon: 1]
+  import GallformersWeb.UIComponents, only: [alert: 1]
 
   @doc """
   Renders the Cancel/Save button pair used by admin forms.
@@ -47,6 +48,47 @@ defmodule GallformersWeb.Admin.FormComponents do
     </div>
     """
   end
+
+  @doc """
+  Renders a warning when a species name matches an existing alias.
+
+  Hidden when `collisions` is empty. Each collision is shown on its own line
+  with a link to the species that owns the alias.
+
+  ## Attributes
+
+  * `:collisions` - Required. List of maps with `:species_id`, `:species_name`,
+    `:taxoncode`, and `:alias_type` keys (from `Species.find_species_with_alias/1`).
+
+  ## Examples
+
+      <.alias_collision_warning collisions={@alias_collisions} />
+  """
+  attr :collisions, :list, required: true
+
+  def alias_collision_warning(assigns) do
+    ~H"""
+    <.alert :if={@collisions != []} variant="warning">
+      <:title>Alias collision</:title>
+      <div :for={c <- @collisions}>
+        This name is a {alias_type_label(c.alias_type)} of
+        <.link
+          navigate={species_path(c.taxoncode, c.species_id)}
+          class="underline font-medium"
+        >
+          {c.species_name}
+        </.link>
+      </div>
+    </.alert>
+    """
+  end
+
+  defp alias_type_label("common"), do: "common name"
+  defp alias_type_label("scientific"), do: "scientific synonym"
+  defp alias_type_label(other), do: other
+
+  defp species_path("gall", id), do: "/gall/#{id}"
+  defp species_path(_taxoncode, id), do: "/host/#{id}"
 
   @doc """
   Renders an alias editor table for editing species/host aliases.
