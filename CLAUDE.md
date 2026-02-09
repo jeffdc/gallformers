@@ -521,7 +521,9 @@ This project uses [Phosphor Icons](https://phosphoricons.com/) with the `ph-` pr
 
 ## SQLite Compatibility
 
-This project uses **SQLite** (via ecto_sqlite3), not PostgreSQL. Always ensure queries are SQLite-compatible:
+This project uses **SQLite** (via ecto_sqlite3), not PostgreSQL. Always ensure queries are SQLite-compatible.
+
+**WAL mode footgun — stale journal files:** SQLite in WAL mode uses three files: `.sqlite`, `.sqlite-wal`, and `.sqlite-shm`. If you replace the main `.sqlite` file (e.g., via `make download-db`) without deleting the WAL/SHM companions, sqlite3 will try to replay the old WAL against the new database and report "database disk image is malformed." Always delete `-wal` and `-shm` files when replacing a database file. The `download-db` Makefile target handles this automatically.
 
 **Case-insensitive search (NO `ilike`):**
 ```elixir
