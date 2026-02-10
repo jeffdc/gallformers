@@ -1082,9 +1082,19 @@ defmodule GallformersWeb.FormComponents do
     default: false,
     doc: "whether this is a gall (enables Unknown genus warnings)"
 
+  attr :has_former_undescribed, :boolean,
+    default: false,
+    doc: "whether the species already has a former_undescribed alias"
+
+  attr :alias_choice, :string,
+    default: "keep",
+    doc: "how to handle existing former_undescribed alias: 'keep' or 'replace'"
+
+  attr :target, :any, default: nil, doc: "phx-target for events (use @myself for LiveComponents)"
+
   def reclassify_modal(assigns) do
     ~H"""
-    <.modal :if={@show} id="reclassify-modal" show on_cancel={JS.push("close_reclassify_modal")}>
+    <.modal :if={@show} id="reclassify-modal" show on_cancel={JS.push("close_reclassify_modal", target: @target)}>
       <:header>Rename and/or Reclassify {@entity_type}</:header>
       <:body>
         <%!-- Family search --%>
@@ -1096,6 +1106,7 @@ defmodule GallformersWeb.FormComponents do
             search_event="reclassify_search_family"
             select_event="reclassify_select_family"
             clear_event="reclassify_clear_family"
+            target={@target}
             query={@family_query}
             results={@family_results}
             selected={@selected_family}
@@ -1116,6 +1127,7 @@ defmodule GallformersWeb.FormComponents do
             search_event="reclassify_search_genus"
             select_event="reclassify_select_genus"
             clear_event="reclassify_clear_genus"
+            target={@target}
             query={@genus_query}
             results={@genus_results}
             selected={@selected_genus}
@@ -1138,8 +1150,10 @@ defmodule GallformersWeb.FormComponents do
             type="text"
             value={@epithet}
             phx-keyup="update_reclassify_epithet"
+            phx-target={@target}
             phx-hook="InputEvent"
             data-event="update_reclassify_epithet"
+            data-target={@target}
             phx-debounce="300"
             class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-gf-maroon focus:border-gf-maroon"
           />
@@ -1159,18 +1173,50 @@ defmodule GallformersWeb.FormComponents do
           </div>
         </.alert>
 
-        <%!-- Add alias checkbox --%>
-        <div class="mt-4">
-          <label class="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={@add_alias_checked}
-              phx-click="toggle_add_alias_on_rename"
-              class="w-5 h-5 rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon"
+        <%!-- Alias handling --%>
+        <%= if @has_former_undescribed do %>
+          <%!-- Species already has a former_undescribed alias — show radio group --%>
+          <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+            <.icon name="ph-info" class="h-4 w-4 inline mr-1" />
+            This species already has a former undescribed alias. Choose how to handle
+            the old name when reclassifying.
+          </div>
+          <form phx-change="set_reclassify_alias_choice" phx-target={@target} class="mt-3">
+            <.radio_group
+              id="reclassify-alias-choice"
+              name="value"
+              options={[
+                %{
+                  value: "keep",
+                  label: "Keep original (recommended)",
+                  description:
+                    "Keep existing former undescribed alias. Add old name as scientific synonym."
+                },
+                %{
+                  value: "replace",
+                  label: "Replace",
+                  description:
+                    "Replace existing former undescribed alias with this name. Move old alias to scientific."
+                }
+              ]}
+              value={@alias_choice}
             />
-            <span class="text-sm text-gray-700">Add scientific synonym alias for old name</span>
-          </label>
-        </div>
+          </form>
+        <% else %>
+          <%!-- Standard alias checkbox --%>
+          <div class="mt-4">
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={@add_alias_checked}
+                phx-click="toggle_add_alias_on_rename"
+                phx-target={@target}
+                class="w-5 h-5 rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon"
+              />
+              <span class="text-sm text-gray-700">Add scientific synonym alias for old name</span>
+            </label>
+          </div>
+        <% end %>
 
         <%!-- Warning about undescribed lock --%>
         <div
@@ -1199,6 +1245,7 @@ defmodule GallformersWeb.FormComponents do
             <button
               type="button"
               phx-click="close_reclassify_modal"
+              phx-target={@target}
               class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
             >
               Cancel
@@ -1206,6 +1253,7 @@ defmodule GallformersWeb.FormComponents do
             <button
               type="button"
               phx-click="do_reclassify"
+              phx-target={@target}
               disabled={is_nil(@selected_genus) or @epithet == ""}
               class="px-4 py-2 text-sm font-medium text-white bg-gf-maroon border border-transparent rounded-md hover:bg-gf-maroon/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
