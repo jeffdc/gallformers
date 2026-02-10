@@ -10,251 +10,105 @@ defmodule Gallformers.Taxonomy do
   alias Gallformers.Galls.GallTraits
   alias Gallformers.Repo
   alias Gallformers.Species.Species
-  alias Gallformers.Taxonomy.{TaxonName, Taxonomy}
+  alias Gallformers.Taxonomy.{TaxonName, Taxonomy, Tree}
+
+  # =====================================================================
+  # Delegated to Taxonomy.Tree — CRUD
+  # =====================================================================
+
+  defdelegate change_taxonomy(taxonomy, attrs \\ %{}), to: Tree
+  defdelegate create_taxonomy(attrs \\ %{}), to: Tree
+  defdelegate update_taxonomy(taxonomy, attrs), to: Tree
+  defdelegate delete_taxonomy(taxonomy), to: Tree
+
+  # =====================================================================
+  # Delegated to Taxonomy.Tree — Lookups
+  # =====================================================================
+
+  defdelegate get_taxonomy(id), to: Tree
+  defdelegate get_taxonomy!(id), to: Tree
+  defdelegate get_taxonomy_by_name(name, type), to: Tree
+  defdelegate get_genera_by_name(name), to: Tree
+  defdelegate get_taxonomies_batch(ids), to: Tree
+  defdelegate resolve_taxonomy_from_name(name), to: Tree
+
+  # =====================================================================
+  # Delegated to Taxonomy.Tree — Hierarchy
+  # =====================================================================
+
+  defdelegate get_parent(id), to: Tree
+  defdelegate get_children(id), to: Tree
+  defdelegate get_children_for_parents(ids), to: Tree
+  defdelegate get_taxonomy_path(id), to: Tree
+
+  # =====================================================================
+  # Delegated to Taxonomy.Tree — Lists
+  # =====================================================================
+
+  defdelegate list_taxonomies(), to: Tree
+  defdelegate list_taxonomies_by_type(type), to: Tree
+  defdelegate list_taxonomies_with_parent(type \\ nil, opts \\ []), to: Tree
+  defdelegate list_child_genera(family_id), to: Tree
+  defdelegate list_child_sections(genus_id), to: Tree
+  defdelegate list_sections_for_family_tree(family_id), to: Tree
+  defdelegate list_sections_for_family(family_id), to: Tree
+  defdelegate list_sections_for_genus(genus_id), to: Tree
+  defdelegate list_families_for_select(filter \\ :all), to: Tree
+  defdelegate list_genera_for_select(), to: Tree
+  defdelegate list_parents_for_genus(), to: Tree
+
+  # =====================================================================
+  # Delegated to Taxonomy.Tree — Unknown/Placeholder Management
+  # =====================================================================
+
+  defdelegate get_unknown_placeholder(parent_id), to: Tree
+  defdelegate find_or_create_unknown_genus(family_id), to: Tree
+  defdelegate empty_unknown_genus_ids(), to: Tree
+
+  # =====================================================================
+  # Delegated to Taxonomy.Tree — Utility
+  # =====================================================================
+
+  defdelegate display_name(taxonomy), to: Tree
+  defdelegate update_genus_parent(genus_id, new_parent_id), to: Tree
+  defdelegate move_genera(genus_ids, old_family_id, new_family_id), to: Tree
+
+  # =====================================================================
+  # TaxonName delegates
+  # =====================================================================
 
   @doc """
   Returns true if the given genus name represents a placeholder (Unknown) genus.
-
-  Works with both the genus name string from a taxonomy map (e.g., "Unknown (Cynipidae)")
-  and the bare "Unknown" for the root unknown family's genus.
   """
   @spec placeholder_genus_name?(String.t() | nil) :: boolean()
   defdelegate placeholder_genus_name?(name), to: TaxonName, as: :unknown_genus?
 
   @doc """
-  Returns all non-placeholder taxonomies.
+  Extracts the epithet (everything after the genus portion) from a species name.
+  Handles "Unknown (Family) epithet" and "Genus epithet" formats.
   """
-  @spec list_taxonomies() :: [Taxonomy.t()]
-  def list_taxonomies do
-    from(t in Taxonomy, where: t.is_placeholder == false)
-    |> Repo.all()
+  defdelegate extract_epithet(name), to: TaxonName, as: :epithet
+
+  # =====================================================================
+  # 1-arity get_taxonomy_by_name (stays — URL parameter lookup)
+  # =====================================================================
+
+  # The 1-arity version is also delegated but needs special handling since
+  # defdelegate can't distinguish arities for same name. We delegate to the
+  # 2-arg version in Tree won't work. Tree has both arities, so we delegate
+  # the 1-arity explicitly.
+
+  # Note: The 1-arity get_taxonomy_by_name is handled by Tree's 1-arity clause.
+  # Elixir's defdelegate for 2-arity (name, type) covers calls with 2 args.
+  # Calls with 1 arg go through the 2-arity defdelegate default? No — we need
+  # an explicit function for 1-arity.
+  def get_taxonomy_by_name(name) when is_binary(name) do
+    Tree.get_taxonomy_by_name(name)
   end
 
-  @doc """
-  Gets the "Unknown" placeholder genus for a given parent family.
-  Returns nil if not found.
-  """
-  @spec get_unknown_placeholder(integer()) :: Taxonomy.t() | nil
-  def get_unknown_placeholder(parent_id) do
-    from(t in Taxonomy,
-      where: t.is_placeholder == true and t.type == "genus" and t.parent_id == ^parent_id
-    )
-    |> Repo.one()
-  end
-
-  @doc """
-  Returns the display name for a taxonomy, handling placeholders.
-
-  Preloads the parent association if not already loaded (needed for placeholder formatting).
-  For better performance, callers should preload :parent when loading taxonomies if they
-  plan to call this function.
-  """
-  @spec display_name(Taxonomy.t()) :: String.t()
-  def display_name(%Taxonomy{} = taxonomy) do
-    taxonomy =
-      if Ecto.assoc_loaded?(taxonomy.parent) do
-        taxonomy
-      else
-        Repo.preload(taxonomy, :parent)
-      end
-
-    Taxonomy.display_name(taxonomy)
-  end
-
-  @doc """
-  Returns all taxonomies of a specific type.
-  """
-  @spec list_taxonomies_by_type(String.t()) :: [Taxonomy.t()]
-  def list_taxonomies_by_type(type) do
-    from(t in Taxonomy,
-      where: t.type == ^type,
-      order_by: t.name
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Returns IDs of "Unknown" genera that have no species linked.
-
-  These are placeholder genera auto-created for each family but not yet
-  used for any undescribed species. They create UI noise and should
-  typically be hidden from browse/search interfaces.
-  """
-  @spec empty_unknown_genus_ids() :: [integer()]
-  def empty_unknown_genus_ids do
-    from(t in Taxonomy,
-      where: t.type == "genus" and t.is_placeholder == true,
-      where:
-        fragment(
-          "NOT EXISTS (SELECT 1 FROM species_taxonomy st WHERE st.taxonomy_id = ?)",
-          t.id
-        ),
-      select: t.id
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets a taxonomy by ID.
-  """
-  @spec get_taxonomy(integer()) :: Taxonomy.t() | nil
-  def get_taxonomy(id) do
-    Repo.get(Taxonomy, id)
-  end
-
-  @doc """
-  Gets a taxonomy by ID, raising if not found.
-  """
-  @spec get_taxonomy!(integer()) :: Taxonomy.t()
-  def get_taxonomy!(id) do
-    Repo.get!(Taxonomy, id)
-  end
-
-  @doc """
-  Resolves taxonomy from a species name by parsing the genus portion.
-
-  Handles two patterns:
-  - "Unknown (Family) ..." — finds or creates the Unknown genus under that family
-  - "Genus ..." — looks up the genus by name
-
-  Returns `{:ok, taxonomy_map}` or `{:error, reason}`.
-  """
-  @spec resolve_taxonomy_from_name(String.t()) :: {:ok, map()} | {:error, String.t()}
-  def resolve_taxonomy_from_name(name) do
-    case parse_genus_from_name(name) do
-      {"Unknown", family_name} -> resolve_unknown_genus(family_name)
-      {genus_name, nil} -> resolve_known_genus(genus_name)
-      nil -> {:error, "Could not parse genus from name: #{name}"}
-    end
-  end
-
-  defp parse_genus_from_name(name) do
-    case Regex.run(~r/^Unknown \(([^)]+)\)/, name) do
-      [_, family_name] -> {"Unknown", family_name}
-      nil -> parse_simple_genus(name)
-    end
-  end
-
-  defp parse_simple_genus(name) do
-    case String.split(name, " ", parts: 2) do
-      [genus | _] when genus != "" -> {genus, nil}
-      _ -> nil
-    end
-  end
-
-  defp resolve_unknown_genus(family_name) do
-    case get_family_by_name(family_name) do
-      nil ->
-        {:error, "Family '#{family_name}' not found"}
-
-      family ->
-        {:ok, genus} = find_or_create_unknown_genus(family.id)
-        taxonomy = build_taxonomy_from_genus(genus)
-        # Display the genus as "Unknown (Family)" to match species name convention
-        {:ok, %{taxonomy | genus: "Unknown (#{family_name})"}}
-    end
-  end
-
-  defp resolve_known_genus(genus_name) do
-    case get_genera_by_name(genus_name) do
-      [] ->
-        {:error, "Genus '#{genus_name}' not found"}
-
-      [genus] ->
-        {:ok, build_taxonomy_from_genus(genus)}
-
-      _multiple ->
-        {:error, "Multiple genera named '#{genus_name}' — use the full form to disambiguate"}
-    end
-  end
-
-  defp get_family_by_name(name) do
-    from(t in Taxonomy, where: t.name == ^name and t.type == "family")
-    |> Repo.one()
-  end
-
-  @doc """
-  Gets multiple taxonomies by IDs in a single query (batch version).
-
-  Returns a map of id => %{id, name, type, description}.
-  """
-  @spec get_taxonomies_batch([integer()]) :: %{integer() => map()}
-  def get_taxonomies_batch([]), do: %{}
-
-  def get_taxonomies_batch(ids) do
-    from(t in Taxonomy,
-      where: t.id in ^ids,
-      select: {t.id, %{id: t.id, name: t.name, type: t.type, description: t.description}}
-    )
-    |> Repo.all()
-    |> Enum.into(%{})
-  end
-
-  @doc """
-  Gets a taxonomy by name and type.
-  """
-  @spec get_taxonomy_by_name(String.t(), String.t()) :: Taxonomy.t() | nil
-  def get_taxonomy_by_name(name, type) do
-    from(t in Taxonomy,
-      where: t.name == ^name and t.type == ^type
-    )
-    |> Repo.one()
-  end
-
-  @doc """
-  Gets all genera with a given name across all families.
-  Returns a list of genera (can be empty, one, or multiple).
-  """
-  @spec get_genera_by_name(String.t()) :: [Taxonomy.t()]
-  def get_genera_by_name(name) do
-    from(t in Taxonomy,
-      where: t.name == ^name and t.type == "genus",
-      order_by: t.id
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets the parent taxonomy for a given taxonomy ID.
-  """
-  @spec get_parent(integer()) :: Taxonomy.t() | nil
-  def get_parent(taxonomy_id) do
-    from(t in Taxonomy,
-      join: child in Taxonomy,
-      on: child.parent_id == t.id,
-      where: child.id == ^taxonomy_id
-    )
-    |> Repo.one()
-  end
-
-  @doc """
-  Gets all children of a taxonomy.
-  """
-  @spec get_children(integer()) :: [Taxonomy.t()]
-  def get_children(taxonomy_id) do
-    from(t in Taxonomy,
-      where: t.parent_id == ^taxonomy_id,
-      order_by: t.name
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets children for multiple parent taxonomy IDs in a single query.
-
-  Returns a map of parent_id => [children].
-  """
-  @spec get_children_for_parents([integer()]) :: %{integer() => [Taxonomy.t()]}
-  def get_children_for_parents([]), do: %{}
-
-  def get_children_for_parents(parent_ids) do
-    from(t in Taxonomy,
-      where: t.parent_id in ^parent_ids,
-      order_by: t.name
-    )
-    |> Repo.all()
-    |> Enum.group_by(& &1.parent_id)
-  end
+  # =====================================================================
+  # Species-Taxonomy Linkage (stays in Taxonomy context)
+  # =====================================================================
 
   @doc """
   Extracts the genus name from a species name (first word before space).
@@ -288,20 +142,6 @@ defmodule Gallformers.Taxonomy do
     and a list of all matching families under `possible_families`
   - If genus is NEW: returns extracted genus name with `genus_is_new: true`
     and empty family fields (user must select a family)
-
-  ## Examples
-
-      iex> lookup_taxonomy_for_new_species("Andricus quercuslanigera")
-      %{genus: "Andricus", genus_id: 123, genus_is_new: false,
-        section: nil, section_id: nil, family: "Cynipidae", family_id: 456}
-
-      iex> lookup_taxonomy_for_new_species("Newgenus species")
-      %{genus: "Newgenus", genus_id: nil, genus_is_new: true,
-        section: nil, section_id: nil, family: nil, family_id: nil}
-
-      iex> lookup_taxonomy_for_new_species("Quercus rubra")
-      %{genus: "Quercus", requires_disambiguation: true,
-        possible_families: [%{family: "Fagaceae", family_id: 1, genus_id: 10}, ...]}
   """
   @spec lookup_taxonomy_for_new_species(String.t()) :: map() | nil
   def lookup_taxonomy_for_new_species(name) when is_binary(name) do
@@ -327,7 +167,7 @@ defmodule Gallformers.Taxonomy do
 
           [single_genus] ->
             # Genus exists in exactly one family
-            result = build_taxonomy_from_genus(single_genus)
+            result = Tree.build_taxonomy_from_genus(single_genus)
             Map.put(result, :genus_is_new, false)
 
           multiple_genera ->
@@ -345,45 +185,8 @@ defmodule Gallformers.Taxonomy do
 
   def lookup_taxonomy_for_new_species(_), do: nil
 
-  # Helper to build taxonomy map from an existing genus
-  defp build_taxonomy_from_genus(genus) do
-    case get_parent(genus.id) do
-      nil ->
-        %{
-          genus: genus.name,
-          genus_id: genus.id,
-          section: nil,
-          section_id: nil,
-          family: nil,
-          family_id: nil
-        }
-
-      parent when parent.type == "section" ->
-        family = get_parent(parent.id)
-
-        %{
-          genus: genus.name,
-          genus_id: genus.id,
-          section: parent.name,
-          section_id: parent.id,
-          family: family && family.name,
-          family_id: family && family.id
-        }
-
-      parent ->
-        %{
-          genus: genus.name,
-          genus_id: genus.id,
-          section: nil,
-          section_id: nil,
-          family: parent.name,
-          family_id: parent.id
-        }
-    end
-  end
-
   defp extract_family_info(genus) do
-    taxonomy = build_taxonomy_from_genus(genus)
+    taxonomy = Tree.build_taxonomy_from_genus(genus)
 
     %{
       genus_id: genus.id,
@@ -502,6 +305,10 @@ defmodule Gallformers.Taxonomy do
     end
   end
 
+  # =====================================================================
+  # Reclassification (stays in Taxonomy context)
+  # =====================================================================
+
   @doc """
   Reassigns a species to a different genus.
 
@@ -546,14 +353,6 @@ defmodule Gallformers.Taxonomy do
   end
 
   # Renames a species to reflect its new genus after reclassification.
-  # For placeholder genera, builds "Unknown (Family) epithet".
-  # For regular genera, builds "NewGenus epithet".
-  # Optionally adds a scientific synonym alias for the old name.
-  #
-  # Alias type logic (based on the undescribed flag, not genus name):
-  # - undescribed gall → any reclassification = "former_undescribed" alias
-  #   (preserves Gallformers Code for iNat observation links)
-  # - described gall → any reclassification = "scientific" alias
   defp rename_species_for_reclassification(
          species_id,
          new_genus_id,
@@ -592,12 +391,6 @@ defmodule Gallformers.Taxonomy do
     end
   end
 
-  @doc """
-  Extracts the epithet (everything after the genus portion) from a species name.
-  Handles "Unknown (Family) epithet" and "Genus epithet" formats.
-  """
-  defdelegate extract_epithet(name), to: TaxonName, as: :epithet
-
   defp maybe_rotate_former_undescribed(_species_id, false), do: :ok
 
   defp maybe_rotate_former_undescribed(species_id, true) do
@@ -623,6 +416,10 @@ defmodule Gallformers.Taxonomy do
       end
     end
   end
+
+  # =====================================================================
+  # Search (stays in Taxonomy context)
+  # =====================================================================
 
   @doc """
   Searches families by name prefix (case-insensitive).
@@ -689,14 +486,6 @@ defmodule Gallformers.Taxonomy do
 
   Returns a map with the same structure as `get_taxonomy_for_species/1`,
   or nil if the genus is not found.
-
-  ## Examples
-
-      iex> get_taxonomy_from_species_name("Andricus quercuslanigera")
-      %{genus: "Andricus", genus_id: 123, section: nil, section_id: nil, family: "Cynipidae", family_id: 456}
-
-      iex> get_taxonomy_from_species_name("Unknown species")
-      nil
   """
   @spec get_taxonomy_from_species_name(String.t()) :: map() | nil
   def get_taxonomy_from_species_name(name) when is_binary(name) do
@@ -744,217 +533,6 @@ defmodule Gallformers.Taxonomy do
       family_id: family.id
     }
   end
-
-  @doc """
-  Gets the genus, section, and family for a species.
-
-  Returns a map with taxonomy names, IDs, and descriptions (common names) or nil if not found.
-  Section is optional and will only be present for plant hosts in genera
-  that have sections (primarily Quercus).
-
-  The data model has:
-  - Family → Genus → Section (hierarchy via parent_id)
-  - Species links directly to both genus AND section via species_taxonomy
-
-  Descriptions contain common names (e.g., "Oaks" for Quercus, "Beeches" for Fagus).
-
-  Note: This uses two queries by design. A species can link to both a genus AND a section
-  via species_taxonomy, and combining these into a single query creates complexity with
-  JOIN cardinality. For single-species lookups (the common case), 2 queries is acceptable.
-  For batch operations, callers should use different patterns (e.g., preloading all taxonomy
-  data for multiple species at once with IN clauses).
-  """
-  @spec get_taxonomy_for_species(integer()) :: map() | nil
-  def get_taxonomy_for_species(species_id) do
-    # Get the genus link - genus's parent is the family
-    genus_query =
-      from st in "species_taxonomy",
-        join: g in Taxonomy,
-        on: st.taxonomy_id == g.id and g.type == "genus",
-        left_join: family in Taxonomy,
-        on: g.parent_id == family.id,
-        where: st.species_id == ^species_id,
-        limit: 1,
-        select: %{
-          genus: g.name,
-          genus_id: g.id,
-          genus_description: g.description,
-          family: family.name,
-          family_id: family.id,
-          family_description: family.description
-        }
-
-    # Get the section link (if any) - species may be directly linked to a section
-    section_query =
-      from st in "species_taxonomy",
-        join: s in Taxonomy,
-        on: st.taxonomy_id == s.id and s.type == "section",
-        where: st.species_id == ^species_id,
-        limit: 1,
-        select: %{
-          section: s.name,
-          section_id: s.id,
-          section_description: s.description
-        }
-
-    case Repo.one(genus_query) do
-      nil ->
-        nil
-
-      genus_result ->
-        section_result = Repo.one(section_query)
-
-        %{
-          genus: genus_result.genus,
-          genus_id: genus_result.genus_id,
-          genus_description: genus_result.genus_description,
-          section: section_result && section_result.section,
-          section_id: section_result && section_result.section_id,
-          section_description: section_result && section_result.section_description,
-          family: genus_result.family,
-          family_id: genus_result.family_id,
-          family_description: genus_result.family_description
-        }
-    end
-  end
-
-  @doc """
-  Gets taxonomy (genus/family) for multiple species in a single query (batch version).
-
-  Returns a map of species_id => %{genus: name, family: name}.
-  This is a simplified version that only fetches genus and family names,
-  suitable for API responses where the full taxonomy details aren't needed.
-  """
-  @spec get_taxonomy_for_species_batch([integer()]) :: %{integer() => map()}
-  def get_taxonomy_for_species_batch([]), do: %{}
-
-  def get_taxonomy_for_species_batch(species_ids) do
-    from(st in "species_taxonomy",
-      join: g in Taxonomy,
-      on: st.taxonomy_id == g.id and g.type == "genus",
-      left_join: family in Taxonomy,
-      on: g.parent_id == family.id,
-      where: st.species_id in ^species_ids,
-      select: {st.species_id, %{genus: g.name, family: family.name}}
-    )
-    |> Repo.all()
-    |> Enum.into(%{})
-  end
-
-  @doc """
-  Gets species IDs associated with a genus.
-  """
-  @spec get_species_ids_for_genus(integer()) :: [integer()]
-  def get_species_ids_for_genus(genus_id) do
-    from(st in "species_taxonomy",
-      where: st.taxonomy_id == ^genus_id,
-      select: st.species_id
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets species IDs for multiple genera in a single query (batch version).
-
-  Returns a map of genus_id => [species_ids].
-  """
-  @spec get_species_ids_for_genera([integer()]) :: %{integer() => [integer()]}
-  def get_species_ids_for_genera([]), do: %{}
-
-  def get_species_ids_for_genera(genus_ids) do
-    from(st in "species_taxonomy",
-      where: st.taxonomy_id in ^genus_ids,
-      select: {st.taxonomy_id, st.species_id}
-    )
-    |> Repo.all()
-    |> Enum.group_by(fn {genus_id, _} -> genus_id end, fn {_, species_id} -> species_id end)
-  end
-
-  @doc """
-  Gets species IDs associated with a family (via genera).
-  """
-  @spec get_species_ids_for_family(integer()) :: [integer()]
-  def get_species_ids_for_family(family_id) do
-    from(st in "species_taxonomy",
-      join: g in Taxonomy,
-      on: st.taxonomy_id == g.id,
-      where: g.parent_id == ^family_id,
-      select: st.species_id
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets the full taxonomic path from a taxonomy up to root.
-
-  Returns a list of taxonomies from the given taxonomy up to the root,
-  ordered from root to leaf (e.g., [Family, Genus, Section]).
-
-  Uses a recursive CTE for efficient single-query path retrieval.
-  """
-  @spec get_taxonomy_path(integer()) :: [Taxonomy.t()]
-  def get_taxonomy_path(taxonomy_id) do
-    # Use a recursive CTE to build the path in a single query
-    # This is much more efficient than the old recursive approach
-    query = """
-    WITH RECURSIVE taxonomy_path AS (
-      -- Base case: start with the given taxonomy
-      SELECT id, name, description, type, parent_id, is_placeholder,
-             inserted_at, updated_at, 0 as depth
-      FROM taxonomy
-      WHERE id = ?1
-
-      UNION ALL
-
-      -- Recursive case: add parent taxonomies
-      SELECT t.id, t.name, t.description, t.type, t.parent_id, t.is_placeholder,
-             t.inserted_at, t.updated_at, tp.depth + 1
-      FROM taxonomy t
-      INNER JOIN taxonomy_path tp ON t.id = tp.parent_id
-    )
-    SELECT id, name, description, type, parent_id, is_placeholder, inserted_at, updated_at
-    FROM taxonomy_path
-    ORDER BY depth DESC
-    """
-
-    case Repo.query(query, [taxonomy_id]) do
-      {:ok, %{rows: rows, columns: columns}} ->
-        Enum.map(rows, fn row ->
-          columns
-          |> Enum.zip(row)
-          |> Map.new()
-          |> cast_to_taxonomy()
-        end)
-
-      {:error, _} ->
-        []
-    end
-  end
-
-  # Helper to cast raw query results to Taxonomy structs
-  defp cast_to_taxonomy(row) do
-    %Taxonomy{
-      id: row["id"],
-      name: row["name"],
-      description: row["description"],
-      type: row["type"],
-      parent_id: row["parent_id"],
-      is_placeholder: row["is_placeholder"] == 1,
-      inserted_at: parse_datetime(row["inserted_at"]),
-      updated_at: parse_datetime(row["updated_at"])
-    }
-  end
-
-  defp parse_datetime(nil), do: nil
-
-  defp parse_datetime(datetime_string) when is_binary(datetime_string) do
-    case NaiveDateTime.from_iso8601(datetime_string) do
-      {:ok, naive_dt} -> DateTime.from_naive!(naive_dt, "Etc/UTC")
-      _ -> nil
-    end
-  end
-
-  defp parse_datetime(datetime), do: datetime
 
   @doc """
   Searches for genera and sections by name or common name (case-insensitive).
@@ -1023,83 +601,182 @@ defmodule Gallformers.Taxonomy do
   end
 
   @doc """
-  Gets a taxonomy by name (for URL parameter lookups).
+  Searches taxonomies by name (case-insensitive).
   """
-  @spec get_taxonomy_by_name(String.t()) :: Taxonomy.t() | nil
-  def get_taxonomy_by_name(name) when is_binary(name) do
-    from(t in Taxonomy,
-      where: t.name == ^name,
-      limit: 1
-    )
-    |> Repo.one()
+  @spec search_taxonomies(String.t(), String.t() | nil, integer()) :: [Taxonomy.t()]
+  def search_taxonomies(query, type \\ nil, limit \\ 50) do
+    search_pattern = "%#{String.downcase(query)}%"
+
+    base_query =
+      from(t in Taxonomy,
+        where: fragment("lower(?) LIKE ?", t.name, ^search_pattern),
+        order_by: t.name,
+        limit: ^limit
+      )
+
+    query_with_type =
+      if type do
+        from(t in base_query, where: t.type == ^type)
+      else
+        base_query
+      end
+
+    Repo.all(query_with_type)
+  end
+
+  # =====================================================================
+  # Species-Taxonomy Queries (stays in Taxonomy context)
+  # =====================================================================
+
+  @doc """
+  Gets the genus, section, and family for a species.
+
+  Returns a map with taxonomy names, IDs, and descriptions (common names) or nil if not found.
+  Section is optional and will only be present for plant hosts in genera
+  that have sections (primarily Quercus).
+  """
+  @spec get_taxonomy_for_species(integer()) :: map() | nil
+  def get_taxonomy_for_species(species_id) do
+    # Get the genus link - genus's parent is the family
+    genus_query =
+      from st in "species_taxonomy",
+        join: g in Taxonomy,
+        on: st.taxonomy_id == g.id and g.type == "genus",
+        left_join: family in Taxonomy,
+        on: g.parent_id == family.id,
+        where: st.species_id == ^species_id,
+        limit: 1,
+        select: %{
+          genus: g.name,
+          genus_id: g.id,
+          genus_description: g.description,
+          family: family.name,
+          family_id: family.id,
+          family_description: family.description
+        }
+
+    # Get the section link (if any) - species may be directly linked to a section
+    section_query =
+      from st in "species_taxonomy",
+        join: s in Taxonomy,
+        on: st.taxonomy_id == s.id and s.type == "section",
+        where: st.species_id == ^species_id,
+        limit: 1,
+        select: %{
+          section: s.name,
+          section_id: s.id,
+          section_description: s.description
+        }
+
+    case Repo.one(genus_query) do
+      nil ->
+        nil
+
+      genus_result ->
+        section_result = Repo.one(section_query)
+
+        %{
+          genus: genus_result.genus,
+          genus_id: genus_result.genus_id,
+          genus_description: genus_result.genus_description,
+          section: section_result && section_result.section,
+          section_id: section_result && section_result.section_id,
+          section_description: section_result && section_result.section_description,
+          family: genus_result.family,
+          family_id: genus_result.family_id,
+          family_description: genus_result.family_description
+        }
+    end
   end
 
   @doc """
-  Lists families for galls that occur on a given host.
+  Gets taxonomy (genus/family) for multiple species in a single query (batch version).
+
+  Returns a map of species_id => %{genus: name, family: name}.
   """
-  @spec list_gall_families_for_host(integer()) :: [map()]
-  def list_gall_families_for_host(host_id) do
-    from(f in Taxonomy,
+  @spec get_taxonomy_for_species_batch([integer()]) :: %{integer() => map()}
+  def get_taxonomy_for_species_batch([]), do: %{}
+
+  def get_taxonomy_for_species_batch(species_ids) do
+    from(st in "species_taxonomy",
       join: g in Taxonomy,
-      on: g.parent_id == f.id,
-      join: st in "species_taxonomy",
-      on: st.taxonomy_id == g.id,
-      join: s in Gallformers.Species.Species,
-      on: st.species_id == s.id,
-      join: h in Gallformers.GallHosts.GallHost,
-      on: h.gall_species_id == s.id,
-      where: s.taxoncode == "gall" and f.type == "family" and h.host_species_id == ^host_id,
-      group_by: [f.id, f.name],
-      order_by: f.name,
-      select: %{
-        id: f.id,
-        name: f.name
-      }
+      on: st.taxonomy_id == g.id and g.type == "genus",
+      left_join: family in Taxonomy,
+      on: g.parent_id == family.id,
+      where: st.species_id in ^species_ids,
+      select: {st.species_id, %{genus: g.name, family: family.name}}
+    )
+    |> Repo.all()
+    |> Enum.into(%{})
+  end
+
+  @doc """
+  Gets species IDs associated with a genus.
+  """
+  @spec get_species_ids_for_genus(integer()) :: [integer()]
+  def get_species_ids_for_genus(genus_id) do
+    from(st in "species_taxonomy",
+      where: st.taxonomy_id == ^genus_id,
+      select: st.species_id
     )
     |> Repo.all()
   end
 
   @doc """
-  Lists families for galls that occur on hosts in a given host genus/section.
+  Gets species IDs for multiple genera in a single query (batch version).
+
+  Returns a map of genus_id => [species_ids].
   """
-  @spec list_gall_families_for_host_genus(integer()) :: [map()]
-  def list_gall_families_for_host_genus(host_genus_id) do
-    from(f in Taxonomy,
-      join: galler_genus in Taxonomy,
-      on: galler_genus.parent_id == f.id,
-      join: st in "species_taxonomy",
-      on: st.taxonomy_id == galler_genus.id,
-      join: s in Gallformers.Species.Species,
-      on: st.species_id == s.id,
-      join: h in Gallformers.GallHosts.GallHost,
-      on: h.gall_species_id == s.id,
-      join: host in Gallformers.Species.Species,
-      on: h.host_species_id == host.id,
-      join: host_tax in "species_taxonomy",
-      on: host_tax.species_id == host.id,
-      where:
-        s.taxoncode == "gall" and f.type == "family" and
-          host_tax.taxonomy_id == ^host_genus_id,
-      group_by: [f.id, f.name],
-      order_by: f.name,
-      select: %{id: f.id, name: f.name}
+  @spec get_species_ids_for_genera([integer()]) :: %{integer() => [integer()]}
+  def get_species_ids_for_genera([]), do: %{}
+
+  def get_species_ids_for_genera(genus_ids) do
+    from(st in "species_taxonomy",
+      where: st.taxonomy_id in ^genus_ids,
+      select: {st.taxonomy_id, st.species_id}
+    )
+    |> Repo.all()
+    |> Enum.group_by(fn {genus_id, _} -> genus_id end, fn {_, species_id} -> species_id end)
+  end
+
+  @doc """
+  Gets species IDs associated with a family (via genera).
+  """
+  @spec get_species_ids_for_family(integer()) :: [integer()]
+  def get_species_ids_for_family(family_id) do
+    from(st in "species_taxonomy",
+      join: g in Taxonomy,
+      on: st.taxonomy_id == g.id,
+      where: g.parent_id == ^family_id,
+      select: st.species_id
     )
     |> Repo.all()
   end
+
+  @doc """
+  Gets species IDs linked to any of the given taxonomy IDs.
+  """
+  @spec get_species_ids_for_taxonomies([integer()]) :: [integer()]
+  def get_species_ids_for_taxonomies([]), do: []
+
+  def get_species_ids_for_taxonomies(taxonomy_ids) do
+    from(st in "species_taxonomy",
+      where: st.taxonomy_id in ^taxonomy_ids,
+      select: st.species_id,
+      distinct: true
+    )
+    |> Repo.all()
+  end
+
+  # =====================================================================
+  # Taxonomy Resolution for Species Forms (stays in Taxonomy context)
+  # =====================================================================
 
   @doc """
   Resolves taxonomy for a species name, filtering to a set of valid family IDs.
 
   Used by both gall and host forms to resolve genus disambiguation against
   the relevant domain (gall families or plant families).
-
-  Takes the raw taxonomy from `lookup_taxonomy_for_new_species/1`, a MapSet of
-  valid family IDs, and options:
-  - `include_section: true` — also returns `section_id` (for hosts)
-
-  Returns:
-  - Without `include_section`: `{taxonomy, genus_is_new, selected_family_id, possible_families}`
-  - With `include_section: true`: `{taxonomy, genus_is_new, selected_family_id, selected_section_id, possible_families}`
   """
   @spec resolve_taxonomy_for_species(map() | nil, MapSet.t(), keyword()) :: tuple()
   def resolve_taxonomy_for_species(taxonomy, family_ids, opts \\ [])
@@ -1220,133 +897,85 @@ defmodule Gallformers.Taxonomy do
     :ok
   end
 
-  # Admin functions
+  @doc """
+  Resolves a genus ID, handling placeholder genera.
+
+  If the selected genus is a placeholder, finds or creates the Unknown genus
+  under the given family. Otherwise returns the genus ID as-is.
+  """
+  @spec resolve_genus_id(%{id: integer(), is_placeholder: boolean()}, %{id: integer()}) ::
+          integer()
+  def resolve_genus_id(%{is_placeholder: true}, %{id: family_id}) do
+    {:ok, unknown_genus} = find_or_create_unknown_genus(family_id)
+    unknown_genus.id
+  end
+
+  def resolve_genus_id(%{id: genus_id}, _family), do: genus_id
+
+  # =====================================================================
+  # Gall-Host Taxonomy Queries (stays in Taxonomy context)
+  # =====================================================================
 
   @doc """
-  Returns a changeset for tracking taxonomy changes.
+  Lists families for galls that occur on a given host.
   """
-  @spec change_taxonomy(Taxonomy.t(), map()) :: Ecto.Changeset.t()
-  def change_taxonomy(%Taxonomy{} = taxonomy, attrs \\ %{}) do
-    Taxonomy.changeset(taxonomy, attrs)
-  end
-
-  @doc """
-  Creates a taxonomy entry.
-
-  When creating a non-plant family, automatically creates an "Unknown" genus placeholder
-  for undescribed species. Plant families (description = "Plant") do not get Unknown genera
-  as we don't track undescribed plant species.
-  """
-  @spec create_taxonomy(map()) :: {:ok, Taxonomy.t()} | {:error, Ecto.Changeset.t()}
-  def create_taxonomy(attrs \\ %{}) do
-    type = attrs["type"] || attrs[:type]
-
-    if type == "family" do
-      create_family_with_unknown_genus(attrs)
-    else
-      %Taxonomy{}
-      |> Taxonomy.changeset(attrs)
-      |> Repo.insert()
-      |> broadcast(:taxonomy_created)
-    end
-  end
-
-  defp create_family_with_unknown_genus(attrs) do
-    Repo.transaction(fn ->
-      case %Taxonomy{} |> Taxonomy.changeset(attrs) |> Repo.insert() do
-        {:ok, family} ->
-          maybe_create_unknown_genus(family, attrs)
-          family
-
-        {:error, changeset} ->
-          Repo.rollback(changeset)
-      end
-    end)
-    |> case do
-      {:ok, family} -> broadcast({:ok, family}, :taxonomy_created)
-      {:error, changeset} -> {:error, changeset}
-    end
-  end
-
-  defp maybe_create_unknown_genus(family, attrs) do
-    # Auto-create Unknown genus for non-plant families only
-    # Plant families don't need Unknown genera as we don't track undescribed plants
-    description = attrs["description"] || attrs[:description]
-
-    if description != "Plant" do
-      {:ok, _unknown_genus} = find_or_create_unknown_genus(family.id)
-    end
+  @spec list_gall_families_for_host(integer()) :: [map()]
+  def list_gall_families_for_host(host_id) do
+    from(f in Taxonomy,
+      join: g in Taxonomy,
+      on: g.parent_id == f.id,
+      join: st in "species_taxonomy",
+      on: st.taxonomy_id == g.id,
+      join: s in Gallformers.Species.Species,
+      on: st.species_id == s.id,
+      join: h in Gallformers.GallHosts.GallHost,
+      on: h.gall_species_id == s.id,
+      where: s.taxoncode == "gall" and f.type == "family" and h.host_species_id == ^host_id,
+      group_by: [f.id, f.name],
+      order_by: f.name,
+      select: %{
+        id: f.id,
+        name: f.name
+      }
+    )
+    |> Repo.all()
   end
 
   @doc """
-  Updates a taxonomy entry.
-
-  When renaming a genus, automatically updates all linked species names and
-  creates scientific synonyms with the old names.
+  Lists families for galls that occur on hosts in a given host genus/section.
   """
-  @spec update_taxonomy(Taxonomy.t(), map()) :: {:ok, Taxonomy.t()} | {:error, Ecto.Changeset.t()}
-  def update_taxonomy(%Taxonomy{} = taxonomy, attrs) do
-    new_name = attrs["name"] || attrs[:name]
-    is_genus_rename = taxonomy.type == "genus" && new_name && new_name != taxonomy.name
-
-    if is_genus_rename do
-      update_genus_with_species_sync(taxonomy, attrs)
-    else
-      taxonomy
-      |> Taxonomy.changeset(attrs)
-      |> Repo.update()
-      |> broadcast(:taxonomy_updated)
-    end
-  end
-
-  # Updates a genus and syncs all linked species names via the Species context.
-  defp update_genus_with_species_sync(%Taxonomy{} = taxonomy, attrs) do
-    old_genus_name = taxonomy.name
-    new_genus_name = attrs["name"] || attrs[:name]
-
-    Repo.transaction(fn ->
-      # Delegate species rename to Species context
-      species_list =
-        from(s in Species,
-          join: st in "species_taxonomy",
-          on: st.species_id == s.id,
-          where: st.taxonomy_id == ^taxonomy.id,
-          select: s
-        )
-        |> Repo.all()
-
-      for species <- species_list do
-        Gallformers.Species.rename_for_genus_change(species, old_genus_name, new_genus_name)
-      end
-
-      # Update the genus itself
-      taxonomy
-      |> Taxonomy.changeset(attrs)
-      |> Repo.update!()
-    end)
-    |> broadcast(:taxonomy_updated)
-  end
-
-  @doc """
-  Deletes a taxonomy entry.
-  """
-  @spec delete_taxonomy(Taxonomy.t()) :: {:ok, Taxonomy.t()} | {:error, Ecto.Changeset.t()}
-  def delete_taxonomy(%Taxonomy{} = taxonomy) do
-    Repo.delete(taxonomy)
-    |> broadcast(:taxonomy_deleted)
+  @spec list_gall_families_for_host_genus(integer()) :: [map()]
+  def list_gall_families_for_host_genus(host_genus_id) do
+    from(f in Taxonomy,
+      join: galler_genus in Taxonomy,
+      on: galler_genus.parent_id == f.id,
+      join: st in "species_taxonomy",
+      on: st.taxonomy_id == galler_genus.id,
+      join: s in Gallformers.Species.Species,
+      on: st.species_id == s.id,
+      join: h in Gallformers.GallHosts.GallHost,
+      on: h.gall_species_id == s.id,
+      join: host in Gallformers.Species.Species,
+      on: h.host_species_id == host.id,
+      join: host_tax in "species_taxonomy",
+      on: host_tax.species_id == host.id,
+      where:
+        s.taxoncode == "gall" and f.type == "family" and
+          host_tax.taxonomy_id == ^host_genus_id,
+      group_by: [f.id, f.name],
+      order_by: f.name,
+      select: %{id: f.id, name: f.name}
+    )
+    |> Repo.all()
   end
 
   # =====================================================================
-  # Deletion Impact Assessment
+  # Deletion Impact & Cascade (stays in Taxonomy context)
   # =====================================================================
 
   @doc """
   Gathers all data that would be deleted if this taxonomy is deleted.
   Returns counts and lists for UI display.
-
-  For family: returns all child genera, sections (via genera), and species count.
-  For genus: returns all child sections and species count.
-  For section/other: returns has_impact: false (no cascade concern).
   """
   @spec get_deletion_impact(Taxonomy.t()) :: map()
   def get_deletion_impact(%Taxonomy{id: id, type: "family"} = taxonomy) do
@@ -1356,7 +985,6 @@ defmodule Gallformers.Taxonomy do
     sections = list_sections_for_family_tree(id)
     section_ids = Enum.map(sections, & &1.id)
 
-    # Species linked to this family's genera or sections
     all_taxonomy_ids = genera_ids ++ section_ids
     species_count = count_species_for_taxonomies(all_taxonomy_ids)
 
@@ -1375,7 +1003,6 @@ defmodule Gallformers.Taxonomy do
     sections = list_child_sections(id)
     section_ids = Enum.map(sections, & &1.id)
 
-    # Species linked to this genus or its sections
     all_taxonomy_ids = [id | section_ids]
     species_count = count_species_for_taxonomies(all_taxonomy_ids)
 
@@ -1391,7 +1018,6 @@ defmodule Gallformers.Taxonomy do
   end
 
   def get_deletion_impact(%Taxonomy{} = taxonomy) do
-    # Section or other types - no cascade concern
     %{
       taxonomy: taxonomy,
       genera: [],
@@ -1402,10 +1028,6 @@ defmodule Gallformers.Taxonomy do
       has_impact: false
     }
   end
-
-  # =====================================================================
-  # Cascade Delete
-  # =====================================================================
 
   @doc """
   Deletes taxonomy and all dependent data in a single transaction.
@@ -1428,7 +1050,6 @@ defmodule Gallformers.Taxonomy do
     sections = list_sections_for_family_tree(id)
     section_ids = Enum.map(sections, & &1.id)
 
-    # All taxonomy IDs that could have species linked (genera + sections)
     all_taxonomy_ids = genera_ids ++ section_ids
     species_count = count_species_for_taxonomies(all_taxonomy_ids)
 
@@ -1438,20 +1059,11 @@ defmodule Gallformers.Taxonomy do
 
     result =
       Repo.transaction(fn ->
-        # 1. Delete all species linked to this family tree
-        #    (includes S3 cleanup, gall_traits, FTS, cascades to images, aliases, hosts, etc.)
         delete_species_for_cascade(all_taxonomy_ids)
-
-        # 2. Delete sections (now safe - no species references)
         Enum.each(sections, &Repo.delete!/1)
-
-        # 3. Delete genera (now safe - no species or section references)
         Enum.each(genera, &Repo.delete!/1)
-
-        # 4. Delete the family itself
         Repo.delete!(taxonomy)
 
-        # Return impact summary
         %{
           taxonomy: taxonomy,
           genera: genera,
@@ -1472,7 +1084,6 @@ defmodule Gallformers.Taxonomy do
     sections = list_child_sections(id)
     section_ids = Enum.map(sections, & &1.id)
 
-    # Species linked to this genus or its sections
     all_taxonomy_ids = [id | section_ids]
     species_count = count_species_for_taxonomies(all_taxonomy_ids)
 
@@ -1482,16 +1093,10 @@ defmodule Gallformers.Taxonomy do
 
     result =
       Repo.transaction(fn ->
-        # 1. Delete all species linked to this genus or its sections
         delete_species_for_cascade(all_taxonomy_ids)
-
-        # 2. Delete sections (now safe - no species references)
         Enum.each(sections, &Repo.delete!/1)
-
-        # 3. Delete the genus itself
         Repo.delete!(taxonomy)
 
-        # Return impact summary
         %{
           taxonomy: taxonomy,
           genera: [],
@@ -1507,7 +1112,6 @@ defmodule Gallformers.Taxonomy do
   end
 
   def delete_taxonomy_cascade(%Taxonomy{} = taxonomy) do
-    # Section or other types - simple delete, no cascade needed
     Logger.info("Simple delete for #{taxonomy.type} #{taxonomy.name} (id=#{taxonomy.id})")
 
     result = Repo.delete(taxonomy)
@@ -1515,12 +1119,9 @@ defmodule Gallformers.Taxonomy do
     broadcast(result, :taxonomy_deleted)
   end
 
-  # Deletes all species linked to the given taxonomy IDs.
-  # Delegates to owning contexts (Galls/Plants) for full cleanup.
   defp delete_species_for_cascade([]), do: :ok
 
   defp delete_species_for_cascade(taxonomy_ids) do
-    # Load species with taxoncodes so we can route to the right context
     species_list =
       from(s in Species,
         join: st in "species_taxonomy",
@@ -1542,59 +1143,6 @@ defmodule Gallformers.Taxonomy do
   end
 
   @doc """
-  Gets species IDs linked to any of the given taxonomy IDs.
-  """
-  @spec get_species_ids_for_taxonomies([integer()]) :: [integer()]
-  def get_species_ids_for_taxonomies([]), do: []
-
-  def get_species_ids_for_taxonomies(taxonomy_ids) do
-    from(st in "species_taxonomy",
-      where: st.taxonomy_id in ^taxonomy_ids,
-      select: st.species_id,
-      distinct: true
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Lists all genera that are direct children of a family.
-  """
-  @spec list_child_genera(integer()) :: [Taxonomy.t()]
-  def list_child_genera(family_id) do
-    from(t in Taxonomy,
-      where: t.parent_id == ^family_id and t.type == "genus",
-      order_by: t.name
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Lists all sections that are direct children of a genus.
-  """
-  @spec list_child_sections(integer()) :: [Taxonomy.t()]
-  def list_child_sections(genus_id) do
-    from(t in Taxonomy,
-      where: t.parent_id == ^genus_id and t.type == "section",
-      order_by: t.name
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Lists all sections under a family tree (sections whose parent genus is a child of this family).
-  """
-  @spec list_sections_for_family_tree(integer()) :: [Taxonomy.t()]
-  def list_sections_for_family_tree(family_id) do
-    from(s in Taxonomy,
-      join: g in Taxonomy,
-      on: s.parent_id == g.id,
-      where: s.type == "section" and g.type == "genus" and g.parent_id == ^family_id,
-      order_by: s.name
-    )
-    |> Repo.all()
-  end
-
-  @doc """
   Counts species linked to any of the given taxonomy IDs.
   """
   @spec count_species_for_taxonomies([integer()]) :: non_neg_integer()
@@ -1608,204 +1156,9 @@ defmodule Gallformers.Taxonomy do
     |> Repo.one()
   end
 
-  @doc """
-  Finds or creates an "Unknown (Family)" placeholder genus under the given family.
-
-  Used for undescribed galls where the genus is not known.
-  Returns {:ok, genus} or {:error, changeset}.
-  """
-  @spec find_or_create_unknown_genus(integer()) ::
-          {:ok, Taxonomy.t()} | {:error, Ecto.Changeset.t()}
-  def find_or_create_unknown_genus(family_id) do
-    # Look for an existing placeholder genus under this family
-    case Repo.one(
-           from(t in Taxonomy,
-             where: t.is_placeholder == true and t.type == "genus" and t.parent_id == ^family_id
-           )
-         ) do
-      nil ->
-        family = get_taxonomy!(family_id)
-
-        create_taxonomy(%{
-          name: "Unknown (#{family.name})",
-          type: "genus",
-          parent_id: family_id,
-          is_placeholder: true,
-          description: "Placeholder genus for undescribed species"
-        })
-
-      existing ->
-        {:ok, existing}
-    end
-  end
-
-  @doc """
-  Resolves a genus ID, handling placeholder genera.
-
-  If the selected genus is a placeholder, finds or creates the Unknown genus
-  under the given family. Otherwise returns the genus ID as-is.
-  """
-  @spec resolve_genus_id(%{id: integer(), is_placeholder: boolean()}, %{id: integer()}) ::
-          integer()
-  def resolve_genus_id(%{is_placeholder: true}, %{id: family_id}) do
-    {:ok, unknown_genus} = find_or_create_unknown_genus(family_id)
-    unknown_genus.id
-  end
-
-  def resolve_genus_id(%{id: genus_id}, _family), do: genus_id
-
-  @doc """
-  Searches taxonomies by name (case-insensitive).
-  """
-  @spec search_taxonomies(String.t(), String.t() | nil, integer()) :: [Taxonomy.t()]
-  def search_taxonomies(query, type \\ nil, limit \\ 50) do
-    search_pattern = "%#{String.downcase(query)}%"
-
-    base_query =
-      from(t in Taxonomy,
-        where: fragment("lower(?) LIKE ?", t.name, ^search_pattern),
-        order_by: t.name,
-        limit: ^limit
-      )
-
-    query_with_type =
-      if type do
-        from(t in base_query, where: t.type == ^type)
-      else
-        base_query
-      end
-
-    Repo.all(query_with_type)
-  end
-
-  @doc """
-  Returns all taxonomies with their parent preloaded, optionally filtered by type.
-
-  ## Options
-  - `hide_empty_unknown` - If true, excludes Unknown genera with no species (default: false)
-  """
-  @spec list_taxonomies_with_parent(String.t() | nil, keyword()) :: [map()]
-  def list_taxonomies_with_parent(type \\ nil, opts \\ []) do
-    hide_empty_unknown = Keyword.get(opts, :hide_empty_unknown, false)
-
-    base_query =
-      from(t in Taxonomy,
-        left_join: p in Taxonomy,
-        on: t.parent_id == p.id,
-        order_by: [t.type, t.name],
-        select: %{
-          id: t.id,
-          name: t.name,
-          description: t.description,
-          type: t.type,
-          parent_id: t.parent_id,
-          parent_name: p.name,
-          parent_type: p.type
-        }
-      )
-
-    query_with_type =
-      if type do
-        from([t, p] in base_query, where: t.type == ^type)
-      else
-        base_query
-      end
-
-    query =
-      if hide_empty_unknown do
-        from([t, p] in query_with_type,
-          where:
-            not (t.is_placeholder == true and t.type == "genus" and
-                   fragment(
-                     "NOT EXISTS (SELECT 1 FROM species_taxonomy st WHERE st.taxonomy_id = ?)",
-                     t.id
-                   ))
-        )
-      else
-        query_with_type
-      end
-
-    Repo.all(query)
-  end
-
-  @doc """
-  Returns families as `{name, id}` tuples for select inputs.
-
-  Filter options:
-  - `:all` — all families (default)
-  - `:plant` — families where description == "Plant"
-  - `:gall` — families where description != "Plant"
-  """
-  @spec list_families_for_select(atom()) :: [{String.t(), integer()}]
-  def list_families_for_select(filter \\ :all) do
-    base =
-      from(t in Taxonomy,
-        where: t.type == "family",
-        order_by: t.name,
-        select: {t.name, t.id}
-      )
-
-    case filter do
-      :plant -> from(t in base, where: t.description == "Plant")
-      :gall -> from(t in base, where: t.description != "Plant")
-      :all -> base
-    end
-    |> Repo.all()
-  end
-
-  @doc """
-  Returns sections for a given family, for use in select dropdowns.
-
-  Sections are children of genera, not families directly. This function
-  finds all sections under any genus that belongs to the given family.
-  """
-  @spec list_sections_for_family(integer()) :: [{String.t(), integer()}]
-  def list_sections_for_family(family_id) when is_integer(family_id) do
-    from(s in Taxonomy,
-      join: g in Taxonomy,
-      on: s.parent_id == g.id,
-      where: s.type == "section" and g.type == "genus" and g.parent_id == ^family_id,
-      order_by: s.name,
-      select: {s.name, s.id}
-    )
-    |> Repo.all()
-  end
-
-  def list_sections_for_family(_), do: []
-
-  @doc """
-  Returns sections for a given genus, for use in select dropdowns.
-  Sections are subdivisions within a specific genus.
-  """
-  @spec list_sections_for_genus(integer()) :: [{String.t(), integer()}]
-  def list_sections_for_genus(genus_id) when is_integer(genus_id) do
-    from(t in Taxonomy,
-      where: t.type == "section" and t.parent_id == ^genus_id,
-      order_by: t.name,
-      select: {t.name, t.id}
-    )
-    |> Repo.all()
-  end
-
-  def list_sections_for_genus(_), do: []
-
-  @doc """
-  Updates a genus's parent to a new section.
-
-  Used when changing what section a host's genus belongs to.
-  """
-  @spec update_genus_parent(integer(), integer()) :: {:ok, Taxonomy.t()} | {:error, term()}
-  def update_genus_parent(genus_id, new_parent_id) do
-    case get_taxonomy(genus_id) do
-      nil ->
-        {:error, :genus_not_found}
-
-      genus ->
-        genus
-        |> Taxonomy.changeset(%{parent_id: new_parent_id})
-        |> Repo.update()
-    end
-  end
+  # =====================================================================
+  # Sections Management (stays in Taxonomy context)
+  # =====================================================================
 
   @doc """
   Gets all species in a Section by ID.
@@ -1937,83 +1290,9 @@ defmodule Gallformers.Taxonomy do
     :ok
   end
 
-  @doc """
-  Returns genera for use in typeahead/select components.
-  Each result includes the parent family ID for auto-population.
-  Excludes genera named "Unknown" as those are created automatically.
-  """
-  @spec list_genera_for_select() :: [map()]
-  def list_genera_for_select do
-    from(g in Taxonomy,
-      left_join: p in Taxonomy,
-      on: g.parent_id == p.id,
-      left_join: gp in Taxonomy,
-      on: p.parent_id == gp.id,
-      where: g.type == "genus" and g.name != "Unknown",
-      order_by: g.name,
-      select: %{
-        id: g.id,
-        name: g.name,
-        # If parent is a section, grandparent is the family
-        # If parent is a family, that's the family
-        family_id:
-          fragment(
-            "CASE WHEN ? = 'section' THEN ? ELSE ? END",
-            p.type,
-            gp.id,
-            p.id
-          )
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Returns families and sections for use as parent options for genera.
-  """
-  @spec list_parents_for_genus() :: [map()]
-  def list_parents_for_genus do
-    from(t in Taxonomy,
-      where: t.type in ["family", "section"],
-      order_by: [t.type, t.name],
-      select: %{id: t.id, name: t.name, type: t.type}
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Moves one or more genera from one family to another.
-
-  This operation updates the parent_id for all specified genera.
-  The parent-child relationship is tracked via the parent_id foreign key
-  in the taxonomy table itself.
-
-  Returns {:ok, count} on success where count is the number of genera moved.
-  """
-  @spec move_genera([integer()], integer(), integer()) :: {:ok, integer()} | {:error, term()}
-  def move_genera([_ | _] = genus_ids, _old_family_id, new_family_id) do
-    Repo.transaction(fn ->
-      # Update parent_id on all genera
-      # Verify they're actually genera and belong to the old family for safety
-      {updated_count, _} =
-        from(t in Taxonomy,
-          where: t.id in ^genus_ids and t.type == "genus"
-        )
-        |> Repo.update_all(set: [parent_id: new_family_id])
-
-      updated_count
-    end)
-    |> case do
-      {:ok, count} ->
-        Phoenix.PubSub.broadcast(Gallformers.PubSub, "taxonomy", :genera_moved)
-        {:ok, count}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  def move_genera([], _old_family_id, _new_family_id), do: {:error, :no_genera_selected}
+  # =====================================================================
+  # PubSub (stays in Taxonomy context)
+  # =====================================================================
 
   @doc """
   Subscribes to taxonomy changes.
