@@ -21,6 +21,9 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   @impl true
   def mount(_params, session, socket) do
     current_user = session["current_user"]
+
+    if connected?(socket), do: Species.subscribe()
+
     abundances = Species.list_abundances()
     all_places = Places.list_places()
     families = Taxonomy.list_plant_families_for_select()
@@ -144,8 +147,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   def handle_event("search_host", %{"value" => query}, socket) do
     results =
       if String.length(query) >= 2 do
-        Species.search_species(query, 10)
-        |> Enum.filter(&(&1.taxoncode == "plant"))
+        Species.search_species_by_name(query, "plant", 10)
       else
         []
       end
@@ -483,6 +485,48 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   end
 
   # =================================================================
+  # PubSub handlers
+  # =================================================================
+
+  @impl true
+  def handle_info({:species_updated, species}, socket) do
+    # If the currently edited host was updated elsewhere, reload it
+    if socket.assigns.host && socket.assigns.host.id == species.id do
+      case Plants.get_host_species(species.id) do
+        nil ->
+          {:noreply,
+           socket
+           |> put_flash(:warning, "This host was deleted by another user")
+           |> build_default_assigns()}
+
+        host ->
+          {:noreply, load_host_for_edit(socket, host)}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info({:species_deleted, species}, socket) do
+    # If the currently edited host was deleted, clear it
+    if socket.assigns.host && socket.assigns.host.id == species.id do
+      {:noreply,
+       socket
+       |> put_flash(:warning, "This host was deleted by another user")
+       |> build_default_assigns()}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info({:species_created, _species}, socket) do
+    # New species created elsewhere - no action needed
+    {:noreply, socket}
+  end
+
+  # =================================================================
   # Render
   # =================================================================
 
@@ -604,51 +648,13 @@ defmodule GallformersWeb.Admin.HostLive.Form do
         <fieldset disabled={@mode == :search} class={[@mode == :search && "opacity-50"]}>
           <.form :if={@form} for={@form} id="host-form" phx-change="validate" phx-submit="save">
             <%!-- Row: Genus | Family --%>
-            <div class="grid grid-cols-2 gap-4 mb-3">
-              <div>
-                <label class="gf-label">
-                  Genus (filled automatically):
-                </label>
-                <input
-                  type="text"
-                  value={if @taxonomy, do: @taxonomy.genus, else: ""}
-                  disabled
-                  class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded text-gray-500 text-sm italic"
-                />
-                <p :if={@genus_is_new} class="text-amber-600 text-xs mt-1">
-                  New genus - will be created under selected section/family
-                </p>
-              </div>
-              <div>
-                <label class="gf-label">
-                  Family:<span :if={@genus_is_new} class="text-red-600 ml-0.5">*</span>
-                </label>
-                <%= if @genus_is_new do %>
-                  <%!-- Genus is new - user must select a family --%>
-                  <select
-                    name="family_id"
-                    phx-change="select_family"
-                    class="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                  >
-                    <option value="">-- Select Family --</option>
-                    <%= for {name, id} <- @families do %>
-                      <option value={id} selected={@selected_family_id == id}>{name}</option>
-                    <% end %>
-                  </select>
-                  <p :if={is_nil(@selected_family_id)} class="text-red-600 text-xs mt-1">
-                    Please select a family for the new genus
-                  </p>
-                <% else %>
-                  <%!-- Genus exists - family is read-only --%>
-                  <input
-                    type="text"
-                    value={if @taxonomy, do: @taxonomy.family, else: ""}
-                    disabled
-                    class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded text-gray-500 text-sm"
-                  />
-                <% end %>
-              </div>
-            </div>
+            <.taxonomy_genus_family_row
+              taxonomy={@taxonomy}
+              genus_is_new={@genus_is_new}
+              selected_family_id={@selected_family_id}
+              families={@families}
+              new_genus_hint="selected section/family"
+            />
 
             <%!-- Row: Section | Abundance --%>
             <div class="grid grid-cols-2 gap-4 mb-3">
@@ -805,44 +811,13 @@ defmodule GallformersWeb.Admin.HostLive.Form do
       />
 
       <%!-- Genus disambiguation modal --%>
-      <.modal
-        :if={@possible_families != [] && @taxonomy}
-        id="genus-disambiguation-modal"
-        show
-        on_cancel={JS.push("clear_host")}
-      >
-        <:header>Select Family for Genus "{Map.get(@taxonomy, :genus, "")}"</:header>
-        <:body>
-          <p class="text-gray-700 mb-4">
-            The genus <strong>{Map.get(@taxonomy, :genus, "")}</strong>
-            exists in multiple plant families. Please select which family this host belongs to:
-          </p>
-          <div class="space-y-2">
-            <%= for family <- @possible_families do %>
-              <button
-                type="button"
-                phx-click="select_family_from_disambiguation"
-                phx-value-family_id={family.family_id}
-                class="block w-full text-left px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50 hover:border-gf-maroon transition-colors"
-              >
-                <div class="font-medium text-gray-900">{family.family}</div>
-                <%= if family.section do %>
-                  <div class="text-sm text-gray-500">Section: {family.section}</div>
-                <% end %>
-              </button>
-            <% end %>
-          </div>
-        </:body>
-        <:footer>
-          <button
-            type="button"
-            phx-click="clear_host"
-            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-        </:footer>
-      </.modal>
+      <.genus_disambiguation_modal
+        possible_families={@possible_families}
+        taxonomy={@taxonomy}
+        entity_description="plant"
+        select_event="select_family_from_disambiguation"
+        clear_event="clear_host"
+      />
     </Layouts.admin>
     """
   end
