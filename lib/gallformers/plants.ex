@@ -511,16 +511,42 @@ defmodule Gallformers.Plants do
     end
   end
 
-  defp maybe_update_section(%{genus_id: genus_id} = section_update) when not is_nil(genus_id) do
-    Taxonomy.maybe_update_genus_section(
-      genus_id,
+  defp maybe_update_section(%{genus_id: _genus_id} = section_update) do
+    # Only update the species→section link. The genus's parent_id must NOT be
+    # changed here — sections are children of genera, not parents. Setting
+    # genus.parent_id = section_id creates circular references and corrupts
+    # the taxonomy tree (family field displays genus name).
+    update_species_section_link(
+      section_update[:species_id],
       section_update.selected_section_id,
-      section_update.section_id,
-      section_update.family_id
+      section_update.section_id
     )
   end
 
   defp maybe_update_section(_), do: :ok
+
+  # Updates the species→section link in species_taxonomy when section changes.
+  defp update_species_section_link(_species_id, same, same), do: :ok
+  defp update_species_section_link(nil, _new, _old), do: :ok
+
+  defp update_species_section_link(species_id, new_section_id, old_section_id) do
+    import Ecto.Query
+
+    # Remove old section link if any
+    if old_section_id do
+      from(st in "species_taxonomy",
+        where: st.species_id == ^species_id and st.taxonomy_id == ^old_section_id
+      )
+      |> Repo.delete_all()
+    end
+
+    # Add new section link if any
+    if new_section_id do
+      Taxonomy.link_species_to_taxonomy(species_id, new_section_id)
+    end
+
+    :ok
+  end
 
   # ============================================
   # Alias Management

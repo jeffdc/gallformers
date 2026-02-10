@@ -181,19 +181,13 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   def handle_event("select_family", %{"family_id" => family_id}, socket) do
     family_id = if family_id == "", do: nil, else: String.to_integer(family_id)
 
-    # Load sections for the selected family
-    sections_for_family =
-      if family_id do
-        Taxonomy.list_sections_for_family(family_id)
-      else
-        []
-      end
-
+    # Sections belong to a genus, not a family. When the family changes on a new genus,
+    # there are no sections to show. For existing genera, sections were loaded at init.
     {:noreply,
      socket
      |> assign(:selected_family_id, family_id)
      |> assign(:selected_section_id, nil)
-     |> assign(:sections_for_family, sections_for_family)
+     |> assign(:sections_for_family, [])
      |> mark_dirty()}
   end
 
@@ -299,10 +293,12 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   defp reclassify_family(nil), do: nil
   defp reclassify_family(%{family_id: nil}), do: nil
   defp reclassify_family(%{family_id: id, family: name}), do: %{id: id, name: name}
+  defp reclassify_family(_), do: nil
 
   defp reclassify_genus(nil), do: nil
   defp reclassify_genus(%{genus_id: nil}), do: nil
   defp reclassify_genus(%{genus_id: id}), do: %{id: id}
+  defp reclassify_genus(_), do: nil
 
   defp toggle_region(%{assigns: %{mode: mode}} = socket, _code) when mode != :edit, do: socket
 
@@ -422,10 +418,10 @@ defmodule GallformersWeb.Admin.HostLive.Form do
         all_places: socket.assigns.all_places
       },
       section_update: %{
+        species_id: host_id,
         genus_id: taxonomy && taxonomy.genus_id,
         selected_section_id: socket.assigns.selected_section_id,
-        section_id: taxonomy && taxonomy.section_id,
-        family_id: taxonomy && taxonomy.family_id
+        section_id: taxonomy && taxonomy.section_id
       }
     }
 
@@ -433,10 +429,12 @@ defmodule GallformersWeb.Admin.HostLive.Form do
       {:ok, updated_host} ->
         aliases = Plants.get_aliases_for_host_full(host_id)
         places = Ranges.get_places_for_host(host_id)
+        taxonomy = Taxonomy.get_taxonomy_for_species(host_id)
 
         {:noreply,
          socket
          |> assign(:host, updated_host)
+         |> assign(:taxonomy, taxonomy)
          |> DeferredChanges.refresh(:aliases, aliases)
          |> assign(:original_places, places)
          |> assign(:places, places)
@@ -676,7 +674,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
                     type="text"
                     value=""
                     disabled
-                    placeholder="No sections for this family"
+                    placeholder="No sections in this genus"
                     class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded text-gray-500 text-sm"
                   />
                 <% end %>
