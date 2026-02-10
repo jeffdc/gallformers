@@ -5,9 +5,7 @@ defmodule Gallformers.Taxonomy do
   Provides functions for working with taxonomic classifications.
   """
 
-  import Ecto.Query
-  alias Gallformers.Repo
-  alias Gallformers.Taxonomy.{Reclassification, Search, SpeciesLink, TaxonName, Taxonomy, Tree}
+  alias Gallformers.Taxonomy.{Reclassification, Search, SpeciesLink, TaxonName, Tree}
 
   # =====================================================================
   # Delegated to Taxonomy.Tree — CRUD
@@ -165,93 +163,15 @@ defmodule Gallformers.Taxonomy do
   defdelegate delete_taxonomy_cascade(taxonomy), to: Reclassification
 
   # =====================================================================
-  # Gall-Host Taxonomy Queries (stays in Taxonomy context)
+  # Delegated to Taxonomy.Tree — Cross-domain Queries
   # =====================================================================
 
-  @doc """
-  Lists families for galls that occur on a given host.
-  """
-  @spec list_gall_families_for_host(integer()) :: [map()]
-  def list_gall_families_for_host(host_id) do
-    from(f in Taxonomy,
-      join: g in Taxonomy,
-      on: g.parent_id == f.id,
-      join: st in "species_taxonomy",
-      on: st.taxonomy_id == g.id,
-      join: s in Gallformers.Species.Species,
-      on: st.species_id == s.id,
-      join: h in Gallformers.GallHosts.GallHost,
-      on: h.gall_species_id == s.id,
-      where: s.taxoncode == "gall" and f.type == "family" and h.host_species_id == ^host_id,
-      group_by: [f.id, f.name],
-      order_by: f.name,
-      select: %{
-        id: f.id,
-        name: f.name
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Lists families for galls that occur on hosts in a given host genus/section.
-  """
-  @spec list_gall_families_for_host_genus(integer()) :: [map()]
-  def list_gall_families_for_host_genus(host_genus_id) do
-    from(f in Taxonomy,
-      join: galler_genus in Taxonomy,
-      on: galler_genus.parent_id == f.id,
-      join: st in "species_taxonomy",
-      on: st.taxonomy_id == galler_genus.id,
-      join: s in Gallformers.Species.Species,
-      on: st.species_id == s.id,
-      join: h in Gallformers.GallHosts.GallHost,
-      on: h.gall_species_id == s.id,
-      join: host in Gallformers.Species.Species,
-      on: h.host_species_id == host.id,
-      join: host_tax in "species_taxonomy",
-      on: host_tax.species_id == host.id,
-      where:
-        s.taxoncode == "gall" and f.type == "family" and
-          host_tax.taxonomy_id == ^host_genus_id,
-      group_by: [f.id, f.name],
-      order_by: f.name,
-      select: %{id: f.id, name: f.name}
-    )
-    |> Repo.all()
-  end
+  defdelegate list_gall_families_for_host(host_id), to: Tree
+  defdelegate list_gall_families_for_host_genus(host_genus_id), to: Tree
+  defdelegate list_sections_with_details(), to: Tree
 
   # =====================================================================
-  # Sections Management (stays in Taxonomy context)
-  # =====================================================================
-
-  @doc """
-  Lists all sections with their parent genus and species count.
-  """
-  @spec list_sections_with_details() :: [map()]
-  def list_sections_with_details do
-    from(s in Taxonomy,
-      left_join: g in Taxonomy,
-      on: s.parent_id == g.id,
-      left_join: st in "species_taxonomy",
-      on: st.taxonomy_id == s.id,
-      where: s.type == "section",
-      group_by: [s.id, s.name, s.description, g.id, g.name],
-      order_by: [g.name, s.name],
-      select: %{
-        id: s.id,
-        name: s.name,
-        description: s.description,
-        genus_id: g.id,
-        genus_name: g.name,
-        species_count: count(st.species_id)
-      }
-    )
-    |> Repo.all()
-  end
-
-  # =====================================================================
-  # PubSub (stays in Taxonomy context)
+  # PubSub
   # =====================================================================
 
   @doc """
