@@ -334,7 +334,7 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
       host = require_host()
       {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
 
-      html = render_click(view, "open_reclassify_modal", %{})
+      html = view |> element("button", "Rename/Reclassify") |> render_click()
 
       assert html =~ "Rename and/or Reclassify Host"
       assert html =~ "Specific epithet"
@@ -345,8 +345,12 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
       host = require_host()
       {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
 
-      render_click(view, "open_reclassify_modal", %{})
-      html = render_click(view, "close_reclassify_modal", %{})
+      view |> element("button", "Rename/Reclassify") |> render_click()
+
+      html =
+        view
+        |> with_target("#reclassify")
+        |> render_click("close_reclassify_modal", %{})
 
       refute html =~ "Rename and/or Reclassify Host"
     end
@@ -355,8 +359,12 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
       host = require_host()
       {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
 
-      render_click(view, "open_reclassify_modal", %{})
-      html = render_click(view, "toggle_add_alias_on_rename", %{})
+      view |> element("button", "Rename/Reclassify") |> render_click()
+
+      html =
+        view
+        |> with_target("#reclassify")
+        |> render_click("toggle_add_alias_on_rename", %{})
 
       # Just verify it doesn't crash
       assert html =~ "alias"
@@ -366,9 +374,10 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
       host = require_host()
       {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
 
-      render_click(view, "open_reclassify_modal", %{})
-      render_click(view, "reclassify_clear_genus", %{})
-      html = render_click(view, "do_reclassify", %{})
+      view |> element("button", "Rename/Reclassify") |> render_click()
+      view |> with_target("#reclassify") |> render_click("reclassify_clear_genus", %{})
+      view |> with_target("#reclassify") |> render_click("do_reclassify", %{})
+      html = render(view)
 
       assert html =~ "select a genus"
     end
@@ -377,8 +386,12 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
       host = require_host()
       {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
 
-      render_click(view, "open_reclassify_modal", %{})
-      html = render_click(view, "update_reclassify_epithet", %{"value" => "newepithet"})
+      view |> element("button", "Rename/Reclassify") |> render_click()
+
+      html =
+        view
+        |> with_target("#reclassify")
+        |> render_click("update_reclassify_epithet", %{"value" => "newepithet"})
 
       assert html =~ "newepithet"
     end

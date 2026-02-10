@@ -553,12 +553,24 @@ defmodule Gallformers.Taxonomy do
           {:ok, Species.t()} | {:error, term()}
   def reassign_species_taxonomy(species_id, new_genus_id, opts \\ []) do
     add_alias? = Keyword.get(opts, :add_alias?, true)
+    rotate_former_undescribed = Keyword.get(opts, :rotate_former_undescribed, false)
+    explicit_alias_type = Keyword.get(opts, :alias_type)
+    # Capture undescribed state BEFORE maybe_force_undescribed changes it
+    was_undescribed? = species_undescribed?(species_id)
 
     Repo.transaction(fn ->
       case update_species_genus(species_id, new_genus_id) do
         :ok ->
           maybe_force_undescribed(species_id, new_genus_id)
-          rename_species_for_reclassification(species_id, new_genus_id, add_alias?)
+          maybe_rotate_former_undescribed(species_id, rotate_former_undescribed)
+
+          rename_species_for_reclassification(
+            species_id,
+            new_genus_id,
+            add_alias?,
+            was_undescribed?,
+            explicit_alias_type
+          )
 
         {:error, reason} ->
           Repo.rollback(reason)
@@ -574,9 +586,18 @@ defmodule Gallformers.Taxonomy do
   # For placeholder genera, builds "Unknown (Family) epithet".
   # For regular genera, builds "NewGenus epithet".
   # Optionally adds a scientific synonym alias for the old name.
-  # When moving from Unknown→Known genus, uses "former_undescribed" alias type
-  # to preserve the Gallformers Code for iNaturalist observation links.
-  defp rename_species_for_reclassification(species_id, new_genus_id, add_alias?) do
+  #
+  # Alias type logic (based on the undescribed flag, not genus name):
+  # - undescribed gall → any reclassification = "former_undescribed" alias
+  #   (preserves Gallformers Code for iNat observation links)
+  # - described gall → any reclassification = "scientific" alias
+  defp rename_species_for_reclassification(
+         species_id,
+         new_genus_id,
+         add_alias?,
+         was_undescribed?,
+         explicit_alias_type
+       ) do
     species = Repo.get!(Species, species_id)
     genus = get_taxonomy!(new_genus_id) |> Repo.preload(:parent)
     new_genus_display = Taxonomy.display_name(genus)
@@ -586,11 +607,12 @@ defmodule Gallformers.Taxonomy do
 
     if new_name != species.name do
       old_genus_display = extract_genus_display(species.name)
-      # Detect Unknown→Known transition for former_undescribed alias
+
       alias_type =
-        if placeholder_genus_name?(old_genus_display) && !genus.is_placeholder,
-          do: "former_undescribed",
-          else: "scientific"
+        explicit_alias_type ||
+          if was_undescribed?,
+            do: "former_undescribed",
+            else: "scientific"
 
       Gallformers.Species.rename_for_genus_change(
         species,
@@ -646,6 +668,20 @@ defmodule Gallformers.Taxonomy do
 
   defp build_reclassified_name(genus_display, epithet) do
     "#{genus_display} #{epithet}"
+  end
+
+  defp maybe_rotate_former_undescribed(_species_id, false), do: :ok
+
+  defp maybe_rotate_former_undescribed(species_id, true) do
+    Gallformers.Species.rotate_former_undescribed_alias(species_id)
+  end
+
+  # Returns true if the species has gall_traits with undescribed=true.
+  defp species_undescribed?(species_id) do
+    case Repo.get(GallTraits, species_id) do
+      %GallTraits{undescribed: true} -> true
+      _ -> false
+    end
   end
 
   # If the new genus is Unknown and the species has gall_traits, force undescribed=true.
@@ -1541,6 +1577,21 @@ defmodule Gallformers.Taxonomy do
         {:ok, existing}
     end
   end
+
+  @doc """
+  Resolves a genus ID, handling placeholder genera.
+
+  If the selected genus is a placeholder, finds or creates the Unknown genus
+  under the given family. Otherwise returns the genus ID as-is.
+  """
+  @spec resolve_genus_id(%{id: integer(), is_placeholder: boolean()}, %{id: integer()}) ::
+          integer()
+  def resolve_genus_id(%{is_placeholder: true}, %{id: family_id}) do
+    {:ok, unknown_genus} = find_or_create_unknown_genus(family_id)
+    unknown_genus.id
+  end
+
+  def resolve_genus_id(%{id: genus_id}, _family), do: genus_id
 
   @doc """
   Searches taxonomies by name (case-insensitive).

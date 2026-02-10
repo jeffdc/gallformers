@@ -72,17 +72,6 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     # Typeahead search state
     |> assign(:host_search_query, "")
     |> assign(:host_search_results, [])
-    # Rename/Reclassify modal state
-    |> assign(:show_reclassify_modal, false)
-    |> assign(:reclassify_family_query, "")
-    |> assign(:reclassify_family_results, [])
-    |> assign(:reclassify_selected_family, nil)
-    |> assign(:reclassify_genus_query, "")
-    |> assign(:reclassify_genus_results, [])
-    |> assign(:reclassify_selected_genus, nil)
-    |> assign(:reclassify_epithet, "")
-    |> assign(:add_alias_on_rename, true)
-    |> assign(:rename_alias_collisions, [])
     |> reset_dirty()
   end
 
@@ -142,17 +131,6 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     # Typeahead state (cleared in edit mode)
     |> assign(:host_search_query, "")
     |> assign(:host_search_results, [])
-    # Rename/Reclassify modal state
-    |> assign(:show_reclassify_modal, false)
-    |> assign(:reclassify_family_query, "")
-    |> assign(:reclassify_family_results, [])
-    |> assign(:reclassify_selected_family, nil)
-    |> assign(:reclassify_genus_query, "")
-    |> assign(:reclassify_genus_results, [])
-    |> assign(:reclassify_selected_genus, nil)
-    |> assign(:reclassify_epithet, "")
-    |> assign(:add_alias_on_rename, true)
-    |> assign(:rename_alias_collisions, [])
     |> reset_dirty()
   end
 
@@ -392,214 +370,6 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     end
   end
 
-  # Reclassify modal events
-
-  @impl true
-  def handle_event("open_reclassify_modal", _params, socket) do
-    taxonomy = socket.assigns.taxonomy
-
-    # Pre-populate family from current taxonomy
-    selected_family =
-      if taxonomy && taxonomy.family_id do
-        %{id: taxonomy.family_id, name: taxonomy.family}
-      else
-        nil
-      end
-
-    # Pre-populate genus from current taxonomy
-    selected_genus =
-      if taxonomy && taxonomy.genus_id do
-        case Gallformers.Taxonomy.get_taxonomy(taxonomy.genus_id) do
-          %{id: id, name: name, is_placeholder: is_placeholder} ->
-            %{id: id, name: name, is_placeholder: is_placeholder}
-
-          _ ->
-            nil
-        end
-      else
-        nil
-      end
-
-    epithet = Gallformers.Taxonomy.extract_epithet(socket.assigns.host.name)
-
-    {:noreply,
-     socket
-     |> assign(:show_reclassify_modal, true)
-     |> assign(:reclassify_family_query, "")
-     |> assign(:reclassify_family_results, [])
-     |> assign(:reclassify_selected_family, selected_family)
-     |> assign(:reclassify_genus_query, "")
-     |> assign(:reclassify_genus_results, [])
-     |> assign(:reclassify_selected_genus, selected_genus)
-     |> assign(:reclassify_epithet, epithet)
-     |> assign(:add_alias_on_rename, true)
-     |> assign(:rename_alias_collisions, [])}
-  end
-
-  @impl true
-  def handle_event("close_reclassify_modal", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_reclassify_modal, false)
-     |> assign(:rename_alias_collisions, [])}
-  end
-
-  @impl true
-  def handle_event("reclassify_search_family", %{"value" => query}, socket) do
-    results =
-      if String.length(query) >= 1 do
-        Taxonomy.search_families(query)
-      else
-        []
-      end
-
-    {:noreply,
-     socket
-     |> assign(:reclassify_family_query, query)
-     |> assign(:reclassify_family_results, results)}
-  end
-
-  @impl true
-  def handle_event("reclassify_select_family", %{"id" => id}, socket) do
-    family_id = String.to_integer(id)
-    family = Enum.find(socket.assigns.reclassify_family_results, &(&1.id == family_id))
-
-    if family do
-      {:noreply,
-       socket
-       |> assign(:reclassify_selected_family, family)
-       |> assign(:reclassify_family_query, "")
-       |> assign(:reclassify_family_results, [])
-       # Clear genus when family changes
-       |> assign(:reclassify_selected_genus, nil)
-       |> assign(:reclassify_genus_query, "")
-       |> assign(:reclassify_genus_results, [])}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("reclassify_clear_family", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:reclassify_selected_family, nil)
-     |> assign(:reclassify_family_query, "")
-     |> assign(:reclassify_family_results, [])
-     # Clear genus when family is cleared
-     |> assign(:reclassify_selected_genus, nil)
-     |> assign(:reclassify_genus_query, "")
-     |> assign(:reclassify_genus_results, [])}
-  end
-
-  @impl true
-  def handle_event("reclassify_search_genus", %{"value" => query}, socket) do
-    family_id =
-      socket.assigns.reclassify_selected_family &&
-        socket.assigns.reclassify_selected_family.id
-
-    results =
-      if String.length(query) >= 1 && family_id do
-        Taxonomy.search_genera(query, family_id)
-      else
-        []
-      end
-
-    {:noreply,
-     socket
-     |> assign(:reclassify_genus_query, query)
-     |> assign(:reclassify_genus_results, results)}
-  end
-
-  @impl true
-  def handle_event("reclassify_select_genus", %{"id" => id}, socket) do
-    genus_id = String.to_integer(id)
-    genus = Enum.find(socket.assigns.reclassify_genus_results, &(&1.id == genus_id))
-
-    if genus do
-      {:noreply,
-       socket
-       |> assign(:reclassify_selected_genus, genus)
-       |> assign(:reclassify_genus_query, "")
-       |> assign(:reclassify_genus_results, [])}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("reclassify_clear_genus", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:reclassify_selected_genus, nil)
-     |> assign(:reclassify_genus_query, "")
-     |> assign(:reclassify_genus_results, [])}
-  end
-
-  @impl true
-  def handle_event("update_reclassify_epithet", %{"value" => value}, socket) do
-    genus = socket.assigns.reclassify_selected_genus
-    epithet = String.trim(value)
-
-    collisions =
-      if genus && String.length(epithet) >= 2 do
-        full_name = "#{genus.name} #{epithet}"
-        Species.find_species_with_alias(full_name)
-      else
-        []
-      end
-
-    {:noreply,
-     socket
-     |> assign(:reclassify_epithet, value)
-     |> assign(:rename_alias_collisions, collisions)}
-  end
-
-  @impl true
-  def handle_event("toggle_add_alias_on_rename", _params, socket) do
-    {:noreply, assign(socket, :add_alias_on_rename, !socket.assigns.add_alias_on_rename)}
-  end
-
-  @impl true
-  def handle_event(
-        "do_reclassify",
-        _params,
-        %{assigns: %{reclassify_selected_genus: nil}} = socket
-      ) do
-    {:noreply, put_flash(socket, :error, "Please select a genus")}
-  end
-
-  def handle_event("do_reclassify", _params, socket) do
-    selected_genus = socket.assigns.reclassify_selected_genus
-    species_id = socket.assigns.host.id
-    epithet = String.trim(socket.assigns.reclassify_epithet)
-    add_alias? = socket.assigns.add_alias_on_rename
-    old_name = socket.assigns.host.name
-
-    new_name = "#{selected_genus.name} #{epithet}"
-    current_genus_id = socket.assigns.taxonomy && socket.assigns.taxonomy.genus_id
-    genus_changed? = selected_genus.id != current_genus_id
-    name_changed? = new_name != old_name
-
-    cond do
-      not genus_changed? and not name_changed? ->
-        {:noreply,
-         socket
-         |> assign(:show_reclassify_modal, false)
-         |> put_flash(:info, "No changes made")}
-
-      epithet == "" ->
-        {:noreply, put_flash(socket, :error, "Epithet cannot be empty")}
-
-      true ->
-        apply_reclassify(socket, species_id, selected_genus.id, new_name, old_name,
-          genus_changed?: genus_changed?,
-          name_changed?: name_changed?,
-          add_alias?: add_alias?
-        )
-    end
-  end
-
   @impl true
   def handle_event("delete", _params, socket) do
     case Plants.delete_host(socket.assigns.host.id) do
@@ -614,59 +384,13 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     end
   end
 
-  defp apply_reclassify(socket, species_id, genus_id, new_name, old_name, opts) do
-    result = do_reclassify_and_rename(species_id, genus_id, new_name, old_name, opts)
-    handle_reclassify_result(socket, result, species_id, new_name != old_name, opts[:add_alias?])
-  end
+  defp reclassify_family(nil), do: nil
+  defp reclassify_family(%{family_id: nil}), do: nil
+  defp reclassify_family(%{family_id: id, family: name}), do: %{id: id, name: name}
 
-  defp handle_reclassify_result(
-         socket,
-         {:ok, updated_species},
-         species_id,
-         name_changed?,
-         add_alias?
-       ) do
-    taxonomy = Taxonomy.get_taxonomy_for_species(species_id)
-    genus_id = taxonomy && taxonomy.genus_id
-    sections_for_family = if genus_id, do: Taxonomy.list_sections_for_genus(genus_id), else: []
-
-    aliases =
-      if add_alias? and name_changed?,
-        do: Plants.get_aliases_for_host_full(species_id),
-        else: socket.assigns.aliases
-
-    {:noreply,
-     socket
-     |> assign(:host, updated_species)
-     |> assign(:aliases, aliases)
-     |> assign(:taxonomy, taxonomy)
-     |> assign(:selected_family_id, taxonomy && taxonomy.family_id)
-     |> assign(:selected_section_id, taxonomy && taxonomy.section_id)
-     |> assign(:sections_for_family, sections_for_family)
-     |> assign(:show_reclassify_modal, false)
-     |> assign(:page_title, "Edit Host - #{updated_species.name}")
-     |> put_flash(:info, "Host updated successfully")}
-  end
-
-  defp handle_reclassify_result(
-         socket,
-         {:error, :name_exists},
-         _species_id,
-         _name_changed?,
-         _add_alias?
-       ) do
-    {:noreply, put_flash(socket, :error, "That name is already in use")}
-  end
-
-  defp handle_reclassify_result(
-         socket,
-         {:error, reason},
-         _species_id,
-         _name_changed?,
-         _add_alias?
-       ) do
-    {:noreply, put_flash(socket, :error, "Failed to update: #{inspect(reason)}")}
-  end
+  defp reclassify_genus(nil), do: nil
+  defp reclassify_genus(%{genus_id: nil}), do: nil
+  defp reclassify_genus(%{genus_id: id}), do: %{id: id}
 
   defp toggle_region(%{assigns: %{mode: mode}} = socket, _code) when mode != :edit, do: socket
 
@@ -733,14 +457,6 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     # Clear search state
     |> assign(:host_search_query, "")
     |> assign(:host_search_results, [])
-    # Reclassify modal state
-    |> assign(:show_reclassify_modal, false)
-    |> assign(:reclassify_family_query, "")
-    |> assign(:reclassify_family_results, [])
-    |> assign(:reclassify_selected_family, nil)
-    |> assign(:reclassify_genus_query, "")
-    |> assign(:reclassify_genus_results, [])
-    |> assign(:reclassify_selected_genus, nil)
     # Mark form dirty since user entered a name (enables save button)
     |> reset_dirty()
     |> mark_dirty()
@@ -931,6 +647,43 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     end
   end
 
+  # =================================================================
+  # Reclassify callbacks (from ReclassifyLive component)
+  # =================================================================
+
+  @impl true
+  def handle_info({:reclassify_complete, result}, socket) do
+    species_id = result.species.id
+    taxonomy = Taxonomy.get_taxonomy_for_species(species_id)
+    genus_id = taxonomy && taxonomy.genus_id
+    sections_for_family = if genus_id, do: Taxonomy.list_sections_for_genus(genus_id), else: []
+
+    aliases =
+      if result.add_alias? and result.name_changed?,
+        do: Plants.get_aliases_for_host_full(species_id),
+        else: socket.assigns.aliases
+
+    {:noreply,
+     socket
+     |> assign(:host, result.species)
+     |> assign(:aliases, aliases)
+     |> assign(:taxonomy, taxonomy)
+     |> assign(:selected_family_id, taxonomy && taxonomy.family_id)
+     |> assign(:selected_section_id, taxonomy && taxonomy.section_id)
+     |> assign(:sections_for_family, sections_for_family)
+     |> assign(:page_title, "Edit Host - #{result.species.name}")
+     |> put_flash(:info, "Host updated successfully")}
+  end
+
+  @impl true
+  def handle_info({:reclassify_flash, level, message}, socket) do
+    {:noreply, put_flash(socket, level, message)}
+  end
+
+  # =================================================================
+  # Render
+  # =================================================================
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -1000,6 +753,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
               <button
                 type="button"
                 phx-click="open_reclassify_modal"
+                phx-target="#reclassify"
                 class="px-3 py-2 text-sm bg-gray-200 hover:bg-gray-300 border border-gray-300 rounded whitespace-nowrap"
               >
                 Rename/Reclassify
@@ -1236,19 +990,16 @@ defmodule GallformersWeb.Admin.HostLive.Form do
         <.discard_confirm_modal show={@show_discard_confirm} />
       </Layouts.admin_edit_layout>
 
-      <.reclassify_modal
-        show={@show_reclassify_modal}
+      <.live_component
+        module={GallformersWeb.Admin.ReclassifyLive}
+        id="reclassify"
+        species_id={@host && @host.id}
+        species_name={@host && @host.name}
+        current_family={reclassify_family(@taxonomy)}
+        current_genus={reclassify_genus(@taxonomy)}
         entity_type="Host"
-        family_query={@reclassify_family_query}
-        family_results={@reclassify_family_results}
-        selected_family={@reclassify_selected_family}
-        genus_query={@reclassify_genus_query}
-        genus_results={@reclassify_genus_results}
-        selected_genus={@reclassify_selected_genus}
-        epithet={@reclassify_epithet}
-        add_alias_checked={@add_alias_on_rename}
-        rename_collisions={@rename_alias_collisions}
         is_gall={false}
+        undescribed={false}
       />
 
       <%!-- Genus disambiguation modal --%>

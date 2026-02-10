@@ -130,17 +130,6 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     # Genus disambiguation modal state
     |> assign(:show_genus_disambiguation, false)
     |> assign(:possible_families, [])
-    # Rename/Reclassify modal state
-    |> assign(:show_reclassify_modal, false)
-    |> assign(:reclassify_family_query, "")
-    |> assign(:reclassify_family_results, [])
-    |> assign(:reclassify_selected_family, nil)
-    |> assign(:reclassify_genus_query, "")
-    |> assign(:reclassify_genus_results, [])
-    |> assign(:reclassify_selected_genus, nil)
-    |> assign(:reclassify_epithet, "")
-    |> assign(:add_alias_on_rename, true)
-    |> assign(:rename_alias_collisions, [])
     |> reset_dirty()
   end
 
@@ -776,219 +765,6 @@ defmodule GallformersWeb.Admin.GallLive.Form do
   end
 
   # =================================================================
-  # Event handlers - Reclassify modal
-  # =================================================================
-
-  @impl true
-  def handle_event("open_reclassify_modal", _params, socket) do
-    taxonomy = socket.assigns.taxonomy
-
-    # Pre-populate family from current taxonomy
-    selected_family =
-      if taxonomy && taxonomy.family_id do
-        %{id: taxonomy.family_id, name: taxonomy.family}
-      else
-        nil
-      end
-
-    # Pre-populate genus from current taxonomy
-    selected_genus =
-      if taxonomy && taxonomy.genus_id do
-        case Gallformers.Taxonomy.get_taxonomy(taxonomy.genus_id) do
-          %{id: id, name: name, is_placeholder: is_placeholder} ->
-            %{id: id, name: name, is_placeholder: is_placeholder}
-
-          _ ->
-            nil
-        end
-      else
-        nil
-      end
-
-    epithet = Gallformers.Taxonomy.extract_epithet(socket.assigns.gall.name)
-
-    {:noreply,
-     socket
-     |> assign(:show_reclassify_modal, true)
-     |> assign(:reclassify_family_query, "")
-     |> assign(:reclassify_family_results, [])
-     |> assign(:reclassify_selected_family, selected_family)
-     |> assign(:reclassify_genus_query, "")
-     |> assign(:reclassify_genus_results, [])
-     |> assign(:reclassify_selected_genus, selected_genus)
-     |> assign(:reclassify_epithet, epithet)
-     |> assign(:add_alias_on_rename, true)
-     |> assign(:rename_alias_collisions, [])}
-  end
-
-  @impl true
-  def handle_event("close_reclassify_modal", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_reclassify_modal, false)
-     |> assign(:rename_alias_collisions, [])}
-  end
-
-  @impl true
-  def handle_event("reclassify_search_family", %{"value" => query}, socket) do
-    results =
-      if String.length(query) >= 1 do
-        Gallformers.Taxonomy.search_families(query)
-      else
-        []
-      end
-
-    {:noreply,
-     socket
-     |> assign(:reclassify_family_query, query)
-     |> assign(:reclassify_family_results, results)}
-  end
-
-  @impl true
-  def handle_event("reclassify_select_family", %{"id" => id}, socket) do
-    family_id = String.to_integer(id)
-    family = Enum.find(socket.assigns.reclassify_family_results, &(&1.id == family_id))
-
-    if family do
-      {:noreply,
-       socket
-       |> assign(:reclassify_selected_family, family)
-       |> assign(:reclassify_family_query, "")
-       |> assign(:reclassify_family_results, [])
-       # Clear genus when family changes
-       |> assign(:reclassify_selected_genus, nil)
-       |> assign(:reclassify_genus_query, "")
-       |> assign(:reclassify_genus_results, [])}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("reclassify_clear_family", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:reclassify_selected_family, nil)
-     |> assign(:reclassify_family_query, "")
-     |> assign(:reclassify_family_results, [])
-     # Clear genus when family is cleared
-     |> assign(:reclassify_selected_genus, nil)
-     |> assign(:reclassify_genus_query, "")
-     |> assign(:reclassify_genus_results, [])}
-  end
-
-  @impl true
-  def handle_event("reclassify_search_genus", %{"value" => query}, socket) do
-    family_id =
-      socket.assigns.reclassify_selected_family &&
-        socket.assigns.reclassify_selected_family.id
-
-    results =
-      if String.length(query) >= 1 && family_id do
-        Gallformers.Taxonomy.search_genera(query, family_id)
-      else
-        []
-      end
-
-    {:noreply,
-     socket
-     |> assign(:reclassify_genus_query, query)
-     |> assign(:reclassify_genus_results, results)}
-  end
-
-  @impl true
-  def handle_event("reclassify_select_genus", %{"id" => id}, socket) do
-    genus_id = String.to_integer(id)
-    genus = Enum.find(socket.assigns.reclassify_genus_results, &(&1.id == genus_id))
-
-    if genus do
-      {:noreply,
-       socket
-       |> assign(:reclassify_selected_genus, genus)
-       |> assign(:reclassify_genus_query, "")
-       |> assign(:reclassify_genus_results, [])}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("reclassify_clear_genus", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:reclassify_selected_genus, nil)
-     |> assign(:reclassify_genus_query, "")
-     |> assign(:reclassify_genus_results, [])}
-  end
-
-  @impl true
-  def handle_event("update_reclassify_epithet", %{"value" => value}, socket) do
-    # Check collisions against the computed full name
-    genus = socket.assigns.reclassify_selected_genus
-    epithet = String.trim(value)
-
-    collisions =
-      if genus && String.length(epithet) >= 2 do
-        full_name = compute_reclassify_name(genus, epithet)
-        Species.find_species_with_alias(full_name)
-      else
-        []
-      end
-
-    {:noreply,
-     socket
-     |> assign(:reclassify_epithet, value)
-     |> assign(:rename_alias_collisions, collisions)}
-  end
-
-  @impl true
-  def handle_event("toggle_add_alias_on_rename", _params, socket) do
-    {:noreply, assign(socket, :add_alias_on_rename, !socket.assigns.add_alias_on_rename)}
-  end
-
-  @impl true
-  def handle_event(
-        "do_reclassify",
-        _params,
-        %{assigns: %{reclassify_selected_genus: nil}} = socket
-      ) do
-    {:noreply, put_flash(socket, :error, "Please select a genus")}
-  end
-
-  def handle_event("do_reclassify", _params, socket) do
-    selected_genus = socket.assigns.reclassify_selected_genus
-    selected_family = socket.assigns.reclassify_selected_family
-    species_id = socket.assigns.gall.id
-    epithet = String.trim(socket.assigns.reclassify_epithet)
-    add_alias? = socket.assigns.add_alias_on_rename
-    old_name = socket.assigns.gall.name
-
-    genus_id = resolve_genus_id(selected_genus, selected_family)
-    new_name = compute_reclassify_name(selected_genus, epithet)
-    current_genus_id = socket.assigns.taxonomy && socket.assigns.taxonomy.genus_id
-    genus_changed? = genus_id != current_genus_id
-    name_changed? = new_name != old_name
-
-    cond do
-      not genus_changed? and not name_changed? ->
-        {:noreply,
-         socket
-         |> assign(:show_reclassify_modal, false)
-         |> put_flash(:info, "No changes made")}
-
-      epithet == "" ->
-        {:noreply, put_flash(socket, :error, "Epithet cannot be empty")}
-
-      true ->
-        apply_reclassify(socket, species_id, genus_id, new_name, old_name,
-          genus_changed?: genus_changed?,
-          name_changed?: name_changed?,
-          add_alias?: add_alias?
-        )
-    end
-  end
-
-  # =================================================================
   # Event handlers - Delete
   # =================================================================
 
@@ -1006,70 +782,46 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     end
   end
 
-  defp resolve_genus_id(selected_genus, selected_family) do
-    if selected_genus.is_placeholder do
-      {:ok, unknown_genus} =
-        Gallformers.Taxonomy.find_or_create_unknown_genus(selected_family.id)
+  defp reclassify_family(nil), do: nil
 
-      unknown_genus.id
-    else
-      selected_genus.id
-    end
-  end
+  defp reclassify_family(%{family_id: nil}), do: nil
 
-  defp compute_reclassify_name(genus, epithet) do
-    "#{genus.name} #{epithet}"
-  end
+  defp reclassify_family(%{family_id: id, family: name}), do: %{id: id, name: name}
 
-  defp apply_reclassify(socket, species_id, genus_id, new_name, old_name, opts) do
-    result = do_reclassify_and_rename(species_id, genus_id, new_name, old_name, opts)
-    handle_reclassify_result(socket, result, species_id, new_name != old_name, opts[:add_alias?])
-  end
+  defp reclassify_genus(nil), do: nil
 
-  defp handle_reclassify_result(
-         socket,
-         {:ok, updated_species},
-         species_id,
-         name_changed?,
-         add_alias?
-       ) do
+  defp reclassify_genus(%{genus_id: nil}), do: nil
+
+  defp reclassify_genus(%{genus_id: id}), do: %{id: id}
+
+  # =================================================================
+  # Reclassify callbacks (from ReclassifyLive component)
+  # =================================================================
+
+  @impl true
+  def handle_info({:reclassify_complete, result}, socket) do
+    species_id = result.species.id
     taxonomy = Gallformers.Taxonomy.get_taxonomy_for_species(species_id)
 
     aliases =
-      if add_alias? and name_changed?,
+      if result.add_alias? and result.name_changed?,
         do: Species.get_aliases_for_species(species_id),
         else: socket.assigns.aliases
 
     {:noreply,
      socket
-     |> assign(:gall, updated_species)
+     |> assign(:gall, result.species)
      |> assign(:aliases, aliases)
      |> assign(:taxonomy, taxonomy)
      |> assign(:selected_family_id, taxonomy && taxonomy.family_id)
-     |> assign(:show_reclassify_modal, false)
-     |> assign(:page_title, "Edit Gall - #{updated_species.name}")
+     |> assign(:page_title, "Edit Gall - #{result.species.name}")
      |> compute_undescribed_lock(taxonomy, species_id)
      |> put_flash(:info, "Gall updated successfully")}
   end
 
-  defp handle_reclassify_result(
-         socket,
-         {:error, :name_exists},
-         _species_id,
-         _name_changed?,
-         _add_alias?
-       ) do
-    {:noreply, put_flash(socket, :error, "That name is already in use")}
-  end
-
-  defp handle_reclassify_result(
-         socket,
-         {:error, reason},
-         _species_id,
-         _name_changed?,
-         _add_alias?
-       ) do
-    {:noreply, put_flash(socket, :error, "Failed to update: #{inspect(reason)}")}
+  @impl true
+  def handle_info({:reclassify_flash, level, message}, socket) do
+    {:noreply, put_flash(socket, level, message)}
   end
 
   # =================================================================
@@ -1433,6 +1185,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
                   <button
                     type="button"
                     phx-click="open_reclassify_modal"
+                    phx-target="#reclassify"
                     class="px-3 py-2 text-sm bg-gray-200 hover:bg-gray-300 border border-gray-300 rounded whitespace-nowrap"
                   >
                     Rename/Reclassify
@@ -1798,19 +1551,16 @@ defmodule GallformersWeb.Admin.GallLive.Form do
           <.discard_confirm_modal show={@show_discard_confirm} />
         </Layouts.admin_edit_layout>
 
-        <.reclassify_modal
-          show={@show_reclassify_modal}
+        <.live_component
+          module={GallformersWeb.Admin.ReclassifyLive}
+          id="reclassify"
+          species_id={@gall && @gall.id}
+          species_name={@gall && @gall.name}
+          current_family={reclassify_family(@taxonomy)}
+          current_genus={reclassify_genus(@taxonomy)}
           entity_type="Gall"
-          family_query={@reclassify_family_query}
-          family_results={@reclassify_family_results}
-          selected_family={@reclassify_selected_family}
-          genus_query={@reclassify_genus_query}
-          genus_results={@reclassify_genus_results}
-          selected_genus={@reclassify_selected_genus}
-          epithet={@reclassify_epithet}
-          add_alias_checked={@add_alias_on_rename}
-          rename_collisions={@rename_alias_collisions}
           is_gall={true}
+          undescribed={@undescribed}
         />
 
         <%!-- Genus disambiguation modal --%>
