@@ -26,7 +26,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
     abundances = Species.list_abundances()
     all_places = Places.list_places()
-    families = Taxonomy.list_plant_families_for_select()
+    families = Taxonomy.list_families_for_select(:plant)
 
     socket =
       socket

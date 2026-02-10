@@ -43,16 +43,6 @@ defmodule Gallformers.Taxonomy do
   end
 
   @doc """
-  Gets or creates an "Unknown" placeholder genus for a family.
-  Alias for find_or_create_unknown_genus/1.
-  """
-  @spec get_or_create_unknown_genus(integer()) ::
-          {:ok, Taxonomy.t()} | {:error, Ecto.Changeset.t()}
-  def get_or_create_unknown_genus(family_id) do
-    find_or_create_unknown_genus(family_id)
-  end
-
-  @doc """
   Returns the display name for a taxonomy, handling placeholders.
 
   Preloads the parent association if not already loaded (needed for placeholder formatting).
@@ -81,30 +71,6 @@ defmodule Gallformers.Taxonomy do
       order_by: t.name
     )
     |> Repo.all()
-  end
-
-  @doc """
-  Returns all families.
-  """
-  @spec list_families() :: [Taxonomy.t()]
-  def list_families do
-    list_taxonomies_by_type("family")
-  end
-
-  @doc """
-  Returns all genera.
-  """
-  @spec list_genera() :: [Taxonomy.t()]
-  def list_genera do
-    list_taxonomies_by_type("genus")
-  end
-
-  @doc """
-  Returns all sections.
-  """
-  @spec list_sections() :: [Taxonomy.t()]
-  def list_sections do
-    list_taxonomies_by_type("section")
   end
 
   @doc """
@@ -1763,43 +1729,27 @@ defmodule Gallformers.Taxonomy do
   end
 
   @doc """
-  Returns families for use as parent options in forms.
-  """
-  @spec list_families_for_select() :: [{String.t(), integer()}]
-  def list_families_for_select do
-    from(t in Taxonomy,
-      where: t.type == "family",
-      order_by: t.name,
-      select: {t.name, t.id}
-    )
-    |> Repo.all()
-  end
+  Returns families as `{name, id}` tuples for select inputs.
 
-  @doc """
-  Returns plant families for use in host creation forms.
-  Plant families have description = "Plant".
+  Filter options:
+  - `:all` — all families (default)
+  - `:plant` — families where description == "Plant"
+  - `:gall` — families where description != "Plant"
   """
-  @spec list_plant_families_for_select() :: [{String.t(), integer()}]
-  def list_plant_families_for_select do
-    from(t in Taxonomy,
-      where: t.type == "family" and t.description == "Plant",
-      order_by: t.name,
-      select: {t.name, t.id}
-    )
-    |> Repo.all()
-  end
+  @spec list_families_for_select(atom()) :: [{String.t(), integer()}]
+  def list_families_for_select(filter \\ :all) do
+    base =
+      from(t in Taxonomy,
+        where: t.type == "family",
+        order_by: t.name,
+        select: {t.name, t.id}
+      )
 
-  @doc """
-  Returns non-plant families for use in gall creation forms.
-  Non-plant families have description != "Plant".
-  """
-  @spec list_gall_families_for_select() :: [{String.t(), integer()}]
-  def list_gall_families_for_select do
-    from(t in Taxonomy,
-      where: t.type == "family" and t.description != "Plant",
-      order_by: t.name,
-      select: {t.name, t.id}
-    )
+    case filter do
+      :plant -> from(t in base, where: t.description == "Plant")
+      :gall -> from(t in base, where: t.description != "Plant")
+      :all -> base
+    end
     |> Repo.all()
   end
 
@@ -1838,19 +1788,6 @@ defmodule Gallformers.Taxonomy do
   end
 
   def list_sections_for_genus(_), do: []
-
-  @doc """
-  Returns all sections for use in select dropdowns.
-  """
-  @spec list_sections_for_select() :: [{String.t(), integer()}]
-  def list_sections_for_select do
-    from(t in Taxonomy,
-      where: t.type == "section",
-      order_by: t.name,
-      select: {t.name, t.id}
-    )
-    |> Repo.all()
-  end
 
   @doc """
   Updates a genus's parent to a new section.

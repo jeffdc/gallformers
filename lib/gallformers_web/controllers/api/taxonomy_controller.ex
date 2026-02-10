@@ -180,7 +180,7 @@ defmodule GallformersWeb.API.TaxonomyController do
   # Private functions
 
   defp fetch_genera(nil, _limit, empty_unknown_ids) do
-    Taxonomy.list_genera()
+    Taxonomy.list_taxonomies_by_type("genus")
     |> Enum.reject(fn g -> MapSet.member?(empty_unknown_ids, g.id) end)
   end
 
@@ -234,7 +234,7 @@ defmodule GallformersWeb.API.TaxonomyController do
   defp parent_to_map(parent), do: %{id: parent.id, name: parent.name}
 
   defp get_families_with_genera do
-    families = Taxonomy.list_families()
+    families = Taxonomy.list_taxonomies_by_type("family")
     empty_unknown_ids = MapSet.new(Taxonomy.empty_unknown_genus_ids())
     family_ids = Enum.map(families, & &1.id)
     children_map = Taxonomy.get_children_for_parents(family_ids)
