@@ -66,8 +66,8 @@ defmodule Gallformers.Accounts.Auth0User do
   Returns the display name for the user, preferring name over nickname over email.
   """
   @spec display_name(t()) :: String.t()
-  def display_name(%__MODULE__{name: name}) when is_binary(name), do: name
-  def display_name(%__MODULE__{nickname: nickname}) when is_binary(nickname), do: nickname
-  def display_name(%__MODULE__{email: email}) when is_binary(email), do: email
+  def display_name(%__MODULE__{name: name}) when name not in [nil, ""], do: name
+  def display_name(%__MODULE__{nickname: nickname}) when nickname not in [nil, ""], do: nickname
+  def display_name(%__MODULE__{email: email}) when email not in [nil, ""], do: email
   def display_name(_), do: "Unknown User"
 end

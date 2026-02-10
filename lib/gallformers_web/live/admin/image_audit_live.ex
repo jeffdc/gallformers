@@ -854,8 +854,7 @@ defmodule GallformersWeb.Admin.ImageAuditLive do
     path = params["path"]
     species_id = String.to_integer(params["species_id"])
 
-    uploader =
-      socket.assigns.current_user.name || socket.assigns.current_user.email || "admin"
+    uploader = Gallformers.Accounts.Auth0User.display_name(socket.assigns.current_user)
 
     attrs = %{
       creator: params["creator"],
@@ -1028,8 +1027,7 @@ defmodule GallformersWeb.Admin.ImageAuditLive do
     editing_image = socket.assigns.editing_image
     image = Images.get_image!(editing_image.id)
 
-    lastchangedby =
-      socket.assigns.current_user.name || socket.assigns.current_user.email || "admin"
+    lastchangedby = Gallformers.Accounts.Auth0User.display_name(socket.assigns.current_user)
 
     license = editing_image.license
 
