@@ -13,7 +13,7 @@ The following tools define and enforce our coding standards:
 | **Dialyzer** | `mix dialyzer` | Type checking via typespecs |
 
 **Rules:**
-- Run `mix format` before committing
+- Run `mix precommit` before committing
 - All code must pass `mix credo --strict` with no errors
 - All code must pass `mix dialyzer` with no warnings
 - Treat warnings as errors during compilation (`--warnings-as-errors`)
@@ -655,16 +655,28 @@ The `Layouts` module is auto-aliased in `my_app_web.ex` - no explicit alias need
 
 The `<.flash_group>` component lives in `layouts.ex` and renders automatically. **Never** call `<.flash_group>` directly in LiveView templates - it's handled by the layout.
 
-### Icons
+### Icons (Phosphor)
 
-Use the `<.icon>` component from `core_components.ex`:
+This project uses [Phosphor Icons](https://phosphoricons.com/) with the `ph-` prefix via the `<.icon>` component:
 
 ```heex
-<.icon name="hero-x-mark" class="w-5 h-5" />
-<.icon name="hero-check" class="w-4 h-4 text-green-500" />
+<.icon name="ph-detective" class="w-5 h-5" />
+<.icon name="ph-trash" class="w-4 h-4 text-red-500" />
 ```
 
-**Never** use external Heroicons packages or inline SVGs for standard icons.
+**When using a new icon that hasn't been used before:**
+
+1. Download the SVG from Phosphor's GitHub:
+   ```bash
+   curl -o assets/vendor/phosphor/detective.svg \
+     https://raw.githubusercontent.com/phosphor-icons/core/main/assets/regular/detective.svg
+   ```
+2. Rebuild assets: `mix assets.build`
+3. Restart the Phoenix server (hot reload doesn't pick up new icons)
+
+**Existing icons** are in `assets/vendor/phosphor/`. Check there before downloading.
+
+**Never** use inline SVGs for standard icons.
 
 ### Form Inputs
 
@@ -821,6 +833,27 @@ Tailwind v4 uses CSS-based configuration (no `tailwind.config.js`):
 
 ---
 
+## S3 Isolation in Tests
+
+**CRITICAL**: Tests must NEVER make real AWS/S3 calls. This is enforced by:
+
+1. **Config flag**: `config :gallformers, s3_enabled: false` in `config/test.exs`
+2. **Wrapper module**: All S3 operations go through `Gallformers.S3.request/1` instead of `ExAws.request/1`
+
+When adding new S3 operations, always use the wrapper:
+
+```elixir
+# WRONG - will fail in CI (no AWS credentials)
+ExAws.S3.put_object(bucket, path, data) |> ExAws.request()
+
+# CORRECT - respects s3_enabled config
+ExAws.S3.put_object(bucket, path, data) |> Gallformers.S3.request()
+```
+
+The wrapper returns `{:ok, %{body: %{contents: []}}}` in test mode, which satisfies both list operations (need `body.contents`) and mutate operations (just check `{:ok, _}`).
+
+---
+
 ## Pre-Commit Checklist
 
 Before committing:
@@ -832,3 +865,272 @@ Before committing:
 5. `mix dialyzer` - No type errors
 
 Or run: `mix precommit` (if configured)
+
+---
+
+## SQLite Compatibility
+
+This project uses **SQLite** (via ecto_sqlite3), not PostgreSQL. Always ensure queries are SQLite-compatible.
+
+**WAL mode footgun — stale journal files:** SQLite in WAL mode uses three files: `.sqlite`, `.sqlite-wal`, and `.sqlite-shm`. If you replace the main `.sqlite` file without deleting the WAL/SHM companions, sqlite3 will replay the old WAL against the new database and report "database disk image is malformed." Always delete `-wal` and `-shm` files when replacing a database file.
+
+**Case-insensitive search (NO `ilike`):**
+```elixir
+# WRONG - PostgreSQL only
+where: ilike(s.name, ^search_term)
+
+# CORRECT - SQLite compatible
+search_term = "%#{String.downcase(query)}%"
+where: fragment("lower(?) LIKE ?", s.name, ^search_term)
+```
+
+**Distinct on column (NO `distinct: column`):**
+```elixir
+# WRONG - PostgreSQL's DISTINCT ON
+distinct: t.id
+
+# CORRECT - SQLite compatible (use group_by instead)
+group_by: [t.id, t.name]
+```
+
+---
+
+## Ecto & Query Patterns (Project-Specific)
+
+**For refactoring or new DB code**: Load `prompts/ecto-refactor.md` for full guidance with mandatory checkpoints.
+
+### Core Principles
+
+1. **Use preloads, not manual joins** - Schema associations exist; use `Repo.preload/2`
+2. **Return structs, not maps** - Maps lose preloadability; transform at boundaries (controller/view)
+3. **No parallel single/batch functions** - If you need `get_x/1` AND `get_x_batch/1`, the design is wrong
+4. **Count your queries** - Know the query count before and after any change
+5. **Contexts own domains, not tables** - Gall-specific logic belongs in a Galls context, not Species
+
+### Schema Associations (USE THESE)
+
+**Species** (`lib/gallformers/species/species.ex`):
+```elixir
+has_many :images                    # Species.Image
+has_one :gall_traits                # Species.GallTraits
+has_many :host_relations            # Hosts.Host (this species as gall)
+has_many :gall_relations            # Hosts.Host (this species as host)
+many_to_many :aliases               # via alias_species
+many_to_many :taxonomies            # via species_taxonomy
+many_to_many :host_ranges           # via host_range (places)
+```
+
+**Taxonomy** (`lib/gallformers/taxonomy/taxonomy.ex`):
+```elixir
+belongs_to :parent                  # Self-referential
+has_many :children                  # Self-referential
+many_to_many :species               # via species_taxonomy
+```
+
+### Red Flags - STOP and Discuss
+
+| Pattern | Problem |
+|---------|---------|
+| `Enum.map(items, &get_X(&1.id))` | N+1 - must batch or preload |
+| `from(x in "table_name", ...)` | Missing schema - should use association |
+| Function returns map with `:id` | Loses preloadability |
+| `get_X/1` and `get_X_batch/1` both exist | Design smell - preloads should unify |
+| Manual join on junction table | Association likely exists |
+| 1000+ line context module | God context - needs splitting |
+
+### Query Pattern Examples
+
+```elixir
+# WRONG: Manual assembly (4 queries)
+def get_host_for_edit(id) do
+  host = get_host(id)
+  taxonomy = Taxonomy.get_taxonomy_for_species(id)
+  places = get_places_for_host(id)
+  aliases = get_aliases_for_host(id)
+  Map.merge(host, %{taxonomy: taxonomy, places: places, aliases: aliases})
+end
+
+# RIGHT: Preload (1-2 queries)
+def get_host_for_edit(id) do
+  Species
+  |> where([s], s.id == ^id and s.taxoncode == "plant")
+  |> preload([:aliases, :host_ranges, taxonomies: :parent])
+  |> Repo.one()
+end
+```
+
+---
+
+## PubSub / Real-time Updates
+
+The admin interface uses Phoenix PubSub for real-time updates. Pattern:
+
+**Context module:**
+```elixir
+@topic "glossary"
+
+def subscribe do
+  Phoenix.PubSub.subscribe(Gallformers.PubSub, @topic)
+end
+
+defp broadcast({:ok, record}, event) do
+  Phoenix.PubSub.broadcast(Gallformers.PubSub, @topic, {event, record})
+  {:ok, record}
+end
+```
+
+**LiveView:**
+```elixir
+def mount(_params, _session, socket) do
+  if connected?(socket), do: Glossary.subscribe()
+  {:ok, stream(socket, :glossaries, Glossary.list_glossaries())}
+end
+
+def handle_info({:glossary_created, glossary}, socket) do
+  {:noreply, stream_insert(socket, :glossaries, glossary, at: 0)}
+end
+```
+
+---
+
+## Styling (Project-Specific)
+
+### Custom Colors
+
+Colors are defined in `assets/css/app.css` via `@theme`:
+
+| Class | Hex | Use for |
+|-------|-----|---------|
+| `text-gf-maroon` / `bg-gf-maroon` | #661419 | Headings, links, primary accent |
+| `text-gf-sky-blue` / `bg-gf-sky-blue` | #c1e0f3 | Header background |
+| `text-gf-autumn` / `bg-gf-autumn` | #bc6428 | Subtitles, secondary text |
+| `bg-cadet-blue` | #96adc8 | Table headers |
+| `bg-canary` | #f8f991 | Selected/highlighted rows |
+
+---
+
+## Schema Field Definitions (In Progress)
+
+Schemas should be the single source of truth for required/optional fields. This ensures:
+- Changeset validations and UI `required` attributes stay in sync
+- No drift between what the form requires and what the database validates
+- Data audit tools can use the same definitions
+
+**Target Pattern (being implemented):**
+
+```elixir
+# In schema module
+defmodule Gallformers.Sources.Source do
+  use Ecto.Schema
+  use Gallformers.SchemaFields  # Behavior for field metadata
+
+  @required_fields [:title, :author, :pubyear, :link, :citation, :license]
+  @optional_fields [:datacomplete, :licenselink]
+
+  @impl Gallformers.SchemaFields
+  def required_fields, do: @required_fields
+
+  def changeset(source, attrs) do
+    source
+    |> cast(attrs, @required_fields ++ @optional_fields)
+    |> validate_required(@required_fields)
+  end
+end
+```
+
+```elixir
+# In form template - auto-derives required from schema
+<.input field={@form[:title]} schema={Source} label="Title:" />
+```
+
+**Tracking:** `gallformers-1j8o` (field audit), `gallformers-uvz3` (tracer bullet), `gallformers-kntb` (full implementation)
+
+**Current State:** Most forms hardcode `required` attributes separately from schema validations. This will be unified once the pattern is proven.
+
+---
+
+## Request Logging
+
+The app logs all HTTP requests to JSON Lines files for incident investigation.
+
+**Location:**
+- **Production**: `/data/logs/requests-YYYY-MM-DD.log` (persistent volume)
+- **Development**: `priv/logs/requests-YYYY-MM-DD.log` (gitignored)
+
+**Log format** (one JSON object per line):
+```json
+{"ts":"2026-02-05T14:32:01Z","method":"GET","path":"/species/123","query":"tab=hosts","status":200,"duration_ms":45,"ip":"1.2.3.4","ua":"Mozilla/5.0..."}
+```
+
+**Retention**: Logs older than 30 days are automatically deleted.
+
+**Retrieving logs from production:**
+```bash
+fly ssh sftp get /data/logs/requests-2026-02-05.log
+```
+
+**Analyzing logs locally:**
+```bash
+# All 500 errors
+cat requests-2026-02-05.log | jq -c 'select(.status >= 500)'
+
+# Slowest requests
+cat requests-2026-02-05.log | jq -s 'sort_by(.duration_ms) | reverse | .[0:10]'
+
+# Requests to a specific path
+cat requests-2026-02-05.log | jq -c 'select(.path | startswith("/api/gall"))'
+
+# Error rate by path
+cat requests-2026-02-05.log | jq -s 'group_by(.path) | map({path: .[0].path, total: length, errors: [.[] | select(.status >= 400)] | length})'
+```
+
+**Configuration:**
+- `config :gallformers, :request_log_dir` - Override log directory
+- `config :gallformers, :request_logger_enabled` - Disable logging (set `false` in test.exs)
+
+**Implementation**: `lib/gallformers/request_logger.ex` - Attaches to Phoenix telemetry events.
+
+---
+
+## E2E Tests (Browser-based)
+
+E2E tests use [Wallaby](https://github.com/elixir-wallaby/wallaby) with Chrome. They're **excluded from regular test runs** to keep the dev loop fast.
+
+**Prerequisites**: ChromeDriver is required.
+```bash
+brew install chromedriver
+xattr -d com.apple.quarantine $(which chromedriver)
+make e2e-setup
+```
+
+**Running E2E tests**:
+```bash
+make e2e                   # Run all E2E tests
+make e2e-changed           # Run only tests affected by changed files
+make e2e-public            # Public pages only
+make e2e-search            # Search functionality only
+make e2e-browse            # Species/hosts/galls browsing only
+make e2e-admin             # Admin pages only
+make e2e-auth              # Authentication flows only
+```
+
+**Debugging**: `make e2e-headed` or `E2E_HEADED=1 make e2e-admin`
+
+### Writing E2E Tests
+
+All E2E tests must be tagged with `@moduletag :e2e` plus an area tag. See `test/support/e2e_case.ex` for full documentation.
+
+```elixir
+defmodule GallformersWeb.E2E.MyTest do
+  use GallformersWeb.E2ECase
+
+  @moduletag :e2e
+  @moduletag :e2e_public  # Area tag
+
+  test "page loads", %{session: session} do
+    session
+    |> visit("/")
+    |> assert_has(Query.css("body.phx-connected"))
+  end
+end
+```
