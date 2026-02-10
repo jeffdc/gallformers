@@ -755,6 +755,192 @@ defmodule Gallformers.Galls do
   end
 
   # ============================================
+  # Composite Save Operations
+  # ============================================
+
+  @doc """
+  Creates a new gall species with all associations in a single transaction.
+
+  Handles species creation, gall_traits, taxonomy linking, hosts, aliases,
+  filter values, and gall properties (detachable/undescribed).
+
+  ## Params
+
+    * `:species_attrs` - Map of species attributes (name, taxoncode, etc.)
+    * `:taxonomy` - Taxonomy map with genus info
+    * `:genus_is_new` - Boolean, whether to create a new genus
+    * `:parent_id` - Family or section ID for taxonomy linking
+    * `:hosts` - List of host maps with `:host_species_id`
+    * `:aliases` - List of alias maps with `:name` and `:type`
+    * `:filter_values` - Map of filter type => list of filter value maps
+    * `:detachable` - Detachable value string
+    * `:undescribed` - Boolean undescribed flag
+
+  Returns `{:ok, species}` or `{:error, changeset | reason}`.
+  """
+  @spec create_gall_with_associations(map()) ::
+          {:ok, Species.t()} | {:error, Ecto.Changeset.t() | term()}
+  def create_gall_with_associations(params) do
+    Repo.transaction(fn ->
+      case Gallformers.Species.create_species(params.species_attrs) do
+        {:ok, species} ->
+          {:ok, _gall} = create_gall_traits(species.id)
+
+          Gallformers.Taxonomy.link_species_taxonomy(
+            species.id,
+            params.taxonomy,
+            params.genus_is_new,
+            params.parent_id
+          )
+
+          for host <- params.hosts do
+            Gallformers.GallHosts.add_host_to_gall(species.id, host.host_species_id)
+          end
+
+          for a <- params.aliases do
+            Gallformers.Species.create_alias_for_species(species.id, %{
+              name: a.name,
+              type: a.type
+            })
+          end
+
+          sync_filter_values(species.id, empty_filter_values(), params.filter_values)
+
+          update_gall_properties(species.id, %{
+            detachable: params.detachable,
+            undescribed: params.undescribed
+          })
+
+          species
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  @doc """
+  Updates a gall species with all associations in a single transaction.
+
+  Handles species update, alias changes, host changes, filter changes,
+  gall properties, and species timestamp touch.
+
+  ## Params
+
+    * `:species_attrs` - Map of species attributes to update
+    * `:alias_changes` - Tuple `{to_add, to_remove}` from DeferredChanges
+    * `:host_changes` - Tuple `{to_add, to_remove}` from DeferredChanges
+    * `:original_filter_values` - Original filter values map for diffing
+    * `:filter_values` - Current filter values map
+    * `:detachable` - Detachable value string
+    * `:undescribed` - Boolean undescribed flag
+
+  Returns `{:ok, species}` or `{:error, changeset | reason}`.
+  """
+  @spec update_gall_with_associations(Species.t(), map()) ::
+          {:ok, Species.t()} | {:error, Ecto.Changeset.t() | term()}
+  def update_gall_with_associations(species, params) do
+    {aliases_to_add, aliases_to_remove} = params.alias_changes
+    {hosts_to_add, hosts_to_remove} = params.host_changes
+
+    Repo.transaction(fn ->
+      case Gallformers.Species.update_species(species, params.species_attrs) do
+        {:ok, updated_species} ->
+          save_alias_changes(species.id, aliases_to_add, aliases_to_remove)
+          save_host_changes(species.id, hosts_to_add, hosts_to_remove)
+
+          sync_filter_values(
+            species.id,
+            params.original_filter_values,
+            params.filter_values
+          )
+
+          update_gall_properties(species.id, %{
+            detachable: params.detachable,
+            undescribed: params.undescribed
+          })
+
+          Gallformers.Species.touch(species.id)
+          updated_species
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  @doc """
+  Syncs filter values for a gall by computing set differences and issuing
+  add/remove calls for each filter type.
+  """
+  @spec sync_filter_values(integer(), map(), map()) :: :ok
+  def sync_filter_values(gall_id, original_values, current_values) do
+    filter_types = [
+      :colors,
+      :shapes,
+      :textures,
+      :alignments,
+      :walls,
+      :cells,
+      :plant_parts,
+      :forms,
+      :seasons
+    ]
+
+    for filter_type <- filter_types do
+      original = Map.get(original_values, filter_type, [])
+      current = Map.get(current_values, filter_type, [])
+
+      original_ids = MapSet.new(Enum.map(original, & &1.id))
+      current_ids = MapSet.new(Enum.map(current, & &1.id))
+
+      for filter_id <- MapSet.difference(original_ids, current_ids) do
+        remove_filter_field_from_gall(gall_id, filter_type, filter_id)
+      end
+
+      for filter_id <- MapSet.difference(current_ids, original_ids) do
+        add_filter_field_to_gall(gall_id, filter_type, filter_id)
+      end
+    end
+
+    :ok
+  end
+
+  defp empty_filter_values do
+    %{
+      colors: [],
+      shapes: [],
+      textures: [],
+      alignments: [],
+      walls: [],
+      cells: [],
+      plant_parts: [],
+      forms: [],
+      seasons: []
+    }
+  end
+
+  defp save_alias_changes(species_id, to_add, to_remove) do
+    for alias_id <- to_remove do
+      Gallformers.Species.remove_alias_from_species(species_id, alias_id)
+    end
+
+    for a <- to_add do
+      Gallformers.Species.create_alias_for_species(species_id, %{name: a.name, type: a.type})
+    end
+  end
+
+  defp save_host_changes(species_id, to_add, to_remove) do
+    for relation_id <- to_remove do
+      Gallformers.GallHosts.remove_host_from_gall(relation_id)
+    end
+
+    for host <- to_add do
+      Gallformers.GallHosts.add_host_to_gall(species_id, host.host_species_id)
+    end
+  end
+
+  # ============================================
   # PubSub
   # ============================================
 
