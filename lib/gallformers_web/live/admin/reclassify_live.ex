@@ -103,6 +103,7 @@ defmodule GallformersWeb.Admin.ReclassifyLive do
     <div id={@id}>
       <.reclassify_modal
         show={@show}
+        target={@myself}
         entity_type={@entity_type}
         family_query={@family_query}
         family_results={@family_results}
