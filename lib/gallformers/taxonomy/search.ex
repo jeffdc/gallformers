@@ -12,19 +12,44 @@ defmodule Gallformers.Taxonomy.Search do
 
   Used by the reclassify modal family typeahead.
   Returns maps with id and name.
-  """
-  @spec search_families(String.t(), integer()) :: [map()]
-  def search_families(query, limit \\ 20) do
-    name_pattern = "#{String.downcase(query)}%"
 
-    from(f in Taxonomy,
-      where: f.type == "family",
-      where: fragment("lower(?) LIKE ?", f.name, ^name_pattern),
-      order_by: f.name,
-      limit: ^limit,
-      select: %{id: f.id, name: f.name}
-    )
-    |> Repo.all()
+  ## Options
+
+    * `:taxoncode` - when set (e.g. `"gall"` or `"plant"`), only returns
+      families that contain genera with at least one species of that taxoncode.
+  """
+  @spec search_families(String.t(), keyword()) :: [map()]
+  def search_families(query, opts \\ []) do
+    name_pattern = "#{String.downcase(query)}%"
+    taxoncode = Keyword.get(opts, :taxoncode)
+    limit = Keyword.get(opts, :limit, 20)
+
+    base =
+      from(f in Taxonomy,
+        where: f.type == "family",
+        where: fragment("lower(?) LIKE ?", f.name, ^name_pattern),
+        order_by: f.name,
+        limit: ^limit,
+        select: %{id: f.id, name: f.name}
+      )
+
+    base =
+      if taxoncode do
+        from(f in base,
+          join: g in Taxonomy,
+          on: g.parent_id == f.id and g.type == "genus",
+          join: st in "species_taxonomy",
+          on: st.taxonomy_id == g.id,
+          join: s in Gallformers.Species.Species,
+          on: st.species_id == s.id,
+          where: s.taxoncode == ^taxoncode,
+          distinct: true
+        )
+      else
+        base
+      end
+
+    Repo.all(base)
   end
 
   @doc """
@@ -32,10 +57,17 @@ defmodule Gallformers.Taxonomy.Search do
 
   Used by the reclassify modal typeahead. When `family_id` is provided,
   constrains results to genera within that family.
+
+  ## Options
+
+    * `:taxoncode` - when set (e.g. `"gall"` or `"plant"`), only returns
+      genera that have at least one species of that taxoncode.
   """
-  @spec search_genera(String.t(), integer() | nil, integer()) :: [map()]
-  def search_genera(query, family_id \\ nil, limit \\ 20) do
+  @spec search_genera(String.t(), integer() | nil, keyword()) :: [map()]
+  def search_genera(query, family_id \\ nil, opts \\ []) do
     name_pattern = "#{String.downcase(query)}%"
+    taxoncode = Keyword.get(opts, :taxoncode)
+    limit = Keyword.get(opts, :limit, 20)
 
     base =
       from(g in Taxonomy,
@@ -57,6 +89,20 @@ defmodule Gallformers.Taxonomy.Search do
     base =
       if family_id do
         from([g, f] in base, where: g.parent_id == ^family_id)
+      else
+        base
+      end
+
+    base =
+      if taxoncode do
+        from([g, ...] in base,
+          join: st in "species_taxonomy",
+          on: st.taxonomy_id == g.id,
+          join: s in Gallformers.Species.Species,
+          on: st.species_id == s.id,
+          where: s.taxoncode == ^taxoncode,
+          distinct: true
+        )
       else
         base
       end

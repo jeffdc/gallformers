@@ -120,7 +120,7 @@ defmodule Gallformers.Taxonomy do
 
   defdelegate get_taxonomy_from_species_name(name), to: SpeciesLink
   defdelegate lookup_taxonomy_for_new_species(name), to: SpeciesLink
-  defdelegate resolve_taxonomy_for_species(taxonomy, family_ids, opts \\ []), to: SpeciesLink
+  defdelegate resolve_taxonomy_for_species(taxonomy, family_ids), to: SpeciesLink
   defdelegate resolve_genus_id(genus, family), to: SpeciesLink
 
   # =====================================================================
@@ -141,6 +141,8 @@ defmodule Gallformers.Taxonomy do
   # Delegated to Taxonomy.Reclassification
   # =====================================================================
 
+  defdelegate reclassify_species(species_id, params), to: Reclassification
+
   defdelegate reassign_species_taxonomy(species_id, new_genus_id, opts \\ []),
     to: Reclassification
 
@@ -148,8 +150,8 @@ defmodule Gallformers.Taxonomy do
   # Delegated to Taxonomy.Search — Typeahead & Search Queries
   # =====================================================================
 
-  defdelegate search_families(query, limit \\ 20), to: Search
-  defdelegate search_genera(query, family_id \\ nil, limit \\ 20), to: Search
+  defdelegate search_families(query, opts \\ []), to: Search
+  defdelegate search_genera(query, family_id \\ nil, opts \\ []), to: Search
   defdelegate search_genera_and_sections(query, limit \\ 20, opts \\ []), to: Search
   defdelegate search_taxonomies(query, type \\ nil, limit \\ 50), to: Search
   defdelegate search_sections(query), to: Search

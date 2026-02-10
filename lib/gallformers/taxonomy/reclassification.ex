@@ -18,6 +18,63 @@ defmodule Gallformers.Taxonomy.Reclassification do
   # =====================================================================
 
   @doc """
+  Performs a combined reclassify (genus change) and/or rename (epithet change).
+
+  Accepts a species ID and a params map with keys:
+  - `genus_id` - target genus ID
+  - `new_name` - desired species name
+  - `old_name` - current species name
+  - `genus_changed?` - whether the genus is changing
+  - `name_changed?` - whether the name is changing
+  - `add_alias?` - whether to create an alias for the old name
+  - `undescribed?` - whether the species is currently undescribed
+  - `former_undescribed_choice` - `:keep`, `:replace`, or `nil`
+
+  Returns `{:ok, species}` or `{:error, reason}`.
+  """
+  @spec reclassify_species(integer(), map()) :: {:ok, Species.t()} | {:error, term()}
+  def reclassify_species(species_id, %{} = params) do
+    %{
+      genus_changed?: genus_changed?,
+      name_changed?: name_changed?,
+      add_alias?: add_alias?,
+      new_name: new_name,
+      genus_id: genus_id
+    } = params
+
+    {alias_type, rotate?} = resolve_alias_opts(params)
+
+    cond do
+      genus_changed? ->
+        target_epithet = TaxonName.epithet(new_name)
+
+        reassign_species_taxonomy(species_id, genus_id,
+          add_alias?: add_alias?,
+          alias_type: alias_type,
+          rotate_former_undescribed: rotate?,
+          target_epithet: target_epithet
+        )
+
+      name_changed? ->
+        if rotate?,
+          do: Gallformers.Species.rotate_former_undescribed_alias(species_id)
+
+        Gallformers.Species.rename_species(species_id, new_name, add_alias?, alias_type)
+
+      true ->
+        {:ok, Repo.get!(Species, species_id)}
+    end
+  end
+
+  defp resolve_alias_opts(params) do
+    case params[:former_undescribed_choice] do
+      :keep -> {"scientific", false}
+      :replace -> {"former_undescribed", true}
+      nil -> {if(params[:undescribed?], do: "former_undescribed", else: "scientific"), false}
+    end
+  end
+
+  @doc """
   Reassigns a species to a different genus.
 
   Wraps `update_species_genus/2` in a transaction. Also renames the species to
@@ -33,6 +90,7 @@ defmodule Gallformers.Taxonomy.Reclassification do
     add_alias? = Keyword.get(opts, :add_alias?, true)
     rotate_former_undescribed = Keyword.get(opts, :rotate_former_undescribed, false)
     explicit_alias_type = Keyword.get(opts, :alias_type)
+    target_epithet = Keyword.get(opts, :target_epithet)
     # Capture undescribed state BEFORE maybe_force_undescribed changes it
     was_undescribed? = species_undescribed?(species_id)
 
@@ -47,7 +105,8 @@ defmodule Gallformers.Taxonomy.Reclassification do
             new_genus_id,
             add_alias?,
             was_undescribed?,
-            explicit_alias_type
+            explicit_alias_type,
+            target_epithet
           )
 
         {:error, reason} ->
@@ -66,13 +125,14 @@ defmodule Gallformers.Taxonomy.Reclassification do
          new_genus_id,
          add_alias?,
          was_undescribed?,
-         explicit_alias_type
+         explicit_alias_type,
+         target_epithet
        ) do
     species = Repo.get!(Species, species_id)
     genus = Tree.get_taxonomy!(new_genus_id) |> Repo.preload(:parent)
     new_genus_display = Taxonomy.display_name(genus)
 
-    epithet = TaxonName.epithet(species.name)
+    epithet = target_epithet || TaxonName.epithet(species.name)
     new_name = TaxonName.build(new_genus_display, epithet)
 
     if new_name != species.name do
@@ -92,8 +152,17 @@ defmodule Gallformers.Taxonomy.Reclassification do
         alias_type: alias_type
       )
 
-      # Return the updated species
-      Repo.get!(Species, species_id)
+      # When target_epithet was provided, rename_for_genus_change produced
+      # "NewGenus old_epithet" — correct the name to use the target epithet.
+      updated = Repo.get!(Species, species_id)
+
+      if updated.name != new_name do
+        updated
+        |> Species.changeset(%{name: new_name})
+        |> Repo.update!()
+      else
+        updated
+      end
     else
       species
     end

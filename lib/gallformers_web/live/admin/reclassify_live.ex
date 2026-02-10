@@ -20,10 +20,10 @@ defmodule GallformersWeb.Admin.ReclassifyLive do
     * `{:reclassify_error, reason}`
   """
   use GallformersWeb, :live_component
-  use GallformersWeb.Admin.FormHelpers
 
   alias Gallformers.Species
   alias Gallformers.Taxonomy
+  alias Gallformers.Taxonomy.TaxonName
 
   # -------------------------------------------------------------------
   # Lifecycle
@@ -143,7 +143,7 @@ defmodule GallformersWeb.Admin.ReclassifyLive do
   def handle_event("reclassify_search_family", %{"value" => query}, socket) do
     results =
       if String.length(query) >= 1 do
-        Taxonomy.search_families(query)
+        Taxonomy.search_families(query, taxoncode: taxoncode_for(socket))
       else
         []
       end
@@ -191,7 +191,7 @@ defmodule GallformersWeb.Admin.ReclassifyLive do
 
     results =
       if String.length(query) >= 1 && family_id do
-        Taxonomy.search_genera(query, family_id)
+        Taxonomy.search_genera(query, family_id, taxoncode: taxoncode_for(socket))
       else
         []
       end
@@ -234,7 +234,7 @@ defmodule GallformersWeb.Admin.ReclassifyLive do
 
     collisions =
       if genus && String.length(epithet) >= 2 do
-        full_name = compute_name(genus, epithet)
+        full_name = compute_name(genus, epithet, socket.assigns.selected_family)
         Species.find_species_with_alias(full_name)
       else
         []
@@ -276,7 +276,7 @@ defmodule GallformersWeb.Admin.ReclassifyLive do
 
     epithet = String.trim(raw_epithet)
     genus_id = Taxonomy.resolve_genus_id(selected_genus, selected_family)
-    new_name = compute_name(selected_genus, epithet)
+    new_name = compute_name(selected_genus, epithet, selected_family)
     current_genus_id = current_genus && current_genus.id
     genus_changed? = genus_id != current_genus_id
     name_changed? = new_name != old_name
@@ -307,14 +307,18 @@ defmodule GallformersWeb.Admin.ReclassifyLive do
     former_undescribed_choice =
       if socket.assigns.has_former_undescribed, do: socket.assigns.alias_choice
 
-    all_opts =
-      opts ++
-        [
-          undescribed?: socket.assigns.undescribed,
-          former_undescribed_choice: former_undescribed_choice
-        ]
+    params = %{
+      genus_id: genus_id,
+      new_name: new_name,
+      old_name: old_name,
+      genus_changed?: opts[:genus_changed?],
+      name_changed?: opts[:name_changed?],
+      add_alias?: opts[:add_alias?],
+      undescribed?: socket.assigns.undescribed,
+      former_undescribed_choice: former_undescribed_choice
+    }
 
-    result = do_reclassify_and_rename(species_id, genus_id, new_name, old_name, all_opts)
+    result = Taxonomy.reclassify_species(species_id, params)
     handle_reclassify_result(socket, result, opts[:name_changed?], opts[:add_alias?])
   end
 
@@ -338,5 +342,15 @@ defmodule GallformersWeb.Admin.ReclassifyLive do
     {:noreply, socket}
   end
 
-  defp compute_name(genus, epithet), do: "#{genus.name} #{epithet}"
+  defp compute_name(%{is_placeholder: true}, epithet, selected_family) do
+    family_name = if selected_family, do: selected_family.name, else: "Unknown"
+    TaxonName.build("Unknown (#{family_name})", epithet)
+  end
+
+  defp compute_name(genus, epithet, _selected_family) do
+    TaxonName.build(genus.name, epithet)
+  end
+
+  defp taxoncode_for(%{assigns: %{is_gall: true}}), do: "gall"
+  defp taxoncode_for(_socket), do: "plant"
 end

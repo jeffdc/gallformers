@@ -358,7 +358,7 @@ const Typeahead = {
       this.input.addEventListener("input", () => {
         const searchEvent = this.el.dataset.searchEvent
         if (searchEvent) {
-          this.pushEvent(searchEvent, {value: this.input.value})
+          this.pushTargetedEvent(searchEvent, {value: this.input.value})
         }
       })
     }
@@ -367,6 +367,16 @@ const Typeahead = {
     if (this.selectedContainer && !this.selectedContainer._typeaheadListener) {
       this.selectedContainer._typeaheadListener = true
       this.selectedContainer.addEventListener("keydown", this.selectedHandler)
+    }
+  },
+
+  // Push event to the correct target (LiveComponent or LiveView)
+  pushTargetedEvent(event, payload) {
+    const target = this.el.dataset.target
+    if (target) {
+      this.pushEventTo(`[data-phx-component="${target}"]`, event, payload)
+    } else {
+      this.pushEvent(event, payload)
     }
   },
 
@@ -406,7 +416,7 @@ const Typeahead = {
           // No result highlighted but there's text - trigger close to add as new item
           const closeEvent = this.el.dataset.closeEvent
           if (closeEvent) {
-            this.pushEvent(closeEvent, {})
+            this.pushTargetedEvent(closeEvent, {})
             this.input.value = "" // Clear input immediately (LiveView won't update focused inputs)
           }
         }
@@ -429,7 +439,7 @@ const Typeahead = {
       if (clearEvent) {
         // Set flag to focus input after DOM updates
         this.pendingFocus = true
-        this.pushEvent(clearEvent, {})
+        this.pushTargetedEvent(clearEvent, {})
       }
     } else if (e.key.length === 1) {
       // Printable character - clear and start searching
@@ -437,8 +447,8 @@ const Typeahead = {
       if (clearEvent && searchEvent) {
         // Set flag to focus input after DOM updates
         this.pendingFocus = true
-        this.pushEvent(clearEvent, {})
-        this.pushEvent(searchEvent, {value: e.key})
+        this.pushTargetedEvent(clearEvent, {})
+        this.pushTargetedEvent(searchEvent, {value: e.key})
       }
     }
   },

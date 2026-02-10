@@ -11,7 +11,7 @@ defmodule Gallformers.Taxonomy.Tree do
   alias Gallformers.GallHosts.GallHost
   alias Gallformers.Repo
   alias Gallformers.Species.Species
-  alias Gallformers.Taxonomy.Taxonomy
+  alias Gallformers.Taxonomy.{TaxonName, Taxonomy}
 
   # =====================================================================
   # CRUD
@@ -220,16 +220,12 @@ defmodule Gallformers.Taxonomy.Tree do
   end
 
   defp parse_genus_from_name(name) do
-    case Regex.run(~r/^Unknown \(([^)]+)\)/, name) do
-      [_, family_name] -> {"Unknown", family_name}
-      nil -> parse_simple_genus(name)
-    end
-  end
+    parsed = TaxonName.parse(name)
 
-  defp parse_simple_genus(name) do
-    case String.split(name, " ", parts: 2) do
-      [genus | _] when genus != "" -> {genus, nil}
-      _ -> nil
+    cond do
+      parsed.genus == "" -> nil
+      parsed.unknown? -> {"Unknown", parsed.family}
+      true -> {parsed.genus, nil}
     end
   end
 
