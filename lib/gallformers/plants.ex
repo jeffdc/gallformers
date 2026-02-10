@@ -407,6 +407,122 @@ defmodule Gallformers.Plants do
   end
 
   # ============================================
+  # Composite Save Operations
+  # ============================================
+
+  @doc """
+  Creates a new host species with all associations in a single transaction.
+
+  Handles species creation, taxonomy linking, and aliases.
+
+  ## Params
+
+    * `:species_attrs` - Map of species attributes (name, taxoncode, etc.)
+    * `:taxonomy` - Taxonomy map with genus info
+    * `:genus_is_new` - Boolean, whether to create a new genus
+    * `:parent_id` - Family or section ID for taxonomy linking
+    * `:aliases` - List of alias maps with `:name` and `:type`
+
+  Returns `{:ok, species}` or `{:error, changeset | reason}`.
+  """
+  @spec create_host_with_associations(map()) ::
+          {:ok, Species.t()} | {:error, Ecto.Changeset.t() | term()}
+  def create_host_with_associations(params) do
+    Repo.transaction(fn ->
+      case create_host(params.species_attrs) do
+        {:ok, host} ->
+          Taxonomy.link_species_taxonomy(
+            host.id,
+            params.taxonomy,
+            params.genus_is_new,
+            params.parent_id
+          )
+
+          for a <- params.aliases do
+            create_alias_for_host(host.id, %{name: a.name, type: a.type})
+          end
+
+          host
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  @doc """
+  Updates a host species with all associations in a single transaction.
+
+  Handles species update, alias changes, place changes, and section updates.
+
+  ## Params
+
+    * `:species_attrs` - Map of species attributes to update
+    * `:alias_changes` - Tuple `{to_add, to_remove}` from DeferredChanges
+    * `:place_changes` - Map with `:original_places`, `:current_places`, `:all_places`
+    * `:section_update` - Map with `:genus_id`, `:selected_section_id`, `:section_id`, `:family_id`
+
+  Returns `{:ok, species}` or `{:error, changeset | reason}`.
+  """
+  @spec update_host_with_associations(Species.t(), map()) ::
+          {:ok, Species.t()} | {:error, Ecto.Changeset.t() | term()}
+  def update_host_with_associations(host, params) do
+    {aliases_to_add, aliases_to_remove} = params.alias_changes
+
+    Repo.transaction(fn ->
+      case update_host(host, params.species_attrs) do
+        {:ok, updated_host} ->
+          save_alias_changes(host.id, aliases_to_add, aliases_to_remove)
+          save_place_changes(host.id, params.place_changes)
+          maybe_update_section(params.section_update)
+          updated_host
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  defp save_alias_changes(host_id, to_add, to_remove) do
+    for alias_id <- to_remove do
+      Gallformers.Species.remove_alias_from_species(host_id, alias_id)
+    end
+
+    for a <- to_add do
+      Gallformers.Species.create_alias_for_species(host_id, %{name: a.name, type: a.type})
+    end
+  end
+
+  defp save_place_changes(host_id, %{
+         original_places: original_places,
+         current_places: current_places,
+         all_places: all_places
+       }) do
+    place_code_to_id = Map.new(all_places, &{&1.code, &1.id})
+
+    original_set = MapSet.new(original_places)
+    current_set = MapSet.new(current_places)
+
+    if original_set != current_set do
+      place_ids =
+        Enum.map(current_places, &Map.get(place_code_to_id, &1)) |> Enum.reject(&is_nil/1)
+
+      Ranges.update_host_places(host_id, place_ids)
+    end
+  end
+
+  defp maybe_update_section(%{genus_id: genus_id} = section_update) when not is_nil(genus_id) do
+    Taxonomy.maybe_update_genus_section(
+      genus_id,
+      section_update.selected_section_id,
+      section_update.section_id,
+      section_update.family_id
+    )
+  end
+
+  defp maybe_update_section(_), do: :ok
+
+  # ============================================
   # Alias Management
   # ============================================
 
