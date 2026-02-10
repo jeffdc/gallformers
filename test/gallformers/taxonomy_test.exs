@@ -973,6 +973,289 @@ defmodule Gallformers.TaxonomyTest do
     end
   end
 
+  describe "resolve_taxonomy_for_species/3" do
+    setup do
+      # Create plant family + genus
+      {:ok, plant_family} =
+        Taxonomy.create_taxonomy(%{
+          name: "ResolvePlantFamily",
+          type: "family",
+          description: "Plant"
+        })
+
+      {:ok, plant_genus} =
+        Taxonomy.create_taxonomy(%{
+          name: "Resolveplantgenus",
+          type: "genus",
+          parent_id: plant_family.id
+        })
+
+      # Create gall family + genus
+      {:ok, gall_family} =
+        Taxonomy.create_taxonomy(%{
+          name: "ResolveGallFamily",
+          type: "family",
+          description: "Wasp"
+        })
+
+      {:ok, gall_genus} =
+        Taxonomy.create_taxonomy(%{
+          name: "Resolvegallgenus",
+          type: "genus",
+          parent_id: gall_family.id
+        })
+
+      plant_family_ids = MapSet.new([plant_family.id])
+      gall_family_ids = MapSet.new([gall_family.id])
+
+      {:ok,
+       plant_family: plant_family,
+       plant_genus: plant_genus,
+       gall_family: gall_family,
+       gall_genus: gall_genus,
+       plant_family_ids: plant_family_ids,
+       gall_family_ids: gall_family_ids}
+    end
+
+    test "returns nil tuple for nil taxonomy" do
+      assert {nil, false, nil, []} =
+               Taxonomy.resolve_taxonomy_for_species(nil, MapSet.new())
+
+      assert {nil, false, nil, nil, []} =
+               Taxonomy.resolve_taxonomy_for_species(nil, MapSet.new(), include_section: true)
+    end
+
+    test "new genus returns genus_is_new=true", ctx do
+      taxonomy = %{genus: "Brandnewgenus", genus_id: nil, genus_is_new: true}
+
+      {result, true, nil, []} =
+        Taxonomy.resolve_taxonomy_for_species(taxonomy, ctx.gall_family_ids)
+
+      assert result.genus == "Brandnewgenus"
+    end
+
+    test "known genus in valid family resolves directly", ctx do
+      taxonomy = %{
+        genus: "Resolvegallgenus",
+        genus_id: ctx.gall_genus.id,
+        genus_is_new: false,
+        section: nil,
+        section_id: nil,
+        family: "ResolveGallFamily",
+        family_id: ctx.gall_family.id
+      }
+
+      {resolved, false, family_id, []} =
+        Taxonomy.resolve_taxonomy_for_species(taxonomy, ctx.gall_family_ids)
+
+      assert family_id == ctx.gall_family.id
+      assert resolved.genus == "Resolvegallgenus"
+    end
+
+    test "known genus in wrong family treated as new genus", ctx do
+      # Plant genus but using gall family IDs
+      taxonomy = %{
+        genus: "Resolveplantgenus",
+        genus_id: ctx.plant_genus.id,
+        genus_is_new: false,
+        section: nil,
+        section_id: nil,
+        family: "ResolvePlantFamily",
+        family_id: ctx.plant_family.id
+      }
+
+      {result, true, nil, []} =
+        Taxonomy.resolve_taxonomy_for_species(taxonomy, ctx.gall_family_ids)
+
+      assert result.genus_is_new == true
+    end
+
+    test "disambiguation filters to valid families", ctx do
+      taxonomy = %{
+        genus: "Ambiguousgenus",
+        requires_disambiguation: true,
+        possible_families: [
+          %{
+            genus_id: 1,
+            family_id: ctx.plant_family.id,
+            family: "ResolvePlantFamily",
+            section: nil,
+            section_id: nil
+          },
+          %{
+            genus_id: 2,
+            family_id: ctx.gall_family.id,
+            family: "ResolveGallFamily",
+            section: nil,
+            section_id: nil
+          }
+        ]
+      }
+
+      # Using gall families, should auto-resolve to single gall family
+      {resolved, false, family_id, []} =
+        Taxonomy.resolve_taxonomy_for_species(taxonomy, ctx.gall_family_ids)
+
+      assert family_id == ctx.gall_family.id
+      assert resolved.genus_id == 2
+    end
+
+    test "disambiguation with no matching families returns new genus", ctx do
+      other_family_ids = MapSet.new([99_999])
+
+      taxonomy = %{
+        genus: "Ambiguousgenus",
+        requires_disambiguation: true,
+        possible_families: [
+          %{
+            genus_id: 1,
+            family_id: ctx.plant_family.id,
+            family: "ResolvePlantFamily",
+            section: nil,
+            section_id: nil
+          }
+        ]
+      }
+
+      {result, true, nil, []} =
+        Taxonomy.resolve_taxonomy_for_species(taxonomy, other_family_ids)
+
+      assert result.genus_is_new == true
+    end
+
+    test "include_section returns 5-tuple with section_id", ctx do
+      {:ok, section} =
+        Taxonomy.create_taxonomy(%{
+          name: "ResolveSection",
+          type: "section",
+          parent_id: ctx.plant_genus.id
+        })
+
+      taxonomy = %{
+        genus: "Resolveplantgenus",
+        genus_id: ctx.plant_genus.id,
+        genus_is_new: false,
+        section: "ResolveSection",
+        section_id: section.id,
+        family: "ResolvePlantFamily",
+        family_id: ctx.plant_family.id
+      }
+
+      {resolved, false, family_id, section_id, []} =
+        Taxonomy.resolve_taxonomy_for_species(taxonomy, ctx.plant_family_ids,
+          include_section: true
+        )
+
+      assert family_id == ctx.plant_family.id
+      assert section_id == section.id
+      assert resolved.section == "ResolveSection"
+    end
+
+    test "disambiguation with multiple matches returns all for modal", ctx do
+      both_family_ids = MapSet.new([ctx.plant_family.id, ctx.gall_family.id])
+
+      taxonomy = %{
+        genus: "Ambiguousgenus",
+        requires_disambiguation: true,
+        possible_families: [
+          %{
+            genus_id: 1,
+            family_id: ctx.plant_family.id,
+            family: "ResolvePlantFamily",
+            section: nil,
+            section_id: nil
+          },
+          %{
+            genus_id: 2,
+            family_id: ctx.gall_family.id,
+            family: "ResolveGallFamily",
+            section: nil,
+            section_id: nil
+          }
+        ]
+      }
+
+      {_taxonomy, false, nil, multiple} =
+        Taxonomy.resolve_taxonomy_for_species(taxonomy, both_family_ids)
+
+      assert length(multiple) == 2
+    end
+  end
+
+  describe "maybe_update_genus_section/4" do
+    setup do
+      {:ok, family} =
+        Taxonomy.create_taxonomy(%{
+          name: "SectionUpdateFamily",
+          type: "family",
+          description: "Plant"
+        })
+
+      {:ok, genus} =
+        Taxonomy.create_taxonomy(%{
+          name: "SectionUpdateGenus",
+          type: "genus",
+          parent_id: family.id
+        })
+
+      {:ok, section} =
+        Taxonomy.create_taxonomy(%{
+          name: "SectionUpdateSection",
+          type: "section",
+          parent_id: genus.id
+        })
+
+      {:ok, family: family, genus: genus, section: section}
+    end
+
+    test "no-op when genus_id is nil" do
+      assert :ok = Taxonomy.maybe_update_genus_section(nil, 1, 2, 3)
+    end
+
+    test "no-op when section unchanged", ctx do
+      assert :ok =
+               Taxonomy.maybe_update_genus_section(
+                 ctx.genus.id,
+                 ctx.section.id,
+                 ctx.section.id,
+                 ctx.family.id
+               )
+
+      # Genus parent should still be family (not section)
+      genus = Taxonomy.get_taxonomy!(ctx.genus.id)
+      assert genus.parent_id == ctx.family.id
+    end
+
+    test "updates genus parent when section changes", ctx do
+      assert :ok =
+               Taxonomy.maybe_update_genus_section(
+                 ctx.genus.id,
+                 ctx.section.id,
+                 nil,
+                 ctx.family.id
+               )
+
+      genus = Taxonomy.get_taxonomy!(ctx.genus.id)
+      assert genus.parent_id == ctx.section.id
+    end
+
+    test "reverts to family when section cleared", ctx do
+      # First move genus under section
+      Taxonomy.update_genus_parent(ctx.genus.id, ctx.section.id)
+
+      assert :ok =
+               Taxonomy.maybe_update_genus_section(
+                 ctx.genus.id,
+                 nil,
+                 ctx.section.id,
+                 ctx.family.id
+               )
+
+      genus = Taxonomy.get_taxonomy!(ctx.genus.id)
+      assert genus.parent_id == ctx.family.id
+    end
+  end
+
   describe "get_deletion_impact/1" do
     test "family shows genera, sections, and species counts" do
       # Create Family → Genus1, Genus2, Genus1 → Section

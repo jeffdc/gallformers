@@ -97,4 +97,68 @@ defmodule Gallformers.GallsTest do
       assert result.undescribed == true
     end
   end
+
+  describe "compute_undescribed_lock/2" do
+    test "locked when genus is placeholder" do
+      taxonomy = %{genus: "Unknown (TestFamily)"}
+      {true, reason} = Galls.compute_undescribed_lock(taxonomy)
+      assert reason =~ "unknown genus"
+    end
+
+    test "locked when genus is bare Unknown" do
+      taxonomy = %{genus: "Unknown"}
+      {true, reason} = Galls.compute_undescribed_lock(taxonomy)
+      assert reason =~ "unknown genus"
+    end
+
+    test "unlocked for real genus with no species_id" do
+      taxonomy = %{genus: "Andricus"}
+      assert {false, nil} = Galls.compute_undescribed_lock(taxonomy)
+    end
+
+    test "locked when species has no sources" do
+      {:ok, species} =
+        Repo.insert(%Species{
+          name: "Locktest sp",
+          taxoncode: "gall",
+          datacomplete: false
+        })
+
+      taxonomy = %{genus: "Locktest"}
+      {true, reason} = Galls.compute_undescribed_lock(taxonomy, species.id)
+      assert reason =~ "source is required"
+    end
+
+    test "unlocked when species has sources" do
+      {:ok, species} =
+        Repo.insert(%Species{
+          name: "Sourced sp",
+          taxoncode: "gall",
+          datacomplete: false
+        })
+
+      # Add a source
+      {:ok, source} =
+        Gallformers.Sources.create_source(%{
+          title: "Test Source",
+          author: "Author",
+          pubyear: "2020",
+          link: "http://example.com",
+          citation: "Test citation",
+          license: "CC BY"
+        })
+
+      Gallformers.Sources.create_species_source(%{
+        species_id: species.id,
+        source_id: source.id
+      })
+
+      taxonomy = %{genus: "Sourced"}
+      assert {false, nil} = Galls.compute_undescribed_lock(taxonomy, species.id)
+    end
+
+    test "returns unlocked for nil taxonomy" do
+      assert {false, nil} = Galls.compute_undescribed_lock(nil)
+    end
+  end
 end

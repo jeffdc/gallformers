@@ -1159,6 +1159,139 @@ defmodule Gallformers.Taxonomy do
     |> Repo.all()
   end
 
+  @doc """
+  Resolves taxonomy for a species name, filtering to a set of valid family IDs.
+
+  Used by both gall and host forms to resolve genus disambiguation against
+  the relevant domain (gall families or plant families).
+
+  Takes the raw taxonomy from `lookup_taxonomy_for_new_species/1`, a MapSet of
+  valid family IDs, and options:
+  - `include_section: true` — also returns `section_id` (for hosts)
+
+  Returns:
+  - Without `include_section`: `{taxonomy, genus_is_new, selected_family_id, possible_families}`
+  - With `include_section: true`: `{taxonomy, genus_is_new, selected_family_id, selected_section_id, possible_families}`
+  """
+  @spec resolve_taxonomy_for_species(map() | nil, MapSet.t(), keyword()) :: tuple()
+  def resolve_taxonomy_for_species(taxonomy, family_ids, opts \\ [])
+
+  def resolve_taxonomy_for_species(nil, _family_ids, opts) do
+    if Keyword.get(opts, :include_section, false) do
+      {nil, false, nil, nil, []}
+    else
+      {nil, false, nil, []}
+    end
+  end
+
+  def resolve_taxonomy_for_species(taxonomy, family_ids, opts) do
+    include_section = Keyword.get(opts, :include_section, false)
+
+    cond do
+      # Genus is new - user must select a family
+      Map.get(taxonomy, :genus_is_new) ->
+        if include_section do
+          {taxonomy, true, nil, nil, []}
+        else
+          {taxonomy, true, nil, []}
+        end
+
+      # Genus exists in multiple families - filter to valid families
+      Map.get(taxonomy, :requires_disambiguation) ->
+        matching_families =
+          Enum.filter(taxonomy.possible_families, fn family ->
+            MapSet.member?(family_ids, family.family_id)
+          end)
+
+        resolve_disambiguation(taxonomy, matching_families, include_section)
+
+      # Genus exists in exactly one family - check if it's a valid family
+      true ->
+        resolve_single_family(taxonomy, family_ids, include_section)
+    end
+  end
+
+  defp resolve_single_family(taxonomy, family_ids, include_section) do
+    if MapSet.member?(family_ids, taxonomy.family_id) do
+      if include_section do
+        {taxonomy, false, taxonomy.family_id, taxonomy.section_id, []}
+      else
+        {taxonomy, false, taxonomy.family_id, []}
+      end
+    else
+      new_genus = %{genus: taxonomy.genus, genus_id: nil, genus_is_new: true}
+
+      if include_section do
+        {new_genus, true, nil, nil, []}
+      else
+        {new_genus, true, nil, []}
+      end
+    end
+  end
+
+  defp resolve_disambiguation(taxonomy, [], include_section) do
+    new_genus = %{genus: taxonomy.genus, genus_id: nil, genus_is_new: true}
+
+    if include_section do
+      {new_genus, true, nil, nil, []}
+    else
+      {new_genus, true, nil, []}
+    end
+  end
+
+  defp resolve_disambiguation(taxonomy, [single], include_section) do
+    resolved = %{
+      genus: taxonomy.genus,
+      genus_id: single.genus_id,
+      genus_is_new: false,
+      section: single.section,
+      section_id: single.section_id,
+      family: single.family,
+      family_id: single.family_id
+    }
+
+    if include_section do
+      {resolved, false, single.family_id, single.section_id, []}
+    else
+      {resolved, false, single.family_id, []}
+    end
+  end
+
+  defp resolve_disambiguation(taxonomy, multiple, include_section) do
+    if include_section do
+      {taxonomy, false, nil, nil, multiple}
+    else
+      {taxonomy, false, nil, multiple}
+    end
+  end
+
+  @doc """
+  Updates a genus's section if it changed.
+
+  Compares `new_section_id` against `old_section_id` for the given genus.
+  If changed, updates the genus's parent to the new section (or family if section cleared).
+  """
+  @spec maybe_update_genus_section(
+          integer() | nil,
+          integer() | nil,
+          integer() | nil,
+          integer() | nil
+        ) :: :ok
+  def maybe_update_genus_section(genus_id, new_section_id, old_section_id, family_id)
+
+  def maybe_update_genus_section(nil, _new, _old, _family_id), do: :ok
+  def maybe_update_genus_section(_genus_id, same, same, _family_id), do: :ok
+
+  def maybe_update_genus_section(genus_id, new_section_id, _old_section_id, family_id) do
+    new_parent_id = new_section_id || family_id
+
+    if new_parent_id do
+      update_genus_parent(genus_id, new_parent_id)
+    end
+
+    :ok
+  end
+
   # Admin functions
 
   @doc """
