@@ -234,6 +234,51 @@ defmodule Gallformers.TaxonomyTest do
       assert result.family_id == family.id
     end
 
+    test "returns correct family when genus parent is a section" do
+      # Tree: Family → Section → Genus (genus.parent_id = section, not family)
+      # This tests legacy data where a genus was reparented under a section.
+      {:ok, family} =
+        Taxonomy.create_taxonomy(%{
+          name: "SectionParentFamily",
+          type: "family",
+          description: "Plant"
+        })
+
+      {:ok, section} =
+        Taxonomy.create_taxonomy(%{
+          name: "SectionParentSection",
+          type: "section",
+          parent_id: family.id
+        })
+
+      {:ok, genus} =
+        Taxonomy.create_taxonomy(%{
+          name: "SectionParentGenus",
+          type: "genus",
+          parent_id: section.id
+        })
+
+      {:ok, species} =
+        Repo.insert(%Species{
+          name: "SectionParentGenus alba",
+          taxoncode: "plant",
+          datacomplete: false
+        })
+
+      Taxonomy.link_species_to_taxonomy(species.id, genus.id)
+      Taxonomy.link_species_to_taxonomy(species.id, section.id)
+
+      result = Taxonomy.get_taxonomy_for_species(species.id)
+
+      assert result.genus == "SectionParentGenus"
+      assert result.genus_id == genus.id
+      assert result.section == "SectionParentSection"
+      assert result.section_id == section.id
+      # Family must resolve through the section, not be the section itself
+      assert result.family == "SectionParentFamily"
+      assert result.family_id == family.id
+    end
+
     test "returns nil for species with no taxonomy" do
       {:ok, species} =
         Repo.insert(%Species{
@@ -1179,80 +1224,6 @@ defmodule Gallformers.TaxonomyTest do
         Taxonomy.resolve_taxonomy_for_species(taxonomy, both_family_ids)
 
       assert length(multiple) == 2
-    end
-  end
-
-  describe "maybe_update_genus_section/4" do
-    setup do
-      {:ok, family} =
-        Taxonomy.create_taxonomy(%{
-          name: "SectionUpdateFamily",
-          type: "family",
-          description: "Plant"
-        })
-
-      {:ok, genus} =
-        Taxonomy.create_taxonomy(%{
-          name: "SectionUpdateGenus",
-          type: "genus",
-          parent_id: family.id
-        })
-
-      {:ok, section} =
-        Taxonomy.create_taxonomy(%{
-          name: "SectionUpdateSection",
-          type: "section",
-          parent_id: genus.id
-        })
-
-      {:ok, family: family, genus: genus, section: section}
-    end
-
-    test "no-op when genus_id is nil" do
-      assert :ok = Taxonomy.maybe_update_genus_section(nil, 1, 2, 3)
-    end
-
-    test "no-op when section unchanged", ctx do
-      assert :ok =
-               Taxonomy.maybe_update_genus_section(
-                 ctx.genus.id,
-                 ctx.section.id,
-                 ctx.section.id,
-                 ctx.family.id
-               )
-
-      # Genus parent should still be family (not section)
-      genus = Taxonomy.get_taxonomy!(ctx.genus.id)
-      assert genus.parent_id == ctx.family.id
-    end
-
-    test "updates genus parent when section changes", ctx do
-      assert :ok =
-               Taxonomy.maybe_update_genus_section(
-                 ctx.genus.id,
-                 ctx.section.id,
-                 nil,
-                 ctx.family.id
-               )
-
-      genus = Taxonomy.get_taxonomy!(ctx.genus.id)
-      assert genus.parent_id == ctx.section.id
-    end
-
-    test "reverts to family when section cleared", ctx do
-      # First move genus under section
-      Taxonomy.update_genus_parent(ctx.genus.id, ctx.section.id)
-
-      assert :ok =
-               Taxonomy.maybe_update_genus_section(
-                 ctx.genus.id,
-                 nil,
-                 ctx.section.id,
-                 ctx.family.id
-               )
-
-      genus = Taxonomy.get_taxonomy!(ctx.genus.id)
-      assert genus.parent_id == ctx.family.id
     end
   end
 

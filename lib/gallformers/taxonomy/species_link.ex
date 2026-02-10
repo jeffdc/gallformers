@@ -128,17 +128,20 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
   """
   @spec update_species_genus(integer(), integer()) :: :ok | {:error, term()}
   def update_species_genus(species_id, new_genus_id) do
-    # First, find all genus taxonomy IDs
-    genus_ids_query =
+    # Find all genus and section taxonomy IDs — both must be cleaned up
+    # when reclassifying, since sections belong to a specific genus and
+    # the old section link would be stale after moving to a new genus.
+    genus_and_section_ids_query =
       from(t in Taxonomy,
-        where: t.type == "genus",
+        where: t.type in ["genus", "section"],
         select: t.id
       )
 
-    # Remove any existing genus links for this species
+    # Remove existing genus AND section links for this species
     # (SQLite doesn't support JOINs in DELETE, so we use a subquery)
     from(st in "species_taxonomy",
-      where: st.species_id == ^species_id and st.taxonomy_id in subquery(genus_ids_query)
+      where:
+        st.species_id == ^species_id and st.taxonomy_id in subquery(genus_and_section_ids_query)
     )
     |> Repo.delete_all()
 
@@ -374,33 +377,6 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
   end
 
   @doc """
-  Updates a genus's section if it changed.
-
-  Compares `new_section_id` against `old_section_id` for the given genus.
-  If changed, updates the genus's parent to the new section (or family if section cleared).
-  """
-  @spec maybe_update_genus_section(
-          integer() | nil,
-          integer() | nil,
-          integer() | nil,
-          integer() | nil
-        ) :: :ok
-  def maybe_update_genus_section(genus_id, new_section_id, old_section_id, family_id)
-
-  def maybe_update_genus_section(nil, _new, _old, _family_id), do: :ok
-  def maybe_update_genus_section(_genus_id, same, same, _family_id), do: :ok
-
-  def maybe_update_genus_section(genus_id, new_section_id, _old_section_id, family_id) do
-    new_parent_id = new_section_id || family_id
-
-    if new_parent_id do
-      Tree.update_genus_parent(genus_id, new_parent_id)
-    end
-
-    :ok
-  end
-
-  @doc """
   Resolves a genus ID, handling placeholder genera.
 
   If the selected genus is a placeholder, finds or creates the Unknown genus
@@ -428,22 +404,30 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
   """
   @spec get_taxonomy_for_species(integer()) :: map() | nil
   def get_taxonomy_for_species(species_id) do
-    # Get the genus link - genus's parent is the family
+    # Get the genus link. The genus parent may be a family directly,
+    # or a section (whose parent is the family). We join two levels up
+    # to handle both: genus → parent → grandparent.
     genus_query =
       from st in "species_taxonomy",
         join: g in Taxonomy,
         on: st.taxonomy_id == g.id and g.type == "genus",
-        left_join: family in Taxonomy,
-        on: g.parent_id == family.id,
+        left_join: parent in Taxonomy,
+        on: g.parent_id == parent.id,
+        left_join: grandparent in Taxonomy,
+        on: parent.parent_id == grandparent.id,
         where: st.species_id == ^species_id,
         limit: 1,
         select: %{
           genus: g.name,
           genus_id: g.id,
           genus_description: g.description,
-          family: family.name,
-          family_id: family.id,
-          family_description: family.description
+          parent_type: parent.type,
+          parent_name: parent.name,
+          parent_id: parent.id,
+          parent_description: parent.description,
+          grandparent_name: grandparent.name,
+          grandparent_id: grandparent.id,
+          grandparent_description: grandparent.description
         }
 
     # Get the section link (if any) - species may be directly linked to a section
@@ -466,6 +450,15 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
       genus_result ->
         section_result = Repo.one(section_query)
 
+        # Resolve family: if genus parent is a section, family is one more level up
+        {family, family_id, family_description} =
+          if genus_result.parent_type == "section" do
+            {genus_result.grandparent_name, genus_result.grandparent_id,
+             genus_result.grandparent_description}
+          else
+            {genus_result.parent_name, genus_result.parent_id, genus_result.parent_description}
+          end
+
         %{
           genus: genus_result.genus,
           genus_id: genus_result.genus_id,
@@ -473,9 +466,9 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
           section: section_result && section_result.section,
           section_id: section_result && section_result.section_id,
           section_description: section_result && section_result.section_description,
-          family: genus_result.family,
-          family_id: genus_result.family_id,
-          family_description: genus_result.family_description
+          family: family,
+          family_id: family_id,
+          family_description: family_description
         }
     end
   end

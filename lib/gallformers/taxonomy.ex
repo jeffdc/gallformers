@@ -121,7 +121,6 @@ defmodule Gallformers.Taxonomy do
   defdelegate get_taxonomy_from_species_name(name), to: SpeciesLink
   defdelegate lookup_taxonomy_for_new_species(name), to: SpeciesLink
   defdelegate resolve_taxonomy_for_species(taxonomy, family_ids, opts \\ []), to: SpeciesLink
-  defdelegate maybe_update_genus_section(genus_id, new, old, family_id), to: SpeciesLink
   defdelegate resolve_genus_id(genus, family), to: SpeciesLink
 
   # =====================================================================
