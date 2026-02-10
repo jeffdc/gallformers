@@ -100,9 +100,9 @@ defmodule GallformersWeb.Admin.HostLive.Index do
                 <td>
                   <.link
                     navigate={~p"/admin/hosts/#{host.id}"}
-                    class="hover:underline font-medium italic"
+                    class="hover:underline font-medium"
                   >
-                    {host.name}
+                    <.taxon_name name={host.name} />
                   </.link>
                 </td>
                 <td class="text-center">

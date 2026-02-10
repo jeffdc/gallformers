@@ -327,6 +327,13 @@ figcaption {
   line-height: 1.3;
 }
 
+/* Taxonomic name styling — semantic hook for italicized scientific names.
+   Actual italic comes from the <em> tag in the component; this class exists
+   so we can target taxon names in CSS if needed (e.g., print styles). */
+.taxon-name {
+  /* intentionally empty — italic via <em> */
+}
+
 /* Table styling */
 .gf-table {
   min-width: 100%;

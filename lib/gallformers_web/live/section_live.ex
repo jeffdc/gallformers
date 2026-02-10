@@ -231,7 +231,7 @@ defmodule GallformersWeb.SectionLive do
                           <td>
                             <%!-- Sections are for hosts (plants) --%>
                             <.link href={"/host/#{species.id}"} class="hover:underline">
-                              <em>{species.name}</em>
+                              <.taxon_name name={species.name} />
                             </.link>
                           </td>
                           <td>{species.common_name}</td>

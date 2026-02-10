@@ -328,7 +328,7 @@ defmodule GallformersWeb.HostLive do
                       href={"/id?h=#{URI.encode(@host.name)}"}
                       class="hover:underline"
                     >
-                      <em>{@host.name}</em>
+                      <.taxon_name name={@host.name} />
                     </.link>
                   </h2>
                   <.link
@@ -368,7 +368,7 @@ defmodule GallformersWeb.HostLive do
                     href={"/section/#{@taxonomy.section_id}"}
                     class="hover:underline"
                   >
-                    <em>{@taxonomy.section}</em>
+                    <.taxon_name name={@taxonomy.section} rank="section" />
                   </.link>
                   <span
                     :if={@taxonomy.section_description && @taxonomy.section_description != ""}
@@ -383,7 +383,7 @@ defmodule GallformersWeb.HostLive do
                   href={"/genus/#{@taxonomy.genus_id}"}
                   class="hover:underline"
                 >
-                  <em>{@taxonomy.genus}</em>
+                  <.taxon_name name={@taxonomy.genus} rank="genus" />
                 </.link>
                 <span
                   :if={@taxonomy.genus_description && @taxonomy.genus_description != ""}
@@ -422,7 +422,7 @@ defmodule GallformersWeb.HostLive do
                       <tr :for={
                         s <- paginated_synonyms(synonyms, @synonymy_page, @synonymy_page_size)
                       }>
-                        <td><em>{s.name}</em></td>
+                        <td><.taxon_name name={s.name} /></td>
                         <td class="text-gray-600">{s.description || "—"}</td>
                       </tr>
                     </tbody>
@@ -486,7 +486,7 @@ defmodule GallformersWeb.HostLive do
                               href={"/gall/#{gall.id}"}
                               class="hover:underline"
                             >
-                              <em>{gall.name}</em>
+                              <.taxon_name name={gall.name} />
                             </.link>
                           </td>
                           <td class="text-center">

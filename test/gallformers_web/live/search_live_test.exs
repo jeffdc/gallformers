@@ -133,18 +133,18 @@ defmodule GallformersWeb.SearchLiveTest do
       # Search for a gall species
       {:ok, _view, html} = live(conn, ~p"/globalsearch?q=andricus")
 
-      # If gall results exist, they should be italicized
+      # If gall results exist, they should be italicized (via taxon_name component)
       if html =~ "Gall" and not (html =~ "No results") do
-        assert html =~ "<em>"
+        assert html =~ "taxon-name"
       end
     end
 
     test "host results show italicized names", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/globalsearch?q=quercus")
 
-      # If host results exist, they should be italicized
+      # If host results exist, they should be italicized (via taxon_name component)
       if html =~ "Host" and not (html =~ "No results") do
-        assert html =~ "<em>"
+        assert html =~ "taxon-name"
       end
     end
 

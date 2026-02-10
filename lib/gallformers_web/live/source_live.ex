@@ -235,7 +235,7 @@ defmodule GallformersWeb.SourceLive do
                             href={"#{if species.taxoncode == "gall", do: "/gall", else: "/host"}/#{species.id}?source=#{@source.id}"}
                             class="hover:underline"
                           >
-                            <em>{species.name}</em>
+                            <.taxon_name name={species.name} />
                           </.link>
                         </td>
                         <td class="text-gray-600">

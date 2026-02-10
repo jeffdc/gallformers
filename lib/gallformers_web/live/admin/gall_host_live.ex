@@ -475,7 +475,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
                 display_fn={& &1.name}
               >
                 <:result :let={gall}>
-                  <span class="italic">{gall.name}</span>
+                  <.taxon_name name={gall.name} />
                 </:result>
               </.typeahead>
             </div>

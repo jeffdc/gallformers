@@ -234,7 +234,7 @@ defmodule GallformersWeb.PlaceLive do
                             href={"/host/#{host.id}"}
                             class="hover:underline"
                           >
-                            <em>{host.name}</em>
+                            <.taxon_name name={host.name} />
                           </.link>
                         </td>
                         <td class="text-gray-600">{host.aliases}</td>

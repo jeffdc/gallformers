@@ -420,7 +420,7 @@ defmodule GallformersWeb.Admin.SpeciesSourceLive.AddFromSource do
                           @selected_species && @selected_species.id == sp.id && "bg-canary"
                         ]}
                       >
-                        <span class="italic">{sp.name}</span>
+                        <.taxon_name name={sp.name} />
                         <span class="text-xs text-gray-400">click to edit</span>
                       </button>
                     </div>
@@ -444,7 +444,7 @@ defmodule GallformersWeb.Admin.SpeciesSourceLive.AddFromSource do
                 >
                   <:result :let={species}>
                     <div class="flex justify-between items-center w-full">
-                      <span class="italic">{species.name}</span>
+                      <.taxon_name name={species.name} />
                       <span class="text-xs text-gray-400">{species.taxoncode}</span>
                     </div>
                   </:result>
@@ -457,9 +457,9 @@ defmodule GallformersWeb.Admin.SpeciesSourceLive.AddFromSource do
                   <div class="flex items-center justify-between mb-4">
                     <h5 class="font-medium text-gray-900">
                       <%= if @editing_existing do %>
-                        Editing: <span class="italic">{@selected_species.name}</span>
+                        Editing: <.taxon_name name={@selected_species.name} />
                       <% else %>
-                        New mapping: <span class="italic">{@selected_species.name}</span>
+                        New mapping: <.taxon_name name={@selected_species.name} />
                       <% end %>
                     </h5>
                     <button

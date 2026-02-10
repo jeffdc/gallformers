@@ -4,6 +4,7 @@ defmodule GallformersWeb.TreeComponents do
   """
   use Phoenix.Component
   import GallformersWeb.CoreComponents, only: [icon: 1]
+  import GallformersWeb.DataDisplayComponents, only: [taxon_name: 1]
   import GallformersWeb.FormComponents, only: [search_input: 1]
 
   @doc """
@@ -113,7 +114,7 @@ defmodule GallformersWeb.TreeComponents do
         <% else %>
           <%!-- Leaf node (species) --%>
           <.link href={node.url} class="flex items-center gap-1 ml-5 hover:underline">
-            <em>{node.label}</em>
+            <.taxon_name name={node.label} />
           </.link>
         <% end %>
       </li>

@@ -13,6 +13,7 @@ defmodule Gallformers.Species do
   alias Gallformers.Repo
   alias Gallformers.Search.Ranking
   alias Gallformers.Species.{Abundance, Alias, Species}
+  alias Gallformers.Taxonomy.TaxonName
   require Logger
 
   @doc """
@@ -705,7 +706,7 @@ defmodule Gallformers.Species do
       ) do
     alias_type = Keyword.get(opts, :alias_type, "scientific")
     old_species_name = species.name
-    new_species_name = replace_genus_in_name(old_species_name, old_genus_name, new_genus_name)
+    new_species_name = TaxonName.replace_genus(old_species_name, old_genus_name, new_genus_name)
 
     # Create synonym alias with the old name (best-effort, don't fail transaction)
     if add_alias?, do: add_rename_alias(species.id, old_species_name, alias_type)
@@ -716,25 +717,6 @@ defmodule Gallformers.Species do
     |> Repo.update!()
 
     :ok
-  end
-
-  # Replaces the genus portion of a species name.
-  # Handles both "Genus epithet" and "Unknown (Family) epithet" formats.
-  defp replace_genus_in_name(species_name, old_genus, new_genus) do
-    if String.starts_with?(species_name, old_genus) do
-      rest = String.trim_leading(species_name, old_genus) |> String.trim_leading()
-
-      case rest do
-        "" -> new_genus
-        epithet -> "#{new_genus} #{epithet}"
-      end
-    else
-      # Old genus doesn't match prefix — fall back to replacing first word
-      case String.split(species_name, " ", parts: 2) do
-        [_genus, epithet] -> "#{new_genus} #{epithet}"
-        _ -> species_name
-      end
-    end
   end
 
   @doc """

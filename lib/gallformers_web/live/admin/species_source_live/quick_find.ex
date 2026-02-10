@@ -327,8 +327,8 @@ defmodule GallformersWeb.Admin.SpeciesSourceLive.QuickFind do
                     >
                       <div class="flex justify-between items-start">
                         <div class="flex-1">
-                          <div class="font-medium text-gray-900 italic">
-                            {result.species_name}
+                          <div class="font-medium text-gray-900">
+                            <.taxon_name name={result.species_name} />
                           </div>
                           <div class="text-sm text-gray-600">
                             {result.source_title}

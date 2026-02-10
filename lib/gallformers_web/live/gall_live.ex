@@ -373,7 +373,7 @@ defmodule GallformersWeb.GallLive do
               <div class="flex items-start justify-between gap-4">
                 <div class="flex items-center gap-2">
                   <h2 class="text-2xl font-bold">
-                    <em>
+                    <em class="taxon-name">
                       {@base_name}
                       <.glossary_tooltip
                         :if={@generation_term}
@@ -438,8 +438,7 @@ defmodule GallformersWeb.GallLive do
                 :if={!@gall.undescribed && @former_undescribed_name}
                 class="text-sm text-gray-600"
               >
-                Formerly tracked as <em>{@former_undescribed_name}</em>
-                —
+                Formerly tracked as <.taxon_name name={@former_undescribed_name} /> —
                 <a
                   href={"https://www.inaturalist.org/observations?verifiable=any&place_id=any&field:Gallformers%20Code=#{URI.encode(@gallformers_code)}"}
                   target="_blank"
@@ -475,7 +474,7 @@ defmodule GallformersWeb.GallLive do
                         href={"/genus/#{@taxonomy.genus_id}"}
                         class="hover:underline"
                       >
-                        <em>{@taxonomy.genus}</em>
+                        <.taxon_name name={@taxonomy.genus} rank="genus" />
                       </.link>
                       <span
                         :if={@taxonomy.genus_description && @taxonomy.genus_description != ""}
@@ -489,7 +488,7 @@ defmodule GallformersWeb.GallLive do
                   <div :if={@gall.hosts && length(@gall.hosts) > 0} class="flex items-center gap-1">
                     <div>
                       <strong>Hosts:</strong>
-                      <em>
+                      <em class="taxon-name">
                         <span :for={{host, idx} <- Enum.with_index(@gall.hosts)}>
                           {if idx > 0, do: " / "}<.link
                             href={"/host/#{host.host_species_id}"}
@@ -566,7 +565,7 @@ defmodule GallformersWeb.GallLive do
                       <tr :for={
                         a <- paginated_aliases(@scientific_aliases, @aliases_page, @aliases_page_size)
                       }>
-                        <td><em>{a.name}</em></td>
+                        <td><.taxon_name name={a.name} /></td>
                         <td class="text-gray-600">{a.type || "—"}</td>
                         <td class="text-gray-600">{a.description || "—"}</td>
                       </tr>
@@ -591,7 +590,7 @@ defmodule GallformersWeb.GallLive do
                 <ul class="list-disc list-inside space-y-1">
                   <li :for={related <- @related_galls}>
                     <.link href={"/gall/#{related.id}"} class="hover:underline">
-                      <em>{related.name}</em>
+                      <.taxon_name name={related.name} />
                     </.link>
                   </li>
                 </ul>

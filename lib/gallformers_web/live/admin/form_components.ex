@@ -6,6 +6,7 @@ defmodule GallformersWeb.Admin.FormComponents do
   use Phoenix.Component
 
   import GallformersWeb.CoreComponents, only: [icon: 1]
+  import GallformersWeb.DataDisplayComponents, only: [taxon_name: 1]
   import GallformersWeb.UIComponents, only: [alert: 1]
 
   @doc """
@@ -134,7 +135,7 @@ defmodule GallformersWeb.Admin.FormComponents do
           </thead>
           <tbody class="divide-y divide-gray-200">
             <tr :for={a <- @aliases} class="hover:bg-gray-50">
-              <td class="px-3 py-1.5 italic">{a.name}</td>
+              <td class="px-3 py-1.5"><.taxon_name name={a.name} /></td>
               <td class="px-3 py-1.5">{a.type}</td>
               <td class="px-3 py-1.5">
                 <button

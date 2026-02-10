@@ -10,7 +10,7 @@ defmodule Gallformers.Taxonomy do
   alias Gallformers.Galls.GallTraits
   alias Gallformers.Repo
   alias Gallformers.Species.Species
-  alias Gallformers.Taxonomy.Taxonomy
+  alias Gallformers.Taxonomy.{TaxonName, Taxonomy}
 
   @doc """
   Returns true if the given genus name represents a placeholder (Unknown) genus.
@@ -19,10 +19,7 @@ defmodule Gallformers.Taxonomy do
   and the bare "Unknown" for the root unknown family's genus.
   """
   @spec placeholder_genus_name?(String.t() | nil) :: boolean()
-  def placeholder_genus_name?(nil), do: false
-  def placeholder_genus_name?("Unknown"), do: true
-  def placeholder_genus_name?("Unknown " <> _), do: true
-  def placeholder_genus_name?(_), do: false
+  defdelegate placeholder_genus_name?(name), to: TaxonName, as: :unknown_genus?
 
   @doc """
   Returns all non-placeholder taxonomies.
@@ -602,11 +599,11 @@ defmodule Gallformers.Taxonomy do
     genus = get_taxonomy!(new_genus_id) |> Repo.preload(:parent)
     new_genus_display = Taxonomy.display_name(genus)
 
-    epithet = extract_epithet(species.name)
-    new_name = build_reclassified_name(new_genus_display, epithet)
+    epithet = TaxonName.epithet(species.name)
+    new_name = TaxonName.build(new_genus_display, epithet)
 
     if new_name != species.name do
-      old_genus_display = extract_genus_display(species.name)
+      old_genus_display = TaxonName.genus_display(species.name)
 
       alias_type =
         explicit_alias_type ||
@@ -633,42 +630,7 @@ defmodule Gallformers.Taxonomy do
   Extracts the epithet (everything after the genus portion) from a species name.
   Handles "Unknown (Family) epithet" and "Genus epithet" formats.
   """
-  def extract_epithet(name) do
-    case Regex.run(~r/^Unknown \([^)]+\)\s*(.*)$/, name) do
-      [_, epithet] ->
-        epithet
-
-      nil ->
-        case String.split(name, " ", parts: 2) do
-          [_, epithet] -> epithet
-          _ -> ""
-        end
-    end
-  end
-
-  # Extracts the genus display portion from a species name.
-  # For "Unknown (Family) epithet" returns "Unknown (Family)".
-  # For "Genus epithet" returns "Genus".
-  defp extract_genus_display(name) do
-    case Regex.run(~r/^(Unknown \([^)]+\))/, name) do
-      [_, genus_display] ->
-        genus_display
-
-      nil ->
-        case String.split(name, " ", parts: 2) do
-          [genus | _] -> genus
-          _ -> name
-        end
-    end
-  end
-
-  defp build_reclassified_name(genus_display, "") do
-    genus_display
-  end
-
-  defp build_reclassified_name(genus_display, epithet) do
-    "#{genus_display} #{epithet}"
-  end
+  defdelegate extract_epithet(name), to: TaxonName, as: :epithet
 
   defp maybe_rotate_former_undescribed(_species_id, false), do: :ok
 

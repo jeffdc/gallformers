@@ -179,7 +179,11 @@ defmodule GallformersWeb.GenusLive do
               <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-2">
                   <h1 class="text-2xl font-bold text-gf-maroon">
-                    Genus <em>{format_with_description(@genus.name, @genus.description)}</em>
+                    Genus
+                    <.taxon_name
+                      name={format_with_description(@genus.name, @genus.description)}
+                      rank="genus"
+                    />
                   </h1>
                   <.link
                     :if={@current_user}
@@ -197,7 +201,7 @@ defmodule GallformersWeb.GenusLive do
                 <div class="text-gray-700">
                   <span class="font-semibold">Family:</span>
                   <.link href={"/family/#{@family.id}"} class="hover:underline">
-                    <em>{@family.name}</em>
+                    <.taxon_name name={@family.name} rank="family" />
                   </.link>
                   <span :if={@family.description} class="text-gray-600">({@family.description})</span>
                 </div>
@@ -260,7 +264,7 @@ defmodule GallformersWeb.GenusLive do
                               href={"#{if species.taxoncode == "gall", do: "/gall", else: "/host"}/#{species.id}"}
                               class="hover:underline"
                             >
-                              <em>{species.name}</em>
+                              <.taxon_name name={species.name} />
                             </.link>
                           </td>
                           <td>{species.common_name}</td>

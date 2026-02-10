@@ -5,6 +5,7 @@ defmodule GallformersWeb.KeyComponents do
   use Phoenix.Component
 
   alias Gallformers.Storage
+  alias Gallformers.Taxonomy.TaxonName
 
   @doc """
   Renders the path tracker showing the user's navigation history through the key.
@@ -105,13 +106,7 @@ defmodule GallformersWeb.KeyComponents do
     """
   end
 
-  # Genus and species names are italicized; family (-idae), subfamily (-inae),
-  # superfamily (-oidea), and tribe (-ini/-ina) names are not.
-  defp italicize_taxon?(name) do
-    first_word = name |> String.split(~r/[\s(]/, parts: 2) |> hd()
-
-    not String.match?(first_word, ~r/(oidea|idae|inae|ini|ina)$/i)
-  end
+  defp italicize_taxon?(name), do: TaxonName.italicize_name?(name)
 
   defp couplet_classes(:active), do: "border-gf-maroon border-l-4 bg-white shadow-md"
   defp couplet_classes(:visited), do: "border-gray-200 bg-gray-50"
