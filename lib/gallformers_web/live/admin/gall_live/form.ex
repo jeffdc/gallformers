@@ -16,6 +16,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
   alias Gallformers.Repo
   alias Gallformers.Species
   alias Gallformers.Species.Species, as: SpeciesSchema
+  alias GallformersWeb.Admin.AliasHandlers
   alias GallformersWeb.Admin.DeferredChanges
 
   import GallformersWeb.Admin.FormComponents,
@@ -548,49 +549,16 @@ defmodule GallformersWeb.Admin.GallLive.Form do
   # =================================================================
 
   @impl true
-  def handle_event("update_new_alias", %{"value" => name, "type" => type}, socket) do
-    {:noreply, assign(socket, new_alias_name: name, new_alias_type: type)}
-  end
+  def handle_event("update_new_alias", params, socket),
+    do: {:noreply, AliasHandlers.handle_update_new_alias(socket, params)}
 
   @impl true
-  def handle_event("update_new_alias", %{"value" => type, "name" => name}, socket) do
-    {:noreply, assign(socket, new_alias_name: name, new_alias_type: type)}
-  end
+  def handle_event("add_alias", _params, socket),
+    do: {:noreply, AliasHandlers.handle_add_alias(socket)}
 
   @impl true
-  def handle_event("add_alias", _params, socket) do
-    name = String.trim(socket.assigns.new_alias_name)
-    type = socket.assigns.new_alias_type
-
-    cond do
-      name == "" ->
-        {:noreply, put_flash(socket, :error, "Alias name cannot be empty")}
-
-      DeferredChanges.exists?(socket, :aliases, :name, name) ->
-        {:noreply, put_flash(socket, :error, "Alias already exists")}
-
-      true ->
-        socket =
-          socket
-          |> DeferredChanges.add_pending(:aliases, %{name: name, type: type})
-          |> assign(:new_alias_name, "")
-          |> mark_dirty()
-
-        {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("remove_alias", %{"alias-id" => alias_id}, socket) do
-    alias_id = String.to_integer(alias_id)
-
-    socket =
-      socket
-      |> DeferredChanges.remove_pending(:aliases, alias_id)
-      |> mark_dirty()
-
-    {:noreply, socket}
-  end
+  def handle_event("remove_alias", %{"alias-id" => alias_id}, socket),
+    do: {:noreply, AliasHandlers.handle_remove_alias(socket, alias_id)}
 
   # =================================================================
   # Event handlers - Hosts
@@ -1053,13 +1021,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
   end
 
   defp save_alias_changes(species_id, to_add, to_remove) do
-    for alias_id <- to_remove do
-      Species.remove_alias_from_species(species_id, alias_id)
-    end
-
-    for a <- to_add do
-      Species.create_alias_for_species(species_id, %{name: a.name, type: a.type})
-    end
+    AliasHandlers.save_alias_changes(species_id, to_add, to_remove)
   end
 
   defp save_host_changes(species_id, to_add, to_remove) do
