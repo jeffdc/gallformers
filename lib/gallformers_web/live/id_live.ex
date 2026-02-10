@@ -806,7 +806,7 @@ defmodule GallformersWeb.IDLive do
                 display_fn={&format_host_display/1}
               >
                 <:result :let={host}>
-                  <span class="italic">{format_host_display(host)}</span>
+                  <.taxon_name name={format_host_display(host)} />
                   <span :if={!host.datacomplete} class="ml-2 text-xs text-yellow-600">
                     (incomplete)
                   </span>
@@ -830,7 +830,7 @@ defmodule GallformersWeb.IDLive do
                 display_fn={&format_genus_display/1}
               >
                 <:result :let={genus}>
-                  <span class="italic">{genus.name}</span>
+                  <.taxon_name name={genus.name} rank="genus" />
                   <span :if={genus.type == "section"} class="ml-1 text-xs text-gray-500">
                     [Section]
                   </span>
@@ -1278,8 +1278,8 @@ defmodule GallformersWeb.IDLive do
           />
         </div>
         <div class="p-2">
-          <p class="text-sm font-medium text-gray-900 group-hover:text-gf-maroon truncate italic">
-            {@gall.name}
+          <p class="text-sm font-medium text-gray-900 group-hover:text-gf-maroon truncate">
+            <.taxon_name name={@gall.name} />
           </p>
           <p :if={!@gall.image_url && @summary} class="text-xs text-gray-600 mt-1" title={@summary}>
             {@summary}

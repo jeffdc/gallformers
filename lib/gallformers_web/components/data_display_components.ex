@@ -10,6 +10,34 @@ defmodule GallformersWeb.DataDisplayComponents do
 
   import GallformersWeb.CoreComponents, only: [icon: 1]
 
+  alias Gallformers.Taxonomy.TaxonName
+
+  @doc """
+  Renders a taxonomic name with correct italicization based on rank.
+
+  Species, genus, and section names are wrapped in `<em>` (italic).
+  Family and higher ranks render as plain `<span>`.
+
+  ## Examples
+
+      <.taxon_name name="Andricus quercuslanigera" />
+      <.taxon_name name="Cynipidae" rank="family" />
+      <.taxon_name name="Quercus" rank="genus" class="text-lg" />
+  """
+  attr :name, :string, required: true
+  attr :rank, :string, default: "species"
+  attr :class, :any, default: nil
+
+  def taxon_name(assigns) do
+    ~H"""
+    <%= if TaxonName.italicize_rank?(@rank) do %>
+      <em class={["taxon-name", @class]}>{@name}</em>
+    <% else %>
+      <span class={@class}>{@name}</span>
+    <% end %>
+    """
+  end
+
   @doc """
   Renders an image gallery with lightbox support and V1-style attribution.
 
@@ -436,7 +464,7 @@ defmodule GallformersWeb.DataDisplayComponents do
         </div>
         <div class="p-4">
           <h3 class="text-lg font-medium hover:underline">
-            <em>{@species[:name] || @species["name"]}</em>
+            <.taxon_name name={@species[:name] || @species["name"]} />
           </h3>
           <p
             :if={@species[:description] || @species["description"]}
@@ -464,7 +492,7 @@ defmodule GallformersWeb.DataDisplayComponents do
         </div>
         <div class="p-4">
           <h3 class="text-lg font-medium text-gf-maroon">
-            <em>{@species[:name] || @species["name"]}</em>
+            <.taxon_name name={@species[:name] || @species["name"]} />
           </h3>
           <p
             :if={@species[:description] || @species["description"]}
@@ -498,13 +526,13 @@ defmodule GallformersWeb.DataDisplayComponents do
           navigate={"/host/#{host[:id] || host["id"]}"}
           class="hover:underline"
         >
-          <em>{host[:name] || host["name"]}</em>
+          <.taxon_name name={host[:name] || host["name"]} />
           <span :if={host[:common_name] || host["common_name"]} class="text-gray-600 ml-1">
             ({host[:common_name] || host["common_name"]})
           </span>
         </.link>
         <span :if={!(host[:id] || host["id"])}>
-          <em>{host[:name] || host["name"]}</em>
+          <.taxon_name name={host[:name] || host["name"]} />
           <span :if={host[:common_name] || host["common_name"]} class="text-gray-600 ml-1">
             ({host[:common_name] || host["common_name"]})
           </span>
@@ -598,14 +626,14 @@ defmodule GallformersWeb.DataDisplayComponents do
           navigate={"/genus/#{@genus[:id] || @genus["id"]}"}
           class="hover:underline"
         >
-          <em>{@genus[:name] || @genus["name"]}</em>
-          <span :if={@genus[:description] || @genus["description"]} class="text-gray-600 not-italic">
+          <.taxon_name name={@genus[:name] || @genus["name"]} rank="genus" />
+          <span :if={@genus[:description] || @genus["description"]} class="text-gray-600">
             - {@genus[:description] || @genus["description"]}
           </span>
         </.link>
         <span :if={!(@genus[:id] || @genus["id"])}>
-          <em>{@genus[:name] || @genus["name"]}</em>
-          <span :if={@genus[:description] || @genus["description"]} class="text-gray-600 not-italic">
+          <.taxon_name name={@genus[:name] || @genus["name"]} rank="genus" />
+          <span :if={@genus[:description] || @genus["description"]} class="text-gray-600">
             - {@genus[:description] || @genus["description"]}
           </span>
         </span>
@@ -620,7 +648,7 @@ defmodule GallformersWeb.DataDisplayComponents do
 
       <span :if={@species} class="flex items-center gap-1">
         <strong>{gettext("Species:")}</strong>
-        <em>{@species[:name] || @species["name"] || @species}</em>
+        <.taxon_name name={@species[:name] || @species["name"] || @species} />
       </span>
     </div>
     """

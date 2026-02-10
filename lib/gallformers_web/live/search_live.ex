@@ -283,9 +283,9 @@ defmodule GallformersWeb.SearchLive do
     end
   end
 
-  defp italicized?(type) do
-    type in ["gall", "host", "genus", "section"]
-  end
+  defp search_type_to_rank("gall"), do: "species"
+  defp search_type_to_rank("host"), do: "species"
+  defp search_type_to_rank(type), do: type
 
   @impl true
   def render(assigns) do
@@ -384,11 +384,10 @@ defmodule GallformersWeb.SearchLive do
                           href={result_link(result)}
                           class="hover:underline"
                         >
-                          <%= if italicized?(result.type) do %>
-                            <em>{format_name(result)}</em>
-                          <% else %>
-                            {format_name(result)}
-                          <% end %>
+                          <.taxon_name
+                            name={format_name(result)}
+                            rank={search_type_to_rank(result.type)}
+                          />
                         </.link>
                         <span
                           :if={Map.get(result, :aliases, []) != []}

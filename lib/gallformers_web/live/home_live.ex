@@ -164,7 +164,7 @@ defmodule GallformersWeb.HomeLive do
                 display_fn={&format_host_display/1}
               >
                 <:result :let={host}>
-                  <span class="italic">{format_host_display(host)}</span>
+                  <.taxon_name name={format_host_display(host)} />
                   <span :if={!host.datacomplete} class="ml-2 text-xs text-amber-600">
                     (incomplete)
                   </span>
