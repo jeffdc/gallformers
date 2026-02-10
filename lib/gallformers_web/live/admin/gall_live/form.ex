@@ -37,7 +37,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     if connected?(socket), do: Species.subscribe()
 
     filter_options = Galls.get_all_filter_options()
-    families = Gallformers.Taxonomy.list_gall_families_for_select()
+    families = Gallformers.Taxonomy.list_families_for_select(:gall)
 
     socket =
       socket
