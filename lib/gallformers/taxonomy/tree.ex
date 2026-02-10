@@ -266,7 +266,10 @@ defmodule Gallformers.Taxonomy.Tree do
   @doc false
   @spec build_taxonomy_from_genus(Taxonomy.t()) :: map()
   def build_taxonomy_from_genus(genus) do
-    case get_parent(genus.id) do
+    # Preload parent chain (genus → section/family → family) in one pass
+    genus = Repo.preload(genus, parent: :parent)
+
+    case genus.parent do
       nil ->
         %{
           genus: genus.name,
@@ -277,26 +280,26 @@ defmodule Gallformers.Taxonomy.Tree do
           family_id: nil
         }
 
-      parent when parent.type == "section" ->
-        family = get_parent(parent.id)
+      %{type: "section"} = section ->
+        family = section.parent
 
         %{
           genus: genus.name,
           genus_id: genus.id,
-          section: parent.name,
-          section_id: parent.id,
+          section: section.name,
+          section_id: section.id,
           family: family && family.name,
           family_id: family && family.id
         }
 
-      parent ->
+      family ->
         %{
           genus: genus.name,
           genus_id: genus.id,
           section: nil,
           section_id: nil,
-          family: parent.name,
-          family_id: parent.id
+          family: family.name,
+          family_id: family.id
         }
     end
   end
