@@ -1094,7 +1094,12 @@ defmodule GallformersWeb.FormComponents do
 
   def reclassify_modal(assigns) do
     ~H"""
-    <.modal :if={@show} id="reclassify-modal" show on_cancel={JS.push("close_reclassify_modal", target: @target)}>
+    <.modal
+      :if={@show}
+      id="reclassify-modal"
+      show
+      on_cancel={JS.push("close_reclassify_modal", target: @target)}
+    >
       <:header>Rename and/or Reclassify {@entity_type}</:header>
       <:body>
         <%!-- Family search --%>

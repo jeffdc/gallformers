@@ -585,22 +585,22 @@ defmodule Gallformers.Species do
 
   Returns {:ok, species} on success, {:error, reason} on failure.
   """
-  @spec rename_species(integer(), String.t(), boolean()) ::
+  @spec rename_species(integer(), String.t(), boolean(), String.t()) ::
           {:ok, Species.t()} | {:error, atom() | String.t()}
-  def rename_species(species_id, new_name, add_alias?) do
+  def rename_species(species_id, new_name, add_alias?, alias_type \\ "scientific") do
     if species_name_exists?(new_name) do
       {:error, :name_exists}
     else
-      do_rename_species(species_id, new_name, add_alias?)
+      do_rename_species(species_id, new_name, add_alias?, alias_type)
     end
   end
 
-  defp do_rename_species(species_id, new_name, add_alias?) do
+  defp do_rename_species(species_id, new_name, add_alias?, alias_type) do
     species = get_species!(species_id)
     old_name = species.name
 
     Repo.transaction(fn ->
-      if add_alias?, do: add_rename_alias(species_id, old_name)
+      if add_alias?, do: add_rename_alias(species_id, old_name, alias_type)
 
       species
       |> Species.changeset(%{name: new_name})
@@ -638,13 +638,45 @@ defmodule Gallformers.Species do
     end
   end
 
-  defp has_former_undescribed_alias?(species_id) do
+  @doc """
+  Returns true if the species already has a `former_undescribed` alias.
+  """
+  @spec has_former_undescribed_alias?(integer()) :: boolean()
+  def has_former_undescribed_alias?(species_id) do
     from(a in Alias,
       join: als in "alias_species",
       on: als.alias_id == a.id,
       where: als.species_id == ^species_id and a.type == "former_undescribed"
     )
     |> Repo.exists?()
+  end
+
+  @doc """
+  Changes the existing `former_undescribed` alias for a species to type `"scientific"`.
+
+  This "rotates" the alias so that a new `former_undescribed` can be created
+  (e.g., when reclassifying an undescribed species that was already reclassified once).
+
+  Returns `{:ok, alias}` if rotated, or `{:ok, nil}` if no former_undescribed alias exists.
+  """
+  @spec rotate_former_undescribed_alias(integer()) ::
+          {:ok, Alias.t() | nil} | {:error, Ecto.Changeset.t()}
+  def rotate_former_undescribed_alias(species_id) do
+    case from(a in Alias,
+           join: als in "alias_species",
+           on: als.alias_id == a.id,
+           where: als.species_id == ^species_id and a.type == "former_undescribed",
+           select: a
+         )
+         |> Repo.one() do
+      nil ->
+        {:ok, nil}
+
+      alias_record ->
+        alias_record
+        |> Ecto.Changeset.change(%{type: "scientific"})
+        |> Repo.update()
+    end
   end
 
   @doc """
