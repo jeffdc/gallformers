@@ -91,6 +91,9 @@ defmodule Gallformers.Taxonomy.TreeBuilder do
       %{
         key: format_key("family", "f", family.id, key_style),
         label: format_label(family.name, family.description),
+        name: family.name,
+        rank: "family",
+        description: format_description(family.description),
         url: "/family/#{family.id}",
         nodes: genus_nodes
       }
@@ -105,6 +108,9 @@ defmodule Gallformers.Taxonomy.TreeBuilder do
       %{
         key: format_key("genus", "g", genus.id, key_style),
         label: format_label(genus.name, genus.description),
+        name: genus.name,
+        rank: "genus",
+        description: format_description(genus.description),
         url: "/genus/#{genus.id}",
         nodes: species_nodes
       }
@@ -130,4 +136,9 @@ defmodule Gallformers.Taxonomy.TreeBuilder do
   defp format_label(name, ""), do: name
   defp format_label(name, "Plant"), do: name
   defp format_label(name, description), do: "#{name} (#{description})"
+
+  defp format_description(nil), do: nil
+  defp format_description(""), do: nil
+  defp format_description("Plant"), do: nil
+  defp format_description(description), do: description
 end

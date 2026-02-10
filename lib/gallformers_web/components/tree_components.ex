@@ -89,7 +89,10 @@ defmodule GallformersWeb.TreeComponents do
                 "font-medium",
                 if(@level == 0, do: "text-gf-maroon", else: "")
               ]}>
-                {node.label}
+                <.taxon_name name={node.name} rank={node.rank} />
+                <span :if={node[:description]} class="font-normal">
+                  ({node.description})
+                </span>
               </span>
               <span class="text-xs text-gray-400 ml-1">
                 ({length(node.nodes)})
