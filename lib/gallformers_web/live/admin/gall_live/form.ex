@@ -340,8 +340,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
   def handle_event("search_gall", %{"value" => query}, socket) do
     results =
       if String.length(query) >= 2 do
-        Species.search_species(query, 10)
-        |> Enum.filter(&(&1.taxoncode == "gall"))
+        Species.search_species_by_name(query, "gall", 10)
       else
         []
       end
@@ -934,51 +933,14 @@ defmodule GallformersWeb.Admin.GallLive.Form do
               phx-submit="save"
             >
               <%!-- Row: Genus | Family --%>
-              <div class="grid grid-cols-2 gap-4 mb-3">
-                <div>
-                  <label class="gf-label">
-                    Genus (filled automatically):
-                  </label>
-                  <input
-                    type="text"
-                    value={if @taxonomy, do: @taxonomy.genus, else: ""}
-                    disabled
-                    class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded text-gray-500 text-sm"
-                  />
-                  <p :if={@genus_is_new} class="text-amber-600 text-xs mt-1">
-                    New genus - will be created under selected family
-                  </p>
-                </div>
-                <div>
-                  <label class="gf-label">
-                    Family:<span class="text-red-600 ml-0.5">*</span>
-                  </label>
-                  <%= if @genus_is_new do %>
-                    <%!-- Genus is new - user must select a family --%>
-                    <select
-                      name="family_id"
-                      phx-change="select_family"
-                      class="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                    >
-                      <option value="">-- Select Family --</option>
-                      <%= for {name, id} <- @families do %>
-                        <option value={id} selected={@selected_family_id == id}>{name}</option>
-                      <% end %>
-                    </select>
-                    <p :if={is_nil(@selected_family_id)} class="text-red-600 text-xs mt-1">
-                      Please select a family for the new genus
-                    </p>
-                  <% else %>
-                    <%!-- Genus exists - family is read-only --%>
-                    <input
-                      type="text"
-                      value={if @taxonomy, do: @taxonomy.family, else: ""}
-                      disabled
-                      class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded text-gray-500 text-sm"
-                    />
-                  <% end %>
-                </div>
-              </div>
+              <.taxonomy_genus_family_row
+                taxonomy={@taxonomy}
+                genus_is_new={@genus_is_new}
+                selected_family_id={@selected_family_id}
+                families={@families}
+                new_genus_hint="selected family"
+                family_required_always={true}
+              />
 
               <%!-- Row: Hosts --%>
               <div class="mb-3">
@@ -1256,44 +1218,13 @@ defmodule GallformersWeb.Admin.GallLive.Form do
         />
 
         <%!-- Genus disambiguation modal --%>
-        <.modal
-          :if={@possible_families != [] && @taxonomy}
-          id="genus-disambiguation-modal"
-          show
-          on_cancel={JS.push("clear_gall")}
-        >
-          <:header>Select Family for Genus "{Map.get(@taxonomy, :genus, "")}"</:header>
-          <:body>
-            <p class="text-gray-700 mb-4">
-              The genus <strong>{Map.get(@taxonomy, :genus, "")}</strong>
-              exists in multiple gall-forming families. Please select which family this gall belongs to:
-            </p>
-            <div class="space-y-2">
-              <%= for family <- @possible_families do %>
-                <button
-                  type="button"
-                  phx-click="select_family_from_disambiguation"
-                  phx-value-family_id={family.family_id}
-                  class="block w-full text-left px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50 hover:border-gf-maroon transition-colors"
-                >
-                  <div class="font-medium text-gray-900">{family.family}</div>
-                  <%= if family.section do %>
-                    <div class="text-sm text-gray-500">Section: {family.section}</div>
-                  <% end %>
-                </button>
-              <% end %>
-            </div>
-          </:body>
-          <:footer>
-            <button
-              type="button"
-              phx-click="clear_gall"
-              class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </:footer>
-        </.modal>
+        <.genus_disambiguation_modal
+          possible_families={@possible_families}
+          taxonomy={@taxonomy}
+          entity_description="gall-forming"
+          select_event="select_family_from_disambiguation"
+          clear_event="clear_gall"
+        />
       </div>
     </Layouts.admin>
     """

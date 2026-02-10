@@ -1271,6 +1271,173 @@ defmodule GallformersWeb.FormComponents do
     """
   end
 
+  @doc """
+  Renders the Genus/Family row used on both gall and host admin forms.
+
+  Shows genus as a read-only field (filled automatically from the species name)
+  and family as either a select (when genus is new) or read-only (when genus exists).
+
+  The host form also shows a "new genus" hint mentioning section/family, while
+  the gall form just says family — controlled by `new_genus_hint`.
+
+  ## Example
+
+      <.taxonomy_genus_family_row
+        taxonomy={@taxonomy}
+        genus_is_new={@genus_is_new}
+        selected_family_id={@selected_family_id}
+        families={@families}
+        new_genus_hint="selected family"
+        family_change_event="select_family"
+      />
+  """
+  attr :taxonomy, :map, default: nil, doc: "current taxonomy map with :genus and :family keys"
+  attr :genus_is_new, :boolean, required: true, doc: "whether the genus is new (not yet in DB)"
+  attr :selected_family_id, :integer, default: nil, doc: "currently selected family ID"
+  attr :families, :list, required: true, doc: "list of {name, id} tuples for family select"
+
+  attr :new_genus_hint, :string,
+    default: "selected family",
+    doc: "hint text for new genus, e.g. 'selected family' or 'selected section/family'"
+
+  attr :family_change_event, :string,
+    default: "select_family",
+    doc: "event name for family select change"
+
+  attr :family_required_always, :boolean,
+    default: false,
+    doc: "when true, always show required asterisk on family; when false, only when genus is new"
+
+  def taxonomy_genus_family_row(assigns) do
+    ~H"""
+    <div class="grid grid-cols-2 gap-4 mb-3">
+      <div>
+        <label class="gf-label">
+          Genus (filled automatically):
+        </label>
+        <input
+          type="text"
+          value={if @taxonomy, do: @taxonomy.genus, else: ""}
+          disabled
+          class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded text-gray-500 text-sm"
+        />
+        <p :if={@genus_is_new} class="text-amber-600 text-xs mt-1">
+          New genus - will be created under {@new_genus_hint}
+        </p>
+      </div>
+      <div>
+        <label class="gf-label">
+          Family:<span
+            :if={@family_required_always || @genus_is_new}
+            class="text-red-600 ml-0.5"
+          >*</span>
+        </label>
+        <%= if @genus_is_new do %>
+          <%!-- Genus is new - user must select a family --%>
+          <select
+            name="family_id"
+            phx-change={@family_change_event}
+            class="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+          >
+            <option value="">-- Select Family --</option>
+            <%= for {name, id} <- @families do %>
+              <option value={id} selected={@selected_family_id == id}>{name}</option>
+            <% end %>
+          </select>
+          <p :if={is_nil(@selected_family_id)} class="text-red-600 text-xs mt-1">
+            Please select a family for the new genus
+          </p>
+        <% else %>
+          <%!-- Genus exists - family is read-only --%>
+          <input
+            type="text"
+            value={if @taxonomy, do: @taxonomy.family, else: ""}
+            disabled
+            class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded text-gray-500 text-sm"
+          />
+        <% end %>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Renders a genus disambiguation modal for selecting which family a genus belongs to.
+
+  Shown when a genus name exists in multiple families. The only differences between
+  gall and host forms are event names and the entity description text.
+
+  ## Events
+
+  - `select_event` - fired with `%{"family_id" => id}` when a family is chosen
+  - `clear_event` - fired when user cancels
+
+  ## Example
+
+      <.genus_disambiguation_modal
+        possible_families={@possible_families}
+        taxonomy={@taxonomy}
+        entity_description="gall-forming"
+        select_event="select_family_from_disambiguation"
+        clear_event="clear_gall"
+      />
+  """
+  attr :possible_families, :list,
+    required: true,
+    doc: "list of family maps with family_id, family, section, etc."
+
+  attr :taxonomy, :map, required: true, doc: "current taxonomy map (needs :genus key)"
+
+  attr :entity_description, :string,
+    required: true,
+    doc: "description like 'gall-forming' or 'plant'"
+
+  attr :select_event, :string, required: true, doc: "event name for family selection"
+  attr :clear_event, :string, required: true, doc: "event name for cancel"
+
+  def genus_disambiguation_modal(assigns) do
+    ~H"""
+    <.modal
+      :if={@possible_families != [] && @taxonomy}
+      id="genus-disambiguation-modal"
+      show
+      on_cancel={JS.push(@clear_event)}
+    >
+      <:header>Select Family for Genus "{Map.get(@taxonomy, :genus, "")}"</:header>
+      <:body>
+        <p class="text-gray-700 mb-4">
+          The genus <strong>{Map.get(@taxonomy, :genus, "")}</strong>
+          exists in multiple {@entity_description} families. Please select which family this belongs to:
+        </p>
+        <div class="space-y-2">
+          <%= for family <- @possible_families do %>
+            <button
+              type="button"
+              phx-click={@select_event}
+              phx-value-family_id={family.family_id}
+              class="block w-full text-left px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50 hover:border-gf-maroon transition-colors"
+            >
+              <div class="font-medium text-gray-900">{family.family}</div>
+              <%= if family.section do %>
+                <div class="text-sm text-gray-500">Section: {family.section}</div>
+              <% end %>
+            </button>
+          <% end %>
+        </div>
+      </:body>
+      <:footer>
+        <button
+          type="button"
+          phx-click={@clear_event}
+          class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+      </:footer>
+    </.modal>
+    """
+  end
+
   defp rename_collision_type_label("common"), do: "common name"
   defp rename_collision_type_label("scientific"), do: "scientific synonym"
   defp rename_collision_type_label(other), do: other
