@@ -135,20 +135,16 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> reset_dirty()
   end
 
-  # Updates the genus's section if it changed
   defp maybe_update_section(socket) do
     taxonomy = socket.assigns.taxonomy
-    selected_section_id = socket.assigns.selected_section_id
-    original_section_id = taxonomy && taxonomy.section_id
 
-    # Only update if section changed and genus exists
-    if taxonomy && taxonomy.genus_id && selected_section_id != original_section_id do
-      # New parent is either the section or the family (if section cleared)
-      new_parent_id = selected_section_id || taxonomy.family_id
-
-      if new_parent_id do
-        Taxonomy.update_genus_parent(taxonomy.genus_id, new_parent_id)
-      end
+    if taxonomy && taxonomy.genus_id do
+      Taxonomy.maybe_update_genus_section(
+        taxonomy.genus_id,
+        socket.assigns.selected_section_id,
+        taxonomy.section_id,
+        taxonomy.family_id
+      )
     end
   end
 
@@ -384,8 +380,10 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     raw_taxonomy = Taxonomy.lookup_taxonomy_for_new_species(name)
 
     # Handle genus disambiguation: filter to plant families only
+    plant_family_ids = MapSet.new(socket.assigns.families, fn {_name, id} -> id end)
+
     {taxonomy, genus_is_new, selected_family_id, selected_section_id, possible_families} =
-      resolve_taxonomy_for_host(raw_taxonomy, socket.assigns.families)
+      Taxonomy.resolve_taxonomy_for_species(raw_taxonomy, plant_family_ids, include_section: true)
 
     # Load sections only for existing genus
     # Sections are specific to a genus, so new genera have no sections
@@ -426,60 +424,6 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     # Mark form dirty since user entered a name (enables save button)
     |> reset_dirty()
     |> mark_dirty()
-  end
-
-  # Resolve taxonomy for hosts: filter to plant families only
-  defp resolve_taxonomy_for_host(nil, _families), do: {nil, false, nil, nil, []}
-
-  defp resolve_taxonomy_for_host(taxonomy, families) do
-    plant_family_ids = MapSet.new(families, fn {_name, id} -> id end)
-
-    cond do
-      # Genus is new - user must select a plant family
-      Map.get(taxonomy, :genus_is_new) ->
-        {taxonomy, true, nil, nil, []}
-
-      # Genus exists in multiple families - filter to plant families
-      Map.get(taxonomy, :requires_disambiguation) ->
-        plant_families =
-          Enum.filter(taxonomy.possible_families, fn family ->
-            MapSet.member?(plant_family_ids, family.family_id)
-          end)
-
-        case plant_families do
-          [] ->
-            # No plant families found - treat as new genus
-            {%{genus: taxonomy.genus, genus_id: nil, genus_is_new: true}, true, nil, nil, []}
-
-          [single] ->
-            # Only one plant family - auto-select it
-            resolved = %{
-              genus: taxonomy.genus,
-              genus_id: single.genus_id,
-              genus_is_new: false,
-              section: single.section,
-              section_id: single.section_id,
-              family: single.family,
-              family_id: single.family_id
-            }
-
-            {resolved, false, single.family_id, single.section_id, []}
-
-          multiple ->
-            # Multiple plant families - needs disambiguation
-            {taxonomy, false, nil, nil, multiple}
-        end
-
-      # Genus exists in exactly one family - check if it's a plant family
-      true ->
-        if MapSet.member?(plant_family_ids, taxonomy.family_id) do
-          # It's a plant family - use it
-          {taxonomy, false, taxonomy.family_id, taxonomy.section_id, []}
-        else
-          # It's NOT a plant family - treat as new genus
-          {%{genus: taxonomy.genus, genus_id: nil, genus_is_new: true}, true, nil, nil, []}
-        end
-    end
   end
 
   defp save_host(socket, :new, params) do

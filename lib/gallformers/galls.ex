@@ -653,6 +653,36 @@ defmodule Gallformers.Galls do
   end
 
   # ============================================
+  # Undescribed Lock Logic
+  # ============================================
+
+  @doc """
+  Computes whether the undescribed checkbox should be locked and why.
+
+  A gall's undescribed flag is locked to `true` when:
+  - The genus is a placeholder (Unknown) — species with unknown genus are always undescribed
+  - The species has no sources linked — a source is required to mark as described
+
+  Returns `{locked?, reason}` where reason is a string explaining the lock, or nil if unlocked.
+  For new galls (species_id is nil), the source check is skipped.
+  """
+  @spec compute_undescribed_lock(map() | nil, integer() | nil) :: {boolean(), String.t() | nil}
+  def compute_undescribed_lock(taxonomy, species_id \\ nil) do
+    genus_name = taxonomy && Map.get(taxonomy, :genus)
+
+    cond do
+      Gallformers.Taxonomy.placeholder_genus_name?(genus_name) ->
+        {true, "Undescribed is required for species with unknown genus."}
+
+      species_id && not Gallformers.Sources.has_sources?(species_id) ->
+        {true, "A source is required to mark a species as described."}
+
+      true ->
+        {false, nil}
+    end
+  end
+
+  # ============================================
   # CRUD Operations
   # ============================================
 

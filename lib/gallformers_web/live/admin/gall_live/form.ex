@@ -166,8 +166,10 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     changeset = Species.change_species(gall)
 
     # Handle genus disambiguation: filter to non-plant families only
+    gall_family_ids = MapSet.new(socket.assigns.families, fn {_name, id} -> id end)
+
     {taxonomy, genus_is_new, selected_family_id, possible_families} =
-      resolve_taxonomy_for_gall(raw_taxonomy, socket.assigns.families)
+      Gallformers.Taxonomy.resolve_taxonomy_for_species(raw_taxonomy, gall_family_ids)
 
     # Check for alias collisions
     alias_collisions = Species.find_species_with_alias(name)
@@ -209,64 +211,10 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(:gall_search_query, "")
     |> assign(:gall_search_results, [])
     # Compute undescribed lock for new gall (no species_id yet, so no sources)
-    |> compute_undescribed_lock(taxonomy)
+    |> apply_undescribed_lock(taxonomy)
     # Mark form dirty since user entered a name (enables save button)
     |> reset_dirty()
     |> mark_dirty()
-  end
-
-  # Resolve taxonomy for galls: filter to non-plant families only
-  defp resolve_taxonomy_for_gall(nil, _families), do: {nil, false, nil, []}
-
-  defp resolve_taxonomy_for_gall(taxonomy, families) do
-    gall_family_ids = MapSet.new(families, fn {_name, id} -> id end)
-
-    cond do
-      # Genus is new - user must select a gall family
-      Map.get(taxonomy, :genus_is_new) ->
-        {taxonomy, true, nil, []}
-
-      # Genus exists in multiple families - filter to non-plant families
-      Map.get(taxonomy, :requires_disambiguation) ->
-        gall_families =
-          Enum.filter(taxonomy.possible_families, fn family ->
-            MapSet.member?(gall_family_ids, family.family_id)
-          end)
-
-        case gall_families do
-          [] ->
-            # No gall families found - treat as new genus
-            {%{genus: taxonomy.genus, genus_id: nil, genus_is_new: true}, true, nil, []}
-
-          [single] ->
-            # Only one gall family - auto-select it
-            resolved = %{
-              genus: taxonomy.genus,
-              genus_id: single.genus_id,
-              genus_is_new: false,
-              section: single.section,
-              section_id: single.section_id,
-              family: single.family,
-              family_id: single.family_id
-            }
-
-            {resolved, false, single.family_id, []}
-
-          multiple ->
-            # Multiple gall families - needs disambiguation
-            {taxonomy, false, nil, multiple}
-        end
-
-      # Genus exists in exactly one family - check if it's a gall family
-      true ->
-        if MapSet.member?(gall_family_ids, taxonomy.family_id) do
-          # It's a gall family - use it
-          {taxonomy, false, taxonomy.family_id, []}
-        else
-          # It's NOT a gall family - treat as new genus
-          {%{genus: taxonomy.genus, genus_id: nil, genus_is_new: true}, true, nil, []}
-        end
-    end
   end
 
   # Initialize state for a new undescribed gall from the undescribed naming flow.
@@ -329,7 +277,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     # Add the type host if provided
     |> maybe_add_initial_host(host)
     # Compute undescribed lock
-    |> compute_undescribed_lock(taxonomy)
+    |> apply_undescribed_lock(taxonomy)
     # Mark form dirty since coming from undescribed flow
     |> reset_dirty()
     |> mark_dirty()
@@ -418,7 +366,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
           # Clear search
           |> assign(:gall_search_query, "")
           |> assign(:gall_search_results, [])
-          |> compute_undescribed_lock(taxonomy, species_id)
+          |> apply_undescribed_lock(taxonomy, species_id)
           |> reset_dirty()
         end
     end
@@ -783,7 +731,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
      |> assign(:taxonomy, taxonomy)
      |> assign(:selected_family_id, taxonomy && taxonomy.family_id)
      |> assign(:page_title, "Edit Gall - #{result.species.name}")
-     |> compute_undescribed_lock(taxonomy, species_id)
+     |> apply_undescribed_lock(taxonomy, species_id)
      |> put_flash(:info, "Gall updated successfully")}
   end
 
@@ -829,39 +777,14 @@ defmodule GallformersWeb.Admin.GallLive.Form do
   # Private helper functions
   # =================================================================
 
-  # Computes whether the undescribed checkbox should be locked and why.
-  # For new galls (no species_id yet), we can't check sources.
-  defp compute_undescribed_lock(socket, taxonomy) do
-    compute_undescribed_lock(socket, taxonomy, nil)
-  end
+  # Applies the undescribed lock result from Galls.compute_undescribed_lock/2 to the socket.
+  defp apply_undescribed_lock(socket, taxonomy, species_id \\ nil) do
+    {locked?, reason} = Galls.compute_undescribed_lock(taxonomy, species_id)
 
-  defp compute_undescribed_lock(socket, taxonomy, species_id) do
-    genus_name = taxonomy && Map.get(taxonomy, :genus)
-
-    cond do
-      Gallformers.Taxonomy.placeholder_genus_name?(genus_name) ->
-        socket
-        |> assign(:undescribed_locked, true)
-        |> assign(
-          :undescribed_lock_reason,
-          "Undescribed is required for species with unknown genus."
-        )
-        |> assign(:undescribed, true)
-
-      species_id && not Gallformers.Sources.has_sources?(species_id) ->
-        socket
-        |> assign(:undescribed_locked, true)
-        |> assign(
-          :undescribed_lock_reason,
-          "A source is required to mark a species as described."
-        )
-        |> assign(:undescribed, true)
-
-      true ->
-        socket
-        |> assign(:undescribed_locked, false)
-        |> assign(:undescribed_lock_reason, nil)
-    end
+    socket
+    |> assign(:undescribed_locked, locked?)
+    |> assign(:undescribed_lock_reason, reason)
+    |> then(fn s -> if locked?, do: assign(s, :undescribed, true), else: s end)
   end
 
   defp add_host_to_pending(socket, host_id) do
