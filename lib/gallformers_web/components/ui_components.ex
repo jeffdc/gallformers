@@ -11,6 +11,7 @@ defmodule GallformersWeb.UIComponents do
 
   import GallformersWeb.CoreComponents, only: [icon: 1]
 
+  alias Gallformers.Taxonomy.TaxonName
   alias Phoenix.LiveView.JS
 
   @doc """
@@ -609,18 +610,20 @@ defmodule GallformersWeb.UIComponents do
   attr :undescribed, :boolean, default: false, doc: "whether the species is undescribed"
 
   def see_also(assigns) do
-    # Parse species name: "Genus species subspecies" -> "Genus species"
-    search_name =
-      assigns.name
-      |> String.split(" ")
-      |> Enum.take(2)
-      |> Enum.join(" ")
-      |> URI.encode()
+    parsed = TaxonName.parse(assigns.name)
 
-    # For undescribed species, extract the code (second word)
+    # "Genus epithet" for search (drops qualifier like "agamic")
+    search_name =
+      if parsed.epithet do
+        "#{parsed.genus} #{parsed.epithet}" |> URI.encode()
+      else
+        parsed.genus |> URI.encode()
+      end
+
+    # For undescribed species, extract the epithet as the code
     undescribed_code =
-      if assigns.undescribed do
-        assigns.name |> String.split(" ") |> Enum.at(1) |> URI.encode()
+      if assigns.undescribed && parsed.full_epithet do
+        parsed.full_epithet |> URI.encode()
       else
         nil
       end

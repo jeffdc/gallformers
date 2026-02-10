@@ -31,9 +31,9 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
   """
   @spec extract_genus_from_name(String.t()) :: String.t() | nil
   def extract_genus_from_name(name) when is_binary(name) do
-    case String.split(name, " ", parts: 2) do
-      [genus_name | _] when byte_size(genus_name) > 0 -> genus_name
-      _ -> nil
+    case TaxonName.parse(name).genus do
+      "" -> nil
+      genus -> genus
     end
   end
 
@@ -167,7 +167,9 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
   """
   @spec get_taxonomy_from_species_name(String.t()) :: map() | nil
   def get_taxonomy_from_species_name(name) when is_binary(name) do
-    with [genus_name | _] when byte_size(genus_name) > 0 <- String.split(name, " ", parts: 2),
+    parsed = TaxonName.parse(name)
+
+    with genus_name when genus_name != "" <- parsed.genus,
          %{} = genus <- Tree.get_taxonomy_by_name(genus_name, "genus") do
       build_taxonomy_map(genus, Tree.get_parent(genus.id))
     else
@@ -283,29 +285,33 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
 
   Used by both gall and host forms to resolve genus disambiguation against
   the relevant domain (gall families or plant families).
-  """
-  @spec resolve_taxonomy_for_species(map() | nil, MapSet.t(), keyword()) :: tuple()
-  def resolve_taxonomy_for_species(taxonomy, family_ids, opts \\ [])
 
-  def resolve_taxonomy_for_species(nil, _family_ids, opts) do
-    if Keyword.get(opts, :include_section, false) do
-      {nil, false, nil, nil, []}
-    else
-      {nil, false, nil, []}
-    end
+  Always returns a map with a uniform shape:
+
+      %{
+        taxonomy: map() | nil,
+        genus_is_new: boolean(),
+        family_id: integer() | nil,
+        section_id: integer() | nil,
+        possible_families: [map()]
+      }
+  """
+  @spec resolve_taxonomy_for_species(map() | nil, MapSet.t()) :: map()
+  def resolve_taxonomy_for_species(nil, _family_ids) do
+    %{taxonomy: nil, genus_is_new: false, family_id: nil, section_id: nil, possible_families: []}
   end
 
-  def resolve_taxonomy_for_species(taxonomy, family_ids, opts) do
-    include_section = Keyword.get(opts, :include_section, false)
-
+  def resolve_taxonomy_for_species(taxonomy, family_ids) do
     cond do
       # Genus is new - user must select a family
       Map.get(taxonomy, :genus_is_new) ->
-        if include_section do
-          {taxonomy, true, nil, nil, []}
-        else
-          {taxonomy, true, nil, []}
-        end
+        %{
+          taxonomy: taxonomy,
+          genus_is_new: true,
+          family_id: nil,
+          section_id: nil,
+          possible_families: []
+        }
 
       # Genus exists in multiple families - filter to valid families
       Map.get(taxonomy, :requires_disambiguation) ->
@@ -314,43 +320,49 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
             MapSet.member?(family_ids, family.family_id)
           end)
 
-        resolve_disambiguation(taxonomy, matching_families, include_section)
+        resolve_disambiguation(taxonomy, matching_families)
 
       # Genus exists in exactly one family - check if it's a valid family
       true ->
-        resolve_single_family(taxonomy, family_ids, include_section)
+        resolve_single_family(taxonomy, family_ids)
     end
   end
 
-  defp resolve_single_family(taxonomy, family_ids, include_section) do
+  defp resolve_single_family(taxonomy, family_ids) do
     if MapSet.member?(family_ids, taxonomy.family_id) do
-      if include_section do
-        {taxonomy, false, taxonomy.family_id, taxonomy.section_id, []}
-      else
-        {taxonomy, false, taxonomy.family_id, []}
-      end
+      %{
+        taxonomy: taxonomy,
+        genus_is_new: false,
+        family_id: taxonomy.family_id,
+        section_id: taxonomy[:section_id],
+        possible_families: []
+      }
     else
       new_genus = %{genus: taxonomy.genus, genus_id: nil, genus_is_new: true}
 
-      if include_section do
-        {new_genus, true, nil, nil, []}
-      else
-        {new_genus, true, nil, []}
-      end
+      %{
+        taxonomy: new_genus,
+        genus_is_new: true,
+        family_id: nil,
+        section_id: nil,
+        possible_families: []
+      }
     end
   end
 
-  defp resolve_disambiguation(taxonomy, [], include_section) do
+  defp resolve_disambiguation(taxonomy, []) do
     new_genus = %{genus: taxonomy.genus, genus_id: nil, genus_is_new: true}
 
-    if include_section do
-      {new_genus, true, nil, nil, []}
-    else
-      {new_genus, true, nil, []}
-    end
+    %{
+      taxonomy: new_genus,
+      genus_is_new: true,
+      family_id: nil,
+      section_id: nil,
+      possible_families: []
+    }
   end
 
-  defp resolve_disambiguation(taxonomy, [single], include_section) do
+  defp resolve_disambiguation(taxonomy, [single]) do
     resolved = %{
       genus: taxonomy.genus,
       genus_id: single.genus_id,
@@ -361,19 +373,23 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
       family_id: single.family_id
     }
 
-    if include_section do
-      {resolved, false, single.family_id, single.section_id, []}
-    else
-      {resolved, false, single.family_id, []}
-    end
+    %{
+      taxonomy: resolved,
+      genus_is_new: false,
+      family_id: single.family_id,
+      section_id: single.section_id,
+      possible_families: []
+    }
   end
 
-  defp resolve_disambiguation(taxonomy, multiple, include_section) do
-    if include_section do
-      {taxonomy, false, nil, nil, multiple}
-    else
-      {taxonomy, false, nil, multiple}
-    end
+  defp resolve_disambiguation(taxonomy, multiple) do
+    %{
+      taxonomy: taxonomy,
+      genus_is_new: false,
+      family_id: nil,
+      section_id: nil,
+      possible_families: multiple
+    }
   end
 
   @doc """

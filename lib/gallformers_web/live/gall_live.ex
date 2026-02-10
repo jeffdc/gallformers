@@ -9,6 +9,7 @@ defmodule GallformersWeb.GallLive do
 
   alias Gallformers.{GallHosts, Galls, Glossaries, Markdown, Ranges, Sources, Species, Taxonomy}
   alias Gallformers.Images.Image
+  alias Gallformers.Taxonomy.TaxonName
   alias GallformersWeb.SEO
 
   @aliases_page_size 10
@@ -201,18 +202,16 @@ defmodule GallformersWeb.GallLive do
   # 1. Check for former_undescribed alias (gall was reclassified from Unknown→Known)
   # 2. Else if currently undescribed, derive from species name
   # 3. Otherwise nil (described galls don't have a gallformers code)
-  defp compute_gallformers_code(aliases, gall, taxonomy) do
+  defp compute_gallformers_code(aliases, gall, _taxonomy) do
     former_undescribed_alias = Enum.find(aliases, &(&1.type == "former_undescribed"))
 
     code =
       cond do
         former_undescribed_alias ->
-          former_undescribed_alias.name
-          |> String.replace(~r/^Unknown(?:\s*\([^)]+\))?\s+/, "")
-          |> String.replace(~r/ \([^)]+\)$/, "")
+          TaxonName.parse(former_undescribed_alias.name).epithet
 
         gall.undescribed ->
-          get_gallformers_code(gall.name, taxonomy && taxonomy[:genus])
+          TaxonName.parse(gall.name).epithet
 
         true ->
           nil
@@ -220,25 +219,6 @@ defmodule GallformersWeb.GallLive do
 
     {code, former_undescribed_alias}
   end
-
-  # Extract the gallformers code from the species name by removing the genus and any trailing parenthetical.
-  # For "Unknown" genera (e.g., "Unknown (Cynipidae)"), the species name uses a different format
-  # like "Unknown-cynipidae ..." so we strip the "Unknown-family" or "Unknown" prefix instead.
-  defp get_gallformers_code(species_name, genus_name) when is_binary(genus_name) do
-    if String.starts_with?(genus_name, "Unknown") do
-      # Strip "Unknown-family " or "Unknown " prefix from species name
-      species_name
-      |> String.replace(~r/^Unknown(?:-[a-z]+)?\s+/, "")
-      |> String.replace(~r/ \([^)]+\)$/, "")
-    else
-      species_name
-      |> String.replace(genus_name, "")
-      |> String.trim()
-      |> String.replace(~r/ \([^)]+\)$/, "")
-    end
-  end
-
-  defp get_gallformers_code(species_name, _), do: species_name
 
   # Parses generation qualifier from species name and fetches glossary definition.
   # Returns {base_name, term, glossary_word, definition} or {full_name, nil, nil, nil}.

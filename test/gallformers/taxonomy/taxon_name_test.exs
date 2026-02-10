@@ -3,6 +3,67 @@ defmodule Gallformers.Taxonomy.TaxonNameTest do
 
   alias Gallformers.Taxonomy.TaxonName
 
+  describe "parse/1" do
+    test "parses simple species name" do
+      parsed = TaxonName.parse("Andricus quercuslanigera")
+      assert parsed.raw == "Andricus quercuslanigera"
+      assert parsed.genus == "Andricus"
+      assert parsed.family == nil
+      assert parsed.epithet == "quercuslanigera"
+      assert parsed.qualifier == nil
+      assert parsed.full_epithet == "quercuslanigera"
+      assert parsed.unknown? == false
+    end
+
+    test "parses species with qualifier" do
+      parsed = TaxonName.parse("Callirhytis furva (agamic)")
+      assert parsed.genus == "Callirhytis"
+      assert parsed.family == nil
+      assert parsed.epithet == "furva"
+      assert parsed.qualifier == "(agamic)"
+      assert parsed.full_epithet == "furva (agamic)"
+      assert parsed.unknown? == false
+    end
+
+    test "parses Unknown genus with epithet and qualifier" do
+      parsed = TaxonName.parse("Unknown (Andricus) foobarrus agamic")
+      assert parsed.genus == "Unknown (Andricus)"
+      assert parsed.family == "Andricus"
+      assert parsed.epithet == "foobarrus"
+      assert parsed.qualifier == "agamic"
+      assert parsed.full_epithet == "foobarrus agamic"
+      assert parsed.unknown? == true
+    end
+
+    test "parses genus-only name" do
+      parsed = TaxonName.parse("Andricus")
+      assert parsed.genus == "Andricus"
+      assert parsed.family == nil
+      assert parsed.epithet == nil
+      assert parsed.qualifier == nil
+      assert parsed.full_epithet == nil
+      assert parsed.unknown? == false
+    end
+
+    test "parses Unknown genus-only" do
+      parsed = TaxonName.parse("Unknown (Cynipidae)")
+      assert parsed.genus == "Unknown (Cynipidae)"
+      assert parsed.family == "Cynipidae"
+      assert parsed.epithet == nil
+      assert parsed.full_epithet == nil
+      assert parsed.unknown? == true
+    end
+
+    test "parses empty string" do
+      parsed = TaxonName.parse("")
+      assert parsed.genus == ""
+      assert parsed.family == nil
+      assert parsed.epithet == nil
+      assert parsed.full_epithet == nil
+      assert parsed.unknown? == false
+    end
+  end
+
   describe "genus_display/1" do
     test "extracts genus from simple species name" do
       assert TaxonName.genus_display("Andricus quercuslanigera") == "Andricus"

@@ -10,6 +10,7 @@ defmodule GallformersWeb.Admin.SectionLive.Form do
 
   alias Gallformers.Plants
   alias Gallformers.Taxonomy
+  alias Gallformers.Taxonomy.TaxonName
   alias Gallformers.Taxonomy.Taxonomy, as: TaxonomySchema
 
   @impl true
@@ -220,9 +221,9 @@ defmodule GallformersWeb.Admin.SectionLive.Form do
   end
 
   defp extract_genus(%{name: name}) do
-    case String.split(name, " ", parts: 2) do
-      [genus | _] -> genus
-      _ -> nil
+    case TaxonName.parse(name).genus do
+      "" -> nil
+      genus -> genus
     end
   end
 

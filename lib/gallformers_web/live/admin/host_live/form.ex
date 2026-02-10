@@ -18,6 +18,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   import GallformersWeb.Admin.FormComponents,
     only: [alias_collision_warning: 1, alias_editor: 1, form_actions: 1]
 
+  import GallformersWeb.Admin.ReclassifyHelpers
+
   @impl true
   def mount(_params, session, socket) do
     current_user = session["current_user"]
@@ -199,38 +201,18 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
   @impl true
   def handle_event("select_family_from_disambiguation", %{"family_id" => family_id_str}, socket) do
-    family_id = String.to_integer(family_id_str)
-    possible_families = socket.assigns.possible_families
+    case apply_family_disambiguation(socket, family_id_str) do
+      {:ok, socket, selected} ->
+        sections_for_family = Taxonomy.list_sections_for_genus(selected.genus_id)
 
-    # Find the selected family from the possible families list
-    selected = Enum.find(possible_families, &(&1.family_id == family_id))
+        {:noreply,
+         socket
+         |> assign(:selected_section_id, selected.section_id)
+         |> assign(:sections_for_family, sections_for_family)
+         |> mark_dirty()}
 
-    if selected do
-      # Load sections for this specific genus
-      sections_for_family = Taxonomy.list_sections_for_genus(selected.genus_id)
-
-      # Update taxonomy with the selected family info
-      taxonomy = %{
-        genus: socket.assigns.taxonomy.genus,
-        genus_id: selected.genus_id,
-        genus_is_new: false,
-        section: selected.section,
-        section_id: selected.section_id,
-        family: selected.family,
-        family_id: selected.family_id
-      }
-
-      {:noreply,
-       socket
-       |> assign(:taxonomy, taxonomy)
-       |> assign(:selected_family_id, family_id)
-       |> assign(:selected_section_id, selected.section_id)
-       |> assign(:sections_for_family, sections_for_family)
-       |> assign(:possible_families, [])
-       |> assign(:show_genus_disambiguation, false)
-       |> mark_dirty()}
-    else
-      {:noreply, put_flash(socket, :error, "Family not found")}
+      {:error, socket} ->
+        {:noreply, socket}
     end
   end
 
@@ -290,16 +272,6 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     end
   end
 
-  defp reclassify_family(nil), do: nil
-  defp reclassify_family(%{family_id: nil}), do: nil
-  defp reclassify_family(%{family_id: id, family: name}), do: %{id: id, name: name}
-  defp reclassify_family(_), do: nil
-
-  defp reclassify_genus(nil), do: nil
-  defp reclassify_genus(%{genus_id: nil}), do: nil
-  defp reclassify_genus(%{genus_id: id}), do: %{id: id}
-  defp reclassify_genus(_), do: nil
-
   defp toggle_region(%{assigns: %{mode: mode}} = socket, _code) when mode != :edit, do: socket
 
   defp toggle_region(socket, code) do
@@ -354,8 +326,14 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     # Handle genus disambiguation: filter to plant families only
     plant_family_ids = MapSet.new(socket.assigns.families, fn {_name, id} -> id end)
 
-    {taxonomy, genus_is_new, selected_family_id, selected_section_id, possible_families} =
-      Taxonomy.resolve_taxonomy_for_species(raw_taxonomy, plant_family_ids, include_section: true)
+    %{
+      taxonomy: taxonomy,
+      genus_is_new: genus_is_new,
+      family_id: selected_family_id,
+      section_id: selected_section_id,
+      possible_families: possible_families
+    } =
+      Taxonomy.resolve_taxonomy_for_species(raw_taxonomy, plant_family_ids)
 
     # Load sections only for existing genus
     sections_for_family =

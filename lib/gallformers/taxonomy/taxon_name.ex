@@ -5,9 +5,111 @@ defmodule Gallformers.Taxonomy.TaxonName do
   No database access — all functions operate on strings and structs.
   Centralizes the scattered name-parsing regexes and italic-logic that were
   previously duplicated across 20+ files.
+
+  ## Struct
+
+  `parse/1` returns a `%TaxonName{}` with pre-split fields so callers don't
+  need to re-discover the Unknown pattern:
+
+      iex> parse("Unknown (Cynipidae) foobarrus agamic")
+      %TaxonName{
+        raw: "Unknown (Cynipidae) foobarrus agamic",
+        genus: "Unknown (Cynipidae)",
+        family: "Cynipidae",
+        epithet: "foobarrus",
+        qualifier: "agamic",
+        full_epithet: "foobarrus agamic",
+        unknown?: true
+      }
+
+  The `family` field is only populated for Unknown genera — it extracts the
+  name inside the parentheses (e.g., `"Unknown (Cynipidae)"` → `family: "Cynipidae"`).
+  For known genera, `family` is always `nil`. Use `unknown?` to distinguish the two cases.
   """
 
   @unknown_genus_re ~r/^Unknown \(([^)]+)\)/
+
+  defstruct [:raw, :genus, :family, :epithet, :qualifier, :full_epithet, unknown?: false]
+
+  @type t :: %__MODULE__{
+          raw: String.t(),
+          genus: String.t(),
+          family: String.t() | nil,
+          epithet: String.t() | nil,
+          qualifier: String.t() | nil,
+          full_epithet: String.t() | nil,
+          unknown?: boolean()
+        }
+
+  @doc """
+  Parses a species name string into a `%TaxonName{}` struct.
+
+  Correctly handles the "Unknown (Family) epithet qualifier" pattern that
+  breaks naive `String.split(name, " ", parts: 2)` approaches.
+
+  ## Examples
+
+      iex> parse("Andricus quercuslanigera")
+      %TaxonName{raw: "Andricus quercuslanigera", genus: "Andricus",
+        epithet: "quercuslanigera", qualifier: nil, full_epithet: "quercuslanigera",
+        unknown?: false}
+
+      iex> parse("Unknown (Cynipidae)")
+      %TaxonName{raw: "Unknown (Cynipidae)", genus: "Unknown (Cynipidae)",
+        family: "Cynipidae", epithet: nil, qualifier: nil, full_epithet: nil,
+        unknown?: true}
+
+      iex> parse("")
+      %TaxonName{raw: "", genus: "", epithet: nil, qualifier: nil,
+        full_epithet: nil, unknown?: false}
+  """
+  @spec parse(String.t()) :: t()
+  def parse(name) when is_binary(name) do
+    case Regex.run(@unknown_genus_re, name) do
+      [genus_display, family] ->
+        rest = String.trim_leading(name, genus_display) |> String.trim_leading()
+        build_struct(name, genus_display, family, rest, true)
+
+      nil ->
+        case String.split(name, " ", parts: 2) do
+          [genus, rest] -> build_struct(name, genus, nil, rest, false)
+          _ -> build_struct(name, name, nil, "", false)
+        end
+    end
+  end
+
+  defp build_struct(raw, genus, family, "", unknown?) do
+    %__MODULE__{
+      raw: raw,
+      genus: genus,
+      family: family,
+      epithet: nil,
+      qualifier: nil,
+      full_epithet: nil,
+      unknown?: unknown?
+    }
+  end
+
+  defp build_struct(raw, genus, family, rest, unknown?) do
+    parts = String.split(rest, " ", parts: 2)
+    epithet = hd(parts)
+
+    qualifier =
+      case parts do
+        [_, q] -> q
+        _ -> nil
+      end
+
+    %__MODULE__{
+      raw: raw,
+      genus: genus,
+      family: family,
+      epithet: epithet,
+      qualifier: qualifier,
+      full_epithet: rest,
+      unknown?: unknown?
+    }
+  end
 
   @doc """
   Extracts the genus display portion from a species name.
@@ -28,22 +130,14 @@ defmodule Gallformers.Taxonomy.TaxonName do
   """
   @spec genus_display(String.t()) :: String.t()
   def genus_display(name) when is_binary(name) do
-    case Regex.run(@unknown_genus_re, name) do
-      [genus_display, _family] ->
-        genus_display
-
-      nil ->
-        case String.split(name, " ", parts: 2) do
-          [genus | _] -> genus
-          _ -> name
-        end
-    end
+    parse(name).genus
   end
 
   @doc """
   Extracts the epithet (everything after the genus portion) from a species name.
 
   Handles "Unknown (Family) epithet" and "Genus epithet" formats.
+  Returns the full_epithet (including qualifier) for backward compatibility.
 
   ## Examples
 
@@ -58,16 +152,7 @@ defmodule Gallformers.Taxonomy.TaxonName do
   """
   @spec epithet(String.t()) :: String.t()
   def epithet(name) when is_binary(name) do
-    case Regex.run(~r/^Unknown \([^)]+\)\s*(.*)$/, name) do
-      [_, epithet] ->
-        epithet
-
-      nil ->
-        case String.split(name, " ", parts: 2) do
-          [_, epithet] -> epithet
-          _ -> ""
-        end
-    end
+    parse(name).full_epithet || ""
   end
 
   @doc """

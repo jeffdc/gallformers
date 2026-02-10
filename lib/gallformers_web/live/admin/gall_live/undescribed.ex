@@ -13,6 +13,7 @@ defmodule GallformersWeb.Admin.GallLive.Undescribed do
   use GallformersWeb, :live_view
 
   alias Gallformers.{Species, Taxonomy}
+  alias Gallformers.Taxonomy.TaxonName
 
   @impl true
   def mount(params, session, socket) do
@@ -24,7 +25,7 @@ defmodule GallformersWeb.Admin.GallLive.Undescribed do
       |> assign(:current_user, current_user)
       |> assign(:page_title, "Add Undescribed Gall")
       |> assign(:genera, Taxonomy.list_genera_for_select())
-      |> assign(:families, Taxonomy.list_families_for_select())
+      |> assign(:families, Taxonomy.list_families_for_select(:gall))
       |> assign(:genus_known, false)
       |> assign(:genus_query, "")
       |> assign(:genus_results, [])
@@ -431,13 +432,13 @@ defmodule GallformersWeb.Admin.GallLive.Undescribed do
   defp extract_host_part(nil), do: nil
 
   defp extract_host_part(%{name: name}) do
-    case String.split(name) do
-      [genus_part, species_part | _] ->
-        first_letter = String.downcase(String.first(genus_part))
-        "#{first_letter}-#{species_part}"
+    parsed = TaxonName.parse(name)
 
-      _ ->
-        String.downcase(name)
+    if parsed.epithet do
+      first_letter = String.downcase(String.first(parsed.genus))
+      "#{first_letter}-#{parsed.epithet}"
+    else
+      String.downcase(name)
     end
   end
 

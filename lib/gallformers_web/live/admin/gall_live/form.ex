@@ -14,11 +14,14 @@ defmodule GallformersWeb.Admin.GallLive.Form do
   alias Gallformers.Galls
   alias Gallformers.Species
   alias Gallformers.Species.Species, as: SpeciesSchema
+  alias Gallformers.Taxonomy.TaxonName
   alias GallformersWeb.Admin.AliasHandlers
   alias GallformersWeb.Admin.DeferredChanges
 
   import GallformersWeb.Admin.FormComponents,
     only: [alias_collision_warning: 1, alias_editor: 1, form_actions: 1]
+
+  import GallformersWeb.Admin.ReclassifyHelpers
 
   @detachable_options [
     {"Unknown", "unknown"},
@@ -144,12 +147,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
   end
 
   defp redirect_to_undescribed_flow(socket, name) do
-    # "Unknown foo-bar" -> pass "foo-bar" as the description
-    description =
-      case String.split(name, " ", parts: 2) do
-        [_, rest] -> String.trim(rest)
-        _ -> ""
-      end
+    description = TaxonName.parse(name).full_epithet || ""
 
     query = URI.encode_query(%{description: description})
 
@@ -164,7 +162,12 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     # Handle genus disambiguation: filter to non-plant families only
     gall_family_ids = MapSet.new(socket.assigns.families, fn {_name, id} -> id end)
 
-    {taxonomy, genus_is_new, selected_family_id, possible_families} =
+    %{
+      taxonomy: taxonomy,
+      genus_is_new: genus_is_new,
+      family_id: selected_family_id,
+      possible_families: possible_families
+    } =
       Gallformers.Taxonomy.resolve_taxonomy_for_species(raw_taxonomy, gall_family_ids)
 
     socket
@@ -507,33 +510,12 @@ defmodule GallformersWeb.Admin.GallLive.Form do
 
   @impl true
   def handle_event("select_family_from_disambiguation", %{"family_id" => family_id_str}, socket) do
-    family_id = String.to_integer(family_id_str)
-    possible_families = socket.assigns.possible_families
+    case apply_family_disambiguation(socket, family_id_str) do
+      {:ok, socket, _selected} ->
+        {:noreply, mark_dirty(socket)}
 
-    # Find the selected family from the possible families list
-    selected = Enum.find(possible_families, &(&1.family_id == family_id))
-
-    if selected do
-      # Update taxonomy with the selected family info
-      taxonomy = %{
-        genus: socket.assigns.taxonomy.genus,
-        genus_id: selected.genus_id,
-        genus_is_new: false,
-        section: selected.section,
-        section_id: selected.section_id,
-        family: selected.family,
-        family_id: selected.family_id
-      }
-
-      {:noreply,
-       socket
-       |> assign(:taxonomy, taxonomy)
-       |> assign(:selected_family_id, family_id)
-       |> assign(:possible_families, [])
-       |> assign(:show_genus_disambiguation, false)
-       |> mark_dirty()}
-    else
-      {:noreply, put_flash(socket, :error, "Family not found")}
+      {:error, socket} ->
+        {:noreply, socket}
     end
   end
 
@@ -616,18 +598,6 @@ defmodule GallformersWeb.Admin.GallLive.Form do
         {:noreply, put_flash(socket, :error, "Failed to delete gall")}
     end
   end
-
-  defp reclassify_family(nil), do: nil
-
-  defp reclassify_family(%{family_id: nil}), do: nil
-
-  defp reclassify_family(%{family_id: id, family: name}), do: %{id: id, name: name}
-
-  defp reclassify_genus(nil), do: nil
-
-  defp reclassify_genus(%{genus_id: nil}), do: nil
-
-  defp reclassify_genus(%{genus_id: id}), do: %{id: id}
 
   # =================================================================
   # Reclassify callbacks (from ReclassifyLive component)
@@ -1159,8 +1129,10 @@ defmodule GallformersWeb.Admin.GallLive.Form do
                   ]}>
                     <input
                       type="checkbox"
+                      name="undescribed"
+                      value="true"
                       checked={@undescribed}
-                      phx-click="toggle_undescribed"
+                      phx-change="toggle_undescribed"
                       disabled={@undescribed_locked}
                       class="rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon disabled:opacity-50"
                     />

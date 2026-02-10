@@ -658,6 +658,7 @@ defmodule GallformersWeb.FormComponents do
       data-clear-event={@clear_event}
       data-search-event={@search_event}
       data-input-id={"#{@id}-input"}
+      data-target={@target && @target.cid}
       class={@class}
     >
       <label class="gf-label">

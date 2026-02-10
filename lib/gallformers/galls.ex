@@ -28,7 +28,7 @@ defmodule Gallformers.Galls do
   alias Gallformers.Images.Image
   alias Gallformers.Repo
   alias Gallformers.Species.{Abundance, Species}
-  alias Gallformers.Taxonomy.{Taxonomy, TreeBuilder}
+  alias Gallformers.Taxonomy.{TaxonName, Taxonomy, TreeBuilder}
 
   @topic "galls"
 
@@ -334,12 +334,10 @@ defmodule Gallformers.Galls do
   """
   @spec get_related_galls(map()) :: [map()]
   def get_related_galls(gall) when is_map(gall) do
-    name = gall.name || ""
-    name_parts = String.split(name, " ", parts: 3)
+    parsed = TaxonName.parse(gall.name || "")
 
-    if length(name_parts) >= 2 do
-      # Match on "Genus species " with trailing space to avoid false positives
-      prefix = "#{Enum.at(name_parts, 0)} #{Enum.at(name_parts, 1)} "
+    if parsed.epithet do
+      prefix = "#{parsed.genus} #{parsed.epithet} "
 
       from(s in Species,
         where: fragment("? LIKE ?", s.name, ^"#{prefix}%"),
