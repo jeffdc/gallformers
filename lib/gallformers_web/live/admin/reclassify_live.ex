@@ -31,10 +31,16 @@ defmodule GallformersWeb.Admin.ReclassifyLive do
 
   @impl true
   def update(assigns, socket) do
-    {:ok, assign_new_from_parent(socket, assigns)}
+    socket =
+      socket
+      |> sync_parent_assigns(assigns)
+      |> init_component_state()
+
+    {:ok, socket}
   end
 
-  defp assign_new_from_parent(socket, assigns) do
+  # Overwrites on every update/2 call to stay in sync with the parent.
+  defp sync_parent_assigns(socket, assigns) do
     socket
     |> assign(:id, assigns.id)
     |> assign(:species_id, assigns[:species_id])
@@ -44,6 +50,11 @@ defmodule GallformersWeb.Admin.ReclassifyLive do
     |> assign(:entity_type, assigns[:entity_type])
     |> assign(:is_gall, assigns[:is_gall] || false)
     |> assign(:undescribed, assigns[:undescribed] || false)
+  end
+
+  # Sets component-internal state only on first mount; preserved across updates.
+  defp init_component_state(socket) do
+    socket
     |> assign_new(:show, fn -> false end)
     |> assign_new(:family_query, fn -> "" end)
     |> assign_new(:family_results, fn -> [] end)
@@ -83,13 +94,17 @@ defmodule GallformersWeb.Admin.ReclassifyLive do
 
   defp resolve_current_genus(nil), do: nil
 
-  defp resolve_current_genus(%{id: genus_id}) do
+  defp resolve_current_genus(%{id: genus_id} = genus_info) do
+    # Fetch from DB to get is_placeholder (not available in taxonomy map)
     case Taxonomy.get_taxonomy(genus_id) do
       %{id: id, name: name, is_placeholder: is_placeholder} ->
         %{id: id, name: name, is_placeholder: is_placeholder}
 
       _ ->
-        nil
+        # Fall back to what the parent provided (missing is_placeholder)
+        if Map.has_key?(genus_info, :name),
+          do: %{id: genus_id, name: genus_info.name, is_placeholder: false},
+          else: nil
     end
   end
 

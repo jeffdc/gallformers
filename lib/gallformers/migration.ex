@@ -129,9 +129,10 @@ defmodule Gallformers.Migration do
       end
   """
   defmacro safe_recreate_table(_table_name, do: block) do
-    quote do
-      alias Ecto.Migration.Runner
+    # Bind outside quote to avoid leaking an alias into the caller's scope
+    runner = Ecto.Migration.Runner
 
+    quote do
       Gallformers.Repo.checkout(fn ->
         Ecto.Migration.execute("PRAGMA foreign_keys = OFF")
 
@@ -139,7 +140,7 @@ defmodule Gallformers.Migration do
 
         Ecto.Migration.execute("PRAGMA foreign_keys = ON")
         Ecto.Migration.execute("PRAGMA foreign_key_check")
-        Runner.flush()
+        unquote(runner).flush()
       end)
     end
   end

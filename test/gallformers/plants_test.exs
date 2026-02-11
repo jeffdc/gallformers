@@ -120,32 +120,29 @@ defmodule Gallformers.PlantsTest do
 
     test "updates places when changed", %{species: species, genus: genus} do
       all_places = Gallformers.Places.list_places()
+      assert all_places != [], "test seeds must include places"
+      place = hd(all_places)
 
-      # Skip if no places in test DB
-      if all_places != [] do
-        place = hd(all_places)
-
-        params = %{
-          species_attrs: %{},
-          alias_changes: {[], []},
-          place_changes: %{
-            original_places: [],
-            current_places: [place.code],
-            all_places: all_places
-          },
-          section_update: %{
-            genus_id: genus.id,
-            selected_section_id: nil,
-            section_id: nil,
-            family_id: nil
-          }
+      params = %{
+        species_attrs: %{},
+        alias_changes: {[], []},
+        place_changes: %{
+          original_places: [],
+          current_places: [place.code],
+          all_places: all_places
+        },
+        section_update: %{
+          genus_id: genus.id,
+          selected_section_id: nil,
+          section_id: nil,
+          family_id: nil
         }
+      }
 
-        assert {:ok, _updated} = Plants.update_host_with_associations(species, params)
+      assert {:ok, _updated} = Plants.update_host_with_associations(species, params)
 
-        places = Ranges.get_places_for_host(species.id)
-        assert place.code in places
-      end
+      places = Ranges.get_places_for_host(species.id)
+      assert place.code in places
     end
 
     test "rolls back on invalid species update", %{species: species, genus: genus} do

@@ -19,6 +19,7 @@ defmodule GallformersWeb.Admin.ReclassifyHelpers do
   """
   def reclassify_genus(nil), do: nil
   def reclassify_genus(%{genus_id: nil}), do: nil
+  def reclassify_genus(%{genus_id: id, genus: name}), do: %{id: id, name: name}
   def reclassify_genus(%{genus_id: id}), do: %{id: id}
   def reclassify_genus(_), do: nil
 

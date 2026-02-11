@@ -129,23 +129,20 @@ defmodule GallformersWeb.SearchLiveTest do
   end
 
   describe "Search results display" do
-    test "gall results show italicized names", %{conn: conn} do
-      # Search for a gall species
+    test "gall results use taxon_name component", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/globalsearch?q=andricus")
 
-      # If gall results exist, they should be italicized (via taxon_name component)
-      if html =~ "Gall" and not (html =~ "No results") do
-        assert html =~ "taxon-name"
-      end
+      refute html =~ "No results", "test seeds must include gall species matching 'andricus'"
+      assert html =~ "taxon-name"
+      assert html =~ "/gall/"
     end
 
-    test "host results show italicized names", %{conn: conn} do
+    test "host results use taxon_name component", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/globalsearch?q=quercus")
 
-      # If host results exist, they should be italicized (via taxon_name component)
-      if html =~ "Host" and not (html =~ "No results") do
-        assert html =~ "taxon-name"
-      end
+      refute html =~ "No results", "test seeds must include host species matching 'quercus'"
+      assert html =~ "taxon-name"
+      assert html =~ "/host/"
     end
 
     test "results have type icons", %{conn: conn} do

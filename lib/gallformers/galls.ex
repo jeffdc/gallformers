@@ -680,6 +680,39 @@ defmodule Gallformers.Galls do
     end
   end
 
+  @doc """
+  Returns true if the species has gall_traits with undescribed=true.
+  """
+  @spec undescribed?(integer()) :: boolean()
+  def undescribed?(species_id) do
+    case Repo.get(GallTraits, species_id) do
+      %GallTraits{undescribed: true} -> true
+      _ -> false
+    end
+  end
+
+  @doc """
+  Forces undescribed=true if the given genus is a placeholder (Unknown).
+  No-op if genus is not a placeholder or species has no gall_traits.
+  """
+  @spec force_undescribed_if_placeholder(integer(), integer()) :: :ok
+  def force_undescribed_if_placeholder(species_id, genus_id) do
+    genus = Gallformers.Taxonomy.get_taxonomy(genus_id)
+
+    if genus && genus.is_placeholder do
+      case Repo.get(GallTraits, species_id) do
+        nil ->
+          :ok
+
+        gall_traits ->
+          GallTraits.changeset(gall_traits, %{undescribed: true}) |> Repo.update!()
+          :ok
+      end
+    else
+      :ok
+    end
+  end
+
   # ============================================
   # CRUD Operations
   # ============================================

@@ -405,6 +405,83 @@ defmodule GallformersWeb.Admin.GallLive.FormTest do
 
       assert html =~ "select a genus"
     end
+
+    test "happy path: reclassify gall to different genus", %{conn: conn} do
+      # Set up taxonomy: Family "Cynipidae" with two genera
+      {:ok, family} =
+        Gallformers.Repo.insert(%Gallformers.Taxonomy.Taxonomy{
+          name: "Cynipidae",
+          description: "Gall Wasps",
+          type: "family",
+          is_placeholder: false
+        })
+
+      {:ok, source_genus} =
+        Gallformers.Repo.insert(%Gallformers.Taxonomy.Taxonomy{
+          name: "Andricus",
+          description: "",
+          type: "genus",
+          parent_id: family.id,
+          is_placeholder: false
+        })
+
+      {:ok, target_genus} =
+        Gallformers.Repo.insert(%Gallformers.Taxonomy.Taxonomy{
+          name: "Callirhytis",
+          description: "",
+          type: "genus",
+          parent_id: family.id,
+          is_placeholder: false
+        })
+
+      # Link gall species 100 ("Andricus quercuscalifornicus") to source genus
+      gall_id = 100
+
+      Gallformers.Repo.insert_all("species_taxonomy", [
+        [species_id: gall_id, taxonomy_id: source_genus.id]
+      ])
+
+      # Link gall species 102 to target genus (so it appears in taxoncode-filtered search)
+      Gallformers.Repo.insert_all("species_taxonomy", [
+        [species_id: 102, taxonomy_id: target_genus.id]
+      ])
+
+      {:ok, view, _html} = live(conn, ~p"/admin/galls/#{gall_id}")
+
+      # Open the reclassify modal
+      view |> element("button", "Rename/Reclassify") |> render_click()
+
+      # Search and select the target family
+      view
+      |> with_target("#reclassify")
+      |> render_click("reclassify_search_family", %{"value" => "Cynip"})
+
+      view
+      |> with_target("#reclassify")
+      |> render_click("reclassify_select_family", %{"id" => Integer.to_string(family.id)})
+
+      # Search and select the target genus
+      view
+      |> with_target("#reclassify")
+      |> render_click("reclassify_search_genus", %{"value" => "Call"})
+
+      view
+      |> with_target("#reclassify")
+      |> render_click("reclassify_select_genus", %{"id" => Integer.to_string(target_genus.id)})
+
+      # Submit reclassification
+      view
+      |> with_target("#reclassify")
+      |> render_click("do_reclassify", %{})
+
+      html = render(view)
+
+      # Verify: species renamed and success flash shown
+      assert html =~ "Callirhytis quercuscalifornicus"
+      assert html =~ "updated successfully"
+      # The old name should appear as a scientific synonym alias
+      assert html =~ "Andricus quercuscalifornicus"
+    end
   end
 
   describe "Cancel and discard" do

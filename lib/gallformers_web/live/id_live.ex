@@ -264,7 +264,7 @@ defmodule GallformersWeb.IDLive do
     genus_type = decode_url_param(params[@url_params.genus_type]) || "genus"
 
     case Taxonomy.get_taxonomy_by_name(name, genus_type) do
-      nil -> Taxonomy.get_taxonomy_by_name(name)
+      nil -> Taxonomy.find_taxonomy_by_name(name)
       tax -> tax
     end
   end

@@ -484,7 +484,7 @@ const InputEvent = {
       if (event) {
         const target = this.el.dataset.target
         if (target) {
-          this.pushEventTo(target, event, {value: this.el.value})
+          this.pushEventTo(`[data-phx-component="${target}"]`, event, {value: this.el.value})
         } else {
           this.pushEvent(event, {value: this.el.value})
         }

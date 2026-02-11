@@ -8,7 +8,6 @@ defmodule Gallformers.Taxonomy.Reclassification do
 
   require Logger
   import Ecto.Query
-  alias Gallformers.Galls.GallTraits
   alias Gallformers.Repo
   alias Gallformers.Species.Species
   alias Gallformers.Taxonomy.{SpeciesLink, TaxonName, Taxonomy, Tree}
@@ -91,13 +90,13 @@ defmodule Gallformers.Taxonomy.Reclassification do
     rotate_former_undescribed = Keyword.get(opts, :rotate_former_undescribed, false)
     explicit_alias_type = Keyword.get(opts, :alias_type)
     target_epithet = Keyword.get(opts, :target_epithet)
-    # Capture undescribed state BEFORE maybe_force_undescribed changes it
-    was_undescribed? = species_undescribed?(species_id)
+    # Capture undescribed state BEFORE force_undescribed_if_placeholder changes it
+    was_undescribed? = Gallformers.Galls.undescribed?(species_id)
 
     Repo.transaction(fn ->
-      case Gallformers.Taxonomy.update_species_genus(species_id, new_genus_id) do
+      case SpeciesLink.update_species_genus(species_id, new_genus_id) do
         :ok ->
-          maybe_force_undescribed(species_id, new_genus_id)
+          Gallformers.Galls.force_undescribed_if_placeholder(species_id, new_genus_id)
           maybe_rotate_former_undescribed(species_id, rotate_former_undescribed)
 
           rename_species_for_reclassification(
@@ -172,26 +171,6 @@ defmodule Gallformers.Taxonomy.Reclassification do
 
   defp maybe_rotate_former_undescribed(species_id, true) do
     Gallformers.Species.rotate_former_undescribed_alias(species_id)
-  end
-
-  # Returns true if the species has gall_traits with undescribed=true.
-  defp species_undescribed?(species_id) do
-    case Repo.get(GallTraits, species_id) do
-      %GallTraits{undescribed: true} -> true
-      _ -> false
-    end
-  end
-
-  # If the new genus is Unknown and the species has gall_traits, force undescribed=true.
-  defp maybe_force_undescribed(species_id, genus_id) do
-    genus = Tree.get_taxonomy(genus_id)
-
-    if genus && genus.is_placeholder do
-      case Repo.get(GallTraits, species_id) do
-        nil -> :ok
-        gall_traits -> GallTraits.changeset(gall_traits, %{undescribed: true}) |> Repo.update!()
-      end
-    end
   end
 
   # =====================================================================
