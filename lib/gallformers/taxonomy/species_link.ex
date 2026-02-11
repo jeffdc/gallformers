@@ -179,6 +179,8 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
 
   def get_taxonomy_from_species_name(_), do: nil
 
+  # Hierarchy: Family → Genus → Section (optional).
+  # A genus's parent is always a family (or nil for orphans).
   defp build_taxonomy_map(genus, nil) do
     %{
       genus: genus.name,
@@ -187,19 +189,6 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
       section_id: nil,
       family: nil,
       family_id: nil
-    }
-  end
-
-  defp build_taxonomy_map(genus, %{type: "section"} = section) do
-    family = Tree.get_parent(section.id)
-
-    %{
-      genus: genus.name,
-      genus_id: genus.id,
-      section: section.name,
-      section_id: section.id,
-      family: family && family.name,
-      family_id: family && family.id
     }
   end
 
@@ -420,33 +409,26 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
   """
   @spec get_taxonomy_for_species(integer()) :: map() | nil
   def get_taxonomy_for_species(species_id) do
-    # Get the genus link. The genus parent may be a family directly,
-    # or a section (whose parent is the family). We join two levels up
-    # to handle both: genus → parent → grandparent.
+    # Hierarchy: Family → Genus → Section (optional).
+    # A genus's parent is always a family, so we only need one join level up.
     genus_query =
       from st in "species_taxonomy",
         join: g in Taxonomy,
         on: st.taxonomy_id == g.id and g.type == "genus",
-        left_join: parent in Taxonomy,
-        on: g.parent_id == parent.id,
-        left_join: grandparent in Taxonomy,
-        on: parent.parent_id == grandparent.id,
+        left_join: family in Taxonomy,
+        on: g.parent_id == family.id,
         where: st.species_id == ^species_id,
         limit: 1,
         select: %{
           genus: g.name,
           genus_id: g.id,
           genus_description: g.description,
-          parent_type: parent.type,
-          parent_name: parent.name,
-          parent_id: parent.id,
-          parent_description: parent.description,
-          grandparent_name: grandparent.name,
-          grandparent_id: grandparent.id,
-          grandparent_description: grandparent.description
+          family: family.name,
+          family_id: family.id,
+          family_description: family.description
         }
 
-    # Get the section link (if any) - species may be directly linked to a section
+    # Get the section link (if any) — species may be directly linked to a section
     section_query =
       from st in "species_taxonomy",
         join: s in Taxonomy,
@@ -466,15 +448,6 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
       genus_result ->
         section_result = Repo.one(section_query)
 
-        # Resolve family: if genus parent is a section, family is one more level up
-        {family, family_id, family_description} =
-          if genus_result.parent_type == "section" do
-            {genus_result.grandparent_name, genus_result.grandparent_id,
-             genus_result.grandparent_description}
-          else
-            {genus_result.parent_name, genus_result.parent_id, genus_result.parent_description}
-          end
-
         %{
           genus: genus_result.genus,
           genus_id: genus_result.genus_id,
@@ -482,9 +455,9 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
           section: section_result && section_result.section,
           section_id: section_result && section_result.section_id,
           section_description: section_result && section_result.section_description,
-          family: family,
-          family_id: family_id,
-          family_description: family_description
+          family: genus_result.family,
+          family_id: genus_result.family_id,
+          family_description: genus_result.family_description
         }
     end
   end

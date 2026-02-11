@@ -234,49 +234,41 @@ defmodule Gallformers.TaxonomyTest do
       assert result.family_id == family.id
     end
 
-    test "returns correct family when genus parent is a section" do
-      # Tree: Family → Section → Genus (genus.parent_id = section, not family)
-      # This tests legacy data where a genus was reparented under a section.
+    test "genus parent is always a family, not a section" do
+      # Hierarchy: Family → Genus → Section (optional).
+      # Genus.parent_id always points to a family. Sections are children of genera.
       {:ok, family} =
         Taxonomy.create_taxonomy(%{
-          name: "SectionParentFamily",
+          name: "DirectFamilyTest",
           type: "family",
           description: "Plant"
         })
 
-      {:ok, section} =
-        Taxonomy.create_taxonomy(%{
-          name: "SectionParentSection",
-          type: "section",
-          parent_id: family.id
-        })
-
       {:ok, genus} =
         Taxonomy.create_taxonomy(%{
-          name: "SectionParentGenus",
+          name: "DirectFamilyGenus",
           type: "genus",
-          parent_id: section.id
+          parent_id: family.id
         })
 
       {:ok, species} =
         Repo.insert(%Species{
-          name: "SectionParentGenus alba",
+          name: "DirectFamilyGenus alba",
           taxoncode: "plant",
           datacomplete: false
         })
 
       Taxonomy.link_species_to_taxonomy(species.id, genus.id)
-      Taxonomy.link_species_to_taxonomy(species.id, section.id)
 
       result = Taxonomy.get_taxonomy_for_species(species.id)
 
-      assert result.genus == "SectionParentGenus"
+      assert result.genus == "DirectFamilyGenus"
       assert result.genus_id == genus.id
-      assert result.section == "SectionParentSection"
-      assert result.section_id == section.id
-      # Family must resolve through the section, not be the section itself
-      assert result.family == "SectionParentFamily"
+      # Family comes directly from genus.parent — no intermediate section
+      assert result.family == "DirectFamilyTest"
       assert result.family_id == family.id
+      assert result.section == nil
+      assert result.section_id == nil
     end
 
     test "returns nil for species with no taxonomy" do

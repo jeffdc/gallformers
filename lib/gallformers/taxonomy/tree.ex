@@ -163,10 +163,10 @@ defmodule Gallformers.Taxonomy.Tree do
   end
 
   @doc """
-  Gets a taxonomy by name (for URL parameter lookups).
+  Finds the first taxonomy matching a name (for URL parameter lookups).
   """
-  @spec get_taxonomy_by_name(String.t()) :: Taxonomy.t() | nil
-  def get_taxonomy_by_name(name) when is_binary(name) do
+  @spec find_taxonomy_by_name(String.t()) :: Taxonomy.t() | nil
+  def find_taxonomy_by_name(name) when is_binary(name) do
     from(t in Taxonomy,
       where: t.name == ^name,
       limit: 1
@@ -263,8 +263,9 @@ defmodule Gallformers.Taxonomy.Tree do
   @doc false
   @spec build_taxonomy_from_genus(Taxonomy.t()) :: map()
   def build_taxonomy_from_genus(genus) do
-    # Preload parent chain (genus → section/family → family) in one pass
-    genus = Repo.preload(genus, parent: :parent)
+    # Hierarchy: Family → Genus → Section (optional).
+    # A genus's parent is always a family (or nil for orphans).
+    genus = Repo.preload(genus, :parent)
 
     case genus.parent do
       nil ->
@@ -275,18 +276,6 @@ defmodule Gallformers.Taxonomy.Tree do
           section_id: nil,
           family: nil,
           family_id: nil
-        }
-
-      %{type: "section"} = section ->
-        family = section.parent
-
-        %{
-          genus: genus.name,
-          genus_id: genus.id,
-          section: section.name,
-          section_id: section.id,
-          family: family && family.name,
-          family_id: family && family.id
         }
 
       family ->
@@ -620,19 +609,6 @@ defmodule Gallformers.Taxonomy.Tree do
     |> Repo.all()
   end
 
-  @doc """
-  Returns families and sections for use as parent options for genera.
-  """
-  @spec list_parents_for_genus() :: [map()]
-  def list_parents_for_genus do
-    from(t in Taxonomy,
-      where: t.type in ["family", "section"],
-      order_by: [t.type, t.name],
-      select: %{id: t.id, name: t.name, type: t.type}
-    )
-    |> Repo.all()
-  end
-
   # =====================================================================
   # Unknown/Placeholder Management
   # =====================================================================
@@ -722,24 +698,6 @@ defmodule Gallformers.Taxonomy.Tree do
       end
 
     Taxonomy.display_name(taxonomy)
-  end
-
-  @doc """
-  Updates a genus's parent to a new section.
-
-  Used when changing what section a host's genus belongs to.
-  """
-  @spec update_genus_parent(integer(), integer()) :: {:ok, Taxonomy.t()} | {:error, term()}
-  def update_genus_parent(genus_id, new_parent_id) do
-    case get_taxonomy(genus_id) do
-      nil ->
-        {:error, :genus_not_found}
-
-      genus ->
-        genus
-        |> Taxonomy.changeset(%{parent_id: new_parent_id})
-        |> Repo.update()
-    end
   end
 
   @doc """

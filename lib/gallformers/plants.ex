@@ -512,10 +512,8 @@ defmodule Gallformers.Plants do
   end
 
   defp maybe_update_section(%{genus_id: _genus_id} = section_update) do
-    # Only update the species→section link. The genus's parent_id must NOT be
-    # changed here — sections are children of genera, not parents. Setting
-    # genus.parent_id = section_id creates circular references and corrupts
-    # the taxonomy tree (family field displays genus name).
+    # Only update the species→section link in species_taxonomy, not genus.parent_id.
+    # Sections are children of genera (Family → Genus → Section).
     update_species_section_link(
       section_update[:species_id],
       section_update.selected_section_id,

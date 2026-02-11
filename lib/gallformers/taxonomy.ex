@@ -50,7 +50,6 @@ defmodule Gallformers.Taxonomy do
   defdelegate list_sections_for_genus(genus_id), to: Tree
   defdelegate list_families_for_select(filter \\ :all), to: Tree
   defdelegate list_genera_for_select(filter \\ :all), to: Tree
-  defdelegate list_parents_for_genus(), to: Tree
 
   # =====================================================================
   # Delegated to Taxonomy.Tree — Unknown/Placeholder Management
@@ -65,7 +64,6 @@ defmodule Gallformers.Taxonomy do
   # =====================================================================
 
   defdelegate display_name(taxonomy), to: Tree
-  defdelegate update_genus_parent(genus_id, new_parent_id), to: Tree
   defdelegate move_genera(genus_ids, old_family_id, new_family_id), to: Tree
 
   # =====================================================================
@@ -84,22 +82,7 @@ defmodule Gallformers.Taxonomy do
   """
   defdelegate extract_epithet(name), to: TaxonName, as: :epithet
 
-  # =====================================================================
-  # 1-arity get_taxonomy_by_name (stays — URL parameter lookup)
-  # =====================================================================
-
-  # The 1-arity version is also delegated but needs special handling since
-  # defdelegate can't distinguish arities for same name. We delegate to the
-  # 2-arg version in Tree won't work. Tree has both arities, so we delegate
-  # the 1-arity explicitly.
-
-  # Note: The 1-arity get_taxonomy_by_name is handled by Tree's 1-arity clause.
-  # Elixir's defdelegate for 2-arity (name, type) covers calls with 2 args.
-  # Calls with 1 arg go through the 2-arity defdelegate default? No — we need
-  # an explicit function for 1-arity.
-  def get_taxonomy_by_name(name) when is_binary(name) do
-    Tree.get_taxonomy_by_name(name)
-  end
+  defdelegate find_taxonomy_by_name(name), to: Tree
 
   # =====================================================================
   # Delegated to Taxonomy.SpeciesLink — Species-Taxonomy Linkage
