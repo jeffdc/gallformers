@@ -109,6 +109,8 @@ defmodule GallformersWeb.FamilyLive do
       %{
         key: "g-#{genus.id}",
         label: format_label(genus.name, genus.description),
+        name: genus.name,
+        rank: "genus",
         url: "/genus/#{genus.id}",
         nodes:
           Enum.map(species, fn s ->
