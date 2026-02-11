@@ -23,10 +23,43 @@ defmodule GallformersWeb.CoreComponents do
 
   """
   use Phoenix.Component
+  import Phoenix.Component, except: [form: 1]
   use Gettext, backend: GallformersWeb.Gettext
 
   alias Phoenix.HTML.Form
   alias Phoenix.LiveView.JS
+
+  @doc """
+  Wraps Phoenix's `<.form>` to prevent Enter key from submitting.
+
+  Pressing Enter in text inputs, selects, or other non-button elements will not
+  submit the form. Users must click the submit button explicitly. This prevents
+  accidental saves, especially in forms with typeaheads where Enter confirms a
+  selection.
+
+  Accepts all the same attributes as `Phoenix.Component.form/1`.
+  """
+  attr :for, :any, required: true, doc: "the data structure for the form"
+  attr :as, :any, default: nil, doc: "the server side parameter to collect all input under"
+
+  attr :rest, :global,
+    include: ~w(autocomplete name rel action enctype method novalidate target multipart),
+    doc: "the arbitrary HTML attributes to apply to the form tag"
+
+  slot :inner_block, required: true
+
+  def form(assigns) do
+    ~H"""
+    <Phoenix.Component.form
+      for={@for}
+      as={@as}
+      onkeydown="if(event.key === 'Enter' && event.target.tagName !== 'BUTTON') event.preventDefault()"
+      {@rest}
+    >
+      {render_slot(@inner_block)}
+    </Phoenix.Component.form>
+    """
+  end
 
   @doc """
   Renders flash notices.

@@ -72,20 +72,19 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
   end
 
   defp load_parent_options(type) when type in [nil, ""] do
-    # For new entries or when no type selected yet, load all families and sections
-    Taxonomy.list_parents_for_genus()
-    |> Enum.map(fn p -> {"#{p.name} (#{p.type})", p.id} end)
+    # For new entries or when no type selected yet, load all families
+    Taxonomy.list_families_for_select()
   end
 
   defp load_parent_options("family"), do: []
 
   defp load_parent_options("genus") do
-    Taxonomy.list_parents_for_genus()
-    |> Enum.map(fn p -> {"#{p.name} (#{p.type})", p.id} end)
+    Taxonomy.list_families_for_select()
   end
 
   defp load_parent_options("section") do
-    Taxonomy.list_families_for_select()
+    Taxonomy.list_genera_for_select(:plant)
+    |> Enum.map(fn g -> {g.name, g.id} end)
   end
 
   # Custom validate handler to update parent_options when type changes
@@ -228,7 +227,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
       >
         <:intro>
           Taxonomy entries define the hierarchical classification of species:
-          Family → Section (optional) → Genus. Species are linked to genera.
+          Family → Genus → Section (optional). Species are linked to genera.
         </:intro>
 
         <.form for={@form} id="taxonomy-form" phx-change="validate" phx-submit="save">
@@ -285,11 +284,15 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
                 field={@form[:parent_id]}
                 type="select"
                 label="Parent:"
-                prompt="Select parent (optional for families)"
+                prompt={
+                  if Phoenix.HTML.Form.input_value(@form, :type) == "section",
+                    do: "Select a genus",
+                    else: "Select a family"
+                }
                 options={@parent_options}
               />
               <p class="mt-1 text-xs text-gray-500">
-                Genera belong to families or sections. Sections belong to families.
+                Genera belong to families. Sections belong to genera.
               </p>
             <% else %>
               <label class="gf-label">Parent:</label>
@@ -337,11 +340,11 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
             <li>
               <strong>Families</strong> are the top-level groupings (e.g., Cynipidae, Fagaceae)
             </li>
+            <li><strong>Genera</strong> belong to families (e.g., Andricus, Quercus)</li>
             <li>
               <strong>Sections</strong>
-              are optional sub-groupings within families (used primarily for Quercus oaks)
+              are optional sub-groupings within genera (used primarily for Quercus oaks)
             </li>
-            <li><strong>Genera</strong> belong to families or sections (e.g., Andricus, Quercus)</li>
           </ul>
         </div>
       </Layouts.admin_edit_layout>

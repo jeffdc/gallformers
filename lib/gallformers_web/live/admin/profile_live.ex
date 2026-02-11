@@ -153,8 +153,8 @@ defmodule GallformersWeb.Admin.ProfileLive do
         title="Edit Profile"
       >
         <:intro>
-        Your display name is used anywhere we display data change attribution and timestamps. It will be publicly visible.
-        Your About blurb and profile links will be visible on the About page if you opt in below.
+          Your display name is used anywhere we display data change attribution and timestamps. It will be publicly visible.
+          Your About blurb and profile links will be visible on the About page if you opt in below.
         </:intro>
 
         <%= if @form do %>
@@ -193,8 +193,7 @@ defmodule GallformersWeb.Admin.ProfileLive do
                 rel="noopener noreferrer"
                 class="inline-flex items-center gap-1 text-sm text-gf-maroon hover:underline"
               >
-                Reset your password on Auth0
-                <.icon name="ph-arrow-square-out" class="w-4 h-4" />
+                Reset your password on Auth0 <.icon name="ph-arrow-square-out" class="w-4 h-4" />
               </a>
             </div>
 

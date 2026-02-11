@@ -93,7 +93,8 @@ defmodule GallformersWeb do
 
       # HTML escaping functionality
       import Phoenix.HTML
-      # Core UI components
+      # Core UI components — our form/1 wrapper takes precedence over Phoenix's
+      import Phoenix.Component, except: [form: 1]
       import GallformersWeb.CoreComponents
       # Shared UI components (cards, alerts, spinners, etc.)
       import GallformersWeb.UIComponents

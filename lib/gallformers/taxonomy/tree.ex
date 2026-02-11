@@ -574,29 +574,49 @@ defmodule Gallformers.Taxonomy.Tree do
   Each result includes the parent family ID for auto-population.
   Excludes genera named "Unknown" as those are created automatically.
   """
-  @spec list_genera_for_select() :: [map()]
-  def list_genera_for_select do
-    from(g in Taxonomy,
-      left_join: p in Taxonomy,
-      on: g.parent_id == p.id,
-      left_join: gp in Taxonomy,
-      on: p.parent_id == gp.id,
-      where: g.type == "genus" and g.name != "Unknown",
-      order_by: g.name,
-      select: %{
-        id: g.id,
-        name: g.name,
-        # If parent is a section, grandparent is the family
-        # If parent is a family, that's the family
-        family_id:
-          fragment(
-            "CASE WHEN ? = 'section' THEN ? ELSE ? END",
-            p.type,
-            gp.id,
-            p.id
-          )
-      }
-    )
+  @spec list_genera_for_select(atom()) :: [map()]
+  def list_genera_for_select(filter \\ :all) do
+    base =
+      from(g in Taxonomy,
+        left_join: p in Taxonomy,
+        on: g.parent_id == p.id,
+        left_join: gp in Taxonomy,
+        on: p.parent_id == gp.id,
+        where: g.type == "genus" and g.name != "Unknown",
+        order_by: g.name,
+        select: %{
+          id: g.id,
+          name: g.name,
+          # If parent is a section, grandparent is the family
+          # If parent is a family, that's the family
+          family_id:
+            fragment(
+              "CASE WHEN ? = 'section' THEN ? ELSE ? END",
+              p.type,
+              gp.id,
+              p.id
+            )
+        }
+      )
+
+    case filter do
+      :plant ->
+        from([g, p, gp] in base,
+          join: f in Taxonomy,
+          on:
+            f.id ==
+              fragment(
+                "CASE WHEN ? = 'section' THEN ? ELSE ? END",
+                p.type,
+                gp.id,
+                p.id
+              ),
+          where: f.description == "Plant"
+        )
+
+      :all ->
+        base
+    end
     |> Repo.all()
   end
 
