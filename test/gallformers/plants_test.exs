@@ -8,6 +8,7 @@ defmodule Gallformers.PlantsTest do
   alias Gallformers.Ranges
   alias Gallformers.Species.Species
   alias Gallformers.Taxonomy
+  alias Gallformers.Taxonomy.{Genus, Lineage}
 
   describe "create_host_with_associations/1" do
     setup do
@@ -35,7 +36,7 @@ defmodule Gallformers.PlantsTest do
           "taxoncode" => "plant",
           "datacomplete" => false
         },
-        taxonomy: %{genus_id: genus.id, genus: genus.name},
+        taxonomy: %Lineage{genus: %Genus{id: genus.id, name: genus.name}},
         genus_is_new: false,
         parent_id: nil,
         aliases: [%{name: "Test common name", type: "common"}]
@@ -48,7 +49,7 @@ defmodule Gallformers.PlantsTest do
       # Verify taxonomy was linked
       taxonomy = Taxonomy.get_taxonomy_for_species(host.id)
       assert taxonomy != nil
-      assert taxonomy.genus_id == genus.id
+      assert taxonomy.genus.id == genus.id
 
       # Verify alias was created
       aliases = Plants.get_aliases_for_host_full(host.id)
@@ -59,7 +60,7 @@ defmodule Gallformers.PlantsTest do
     test "rolls back on invalid species attrs" do
       params = %{
         species_attrs: %{"taxoncode" => "plant"},
-        taxonomy: %{genus: "Whatever"},
+        taxonomy: %Lineage{genus: %Genus{name: "Whatever"}},
         genus_is_new: false,
         parent_id: nil,
         aliases: []

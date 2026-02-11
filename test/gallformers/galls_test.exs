@@ -8,6 +8,7 @@ defmodule Gallformers.GallsTest do
   alias Gallformers.Galls.GallTraits
   alias Gallformers.Species.Species
   alias Gallformers.Taxonomy
+  alias Gallformers.Taxonomy.{Genus, Lineage}
 
   describe "update_gall_properties/2 unknown genus floor" do
     setup do
@@ -132,7 +133,7 @@ defmodule Gallformers.GallsTest do
           "taxoncode" => "gall",
           "datacomplete" => false
         },
-        taxonomy: %{genus_id: genus.id, genus: genus.name},
+        taxonomy: %Lineage{genus: %Genus{id: genus.id, name: genus.name}},
         genus_is_new: false,
         parent_id: nil,
         hosts: [%{host_species_id: host.id}],
@@ -173,13 +174,13 @@ defmodule Gallformers.GallsTest do
       # Verify taxonomy was linked
       taxonomy = Taxonomy.get_taxonomy_for_species(species.id)
       assert taxonomy != nil
-      assert taxonomy.genus_id == genus.id
+      assert taxonomy.genus.id == genus.id
     end
 
     test "rolls back on invalid species attrs" do
       params = %{
         species_attrs: %{"taxoncode" => "gall"},
-        taxonomy: %{genus: "Whatever"},
+        taxonomy: %Lineage{genus: %Genus{name: "Whatever"}},
         genus_is_new: false,
         parent_id: nil,
         hosts: [],
@@ -359,19 +360,19 @@ defmodule Gallformers.GallsTest do
 
   describe "compute_undescribed_lock/2" do
     test "locked when genus is placeholder" do
-      taxonomy = %{genus: "Unknown (TestFamily)"}
+      taxonomy = %Lineage{genus: %Genus{name: "Unknown (TestFamily)"}}
       {true, reason} = Galls.compute_undescribed_lock(taxonomy)
       assert reason =~ "unknown genus"
     end
 
     test "locked when genus is bare Unknown" do
-      taxonomy = %{genus: "Unknown"}
+      taxonomy = %Lineage{genus: %Genus{name: "Unknown"}}
       {true, reason} = Galls.compute_undescribed_lock(taxonomy)
       assert reason =~ "unknown genus"
     end
 
     test "unlocked for real genus with no species_id" do
-      taxonomy = %{genus: "Andricus"}
+      taxonomy = %Lineage{genus: %Genus{name: "Andricus"}}
       assert {false, nil} = Galls.compute_undescribed_lock(taxonomy)
     end
 
@@ -383,7 +384,7 @@ defmodule Gallformers.GallsTest do
           datacomplete: false
         })
 
-      taxonomy = %{genus: "Locktest"}
+      taxonomy = %Lineage{genus: %Genus{name: "Locktest"}}
       {true, reason} = Galls.compute_undescribed_lock(taxonomy, species.id)
       assert reason =~ "source is required"
     end
@@ -412,7 +413,7 @@ defmodule Gallformers.GallsTest do
         source_id: source.id
       })
 
-      taxonomy = %{genus: "Sourced"}
+      taxonomy = %Lineage{genus: %Genus{name: "Sourced"}}
       assert {false, nil} = Galls.compute_undescribed_lock(taxonomy, species.id)
     end
 

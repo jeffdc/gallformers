@@ -12,7 +12,7 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
   import Ecto.Query
   alias Gallformers.Repo
   alias Gallformers.Species.Species
-  alias Gallformers.Taxonomy.{TaxonName, Taxonomy, Tree}
+  alias Gallformers.Taxonomy.{Genus, Lineage, TaxonName, Taxonomy, Tree}
 
   # =====================================================================
   # Genus Name Extraction
@@ -76,8 +76,13 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
 
   Returns :ok on success.
   """
-  @spec link_species_taxonomy(integer(), map() | nil, boolean(), integer() | nil) :: :ok
-  def link_species_taxonomy(species_id, %{genus: genus_name} = _taxonomy, true, parent_id)
+  @spec link_species_taxonomy(integer(), Lineage.t() | nil, boolean(), integer() | nil) :: :ok
+  def link_species_taxonomy(
+        species_id,
+        %Lineage{genus: %Genus{name: genus_name}},
+        true,
+        parent_id
+      )
       when is_binary(genus_name) do
     if TaxonName.unknown_genus?(genus_name) do
       # For Unknown genus, use find_or_create to avoid duplicates per family
@@ -91,7 +96,7 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
     :ok
   end
 
-  def link_species_taxonomy(species_id, %{genus_id: genus_id}, false, _parent_id)
+  def link_species_taxonomy(species_id, %Lineage{genus: %Genus{id: genus_id}}, false, _parent_id)
       when not is_nil(genus_id) do
     link_species_to_taxonomy(species_id, genus_id)
     :ok
@@ -165,43 +170,19 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
   Returns a map with the same structure as `get_taxonomy_for_species/1`,
   or nil if the genus is not found.
   """
-  @spec get_taxonomy_from_species_name(String.t()) :: map() | nil
+  @spec get_taxonomy_from_species_name(String.t()) :: Lineage.t() | nil
   def get_taxonomy_from_species_name(name) when is_binary(name) do
     parsed = TaxonName.parse(name)
 
     with genus_name when genus_name != "" <- parsed.genus,
          %{} = genus <- Tree.get_taxonomy_by_name(genus_name, "genus") do
-      build_taxonomy_map(genus, Tree.get_parent(genus.id))
+      Tree.build_taxonomy_from_genus(genus)
     else
       _ -> nil
     end
   end
 
   def get_taxonomy_from_species_name(_), do: nil
-
-  # Hierarchy: Family → Genus → Section (optional).
-  # A genus's parent is always a family (or nil for orphans).
-  defp build_taxonomy_map(genus, nil) do
-    %{
-      genus: genus.name,
-      genus_id: genus.id,
-      section: nil,
-      section_id: nil,
-      family: nil,
-      family_id: nil
-    }
-  end
-
-  defp build_taxonomy_map(genus, family) do
-    %{
-      genus: genus.name,
-      genus_id: genus.id,
-      section: nil,
-      section_id: nil,
-      family: family.name,
-      family_id: family.id
-    }
-  end
 
   @doc """
   Looks up or prepares taxonomy info for a species name.
@@ -215,7 +196,7 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
   - If genus is NEW: returns extracted genus name with `genus_is_new: true`
     and empty family fields (user must select a family)
   """
-  @spec lookup_taxonomy_for_new_species(String.t()) :: map() | nil
+  @spec lookup_taxonomy_for_new_species(String.t()) :: Lineage.lookup_result() | nil
   def lookup_taxonomy_for_new_species(name) when is_binary(name) do
     case extract_genus_from_name(name) do
       nil ->
@@ -226,46 +207,27 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
 
         case genera do
           [] ->
-            # Genus doesn't exist - this is a new genus
-            %{
-              genus: genus_name,
-              genus_id: nil,
-              genus_is_new: true,
-              section: nil,
-              section_id: nil,
-              family: nil,
-              family_id: nil
-            }
+            {:new_genus, Lineage.new_genus(genus_name)}
 
           [single_genus] ->
-            # Genus exists in exactly one family
-            result = Tree.build_taxonomy_from_genus(single_genus)
-            Map.put(result, :genus_is_new, false)
+            {:ok, Tree.build_taxonomy_from_genus(single_genus)}
 
           multiple_genera ->
-            # Genus exists in multiple families - requires disambiguation
-            possible_families = Enum.map(multiple_genera, &extract_family_info/1)
-
-            %{
-              genus: genus_name,
-              requires_disambiguation: true,
-              possible_families: possible_families
-            }
+            possible_families = Enum.map(multiple_genera, &extract_family_candidate/1)
+            {:ambiguous, genus_name, possible_families}
         end
     end
   end
 
   def lookup_taxonomy_for_new_species(_), do: nil
 
-  defp extract_family_info(genus) do
-    taxonomy = Tree.build_taxonomy_from_genus(genus)
+  defp extract_family_candidate(genus) do
+    lineage = Tree.build_taxonomy_from_genus(genus)
 
     %{
       genus_id: genus.id,
-      section: taxonomy.section,
-      section_id: taxonomy.section_id,
-      family: taxonomy.family,
-      family_id: taxonomy.family_id
+      section: lineage.section,
+      family: lineage.family
     }
   end
 
@@ -285,52 +247,38 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
         possible_families: [map()]
       }
   """
-  @spec resolve_taxonomy_for_species(map() | nil, MapSet.t()) :: map()
+  @spec resolve_taxonomy_for_species(Lineage.lookup_result() | nil, MapSet.t()) :: map()
   def resolve_taxonomy_for_species(nil, _family_ids) do
     %{taxonomy: nil, genus_is_new: false, family_id: nil, section_id: nil, possible_families: []}
   end
 
-  def resolve_taxonomy_for_species(taxonomy, family_ids) do
-    cond do
-      # Genus is new - user must select a family
-      Map.get(taxonomy, :genus_is_new) ->
-        %{
-          taxonomy: taxonomy,
-          genus_is_new: true,
-          family_id: nil,
-          section_id: nil,
-          possible_families: []
-        }
-
-      # Genus exists in multiple families - filter to valid families
-      Map.get(taxonomy, :requires_disambiguation) ->
-        matching_families =
-          Enum.filter(taxonomy.possible_families, fn family ->
-            MapSet.member?(family_ids, family.family_id)
-          end)
-
-        resolve_disambiguation(taxonomy, matching_families)
-
-      # Genus exists in exactly one family - check if it's a valid family
-      true ->
-        resolve_single_family(taxonomy, family_ids)
-    end
+  def resolve_taxonomy_for_species({:new_genus, %Lineage{} = lineage}, _family_ids) do
+    %{
+      taxonomy: lineage,
+      genus_is_new: true,
+      family_id: nil,
+      section_id: nil,
+      possible_families: []
+    }
   end
 
-  defp resolve_single_family(taxonomy, family_ids) do
-    if MapSet.member?(family_ids, taxonomy.family_id) do
+  def resolve_taxonomy_for_species({:ok, %Lineage{} = lineage}, family_ids) do
+    family_id = lineage.family && lineage.family.id
+
+    if MapSet.member?(family_ids, family_id) do
+      section_id = lineage.section && lineage.section.id
+
       %{
-        taxonomy: taxonomy,
+        taxonomy: lineage,
         genus_is_new: false,
-        family_id: taxonomy.family_id,
-        section_id: taxonomy[:section_id],
+        family_id: family_id,
+        section_id: section_id,
         possible_families: []
       }
     else
-      new_genus = %{genus: taxonomy.genus, genus_id: nil, genus_is_new: true}
-
+      # Genus exists but in a different domain — treat as new
       %{
-        taxonomy: new_genus,
+        taxonomy: Lineage.new_genus(lineage.genus.name),
         genus_is_new: true,
         family_id: nil,
         section_id: nil,
@@ -339,11 +287,18 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
     end
   end
 
-  defp resolve_disambiguation(taxonomy, []) do
-    new_genus = %{genus: taxonomy.genus, genus_id: nil, genus_is_new: true}
+  def resolve_taxonomy_for_species({:ambiguous, genus_name, possible_families}, family_ids) do
+    matching_families =
+      Enum.filter(possible_families, fn candidate ->
+        MapSet.member?(family_ids, candidate.family.id)
+      end)
 
+    resolve_disambiguation(genus_name, matching_families)
+  end
+
+  defp resolve_disambiguation(genus_name, []) do
     %{
-      taxonomy: new_genus,
+      taxonomy: Lineage.new_genus(genus_name),
       genus_is_new: true,
       family_id: nil,
       section_id: nil,
@@ -351,29 +306,30 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
     }
   end
 
-  defp resolve_disambiguation(taxonomy, [single]) do
-    resolved = %{
-      genus: taxonomy.genus,
-      genus_id: single.genus_id,
-      genus_is_new: false,
-      section: single.section,
-      section_id: single.section_id,
+  defp resolve_disambiguation(genus_name, [single]) do
+    section_id = single.section && single.section.id
+
+    lineage = %Lineage{
+      genus: %Genus{id: single.genus_id, name: genus_name},
       family: single.family,
-      family_id: single.family_id
+      section: single.section
     }
 
     %{
-      taxonomy: resolved,
+      taxonomy: lineage,
       genus_is_new: false,
-      family_id: single.family_id,
-      section_id: single.section_id,
+      family_id: single.family.id,
+      section_id: section_id,
       possible_families: []
     }
   end
 
-  defp resolve_disambiguation(taxonomy, multiple) do
+  defp resolve_disambiguation(genus_name, multiple) do
+    # Multiple matches — caller must show disambiguation UI
+    lineage = Lineage.new_genus(genus_name)
+
     %{
-      taxonomy: taxonomy,
+      taxonomy: lineage,
       genus_is_new: false,
       family_id: nil,
       section_id: nil,
@@ -407,7 +363,7 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
   Section is optional and will only be present for plant hosts in genera
   that have sections (primarily Quercus).
   """
-  @spec get_taxonomy_for_species(integer()) :: map() | nil
+  @spec get_taxonomy_for_species(integer()) :: Lineage.t() | nil
   def get_taxonomy_for_species(species_id) do
     # Hierarchy: Family → Genus → Section (optional).
     # A genus's parent is always a family, so we only need one join level up.
@@ -447,18 +403,7 @@ defmodule Gallformers.Taxonomy.SpeciesLink do
 
       genus_result ->
         section_result = Repo.one(section_query)
-
-        %{
-          genus: genus_result.genus,
-          genus_id: genus_result.genus_id,
-          genus_description: genus_result.genus_description,
-          section: section_result && section_result.section,
-          section_id: section_result && section_result.section_id,
-          section_description: section_result && section_result.section_description,
-          family: genus_result.family,
-          family_id: genus_result.family_id,
-          family_description: genus_result.family_description
-        }
+        Lineage.from_query_result(genus_result, section_result)
     end
   end
 

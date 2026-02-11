@@ -82,8 +82,6 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     aliases = Plants.get_aliases_for_host_full(host_id)
     places = Ranges.get_places_for_host(host_id)
     taxonomy = Taxonomy.get_taxonomy_for_species(host_id)
-    genus_id = taxonomy && taxonomy.genus_id
-    sections_for_family = if genus_id, do: Taxonomy.list_sections_for_genus(genus_id), else: []
 
     socket
     |> build_default_assigns()
@@ -95,10 +93,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> assign(DeferredChanges.init(:aliases, aliases))
     |> assign(:original_places, places)
     |> assign(:places, places)
-    |> assign(:taxonomy, taxonomy)
-    |> assign(:selected_family_id, taxonomy && taxonomy.family_id)
-    |> assign(:selected_section_id, taxonomy && taxonomy.section_id)
-    |> assign(:sections_for_family, sections_for_family)
+    |> assign_taxonomy_fields(taxonomy)
   end
 
   # Event handlers
@@ -204,10 +199,11 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     case apply_family_disambiguation(socket, family_id_str) do
       {:ok, socket, selected} ->
         sections_for_family = Taxonomy.list_sections_for_genus(selected.genus_id)
+        section_id = selected.section && selected.section.id
 
         {:noreply,
          socket
-         |> assign(:selected_section_id, selected.section_id)
+         |> assign(:selected_section_id, section_id)
          |> assign(:sections_for_family, sections_for_family)
          |> mark_dirty()}
 
@@ -337,8 +333,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
     # Load sections only for existing genus
     sections_for_family =
-      if !genus_is_new && taxonomy && taxonomy.genus_id do
-        Taxonomy.list_sections_for_genus(taxonomy.genus_id)
+      if !genus_is_new && taxonomy && taxonomy.genus && taxonomy.genus.id do
+        Taxonomy.list_sections_for_genus(taxonomy.genus.id)
       else
         []
       end
@@ -357,6 +353,25 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> assign(:possible_families, possible_families)
     |> assign(:alias_collisions, Species.find_species_with_alias(name))
     |> mark_dirty()
+  end
+
+  defp assign_taxonomy_fields(socket, nil) do
+    socket
+    |> assign(:taxonomy, nil)
+    |> assign(:selected_family_id, nil)
+    |> assign(:selected_section_id, nil)
+    |> assign(:sections_for_family, [])
+  end
+
+  defp assign_taxonomy_fields(socket, taxonomy) do
+    genus_id = taxonomy.genus && taxonomy.genus.id
+    sections_for_family = if genus_id, do: Taxonomy.list_sections_for_genus(genus_id), else: []
+
+    socket
+    |> assign(:taxonomy, taxonomy)
+    |> assign(:selected_family_id, taxonomy.family && taxonomy.family.id)
+    |> assign(:selected_section_id, taxonomy.section && taxonomy.section.id)
+    |> assign(:sections_for_family, sections_for_family)
   end
 
   defp save_host(socket, :new, params) do
@@ -397,9 +412,9 @@ defmodule GallformersWeb.Admin.HostLive.Form do
       },
       section_update: %{
         species_id: host_id,
-        genus_id: taxonomy && taxonomy.genus_id,
+        genus_id: taxonomy && taxonomy.genus && taxonomy.genus.id,
         selected_section_id: socket.assigns.selected_section_id,
-        section_id: taxonomy && taxonomy.section_id
+        section_id: taxonomy && taxonomy.section && taxonomy.section.id
       }
     }
 
@@ -435,8 +450,6 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   def handle_info({:reclassify_complete, result}, socket) do
     species_id = result.species.id
     taxonomy = Taxonomy.get_taxonomy_for_species(species_id)
-    genus_id = taxonomy && taxonomy.genus_id
-    sections_for_family = if genus_id, do: Taxonomy.list_sections_for_genus(genus_id), else: []
 
     aliases =
       if result.add_alias? and result.name_changed?,
@@ -447,11 +460,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
      socket
      |> assign(:host, result.species)
      |> assign(:aliases, aliases)
-     |> assign(:taxonomy, taxonomy)
-     |> assign(:selected_family_id, taxonomy && taxonomy.family_id)
-     |> assign(:selected_section_id, taxonomy && taxonomy.section_id)
-     |> assign(:sections_for_family, sections_for_family)
      |> assign(:page_title, "Edit Host - #{result.species.name}")
+     |> assign_taxonomy_fields(taxonomy)
      |> put_flash(:info, "Host updated successfully")}
   end
 
@@ -779,8 +789,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
         id="reclassify"
         species_id={@host && @host.id}
         species_name={@host && @host.name}
-        current_family={reclassify_family(@taxonomy)}
-        current_genus={reclassify_genus(@taxonomy)}
+        current_family={@taxonomy && @taxonomy.family}
+        current_genus={@taxonomy && @taxonomy.genus}
         entity_type="Host"
         is_gall={false}
         undescribed={false}

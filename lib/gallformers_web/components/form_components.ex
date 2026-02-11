@@ -1318,7 +1318,7 @@ defmodule GallformersWeb.FormComponents do
         </label>
         <input
           type="text"
-          value={if @taxonomy, do: @taxonomy.genus, else: ""}
+          value={if @taxonomy, do: @taxonomy.genus.name, else: ""}
           disabled
           class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded text-gray-500 text-sm"
         />
@@ -1352,7 +1352,7 @@ defmodule GallformersWeb.FormComponents do
           <%!-- Genus exists - family is read-only --%>
           <input
             type="text"
-            value={if @taxonomy, do: @taxonomy.family, else: ""}
+            value={if @taxonomy && @taxonomy.family, do: @taxonomy.family.name, else: ""}
             disabled
             class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded text-gray-500 text-sm"
           />
@@ -1404,10 +1404,10 @@ defmodule GallformersWeb.FormComponents do
       show
       on_cancel={JS.push(@clear_event)}
     >
-      <:header>Select Family for Genus "{Map.get(@taxonomy, :genus, "")}"</:header>
+      <:header>Select Family for Genus "{@taxonomy.genus.name}"</:header>
       <:body>
         <p class="text-gray-700 mb-4">
-          The genus <strong>{Map.get(@taxonomy, :genus, "")}</strong>
+          The genus <strong>{@taxonomy.genus.name}</strong>
           exists in multiple {@entity_description} families. Please select which family this belongs to:
         </p>
         <div class="space-y-2">
@@ -1415,12 +1415,12 @@ defmodule GallformersWeb.FormComponents do
             <button
               type="button"
               phx-click={@select_event}
-              phx-value-family_id={family.family_id}
+              phx-value-family_id={family.family.id}
               class="block w-full text-left px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50 hover:border-gf-maroon transition-colors"
             >
-              <div class="font-medium text-gray-900">{family.family}</div>
+              <div class="font-medium text-gray-900">{family.family.name}</div>
               <%= if family.section do %>
-                <div class="text-sm text-gray-500">Section: {family.section}</div>
+                <div class="text-sm text-gray-500">Section: {family.section.name}</div>
               <% end %>
             </button>
           <% end %>

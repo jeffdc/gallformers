@@ -137,14 +137,21 @@ defmodule GallformersWeb.Admin.GallLive.Form do
   # Initialize state for a new gall (user typed new name)
   # If the genus is a placeholder (Unknown), redirect to the undescribed naming flow instead.
   defp init_new_gall_state(socket, name) do
-    raw_taxonomy = Gallformers.Taxonomy.lookup_taxonomy_for_new_species(name)
+    lookup_result = Gallformers.Taxonomy.lookup_taxonomy_for_new_species(name)
 
-    if raw_taxonomy && Gallformers.Taxonomy.placeholder_genus_name?(raw_taxonomy.genus) do
+    genus_name = lookup_genus_name(lookup_result)
+
+    if genus_name && Gallformers.Taxonomy.placeholder_genus_name?(genus_name) do
       redirect_to_undescribed_flow(socket, name)
     else
-      init_new_gall_form(socket, name, raw_taxonomy)
+      init_new_gall_form(socket, name, lookup_result)
     end
   end
+
+  defp lookup_genus_name({:ok, %{genus: genus}}), do: genus.name
+  defp lookup_genus_name({:new_genus, %{genus: genus}}), do: genus.name
+  defp lookup_genus_name({:ambiguous, genus_name, _}), do: genus_name
+  defp lookup_genus_name(nil), do: nil
 
   defp redirect_to_undescribed_flow(socket, name) do
     description = TaxonName.parse(name).full_epithet || ""
@@ -215,7 +222,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(:gall, gall)
     |> assign(:form, to_form(Species.change_species(gall)))
     |> assign(:taxonomy, taxonomy)
-    |> assign(:selected_family_id, taxonomy.family_id)
+    |> assign(:selected_family_id, taxonomy.family && taxonomy.family.id)
     |> assign(:undescribed, true)
     |> maybe_add_initial_host(host)
     |> apply_undescribed_lock(taxonomy)
@@ -286,7 +293,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
           |> assign(:original_undescribed, undescribed)
           # Pending state (loaded from DB)
           |> assign(:taxonomy, taxonomy)
-          |> assign(:selected_family_id, taxonomy && taxonomy.family_id)
+          |> assign(:selected_family_id, taxonomy && taxonomy.family && taxonomy.family.id)
           |> assign(:filter_values, filter_values)
           |> assign(:detachable, detachable)
           |> assign(:undescribed, undescribed)
@@ -618,7 +625,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
      |> assign(:gall, result.species)
      |> assign(:aliases, aliases)
      |> assign(:taxonomy, taxonomy)
-     |> assign(:selected_family_id, taxonomy && taxonomy.family_id)
+     |> assign(:selected_family_id, taxonomy && taxonomy.family && taxonomy.family.id)
      |> assign(:page_title, "Edit Gall - #{result.species.name}")
      |> apply_undescribed_lock(taxonomy, species_id)
      |> put_flash(:info, "Gall updated successfully")}
@@ -1182,8 +1189,8 @@ defmodule GallformersWeb.Admin.GallLive.Form do
           id="reclassify"
           species_id={@gall && @gall.id}
           species_name={@gall && @gall.name}
-          current_family={reclassify_family(@taxonomy)}
-          current_genus={reclassify_genus(@taxonomy)}
+          current_family={@taxonomy && @taxonomy.family}
+          current_genus={@taxonomy && @taxonomy.genus}
           entity_type="Gall"
           is_gall={true}
           undescribed={@undescribed}

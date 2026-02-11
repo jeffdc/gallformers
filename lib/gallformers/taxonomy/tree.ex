@@ -11,7 +11,7 @@ defmodule Gallformers.Taxonomy.Tree do
   alias Gallformers.GallHosts.GallHost
   alias Gallformers.Repo
   alias Gallformers.Species.Species
-  alias Gallformers.Taxonomy.{TaxonName, Taxonomy}
+  alias Gallformers.Taxonomy.{Lineage, TaxonName, Taxonomy}
 
   # =====================================================================
   # CRUD
@@ -210,7 +210,7 @@ defmodule Gallformers.Taxonomy.Tree do
 
   Returns `{:ok, taxonomy_map}` or `{:error, reason}`.
   """
-  @spec resolve_taxonomy_from_name(String.t()) :: {:ok, map()} | {:error, String.t()}
+  @spec resolve_taxonomy_from_name(String.t()) :: {:ok, Lineage.t()} | {:error, String.t()}
   def resolve_taxonomy_from_name(name) do
     case parse_genus_from_name(name) do
       {"Unknown", family_name} -> resolve_unknown_genus(family_name)
@@ -236,9 +236,11 @@ defmodule Gallformers.Taxonomy.Tree do
 
       family ->
         {:ok, genus} = find_or_create_unknown_genus(family.id)
-        taxonomy = build_taxonomy_from_genus(genus)
+        lineage = build_taxonomy_from_genus(genus)
         # Display the genus as "Unknown (Family)" to match species name convention
-        {:ok, %{taxonomy | genus: "Unknown (#{family_name})"}}
+        display_name = "Unknown (#{family_name})"
+        genus_struct = %{lineage.genus | name: display_name}
+        {:ok, %{lineage | genus: genus_struct}}
     end
   end
 
@@ -261,33 +263,11 @@ defmodule Gallformers.Taxonomy.Tree do
   end
 
   @doc false
-  @spec build_taxonomy_from_genus(Taxonomy.t()) :: map()
+  @spec build_taxonomy_from_genus(Taxonomy.t()) :: Lineage.t()
   def build_taxonomy_from_genus(genus) do
-    # Hierarchy: Family → Genus → Section (optional).
-    # A genus's parent is always a family (or nil for orphans).
-    genus = Repo.preload(genus, :parent)
-
-    case genus.parent do
-      nil ->
-        %{
-          genus: genus.name,
-          genus_id: genus.id,
-          section: nil,
-          section_id: nil,
-          family: nil,
-          family_id: nil
-        }
-
-      family ->
-        %{
-          genus: genus.name,
-          genus_id: genus.id,
-          section: nil,
-          section_id: nil,
-          family: family.name,
-          family_id: family.id
-        }
-    end
+    genus
+    |> Repo.preload(:parent)
+    |> Lineage.from_genus()
   end
 
   # =====================================================================

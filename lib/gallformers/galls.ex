@@ -561,7 +561,7 @@ defmodule Gallformers.Galls do
 
   defp has_unknown_genus?(species_id) do
     taxonomy = Gallformers.Taxonomy.get_taxonomy_for_species(species_id)
-    taxonomy && Gallformers.Taxonomy.placeholder_genus_name?(taxonomy.genus)
+    taxonomy && Gallformers.Taxonomy.placeholder_genus_name?(taxonomy.genus.name)
   end
 
   # Preserve the key type (atom or string) used by the caller
@@ -664,9 +664,10 @@ defmodule Gallformers.Galls do
   Returns `{locked?, reason}` where reason is a string explaining the lock, or nil if unlocked.
   For new galls (species_id is nil), the source check is skipped.
   """
-  @spec compute_undescribed_lock(map() | nil, integer() | nil) :: {boolean(), String.t() | nil}
+  @spec compute_undescribed_lock(Gallformers.Taxonomy.Lineage.t() | nil, integer() | nil) ::
+          {boolean(), String.t() | nil}
   def compute_undescribed_lock(taxonomy, species_id \\ nil) do
-    genus_name = taxonomy && Map.get(taxonomy, :genus)
+    genus_name = taxonomy && taxonomy.genus && taxonomy.genus.name
 
     cond do
       Gallformers.Taxonomy.placeholder_genus_name?(genus_name) ->

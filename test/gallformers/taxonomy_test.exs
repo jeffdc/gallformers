@@ -8,6 +8,7 @@ defmodule Gallformers.TaxonomyTest do
   alias Gallformers.Species.Alias
   alias Gallformers.Species.Species
   alias Gallformers.Taxonomy
+  alias Gallformers.Taxonomy.{Family, Genus, Lineage, Section}
 
   describe "update_taxonomy/2 genus rename" do
     setup do
@@ -180,12 +181,11 @@ defmodule Gallformers.TaxonomyTest do
       # Get taxonomy info
       result = Taxonomy.get_taxonomy_for_species(species.id)
 
-      assert result.genus == "TestSpeciesTaxGenus"
-      assert result.genus_id == genus.id
-      assert result.family == "TestSpeciesTaxFamily"
-      assert result.family_id == family.id
+      assert result.genus.name == "TestSpeciesTaxGenus"
+      assert result.genus.id == genus.id
+      assert result.family.name == "TestSpeciesTaxFamily"
+      assert result.family.id == family.id
       assert result.section == nil
-      assert result.section_id == nil
     end
 
     test "returns taxonomy info for species with genus and section" do
@@ -226,12 +226,12 @@ defmodule Gallformers.TaxonomyTest do
       # Get taxonomy info
       result = Taxonomy.get_taxonomy_for_species(species.id)
 
-      assert result.genus == "TestSectionGenus"
-      assert result.genus_id == genus.id
-      assert result.section == "TestSection"
-      assert result.section_id == section.id
-      assert result.family == "TestSectionFamily"
-      assert result.family_id == family.id
+      assert result.genus.name == "TestSectionGenus"
+      assert result.genus.id == genus.id
+      assert result.section.name == "TestSection"
+      assert result.section.id == section.id
+      assert result.family.name == "TestSectionFamily"
+      assert result.family.id == family.id
     end
 
     test "genus parent is always a family, not a section" do
@@ -262,13 +262,12 @@ defmodule Gallformers.TaxonomyTest do
 
       result = Taxonomy.get_taxonomy_for_species(species.id)
 
-      assert result.genus == "DirectFamilyGenus"
-      assert result.genus_id == genus.id
+      assert result.genus.name == "DirectFamilyGenus"
+      assert result.genus.id == genus.id
       # Family comes directly from genus.parent — no intermediate section
-      assert result.family == "DirectFamilyTest"
-      assert result.family_id == family.id
+      assert result.family.name == "DirectFamilyTest"
+      assert result.family.id == family.id
       assert result.section == nil
-      assert result.section_id == nil
     end
 
     test "returns nil for species with no taxonomy" do
@@ -420,7 +419,7 @@ defmodule Gallformers.TaxonomyTest do
         })
 
       # Link both to Unknown genus (simulating undescribed gall creation)
-      taxonomy = %{genus: "Unknown", genus_id: nil}
+      taxonomy = %Lineage{genus: %Genus{name: "Unknown"}}
       :ok = Taxonomy.link_species_taxonomy(species1.id, taxonomy, true, family.id)
       :ok = Taxonomy.link_species_taxonomy(species2.id, taxonomy, true, family.id)
 
@@ -631,8 +630,8 @@ defmodule Gallformers.TaxonomyTest do
       assert {:ok, updated} = Taxonomy.reassign_species_taxonomy(species.id, genus2.id)
 
       taxonomy = Taxonomy.get_taxonomy_for_species(species.id)
-      assert taxonomy.genus == "ReclassifyGenus2"
-      assert taxonomy.family == "ReclassifyFamily2"
+      assert taxonomy.genus.name == "ReclassifyGenus2"
+      assert taxonomy.family.name == "ReclassifyFamily2"
 
       # Species name should reflect the new genus
       assert updated.name == "ReclassifyGenus2 testsp"
@@ -648,7 +647,7 @@ defmodule Gallformers.TaxonomyTest do
 
       # Verify genus changed to a placeholder
       taxonomy = Taxonomy.get_taxonomy_for_species(species.id)
-      assert Taxonomy.placeholder_genus_name?(taxonomy.genus)
+      assert Taxonomy.placeholder_genus_name?(taxonomy.genus.name)
 
       # Species name should reflect the Unknown genus
       assert updated.name == "Unknown (ReclassifyFamily2) testsp"
@@ -1322,119 +1321,95 @@ defmodule Gallformers.TaxonomyTest do
     end
 
     test "new genus returns genus_is_new=true", ctx do
-      taxonomy = %{genus: "Brandnewgenus", genus_id: nil, genus_is_new: true}
+      lookup_result = {:new_genus, Lineage.new_genus("Brandnewgenus")}
 
       %{taxonomy: result, genus_is_new: true, family_id: nil, possible_families: []} =
-        Taxonomy.resolve_taxonomy_for_species(taxonomy, ctx.gall_family_ids)
+        Taxonomy.resolve_taxonomy_for_species(lookup_result, ctx.gall_family_ids)
 
-      assert result.genus == "Brandnewgenus"
+      assert result.genus.name == "Brandnewgenus"
     end
 
     test "known genus in valid family resolves directly", ctx do
-      taxonomy = %{
-        genus: "Resolvegallgenus",
-        genus_id: ctx.gall_genus.id,
-        genus_is_new: false,
-        section: nil,
-        section_id: nil,
-        family: "ResolveGallFamily",
-        family_id: ctx.gall_family.id
+      lineage = %Lineage{
+        genus: %Genus{id: ctx.gall_genus.id, name: "Resolvegallgenus"},
+        family: %Family{id: ctx.gall_family.id, name: "ResolveGallFamily"}
       }
 
       %{taxonomy: resolved, genus_is_new: false, family_id: family_id, possible_families: []} =
-        Taxonomy.resolve_taxonomy_for_species(taxonomy, ctx.gall_family_ids)
+        Taxonomy.resolve_taxonomy_for_species({:ok, lineage}, ctx.gall_family_ids)
 
       assert family_id == ctx.gall_family.id
-      assert resolved.genus == "Resolvegallgenus"
+      assert resolved.genus.name == "Resolvegallgenus"
     end
 
     test "known genus in wrong family treated as new genus", ctx do
       # Plant genus but using gall family IDs
-      taxonomy = %{
-        genus: "Resolveplantgenus",
-        genus_id: ctx.plant_genus.id,
-        genus_is_new: false,
-        section: nil,
-        section_id: nil,
-        family: "ResolvePlantFamily",
-        family_id: ctx.plant_family.id
+      lineage = %Lineage{
+        genus: %Genus{id: ctx.plant_genus.id, name: "Resolveplantgenus"},
+        family: %Family{id: ctx.plant_family.id, name: "ResolvePlantFamily"}
       }
 
       %{taxonomy: result, genus_is_new: true, family_id: nil, possible_families: []} =
-        Taxonomy.resolve_taxonomy_for_species(taxonomy, ctx.gall_family_ids)
+        Taxonomy.resolve_taxonomy_for_species({:ok, lineage}, ctx.gall_family_ids)
 
-      assert result.genus_is_new == true
+      assert not Lineage.resolved?(result)
     end
 
     test "disambiguation filters to valid families", ctx do
-      taxonomy = %{
-        genus: "Ambiguousgenus",
-        requires_disambiguation: true,
-        possible_families: [
-          %{
-            genus_id: 1,
-            family_id: ctx.plant_family.id,
-            family: "ResolvePlantFamily",
-            section: nil,
-            section_id: nil
-          },
-          %{
-            genus_id: 2,
-            family_id: ctx.gall_family.id,
-            family: "ResolveGallFamily",
-            section: nil,
-            section_id: nil
-          }
-        ]
-      }
+      lookup_result =
+        {:ambiguous, "Ambiguousgenus",
+         [
+           %{
+             genus_id: 1,
+             family: %Family{id: ctx.plant_family.id, name: "ResolvePlantFamily"},
+             section: nil
+           },
+           %{
+             genus_id: 2,
+             family: %Family{id: ctx.gall_family.id, name: "ResolveGallFamily"},
+             section: nil
+           }
+         ]}
 
       # Using gall families, should auto-resolve to single gall family
       %{taxonomy: resolved, genus_is_new: false, family_id: family_id, possible_families: []} =
-        Taxonomy.resolve_taxonomy_for_species(taxonomy, ctx.gall_family_ids)
+        Taxonomy.resolve_taxonomy_for_species(lookup_result, ctx.gall_family_ids)
 
       assert family_id == ctx.gall_family.id
-      assert resolved.genus_id == 2
+      assert resolved.genus.id == 2
     end
 
-    test "disambiguation with no matching families returns new genus", ctx do
+    test "disambiguation with no matching families returns new genus", _ctx do
       other_family_ids = MapSet.new([99_999])
 
-      taxonomy = %{
-        genus: "Ambiguousgenus",
-        requires_disambiguation: true,
-        possible_families: [
-          %{
-            genus_id: 1,
-            family_id: ctx.plant_family.id,
-            family: "ResolvePlantFamily",
-            section: nil,
-            section_id: nil
-          }
-        ]
-      }
+      lookup_result =
+        {:ambiguous, "Ambiguousgenus",
+         [
+           %{
+             genus_id: 1,
+             family: %Family{id: 12, name: "ResolvePlantFamily"},
+             section: nil
+           }
+         ]}
 
       %{taxonomy: result, genus_is_new: true, family_id: nil, possible_families: []} =
-        Taxonomy.resolve_taxonomy_for_species(taxonomy, other_family_ids)
+        Taxonomy.resolve_taxonomy_for_species(lookup_result, other_family_ids)
 
-      assert result.genus_is_new == true
+      assert not Lineage.resolved?(result)
     end
 
     test "returns section_id when taxonomy has a section", ctx do
-      {:ok, section} =
+      {:ok, section_record} =
         Taxonomy.create_taxonomy(%{
           name: "ResolveSection",
           type: "section",
           parent_id: ctx.plant_genus.id
         })
 
-      taxonomy = %{
-        genus: "Resolveplantgenus",
-        genus_id: ctx.plant_genus.id,
-        genus_is_new: false,
-        section: "ResolveSection",
-        section_id: section.id,
-        family: "ResolvePlantFamily",
-        family_id: ctx.plant_family.id
+      lineage = %Lineage{
+        genus: %Genus{id: ctx.plant_genus.id, name: "Resolveplantgenus"},
+        family: %Family{id: ctx.plant_family.id, name: "ResolvePlantFamily"},
+        section: %Section{id: section_record.id, name: "ResolveSection"}
       }
 
       %{
@@ -1444,39 +1419,33 @@ defmodule Gallformers.TaxonomyTest do
         section_id: section_id,
         possible_families: []
       } =
-        Taxonomy.resolve_taxonomy_for_species(taxonomy, ctx.plant_family_ids)
+        Taxonomy.resolve_taxonomy_for_species({:ok, lineage}, ctx.plant_family_ids)
 
       assert family_id == ctx.plant_family.id
-      assert section_id == section.id
-      assert resolved.section == "ResolveSection"
+      assert section_id == section_record.id
+      assert resolved.section.name == "ResolveSection"
     end
 
     test "disambiguation with multiple matches returns all for modal", ctx do
       both_family_ids = MapSet.new([ctx.plant_family.id, ctx.gall_family.id])
 
-      taxonomy = %{
-        genus: "Ambiguousgenus",
-        requires_disambiguation: true,
-        possible_families: [
-          %{
-            genus_id: 1,
-            family_id: ctx.plant_family.id,
-            family: "ResolvePlantFamily",
-            section: nil,
-            section_id: nil
-          },
-          %{
-            genus_id: 2,
-            family_id: ctx.gall_family.id,
-            family: "ResolveGallFamily",
-            section: nil,
-            section_id: nil
-          }
-        ]
-      }
+      lookup_result =
+        {:ambiguous, "Ambiguousgenus",
+         [
+           %{
+             genus_id: 1,
+             family: %Family{id: ctx.plant_family.id, name: "ResolvePlantFamily"},
+             section: nil
+           },
+           %{
+             genus_id: 2,
+             family: %Family{id: ctx.gall_family.id, name: "ResolveGallFamily"},
+             section: nil
+           }
+         ]}
 
       %{taxonomy: _taxonomy, genus_is_new: false, family_id: nil, possible_families: multiple} =
-        Taxonomy.resolve_taxonomy_for_species(taxonomy, both_family_ids)
+        Taxonomy.resolve_taxonomy_for_species(lookup_result, both_family_ids)
 
       assert length(multiple) == 2
     end
