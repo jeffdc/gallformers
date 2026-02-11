@@ -1,0 +1,507 @@
+{
+  "slug": "populus-aphid-key",
+  "title": "Populus Aphid Gall Identification Key",
+  "subtitle": "Aphidoidea on North American Populus",
+  "authors": [],
+  "citation": null,
+  "citation_url": null,
+  "description": "This key is a synthesis of gall descriptions given in the literature. There is reason to believe that these gall descriptions may not map perfectly onto monophyletic aphid taxa; cases where this is known to be true will be noted but the full extent of variation for all species is likely not known, and cryptic species likely await description.",
+  "version": "2026-02-10",
+  "couplets": {
+    "1": {
+      "leads": [
+        {
+          "text": "Leaves folded into loose \"nest.\" No galled tissue, leaves often not even curled, aphids exposed along the petioles causing them to shorten and bend together. Only on Populus tremuloides.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pachypappa rosettei",
+            "species_id": 4012
+          }
+        },
+        {
+          "text": "Gall on stem, dropping late in the season leaving a flat circular scar. Slit opening usually aligned with stem rather than perpendicular to it. On Sect. Tacamahaca and Aigeiros.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus populiramulorum",
+            "species_id": 3459
+          }
+        },
+        {
+          "text": "Full or most of leaf galls.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "2"}
+        },
+        {
+          "text": "Pouch or pocket galls on leaf.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "6"}
+        },
+        {
+          "text": "Globular to conical galls on petiole at or below leaf base.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "15"}
+        }
+      ]
+    },
+    "2": {
+      "leads": [
+        {
+          "text": "Galling of all or part of leaf.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "3"}
+        },
+        {
+          "text": "No galling, leaf folded to varying extents.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "4"}
+        }
+      ]
+    },
+    "3": {
+      "leads": [
+        {
+          "text": "Entire leaf with walnut-like corrugations, wax-glossy. Only on Populus deltoides.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Mordwilkoja vagabunda",
+            "species_id": 3678
+          }
+        },
+        {
+          "text": "Large, broadly wrinkled sacks, dull in texture. Only on Populus tremuloides.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pachypappa sacculi",
+            "species_id": 4013
+          }
+        }
+      ]
+    },
+    "4": {
+      "leads": [
+        {
+          "text": "Tight folding, blistering, or convolution.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "5"}
+        },
+        {
+          "text": "Loose bending at midrib without discoloration.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pachypappa pseudobyrsa",
+            "species_id": 3677
+          }
+        }
+      ]
+    },
+    "5": {
+      "leads": [
+        {
+          "text": "On native poplars.",
+          "notes": "Both Thecabius gravicornis and T. populiconduplifolius can cause tight folding on native poplars and may not be distinguishable by gall morphology alone.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Thecabius gravicornis / T. populiconduplifolius",
+            "species_id": [4010, 4034]
+          }
+        },
+        {
+          "text": "On non-native poplars.",
+          "notes": "Both Thecabius lysimachiae and T. affinis can cause tight folding on non-native poplars and may not be distinguishable by gall morphology alone.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Thecabius lysimachiae / T. affinis",
+            "species_id": [4011, 3989]
+          }
+        }
+      ]
+    },
+    "6": {
+      "leads": [
+        {
+          "text": "Leaf edge fold.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "7"}
+        },
+        {
+          "text": "Linear or ovate pocket(s) on lamina or along edge, often parallel to midrib.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "9"}
+        }
+      ]
+    },
+    "7": {
+      "leads": [
+        {
+          "text": "A thick, crescent shaped gall containing many aphids. On Populus angustifolia.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Cornaphis populi",
+            "species_id": 4057
+          }
+        },
+        {
+          "text": "A globular, near spherical, pouch bulging out of a leaf edge fold. On Populus tremuloides.",
+          "notes": "Only tentatively thought to be induced by an aphid.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "p-tremuloides-cherry-gall",
+            "species_id": 4058
+          }
+        },
+        {
+          "text": "A simple ungalled leaf edge fold.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "8"}
+        }
+      ]
+    },
+    "8": {
+      "leads": [
+        {
+          "text": "On Populus deltoides or balsamifera: stem mother.",
+          "notes": "Some sources state this is also known from Populus nigra but these reports may be T. affinis; broadly this seems to be a native species found on native hosts.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Thecabius populiconduplifolius",
+            "species_id": 4034
+          }
+        },
+        {
+          "text": "On Populus nigra: stem mother.",
+          "notes": "A European species present in NA but likely only found on non-native Populus like P. nigra; similar observations on native poplars are presumably T. populiconduplifolius. The species are closely related but have different chromosome counts.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Thecabius affinis",
+            "species_id": 3989
+          }
+        }
+      ]
+    },
+    "9": {
+      "leads": [
+        {
+          "text": "Large, smooth, flat-sided cockscomb gall. On Populus deltoides.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus longicornis",
+            "species_id": 3451
+          }
+        },
+        {
+          "text": "Pseudogall pocket or pouch, not on the midrib.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "10"}
+        },
+        {
+          "text": "Pseudogall pocket on midrib. Typically on Populus deltoides: stem mother.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pachypappa pseudobyrsa",
+            "species_id": 3677
+          }
+        },
+        {
+          "text": "Gall on midrib.",
+          "notes": "Many of these aphids occur on the same hosts and cause similar or overlapping symptoms; DNA or anatomical evidence is likely necessary to distinguish them.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "11"}
+        }
+      ]
+    },
+    "10": {
+      "leads": [
+        {
+          "text": "A single long, narrow, pseudogall parallel to the midrib, barely raised above the leaf, containing one apterous aphid. In spring. Typically on Sect. Tacamahaca; apparently the same species on Populus fremontii: stem mother.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Thecabius populimonilis",
+            "species_id": 4009
+          }
+        },
+        {
+          "text": "Apparently similar, on Sect. Tacamahaca: stem mother.",
+          "notes": "Disagreement in the literature whether this is on the midrib, adjacent to the midrib, or halfway between the midrib and the leaf edge.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Thecabius gravicornis",
+            "species_id": 4010
+          }
+        },
+        {
+          "text": "One to four rows of bead-like galls parallel to midrib or (on Populus fremontii) along the edge of the leaf, each containing a single winged or apterous aphid. In summer. Often in numbers, overtaking the whole leaf and causing it to spiral. Typically on Sect. Tacamahaca.",
+          "notes": "Apparently the same species forms similar galls on Populus fremontii but this may be worth confirming.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Thecabius populimonilis",
+            "species_id": 4009
+          }
+        }
+      ]
+    },
+    "11": {
+      "leads": [
+        {
+          "text": "Lower midrib.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "12"}
+        },
+        {
+          "text": "Upper midrib.",
+          "notes": "These three galls all occur chiefly on Sect. Tacamahaca and their galls may overlap morphologically especially when populations are high.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "13"}
+        },
+        {
+          "text": "Clusters of yellow-red globular galls on the lower side of the leaf of Populus tremuloides.",
+          "notes": "Unclear if this is in fact an aphid species; no sources mention the aphid past Stebbins.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus rileyi",
+            "species_id": 3990
+          }
+        }
+      ]
+    },
+    "12": {
+      "leads": [
+        {
+          "text": "An elongate-globular or triangular pocket gall, typically near the base of the leaf. Only on Sect. Tacamahaca.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus betae",
+            "species_id": 3461
+          }
+        },
+        {
+          "text": "Similar, only known from Populus angustifolia in Utah.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus knowltoni",
+            "species_id": 3462
+          }
+        },
+        {
+          "text": "Similar, typically found on the upper leaf per early literature but Foottit et al. 2010 state that this aphid was found predominantly in galls on the lower side. A third, undescribed taxon was also reported on similar galls.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus populivenae",
+            "species_id": 3456
+          }
+        },
+        {
+          "text": "Irregularly globular, twisted galls on the lower midrib, opening with a thick slit on the upper midrib. On Populus fremontii.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus p-fremontii-midrib-gall",
+            "species_id": 3996
+          }
+        }
+      ]
+    },
+    "13": {
+      "leads": [
+        {
+          "text": "Localized at the base of the leaf. A single or sometimes two large irregularly globose galls. Narrow to a small thickening of the midrib where they connect to the leaf base. Alate aphids emerge in mid-July. Only on Sect. Tacamahaca.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus populiglobuli",
+            "species_id": 3458
+          }
+        },
+        {
+          "text": "Along the length of the leaf.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "14"}
+        }
+      ]
+    },
+    "14": {
+      "leads": [
+        {
+          "text": "Leathery, slightly sinuous thickening of the midrib with sometimes one but typically at least 2 globular galls, often confluent in irregular cockscomb divided by saddle-like furrows, typically with a roughened surface. Alate aphids emerge in late August\u2013September. Only on Sect. Tacamahaca.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus monophagus",
+            "species_id": 3457
+          }
+        },
+        {
+          "text": "An elongate-globular or triangular pocket gall, typically near the base of the leaf. Typically on Sect. Tacamahaca.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus populivenae",
+            "species_id": 3456
+          }
+        }
+      ]
+    },
+    "15": {
+      "leads": [
+        {
+          "text": "Not twisted (occasionally bending the petiole), not incorporating any leaf tissue.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "16"}
+        },
+        {
+          "text": "Twisted, with a long winding groove or slit (which may or may not ever open), gall sometimes including base of midrib.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "19"}
+        }
+      ]
+    },
+    "16": {
+      "leads": [
+        {
+          "text": "Opening with a round ostiole. Conical, often squatly triangular but sometimes elongate and narrow. Only on Populus nigra var. italica.",
+          "notes": "Reported from North America in the literature but apparently not observed on iNaturalist yet.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus bursarius",
+            "species_id": 3450
+          }
+        },
+        {
+          "text": "Opening with a simple linear slit, sometimes with protruding lips.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "17"}
+        }
+      ]
+    },
+    "17": {
+      "leads": [
+        {
+          "text": "Slit oriented parallel to petiole. A stem gall rarely found on only petiole.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus populiramulorum",
+            "species_id": 3459
+          }
+        },
+        {
+          "text": "Slit oriented nearly perpendicular to petiole.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "18"}
+        }
+      ]
+    },
+    "18": {
+      "leads": [
+        {
+          "text": "Globular (some galls in CA almost laterally compressed), near junction with leaf (though not incorporating leaf midrib), slit has protruding, sometimes almost conical, lips. May cause petiole to bend slightly but never twist. Aphids in galls from May to October (longer in CA?). On Populus fremontii and deltoides.",
+          "notes": "Eastern galls of this species were formerly considered a morph of P. populitransversus.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus obesinymphae",
+            "species_id": 3453
+          }
+        },
+        {
+          "text": "Elongate, near center of petiole, opens via slit. Aphids in galls from March to July. On Populus deltoides only.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus populitransversus",
+            "species_id": 3460
+          }
+        }
+      ]
+    },
+    "19": {
+      "leads": [
+        {
+          "text": "Only at junction of petiole and leaf.",
+          "notes": "These aphids apparently have at least some host overlap and cause nearly indistinguishable symptoms; DNA or anatomical evidence is likely necessary to distinguish them.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "20"}
+        },
+        {
+          "text": "Typically below junction of leaf along the petiole, though some galls may be near the junction. Twisted petioles maturing to large, irregularly globular, rough-textured galls. Only on Populus nigra var. italica.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus spyrothecae",
+            "species_id": 3994
+          }
+        }
+      ]
+    },
+    "20": {
+      "leads": [
+        {
+          "text": "Almost entirely above upper surface of leaf. A single or sometimes two large irregularly globose galls. Narrow to a small thickening of the midrib where they connect to the leaf base. Alate aphids emerge in mid-July. On Sect. Tacamahaca.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus populiglobuli",
+            "species_id": 3458
+          }
+        },
+        {
+          "text": "To either side of the leaf. On Sect. Aigeiros.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "21"}
+        }
+      ]
+    },
+    "21": {
+      "leads": [
+        {
+          "text": "Large, near leaf base but almost entirely on petiole. Opening with a slit. On Populus deltoides and fremontii.",
+          "notes": "Russo notes that uncited DNA evidence suggests the CA galls that key to this species are more closely related to populiramulorum; this key leaves them together pending further information.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus nortonii",
+            "species_id": 3452
+          }
+        },
+        {
+          "text": "Galls with a visible exit hole or fully on the leaf lamina can be identified as populicaulis; those with no hole and found equally on the petiole are apparently indistinguishable from tartareus. On leaf base with some of the petiole twisted into the gall. On Populus deltoides.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus populicaulis",
+            "species_id": 3454
+          }
+        },
+        {
+          "text": "Principally on the petiole but with enough of the gall on the blade that the leaf margin can be traced along the edge. On Populus deltoides.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Pemphigus tartareus",
+            "species_id": 4014
+          }
+        }
+      ]
+    }
+  }
+}

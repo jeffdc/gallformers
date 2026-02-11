@@ -507,6 +507,20 @@ const ScrollToCouplet = {
         }
       })
     })
+
+    this.handleEvent("copy_to_clipboard", ({text, url_path}) => {
+      const origin = window.location.origin
+      let finalText = text
+      if (url_path) {
+        finalText = finalText.replace("{{KEY_URL}}", origin + url_path)
+      }
+      finalText = finalText.replaceAll("{{KEY_URL_ORIGIN}}", origin)
+      navigator.clipboard.writeText(finalText).then(() => {
+        this.pushEvent("clipboard_copy_success", {})
+      }).catch(() => {
+        this.pushEvent("clipboard_copy_error", {})
+      })
+    })
   }
 }
 

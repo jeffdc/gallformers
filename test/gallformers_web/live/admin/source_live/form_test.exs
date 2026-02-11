@@ -26,6 +26,7 @@ defmodule GallformersWeb.Admin.SourceLive.FormTest do
     conn
     |> init_test_session(%{})
     |> put_session(:current_user, user)
+    |> put_session(:db_display_name, "Test User")
   end
 
   describe "Create source navigation" do

@@ -67,6 +67,7 @@ defmodule GallformersWeb.Admin.DashboardLive do
           icon="ph-plus-circle"
         />
         <.action_card label="Create a New Article" href="/admin/articles/new" icon="ph-plus-circle" />
+        <.action_card label="Create a New Key" href="/admin/keys/new" icon="ph-plus-circle" />
         <.action_card
           label="Manage Gall-Host Associations"
           href="/admin/gallhost"

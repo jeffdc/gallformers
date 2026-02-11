@@ -1,121 +1,130 @@
 defmodule Gallformers.Keys do
   @moduledoc """
-  Context for loading and querying dichotomous identification keys.
+  Context for managing dichotomous identification keys.
 
-  Keys are stored as JSON files in `priv/keys/`. Each file represents
-  one key with metadata and a set of numbered couplets. Files are read
-  at compile time and cached as module attributes.
+  Keys are stored in the database with metadata and a couplets JSON column.
+  Admins can create, edit, and delete keys through the admin interface.
   """
 
-  @keys_dir Path.join(:code.priv_dir(:gallformers), "keys")
-
-  # Parse functions used at compile time — must be defined before @keys attribute
-  defmodule Parser do
-    @moduledoc false
-
-    def parse_key(data) do
-      %{
-        slug: data["slug"],
-        title: data["title"],
-        subtitle: data["subtitle"],
-        authors: data["authors"] || [],
-        citation: data["citation"],
-        citation_url: data["citation_url"],
-        description: data["description"],
-        version: data["version"],
-        couplets: parse_couplets(data["couplets"] || %{})
-      }
-    end
-
-    defp parse_couplets(couplets_map) do
-      Map.new(couplets_map, fn {number, couplet_data} ->
-        {number, parse_couplet(couplet_data)}
-      end)
-    end
-
-    defp parse_couplet(data) do
-      %{
-        leads: Enum.map(data["leads"] || [], &parse_lead/1)
-      }
-    end
-
-    defp parse_lead(data) do
-      %{
-        text: data["text"],
-        images: Enum.map(data["images"] || [], &parse_image/1),
-        destination: parse_destination(data["destination"])
-      }
-    end
-
-    defp parse_image(data) do
-      %{
-        ref: data["ref"],
-        file: data["file"],
-        caption: data["caption"]
-      }
-    end
-
-    defp parse_destination(nil), do: nil
-
-    defp parse_destination(data) do
-      base = %{type: data["type"]}
-
-      case data["type"] do
-        "couplet" ->
-          base
-          |> Map.put(:number, data["number"])
-          |> Map.put(:label, data["label"])
-
-        "taxon" ->
-          base
-          |> Map.put(:name, data["name"])
-          |> Map.put(:context, data["context"])
-
-        _ ->
-          base
-      end
-    end
-  end
-
-  @keys @keys_dir
-        |> File.ls!()
-        |> Enum.filter(&String.ends_with?(&1, ".json"))
-        |> Enum.map(fn filename ->
-          path = Path.join(@keys_dir, filename)
-          json = File.read!(path)
-          data = Jason.decode!(json)
-          Parser.parse_key(data)
-        end)
-        |> Map.new(&{&1.slug, &1})
+  import Ecto.Query
+  alias Gallformers.Keys.Key
+  alias Gallformers.Repo
 
   @doc """
   Returns a list of all available keys (metadata only, no couplet data).
   """
+  @spec list_keys() :: [Key.t()]
   def list_keys do
-    @keys
-    |> Map.values()
-    |> Enum.map(fn key ->
-      Map.drop(key, [:couplets])
-    end)
-    |> Enum.sort_by(& &1.title)
+    Key
+    |> select([k], %{
+      id: k.id,
+      slug: k.slug,
+      title: k.title,
+      subtitle: k.subtitle,
+      authors: k.authors,
+      citation: k.citation,
+      citation_url: k.citation_url,
+      description: k.description,
+      version: k.version
+    })
+    |> order_by([k], asc: k.title)
+    |> Repo.all()
   end
 
   @doc """
   Returns the full key data for the given slug, including all couplets.
   """
+  @spec get_key(String.t()) :: {:ok, Key.t()} | {:error, :not_found}
   def get_key(slug) do
-    case Map.fetch(@keys, slug) do
-      {:ok, key} -> {:ok, key}
-      :error -> {:error, :not_found}
+    case Repo.get_by(Key, slug: slug) do
+      nil -> {:error, :not_found}
+      key -> {:ok, key}
     end
+  end
+
+  @doc """
+  Gets a key by ID. Raises if not found.
+  """
+  @spec get_key!(integer()) :: Key.t()
+  def get_key!(id) do
+    Repo.get!(Key, id)
   end
 
   @doc """
   Returns the couplet numbers for a key, sorted numerically.
   """
+  @spec couplet_numbers(Key.t() | map()) :: [String.t()]
   def couplet_numbers(key) do
     key.couplets
     |> Map.keys()
     |> Enum.sort_by(&String.to_integer/1)
+  end
+
+  @doc """
+  Creates a new key.
+  """
+  @spec create_key(map()) :: {:ok, Key.t()} | {:error, Ecto.Changeset.t()}
+  def create_key(attrs \\ %{}) do
+    %Key{}
+    |> Key.changeset(attrs)
+    |> ensure_unique_slug()
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates an existing key.
+  """
+  @spec update_key(Key.t(), map()) :: {:ok, Key.t()} | {:error, Ecto.Changeset.t()}
+  def update_key(%Key{} = key, attrs) do
+    key
+    |> Key.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Deletes a key.
+  """
+  @spec delete_key(Key.t()) :: {:ok, Key.t()} | {:error, Ecto.Changeset.t()}
+  def delete_key(%Key{} = key) do
+    Repo.delete(key)
+  end
+
+  @doc """
+  Returns a changeset for tracking key changes.
+  """
+  @spec change_key(Key.t(), map()) :: Ecto.Changeset.t()
+  def change_key(%Key{} = key, attrs \\ %{}) do
+    Key.changeset(key, attrs)
+  end
+
+  # Ensures the slug is unique by appending a number if necessary
+  defp ensure_unique_slug(changeset) do
+    slug = Ecto.Changeset.get_field(changeset, :slug)
+    exclude_id = changeset.data.id
+
+    if slug && slug_exists?(slug, exclude_id) do
+      unique_slug = find_unique_slug(slug, exclude_id, 2)
+      Ecto.Changeset.put_change(changeset, :slug, unique_slug)
+    else
+      changeset
+    end
+  end
+
+  defp slug_exists?(slug, nil) do
+    Repo.exists?(from(k in Key, where: k.slug == ^slug))
+  end
+
+  defp slug_exists?(slug, exclude_id) do
+    Repo.exists?(from(k in Key, where: k.slug == ^slug and k.id != ^exclude_id))
+  end
+
+  defp find_unique_slug(base_slug, exclude_id, n) do
+    candidate = "#{base_slug}-#{n}"
+
+    if slug_exists?(candidate, exclude_id) do
+      find_unique_slug(base_slug, exclude_id, n + 1)
+    else
+      candidate
+    end
   end
 end

@@ -30,6 +30,7 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
     conn
     |> init_test_session(%{})
     |> put_session(:current_user, user)
+    |> put_session(:db_display_name, "Test User")
   end
 
   # Helper to find any host for testing - fails explicitly if no data

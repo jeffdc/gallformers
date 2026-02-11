@@ -45,8 +45,6 @@ Infrastructure as Code for Gallformers AWS resources using OpenTofu.
 
 All AWS resources are deployed to **`us-east-1`** (N. Virginia) to match Fly.io's `iad` datacenter for low latency.
 
-**Migration note:** The legacy `gallformers` image bucket was in `us-east-2`. The new `gallformers-images-us-east-1` bucket is the authoritative location. See [migrate-images-bucket.md](../runbooks/migrate-images-bucket.md) for the migration procedure.
-
 ## Resources
 
 ### S3 Buckets
@@ -100,5 +98,4 @@ tofu import aws_s3_bucket.images gallformers-images-us-east-1
 See [Beads](../.beads/) for tracked infrastructure work (issues tagged with `infra`).
 
 Key runbooks:
-- [migrate-images-bucket.md](../runbooks/migrate-images-bucket.md) - Migrate images from us-east-2 to us-east-1
 - [backup-setup.md](../docs/backup-setup.md) - S3/IAM configuration details

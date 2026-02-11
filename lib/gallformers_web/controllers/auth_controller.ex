@@ -50,9 +50,11 @@ defmodule GallformersWeb.AuthController do
 
     # Sync user profile to database (create or update)
     case Accounts.sync_user_from_auth0(auth0_user) do
-      {:ok, _user} ->
+      {:ok, db_user} ->
         conn
         |> Accounts.put_user_in_session(auth0_user)
+        |> Plug.Conn.put_session(:db_user_id, db_user.id)
+        |> Plug.Conn.put_session(:db_display_name, db_user.display_name)
         |> put_flash(:info, "Welcome back, #{Auth0User.display_name(auth0_user)}!")
         |> redirect(to: ~p"/admin")
 
@@ -60,9 +62,12 @@ defmodule GallformersWeb.AuthController do
         require Logger
         Logger.error("Failed to sync user profile: #{inspect(changeset.errors)}")
 
-        # Still allow login even if profile sync fails
+        # Still allow login even if profile sync fails - try to load DB user for session
+        db_user = Accounts.get_user_by_auth0_id(auth0_user.id)
+
         conn
         |> Accounts.put_user_in_session(auth0_user)
+        |> maybe_put_db_session(db_user)
         |> put_flash(:info, "Welcome back, #{Auth0User.display_name(auth0_user)}!")
         |> redirect(to: ~p"/admin")
     end
@@ -76,6 +81,41 @@ defmodule GallformersWeb.AuthController do
     conn
     |> put_flash(:error, "Authentication failed. Please try again.")
     |> redirect(to: ~p"/")
+  end
+
+  @doc """
+  Refreshes DB user fields in the session and redirects.
+
+  Used after profile updates (e.g., display_name change) to sync the session
+  with the latest database values, since LiveViews can't write to the session.
+  """
+  def refresh_session(conn, params) do
+    auth0_user = Accounts.get_user_from_session(conn)
+    return_to = params["return_to"] || ~p"/admin"
+
+    if auth0_user do
+      case Accounts.get_user_by_auth0_id(auth0_user.id) do
+        %Accounts.User{} = db_user ->
+          conn
+          |> Plug.Conn.put_session(:db_user_id, db_user.id)
+          |> Plug.Conn.put_session(:db_display_name, db_user.display_name)
+          |> put_flash(:info, "Profile updated successfully")
+          |> redirect(to: return_to)
+
+        nil ->
+          redirect(conn, to: return_to)
+      end
+    else
+      redirect(conn, to: ~p"/")
+    end
+  end
+
+  defp maybe_put_db_session(conn, nil), do: conn
+
+  defp maybe_put_db_session(conn, db_user) do
+    conn
+    |> Plug.Conn.put_session(:db_user_id, db_user.id)
+    |> Plug.Conn.put_session(:db_display_name, db_user.display_name)
   end
 
   @doc """

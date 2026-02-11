@@ -42,7 +42,6 @@ V2 needs robust, reliable image handling with proper async processing, status tr
 ### Migration
 
 Existing 6,531 images across 2,522 species will be migrated via Elixir Mix task to:
-- Relocate from `us-east-2` to `us-east-1` (match Fly.io region)
 - Generate optimized WebP variants + JPEG fallback
 - Create new UUID-based records with legacy_id traceability
 

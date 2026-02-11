@@ -8,7 +8,7 @@ Gallformers needs a robust image processing system for the v2 rewrite. The v1 sy
 
 ### Current State
 
-- **S3 Bucket**: `gallformers` in `us-east-2` (will migrate to `us-east-1`)
+- **S3 Bucket**: `gallformers-images-us-east-1` in `us-east-1`
 - **CDN**: CloudFront at `https://dhz6u1p7t6okk.cloudfront.net`
 - **Image Count**: 6,531 images across 2,522 species
 - **Size Variants**: 5 sizes embedded in path names (`_original`, `_small`, `_medium`, `_large`, `_xlarge`)
@@ -194,7 +194,7 @@ gallformers/
 │   ├── large/{id}.webp
 │   ├── xlarge/{id}.webp
 │   └── fallback/{id}.jpg    # JPEG fallback for old browsers
-└── gall/                    # Legacy v1 images (us-east-2, archive after migration)
+└── gall/                    # Legacy v1 images
     └── {species_id}/...
 ```
 

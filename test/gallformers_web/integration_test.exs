@@ -173,6 +173,7 @@ defmodule GallformersWeb.IntegrationTest do
         conn
         |> init_test_session(%{})
         |> put_session(:current_user, user)
+        |> put_session(:db_display_name, "Test User")
 
       {:ok, _view, html} = live(conn, ~p"/admin")
       assert html =~ "Dashboard" or html =~ "Admin"

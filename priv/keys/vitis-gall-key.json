@@ -1,0 +1,199 @@
+{
+  "slug": "vitis-gall-key",
+  "title": "Key to Galls on Grapes",
+  "subtitle": "Galls on Vitis (Vitaceae)",
+  "authors": [],
+  "citation": null,
+  "citation_url": null,
+  "description": null,
+  "version": "2026-02-10",
+  "couplets": {
+    "1": {
+      "leads": [
+        {
+          "text": "Integral: gall is an outgrowth or modification of existing plant tissue and cannot be cleanly separated from it.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "2"}
+        },
+        {
+          "text": "Detachable: gall can be separated from the plant tissue it grows on.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "5"}
+        }
+      ]
+    },
+    "2": {
+      "leads": [
+        {
+          "text": "On main stem, a slight swelling typically directly adjacent to a node. Contains beetle larva and frass.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Ampeloglypter sesostris",
+            "species_id": 3111
+          }
+        },
+        {
+          "text": "Swollen buds containing gall midge larvae.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Contarinia johnsoni",
+            "species_id": 3109
+          }
+        },
+        {
+          "text": "On petiole or tendrils; tapered swellings with matte green exterior when fresh, brown and often splitting longitudinally with age.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Neolasioptera vitinea",
+            "species_id": 1408
+          }
+        },
+        {
+          "text": "On leaves, petioles, inflorescences, and tendrils; abrupt swellings, either densely clustered across many tissues or scattered in globules on leaves, exterior pink-red, succulent and glossy, developing small egress holes on the upper side later in the season.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Vitisiella brevicauda",
+            "species_id": 1407
+          }
+        },
+        {
+          "text": "Exclusively on leaves.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "3"}
+        }
+      ]
+    },
+    "3": {
+      "leads": [
+        {
+          "text": "Blistering above with corresponding patches of white, red, or brown erineum below.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Colomerus vitis",
+            "species_id": 689
+          }
+        },
+        {
+          "text": "Numerous globular pockets on the lower side of the leaf with hairy tufts above. Extremely common.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Daktulosphaira vitifoliae",
+            "species_id": 1406
+          }
+        },
+        {
+          "text": "Broad, flat, light yellow-green swellings on both sides of the leaf, thick-walled in spring but hollow with large opening holes by early summer.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Heliozela aesella",
+            "species_id": 1419
+          }
+        },
+        {
+          "text": "Many small globular swellings, often pink-red and succulent and resembling Vitisiella brevicauda but differing in surface features.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "4"}
+        }
+      ]
+    },
+    "4": {
+      "leads": [
+        {
+          "text": "A tuft or covering of hairs.",
+          "notes": "Highly variable; may represent multiple species.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Vitisiella vitis-tuft-gall",
+            "species_id": 2687
+          }
+        },
+        {
+          "text": "A narrow, hairy, sometimes curved protrusion on the lower side.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Dasineura v-cinerea-hook-gall",
+            "species_id": 1748
+          }
+        }
+      ]
+    },
+    "5": {
+      "leads": [
+        {
+          "text": "On stem at nodes (replacing buds).",
+          "images": [],
+          "destination": {"type": "couplet", "number": "6"}
+        },
+        {
+          "text": "On leaves.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "7"}
+        }
+      ]
+    },
+    "6": {
+      "leads": [
+        {
+          "text": "One (sometimes several) large, globular, polythalamous gall(s). May be hairy or glabrous, ribbed or smooth.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Ampelomyia vitispomum",
+            "species_id": 1405
+          }
+        },
+        {
+          "text": "A cluster of typically 10 or more pointed-globular monothalamous galls. May be hairy or glabrous.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Ampelomyia vitiscoryloides",
+            "species_id": 1404
+          }
+        }
+      ]
+    },
+    "7": {
+      "leads": [
+        {
+          "text": "Numerous elongate, conical galls scattered on either the upper or lower side of the leaf (typically not both). Yellow, turning red with exposure to the sun. May be hairy or glabrous.",
+          "notes": "Nearly identical galls on Vitis tilifolia in Mexico may or may not be a distinct species (Ampelomyia v-tiliifolia-pubescent-conical-gall).",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Ampelomyia viticola",
+            "species_id": [1403, 3355]
+          }
+        },
+        {
+          "text": "Numerous abruptly truncated cylindrical hairless yellow galls scattered on the lower side of the leaf.",
+          "notes": "Common on Vitis mustangensis but similar galls have been observed on other Vitis species.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Ampelomyia v-mustangensis-lower-tube-gall",
+            "species_id": 1357
+          }
+        },
+        {
+          "text": "One or two wide ovate-conical galls causing a bunching of leaf tissue beyond the location of the gall. Green, turning red in the sun. May be hairy or glabrous.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Ampelomyia vitis-large-cone-gall",
+            "species_id": 2265
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,7 +1,4 @@
 # S3 bucket for gallformers images (us-east-1)
-#
-# Replaces the legacy "gallformers" bucket in us-east-2.
-# See runbooks/migrate-images-bucket.md for migration procedure.
 
 resource "aws_s3_bucket" "images" {
   bucket = "gallformers-images-us-east-1"

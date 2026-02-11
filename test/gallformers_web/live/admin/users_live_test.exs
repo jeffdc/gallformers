@@ -46,6 +46,7 @@ defmodule GallformersWeb.Admin.UsersLiveTest do
         conn
         |> init_test_session(%{})
         |> put_session(:current_user, superadmin)
+        |> put_session(:db_display_name, "Test User")
 
       {:ok, conn: conn, user1: user1, user2: user2, superadmin: superadmin}
     end
@@ -155,6 +156,7 @@ defmodule GallformersWeb.Admin.UsersLiveTest do
         conn
         |> init_test_session(%{})
         |> put_session(:current_user, admin)
+        |> put_session(:db_display_name, "Test User")
 
       # Should be forbidden
       conn = get(conn, ~p"/admin/users")
@@ -176,6 +178,7 @@ defmodule GallformersWeb.Admin.UsersLiveTest do
         conn
         |> init_test_session(%{})
         |> put_session(:current_user, user)
+        |> put_session(:db_display_name, "Test User")
 
       # Non-admin users should get forbidden (403) or be redirected
       conn = get(conn, ~p"/admin/users")
@@ -203,6 +206,7 @@ defmodule GallformersWeb.Admin.UsersLiveTest do
         conn
         |> init_test_session(%{})
         |> put_session(:current_user, superadmin)
+        |> put_session(:db_display_name, "Test User")
 
       # Should load without error
       {:ok, _view, html} = live(conn, ~p"/admin/users")
@@ -241,6 +245,7 @@ defmodule GallformersWeb.Admin.UsersLiveTest do
         conn
         |> init_test_session(%{})
         |> put_session(:current_user, superadmin)
+        |> put_session(:db_display_name, "Test User")
 
       {:ok,
        conn: conn,
@@ -278,6 +283,7 @@ defmodule GallformersWeb.Admin.UsersLiveTest do
         conn
         |> init_test_session(%{})
         |> put_session(:current_user, superadmin)
+        |> put_session(:db_display_name, "Test User")
 
       {:ok, conn: conn}
     end

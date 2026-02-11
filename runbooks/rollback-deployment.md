@@ -17,35 +17,33 @@ Revert the application to a previous known-good release.
 ## Important
 This runbook rolls back **code only**. Database changes persist across deployments. If the database is corrupted, see [Restore Database](./restore-database.md) first.
 
-## Procedure
+## Choose Your Approach
 
-### 1. Identify Target Release
+**Option A: Emergency rollback (minutes)** — Redeploy a previous Fly.io image. Use when the site is down and you need it back NOW. See Procedure below.
 
-List recent releases:
+**Option B: Git revert (slower but cleaner)** — `git revert <bad-commit>` and push to main. CI/CD handles the rest. Keeps git history as source of truth. Preferred when you have time.
+
+## Procedure (Option A: Image Rollback)
+
+### 1. Identify Target Release and Image
+
+List recent releases with their images:
 
 ```bash
-fly releases -a gallformers
+fly releases -a gallformers --image
 ```
 
 Output example:
 ```
-VERSION STABLE  TYPE    STATUS    DESCRIPTION                  USER             DATE
-v15     true    release succeeded Deploy image                 user@example.com 2024-01-08T10:00:00Z
-v14     true    release succeeded Deploy image                 user@example.com 2024-01-07T15:00:00Z
-v13     true    release succeeded Deploy image                 user@example.com 2024-01-05T09:00:00Z
+VERSION STABLE  TYPE    STATUS    DESCRIPTION   IMAGE
+v15     true    release succeeded Deploy image  registry.fly.io/gallformers:deployment-01ABC123
+v14     true    release succeeded Deploy image  registry.fly.io/gallformers:deployment-01XYZ789
+v13     true    release succeeded Deploy image  registry.fly.io/gallformers:deployment-01DEF456
 ```
 
-Record the target version: `v____`
+Identify the last known-good version and record its image reference.
 
-### 2. Get Target Image
-
-```bash
-fly releases show v<TARGET_VERSION> -a gallformers
-```
-
-Record the image reference: `registry.fly.io/gallformers:deployment-________________`
-
-### 3. Execute Rollback
+### 2. Execute Rollback
 
 ```bash
 fly deploy --image registry.fly.io/gallformers:deployment-<ID> -a gallformers
@@ -53,20 +51,20 @@ fly deploy --image registry.fly.io/gallformers:deployment-<ID> -a gallformers
 
 Wait for deployment to complete.
 
-### 4. Verify Rollback
+### 3. Verify Rollback
 
 Run health check:
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}" https://gallformers.fly.dev/health
+curl -s -o /dev/null -w "%{http_code}" https://www.gallformers.org/health
 ```
 
 Expected: `200`
 
-Check logs for clean startup:
+Check logs for clean startup (runs for 5 seconds then stops):
 
 ```bash
-fly logs -a gallformers --no-tail | head -50
+fly logs -a gallformers 2>&1 | timeout 5 cat
 ```
 
 Verify no errors in recent log output.

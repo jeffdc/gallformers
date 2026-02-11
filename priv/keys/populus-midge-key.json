@@ -1,0 +1,188 @@
+{
+  "slug": "populus-midge-key",
+  "title": "Populus Midge Gall Identification Key",
+  "subtitle": "Cecidomyiidae on North American Populus",
+  "authors": [],
+  "citation": null,
+  "citation_url": null,
+  "description": "This key is largely based on original categorizations of iNaturalist observations, with some remarks on the limited prior literature. Even moreso than many gall-inducer taxa, midge galls on native North American poplars seem to map very closely onto midges known from Europe; these similarities are noted below.",
+  "version": "2026-02-10",
+  "couplets": {
+    "1": {
+      "leads": [
+        {
+          "text": "Leaf edge roll.",
+          "notes": "Can be confused with Aceria dispar, which causes ragged leaf edge rolling but also shortens the petiole and occurs in bunched clusters.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Prodiplosis morrisi",
+            "species_id": 2166
+          }
+        },
+        {
+          "text": "Concentric circular spot with raised papilla and exposed larva below.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "2"}
+        },
+        {
+          "text": "Larva concealed within galled tissue, protruding at least slightly on at least one side of the leaf.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "3"}
+        }
+      ]
+    },
+    "2": {
+      "leads": [
+        {
+          "text": "A green spot on Populus balsamifera.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "p-balsamifera-leaf-gall",
+            "species_id": 3987
+          }
+        },
+        {
+          "text": "A green spot on Populus tristis (= trichocarpa).",
+          "notes": "This and the previous are indistinguishable without host ID and may be sympatric where the hosts both occur. They may be conspecific.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "p-tristis-leaf-spot",
+            "species_id": 4027
+          }
+        },
+        {
+          "text": "A reddish blister on Populus grandidentata.",
+          "notes": "It's ambiguous whether H. stebbinsae fits in this group. Gagné 1989's drawing matches this description, but no observations of this gall type have been reported from the host or range given for that species. It also seems unlikely that none of the sources would note that the gall has an exposed larva if it did. The text descriptions suggest something like p-tremuloides-like-globuli but that gall looks very different from Gagné's drawing. No galls matching this description have been observed on Populus grandidentata so far.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "?Harmandiola stebbinsae",
+            "species_id": 3985
+          }
+        }
+      ]
+    },
+    "3": {
+      "leads": [
+        {
+          "text": "Gall entirely on the upper side of the leaf, with only a flat opening on the lower side.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "4"}
+        },
+        {
+          "text": "Gall largely on the lower side or evenly protruding from both sides.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "5"}
+        }
+      ]
+    },
+    "4": {
+      "leads": [
+        {
+          "text": "A relatively large, spherical, thick-walled pea gall on a leaf vein.",
+          "notes": "Similar to Harmandiola tremulae in Europe. Russo's species B might key here but it has an opening above.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "p-tremuloides-like-tremulae",
+            "species_id": 4028
+          }
+        },
+        {
+          "text": "A relatively small, capsule-shaped, thin-walled gall anywhere on the upper leaf.",
+          "notes": "Similar to Harmandiola globuli in Europe. Easily confused with H. helena from above.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "p-tremuloides-like-globuli",
+            "species_id": 4033
+          }
+        }
+      ]
+    },
+    "5": {
+      "leads": [
+        {
+          "text": "Circular to ovate openings typically on the upper side but sometimes on the lower or even on both sides of the leaf. Circles often visible before inducers emerge. Gall protruding more or less but typically to the same degree on either side of the leaf. Variable in size, shape, and number but often confluent with each other and with nearby veins, glossy and succulent, often but not always clustering in large confluent masses at the leaf base though never on the petiole.",
+          "notes": "Similar to Lasioptera populnea/Contarinia populi in Europe. Galls with confluent and thus linear/elongated slits can be confused with p-tremuloides-lips-gall. Seems to be Russo's species A. His species B might key here as well but I haven't seen anything matching that description yet. This is a highly variable gall and is perhaps the morphotype most likely to represent multiple species.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "p-tremuloides-like-populnea",
+            "species_id": 4030
+          }
+        },
+        {
+          "text": "Linear slit openings on one or the other side of the leaf.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "6"}
+        }
+      ]
+    },
+    "6": {
+      "leads": [
+        {
+          "text": "Linear slits on the lower side of the leaf.",
+          "notes": "Based on Gagné's drawing; opposite of the original Felt description.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "7"}
+        },
+        {
+          "text": "Linear slits on the upper side of the leaf.",
+          "images": [],
+          "destination": {"type": "couplet", "number": "8"}
+        }
+      ]
+    },
+    "7": {
+      "leads": [
+        {
+          "text": "Numerous small globular galls in loose rows along the midrib, protruding equally on both sides of the leaf, with a hole on the lower side.",
+          "notes": "Similar to Harmandiola pustulans in Europe. Easily confused with p-tremuloides-like-globuli from above. All of my IDs of H. helena are made based on Gagné's figure, which is listed as \"possibly helena,\" contradicts the original description, and are essentially all on Populus grandidentata rather than the type host, Populus tremuloides.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Harmandiola helena",
+            "species_id": 4005
+          }
+        },
+        {
+          "text": "Pocked, globular galls with a hairy slit on the lower side. Apparently unique in having globular galls that expand toward the base.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "Russo's species C",
+            "species_id": 4000
+          }
+        }
+      ]
+    },
+    "8": {
+      "leads": [
+        {
+          "text": "Small, numerous, thin-walled pouch galls in rows on either side of the midrib or lateral veins, only a small protrusion if any on the upper side around the opening.",
+          "notes": "Similar to Harmandiola populi in Europe.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "p-tremuloides-pouch-gall",
+            "species_id": 4031
+          }
+        },
+        {
+          "text": "Large, thick-walled, globular galls singly or in clusters on the lamina, often with wide succulent lips protruding slightly on the upper side of the leaf.",
+          "notes": "Similar to Harmandiola cavernosa in Europe. Can be confused with galls of p-tremuloides-like-populnea with confluent, elongate openings on the upper side.",
+          "images": [],
+          "destination": {
+            "type": "taxon",
+            "name": "p-tremuloides-lips-gall",
+            "species_id": 4029
+          }
+        }
+      ]
+    }
+  }
+}

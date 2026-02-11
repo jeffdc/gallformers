@@ -32,6 +32,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.FormTest do
     conn
     |> init_test_session(%{})
     |> put_session(:current_user, user)
+    |> put_session(:db_display_name, "Test User")
   end
 
   describe "cascade delete modal" do

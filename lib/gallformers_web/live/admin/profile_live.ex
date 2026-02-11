@@ -123,18 +123,9 @@ defmodule GallformersWeb.Admin.ProfileLive do
     user_params = Map.put(user_params, "inaturalist_url", build_inat_url(inat_username))
 
     case Accounts.update_user(socket.assigns.user, user_params) do
-      {:ok, user} ->
-        changeset = User.update_changeset(user, %{})
-
-        socket =
-          socket
-          |> assign(:user, user)
-          |> assign(:form, to_form(changeset))
-          |> assign(:inat_username, extract_inat_username(user.inaturalist_url))
-          |> assign(:form_dirty, false)
-          |> put_flash(:info, "Profile updated successfully")
-
-        {:noreply, socket}
+      {:ok, _user} ->
+        # Redirect through refresh-session to update session with new display_name
+        {:noreply, redirect(socket, to: "/admin/refresh-session?return_to=/admin/profile")}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign(socket, :form, to_form(changeset))}
@@ -162,21 +153,20 @@ defmodule GallformersWeb.Admin.ProfileLive do
         title="Edit Profile"
       >
         <:intro>
-          Update your profile information. Your display name and profile links will be visible
-          on the About page if you opt in below.
+        Your display name is used anywhere we display data change attribution and timestamps. It will be publicly visible.
+        Your About blurb and profile links will be visible on the About page if you opt in below.
         </:intro>
 
         <%= if @form do %>
           <.form for={@form} id="profile-form" phx-change="validate" phx-submit="save">
             <%!-- Display Name --%>
             <div class="mb-3">
-              <label class="gf-label">Display Name:</label>
-              <input
+              <.input
+                field={@form[:display_name]}
                 type="text"
-                name={@form[:display_name].name}
-                value={Phoenix.HTML.Form.input_value(@form, :display_name)}
+                label="Display Name:"
                 placeholder="How you want to be known"
-                class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gf-maroon focus:border-gf-maroon"
+                required
               />
             </div>
 
@@ -192,6 +182,20 @@ defmodule GallformersWeb.Admin.ProfileLive do
               <p class="mt-1 text-xs text-gray-500">
                 Synced from your Auth0 account and cannot be changed here
               </p>
+            </div>
+
+            <%!-- Password Reset --%>
+            <div class="mb-3">
+              <label class="gf-label">Password:</label>
+              <a
+                href={Accounts.password_reset_url()}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-1 text-sm text-gf-maroon hover:underline"
+              >
+                Reset your password on Auth0
+                <.icon name="ph-arrow-square-out" class="w-4 h-4" />
+              </a>
             </div>
 
             <%!-- About Me --%>
@@ -232,7 +236,7 @@ defmodule GallformersWeb.Admin.ProfileLive do
                 type="url"
                 name={@form[:social_url].name}
                 value={Phoenix.HTML.Form.input_value(@form, :social_url)}
-                placeholder="https://twitter.com/yourusername"
+                placeholder="https://bsky.app/profile/youruserprofile"
                 class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gf-maroon focus:border-gf-maroon"
               />
             </div>

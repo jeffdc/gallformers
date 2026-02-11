@@ -64,6 +64,8 @@ defmodule GallformersWeb.Router do
   scope "/admin", GallformersWeb do
     pipe_through [:browser, :admin]
 
+    get "/refresh-session", AuthController, :refresh_session
+
     live "/", Admin.DashboardLive
 
     # Gall admin
@@ -112,6 +114,11 @@ defmodule GallformersWeb.Router do
     live "/articles", Admin.ArticleLive.Index, :index
     live "/articles/new", Admin.ArticleLive.Form, :new
     live "/articles/:id", Admin.ArticleLive.Form, :edit
+
+    # Keys admin
+    live "/keys", Admin.KeyLive.Index, :index
+    live "/keys/new", Admin.KeyLive.Form, :new
+    live "/keys/:id", Admin.KeyLive.Form, :edit
 
     # User profile
     live "/profile", Admin.ProfileLive

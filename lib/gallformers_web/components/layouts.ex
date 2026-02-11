@@ -471,7 +471,8 @@ defmodule GallformersWeb.Layouts do
       %{href: "/admin/images", label: "Images", icon: "ph-image"},
       %{href: "/admin/taxonomy", label: "Taxonomy", icon: "gf-taxon"},
       %{href: "/admin/glossary", label: "Glossary", icon: "gf-entry"},
-      %{href: "/admin/articles", label: "Articles", icon: "ph-article"}
+      %{href: "/admin/articles", label: "Articles", icon: "ph-article"},
+      %{href: "/admin/keys", label: "Keys", icon: "ph-tree-structure"}
     ]
 
     superadmin_nav_links = [

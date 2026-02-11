@@ -23,6 +23,7 @@ defmodule GallformersWeb.Admin.DashboardLiveTest do
         conn
         |> init_test_session(%{})
         |> put_session(:current_user, user)
+        |> put_session(:db_display_name, "Test User")
 
       {:ok, conn: conn, user: user}
     end
@@ -83,6 +84,7 @@ defmodule GallformersWeb.Admin.DashboardLiveTest do
         conn
         |> init_test_session(%{})
         |> put_session(:current_user, user)
+        |> put_session(:db_display_name, "Test User")
 
       {:ok, conn: conn}
     end
@@ -127,6 +129,7 @@ defmodule GallformersWeb.Admin.DashboardLiveTest do
         conn
         |> init_test_session(%{})
         |> put_session(:current_user, user)
+        |> put_session(:db_display_name, "Test User")
 
       {:ok, conn: conn}
     end

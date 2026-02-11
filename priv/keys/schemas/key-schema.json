@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gallformers.org/schemas/key.json",
+  "title": "Gallformers Identification Key",
+  "description": "Schema for dichotomous/polytomous identification keys used on gallformers.org",
+  "type": "object",
+  "required": ["slug", "title", "version", "couplets"],
+  "additionalProperties": false,
+  "properties": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "URL-safe identifier for the key"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Display title for the key"
+    },
+    "subtitle": {
+      "type": ["string", "null"],
+      "description": "Optional subtitle, typically the taxonomic group"
+    },
+    "authors": {
+      "type": "array",
+      "items": {"type": "string"},
+      "default": [],
+      "description": "List of author names"
+    },
+    "citation": {
+      "type": ["string", "null"],
+      "description": "Citation text for the source publication"
+    },
+    "citation_url": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "description": "URL to the source publication"
+    },
+    "description": {
+      "type": ["string", "null"],
+      "description": "Introductory text displayed above the key"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Date-based version string (YYYY-MM-DD)"
+    },
+    "couplets": {
+      "type": "object",
+      "description": "Map of couplet number (as string) to couplet object. Must contain at least couplet \"1\".",
+      "patternProperties": {
+        "^[1-9][0-9]*$": {"$ref": "#/$defs/couplet"}
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    }
+  },
+  "$defs": {
+    "couplet": {
+      "type": "object",
+      "required": ["leads"],
+      "additionalProperties": false,
+      "properties": {
+        "leads": {
+          "type": "array",
+          "minItems": 2,
+          "items": {"$ref": "#/$defs/lead"},
+          "description": "The choices available at this couplet. Typically 2 (dichotomous) but may be more (polytomous)."
+        }
+      }
+    },
+    "lead": {
+      "type": "object",
+      "required": ["text", "images", "destination"],
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The diagnostic description for this choice"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional additional context: taxonomic notes, similar species, caveats, European parallels"
+        },
+        "images": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/image"},
+          "description": "Reference images for this lead"
+        },
+        "destination": {
+          "$ref": "#/$defs/destination",
+          "description": "Where this choice leads: another couplet or a terminal taxon"
+        }
+      }
+    },
+    "image": {
+      "type": "object",
+      "required": ["file"],
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": ["string", "null"],
+          "description": "Figure reference label (e.g. \"Fig. 1\")"
+        },
+        "file": {
+          "type": "string",
+          "description": "Filename of the image in the key's S3 directory"
+        },
+        "caption": {
+          "type": ["string", "null"],
+          "description": "Alt text / caption for the image"
+        }
+      }
+    },
+    "destination": {
+      "type": "object",
+      "required": ["type"],
+      "oneOf": [
+        {
+          "properties": {
+            "type": {"const": "couplet"},
+            "number": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$",
+              "description": "The couplet number to jump to"
+            },
+            "label": {
+              "type": ["string", "null"],
+              "description": "Optional label shown in the path tracker (e.g. taxonomic group name)"
+            }
+          },
+          "required": ["type", "number"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": {"const": "taxon"},
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Taxon name displayed as the terminal result"
+            },
+            "context": {
+              "type": ["string", "null"],
+              "description": "Higher-level taxonomic context shown in parentheses"
+            },
+            "species_id": {
+              "oneOf": [
+                {"type": "integer"},
+                {
+                  "type": "array",
+                  "items": {"type": "integer"},
+                  "minItems": 1
+                },
+                {"type": "null"}
+              ],
+              "description": "Gallformers species ID(s) for linking to species pages. Single integer or array of integers when multiple species are possible."
+            }
+          },
+          "required": ["type", "name"],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

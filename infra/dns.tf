@@ -28,8 +28,7 @@ resource "aws_route53_zone" "com" {
 # -----------------------------------------------------------------------------
 # Apex domains → CloudFront (ALIAS records)
 # -----------------------------------------------------------------------------
-# Route53 ALIAS records work at the zone apex — no need for the old A record
-# pointing at the DigitalOcean droplet (157.245.243.86).
+# Route53 ALIAS records work at the zone apex.
 
 resource "aws_route53_record" "org_apex" {
   zone_id = aws_route53_zone.org.zone_id
@@ -104,7 +103,6 @@ resource "aws_route53_record" "com_www" {
 # ACM Certificate Validation
 # -----------------------------------------------------------------------------
 # Dynamically creates the CNAME records needed for ACM DNS validation.
-# This replaces the manually-managed validation CNAMEs in DigitalOcean.
 
 locals {
   # Build a map of validation options keyed by domain name.

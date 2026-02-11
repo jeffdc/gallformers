@@ -105,6 +105,20 @@ defmodule Gallformers.Accounts do
   end
 
   @doc """
+  Returns the DB display name from the session.
+
+  Falls back to "Unknown" if not set.
+  """
+  @spec db_display_name(map()) :: String.t()
+  def db_display_name(%{} = session) do
+    case Map.get(session, "db_display_name") do
+      nil -> "Unknown"
+      "" -> "Unknown"
+      name -> name
+    end
+  end
+
+  @doc """
   Returns true if the user is an admin (or superadmin).
 
   Accepts Auth0User structs or any map with a `roles` field (to handle
@@ -143,6 +157,26 @@ defmodule Gallformers.Accounts do
       URI.encode_query(%{
         "client_id" => client_id,
         "returnTo" => return_to
+      })
+  end
+
+  @doc """
+  Returns the Auth0 password reset URL.
+
+  Links to Auth0's Universal Login with the reset-password screen hint,
+  so the user lands directly on the password reset form.
+  """
+  @spec password_reset_url() :: String.t()
+  def password_reset_url do
+    config = Application.get_env(:ueberauth, Ueberauth.Strategy.Auth0.OAuth, [])
+    domain = Keyword.get(config, :domain, "")
+    client_id = Keyword.get(config, :client_id, "")
+
+    "https://#{domain}/authorize?" <>
+      URI.encode_query(%{
+        "client_id" => client_id,
+        "response_type" => "code",
+        "screen_hint" => "reset-password"
       })
   end
 

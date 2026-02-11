@@ -176,6 +176,7 @@ defmodule GallformersWeb.AuthControllerTest do
         conn
         |> init_test_session(%{})
         |> put_session(:current_user, auth0_user)
+        |> put_session(:db_display_name, "Test User")
         |> get(~p"/auth/logout")
 
       # Should redirect to Auth0 logout URL

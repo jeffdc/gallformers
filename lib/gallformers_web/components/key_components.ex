@@ -22,7 +22,7 @@ defmodule GallformersWeb.KeyComponents do
       :if={@path != []}
       class="sticky top-[78px] z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 py-2"
     >
-      <div class="mx-auto max-w-4xl flex items-center gap-1 flex-wrap text-sm">
+      <div class="mx-auto max-w-4xl flex items-center gap-1 flex-wrap text-base">
         <span class="text-gray-500 font-medium mr-1">Path:</span>
 
         <span :for={{step, index} <- Enum.with_index(@path)} class="flex items-center gap-1">
@@ -38,20 +38,24 @@ defmodule GallformersWeb.KeyComponents do
 
         <span :if={@terminal} class="flex items-center gap-1">
           <span class="text-gray-400">→</span>
-          <span class={[
-            "font-bold text-gf-maroon",
-            if(italicize_taxon?(@terminal.name), do: "italic")
-          ]}>
-            {@terminal.name}
-          </span>
+          <.taxon_links destination={@terminal} />
         </span>
 
-        <button
-          phx-click="reset"
-          class="ml-auto text-xs text-gray-500 hover:text-gf-maroon hover:underline"
-        >
-          Start over
-        </button>
+        <div class="ml-auto flex items-center gap-3">
+          <button
+            :if={@terminal}
+            phx-click="copy_path"
+            class="text-sm text-gray-500 hover:text-gf-maroon hover:underline"
+          >
+            Copy path
+          </button>
+          <button
+            phx-click="reset"
+            class="text-sm text-gray-500 hover:text-gf-maroon hover:underline"
+          >
+            Start over
+          </button>
+        </div>
       </div>
     </div>
     """
@@ -83,7 +87,7 @@ defmodule GallformersWeb.KeyComponents do
         couplet_classes(@state)
       ]}
     >
-      <div class="flex items-start gap-4 p-4">
+      <div class="flex items-start gap-3 p-3">
         <span class={[
           "text-2xl font-bold shrink-0 w-10 text-right",
           if(@state == :unvisited, do: "text-gray-400", else: "text-gf-maroon")
@@ -91,7 +95,7 @@ defmodule GallformersWeb.KeyComponents do
           {@number}.
         </span>
 
-        <div class="flex-1 space-y-4">
+        <div class="flex-1 space-y-1">
           <.lead
             :for={{lead, index} <- Enum.with_index(@couplet.leads)}
             lead={lead}
@@ -130,14 +134,14 @@ defmodule GallformersWeb.KeyComponents do
     ~H"""
     <div
       class={[
-        "rounded-md p-3 transition-all duration-200",
+        "rounded-md p-2 transition-all duration-200",
         lead_classes(@state)
       ]}
       phx-click={if @state in [:active, :inactive], do: "select_lead"}
       phx-value-couplet={@couplet_number}
       phx-value-lead={@lead_index}
     >
-      <div class="flex flex-col lg:flex-row lg:items-start gap-3">
+      <div class="flex flex-col lg:flex-row lg:items-start gap-2">
         <%!-- Lead text and destination --%>
         <div class="flex-1">
           <div class="flex items-start gap-2">
@@ -154,16 +158,25 @@ defmodule GallformersWeb.KeyComponents do
 
             <div class="flex-1">
               <p class={[
-                "leading-relaxed",
+                "text-lg leading-relaxed",
                 if(@state == :unchosen, do: "text-gray-400", else: "text-gray-800")
               ]}>
                 {@lead.text}
+              </p>
+              <p
+                :if={@lead[:notes]}
+                class={[
+                  "mt-1 text-sm leading-relaxed",
+                  if(@state == :unchosen, do: "text-gray-300", else: "text-gray-500")
+                ]}
+              >
+                {@lead.notes}
               </p>
             </div>
           </div>
 
           <%!-- Destination indicator --%>
-          <div class="mt-2 ml-6">
+          <div class="mt-1 ml-6">
             <.destination_badge destination={@lead.destination} state={@state} />
           </div>
         </div>
@@ -209,15 +222,59 @@ defmodule GallformersWeb.KeyComponents do
           "inline-flex items-center gap-1 font-bold",
           if(@state == :unchosen, do: "text-gray-400", else: "text-gf-maroon")
         ]}>
-          <span class={if(italicize_taxon?(@destination.name), do: "italic")}>
-            {@destination.name}
-          </span>
+          <.taxon_links destination={@destination} />
           <span :if={@destination[:context]} class="text-sm font-normal text-gray-500">
             ({@destination.context})
           </span>
         </span>
       <% _ -> %>
         <span></span>
+    <% end %>
+    """
+  end
+
+  @doc """
+  Renders a taxon name with links to species pages.
+
+  When a single species_id is present, the entire name links to it.
+  When multiple species_ids are present, the name is shown with individual
+  species links rendered as small linked badges.
+  When no species_ids are present, the name is shown as plain text.
+  """
+  attr :destination, :map, required: true
+
+  def taxon_links(assigns) do
+    assigns = assign(assigns, :species_ids, assigns.destination[:species_ids] || [])
+
+    ~H"""
+    <%= case @species_ids do %>
+      <% [single_id] -> %>
+        <a
+          href={"/gall/#{single_id}"}
+          class={[
+            "hover:underline",
+            if(italicize_taxon?(@destination.name), do: "italic")
+          ]}
+        >
+          {@destination.name}
+        </a>
+      <% [_ | _] = ids -> %>
+        <span class={if(italicize_taxon?(@destination.name), do: "italic")}>
+          {@destination.name}
+        </span>
+        <span class="inline-flex gap-1 ml-1">
+          <a
+            :for={id <- ids}
+            href={"/gall/#{id}"}
+            class="text-xs font-normal text-gf-maroon hover:underline"
+          >
+            [{id}]
+          </a>
+        </span>
+      <% _ -> %>
+        <span class={if(italicize_taxon?(@destination.name), do: "italic")}>
+          {@destination.name}
+        </span>
     <% end %>
     """
   end

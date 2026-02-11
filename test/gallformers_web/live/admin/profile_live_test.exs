@@ -38,6 +38,7 @@ defmodule GallformersWeb.Admin.ProfileLiveTest do
         conn
         |> init_test_session(%{})
         |> put_session(:current_user, auth0_user)
+        |> put_session(:db_display_name, "Test User")
 
       {:ok, conn: conn, user: user, auth0_user: auth0_user}
     end
@@ -128,16 +129,16 @@ defmodule GallformersWeb.Admin.ProfileLiveTest do
       assert has_element?(view, "input[type='url'][name='user[personal_url]']")
     end
 
-    test "shows success message after save", %{conn: conn} do
+    test "redirects to refresh-session after save", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/profile")
 
-      view
-      |> form("#profile-form", user: %{display_name: "Updated Name"})
-      |> render_submit()
+      assert {:error, {:redirect, %{to: to}}} =
+               view
+               |> form("#profile-form", user: %{display_name: "Updated Name"})
+               |> render_submit()
 
-      # Check for flash message
-      html = render(view)
-      assert html =~ "Profile updated successfully" or html =~ "updated"
+      assert to =~ "/admin/refresh-session"
+      assert to =~ "return_to=/admin/profile"
     end
 
     test "displays Auth0 nickname as read-only", %{conn: conn, auth0_user: auth0_user} do
@@ -184,6 +185,7 @@ defmodule GallformersWeb.Admin.ProfileLiveTest do
         conn
         |> init_test_session(%{})
         |> put_session(:current_user, auth0_user)
+        |> put_session(:db_display_name, "Test User")
 
       # Should redirect or show forbidden
       conn = get(conn, ~p"/admin/profile")
@@ -210,6 +212,7 @@ defmodule GallformersWeb.Admin.ProfileLiveTest do
         conn
         |> init_test_session(%{})
         |> put_session(:current_user, auth0_user)
+        |> put_session(:db_display_name, "Test User")
 
       {:ok, _view, html} = live(conn, ~p"/admin/profile")
 
@@ -248,6 +251,7 @@ defmodule GallformersWeb.Admin.ProfileLiveTest do
         conn
         |> init_test_session(%{})
         |> put_session(:current_user, auth0_user)
+        |> put_session(:db_display_name, "Test User")
 
       {:ok, conn: conn, user: user}
     end

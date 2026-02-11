@@ -97,6 +97,7 @@ defmodule Gallformers.Accounts.User do
       :personal_url,
       :show_on_about
     ])
+    |> validate_required([:display_name])
     |> validate_url(:inaturalist_url)
     |> validate_url(:social_url)
     |> validate_url(:personal_url)
