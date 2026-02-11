@@ -178,9 +178,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.FormTest do
       view |> element("button", "Delete") |> render_click()
 
       # Type correct name in confirmation
-      view
-      |> element("input#delete-confirmation")
-      |> render_keyup(%{value: "CascadeTestFamily"})
+      render_click(view, "update_delete_confirmation", %{"value" => "CascadeTestFamily"})
 
       # Submit using the specific delete confirmation form
       view
@@ -288,9 +286,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.FormTest do
 
       view |> element("button", "Delete") |> render_click()
 
-      view
-      |> element("input#delete-confirmation")
-      |> render_keyup(%{value: "GenusDeleteTestGenus"})
+      render_click(view, "update_delete_confirmation", %{"value" => "GenusDeleteTestGenus"})
 
       view
       |> form("form[phx-submit=confirm_cascade_delete]", %{confirmation: "GenusDeleteTestGenus"})
@@ -359,9 +355,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.FormTest do
 
       view |> element("button", "Delete") |> render_click()
 
-      view
-      |> element("input#delete-confirmation")
-      |> render_keyup(%{value: "SectionDeleteTestSection"})
+      render_click(view, "update_delete_confirmation", %{"value" => "SectionDeleteTestSection"})
 
       view
       |> form("form[phx-submit=confirm_cascade_delete]", %{

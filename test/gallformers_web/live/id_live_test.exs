@@ -27,15 +27,13 @@ defmodule GallformersWeb.IDLiveTest do
     test "has host search input", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/id")
 
-      # Check for host search input by phx-keyup attribute
-      assert has_element?(view, "input[phx-keyup='search_host']")
+      assert has_element?(view, "#host-picker-input[data-typeahead-input]")
     end
 
     test "has genus search input", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/id")
 
-      # Check for genus search input by phx-keyup attribute
-      assert has_element?(view, "input[phx-keyup='search_genus']")
+      assert has_element?(view, "#genus-picker-input[data-typeahead-input]")
     end
   end
 
@@ -49,9 +47,7 @@ defmodule GallformersWeb.IDLiveTest do
         # Search for part of first host's name
         search_term = String.slice(hd(hosts).name, 0, 4)
 
-        view
-        |> element("input[phx-keyup='search_host']")
-        |> render_keyup(%{"value" => search_term})
+        render_click(view, "search_host", %{"value" => search_term})
 
         # Results should appear
         html = render(view)

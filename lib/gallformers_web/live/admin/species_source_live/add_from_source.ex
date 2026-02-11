@@ -357,45 +357,25 @@ defmodule GallformersWeb.Admin.SpeciesSourceLive.AddFromSource do
                   </button>
                 </div>
               <% else %>
-                <div
+                <.typeahead
                   id="source-picker"
-                  phx-hook="Typeahead"
-                  data-input-id="source-search-input"
-                  class="relative"
+                  label=""
+                  placeholder="Search sources by title or author..."
+                  query={@source_search_query}
+                  results={@source_search_results}
+                  selected={nil}
+                  search_event="search_sources"
+                  select_event="select_source"
+                  clear_event="clear_source"
+                  display_fn={& &1.title}
                 >
-                  <input
-                    id="source-search-input"
-                    data-typeahead-input
-                    type="text"
-                    value={@source_search_query}
-                    placeholder="Search sources by title or author..."
-                    phx-keyup="search_sources"
-                    phx-debounce="300"
-                    class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-gf-maroon focus:border-gf-maroon"
-                    autofocus
-                  />
-                  <%= if @source_search_results != [] do %>
-                    <div
-                      id="source-search-results"
-                      data-typeahead-results
-                      class="absolute z-20 mt-1 w-full bg-white shadow-lg rounded border border-gray-200 max-h-64 overflow-auto"
-                    >
-                      <button
-                        :for={source <- @source_search_results}
-                        type="button"
-                        data-typeahead-option
-                        phx-click="select_source"
-                        phx-value-id={source.id}
-                        class="w-full px-3 py-2 text-left hover:bg-gray-100 border-b border-gray-100 last:border-0"
-                      >
-                        <div class="font-medium text-gray-900">{source.title}</div>
-                        <div class="text-sm text-gray-600">
-                          {source.author} ({source.pubyear})
-                        </div>
-                      </button>
+                  <:result :let={source}>
+                    <div class="font-medium text-gray-900">{source.title}</div>
+                    <div class="text-sm text-gray-600">
+                      {source.author} ({source.pubyear})
                     </div>
-                  <% end %>
-                </div>
+                  </:result>
+                </.typeahead>
               <% end %>
             </div>
 

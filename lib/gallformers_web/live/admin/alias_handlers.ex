@@ -29,11 +29,13 @@ defmodule GallformersWeb.Admin.AliasHandlers do
   @doc """
   Handles alias name or type field changes.
 
-  Accepts params from either the name text input (phx-keyup) or the type select (phx-change).
-  Both send "value" plus the other field, just with different keys.
+  Accepts params from:
+  - The name text input (InputEvent hook): `%{"value" => name}` — type read from assigns
+  - The type select (phx-change): `%{"value" => type, "name" => name}`
   """
-  def handle_update_new_alias(socket, %{"value" => name, "type" => type}) do
-    assign(socket, new_alias_name: name, new_alias_type: type)
+  def handle_update_new_alias(socket, %{"value" => name} = params)
+      when not is_map_key(params, "name") do
+    assign(socket, new_alias_name: name)
   end
 
   def handle_update_new_alias(socket, %{"value" => type, "name" => name}) do

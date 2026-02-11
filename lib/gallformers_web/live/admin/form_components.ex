@@ -151,11 +151,12 @@ defmodule GallformersWeb.Admin.FormComponents do
             <tr>
               <td class="px-3 py-1.5">
                 <input
+                  id="new-alias-input"
                   type="text"
                   value={@new_alias_name}
                   placeholder="New alias..."
-                  phx-keyup="update_new_alias"
-                  phx-value-type={@new_alias_type}
+                  phx-hook="InputEvent"
+                  data-event="update_new_alias"
                   class="gf-input text-sm"
                 />
               </td>

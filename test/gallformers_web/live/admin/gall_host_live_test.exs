@@ -135,10 +135,7 @@ defmodule GallformersWeb.Admin.GallHostLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/gallhost")
 
       # Search for a gall (most databases have galls with common letters)
-      html =
-        view
-        |> element("#gall-picker input")
-        |> render_keyup(%{"value" => "oak"})
+      html = render_click(view, "search_galls", %{"value" => "oak"})
 
       # Should trigger search and potentially show results
       # The actual results depend on database content
@@ -149,9 +146,7 @@ defmodule GallformersWeb.Admin.GallHostLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/gallhost")
 
       # Search with 1 character should not return results
-      view
-      |> element("#gall-picker input")
-      |> render_keyup(%{"value" => "a"})
+      render_click(view, "search_galls", %{"value" => "a"})
 
       # Results should be empty (no dropdown visible)
       refute has_element?(view, "[data-typeahead-results] button")
@@ -219,10 +214,7 @@ defmodule GallformersWeb.Admin.GallHostLiveTest do
         {:ok, view, _html} = live(conn, ~p"/admin/gallhost?id=#{gall.id}")
 
         # Search for hosts
-        html =
-          view
-          |> element("#host-picker-input")
-          |> render_keyup(%{"value" => "quercus"})
+        html = render_click(view, "search_hosts", %{"value" => "quercus"})
 
         # Search was triggered (results depend on database)
         assert html =~ "host-picker" or true
@@ -236,9 +228,7 @@ defmodule GallformersWeb.Admin.GallHostLiveTest do
         {:ok, view, _html} = live(conn, ~p"/admin/gallhost?id=#{gall.id}")
 
         # Search with 1 character
-        view
-        |> element("#host-picker-input")
-        |> render_keyup(%{"value" => "q"})
+        render_click(view, "search_hosts", %{"value" => "q"})
 
         # Results should be empty
         refute has_element?(view, "#host-search-results button")
@@ -459,10 +449,7 @@ defmodule GallformersWeb.Admin.GallHostLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/gallhost")
 
       # Search with special characters - should not crash
-      html =
-        view
-        |> element("#gall-picker input")
-        |> render_keyup(%{"value" => "test<script>alert(1)</script>"})
+      html = render_click(view, "search_galls", %{"value" => "test<script>alert(1)</script>"})
 
       # Should handle gracefully without crashing
       assert html =~ "gall-picker" or true

@@ -74,6 +74,11 @@ defmodule GallformersWeb.Admin.DashboardLive do
           icon="ph-arrows-left-right"
         />
         <.action_card
+          label="Manage Sections"
+          href="/admin/section"
+          icon="ph-tree-structure"
+        />
+        <.action_card
           label="Bulk Add Species Descriptions from Sources"
           href="/admin/species-sources/add"
           icon="ph-file-plus"

@@ -428,6 +428,7 @@ defmodule GallformersWeb.FormComponents do
         id={@id}
         phx-hook="Typeahead"
         data-input-id={"#{@id}-input"}
+        data-search-event={@on_search}
         data-close-event={@on_close}
         class="relative"
       >
@@ -458,7 +459,6 @@ defmodule GallformersWeb.FormComponents do
             type="text"
             value={@search_query}
             placeholder={if @selected == [], do: @placeholder, else: ""}
-            phx-keyup={@on_search}
             phx-focus={@on_open}
             phx-blur={@on_close}
             phx-value-type={@type}
@@ -692,7 +692,6 @@ defmodule GallformersWeb.FormComponents do
             data-typeahead-input
             type="text"
             value={@query}
-            phx-keyup={@search_event}
             phx-target={@target}
             phx-debounce="200"
             placeholder={@placeholder}
@@ -844,7 +843,6 @@ defmodule GallformersWeb.FormComponents do
             id={@id}
             data-typeahead-input
             value={@query}
-            phx-keyup={"#{@name}_search"}
             phx-focus={"#{@name}_focus"}
             phx-blur={"#{@name}_blur"}
             phx-debounce="100"
@@ -1011,7 +1009,8 @@ defmodule GallformersWeb.FormComponents do
               id="delete-confirmation"
               name="confirmation"
               value={@confirmation_value}
-              phx-keyup="update_delete_confirmation"
+              phx-hook="InputEvent"
+              data-event="update_delete_confirmation"
               autocomplete="off"
               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-red-500 focus:border-red-500"
               autofocus
@@ -1155,8 +1154,6 @@ defmodule GallformersWeb.FormComponents do
             id="reclassify-epithet"
             type="text"
             value={@epithet}
-            phx-keyup="update_reclassify_epithet"
-            phx-target={@target}
             phx-hook="InputEvent"
             data-event="update_reclassify_epithet"
             data-target={@target}
