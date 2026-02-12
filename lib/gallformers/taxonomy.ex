@@ -22,6 +22,9 @@ defmodule Gallformers.Taxonomy do
 
   defdelegate get_taxonomy(id), to: Tree
   defdelegate get_taxonomy!(id), to: Tree
+  defdelegate get_family(id), to: Tree
+  defdelegate get_genus_lineage(id), to: Tree
+  defdelegate get_section_lineage(id), to: Tree
   defdelegate get_taxonomy_by_name(name, type), to: Tree
   defdelegate get_genera_by_name(name), to: Tree
   defdelegate get_taxonomies_batch(ids), to: Tree

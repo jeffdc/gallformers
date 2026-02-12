@@ -8,6 +8,7 @@ defmodule GallformersWeb.GenusLive do
 
   alias Gallformers.Species
   alias Gallformers.Taxonomy
+  alias Gallformers.Taxonomy.Lineage
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -24,22 +25,19 @@ defmodule GallformersWeb.GenusLive do
            page_image: nil,
            page_json_ld: nil,
            page_noindex: true,
-           genus: nil,
+           lineage: nil,
            error: "Invalid genus ID"
          )}
     end
   end
 
   defp load_genus(socket, genus_id) do
-    case Taxonomy.get_taxonomy(genus_id) do
-      nil ->
+    case Taxonomy.get_genus_lineage(genus_id) do
+      {:ok, lineage} ->
+        {:ok, assign_genus_data(socket, lineage, genus_id)}
+
+      {:error, :not_found} ->
         {:ok, assign_genus_not_found(socket, "Genus not found")}
-
-      %{type: "genus"} = genus ->
-        {:ok, assign_genus_data(socket, genus, genus_id)}
-
-      _not_a_genus ->
-        {:ok, assign_genus_not_found(socket, "Not a genus")}
     end
   end
 
@@ -51,13 +49,12 @@ defmodule GallformersWeb.GenusLive do
       page_image: nil,
       page_json_ld: nil,
       page_noindex: true,
-      genus: nil,
+      lineage: nil,
       error: error
     )
   end
 
-  defp assign_genus_data(socket, genus, genus_id) do
-    family = if genus.parent_id, do: Taxonomy.get_taxonomy(genus.parent_id), else: nil
+  defp assign_genus_data(socket, %Lineage{} = lineage, genus_id) do
     species_ids = Taxonomy.get_species_ids_for_genus(genus_id)
 
     species =
@@ -70,7 +67,7 @@ defmodule GallformersWeb.GenusLive do
       end
 
     # Don't index empty placeholder genera (no species)
-    is_empty_unknown = genus.is_placeholder && species == []
+    is_empty_unknown = Lineage.placeholder_genus?(lineage) && species == []
 
     # Determine column header based on species type in this genus
     count_header =
@@ -83,15 +80,14 @@ defmodule GallformersWeb.GenusLive do
       end
 
     assign(socket,
-      page_title: "Genus #{genus.name}",
+      page_title: "Genus #{lineage.genus.name}",
       page_description:
-        "#{genus.name} - A taxonomic genus documented on Gallformers with #{length(species)} species.",
+        "#{lineage.genus.name} - A taxonomic genus documented on Gallformers with #{length(species)} species.",
       page_url: "/genus/#{genus_id}",
       page_image: nil,
       page_json_ld: nil,
       page_noindex: is_empty_unknown,
-      genus: genus,
-      family: family,
+      lineage: lineage,
       species: species,
       search_query: "",
       sort_by: :name,
@@ -173,7 +169,7 @@ defmodule GallformersWeb.GenusLive do
         <%= if @error do %>
           <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{@error}</div>
         <% else %>
-          <%= if @genus do %>
+          <%= if @lineage do %>
             <%!-- Header --%>
             <div class="mb-6">
               <div class="flex items-center justify-between mb-2">
@@ -181,13 +177,13 @@ defmodule GallformersWeb.GenusLive do
                   <h1 class="text-2xl font-bold text-gf-maroon">
                     Genus
                     <.taxon_name
-                      name={format_with_description(@genus.name, @genus.description)}
+                      name={format_with_description(@lineage.genus.name, @lineage.genus.description)}
                       rank="genus"
                     />
                   </h1>
                   <.link
                     :if={@current_user}
-                    href={~p"/admin/taxonomy/#{@genus.id}"}
+                    href={~p"/admin/taxonomy/#{@lineage.genus.id}"}
                     class="text-gray-400 hover:text-gf-maroon"
                     title="Edit in admin"
                   >
@@ -197,13 +193,15 @@ defmodule GallformersWeb.GenusLive do
               </div>
 
               <%!-- Family link --%>
-              <%= if @family do %>
+              <%= if @lineage.family do %>
                 <div class="text-gray-700">
                   <span class="font-semibold">Family:</span>
-                  <.link href={"/family/#{@family.id}"} class="hover:underline">
-                    <.taxon_name name={@family.name} rank="family" />
+                  <.link href={"/family/#{@lineage.family.id}"} class="hover:underline">
+                    <.taxon_name name={@lineage.family.name} rank="family" />
                   </.link>
-                  <span :if={@family.description} class="text-gray-600">({@family.description})</span>
+                  <span :if={@lineage.family.description} class="text-gray-600">
+                    ({@lineage.family.description})
+                  </span>
                 </div>
               <% end %>
             </div>
@@ -291,7 +289,7 @@ defmodule GallformersWeb.GenusLive do
             </div>
           <% else %>
             <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-              Genus not found
+              Genus not found.
             </div>
           <% end %>
         <% end %>

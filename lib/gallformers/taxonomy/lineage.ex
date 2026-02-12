@@ -63,6 +63,25 @@ defmodule Gallformers.Taxonomy.Lineage do
   end
 
   @doc """
+  Build a Lineage from a Taxonomy section record and its parent genus
+  (which must have its `:parent` association preloaded).
+
+  Models the full path: Family → Genus → Section.
+  """
+  @spec from_section(TaxonomySchema.t(), TaxonomySchema.t()) :: t()
+  def from_section(
+        %TaxonomySchema{type: "section"} = section,
+        %TaxonomySchema{type: "genus"} = genus
+      ) do
+    lineage = from_genus(genus)
+
+    %{
+      lineage
+      | section: %Section{id: section.id, name: section.name, description: section.description}
+    }
+  end
+
+  @doc """
   Build a Lineage for a new genus that doesn't exist in the DB yet.
   """
   @spec new_genus(String.t()) :: t()

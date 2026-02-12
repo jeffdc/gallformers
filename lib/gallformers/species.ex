@@ -838,9 +838,7 @@ defmodule Gallformers.Species do
     from(a in "alias",
       where:
         a.id in ^alias_ids and
-          a.id not in subquery(
-            from(als in "alias_species", select: als.alias_id)
-          )
+          a.id not in subquery(from(als in "alias_species", select: als.alias_id))
     )
     |> Repo.delete_all()
 

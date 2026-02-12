@@ -11,7 +11,7 @@ defmodule Gallformers.Taxonomy.Tree do
   alias Gallformers.GallHosts.GallHost
   alias Gallformers.Repo
   alias Gallformers.Species.Species
-  alias Gallformers.Taxonomy.{Lineage, TaxonName, Taxonomy}
+  alias Gallformers.Taxonomy.{Family, Lineage, TaxonName, Taxonomy}
 
   # =====================================================================
   # CRUD
@@ -179,6 +179,49 @@ defmodule Gallformers.Taxonomy.Tree do
   @spec get_taxonomy!(integer()) :: Taxonomy.t()
   def get_taxonomy!(id) do
     Repo.get!(Taxonomy, id)
+  end
+
+  @doc """
+  Returns a `%Family{}` domain struct for the given taxonomy ID, or nil.
+  """
+  @spec get_family(integer()) :: Family.t() | nil
+  def get_family(id) do
+    case Repo.get(Taxonomy, id) do
+      %Taxonomy{type: "family"} = t ->
+        %Family{id: t.id, name: t.name, description: t.description}
+
+      _ ->
+        nil
+    end
+  end
+
+  @doc """
+  Returns a `%Lineage{}` for a genus, including its parent family.
+  """
+  @spec get_genus_lineage(integer()) :: {:ok, Lineage.t()} | {:error, :not_found}
+  def get_genus_lineage(id) do
+    case Repo.get(Taxonomy, id) |> Repo.preload(:parent) do
+      %Taxonomy{type: "genus"} = genus ->
+        {:ok, Lineage.from_genus(genus)}
+
+      _ ->
+        {:error, :not_found}
+    end
+  end
+
+  @doc """
+  Returns a `%Lineage{}` for a section, including its parent genus and grandparent family.
+  """
+  @spec get_section_lineage(integer()) :: {:ok, Lineage.t()} | {:error, :not_found}
+  def get_section_lineage(id) do
+    case Repo.get(Taxonomy, id) do
+      %Taxonomy{type: "section", parent_id: genus_id} = section when not is_nil(genus_id) ->
+        genus = Repo.get!(Taxonomy, genus_id) |> Repo.preload(:parent)
+        {:ok, Lineage.from_section(section, genus)}
+
+      _ ->
+        {:error, :not_found}
+    end
   end
 
   @doc """

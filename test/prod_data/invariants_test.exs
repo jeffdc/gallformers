@@ -149,7 +149,8 @@ defmodule Gallformers.ProdData.InvariantsTest do
     test "no species has a section link without also having a genus link" do
       genus_species =
         from st in "species_taxonomy",
-          join: t in "taxonomy", on: st.taxonomy_id == t.id and t.type == "genus",
+          join: t in "taxonomy",
+          on: st.taxonomy_id == t.id and t.type == "genus",
           select: st.species_id
 
       bad =

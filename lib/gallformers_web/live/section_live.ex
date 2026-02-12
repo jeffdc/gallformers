@@ -25,15 +25,40 @@ defmodule GallformersWeb.SectionLive do
            page_image: nil,
            page_json_ld: nil,
            page_noindex: true,
-           section: nil,
+           lineage: nil,
            error: "Invalid section ID"
          )}
     end
   end
 
   defp load_section(socket, section_id) do
-    case Taxonomy.get_taxonomy(section_id) do
-      nil ->
+    case Taxonomy.get_section_lineage(section_id) do
+      {:ok, lineage} ->
+        # Get enriched species for this section
+        species =
+          Taxonomy.get_species_for_section(section_id)
+          |> Species.enrich_with_common_names_and_counts()
+
+        {:ok,
+         assign(socket,
+           page_title: "Section #{lineage.section.name}",
+           page_description:
+             "#{lineage.section.name} - A taxonomic section documented on Gallformers with #{length(species)} species.",
+           page_url: "/section/#{section_id}",
+           page_image: nil,
+           page_json_ld: nil,
+           page_noindex: false,
+           lineage: lineage,
+           species: species,
+           search_query: "",
+           sort_by: :name,
+           sort_dir: :asc,
+           filtered_species: species,
+           total_species_count: length(species),
+           error: nil
+         )}
+
+      {:error, :not_found} ->
         {:ok,
          assign(socket,
            page_title: "Section Not Found",
@@ -42,48 +67,9 @@ defmodule GallformersWeb.SectionLive do
            page_image: nil,
            page_json_ld: nil,
            page_noindex: true,
-           section: nil,
+           lineage: nil,
            error: "Section not found"
          )}
-
-      section ->
-        if section.type != "section" do
-          {:ok,
-           assign(socket,
-             page_title: "Section Not Found",
-             page_description: "The requested taxonomic section was not found on Gallformers.",
-             page_url: nil,
-             page_image: nil,
-             page_json_ld: nil,
-             page_noindex: true,
-             section: nil,
-             error: "Not a section"
-           )}
-        else
-          # Get enriched species for this section
-          species =
-            Taxonomy.get_species_for_section(section_id)
-            |> Species.enrich_with_common_names_and_counts()
-
-          {:ok,
-           assign(socket,
-             page_title: "Section #{section.name}",
-             page_description:
-               "#{section.name} - A taxonomic section documented on Gallformers with #{length(species)} species.",
-             page_url: "/section/#{section_id}",
-             page_image: nil,
-             page_json_ld: nil,
-             page_noindex: false,
-             section: section,
-             species: species,
-             search_query: "",
-             sort_by: :name,
-             sort_dir: :asc,
-             filtered_species: species,
-             total_species_count: length(species),
-             error: nil
-           )}
-        end
     end
   end
 
@@ -157,23 +143,44 @@ defmodule GallformersWeb.SectionLive do
         <%= if @error do %>
           <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{@error}</div>
         <% else %>
-          <%= if @section do %>
+          <%= if @lineage do %>
             <%!-- Header --%>
             <div class="mb-6">
               <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-2">
                   <h1 class="text-2xl font-bold text-gf-maroon">
-                    {format_full_name(@section.name, @section.description)}
+                    Section {format_full_name(@lineage.section.name, @lineage.section.description)}
                   </h1>
                   <.link
                     :if={@current_user}
-                    href={~p"/admin/section/#{@section.id}"}
+                    href={~p"/admin/section/#{@lineage.section.id}"}
                     class="text-gray-400 hover:text-gf-maroon"
                     title="Edit in admin"
                   >
                     <.icon name="ph-pencil-simple" class="h-5 w-5" />
                   </.link>
                 </div>
+              </div>
+
+              <%!-- Parent breadcrumbs --%>
+              <div class="text-gray-700 flex items-center gap-1">
+                <%= if @lineage.family do %>
+                  <span class="font-semibold">Family:</span>
+                  <.link href={"/family/#{@lineage.family.id}"} class="hover:underline">
+                    <.taxon_name name={@lineage.family.name} rank="family" />
+                  </.link>
+                  <span :if={@lineage.family.description} class="text-gray-600">
+                    ({@lineage.family.description})
+                  </span>
+                  <span class="text-gray-400 mx-1">/</span>
+                <% end %>
+                <span class="font-semibold">Genus:</span>
+                <.link href={"/genus/#{@lineage.genus.id}"} class="hover:underline">
+                  <.taxon_name name={@lineage.genus.name} rank="genus" />
+                </.link>
+                <span :if={@lineage.genus.description} class="text-gray-600">
+                  ({@lineage.genus.description})
+                </span>
               </div>
             </div>
 
@@ -258,7 +265,7 @@ defmodule GallformersWeb.SectionLive do
             </div>
           <% else %>
             <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-              Section not found
+              Section not found.
             </div>
           <% end %>
         <% end %>

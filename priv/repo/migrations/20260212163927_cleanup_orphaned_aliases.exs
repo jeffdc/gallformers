@@ -1,5 +1,5 @@
 defmodule Gallformers.Repo.Migrations.CleanupOrphanedAliases do
-  use Ecto.Migration
+  use Gallformers.Migration
 
   def up do
     # Delete alias records that have no alias_species link.

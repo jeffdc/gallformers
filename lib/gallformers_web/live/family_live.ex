@@ -7,6 +7,7 @@ defmodule GallformersWeb.FamilyLive do
   use GallformersWeb, :live_view
 
   alias Gallformers.Taxonomy
+  alias Gallformers.Taxonomy.Family
   alias GallformersWeb.TreeComponents
 
   # Smart expand thresholds (same as Explore page)
@@ -34,7 +35,7 @@ defmodule GallformersWeb.FamilyLive do
   end
 
   defp load_family(socket, family_id) do
-    case Taxonomy.get_taxonomy(family_id) do
+    case Taxonomy.get_family(family_id) do
       nil ->
         {:ok,
          assign(socket,
@@ -48,43 +49,29 @@ defmodule GallformersWeb.FamilyLive do
            error: "Family not found"
          )}
 
-      family ->
-        if family.type != "family" do
-          {:ok,
-           assign(socket,
-             page_title: "Family Not Found",
-             page_description: "The requested taxonomic family was not found on Gallformers.",
-             page_url: nil,
-             page_image: nil,
-             page_json_ld: nil,
-             page_noindex: true,
-             family: nil,
-             error: "Not a family"
-           )}
-        else
-          # Get genera under this family
-          genera = Taxonomy.get_children(family_id)
+      %Family{} = family ->
+        # Get genera under this family
+        genera = Taxonomy.get_children(family_id)
 
-          # Build tree data
-          tree_data = build_tree_data(genera)
+        # Build tree data
+        tree_data = build_tree_data(genera)
 
-          {:ok,
-           assign(socket,
-             page_title: family.name,
-             page_description:
-               "#{family.name} - A taxonomic family documented on Gallformers with genera and species.",
-             page_url: "/family/#{family_id}",
-             page_image: nil,
-             page_json_ld: nil,
-             page_noindex: false,
-             family: family,
-             tree_data: tree_data,
-             filtered_tree: tree_data,
-             expanded_keys: MapSet.new(),
-             search_query: "",
-             error: nil
-           )}
-        end
+        {:ok,
+         assign(socket,
+           page_title: family.name,
+           page_description:
+             "#{family.name} - A taxonomic family documented on Gallformers with genera and species.",
+           page_url: "/family/#{family_id}",
+           page_image: nil,
+           page_json_ld: nil,
+           page_noindex: false,
+           family: family,
+           tree_data: tree_data,
+           filtered_tree: tree_data,
+           expanded_keys: MapSet.new(),
+           search_query: "",
+           error: nil
+         )}
     end
   end
 
