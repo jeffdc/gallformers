@@ -6,6 +6,7 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
 
   alias Gallformers.Sources
 
+  @page_size 50
   @valid_sort_columns ~w(title author pubyear datacomplete)
 
   @impl true
@@ -19,6 +20,8 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
       |> assign(:current_user, current_user)
       |> assign(:page_title, "Sources")
       |> assign(:search_query, "")
+      |> assign(:current_page, 1)
+      |> assign(:page_size, @page_size)
       |> assign(:sort_by, :title)
       |> assign(:sort_dir, :asc)
       |> load_sources()
@@ -41,9 +44,16 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
     socket =
       socket
       |> assign(:search_query, query)
+      |> assign(:current_page, 1)
       |> load_sources()
 
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("page", %{"page" => page}, socket) do
+    page = max(1, min(page, total_pages(socket.assigns.sources, socket.assigns.page_size)))
+    {:noreply, assign(socket, current_page: page)}
   end
 
   @impl true
@@ -58,7 +68,7 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
         {column_atom, :asc}
       end
 
-    {:noreply, assign(socket, sort_by: new_sort_by, sort_dir: new_sort_dir)}
+    {:noreply, assign(socket, sort_by: new_sort_by, sort_dir: new_sort_dir, current_page: 1)}
   end
 
   @impl true
@@ -86,11 +96,22 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
   defp load_sources(socket) do
     sources =
       case socket.assigns.search_query do
-        "" -> Sources.list_sources_paginated(100, 0)
+        "" -> Sources.list_sources()
         query -> Sources.search_sources(query)
       end
 
     assign(socket, :sources, sources)
+  end
+
+  defp paginated_sources(sources, current_page, page_size, sort_by, sort_dir) do
+    sources
+    |> sorted_sources(sort_by, sort_dir)
+    |> Enum.drop((current_page - 1) * page_size)
+    |> Enum.take(page_size)
+  end
+
+  defp total_pages(list, page_size) do
+    max(1, ceil(length(list) / page_size))
   end
 
   @impl true
@@ -149,7 +170,10 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
               </tr>
             </thead>
             <tbody>
-              <tr :for={source <- sorted_sources(@sources, @sort_by, @sort_dir)}>
+              <tr :for={
+                source <-
+                  paginated_sources(@sources, @current_page, @page_size, @sort_by, @sort_dir)
+              }>
                 <td>
                   <.link
                     navigate={~p"/admin/sources/#{source.id}"}
@@ -214,9 +238,19 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
           </table>
         </div>
 
-        <p class="text-sm text-gray-500">
-          Showing {@sources |> length()} sources
-        </p>
+        <%= if total_pages(@sources, @page_size) > 1 do %>
+          <.pagination
+            page={@current_page}
+            total_pages={total_pages(@sources, @page_size)}
+            total_items={length(@sources)}
+            page_size={@page_size}
+            on_page_change={fn page -> JS.push("page", value: %{page: page}) end}
+          />
+        <% else %>
+          <p class="text-sm text-gray-500">
+            Showing {length(@sources)} sources
+          </p>
+        <% end %>
       </div>
     </Layouts.admin>
     """

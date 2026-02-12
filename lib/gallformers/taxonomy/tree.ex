@@ -26,6 +26,36 @@ defmodule Gallformers.Taxonomy.Tree do
   end
 
   @doc """
+  Checks if a taxonomy entry with the given name and parent already exists.
+
+  Excludes the given `exclude_id` (for edit mode, so a record doesn't conflict with itself).
+  Returns true if a duplicate exists.
+  """
+  @spec name_parent_exists?(String.t(), integer() | nil, integer() | nil) :: boolean()
+  def name_parent_exists?(name, parent_id, exclude_id \\ nil) do
+    query =
+      from(t in Taxonomy,
+        where: t.name == ^name and t.is_placeholder == false
+      )
+
+    query =
+      if is_nil(parent_id) do
+        from(t in query, where: is_nil(t.parent_id))
+      else
+        from(t in query, where: t.parent_id == ^parent_id)
+      end
+
+    query =
+      if exclude_id do
+        from(t in query, where: t.id != ^exclude_id)
+      else
+        query
+      end
+
+    Repo.exists?(query)
+  end
+
+  @doc """
   Creates a taxonomy entry.
 
   When creating a non-plant family, automatically creates an "Unknown" genus placeholder

@@ -7,6 +7,8 @@ defmodule GallformersWeb.Admin.GallLive.Index do
   alias Gallformers.Galls
   alias Gallformers.Species
 
+  @page_size 50
+
   @impl true
   def mount(_params, session, socket) do
     current_user = session["current_user"]
@@ -18,6 +20,8 @@ defmodule GallformersWeb.Admin.GallLive.Index do
       |> assign(:current_user, current_user)
       |> assign(:page_title, "Galls")
       |> assign(:search_query, "")
+      |> assign(:current_page, 1)
+      |> assign(:page_size, @page_size)
       |> assign(:gall_list, list_galls(""))
 
     {:ok, socket}
@@ -36,7 +40,13 @@ defmodule GallformersWeb.Admin.GallLive.Index do
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
     gall_list = list_galls(query)
-    {:noreply, assign(socket, gall_list: gall_list, search_query: query)}
+    {:noreply, assign(socket, gall_list: gall_list, search_query: query, current_page: 1)}
+  end
+
+  @impl true
+  def handle_event("page", %{"page" => page}, socket) do
+    page = max(1, min(page, total_pages(socket.assigns.gall_list, socket.assigns.page_size)))
+    {:noreply, assign(socket, current_page: page)}
   end
 
   @impl true
@@ -63,12 +73,22 @@ defmodule GallformersWeb.Admin.GallLive.Index do
   end
 
   defp list_galls("") do
-    Galls.list_galls_paginated(100, 0)
+    Galls.list_galls()
   end
 
   defp list_galls(query) do
-    Species.search_species(query, 100)
+    Species.search_species(query, 500)
     |> Enum.filter(&(&1.taxoncode == "gall"))
+  end
+
+  defp paginated(list, current_page, page_size) do
+    list
+    |> Enum.drop((current_page - 1) * page_size)
+    |> Enum.take(page_size)
+  end
+
+  defp total_pages(list, page_size) do
+    max(1, ceil(length(list) / page_size))
   end
 
   @impl true
@@ -105,7 +125,7 @@ defmodule GallformersWeb.Admin.GallLive.Index do
               </tr>
             </thead>
             <tbody>
-              <tr :for={gall <- @gall_list}>
+              <tr :for={gall <- paginated(@gall_list, @current_page, @page_size)}>
                 <td>
                   <.link
                     navigate={~p"/admin/galls/#{gall.id}"}
@@ -173,9 +193,19 @@ defmodule GallformersWeb.Admin.GallLive.Index do
           </table>
         </div>
 
-        <p class="text-sm text-gray-500">
-          Showing {@gall_list |> length()} galls
-        </p>
+        <%= if total_pages(@gall_list, @page_size) > 1 do %>
+          <.pagination
+            page={@current_page}
+            total_pages={total_pages(@gall_list, @page_size)}
+            total_items={length(@gall_list)}
+            page_size={@page_size}
+            on_page_change={fn page -> JS.push("page", value: %{page: page}) end}
+          />
+        <% else %>
+          <p class="text-sm text-gray-500">
+            Showing {length(@gall_list)} galls
+          </p>
+        <% end %>
       </div>
     </Layouts.admin>
     """

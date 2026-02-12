@@ -25,6 +25,7 @@ defmodule GallformersWeb.Admin.FormComponents do
       <.form_actions form_dirty={@form_dirty} mode={@mode} save_label="Save Changes" create_label="Create Place" />
   """
   attr :form_dirty, :boolean, required: true
+  attr :form_valid, :boolean, default: true
   attr :mode, :atom, required: true, values: [:new, :edit]
   attr :save_label, :string, default: "Save"
   attr :create_label, :string, default: "Create"
@@ -41,7 +42,7 @@ defmodule GallformersWeb.Admin.FormComponents do
       </button>
       <button
         type="submit"
-        disabled={not @form_dirty}
+        disabled={not @form_dirty or not @form_valid}
         class="gf-btn gf-btn-primary"
       >
         {if @mode == :new, do: @create_label, else: @save_label}

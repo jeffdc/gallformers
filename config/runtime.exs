@@ -25,9 +25,13 @@ if System.get_env("GALLFORMERS_E2E") == "1" do
   config :gallformers, GallformersWeb.Endpoint, server: true
 end
 
-# Only override port if PORT env var is explicitly set (don't interfere with test config)
+# Only override port/bind if env vars are explicitly set (don't interfere with test config)
 if port = System.get_env("PORT") do
   config :gallformers, GallformersWeb.Endpoint, http: [port: String.to_integer(port)]
+end
+
+if System.get_env("PHX_BIND") == "0.0.0.0" do
+  config :gallformers, GallformersWeb.Endpoint, http: [ip: {0, 0, 0, 0}]
 end
 
 # Auth0 configuration

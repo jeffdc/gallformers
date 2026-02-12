@@ -6,6 +6,8 @@ defmodule GallformersWeb.Admin.PlaceLive.Index do
 
   alias Gallformers.Places
 
+  @page_size 50
+
   @impl true
   def mount(_params, session, socket) do
     current_user = session["current_user"]
@@ -17,6 +19,8 @@ defmodule GallformersWeb.Admin.PlaceLive.Index do
       |> assign(:current_user, current_user)
       |> assign(:page_title, "Places")
       |> assign(:search_query, "")
+      |> assign(:current_page, 1)
+      |> assign(:page_size, @page_size)
       |> load_places()
 
     {:ok, socket}
@@ -37,9 +41,16 @@ defmodule GallformersWeb.Admin.PlaceLive.Index do
     socket =
       socket
       |> assign(:search_query, query)
+      |> assign(:current_page, 1)
       |> load_places()
 
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("page", %{"page" => page}, socket) do
+    page = max(1, min(page, total_pages(socket.assigns.places, socket.assigns.page_size)))
+    {:noreply, assign(socket, current_page: page)}
   end
 
   @impl true
@@ -68,10 +79,20 @@ defmodule GallformersWeb.Admin.PlaceLive.Index do
     places =
       case socket.assigns.search_query do
         "" -> Places.list_all_places()
-        query -> Places.search_places(query, 100)
+        query -> Places.search_places(query, 500)
       end
 
     assign(socket, :places, places)
+  end
+
+  defp paginated(list, current_page, page_size) do
+    list
+    |> Enum.drop((current_page - 1) * page_size)
+    |> Enum.take(page_size)
+  end
+
+  defp total_pages(list, page_size) do
+    max(1, ceil(length(list) / page_size))
   end
 
   @impl true
@@ -109,7 +130,7 @@ defmodule GallformersWeb.Admin.PlaceLive.Index do
               </tr>
             </thead>
             <tbody>
-              <tr :for={place <- @places}>
+              <tr :for={place <- paginated(@places, @current_page, @page_size)}>
                 <td>
                   <.link
                     navigate={~p"/admin/places/#{place.id}"}
@@ -160,9 +181,19 @@ defmodule GallformersWeb.Admin.PlaceLive.Index do
           </table>
         </div>
 
-        <p class="text-sm text-gray-500">
-          Showing {@places |> length()} places
-        </p>
+        <%= if total_pages(@places, @page_size) > 1 do %>
+          <.pagination
+            page={@current_page}
+            total_pages={total_pages(@places, @page_size)}
+            total_items={length(@places)}
+            page_size={@page_size}
+            on_page_change={fn page -> JS.push("page", value: %{page: page}) end}
+          />
+        <% else %>
+          <p class="text-sm text-gray-500">
+            Showing {length(@places)} places
+          </p>
+        <% end %>
       </div>
     </Layouts.admin>
     """

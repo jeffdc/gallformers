@@ -57,11 +57,29 @@ defmodule Gallformers.Taxonomy.Taxonomy do
     |> validate_required(@required_fields)
     |> validate_inclusion(:type, @taxonomy_types)
     |> validate_length(:name, min: 1, max: 255)
+    |> maybe_require_family_type()
+    |> maybe_require_parent()
     |> unique_constraint([:name, :parent_id],
-      name: :idx_taxonomy_name_parent,
+      name: :taxonomy_name_parent_id_index,
       message: "already exists for this parent"
     )
     |> foreign_key_constraint(:parent_id)
+  end
+
+  defp maybe_require_family_type(changeset) do
+    if get_field(changeset, :type) == "family" do
+      validate_required(changeset, [:description], message: "is required for families")
+    else
+      changeset
+    end
+  end
+
+  defp maybe_require_parent(changeset) do
+    if get_field(changeset, :type) in ["genus", "section"] do
+      validate_required(changeset, [:parent_id], message: "is required")
+    else
+      changeset
+    end
   end
 
   @doc """

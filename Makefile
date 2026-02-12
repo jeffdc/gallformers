@@ -2,7 +2,7 @@
 #
 # Phoenix/LiveView development commands
 
-.PHONY: dev test test-db download-db ci help deps assets setup clean check-db build run-local-release dump-schema upload-reset-db
+.PHONY: dev dev-lan test test-db download-db ci help deps assets setup clean check-db build run-local-release dump-schema upload-reset-db
 
 # Download production database for local dev
 # Uses public S3 snapshot (updated daily by GitHub Actions)
@@ -92,8 +92,18 @@ setup: deps assets check-db
 # =============================================================================
 
 # Start development server (ensures deps and assets are ready)
+# Loads .env if present for Auth0 and other local config
 dev: setup
-	mix phx.server
+	set -a && [ -f .env ] && . .env; set +a && mix phx.server
+
+# Start dev server on port 4002 for LAN access (dev already binds 0.0.0.0)
+# Usage: make dev-lan              # default port 4002
+#        make dev-lan LAN_PORT=4444 # custom port
+LAN_PORT ?= 4002
+dev-lan: setup
+	@echo "Starting LAN dev server on port $(LAN_PORT)..."
+	@echo "Access from other devices at http://$$(ipconfig getifaddr en0 2>/dev/null || hostname -I | awk '{print $$1}'):$(LAN_PORT)"
+	set -a && [ -f .env ] && . .env; set +a && PHX_BIND=0.0.0.0 PORT=$(LAN_PORT) mix phx.server
 
 # =============================================================================
 # Production Build
@@ -325,6 +335,7 @@ help:
 	@echo ""
 	@echo "Development:"
 	@echo "  make dev               Start Phoenix dev server (:4000) - auto-installs deps"
+	@echo "  make dev-lan           Start dev server on :4002 for LAN access (LAN_PORT=N to override)"
 	@echo "  make test              Run tests (fast, excludes E2E)"
 	@echo "  make ci                Run all CI checks (format, compile, credo, test, dialyzer)"
 	@echo ""

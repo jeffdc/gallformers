@@ -141,14 +141,44 @@ defmodule GallformersWeb.Plugs.FetchCurrentUser do
 
   This plug does NOT require authentication - it simply makes the current user
   available if one exists. Use RequireAdmin or RequireSuperAdmin to require auth.
+
+  When `config :gallformers, dev_auth_bypass: true` is set (dev only), injects
+  a fake admin user into the session so Auth0 is not required. This is useful
+  for LAN testing where Auth0 callback URLs can't reach the dev server.
   """
 
   import Plug.Conn
 
+  alias Gallformers.Accounts.Auth0User
+
   def init(opts), do: opts
 
   def call(conn, _opts) do
+    conn
+    |> maybe_bypass_auth()
+    |> fetch_user()
+  end
+
+  defp fetch_user(conn) do
     user = get_session(conn, :current_user)
     assign(conn, :current_user, user)
+  end
+
+  defp maybe_bypass_auth(conn) do
+    if Application.get_env(:gallformers, :dev_auth_bypass) && !get_session(conn, :current_user) do
+      user = %Auth0User{
+        id: "dev|bypass",
+        email: "dev@localhost",
+        name: "Dev Admin",
+        nickname: "dev",
+        roles: ["admin"]
+      }
+
+      conn
+      |> put_session(:current_user, user)
+      |> put_session(:db_display_name, "Dev Admin")
+    else
+      conn
+    end
   end
 end

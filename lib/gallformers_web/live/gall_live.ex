@@ -435,32 +435,32 @@ defmodule GallformersWeb.GallLive do
                     <span :if={@taxonomy.family}>
                       <strong>Family:</strong>
                       <.link
-                        href={"/family/#{@taxonomy.family_id}"}
+                        href={"/family/#{@taxonomy.family.id}"}
                         class="hover:underline"
                       >
-                        {@taxonomy.family}
+                        {@taxonomy.family.name}
                       </.link>
                       <span
-                        :if={@taxonomy.family_description && @taxonomy.family_description != ""}
+                        :if={@taxonomy.family.description not in [nil, ""]}
                         class="text-gray-600"
                       >
-                        ({@taxonomy.family_description})
+                        ({@taxonomy.family.description})
                       </span>
                     </span>
                     <span :if={@taxonomy.family && @taxonomy.genus} class="mx-1">|</span>
                     <span :if={@taxonomy.genus}>
                       <strong>Genus:</strong>
                       <.link
-                        href={"/genus/#{@taxonomy.genus_id}"}
+                        href={"/genus/#{@taxonomy.genus.id}"}
                         class="hover:underline"
                       >
-                        <.taxon_name name={@taxonomy.genus} rank="genus" />
+                        <.taxon_name name={@taxonomy.genus.name} rank="genus" />
                       </.link>
                       <span
-                        :if={@taxonomy.genus_description && @taxonomy.genus_description != ""}
+                        :if={@taxonomy.genus.description not in [nil, ""]}
                         class="text-gray-600"
                       >
-                        ({@taxonomy.genus_description})
+                        ({@taxonomy.genus.description})
                       </span>
                     </span>
                   </p>

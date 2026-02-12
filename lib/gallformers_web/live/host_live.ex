@@ -350,46 +350,46 @@ defmodule GallformersWeb.HostLive do
               <p :if={@taxonomy}>
                 <strong>Family:</strong>
                 <.link
-                  href={"/family/#{@taxonomy.family_id}"}
+                  href={"/family/#{@taxonomy.family.id}"}
                   class="hover:underline"
                 >
-                  {@taxonomy.family}
+                  {@taxonomy.family.name}
                 </.link>
                 <span
-                  :if={@taxonomy.family_description && @taxonomy.family_description != ""}
+                  :if={@taxonomy.family && @taxonomy.family.description not in [nil, ""]}
                   class="text-gray-600"
                 >
-                  ({@taxonomy.family_description})
+                  ({@taxonomy.family.description})
                 </span>
                 <span :if={@taxonomy.section}>
                   <span class="mx-1">|</span>
                   <strong>Section:</strong>
                   <.link
-                    href={"/section/#{@taxonomy.section_id}"}
+                    href={"/section/#{@taxonomy.section.id}"}
                     class="hover:underline"
                   >
-                    <.taxon_name name={@taxonomy.section} rank="section" />
+                    <.taxon_name name={@taxonomy.section.name} rank="section" />
                   </.link>
                   <span
-                    :if={@taxonomy.section_description && @taxonomy.section_description != ""}
+                    :if={@taxonomy.section.description not in [nil, ""]}
                     class="text-gray-600"
                   >
-                    ({@taxonomy.section_description})
+                    ({@taxonomy.section.description})
                   </span>
                 </span>
                 <span class="mx-1">|</span>
                 <strong>Genus:</strong>
                 <.link
-                  href={"/genus/#{@taxonomy.genus_id}"}
+                  href={"/genus/#{@taxonomy.genus.id}"}
                   class="hover:underline"
                 >
-                  <.taxon_name name={@taxonomy.genus} rank="genus" />
+                  <.taxon_name name={@taxonomy.genus.name} rank="genus" />
                 </.link>
                 <span
-                  :if={@taxonomy.genus_description && @taxonomy.genus_description != ""}
+                  :if={@taxonomy.genus.description not in [nil, ""]}
                   class="text-gray-600"
                 >
-                  ({@taxonomy.genus_description})
+                  ({@taxonomy.genus.description})
                 </span>
               </p>
 

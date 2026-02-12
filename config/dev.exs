@@ -20,8 +20,7 @@ config :gallformers, Gallformers.Repo,
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
 config :gallformers, GallformersWeb.Endpoint,
-  # Bind to all interfaces to allow access from other machines on the network
-  http: [ip: {0, 0, 0, 0}],
+  http: [ip: {127, 0, 0, 1}],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
@@ -92,6 +91,10 @@ config :phoenix_live_view,
 
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
+
+# Dev auth bypass: auto-login as admin without Auth0.
+# Useful for LAN testing where Auth0 callbacks won't work.
+config :gallformers, dev_auth_bypass: true
 
 # Request logger writes to priv/logs in development (gitignored)
 config :gallformers, :request_log_dir, Path.expand("../priv/logs", __DIR__)

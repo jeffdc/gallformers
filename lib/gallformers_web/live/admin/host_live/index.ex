@@ -6,6 +6,8 @@ defmodule GallformersWeb.Admin.HostLive.Index do
 
   alias Gallformers.Plants
 
+  @page_size 50
+
   @impl true
   def mount(_params, session, socket) do
     current_user = session["current_user"]
@@ -17,6 +19,8 @@ defmodule GallformersWeb.Admin.HostLive.Index do
       |> assign(:current_user, current_user)
       |> assign(:page_title, "Hosts")
       |> assign(:search_query, "")
+      |> assign(:current_page, 1)
+      |> assign(:page_size, @page_size)
       |> assign(:hosts, list_hosts(""))
 
     {:ok, socket}
@@ -35,7 +39,13 @@ defmodule GallformersWeb.Admin.HostLive.Index do
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
     hosts = list_hosts(query)
-    {:noreply, assign(socket, hosts: hosts, search_query: query)}
+    {:noreply, assign(socket, hosts: hosts, search_query: query, current_page: 1)}
+  end
+
+  @impl true
+  def handle_event("page", %{"page" => page}, socket) do
+    page = max(1, min(page, total_pages(socket.assigns.hosts, socket.assigns.page_size)))
+    {:noreply, assign(socket, current_page: page)}
   end
 
   @impl true
@@ -59,8 +69,18 @@ defmodule GallformersWeb.Admin.HostLive.Index do
     {:noreply, assign(socket, hosts: hosts)}
   end
 
-  defp list_hosts(""), do: Plants.list_hosts_paginated(100, 0)
-  defp list_hosts(query), do: Plants.search_hosts(query, 100)
+  defp list_hosts(""), do: Plants.list_hosts()
+  defp list_hosts(query), do: Plants.search_hosts(query, 500)
+
+  defp paginated(list, current_page, page_size) do
+    list
+    |> Enum.drop((current_page - 1) * page_size)
+    |> Enum.take(page_size)
+  end
+
+  defp total_pages(list, page_size) do
+    max(1, ceil(length(list) / page_size))
+  end
 
   @impl true
   def render(assigns) do
@@ -96,7 +116,7 @@ defmodule GallformersWeb.Admin.HostLive.Index do
               </tr>
             </thead>
             <tbody>
-              <tr :for={host <- @hosts}>
+              <tr :for={host <- paginated(@hosts, @current_page, @page_size)}>
                 <td>
                   <.link
                     navigate={~p"/admin/hosts/#{host.id}"}
@@ -159,9 +179,19 @@ defmodule GallformersWeb.Admin.HostLive.Index do
           </table>
         </div>
 
-        <p class="text-sm text-gray-500">
-          Showing {@hosts |> length()} hosts
-        </p>
+        <%= if total_pages(@hosts, @page_size) > 1 do %>
+          <.pagination
+            page={@current_page}
+            total_pages={total_pages(@hosts, @page_size)}
+            total_items={length(@hosts)}
+            page_size={@page_size}
+            on_page_change={fn page -> JS.push("page", value: %{page: page}) end}
+          />
+        <% else %>
+          <p class="text-sm text-gray-500">
+            Showing {length(@hosts)} hosts
+          </p>
+        <% end %>
       </div>
     </Layouts.admin>
     """
