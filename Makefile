@@ -2,7 +2,7 @@
 #
 # Phoenix/LiveView development commands
 
-.PHONY: dev dev-lan test test-db download-db ci help deps assets setup clean check-db build run-local-release dump-schema upload-reset-db
+.PHONY: dev dev-lan test test-db test-prod-data test-prod-data-e2e test-prod-data-all download-db ci help deps assets setup clean check-db build run-local-release dump-schema upload-reset-db
 
 # Download production database for local dev
 # Uses public S3 snapshot (updated daily by GitHub Actions)
@@ -143,6 +143,38 @@ test-db:
 # Run tests (rebuilds test DB first, excludes E2E tests)
 test: test-db
 	mix test
+
+# Run context-level tests against a copy of the production database (no browser)
+# Validates data integrity and exercises write paths against real data
+# All writes use Ecto sandbox (rolled back automatically)
+test-prod-data: check-db
+	@echo "Copying production database for testing..."
+	@cp priv/gallformers.sqlite priv/gallformers_test.sqlite
+	@echo "Running prod data tests (excluding E2E)..."
+	mix test test/prod_data --exclude e2e --include prod_data
+	@echo "Restoring test database..."
+	@$(MAKE) test-db
+
+# Run E2E browser tests against a copy of the production database
+# Requires chromedriver: brew install chromedriver
+test-prod-data-e2e: check-db
+	$(call check_chromedriver)
+	@echo "Copying production database for testing..."
+	@cp priv/gallformers.sqlite priv/gallformers_test.sqlite
+	@echo "Running prod data E2E tests..."
+	GALLFORMERS_E2E=1 mix test test/prod_data/e2e --include prod_data
+	@echo "Restoring test database..."
+	@$(MAKE) test-db
+
+# Run all prod data tests (context + E2E)
+test-prod-data-all: check-db
+	$(call check_chromedriver)
+	@echo "Copying production database for testing..."
+	@cp priv/gallformers.sqlite priv/gallformers_test.sqlite
+	@echo "Running all prod data tests..."
+	GALLFORMERS_E2E=1 mix test test/prod_data --include prod_data
+	@echo "Restoring test database..."
+	@$(MAKE) test-db
 
 # Check for unexpected test exclusions (non-E2E tests with @tag :skip, etc.)
 # Runs ALL tests including E2E - if output shows "X excluded", investigate
@@ -336,7 +368,10 @@ help:
 	@echo "Development:"
 	@echo "  make dev               Start Phoenix dev server (:4000) - auto-installs deps"
 	@echo "  make dev-lan           Start dev server on :4002 for LAN access (LAN_PORT=N to override)"
-	@echo "  make test              Run tests (fast, excludes E2E)"
+	@echo "  make test              Run tests (fast, excludes E2E and prod_data)"
+	@echo "  make test-prod-data    Run context tests against prod data copy (no browser)"
+	@echo "  make test-prod-data-e2e  Run E2E tests against prod data copy (requires chromedriver)"
+	@echo "  make test-prod-data-all  Run all tests against prod data copy"
 	@echo "  make ci                Run all CI checks (format, compile, credo, test, dialyzer)"
 	@echo ""
 	@echo "E2E Testing (Wallaby/Chrome):"
