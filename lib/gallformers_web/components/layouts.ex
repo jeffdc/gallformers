@@ -475,10 +475,7 @@ defmodule GallformersWeb.Layouts do
       %{href: "/admin/keys", label: "Keys", icon: "ph-tree-structure"}
     ]
 
-    superadmin_nav_links = [
-      %{href: "/admin/places", label: "Places", icon: "gf-place"},
-      %{href: "/admin/filter-terms", label: "Filter Terms", icon: "ph-funnel"}
-    ]
+    superadmin_nav_links = []
 
     is_superadmin = Gallformers.Accounts.superadmin?(assigns.current_user)
 
@@ -495,10 +492,11 @@ defmodule GallformersWeb.Layouts do
       <main class="flex-1 pb-32">
         <%!-- Admin navigation links - always in same position --%>
         <div class="bg-white border-b border-gray-200 px-6 sm:px-10 lg:px-16 py-3">
-          <div class="flex flex-wrap gap-4 items-center">
+          <div class="flex flex-wrap gap-4 items-center" id="admin-nav" phx-hook="AdminNav">
             <a
               :for={link <- @admin_nav_links}
               href={link.href}
+              data-nav-href={link.href}
               class="flex items-center gap-2 text-lg font-medium text-gf-maroon hover:text-gf-autumn"
             >
               <.icon name={link.icon} class="h-5 w-5" />
@@ -510,6 +508,7 @@ defmodule GallformersWeb.Layouts do
               :for={link <- @superadmin_nav_links}
               :if={@is_superadmin}
               href={link.href}
+              data-nav-href={link.href}
               class="flex items-center gap-2 text-lg font-medium text-gf-maroon hover:text-gf-autumn"
             >
               <.icon name={link.icon} class="h-5 w-5" />

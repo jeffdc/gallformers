@@ -167,7 +167,7 @@ defmodule GallformersWeb.SectionLive do
                   </h1>
                   <.link
                     :if={@current_user}
-                    href={~p"/admin/taxonomy/#{@section.id}"}
+                    href={~p"/admin/section/#{@section.id}"}
                     class="text-gray-400 hover:text-gf-maroon"
                     title="Edit in admin"
                   >

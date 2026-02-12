@@ -11,10 +11,12 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
   import GallformersWeb.FormComponents, only: [cascade_delete_modal: 1]
 
   alias Gallformers.Taxonomy
+  alias Phoenix.HTML.Form, as: HtmlForm
 
   # Family types - these categorize what kind of organism a family contains.
   # "Plant" indicates a host family; all others are gall-former families.
-  @gall_family_types ~w(Aphid Bacteria Beetle Fly Fungus Midge Mite Moth Nematode Oomycete Psyllid Sawfly Scale Thrips True\ Bug Unknown Virus Wasp)
+  @gall_family_types ~w(Aphid Bacteria Beetle Fly Fungus Midge Mite Moth Nematode Oomycete Psyllid Sawfly Scale Thrips Unknown Virus Wasp) ++
+                       ["Plant (gall forming)", "True Bug"]
   @host_family_types ~w(Plant)
 
   # Required callbacks for FormHelpers
@@ -72,8 +74,8 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
   end
 
   defp load_parent_options(type) when type in [nil, ""] do
-    # For new entries or when no type selected yet, load all families
-    Taxonomy.list_families_for_select()
+    # No type selected yet — don't show parent options
+    []
   end
 
   defp load_parent_options("family"), do: []
@@ -90,9 +92,20 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
   # Custom validate handler to update parent_options when type changes
   @impl true
   def handle_event("validate", %{"taxonomy" => params}, socket) do
+    # Clear name and parent when type changes
+    prev_type = HtmlForm.input_value(socket.assigns.form, :type)
+
+    params =
+      if params["type"] != prev_type do
+        Map.merge(params, %{"name" => "", "parent_id" => ""})
+      else
+        params
+      end
+
     changeset =
       socket.assigns.taxonomy
       |> Taxonomy.change_taxonomy(params)
+      |> validate_unique_name_parent(socket.assigns.taxonomy)
       |> Map.put(:action, :validate)
 
     parent_options = load_parent_options(params["type"])
@@ -111,7 +124,19 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
   end
 
   @impl true
-  def handle_event("save", params, socket), do: handle_save(params, socket)
+  def handle_event("save", %{"taxonomy" => taxonomy_params} = params, socket) do
+    changeset =
+      socket.assigns.taxonomy
+      |> Taxonomy.change_taxonomy(taxonomy_params)
+      |> validate_unique_name_parent(socket.assigns.taxonomy)
+
+    if changeset.valid? do
+      handle_save(params, socket)
+    else
+      changeset = Map.put(changeset, :action, :validate)
+      {:noreply, assign(socket, :form, to_form(changeset))}
+    end
+  end
 
   @impl true
   def handle_event("delete", _params, socket) do
@@ -204,11 +229,23 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
   defp taxonomy_public_url(%{type: "section", id: id}), do: ~p"/section/#{id}"
   defp taxonomy_public_url(_), do: nil
 
+  defp validate_unique_name_parent(changeset, taxonomy) do
+    name = Ecto.Changeset.get_field(changeset, :name)
+    parent_id = Ecto.Changeset.get_field(changeset, :parent_id)
+
+    if name && Taxonomy.Tree.name_parent_exists?(name, parent_id, taxonomy.id) do
+      Ecto.Changeset.add_error(changeset, :name, "already exists for this parent")
+    else
+      changeset
+    end
+  end
+
   defp family_type_options do
-    # Group gall-former types first, then host type
     gall_options = Enum.map(@gall_family_types, &{&1, &1})
     host_options = Enum.map(@host_family_types, &{"#{&1} (host)", &1})
-    gall_options ++ host_options
+
+    (gall_options ++ host_options)
+    |> Enum.sort_by(fn {label, _value} -> String.downcase(label) end)
   end
 
   @impl true
@@ -230,36 +267,48 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
           Family → Genus → Section (optional). Species are linked to genera.
         </:intro>
 
+        <div :if={@mode == :edit and @taxonomy.type == "section"} class="mb-4">
+          <.link
+            href={~p"/admin/section/#{@taxonomy.id}"}
+            class="inline-flex items-center gap-1.5 text-sm text-gf-maroon hover:text-gf-autumn"
+          >
+            <.icon name="ph-arrow-right" class="h-4 w-4" /> Manage species in this section
+          </.link>
+        </div>
+
+        <% type_selected = HtmlForm.input_value(@form, :type) not in [nil, ""] %>
         <.form for={@form} id="taxonomy-form" phx-change="validate" phx-submit="save">
           <div class="mb-3">
             <.input
-              field={@form[:name]}
+              field={@form[:type]}
               schema={Taxonomy.Taxonomy}
-              type="text"
-              label="Name"
-              placeholder="Enter taxonomy name"
+              type="select"
+              label="Type"
+              prompt="Select type"
+              options={[{"Family", "family"}, {"Genus", "genus"}, {"Section", "section"}]}
             />
           </div>
 
           <div class="grid grid-cols-2 gap-4 mb-3">
             <div>
               <.input
-                field={@form[:type]}
+                field={@form[:name]}
                 schema={Taxonomy.Taxonomy}
-                type="select"
-                label="Type"
-                prompt="Select type"
-                options={[{"Family", "family"}, {"Genus", "genus"}, {"Section", "section"}]}
+                type="text"
+                label="Name"
+                placeholder="Enter taxonomy name"
+                disabled={!type_selected}
               />
             </div>
             <div>
-              <%= if Phoenix.HTML.Form.input_value(@form, :type) == "family" do %>
+              <%= if HtmlForm.input_value(@form, :type) == "family" do %>
                 <.input
                   field={@form[:description]}
                   type="select"
                   label="Family Type:"
                   prompt="Select family type"
                   options={family_type_options()}
+                  required={true}
                 />
                 <p class="mt-1 text-xs text-gray-500">
                   Select "Plant" for host families; all others are gall-former families.
@@ -270,6 +319,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
                   type="text"
                   label="Description:"
                   placeholder="Common name or description"
+                  disabled={!type_selected}
                 />
                 <p class="mt-1 text-xs text-gray-500">
                   Optional common name (e.g., "oaks" for Quercus)
@@ -285,11 +335,12 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
                 type="select"
                 label="Parent:"
                 prompt={
-                  if Phoenix.HTML.Form.input_value(@form, :type) == "section",
+                  if HtmlForm.input_value(@form, :type) == "section",
                     do: "Select a genus",
                     else: "Select a family"
                 }
                 options={@parent_options}
+                required={true}
               />
               <p class="mt-1 text-xs text-gray-500">
                 Genera belong to families. Sections belong to genera.
@@ -297,7 +348,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
             <% else %>
               <label class="gf-label">Parent:</label>
               <p class="text-sm text-gray-500 italic px-3 py-2">
-                <%= if Phoenix.HTML.Form.input_value(@form, :type) == "family" do %>
+                <%= if HtmlForm.input_value(@form, :type) == "family" do %>
                   Families are top-level entries and have no parent.
                 <% else %>
                   Select a type to see available parent options.
@@ -317,7 +368,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
                 Delete
               </button>
             </div>
-            <.form_actions form_dirty={@form_dirty} mode={@mode} />
+            <.form_actions form_dirty={@form_dirty} form_valid={@form.source.valid?} mode={@mode} />
           </div>
         </.form>
 

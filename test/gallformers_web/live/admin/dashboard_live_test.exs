@@ -65,7 +65,7 @@ defmodule GallformersWeb.Admin.DashboardLiveTest do
     test "welcome section is displayed", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/admin")
 
-      assert html =~ "Welcome" or html =~ "admin panel"
+      assert html =~ "Need help?" or html =~ "Discord"
     end
   end
 
