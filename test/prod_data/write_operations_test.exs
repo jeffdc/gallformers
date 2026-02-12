@@ -719,9 +719,12 @@ defmodule Gallformers.ProdData.WriteOperationsTest do
       else
         # Get predicted impact
         impact = Taxonomy.get_deletion_impact(genus)
+        species_ids = Taxonomy.get_species_ids_for_genus(genus.id)
 
         # Actually delete
         {:ok, actual} = Taxonomy.delete_taxonomy_cascade(genus)
+
+        assert Repo.all(from(s in Species, where: s.id in ^species_ids)) == []
 
         assert impact.species_count == actual.species_count,
                "Impact predicted #{impact.species_count} species but deleted #{actual.species_count}"

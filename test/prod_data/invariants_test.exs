@@ -147,6 +147,11 @@ defmodule Gallformers.ProdData.InvariantsTest do
     end
 
     test "no species has a section link without also having a genus link" do
+      genus_species =
+        from st in "species_taxonomy",
+          join: t in "taxonomy", on: st.taxonomy_id == t.id and t.type == "genus",
+          select: st.species_id
+
       bad =
         Repo.all(
           from s in "species",
@@ -154,11 +159,7 @@ defmodule Gallformers.ProdData.InvariantsTest do
             on: s.id == st_sec.species_id,
             join: t_sec in "taxonomy",
             on: st_sec.taxonomy_id == t_sec.id and t_sec.type == "section",
-            left_join: st_gen in "species_taxonomy",
-            on: s.id == st_gen.species_id,
-            left_join: t_gen in "taxonomy",
-            on: st_gen.taxonomy_id == t_gen.id and t_gen.type == "genus",
-            where: is_nil(t_gen.id),
+            where: s.id not in subquery(genus_species),
             select: %{id: s.id, name: s.name}
         )
 

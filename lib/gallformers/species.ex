@@ -743,10 +743,20 @@ defmodule Gallformers.Species do
       # 3. Delete from FTS index
       delete_species_fts(species.id)
 
-      # 4. Delete the species record (cascades to image rows, hosts, etc.)
+      # 4. Collect alias IDs before deletion (CASCADE will remove alias_species rows)
+      alias_ids =
+        from(als in "alias_species", where: als.species_id == ^species.id, select: als.alias_id)
+        |> Repo.all()
+
+      # 5. Delete the species record (cascades to image rows, hosts, alias_species, etc.)
       case Repo.delete(species) do
-        {:ok, deleted} -> deleted
-        {:error, changeset} -> Repo.rollback(changeset)
+        {:ok, deleted} ->
+          # 6. Clean up aliases that no longer have any species links
+          delete_orphaned_aliases(alias_ids)
+          deleted
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
       end
     end)
     |> broadcast(:species_deleted)
@@ -802,6 +812,9 @@ defmodule Gallformers.Species do
     )
     |> Repo.delete_all()
 
+    # Delete the alias if it has no remaining species links
+    delete_orphaned_aliases([alias_id])
+
     # Update FTS index after alias is removed
     update_species_fts(species_id)
 
@@ -814,6 +827,24 @@ defmodule Gallformers.Species do
   @spec subscribe() :: :ok | {:error, term()}
   def subscribe do
     Phoenix.PubSub.subscribe(Gallformers.PubSub, "species")
+  end
+
+  # Deletes alias records that have no remaining alias_species links.
+  # Aliases can be shared across species (rare but possible), so we only
+  # delete those with zero remaining links.
+  defp delete_orphaned_aliases([]), do: :ok
+
+  defp delete_orphaned_aliases(alias_ids) do
+    from(a in "alias",
+      where:
+        a.id in ^alias_ids and
+          a.id not in subquery(
+            from(als in "alias_species", select: als.alias_id)
+          )
+    )
+    |> Repo.delete_all()
+
+    :ok
   end
 
   defp broadcast({:ok, species}, event) do
