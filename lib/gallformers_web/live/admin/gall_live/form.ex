@@ -118,6 +118,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(:undescribed_lock_reason, nil)
     |> assign(:datacomplete_locked, false)
     |> assign(:datacomplete_lock_reason, nil)
+    |> assign(:gallformers_code, nil)
     |> assign(:new_alias_name, "")
     |> assign(:new_alias_type, "common")
     |> assign(:host_search_query, "")
@@ -280,6 +281,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
           filter_values = gall_data.filter_values
           detachable = gall_data.detachable || "unknown"
           undescribed = gall_data.undescribed || false
+          gallformers_code = gall_data.gallformers_code
 
           socket
           |> build_default_assigns()
@@ -301,6 +303,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
           |> assign(:filter_values, filter_values)
           |> assign(:detachable, detachable)
           |> assign(:undescribed, undescribed)
+          |> assign(:gallformers_code, gallformers_code)
           |> apply_undescribed_lock(taxonomy, species_id)
           |> apply_datacomplete_lock(species_id)
         end
@@ -523,6 +526,11 @@ defmodule GallformersWeb.Admin.GallLive.Form do
   end
 
   @impl true
+  def handle_event("update_gallformers_code", %{"value" => value}, socket) do
+    {:noreply, socket |> assign(:gallformers_code, value) |> mark_dirty()}
+  end
+
+  @impl true
   def handle_event("select_family", %{"family_id" => family_id}, socket) do
     family_id = if family_id == "", do: nil, else: String.to_integer(family_id)
     {:noreply, socket |> assign(:selected_family_id, family_id) |> mark_dirty()}
@@ -737,7 +745,8 @@ defmodule GallformersWeb.Admin.GallLive.Form do
       aliases: socket.assigns.aliases,
       filter_values: socket.assigns.filter_values,
       detachable: socket.assigns.detachable,
-      undescribed: socket.assigns.undescribed
+      undescribed: socket.assigns.undescribed,
+      gallformers_code: socket.assigns.gallformers_code
     }
 
     case Galls.create_gall_with_associations(create_params) do
@@ -766,7 +775,8 @@ defmodule GallformersWeb.Admin.GallLive.Form do
       original_filter_values: socket.assigns.original_filter_values,
       filter_values: socket.assigns.filter_values,
       detachable: socket.assigns.detachable,
-      undescribed: socket.assigns.undescribed
+      undescribed: socket.assigns.undescribed,
+      gallformers_code: socket.assigns.gallformers_code
     }
 
     case Galls.update_gall_with_associations(socket.assigns.gall, update_params) do
@@ -1191,6 +1201,24 @@ defmodule GallformersWeb.Admin.GallLive.Form do
                   </label>
                   <p :if={@undescribed_lock_reason} class="text-amber-600 text-xs mt-1 ml-6">
                     {@undescribed_lock_reason}
+                  </p>
+                </div>
+
+                <div :if={@undescribed || @gallformers_code not in [nil, ""]} class="mt-2">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Gallformers Code
+                  </label>
+                  <input
+                    type="text"
+                    name="gallformers_code"
+                    value={@gallformers_code}
+                    phx-change="update_gallformers_code"
+                    phx-debounce="300"
+                    placeholder="e.g. q-lobata-leaf-blister"
+                    class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-gf-maroon focus:border-gf-maroon"
+                  />
+                  <p class="text-gray-500 text-xs mt-1">
+                    Used for iNaturalist observation linking. Auto-populated for new undescribed galls.
                   </p>
                 </div>
               </div>

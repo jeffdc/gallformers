@@ -265,6 +265,7 @@ defmodule Gallformers.Galls do
           abundance_name: a.abundance,
           detachable: gt.detachable,
           undescribed: gt.undescribed,
+          gallformers_code: gt.gallformers_code,
           inserted_at: s.inserted_at,
           updated_at: s.updated_at
         }
@@ -859,7 +860,8 @@ defmodule Gallformers.Galls do
 
           update_gall_properties(species.id, %{
             detachable: params.detachable,
-            undescribed: params.undescribed
+            undescribed: params.undescribed,
+            gallformers_code: params[:gallformers_code]
           })
 
           species
@@ -908,7 +910,8 @@ defmodule Gallformers.Galls do
 
           update_gall_properties(species.id, %{
             detachable: params.detachable,
-            undescribed: params.undescribed
+            undescribed: params.undescribed,
+            gallformers_code: params[:gallformers_code]
           })
 
           Gallformers.Species.touch(species.id)
