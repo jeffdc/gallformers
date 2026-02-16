@@ -659,25 +659,19 @@ defmodule Gallformers.Galls do
 
   A gall's undescribed flag is locked to `true` when:
   - The genus is a placeholder (Unknown) — species with unknown genus are always undescribed
-  - The species has no sources linked — a source is required to mark as described
 
   Returns `{locked?, reason}` where reason is a string explaining the lock, or nil if unlocked.
-  For new galls (species_id is nil), the source check is skipped.
+  Missing sources are handled by `compute_datacomplete_lock/1` instead.
   """
   @spec compute_undescribed_lock(Gallformers.Taxonomy.Lineage.t() | nil, integer() | nil) ::
           {boolean(), String.t() | nil}
-  def compute_undescribed_lock(taxonomy, species_id \\ nil) do
+  def compute_undescribed_lock(taxonomy, _species_id \\ nil) do
     genus_name = taxonomy && taxonomy.genus && taxonomy.genus.name
 
-    cond do
-      Gallformers.Taxonomy.placeholder_genus_name?(genus_name) ->
-        {true, "Undescribed is required for species with unknown genus."}
-
-      species_id && not Gallformers.Sources.has_sources?(species_id) ->
-        {true, "A source is required to mark a species as described."}
-
-      true ->
-        {false, nil}
+    if Gallformers.Taxonomy.placeholder_genus_name?(genus_name) do
+      {true, "Undescribed is required for species with unknown genus."}
+    else
+      {false, nil}
     end
   end
 

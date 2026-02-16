@@ -376,7 +376,7 @@ defmodule Gallformers.GallsTest do
       assert {false, nil} = Galls.compute_undescribed_lock(taxonomy)
     end
 
-    test "locked when species has no sources" do
+    test "unlocked when species has no sources but real genus" do
       {:ok, species} =
         Repo.insert(%Species{
           name: "Locktest sp",
@@ -385,8 +385,7 @@ defmodule Gallformers.GallsTest do
         })
 
       taxonomy = %Lineage{genus: %Genus{name: "Locktest"}}
-      {true, reason} = Galls.compute_undescribed_lock(taxonomy, species.id)
-      assert reason =~ "source is required"
+      assert {false, nil} = Galls.compute_undescribed_lock(taxonomy, species.id)
     end
 
     test "unlocked when species has sources" do
