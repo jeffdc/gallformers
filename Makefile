@@ -137,6 +137,7 @@ test-db:
 	@rm -f priv/gallformers_test.sqlite*
 	@MIX_ENV=test mix ecto.create --quiet
 	@MIX_ENV=test mix ecto.load --quiet
+	@MIX_ENV=test mix ecto.migrate --quiet
 	@sqlite3 priv/gallformers_test.sqlite < priv/repo/test_seeds.sql
 	@echo "Test database ready"
 
@@ -150,8 +151,10 @@ test: test-db
 test-prod-data: check-db
 	@echo "Copying production database for testing..."
 	@cp priv/gallformers.sqlite priv/gallformers_test.sqlite
-	@echo "Running prod data tests (excluding E2E)..."
-	@mix test test/prod_data --exclude e2e --include prod_data; \
+	@echo "Applying pending migrations to test copy..."
+	@MIX_ENV=test mix ecto.migrate --quiet
+	@echo "Running prod data tests..."
+	@GALLFORMERS_E2E=1 mix test test/prod_data --include prod_data; \
 		status=$$?; \
 		echo "Restoring test database..."; \
 		$(MAKE) test-db; \
@@ -163,6 +166,8 @@ test-prod-data-e2e: check-db
 	$(call check_chromedriver)
 	@echo "Copying production database for testing..."
 	@cp priv/gallformers.sqlite priv/gallformers_test.sqlite
+	@echo "Applying pending migrations to test copy..."
+	@MIX_ENV=test mix ecto.migrate --quiet
 	@echo "Running prod data E2E tests..."
 	@GALLFORMERS_E2E=1 mix test test/prod_data/e2e --include prod_data; \
 		status=$$?; \
@@ -175,6 +180,8 @@ test-prod-data-all: check-db
 	$(call check_chromedriver)
 	@echo "Copying production database for testing..."
 	@cp priv/gallformers.sqlite priv/gallformers_test.sqlite
+	@echo "Applying pending migrations to test copy..."
+	@MIX_ENV=test mix ecto.migrate --quiet
 	@echo "Running all prod data tests..."
 	@GALLFORMERS_E2E=1 mix test test/prod_data --include prod_data; \
 		status=$$?; \
@@ -314,6 +321,7 @@ preflight: ci download-db
 	@echo ""
 	@echo "==> E2E tests passed. Running prod data tests..."
 	@cp priv/gallformers.sqlite priv/gallformers_test.sqlite
+	@MIX_ENV=test mix ecto.migrate --quiet
 	@GALLFORMERS_E2E=1 mix test test/prod_data --include prod_data; \
 		status=$$?; \
 		echo "Restoring test database..."; \

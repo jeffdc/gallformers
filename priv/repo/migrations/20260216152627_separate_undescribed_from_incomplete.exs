@@ -14,13 +14,17 @@ defmodule Gallformers.Repo.Migrations.SeparateUndescribedFromIncomplete do
 
   alias Gallformers.Taxonomy.TaxonName
 
-  # Legitimate described species whose epithets contain dashes — do NOT assign codes
-  # Also excludes 2747/5443 which share an epithet and are handled separately below
+  # Legitimate described species whose epithets contain dashes — do NOT assign codes.
+  # 2747/5443 share an epithet and are handled in step 1b (disambiguation) — they are
+  # undescribed and must NOT appear here, since step 3b uses this list to clear undescribed.
   @exclusions MapSet.new([
-    633, 778, 1005, 1339, 1340, 1373, 1906, 1996, 2255, 2688, 2747,
+    633, 778, 1005, 1339, 1340, 1373, 1906, 1996, 2255, 2688,
     3167, 3346, 3979, 3981, 3992, 4089, 4092, 4603, 4614, 4792,
-    5027, 5443, 5578, 5645
+    5027, 5578, 5645
   ])
+
+  # Species that need code disambiguation — skipped by step 1, handled by step 1b
+  @disambiguated MapSet.new([2747, 5443])
 
   def up do
     # ---------------------------------------------------------------
@@ -35,7 +39,7 @@ defmodule Gallformers.Repo.Migrations.SeparateUndescribedFromIncomplete do
       )
 
     for %{id: id, name: name} <- gall_species,
-        id not in @exclusions,
+        id not in @exclusions and id not in @disambiguated,
         parsed = TaxonName.parse(name),
         epithet = parsed.epithet,
         epithet != nil,
@@ -101,7 +105,7 @@ defmodule Gallformers.Repo.Migrations.SeparateUndescribedFromIncomplete do
     # 3a. ID 2235 → set undescribed = true
     repo().update_all(
       from(gt in "gall_traits", where: gt.species_id == 2235),
-      set: [undescribed: true]
+      set: [undescribed: 1]
     )
 
     # 3b. Undescribed galls with real genus and no dashes → set undescribed = false
@@ -115,7 +119,7 @@ defmodule Gallformers.Repo.Migrations.SeparateUndescribedFromIncomplete do
           join: t in "taxonomy",
           on: t.id == st.taxonomy_id and t.type == "genus",
           where: s.taxoncode == "gall",
-          where: gt.undescribed == true,
+          where: gt.undescribed == 1,
           where: not like(t.name, "Unknown%"),
           select: %{id: s.id, name: s.name}
         )
@@ -130,7 +134,7 @@ defmodule Gallformers.Repo.Migrations.SeparateUndescribedFromIncomplete do
       if (epithet && not String.contains?(epithet, "-")) || id in @exclusions do
         repo().update_all(
           from(gt in "gall_traits", where: gt.species_id == ^id),
-          set: [undescribed: false]
+          set: [undescribed: 0]
         )
       end
     end
@@ -144,7 +148,7 @@ defmodule Gallformers.Repo.Migrations.SeparateUndescribedFromIncomplete do
         on: t.id == st.taxonomy_id and t.type == "genus",
         where: like(t.name, "Unknown%")
       ),
-      set: [undescribed: true]
+      set: [undescribed: 1]
     )
 
     # ---------------------------------------------------------------
@@ -155,13 +159,13 @@ defmodule Gallformers.Repo.Migrations.SeparateUndescribedFromIncomplete do
     repo().update_all(
       from(s in "species",
         where: s.taxoncode == "gall",
-        where: s.datacomplete == true,
+        where: s.datacomplete == 1,
         where:
           s.id not in subquery(
             from(ss in "species_source", distinct: true, select: ss.species_id)
           )
       ),
-      set: [datacomplete: false]
+      set: [datacomplete: 0]
     )
 
     # 4b. All undescribed galls → set datacomplete = false
@@ -170,10 +174,10 @@ defmodule Gallformers.Repo.Migrations.SeparateUndescribedFromIncomplete do
         join: gt in "gall_traits",
         on: gt.species_id == s.id,
         where: s.taxoncode == "gall",
-        where: gt.undescribed == true,
-        where: s.datacomplete == true
+        where: gt.undescribed == 1,
+        where: s.datacomplete == 1
       ),
-      set: [datacomplete: false]
+      set: [datacomplete: 0]
     )
 
     # ---------------------------------------------------------------

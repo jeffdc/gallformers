@@ -228,6 +228,50 @@ defmodule Gallformers.ProdData.InvariantsTest do
              "Found #{length(bad)} gall_traits rows for non-gall species: #{inspect(Enum.take(bad, 10))}"
     end
 
+    test "no gall with datacomplete=true lacks sources" do
+      bad =
+        Repo.all(
+          from s in "species",
+            where: s.taxoncode == "gall",
+            where: s.datacomplete == 1,
+            where: s.id not in subquery(from(ss in "species_source", select: ss.species_id)),
+            select: %{id: s.id, name: s.name}
+        )
+
+      assert bad == [],
+             "Found #{length(bad)} complete galls without sources: #{inspect(Enum.take(bad, 10))}"
+    end
+
+    test "no undescribed gall has datacomplete=true" do
+      bad =
+        Repo.all(
+          from s in "species",
+            join: gt in "gall_traits",
+            on: gt.species_id == s.id,
+            where: s.taxoncode == "gall",
+            where: gt.undescribed == 1,
+            where: s.datacomplete == 1,
+            select: %{id: s.id, name: s.name}
+        )
+
+      assert bad == [],
+             "Found #{length(bad)} undescribed complete galls: #{inspect(Enum.take(bad, 10))}"
+    end
+
+    test "no duplicate gallformers_code values" do
+      bad =
+        Repo.all(
+          from gt in "gall_traits",
+            where: not is_nil(gt.gallformers_code) and gt.gallformers_code != "",
+            group_by: gt.gallformers_code,
+            having: count(gt.species_id) > 1,
+            select: gt.gallformers_code
+        )
+
+      assert bad == [],
+             "Found #{length(bad)} duplicate gallformers codes: #{inspect(bad)}"
+    end
+
     test "every gall under an Unknown genus has undescribed=true in gall_traits" do
       bad =
         Repo.all(
@@ -240,8 +284,8 @@ defmodule Gallformers.ProdData.InvariantsTest do
             on: s.id == gt.species_id,
             where:
               s.taxoncode == "gall" and
-                t.is_placeholder == true and
-                gt.undescribed != true,
+                t.is_placeholder == 1 and
+                gt.undescribed != 1,
             select: %{id: s.id, name: s.name, genus: t.name}
         )
 
@@ -261,7 +305,7 @@ defmodule Gallformers.ProdData.InvariantsTest do
           from t in "taxonomy",
             where:
               t.type == "genus" and
-                t.is_placeholder == true and
+                t.is_placeholder == 1 and
                 not fragment("? LIKE 'Unknown (%)'", t.name),
             select: %{id: t.id, name: t.name}
         )
