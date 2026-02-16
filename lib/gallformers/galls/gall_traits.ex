@@ -11,12 +11,13 @@ defmodule Gallformers.Galls.GallTraits do
   @behaviour Gallformers.SchemaFields
 
   @required_fields [:species_id]
-  @optional_fields [:detachable, :undescribed]
+  @optional_fields [:detachable, :undescribed, :gallformers_code]
 
   @type t :: %__MODULE__{
           species_id: integer(),
           detachable: String.t() | nil,
-          undescribed: boolean()
+          undescribed: boolean(),
+          gallformers_code: String.t() | nil
         }
 
   @primary_key {:species_id, :integer, autogenerate: false}
@@ -26,6 +27,7 @@ defmodule Gallformers.Galls.GallTraits do
     # Gall-specific columns
     field :detachable, :string
     field :undescribed, :boolean, default: false
+    field :gallformers_code, :string
 
     # 1:1 relationship to species
     belongs_to :species, Gallformers.Species.Species,
@@ -90,5 +92,6 @@ defmodule Gallformers.Galls.GallTraits do
       message: "must be one of: unknown, integral, detachable, both"
     )
     |> foreign_key_constraint(:species_id)
+    |> unique_constraint(:gallformers_code, name: :gall_traits_gallformers_code_unique)
   end
 end
