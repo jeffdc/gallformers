@@ -72,16 +72,13 @@ defmodule GallformersWeb.GallLiveTest do
       end
     end
 
-    test "displays external links (See Also)", %{conn: conn} do
-      galls = Galls.list_galls()
+    test "displays iNaturalist link for undescribed gall with gallformers code", %{conn: conn} do
+      # Species 102 is undescribed in test seeds — add a gallformers_code
+      Gallformers.Galls.update_gall_properties(102, %{gallformers_code: "test-gf-code"})
+      {:ok, _view, html} = live(conn, ~p"/gall/102")
 
-      if length(galls) > 0 do
-        gall = hd(galls)
-        {:ok, _view, html} = live(conn, ~p"/gall/#{gall.id}")
-
-        # Should display external reference links
-        assert html =~ "See Also" or html =~ "iNaturalist" or html =~ "BugGuide"
-      end
+      assert html =~ "iNaturalist"
+      assert html =~ "test-gf-code"
     end
 
     test "displays range map component", %{conn: conn} do
