@@ -116,6 +116,8 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(:undescribed, false)
     |> assign(:undescribed_locked, false)
     |> assign(:undescribed_lock_reason, nil)
+    |> assign(:datacomplete_locked, false)
+    |> assign(:datacomplete_lock_reason, nil)
     |> assign(:new_alias_name, "")
     |> assign(:new_alias_type, "common")
     |> assign(:host_search_query, "")
@@ -189,6 +191,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(:possible_families, possible_families)
     |> assign(:alias_collisions, Species.find_species_with_alias(name))
     |> apply_undescribed_lock(taxonomy)
+    |> apply_datacomplete_lock()
     |> mark_dirty()
   end
 
@@ -226,6 +229,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(:undescribed, true)
     |> maybe_add_initial_host(host)
     |> apply_undescribed_lock(taxonomy)
+    |> apply_datacomplete_lock()
     |> mark_dirty()
   end
 
@@ -298,6 +302,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
           |> assign(:detachable, detachable)
           |> assign(:undescribed, undescribed)
           |> apply_undescribed_lock(taxonomy, species_id)
+          |> apply_datacomplete_lock(species_id)
         end
     end
   end
@@ -410,6 +415,14 @@ defmodule GallformersWeb.Admin.GallLive.Form do
         params
         |> Map.put("taxoncode", "gall")
         |> Map.put("name", socket.assigns.gall.name)
+
+      # Enforce datacomplete lock server-side
+      params =
+        if socket.assigns.datacomplete_locked do
+          Map.put(params, "datacomplete", "false")
+        else
+          params
+        end
 
       save_gall(socket, socket.assigns.mode, params)
     end
@@ -628,6 +641,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
      |> assign(:selected_family_id, taxonomy && taxonomy.family && taxonomy.family.id)
      |> assign(:page_title, "Edit Gall - #{result.species.name}")
      |> apply_undescribed_lock(taxonomy, species_id)
+     |> apply_datacomplete_lock(species_id)
      |> put_flash(:info, "Gall updated successfully")}
   end
 
@@ -681,6 +695,14 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(:undescribed_locked, locked?)
     |> assign(:undescribed_lock_reason, reason)
     |> then(fn s -> if locked?, do: assign(s, :undescribed, true), else: s end)
+  end
+
+  defp apply_datacomplete_lock(socket, species_id \\ nil) do
+    {locked?, reason} = Galls.compute_datacomplete_lock(species_id)
+
+    socket
+    |> assign(:datacomplete_locked, locked?)
+    |> assign(:datacomplete_lock_reason, reason)
   end
 
   defp add_host_to_pending(socket, host_id) do
@@ -1129,11 +1151,27 @@ defmodule GallformersWeb.Admin.GallLive.Form do
 
               <%!-- Checkboxes --%>
               <div class="space-y-2 mb-4">
-                <.input
-                  type="checkbox"
-                  field={@form[:datacomplete]}
-                  label="All sources containing unique information relevant to this gall have been added and are reflected in its associated data. However, filter criteria may not be comprehensive in every field."
-                />
+                <div>
+                  <label class={[
+                    "flex items-center gap-2",
+                    if(@datacomplete_locked, do: "cursor-not-allowed", else: "cursor-pointer")
+                  ]}>
+                    <input
+                      type="checkbox"
+                      name={@form[:datacomplete].name}
+                      value="true"
+                      checked={Phoenix.HTML.Form.normalize_value("checkbox", @form[:datacomplete].value)}
+                      disabled={@datacomplete_locked}
+                      class="rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon disabled:opacity-50"
+                    />
+                    <span class="text-sm text-gray-700">
+                      All sources containing unique information relevant to this gall have been added and are reflected in its associated data.
+                    </span>
+                  </label>
+                  <p :if={@datacomplete_lock_reason} class="text-amber-600 text-xs mt-1 ml-6">
+                    {@datacomplete_lock_reason}
+                  </p>
+                </div>
 
                 <div>
                   <label class={[
