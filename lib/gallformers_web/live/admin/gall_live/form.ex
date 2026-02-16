@@ -119,6 +119,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(:datacomplete_locked, false)
     |> assign(:datacomplete_lock_reason, nil)
     |> assign(:gallformers_code, nil)
+    |> assign(:gallformers_code_error, nil)
     |> assign(:new_alias_name, "")
     |> assign(:new_alias_type, "common")
     |> assign(:host_search_query, "")
@@ -528,8 +529,19 @@ defmodule GallformersWeb.Admin.GallLive.Form do
   end
 
   @impl true
-  def handle_event("update_gallformers_code", %{"value" => value}, socket) do
-    {:noreply, socket |> assign(:gallformers_code, value) |> mark_dirty()}
+  def handle_event("update_gallformers_code", %{"gallformers_code" => value}, socket) do
+    species_id = socket.assigns[:gall_id]
+
+    error =
+      if Galls.gallformers_code_taken?(value, species_id),
+        do: "This code is already in use by another gall.",
+        else: nil
+
+    {:noreply,
+     socket
+     |> assign(:gallformers_code, value)
+     |> assign(:gallformers_code_error, error)
+     |> mark_dirty()}
   end
 
   @impl true
@@ -759,7 +771,8 @@ defmodule GallformersWeb.Admin.GallLive.Form do
          |> load_gall_for_edit(species.id)}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign(socket, :form, to_form(changeset))}
+        message = changeset_error_message(changeset)
+        {:noreply, put_flash(socket, :error, message)}
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Failed to create gall. Please try again.")}
@@ -801,11 +814,21 @@ defmodule GallformersWeb.Admin.GallLive.Form do
          |> put_flash(:info, "Gall saved successfully")}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign(socket, :form, to_form(changeset))}
+        message = changeset_error_message(changeset)
+        {:noreply, put_flash(socket, :error, message)}
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Failed to save gall. Please try again.")}
     end
+  end
+
+  defp changeset_error_message(changeset) do
+    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+      Regex.replace(~r"%{(\w+)}", msg, fn _, key ->
+        opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
+      end)
+    end)
+    |> Enum.map_join("; ", fn {field, errors} -> "#{field} #{Enum.join(errors, ", ")}" end)
   end
 
   # Convert valid filter type strings to atoms (whitelist strings derived from @valid_filter_types)
@@ -1221,7 +1244,10 @@ defmodule GallformersWeb.Admin.GallLive.Form do
                     placeholder="e.g. q-lobata-leaf-blister"
                     class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-gf-maroon focus:border-gf-maroon"
                   />
-                  <p class="text-gray-500 text-xs mt-1">
+                  <p :if={@gallformers_code_error} class="text-red-600 text-xs mt-1">
+                    {@gallformers_code_error}
+                  </p>
+                  <p :if={!@gallformers_code_error} class="text-gray-500 text-xs mt-1">
                     Used for iNaturalist observation linking. Auto-populated for new undescribed galls.
                   </p>
                 </div>
@@ -1240,7 +1266,11 @@ defmodule GallformersWeb.Admin.GallLive.Form do
                     Delete
                   </button>
                 </div>
-                <.form_actions form_dirty={@form_dirty} mode={@mode} />
+                <.form_actions
+                  form_dirty={@form_dirty}
+                  form_valid={!@gallformers_code_error}
+                  mode={@mode}
+                />
               </div>
             </.form>
 

@@ -548,6 +548,29 @@ defmodule Gallformers.Galls do
     end
   end
 
+  @doc """
+  Checks whether a gallformers_code is already in use by another species.
+  Returns the species_id of the owner if taken, nil if available.
+  """
+  @spec gallformers_code_taken?(String.t(), integer() | nil) :: integer() | nil
+  def gallformers_code_taken?(code, exclude_species_id \\ nil)
+  def gallformers_code_taken?(code, _) when code in [nil, ""], do: nil
+
+  def gallformers_code_taken?(code, exclude_species_id) do
+    query =
+      from(gt in GallTraits,
+        where: gt.gallformers_code == ^code,
+        select: gt.species_id
+      )
+
+    query =
+      if exclude_species_id,
+        do: where(query, [gt], gt.species_id != ^exclude_species_id),
+        else: query
+
+    Repo.one(query)
+  end
+
   # If the caller is trying to set undescribed=false but the species has an Unknown genus,
   # silently correct to undescribed=true.
   defp enforce_unknown_genus_floor(species_id, attrs) do
@@ -858,13 +881,14 @@ defmodule Gallformers.Galls do
 
           sync_filter_values(species.id, empty_filter_values(), params.filter_values)
 
-          update_gall_properties(species.id, %{
-            detachable: params.detachable,
-            undescribed: params.undescribed,
-            gallformers_code: params[:gallformers_code]
-          })
-
-          species
+          case update_gall_properties(species.id, %{
+                 detachable: params.detachable,
+                 undescribed: params.undescribed,
+                 gallformers_code: params[:gallformers_code]
+               }) do
+            {:ok, _} -> species
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
 
         {:error, changeset} ->
           Repo.rollback(changeset)
@@ -908,14 +932,18 @@ defmodule Gallformers.Galls do
             params.filter_values
           )
 
-          update_gall_properties(species.id, %{
-            detachable: params.detachable,
-            undescribed: params.undescribed,
-            gallformers_code: params[:gallformers_code]
-          })
+          case update_gall_properties(species.id, %{
+                 detachable: params.detachable,
+                 undescribed: params.undescribed,
+                 gallformers_code: params[:gallformers_code]
+               }) do
+            {:ok, _} ->
+              Gallformers.Species.touch(species.id)
+              updated_species
 
-          Gallformers.Species.touch(species.id)
-          updated_species
+            {:error, changeset} ->
+              Repo.rollback(changeset)
+          end
 
         {:error, changeset} ->
           Repo.rollback(changeset)

@@ -1,7 +1,7 @@
 ---
 status: planned
 created: 2026-02-14
-updated: 2026-02-15
+updated: 2026-02-16
 relates: [5b3d]
 title: Separate undescribed status from data completeness (gallformers code)
 docket: true

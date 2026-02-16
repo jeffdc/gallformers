@@ -97,6 +97,24 @@ defmodule Gallformers.GallsTest do
       {:ok, result} = Galls.update_gall_properties(species.id, %{"undescribed" => false})
       assert result.undescribed == true
     end
+
+    test "rejects duplicate gallformers_code" do
+      {:ok, species1} =
+        Repo.insert(%Species{name: "Dupecode sp1", taxoncode: "gall", datacomplete: false})
+
+      {:ok, species2} =
+        Repo.insert(%Species{name: "Dupecode sp2", taxoncode: "gall", datacomplete: false})
+
+      {:ok, _} = Galls.create_gall_traits(species1.id)
+      {:ok, _} = Galls.create_gall_traits(species2.id)
+
+      {:ok, _} = Galls.update_gall_properties(species1.id, %{gallformers_code: "dupe-code"})
+
+      {:error, changeset} =
+        Galls.update_gall_properties(species2.id, %{gallformers_code: "dupe-code"})
+
+      assert errors_on(changeset).gallformers_code
+    end
   end
 
   describe "create_gall_with_associations/1" do
