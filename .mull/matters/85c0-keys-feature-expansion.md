@@ -1,8 +1,9 @@
 ---
 status: refined
 created: 2026-02-13
-updated: 2026-02-15
+updated: 2026-02-16
 epic: 1-foundation
+relates: [439a]
 ---
 
 # Keys feature expansion
