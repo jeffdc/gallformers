@@ -376,11 +376,14 @@ defmodule GallformersWeb.Admin.GallLive.Undescribed do
 
     with :ok <- validate_name_not_taken(name),
          :ok <- validate_genus_in_name(name, socket.assigns) do
+      gallformers_code = TaxonName.parse(name).epithet
+
       query_string =
         URI.encode_query(%{
           species_name: name,
           host_id: to_string(socket.assigns.selected_host.id),
-          undescribed: "true"
+          undescribed: "true",
+          gallformers_code: gallformers_code
         })
 
       {:noreply,

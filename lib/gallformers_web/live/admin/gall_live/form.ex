@@ -202,10 +202,11 @@ defmodule GallformersWeb.Admin.GallLive.Form do
   defp init_undescribed_gall_state(socket, params) do
     name = params["species_name"]
     host_id = parse_int_param(params["host_id"])
+    gallformers_code = params["gallformers_code"]
 
     case Gallformers.Taxonomy.resolve_taxonomy_from_name(name) do
       {:ok, taxonomy} ->
-        init_undescribed_gall_with_taxonomy(socket, name, taxonomy, host_id)
+        init_undescribed_gall_with_taxonomy(socket, name, taxonomy, host_id, gallformers_code)
 
       {:error, reason} ->
         socket
@@ -214,7 +215,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     end
   end
 
-  defp init_undescribed_gall_with_taxonomy(socket, name, taxonomy, host_id) do
+  defp init_undescribed_gall_with_taxonomy(socket, name, taxonomy, host_id, gallformers_code) do
     gall = %SpeciesSchema{taxoncode: "gall", name: name}
     host = if host_id, do: Species.get_species(host_id)
 
@@ -228,6 +229,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(:taxonomy, taxonomy)
     |> assign(:selected_family_id, taxonomy.family && taxonomy.family.id)
     |> assign(:undescribed, true)
+    |> assign(:gallformers_code, gallformers_code)
     |> maybe_add_initial_host(host)
     |> apply_undescribed_lock(taxonomy)
     |> apply_datacomplete_lock()
