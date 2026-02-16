@@ -586,13 +586,13 @@ defmodule Gallformers.Species do
 
   Returns {:ok, species} on success, {:error, reason} on failure.
   """
-  @spec rename_species(integer(), String.t(), boolean(), String.t()) ::
+  @spec rename_species(integer(), String.t(), boolean()) ::
           {:ok, Species.t()} | {:error, atom() | String.t()}
-  def rename_species(species_id, new_name, add_alias?, alias_type \\ "scientific") do
+  def rename_species(species_id, new_name, add_alias?) do
     species = get_species!(species_id)
 
     Repo.transaction(fn ->
-      case do_rename(species, new_name, add_alias?, alias_type) do
+      case do_rename(species, new_name, add_alias?) do
         {:ok, updated} -> updated
         {:error, reason} -> Repo.rollback(reason)
       end
@@ -600,73 +600,22 @@ defmodule Gallformers.Species do
   end
 
   @doc """
-  Adds a rename alias for a species' old name.
-
-  The `type` parameter controls the alias type:
-  - `"scientific"` (default) — standard scientific synonym
-  - `"former_undescribed"` — preserves the Gallformers Code for iNat links
-    (at most one per species; skips if one already exists)
+  Adds a rename alias for a species' old name as a scientific synonym.
   """
-  def add_rename_alias(species_id, old_name, type \\ "scientific") do
-    if type == "former_undescribed" && has_former_undescribed_alias?(species_id) do
-      # Only keep the first undescribed name (the one iNat observations were tagged with)
-      nil
-    else
-      alias_changeset =
-        %Alias{}
-        |> Ecto.Changeset.cast(
-          %{name: old_name, type: type, description: "Previous name"},
-          [:name, :type, :description]
-        )
+  def add_rename_alias(species_id, old_name) do
+    alias_changeset =
+      %Alias{}
+      |> Ecto.Changeset.cast(
+        %{name: old_name, type: "scientific", description: "Previous name"},
+        [:name, :type, :description]
+      )
 
-      case Repo.insert(alias_changeset) do
-        {:ok, new_alias} ->
-          Repo.insert_all("alias_species", [%{alias_id: new_alias.id, species_id: species_id}])
+    case Repo.insert(alias_changeset) do
+      {:ok, new_alias} ->
+        Repo.insert_all("alias_species", [%{alias_id: new_alias.id, species_id: species_id}])
 
-        {:error, _} ->
-          nil
-      end
-    end
-  end
-
-  @doc """
-  Returns true if the species already has a `former_undescribed` alias.
-  """
-  @spec has_former_undescribed_alias?(integer()) :: boolean()
-  def has_former_undescribed_alias?(species_id) do
-    from(a in Alias,
-      join: als in "alias_species",
-      on: als.alias_id == a.id,
-      where: als.species_id == ^species_id and a.type == "former_undescribed"
-    )
-    |> Repo.exists?()
-  end
-
-  @doc """
-  Changes the existing `former_undescribed` alias for a species to type `"scientific"`.
-
-  This "rotates" the alias so that a new `former_undescribed` can be created
-  (e.g., when reclassifying an undescribed species that was already reclassified once).
-
-  Returns `{:ok, alias}` if rotated, or `{:ok, nil}` if no former_undescribed alias exists.
-  """
-  @spec rotate_former_undescribed_alias(integer()) ::
-          {:ok, Alias.t() | nil} | {:error, Ecto.Changeset.t()}
-  def rotate_former_undescribed_alias(species_id) do
-    case from(a in Alias,
-           join: als in "alias_species",
-           on: als.alias_id == a.id,
-           where: als.species_id == ^species_id and a.type == "former_undescribed",
-           select: a
-         )
-         |> Repo.one() do
-      nil ->
-        {:ok, nil}
-
-      alias_record ->
-        alias_record
-        |> Ecto.Changeset.change(%{type: "scientific"})
-        |> Repo.update()
+      {:error, _} ->
+        nil
     end
   end
 
@@ -690,32 +639,30 @@ defmodule Gallformers.Species do
       iex> rename_for_genus_change(species, "Quercus", "Oakus")
       {:ok, species}  # "Quercus alba" becomes "Oakus alba", synonym "Quercus alba" created
   """
-  @spec rename_for_genus_change(Species.t(), String.t(), String.t(), boolean(), keyword()) ::
+  @spec rename_for_genus_change(Species.t(), String.t(), String.t(), boolean()) ::
           {:ok, Species.t()} | {:error, :name_exists}
   def rename_for_genus_change(
         %Species{} = species,
         old_genus_name,
         new_genus_name,
-        add_alias? \\ true,
-        opts \\ []
+        add_alias? \\ true
       ) do
-    alias_type = Keyword.get(opts, :alias_type, "scientific")
     new_species_name = TaxonName.replace_genus(species.name, old_genus_name, new_genus_name)
 
-    do_rename(species, new_species_name, add_alias?, alias_type)
+    do_rename(species, new_species_name, add_alias?)
   end
 
   # Core rename helper used by all rename paths.
   # Checks for name collisions, optionally adds alias, updates species name, and updates FTS.
   # Must be called within a transaction when atomicity with other operations is needed.
-  defp do_rename(%Species{} = species, new_name, _add_alias?, _alias_type)
+  defp do_rename(%Species{} = species, new_name, _add_alias?)
        when new_name == species.name,
        do: {:ok, species}
 
-  defp do_rename(%Species{} = species, new_name, add_alias?, alias_type) do
+  defp do_rename(%Species{} = species, new_name, add_alias?) do
     case check_name_collision(species.id, new_name) do
       :ok ->
-        if add_alias?, do: add_rename_alias(species.id, species.name, alias_type)
+        if add_alias?, do: add_rename_alias(species.id, species.name)
 
         updated =
           species

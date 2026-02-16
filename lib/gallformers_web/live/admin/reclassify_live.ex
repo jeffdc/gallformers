@@ -65,17 +65,11 @@ defmodule GallformersWeb.Admin.ReclassifyLive do
     |> assign_new(:epithet, fn -> "" end)
     |> assign_new(:add_alias_on_rename, fn -> true end)
     |> assign_new(:rename_collisions, fn -> [] end)
-    |> assign_new(:has_former_undescribed, fn -> false end)
-    |> assign_new(:alias_choice, fn -> :keep end)
   end
 
   defp open_modal(socket) do
     taxonomy_genus = resolve_current_genus(socket.assigns.current_genus)
     epithet = Taxonomy.extract_epithet(socket.assigns.species_name)
-
-    has_former_undescribed =
-      socket.assigns.undescribed && socket.assigns.species_id &&
-        Species.has_former_undescribed_alias?(socket.assigns.species_id)
 
     socket
     |> assign(:show, true)
@@ -88,8 +82,6 @@ defmodule GallformersWeb.Admin.ReclassifyLive do
     |> assign(:epithet, epithet)
     |> assign(:add_alias_on_rename, true)
     |> assign(:rename_collisions, [])
-    |> assign(:has_former_undescribed, has_former_undescribed)
-    |> assign(:alias_choice, :keep)
   end
 
   defp resolve_current_genus(nil), do: nil
@@ -130,8 +122,6 @@ defmodule GallformersWeb.Admin.ReclassifyLive do
         add_alias_checked={@add_alias_on_rename}
         rename_collisions={@rename_collisions}
         is_gall={@is_gall}
-        has_former_undescribed={@has_former_undescribed}
-        alias_choice={to_string(@alias_choice)}
       />
     </div>
     """
@@ -267,12 +257,6 @@ defmodule GallformersWeb.Admin.ReclassifyLive do
   end
 
   @impl true
-  def handle_event("set_reclassify_alias_choice", %{"value" => value}, socket) do
-    choice = String.to_existing_atom(value)
-    {:noreply, assign(socket, :alias_choice, choice)}
-  end
-
-  @impl true
   def handle_event("do_reclassify", _params, %{assigns: %{selected_genus: nil}} = socket) do
     send(self(), {:reclassify_flash, :error, "Please select a genus"})
     {:noreply, socket}
@@ -319,18 +303,13 @@ defmodule GallformersWeb.Admin.ReclassifyLive do
   # -------------------------------------------------------------------
 
   defp execute_reclassify(socket, species_id, genus_id, new_name, old_name, opts) do
-    former_undescribed_choice =
-      if socket.assigns.has_former_undescribed, do: socket.assigns.alias_choice
-
     params = %{
       genus_id: genus_id,
       new_name: new_name,
       old_name: old_name,
       genus_changed?: opts[:genus_changed?],
       name_changed?: opts[:name_changed?],
-      add_alias?: opts[:add_alias?],
-      undescribed?: socket.assigns.undescribed,
-      former_undescribed_choice: former_undescribed_choice
+      add_alias?: opts[:add_alias?]
     }
 
     result = Taxonomy.reclassify_species(species_id, params)

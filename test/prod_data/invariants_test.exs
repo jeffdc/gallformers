@@ -355,22 +355,6 @@ defmodule Gallformers.ProdData.InvariantsTest do
              "Found #{length(bad_species)} alias_species rows with invalid species_id: #{inspect(Enum.take(bad_species, 10))}"
     end
 
-    test "no species has more than one alias of type former_undescribed" do
-      bad =
-        Repo.all(
-          from als in "alias_species",
-            join: a in "alias",
-            on: als.alias_id == a.id,
-            where: a.type == "former_undescribed",
-            group_by: als.species_id,
-            having: count(a.id) > 1,
-            select: %{species_id: als.species_id, count: count(a.id)}
-        )
-
-      assert bad == [],
-             "Found #{length(bad)} species with multiple former_undescribed aliases: #{inspect(Enum.take(bad, 10))}"
-    end
-
     test "no alias record exists without at least one alias_species link" do
       orphans =
         Repo.all(

@@ -299,9 +299,7 @@ defmodule Gallformers.TaxonomyTest do
         old_name: "ReclCollisionGenus1 testsp",
         genus_changed?: false,
         name_changed?: true,
-        add_alias?: true,
-        undescribed?: false,
-        former_undescribed_choice: nil
+        add_alias?: true
       }
 
       assert {:error, :name_exists} = Taxonomy.reclassify_species(species.id, params)
@@ -844,7 +842,7 @@ defmodule Gallformers.TaxonomyTest do
       assert updated2.name == "ReclassifyGenus2 testsp"
     end
 
-    test "creates former_undescribed alias when moving undescribed species to real genus", %{
+    test "creates scientific alias when moving undescribed species to real genus", %{
       species: species,
       family2: family2,
       genus2: genus2
@@ -852,9 +850,8 @@ defmodule Gallformers.TaxonomyTest do
       # Move to Unknown genus first (species starts described, so first alias is scientific)
       {:ok, unknown_genus} = Taxonomy.find_or_create_unknown_genus(family2.id)
       assert {:ok, _updated} = Taxonomy.reassign_species_taxonomy(species.id, unknown_genus.id)
-      # maybe_force_undescribed sets undescribed=true since genus is now Unknown
 
-      # Verify first move created a scientific alias (was described before move)
+      # Verify first move created a scientific alias
       scientific_aliases =
         from(a in Alias,
           join: as in "alias_species",
@@ -866,35 +863,31 @@ defmodule Gallformers.TaxonomyTest do
 
       assert length(scientific_aliases) == 1
 
-      # Now move from Unknown to a real genus — species is undescribed, so former_undescribed alias
+      # Now move from Unknown to a real genus — always creates scientific alias
       assert {:ok, _updated2} = Taxonomy.reassign_species_taxonomy(species.id, genus2.id)
 
-      # Verify alias with type "former_undescribed" was created
-      former_aliases =
+      all_aliases =
         from(a in Alias,
           join: as in "alias_species",
           on: as.alias_id == a.id,
-          where: as.species_id == ^species.id and a.type == "former_undescribed",
+          where: as.species_id == ^species.id,
           select: a
         )
         |> Repo.all()
 
-      assert length(former_aliases) == 1
-      [former] = former_aliases
-      # The alias preserves the Unknown name from when the species was undescribed
-      assert former.name == "Unknown (ReclassifyFamily2) testsp"
+      # All aliases should be scientific
+      assert Enum.all?(all_aliases, &(&1.type == "scientific"))
+      assert length(all_aliases) == 2
     end
 
-    test "creates scientific alias (not former_undescribed) for described Known→Known genus change",
+    test "creates scientific alias for Known→Known genus change",
          %{
            species: species,
            genus2: genus2
          } do
-      # species has undescribed: false in setup
       # Move from one real genus to another
       assert {:ok, _updated} = Taxonomy.reassign_species_taxonomy(species.id, genus2.id)
 
-      # Verify alias is "scientific", not "former_undescribed"
       aliases =
         from(a in Alias,
           join: as in "alias_species",
@@ -908,33 +901,6 @@ defmodule Gallformers.TaxonomyTest do
       [synonym] = aliases
       assert synonym.type == "scientific"
       assert synonym.name == "ReclassifyGenus1 testsp"
-    end
-
-    test "creates former_undescribed alias for undescribed Known→Known genus change", %{
-      species: species,
-      genus2: genus2
-    } do
-      # Mark species as undescribed (it's in a known genus but undescribed)
-      gall_traits = Repo.get!(GallTraits, species.id)
-      GallTraits.changeset(gall_traits, %{undescribed: true}) |> Repo.update!()
-
-      # Move from one real genus to another
-      assert {:ok, _updated} = Taxonomy.reassign_species_taxonomy(species.id, genus2.id)
-
-      # Verify alias is "former_undescribed" because species was undescribed
-      aliases =
-        from(a in Alias,
-          join: as in "alias_species",
-          on: as.alias_id == a.id,
-          where: as.species_id == ^species.id,
-          select: a
-        )
-        |> Repo.all()
-
-      assert length(aliases) == 1
-      [alias_record] = aliases
-      assert alias_record.type == "former_undescribed"
-      assert alias_record.name == "ReclassifyGenus1 testsp"
     end
 
     test "target_epithet overrides the extracted epithet", %{
@@ -976,7 +942,7 @@ defmodule Gallformers.TaxonomyTest do
       assert updated.name == "ReclassifyGenus2 testsp"
     end
 
-    test "only keeps first former_undescribed alias per species", %{
+    test "creates scientific aliases for multiple reclassifications", %{
       species: species,
       family1: family1,
       family2: family2,
@@ -987,188 +953,27 @@ defmodule Gallformers.TaxonomyTest do
       {:ok, unknown1} = Taxonomy.find_or_create_unknown_genus(family2.id)
       assert {:ok, _} = Taxonomy.reassign_species_taxonomy(species.id, unknown1.id)
 
-      # Move to real genus (creates former_undescribed alias)
+      # Move to real genus (creates scientific alias)
       assert {:ok, _} = Taxonomy.reassign_species_taxonomy(species.id, genus2.id)
 
       # Move back to Unknown
       {:ok, unknown2} = Taxonomy.find_or_create_unknown_genus(family1.id)
       assert {:ok, _} = Taxonomy.reassign_species_taxonomy(species.id, unknown2.id)
 
-      # Move to real genus again (should NOT create a second former_undescribed)
+      # Move to real genus again
       assert {:ok, _} = Taxonomy.reassign_species_taxonomy(species.id, genus1.id)
 
-      former_aliases =
+      all_aliases =
         from(a in Alias,
           join: as in "alias_species",
           on: as.alias_id == a.id,
-          where: as.species_id == ^species.id and a.type == "former_undescribed",
+          where: as.species_id == ^species.id,
           select: a
         )
         |> Repo.all()
 
-      assert length(former_aliases) == 1
-    end
-  end
-
-  describe "has_former_undescribed_alias?/1 and rotate_former_undescribed_alias/1" do
-    setup do
-      {:ok, species} =
-        Repo.insert(%Species{
-          name: "Testgenus testsp",
-          taxoncode: "gall",
-          datacomplete: false
-        })
-
-      {:ok, species: species}
-    end
-
-    test "has_former_undescribed_alias? returns false when no aliases", %{species: species} do
-      refute Gallformers.Species.has_former_undescribed_alias?(species.id)
-    end
-
-    test "has_former_undescribed_alias? returns true when former_undescribed alias exists", %{
-      species: species
-    } do
-      Gallformers.Species.add_rename_alias(species.id, "OldCode123", "former_undescribed")
-      assert Gallformers.Species.has_former_undescribed_alias?(species.id)
-    end
-
-    test "has_former_undescribed_alias? returns false when only scientific aliases exist", %{
-      species: species
-    } do
-      Gallformers.Species.add_rename_alias(species.id, "OldName", "scientific")
-      refute Gallformers.Species.has_former_undescribed_alias?(species.id)
-    end
-
-    test "rotate_former_undescribed_alias changes type to scientific", %{species: species} do
-      Gallformers.Species.add_rename_alias(species.id, "OldCode123", "former_undescribed")
-      assert Gallformers.Species.has_former_undescribed_alias?(species.id)
-
-      {:ok, rotated} = Gallformers.Species.rotate_former_undescribed_alias(species.id)
-      assert rotated.type == "scientific"
-      assert rotated.name == "OldCode123"
-
-      # No longer has former_undescribed
-      refute Gallformers.Species.has_former_undescribed_alias?(species.id)
-    end
-
-    test "rotate_former_undescribed_alias returns {:ok, nil} when no alias exists", %{
-      species: species
-    } do
-      assert {:ok, nil} = Gallformers.Species.rotate_former_undescribed_alias(species.id)
-    end
-  end
-
-  describe "reassign with former_undescribed_choice" do
-    alias Gallformers.Galls.GallTraits
-
-    setup do
-      {:ok, family1} =
-        Taxonomy.create_taxonomy(%{
-          name: "FUChoiceFamily1",
-          type: "family",
-          description: "Wasp"
-        })
-
-      {:ok, genus1} =
-        Taxonomy.create_taxonomy(%{
-          name: "FUChoiceGenus1",
-          type: "genus",
-          parent_id: family1.id
-        })
-
-      {:ok, family2} =
-        Taxonomy.create_taxonomy(%{
-          name: "FUChoiceFamily2",
-          type: "family",
-          description: "Midge"
-        })
-
-      {:ok, genus2} =
-        Taxonomy.create_taxonomy(%{
-          name: "FUChoiceGenus2",
-          type: "genus",
-          parent_id: family2.id
-        })
-
-      # Species starts in genus1 with a former_undescribed alias (simulating prior reclassification)
-      {:ok, species} =
-        Repo.insert(%Species{
-          name: "FUChoiceGenus1 testsp",
-          taxoncode: "gall",
-          datacomplete: false
-        })
-
-      Taxonomy.link_species_to_taxonomy(species.id, genus1.id)
-
-      {:ok, _gall_traits} =
-        Repo.insert(%GallTraits{
-          species_id: species.id,
-          undescribed: true,
-          detachable: "unknown"
-        })
-
-      # Add existing former_undescribed alias (simulating original Gallformers Code)
-      Gallformers.Species.add_rename_alias(species.id, "OriginalCode A", "former_undescribed")
-
-      {:ok, genus1: genus1, genus2: genus2, species: species}
-    end
-
-    test "keep choice: preserves former_undescribed, adds scientific alias", %{
-      species: species,
-      genus2: genus2
-    } do
-      # Reclassify with keep choice
-      assert {:ok, updated} =
-               Taxonomy.reassign_species_taxonomy(species.id, genus2.id,
-                 add_alias?: true,
-                 alias_type: "scientific",
-                 rotate_former_undescribed: false
-               )
-
-      assert updated.name == "FUChoiceGenus2 testsp"
-
-      # Check aliases
-      aliases = Gallformers.Species.get_aliases_for_species(species.id)
-
-      former_aliases = Enum.filter(aliases, &(&1.type == "former_undescribed"))
-      scientific_aliases = Enum.filter(aliases, &(&1.type == "scientific"))
-
-      # Original former_undescribed should still be there
-      assert length(former_aliases) == 1
-      assert hd(former_aliases).name == "OriginalCode A"
-
-      # Old name should be added as scientific
-      assert length(scientific_aliases) == 1
-      assert hd(scientific_aliases).name == "FUChoiceGenus1 testsp"
-    end
-
-    test "replace choice: rotates former_undescribed, adds new former_undescribed", %{
-      species: species,
-      genus2: genus2
-    } do
-      # Reclassify with replace choice
-      assert {:ok, updated} =
-               Taxonomy.reassign_species_taxonomy(species.id, genus2.id,
-                 add_alias?: true,
-                 alias_type: "former_undescribed",
-                 rotate_former_undescribed: true
-               )
-
-      assert updated.name == "FUChoiceGenus2 testsp"
-
-      # Check aliases
-      aliases = Gallformers.Species.get_aliases_for_species(species.id)
-
-      former_aliases = Enum.filter(aliases, &(&1.type == "former_undescribed"))
-      scientific_aliases = Enum.filter(aliases, &(&1.type == "scientific"))
-
-      # Old former_undescribed should now be scientific
-      assert Enum.any?(scientific_aliases, &(&1.name == "OriginalCode A"))
-
-      # New former_undescribed should be the intermediate name
-      assert length(former_aliases) == 1
-      assert hd(former_aliases).name == "FUChoiceGenus1 testsp"
+      # All aliases should be scientific
+      assert Enum.all?(all_aliases, &(&1.type == "scientific"))
     end
   end
 
@@ -1233,9 +1038,7 @@ defmodule Gallformers.TaxonomyTest do
         old_name: "ReclSpGenus1 testsp",
         genus_changed?: true,
         name_changed?: true,
-        add_alias?: true,
-        undescribed?: false,
-        former_undescribed_choice: nil
+        add_alias?: true
       }
 
       assert {:ok, updated} = Taxonomy.reclassify_species(species.id, params)
@@ -1257,9 +1060,7 @@ defmodule Gallformers.TaxonomyTest do
         old_name: "ReclSpGenus1 testsp",
         genus_changed?: false,
         name_changed?: true,
-        add_alias?: true,
-        undescribed?: false,
-        former_undescribed_choice: nil
+        add_alias?: true
       }
 
       assert {:ok, updated} = Taxonomy.reclassify_species(species.id, params)
@@ -1281,9 +1082,7 @@ defmodule Gallformers.TaxonomyTest do
         old_name: "ReclSpGenus1 testsp",
         genus_changed?: false,
         name_changed?: false,
-        add_alias?: true,
-        undescribed?: false,
-        former_undescribed_choice: nil
+        add_alias?: true
       }
 
       assert {:ok, returned} = Taxonomy.reclassify_species(species.id, params)
@@ -1291,42 +1090,6 @@ defmodule Gallformers.TaxonomyTest do
 
       aliases = Gallformers.Species.get_aliases_for_species(species.id)
       assert aliases == []
-    end
-
-    test "former_undescribed_choice :keep uses scientific alias type", %{
-      species: species,
-      genus2: genus2
-    } do
-      # Mark species as undescribed and add a former_undescribed alias
-      gall_traits = Repo.get!(GallTraits, species.id)
-      GallTraits.changeset(gall_traits, %{undescribed: true}) |> Repo.update!()
-      Gallformers.Species.add_rename_alias(species.id, "OldCode X", "former_undescribed")
-
-      params = %{
-        genus_id: genus2.id,
-        new_name: "ReclSpGenus2 testsp",
-        old_name: "ReclSpGenus1 testsp",
-        genus_changed?: true,
-        name_changed?: true,
-        add_alias?: true,
-        undescribed?: true,
-        former_undescribed_choice: :keep
-      }
-
-      assert {:ok, updated} = Taxonomy.reclassify_species(species.id, params)
-      assert updated.name == "ReclSpGenus2 testsp"
-
-      aliases = Gallformers.Species.get_aliases_for_species(species.id)
-      former = Enum.filter(aliases, &(&1.type == "former_undescribed"))
-      scientific = Enum.filter(aliases, &(&1.type == "scientific"))
-
-      # Original former_undescribed preserved
-      assert length(former) == 1
-      assert hd(former).name == "OldCode X"
-
-      # Old name added as scientific
-      assert length(scientific) == 1
-      assert hd(scientific).name == "ReclSpGenus1 testsp"
     end
 
     test "combined genus and epithet change produces final name atomically", %{
@@ -1339,9 +1102,7 @@ defmodule Gallformers.TaxonomyTest do
         old_name: "ReclSpGenus1 testsp",
         genus_changed?: true,
         name_changed?: true,
-        add_alias?: true,
-        undescribed?: false,
-        former_undescribed_choice: nil
+        add_alias?: true
       }
 
       assert {:ok, updated} = Taxonomy.reclassify_species(species.id, params)
@@ -1351,41 +1112,6 @@ defmodule Gallformers.TaxonomyTest do
       aliases = Gallformers.Species.get_aliases_for_species(species.id)
       assert length(aliases) == 1
       assert hd(aliases).name == "ReclSpGenus1 testsp"
-    end
-
-    test "former_undescribed_choice :replace rotates existing and adds new former_undescribed", %{
-      species: species,
-      genus2: genus2
-    } do
-      # Mark species as undescribed and add a former_undescribed alias
-      gall_traits = Repo.get!(GallTraits, species.id)
-      GallTraits.changeset(gall_traits, %{undescribed: true}) |> Repo.update!()
-      Gallformers.Species.add_rename_alias(species.id, "OldCode X", "former_undescribed")
-
-      params = %{
-        genus_id: genus2.id,
-        new_name: "ReclSpGenus2 testsp",
-        old_name: "ReclSpGenus1 testsp",
-        genus_changed?: true,
-        name_changed?: true,
-        add_alias?: true,
-        undescribed?: true,
-        former_undescribed_choice: :replace
-      }
-
-      assert {:ok, updated} = Taxonomy.reclassify_species(species.id, params)
-      assert updated.name == "ReclSpGenus2 testsp"
-
-      aliases = Gallformers.Species.get_aliases_for_species(species.id)
-      former = Enum.filter(aliases, &(&1.type == "former_undescribed"))
-      scientific = Enum.filter(aliases, &(&1.type == "scientific"))
-
-      # Old former_undescribed rotated to scientific
-      assert Enum.any?(scientific, &(&1.name == "OldCode X"))
-
-      # New former_undescribed for the old name
-      assert length(former) == 1
-      assert hd(former).name == "ReclSpGenus1 testsp"
     end
   end
 

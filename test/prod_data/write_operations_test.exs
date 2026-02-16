@@ -128,9 +128,7 @@ defmodule Gallformers.ProdData.WriteOperationsTest do
             old_name: old_name,
             genus_changed?: true,
             name_changed?: true,
-            add_alias?: true,
-            undescribed?: false,
-            former_undescribed_choice: nil
+            add_alias?: true
           })
 
         # Species name updated
@@ -176,9 +174,7 @@ defmodule Gallformers.ProdData.WriteOperationsTest do
             old_name: old_name,
             genus_changed?: true,
             name_changed?: true,
-            add_alias?: true,
-            undescribed?: false,
-            former_undescribed_choice: nil
+            add_alias?: true
           })
 
         assert updated.name == new_name
@@ -238,9 +234,7 @@ defmodule Gallformers.ProdData.WriteOperationsTest do
             old_name: old_name,
             genus_changed?: true,
             name_changed?: true,
-            add_alias?: true,
-            undescribed?: false,
-            former_undescribed_choice: nil
+            add_alias?: true
           })
 
         # Old section link should be removed
@@ -266,9 +260,7 @@ defmodule Gallformers.ProdData.WriteOperationsTest do
           old_name: old_name,
           genus_changed?: false,
           name_changed?: true,
-          add_alias?: true,
-          undescribed?: false,
-          former_undescribed_choice: nil
+          add_alias?: true
         })
 
       assert updated.name == new_name
@@ -294,9 +286,7 @@ defmodule Gallformers.ProdData.WriteOperationsTest do
           old_name: species.name,
           genus_changed?: false,
           name_changed?: false,
-          add_alias?: false,
-          undescribed?: false,
-          former_undescribed_choice: nil
+          add_alias?: false
         })
 
       # Same species returned
@@ -353,9 +343,7 @@ defmodule Gallformers.ProdData.WriteOperationsTest do
             old_name: old_name,
             genus_changed?: true,
             name_changed?: true,
-            add_alias?: true,
-            undescribed?: true,
-            former_undescribed_choice: nil
+            add_alias?: true
           })
 
         # Name updated to use real genus
@@ -415,9 +403,7 @@ defmodule Gallformers.ProdData.WriteOperationsTest do
             old_name: old_name,
             genus_changed?: true,
             name_changed?: true,
-            add_alias?: true,
-            undescribed?: false,
-            former_undescribed_choice: nil
+            add_alias?: true
           })
 
         # Name should reflect the Unknown genus
@@ -761,9 +747,7 @@ defmodule Gallformers.ProdData.WriteOperationsTest do
           old_name: "Nonexistent species",
           genus_changed?: true,
           name_changed?: true,
-          add_alias?: true,
-          undescribed?: false,
-          former_undescribed_choice: nil
+          add_alias?: true
         })
       end
     end
@@ -798,9 +782,7 @@ defmodule Gallformers.ProdData.WriteOperationsTest do
             old_name: sp1.species_name,
             genus_changed?: false,
             name_changed?: true,
-            add_alias?: true,
-            undescribed?: false,
-            former_undescribed_choice: nil
+            add_alias?: true
           })
 
         assert {:error, :name_exists} = result

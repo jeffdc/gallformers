@@ -1088,14 +1088,6 @@ defmodule GallformersWeb.FormComponents do
     default: false,
     doc: "whether this is a gall (enables Unknown genus warnings)"
 
-  attr :has_former_undescribed, :boolean,
-    default: false,
-    doc: "whether the species already has a former_undescribed alias"
-
-  attr :alias_choice, :string,
-    default: "keep",
-    doc: "how to handle existing former_undescribed alias: 'keep' or 'replace'"
-
   attr :target, :any, default: nil, doc: "phx-target for events (use @myself for LiveComponents)"
 
   def reclassify_modal(assigns) do
@@ -1183,49 +1175,18 @@ defmodule GallformersWeb.FormComponents do
         </.alert>
 
         <%!-- Alias handling --%>
-        <%= if @has_former_undescribed do %>
-          <%!-- Species already has a former_undescribed alias — show radio group --%>
-          <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
-            <.icon name="ph-info" class="h-4 w-4 inline mr-1" />
-            This species already has a former undescribed alias. Choose how to handle
-            the old name when reclassifying.
-          </div>
-          <form phx-change="set_reclassify_alias_choice" phx-target={@target} class="mt-3">
-            <.radio_group
-              id="reclassify-alias-choice"
-              name="value"
-              options={[
-                %{
-                  value: "keep",
-                  label: "Keep original (recommended)",
-                  description:
-                    "Keep existing former undescribed alias. Add old name as scientific synonym."
-                },
-                %{
-                  value: "replace",
-                  label: "Replace",
-                  description:
-                    "Replace existing former undescribed alias with this name. Move old alias to scientific."
-                }
-              ]}
-              value={@alias_choice}
+        <div class="mt-4">
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={@add_alias_checked}
+              phx-click="toggle_add_alias_on_rename"
+              phx-target={@target}
+              class="w-5 h-5 rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon"
             />
-          </form>
-        <% else %>
-          <%!-- Standard alias checkbox --%>
-          <div class="mt-4">
-            <label class="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={@add_alias_checked}
-                phx-click="toggle_add_alias_on_rename"
-                phx-target={@target}
-                class="w-5 h-5 rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon"
-              />
-              <span class="text-sm text-gray-700">Add scientific synonym alias for old name</span>
-            </label>
-          </div>
-        <% end %>
+            <span class="text-sm text-gray-700">Add scientific synonym alias for old name</span>
+          </label>
+        </div>
 
         <%!-- Warning about undescribed lock --%>
         <div

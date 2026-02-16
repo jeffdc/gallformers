@@ -26,8 +26,6 @@ defmodule Gallformers.Taxonomy.Reclassification do
   - `genus_changed?` - whether the genus is changing
   - `name_changed?` - whether the name is changing
   - `add_alias?` - whether to create an alias for the old name
-  - `undescribed?` - whether the species is currently undescribed
-  - `former_undescribed_choice` - `:keep`, `:replace`, or `nil`
 
   Returns `{:ok, species}` or `{:error, reason}`.
   """
@@ -41,35 +39,20 @@ defmodule Gallformers.Taxonomy.Reclassification do
       genus_id: genus_id
     } = params
 
-    {alias_type, rotate?} = resolve_alias_opts(params)
-
     cond do
       genus_changed? ->
         target_epithet = TaxonName.epithet(new_name)
 
         reassign_species_taxonomy(species_id, genus_id,
           add_alias?: add_alias?,
-          alias_type: alias_type,
-          rotate_former_undescribed: rotate?,
           target_epithet: target_epithet
         )
 
       name_changed? ->
-        if rotate?,
-          do: Gallformers.Species.rotate_former_undescribed_alias(species_id)
-
-        Gallformers.Species.rename_species(species_id, new_name, add_alias?, alias_type)
+        Gallformers.Species.rename_species(species_id, new_name, add_alias?)
 
       true ->
         {:ok, Repo.get!(Species, species_id)}
-    end
-  end
-
-  defp resolve_alias_opts(params) do
-    case params[:former_undescribed_choice] do
-      :keep -> {"scientific", false}
-      :replace -> {"former_undescribed", true}
-      nil -> {if(params[:undescribed?], do: "former_undescribed", else: "scientific"), false}
     end
   end
 
@@ -87,24 +70,17 @@ defmodule Gallformers.Taxonomy.Reclassification do
           {:ok, Species.t()} | {:error, term()}
   def reassign_species_taxonomy(species_id, new_genus_id, opts \\ []) do
     add_alias? = Keyword.get(opts, :add_alias?, true)
-    rotate_former_undescribed = Keyword.get(opts, :rotate_former_undescribed, false)
-    explicit_alias_type = Keyword.get(opts, :alias_type)
     target_epithet = Keyword.get(opts, :target_epithet)
-    # Capture undescribed state BEFORE force_undescribed_if_placeholder changes it
-    was_undescribed? = Gallformers.Galls.undescribed?(species_id)
 
     Repo.transaction(fn ->
       case SpeciesLink.update_species_genus(species_id, new_genus_id) do
         :ok ->
           Gallformers.Galls.force_undescribed_if_placeholder(species_id, new_genus_id)
-          maybe_rotate_former_undescribed(species_id, rotate_former_undescribed)
 
           rename_species_for_reclassification(
             species_id,
             new_genus_id,
             add_alias?,
-            was_undescribed?,
-            explicit_alias_type,
             target_epithet
           )
 
@@ -120,14 +96,7 @@ defmodule Gallformers.Taxonomy.Reclassification do
 
   # Renames a species to reflect its new genus after reclassification.
   # Returns the updated species or calls Repo.rollback on collision.
-  defp rename_species_for_reclassification(
-         species_id,
-         new_genus_id,
-         add_alias?,
-         was_undescribed?,
-         explicit_alias_type,
-         target_epithet
-       ) do
+  defp rename_species_for_reclassification(species_id, new_genus_id, add_alias?, target_epithet) do
     species = Repo.get!(Species, species_id)
     genus = Tree.get_taxonomy!(new_genus_id) |> Repo.preload(:parent)
     new_genus_display = Taxonomy.display_name(genus)
@@ -138,27 +107,19 @@ defmodule Gallformers.Taxonomy.Reclassification do
     if new_name == species.name do
       species
     else
-      alias_type = resolve_reclassify_alias_type(explicit_alias_type, was_undescribed?)
       old_genus_display = TaxonName.genus_display(species.name)
 
-      do_reclassify_rename(species, old_genus_display, new_genus_display, new_name, add_alias?,
-        alias_type: alias_type
-      )
+      do_reclassify_rename(species, old_genus_display, new_genus_display, new_name, add_alias?)
     end
   end
 
-  defp resolve_reclassify_alias_type(nil, true), do: "former_undescribed"
-  defp resolve_reclassify_alias_type(nil, false), do: "scientific"
-  defp resolve_reclassify_alias_type(explicit, _), do: explicit
-
   # Performs genus rename then optional epithet correction, rolling back on collision.
-  defp do_reclassify_rename(species, old_genus, new_genus, final_name, add_alias?, opts) do
+  defp do_reclassify_rename(species, old_genus, new_genus, final_name, add_alias?) do
     case Gallformers.Species.rename_for_genus_change(
            species,
            old_genus,
            new_genus,
-           add_alias?,
-           opts
+           add_alias?
          ) do
       {:ok, updated} ->
         maybe_correct_epithet(updated, final_name)
@@ -177,12 +138,6 @@ defmodule Gallformers.Taxonomy.Reclassification do
       {:ok, final} -> final
       {:error, reason} -> Repo.rollback(reason)
     end
-  end
-
-  defp maybe_rotate_former_undescribed(_species_id, false), do: :ok
-
-  defp maybe_rotate_former_undescribed(species_id, true) do
-    Gallformers.Species.rotate_former_undescribed_alias(species_id)
   end
 
   # =====================================================================
