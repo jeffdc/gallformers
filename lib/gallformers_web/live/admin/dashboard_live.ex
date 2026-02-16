@@ -27,11 +27,21 @@ defmodule GallformersWeb.Admin.DashboardLive do
       <%!-- Quick Actions Toolbar --%>
       <div class="relative">
         <p class="text-sm text-gray-500 absolute right-0 top-0.5">
-          Need help? Ask in the <a
+          <a
+            href="https://github.com/jeffdc/gallformers/blob/main/docs/ops/admin-onboarding.md"
+            target="_blank"
+            class="text-gf-maroon hover:underline"
+          >
+            Getting Started Guide
+          </a>
+          ·
+          <a
             href="https://discord.com/channels/1178401400821125122/1180224727978094632"
             target="_blank"
             class="text-gf-maroon hover:underline"
-          >Discord</a>.
+          >
+            Discord
+          </a>
         </p>
         <h2 class="text-sm font-medium text-gray-500 mb-3">
           Quick Actions

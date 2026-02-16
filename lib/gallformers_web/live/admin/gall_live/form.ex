@@ -1172,7 +1172,9 @@ defmodule GallformersWeb.Admin.GallLive.Form do
                       type="checkbox"
                       name={@form[:datacomplete].name}
                       value="true"
-                      checked={Phoenix.HTML.Form.normalize_value("checkbox", @form[:datacomplete].value)}
+                      checked={
+                        Phoenix.HTML.Form.normalize_value("checkbox", @form[:datacomplete].value)
+                      }
                       disabled={@datacomplete_locked}
                       class="rounded border-gray-300 text-gf-maroon focus:ring-gf-maroon disabled:opacity-50"
                     />

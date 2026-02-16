@@ -1,9 +1,9 @@
 ---
-status: raw
+status: done
 created: 2026-02-13
-updated: 2026-02-13
-relates: [9005]
+updated: 2026-02-16
 epic: 1-foundation
+relates: [9005]
 ---
 
 # Admin onboarding documentation
