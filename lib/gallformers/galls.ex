@@ -687,6 +687,31 @@ defmodule Gallformers.Galls do
   end
 
   @doc """
+  Computes whether the datacomplete checkbox should be locked and why.
+
+  A gall's datacomplete flag is locked to `false` when:
+  - The species has no sources linked — a source is required for completeness
+  - The gall is marked undescribed — undescribed species are by definition incomplete
+
+  Returns `{locked?, reason}` where reason is a string explaining the lock, or nil if unlocked.
+  """
+  @spec compute_datacomplete_lock(integer() | nil) :: {boolean(), String.t() | nil}
+  def compute_datacomplete_lock(nil), do: {false, nil}
+
+  def compute_datacomplete_lock(species_id) do
+    cond do
+      not Gallformers.Sources.has_sources?(species_id) ->
+        {true, "A source is required to mark a gall as data complete."}
+
+      undescribed?(species_id) ->
+        {true, "An undescribed gall cannot be marked as data complete."}
+
+      true ->
+        {false, nil}
+    end
+  end
+
+  @doc """
   Forces undescribed=true if the given genus is a placeholder (Unknown).
   No-op if genus is not a placeholder or species has no gall_traits.
   """
