@@ -319,6 +319,7 @@ defmodule Gallformers.Places do
       key: "p-#{place.code}",
       label: place.name,
       name: place.name,
+      rank: nil,
       url: "/place/#{place.code}"
     }
 

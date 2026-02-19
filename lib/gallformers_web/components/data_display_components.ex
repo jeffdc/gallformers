@@ -30,7 +30,7 @@ defmodule GallformersWeb.DataDisplayComponents do
       <.taxon_name name="Ichneumonoidea" rank="auto" />
   """
   attr :name, :string, required: true
-  attr :rank, :string, default: "species"
+  attr :rank, :any, default: "species"
   attr :class, :any, default: nil
 
   def taxon_name(assigns) do

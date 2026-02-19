@@ -248,7 +248,9 @@ defmodule Gallformers.Taxonomy.TaxonName do
       iex> italicize_rank?("family")
       false
   """
-  @spec italicize_rank?(String.t()) :: boolean()
+  @spec italicize_rank?(String.t() | nil) :: boolean()
+  def italicize_rank?(nil), do: false
+
   def italicize_rank?(rank) when is_binary(rank) do
     rank in ["species", "genus", "section"]
   end

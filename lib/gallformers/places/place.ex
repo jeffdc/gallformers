@@ -19,7 +19,7 @@ defmodule Gallformers.Places.Place do
           type: String.t() | nil
         }
 
-  @place_types ~w(state province country region)
+  @place_types ~w(state province country continent region)
 
   schema "place" do
     field :name, :string
@@ -58,7 +58,6 @@ defmodule Gallformers.Places.Place do
     |> validate_inclusion(:type, @place_types)
     |> validate_length(:name, min: 1, max: 100)
     |> validate_length(:code, min: 1, max: 10)
-    |> unique_constraint(:name)
     |> unique_constraint(:code)
   end
 

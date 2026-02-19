@@ -252,6 +252,11 @@ defmodule GallformersWeb.HostLive do
     {:noreply, assign(socket, synonymy_page: page)}
   end
 
+  @impl true
+  def handle_event("navigate_to_place", %{"code" => code}, socket) do
+    {:noreply, push_navigate(socket, to: "/place/#{code}")}
+  end
+
   defp sorted_galls(galls, sort_by, sort_dir) do
     sorted =
       case sort_by do
@@ -572,6 +577,7 @@ defmodule GallformersWeb.HostLive do
                   id="host-range-map"
                   in_range={MapSet.to_list(@range)}
                   inherited_range={@inherited_range}
+                  navigable
                 />
                 <div
                   :if={@inherited_range != []}

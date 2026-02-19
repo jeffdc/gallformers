@@ -273,6 +273,11 @@ defmodule GallformersWeb.GallLive do
     {:noreply, assign(socket, sources_expanded: true)}
   end
 
+  @impl true
+  def handle_event("navigate_to_place", %{"code" => code}, socket) do
+    {:noreply, push_navigate(socket, to: "/place/#{code}")}
+  end
+
   defp paginated_aliases(aliases, current_page, page_size) do
     aliases
     |> Enum.drop((current_page - 1) * page_size)
@@ -497,6 +502,7 @@ defmodule GallformersWeb.GallLive do
                     in_range={MapSet.to_list(@range)}
                     inherited_range={@inherited_range}
                     excluded_range={MapSet.to_list(@excluded_range)}
+                    navigable
                   />
                   <div
                     :if={@inherited_range != []}

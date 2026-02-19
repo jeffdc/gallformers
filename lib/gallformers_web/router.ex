@@ -159,6 +159,7 @@ defmodule GallformersWeb.Router do
       live "/articles/:slug", ArticleLive
       live "/globalsearch", SearchLive
       live "/explore", ExploreLive
+      live "/places", PlacesLive
 
       # ID Tool
       live "/id", IDLive
@@ -174,7 +175,7 @@ defmodule GallformersWeb.Router do
       live "/genus/:id", GenusLive
       live "/source/:id", SourceLive
       live "/section/:id", SectionLive
-      live "/place/:id", PlaceLive
+      live "/place/:code", PlaceLive
 
       # User profiles
       live "/user/:nickname", UserProfileLive

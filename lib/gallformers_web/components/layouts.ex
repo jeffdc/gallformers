@@ -59,7 +59,8 @@ defmodule GallformersWeb.Layouts do
   def site_header(assigns) do
     nav_links = [
       %{href: "/id", label: "Identify"},
-      %{href: "/explore", label: "Explore"}
+      %{href: "/explore", label: "Explore"},
+      %{href: "/places", label: "Places"}
     ]
 
     resource_links = [
