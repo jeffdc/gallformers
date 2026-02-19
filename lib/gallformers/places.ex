@@ -34,6 +34,18 @@ defmodule Gallformers.Places do
   end
 
   @doc """
+  Gets a place by name (case-insensitive). Used for V1 URL compatibility.
+  """
+  @spec get_place_by_name(String.t()) :: Place.t() | nil
+  def get_place_by_name(name) do
+    from(p in Place,
+      where: fragment("lower(?) = lower(?)", p.name, ^name),
+      limit: 1
+    )
+    |> Repo.one()
+  end
+
+  @doc """
   Gets a place by ID.
   """
   @spec get_place(integer()) :: Place.t() | nil
@@ -84,6 +96,24 @@ defmodule Gallformers.Places do
   end
 
   @doc """
+  Searches subdivision-level places (states/provinces) by name.
+
+  Used by the ID tool where only subdivisions are relevant for filtering.
+  """
+  @spec search_subdivision_places(String.t(), integer()) :: [Place.t()]
+  def search_subdivision_places(query, limit \\ 20) do
+    search_pattern = "%#{String.downcase(query)}%"
+
+    from(p in Place,
+      where:
+        p.type in ["state", "province"] and fragment("lower(?) LIKE ?", p.name, ^search_pattern),
+      order_by: p.name,
+      limit: ^limit
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Returns all places ordered by type then name.
   """
   @spec list_all_places() :: [Place.t()]
@@ -92,6 +122,77 @@ defmodule Gallformers.Places do
       order_by: [p.type, p.name]
     )
     |> Repo.all()
+  end
+
+  # Hierarchy traversal using WITH RECURSIVE CTEs
+
+  @doc """
+  Returns IDs for a place and all its descendants (recursive).
+  """
+  @spec descendant_ids(integer()) :: [integer()]
+  def descendant_ids(place_id) do
+    {:ok, %{rows: rows}} =
+      Repo.query(
+        """
+        WITH RECURSIVE descendants(id) AS (
+          SELECT ?1
+          UNION ALL
+          SELECT ph.place_id
+          FROM place_hierarchy ph
+          JOIN descendants d ON ph.parent_id = d.id
+        )
+        SELECT id FROM descendants
+        """,
+        [place_id]
+      )
+
+    Enum.map(rows, fn [id] -> id end)
+  end
+
+  @doc """
+  Returns IDs for a place and all its ancestors (recursive).
+  """
+  @spec ancestor_ids(integer()) :: [integer()]
+  def ancestor_ids(place_id) do
+    {:ok, %{rows: rows}} =
+      Repo.query(
+        """
+        WITH RECURSIVE ancestors(id) AS (
+          SELECT ?1
+          UNION ALL
+          SELECT ph.parent_id
+          FROM place_hierarchy ph
+          JOIN ancestors a ON ph.place_id = a.id
+        )
+        SELECT id FROM ancestors
+        """,
+        [place_id]
+      )
+
+    Enum.map(rows, fn [id] -> id end)
+  end
+
+  @doc """
+  Returns IDs for leaf descendants only (places with no children).
+  For a leaf place, returns just itself.
+  """
+  @spec leaf_descendant_ids(integer()) :: [integer()]
+  def leaf_descendant_ids(place_id) do
+    all_ids = descendant_ids(place_id)
+
+    if length(all_ids) == 1 do
+      all_ids
+    else
+      parent_ids =
+        from(ph in "place_hierarchy",
+          where: ph.parent_id in ^all_ids,
+          select: ph.parent_id,
+          distinct: true
+        )
+        |> Repo.all()
+
+      Enum.reject(all_ids, &(&1 in parent_ids))
+    end
   end
 
   # Range management - semantic wrappers for V2 schema
