@@ -208,25 +208,11 @@ defmodule Gallformers.Ranges do
   """
   @spec update_host_places(integer(), [{integer(), String.t()}] | [integer()]) :: {:ok, map()}
   def update_host_places(host_species_id, place_entries) do
+    entries = normalize_place_entries(host_species_id, place_entries)
+
     Repo.transaction(fn ->
-      from(hr in HostRange,
-        where: hr.species_id == ^host_species_id
-      )
-      |> Repo.delete_all()
-
-      if place_entries != [] do
-        entries =
-          Enum.map(place_entries, fn
-            {place_id, precision} ->
-              %{species_id: host_species_id, place_id: place_id, precision: precision}
-
-            place_id when is_integer(place_id) ->
-              %{species_id: host_species_id, place_id: place_id, precision: "exact"}
-          end)
-
-        Repo.insert_all(HostRange, entries)
-      end
-
+      from(hr in HostRange, where: hr.species_id == ^host_species_id) |> Repo.delete_all()
+      if entries != [], do: Repo.insert_all(HostRange, entries)
       :ok
     end)
 
@@ -335,25 +321,13 @@ defmodule Gallformers.Ranges do
   """
   @spec set_range_exclusions_for_gall(integer(), [{integer(), String.t()}] | [integer()]) :: :ok
   def set_range_exclusions_for_gall(gall_species_id, place_entries) do
+    entries = normalize_exclusion_entries(gall_species_id, place_entries)
+
     Repo.transaction(fn ->
-      from(gre in GallRangeExclusion,
-        where: gre.species_id == ^gall_species_id
-      )
+      from(gre in GallRangeExclusion, where: gre.species_id == ^gall_species_id)
       |> Repo.delete_all()
 
-      if place_entries != [] do
-        entries =
-          Enum.map(place_entries, fn
-            {place_id, precision} ->
-              %{species_id: gall_species_id, place_id: place_id, precision: precision}
-
-            place_id when is_integer(place_id) ->
-              %{species_id: gall_species_id, place_id: place_id, precision: "exact"}
-          end)
-
-        Repo.insert_all(GallRangeExclusion, entries)
-      end
-
+      if entries != [], do: Repo.insert_all(GallRangeExclusion, entries)
       :ok
     end)
 
@@ -421,5 +395,29 @@ defmodule Gallformers.Ranges do
       select: p.id
     )
     |> Repo.one()
+  end
+
+  # ============================================
+  # Private helpers
+  # ============================================
+
+  defp normalize_place_entries(species_id, entries) do
+    Enum.map(entries, fn
+      {place_id, precision} ->
+        %{species_id: species_id, place_id: place_id, precision: precision}
+
+      place_id when is_integer(place_id) ->
+        %{species_id: species_id, place_id: place_id, precision: "exact"}
+    end)
+  end
+
+  defp normalize_exclusion_entries(species_id, entries) do
+    Enum.map(entries, fn
+      {place_id, precision} ->
+        %{species_id: species_id, place_id: place_id, precision: precision}
+
+      place_id when is_integer(place_id) ->
+        %{species_id: species_id, place_id: place_id, precision: "exact"}
+    end)
   end
 end

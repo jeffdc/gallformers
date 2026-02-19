@@ -357,18 +357,38 @@ defmodule GallformersWeb.IDLiveTest do
       end
     end
 
-    test "V1 place name is resolved to place code in dropdown", %{conn: conn} do
+    test "V1 place name is resolved to place code in typeahead", %{conn: conn} do
       hosts = Plants.list_hosts()
 
       if length(hosts) > 0 do
         host = hd(hosts)
 
-        # V1 used place names ("California"); V2 uses codes ("CA")
+        # V1 used place names ("California"); V2 uses ISO 3166-2 codes ("US-CA")
         {:ok, _view, html} =
           live(conn, "/id?hostOrTaxon=#{URI.encode(host.name)}&type=host&place=California")
 
-        # The dropdown should have California selected (code "CA" resolved from name)
-        assert html =~ ~r/<option[^>]*selected[^>]*value="CA"/
+        # The typeahead should show California as the selected place
+        assert html =~ "California"
+        assert html =~ "Selected: California"
+      end
+    end
+  end
+
+  describe "grouped place search" do
+    test "place search returns countries and subdivisions with groups", %{conn: conn} do
+      hosts = Plants.list_hosts()
+
+      if length(hosts) > 0 do
+        host = hd(hosts)
+        {:ok, view, _html} = live(conn, "/id?hostOrTaxon=#{URI.encode(host.name)}&type=host")
+
+        # Push the search event directly (phx-debounce prevents keyup testing)
+        html = render_hook(view, "search_place", %{"value" => "ca"})
+
+        assert html =~ "Countries"
+        assert html =~ "Canada"
+        assert html =~ "States &amp; Provinces"
+        assert html =~ "California"
       end
     end
   end

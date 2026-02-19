@@ -57,7 +57,6 @@ defmodule GallformersWeb.IDLive do
   @impl true
   def mount(_params, _session, socket) do
     filter_options = Galls.get_filter_options()
-    places = Places.list_places()
 
     # Add "leaf (anywhere)" virtual option to plant_parts, sorted alphabetically
     plant_parts_with_virtual = add_leaf_anywhere_option(filter_options.plant_parts)
@@ -73,7 +72,6 @@ defmodule GallformersWeb.IDLive do
        page_json_ld: nil,
        page_noindex: true,
        filter_options: filter_options,
-       places: places,
        families: [],
        # Current filter selections
        filters: default_filters(),
@@ -84,6 +82,9 @@ defmodule GallformersWeb.IDLive do
        genus_query: "",
        genus_results: [],
        selected_genus: nil,
+       place_query: "",
+       place_results: [],
+       selected_place: nil,
        # Multi-select typeahead state
        plant_part_query: "",
        plant_part_focused: false,
@@ -216,33 +217,33 @@ defmodule GallformersWeb.IDLive do
   defp apply_url_filters(socket, filters, params) do
     selected_host = load_host_from_params(params)
     selected_genus = load_genus_from_params(params)
+    selected_place = load_place_from_params(filters)
     families = load_families_for_selection(selected_host, selected_genus)
 
-    # V1 URLs used place names ("Quebec"); V2 uses codes ("QC"). Resolve name → code.
-    filters = resolve_place_name(filters, socket.assigns.places)
+    # Normalize place filter to code (V1 URLs used names like "Quebec")
+    filters = normalize_place_filter(filters, selected_place)
 
     socket
     |> assign(filters: filters)
     |> assign(selected_host: selected_host)
     |> assign(selected_genus: selected_genus)
+    |> assign(selected_place: selected_place)
     |> assign(families: families)
     |> maybe_load_results()
   end
 
-  defp resolve_place_name(%{place: nil} = filters, _places), do: filters
+  defp load_place_from_params(%{place: nil}), do: nil
 
-  defp resolve_place_name(%{place: place_value} = filters, places) do
-    if Enum.any?(places, &(&1.code == place_value)) do
-      # Already a valid code
-      filters
-    else
-      # Try matching by name (case-insensitive for V1 compatibility)
-      case Enum.find(places, &(String.downcase(&1.name) == String.downcase(place_value))) do
-        nil -> filters
-        place -> %{filters | place: place.code}
-      end
+  defp load_place_from_params(%{place: place_value}) do
+    # Try as code first, then as name (V1 compatibility)
+    case Places.get_place_by_code(place_value) do
+      nil -> Places.get_place_by_name(place_value)
+      place -> place
     end
   end
+
+  defp normalize_place_filter(filters, nil), do: %{filters | place: nil}
+  defp normalize_place_filter(filters, place), do: %{filters | place: place.code}
 
   defp load_host_from_params(params) do
     case decode_url_param(params[@url_params.host]) do
@@ -571,6 +572,43 @@ defmodule GallformersWeb.IDLive do
   end
 
   @impl true
+  def handle_event("search_place", %{"value" => query}, socket) do
+    results =
+      if String.length(query) >= 2 do
+        Places.search_places_grouped(query, 10)
+      else
+        []
+      end
+
+    {:noreply, assign(socket, place_query: query, place_results: results)}
+  end
+
+  @impl true
+  def handle_event("select_place", %{"id" => id_str}, socket) do
+    place_id = String.to_integer(id_str)
+    place = Places.get_place(place_id)
+
+    socket =
+      socket
+      |> assign(selected_place: place, place_query: "", place_results: [])
+      |> update_filter(:place, place && place.code)
+      |> push_filter_patch()
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("clear_place", _params, socket) do
+    socket =
+      socket
+      |> assign(selected_place: nil, place_query: "", place_results: [])
+      |> update_filter(:place, nil)
+      |> push_filter_patch()
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("toggle_advanced", _params, socket) do
     {:noreply, assign(socket, show_advanced: !socket.assigns.show_advanced)}
   end
@@ -868,7 +906,21 @@ defmodule GallformersWeb.IDLive do
               />
             </div>
             <.detachable_filter value={@filters.detachable} />
-            <.place_filter places={@places} value={@filters.place} />
+            <div>
+              <.typeahead
+                id="place-filter"
+                label="Region"
+                placeholder="Search regions..."
+                search_event="search_place"
+                select_event="select_place"
+                clear_event="clear_place"
+                query={@place_query}
+                results={@place_results}
+                selected={@selected_place}
+                display_fn={fn place -> place.name end}
+                group_key={:group}
+              />
+            </div>
             <.family_filter families={@families} value={@filters.family} />
           </div>
 
@@ -982,25 +1034,6 @@ defmodule GallformersWeb.IDLive do
         label="Detachable"
         prompt="Any"
         options={[{"Integral", "integral"}, {"Detachable", "detachable"}, {"Both", "both"}]}
-        value={@value}
-      />
-    </form>
-    """
-  end
-
-  # Component: Place Filter
-  attr :places, :list, required: true
-  attr :value, :string, required: true
-
-  defp place_filter(assigns) do
-    ~H"""
-    <form phx-change="change_filter" phx-value-filter="place">
-      <.input
-        type="select"
-        name="value"
-        label="Region"
-        prompt="Any Region"
-        options={Enum.map(@places, &{&1.name, &1.code})}
         value={@value}
       />
     </form>

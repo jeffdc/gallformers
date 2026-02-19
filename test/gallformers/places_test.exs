@@ -73,8 +73,18 @@ defmodule Gallformers.PlacesTest do
     test "countries sort before subdivisions" do
       results = Places.search_places_grouped("ca", 10)
       groups = Enum.map(results, & &1.group)
-      country_indices = groups |> Enum.with_index() |> Enum.filter(fn {g, _} -> g == "Countries" end) |> Enum.map(&elem(&1, 1))
-      subdiv_indices = groups |> Enum.with_index() |> Enum.filter(fn {g, _} -> g == "States & Provinces" end) |> Enum.map(&elem(&1, 1))
+
+      country_indices =
+        groups
+        |> Enum.with_index()
+        |> Enum.filter(fn {g, _} -> g == "Countries" end)
+        |> Enum.map(&elem(&1, 1))
+
+      subdiv_indices =
+        groups
+        |> Enum.with_index()
+        |> Enum.filter(fn {g, _} -> g == "States & Provinces" end)
+        |> Enum.map(&elem(&1, 1))
 
       if country_indices != [] and subdiv_indices != [] do
         assert Enum.max(country_indices) < Enum.min(subdiv_indices)
