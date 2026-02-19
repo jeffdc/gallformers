@@ -16,6 +16,7 @@ defmodule Gallformers.Ranges do
   import Ecto.Query
 
   alias Gallformers.GallHosts.GallHost
+  alias Gallformers.Places
   alias Gallformers.Ranges.{GallRangeExclusion, HostRange}
   alias Gallformers.Repo
   alias Gallformers.Species.Species
@@ -71,6 +72,39 @@ defmodule Gallformers.Ranges do
       select: hr.place_id
     )
     |> Repo.all()
+  end
+
+  @doc """
+  Gets place codes and precision for a host species.
+  """
+  @spec get_places_for_host_with_precision(integer()) :: [map()]
+  def get_places_for_host_with_precision(host_species_id) do
+    from(hr in HostRange,
+      join: p in "place",
+      on: hr.place_id == p.id,
+      where: hr.species_id == ^host_species_id,
+      select: %{code: p.code, precision: hr.precision}
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Checks whether a host species covers a given place, accounting for hierarchy.
+
+  A host covers a place if there's a host_range row for that place or any
+  of its ancestors (e.g., country-level range covers all subdivisions).
+  """
+  @spec host_covers_place?(integer(), integer()) :: boolean()
+  def host_covers_place?(host_species_id, place_id) do
+    ancestor_ids = Places.ancestor_ids(place_id)
+
+    from(hr in HostRange,
+      where: hr.species_id == ^host_species_id,
+      where: hr.place_id in ^ancestor_ids,
+      select: count()
+    )
+    |> Repo.one()
+    |> Kernel.>(0)
   end
 
   @doc """
