@@ -407,6 +407,7 @@ const Typeahead = {
 
   getResults() {
     if (!this.resultsContainer) return []
+    // Only return selectable items — skip group headers (role="presentation")
     return Array.from(this.resultsContainer.querySelectorAll("[data-typeahead-option]"))
   },
 

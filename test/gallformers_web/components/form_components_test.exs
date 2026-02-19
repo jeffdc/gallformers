@@ -85,6 +85,99 @@ defmodule GallformersWeb.FormComponentsTest do
     def handle_event("cancel_cascade_delete", _, socket), do: {:noreply, socket}
   end
 
+  defmodule GroupedTypeaheadTestLive do
+    use Phoenix.LiveView
+
+    def render(assigns) do
+      ~H"""
+      <FormComponents.typeahead
+        id="test-grouped"
+        label="Place"
+        query={@query}
+        results={@results}
+        selected={nil}
+        search_event="search"
+        select_event="select"
+        clear_event="clear"
+        display_fn={fn item -> item.name end}
+        group_key={:group}
+      />
+      """
+    end
+
+    def mount(_params, _session, socket) do
+      {:ok,
+       assign(socket,
+         query: "br",
+         results: [
+           %{id: 1, name: "Brazil", group: "Countries"},
+           %{id: 2, name: "British Columbia", group: "States & Provinces"}
+         ]
+       )}
+    end
+
+    def handle_event("search", _params, socket), do: {:noreply, socket}
+    def handle_event("select", _params, socket), do: {:noreply, socket}
+    def handle_event("clear", _params, socket), do: {:noreply, socket}
+  end
+
+  defmodule UngroupedTypeaheadTestLive do
+    use Phoenix.LiveView
+
+    def render(assigns) do
+      ~H"""
+      <FormComponents.typeahead
+        id="test-ungrouped"
+        label="Place"
+        query={@query}
+        results={@results}
+        selected={nil}
+        search_event="search"
+        select_event="select"
+        clear_event="clear"
+        display_fn={fn item -> item.name end}
+      />
+      """
+    end
+
+    def mount(_params, _session, socket) do
+      {:ok,
+       assign(socket,
+         query: "b",
+         results: [%{id: 1, name: "Brazil"}, %{id: 2, name: "Canada"}]
+       )}
+    end
+
+    def handle_event("search", _params, socket), do: {:noreply, socket}
+    def handle_event("select", _params, socket), do: {:noreply, socket}
+    def handle_event("clear", _params, socket), do: {:noreply, socket}
+  end
+
+  describe "typeahead with group_key" do
+    test "renders group headers between groups", %{conn: conn} do
+      {:ok, _view, html} = live_isolated(conn, GroupedTypeaheadTestLive)
+
+      assert html =~ "Countries"
+      assert html =~ "States &amp; Provinces"
+      assert html =~ "Brazil"
+      assert html =~ "British Columbia"
+    end
+
+    test "group headers have role=presentation", %{conn: conn} do
+      {:ok, _view, html} = live_isolated(conn, GroupedTypeaheadTestLive)
+
+      assert html =~ ~s(role="presentation")
+    end
+
+    test "renders without groups when group_key is nil", %{conn: conn} do
+      {:ok, _view, html} = live_isolated(conn, UngroupedTypeaheadTestLive)
+
+      refute html =~ ~s(role="presentation")
+      assert html =~ "Brazil"
+      assert html =~ "Canada"
+    end
+  end
+
   describe "cascade_delete_modal/1" do
     test "renders modal with impact summary", %{conn: conn} do
       {:ok, _view, html} = live_isolated(conn, CascadeDeleteTestLive)
