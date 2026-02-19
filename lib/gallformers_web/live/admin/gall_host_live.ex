@@ -595,6 +595,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
                         phx-update="ignore"
                         data-in-range={Jason.encode!(@in_range)}
                         data-excluded-range={Jason.encode!(@excluded_places)}
+                        data-inherited-range={Jason.encode!(Map.get(assigns, :inherited_range, []))}
                         data-editable="true"
                         class="border border-gray-300 rounded bg-gray-50 min-h-[350px]"
                       >

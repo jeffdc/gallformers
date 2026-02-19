@@ -978,6 +978,10 @@ defmodule GallformersWeb.DataDisplayComponents do
     default: [],
     doc: "list of postal codes explicitly excluded"
 
+  attr :inherited_range, :list,
+    default: [],
+    doc: "list of postal codes with country/continent-level range (shown lighter green)"
+
   attr :editable, :boolean,
     default: false,
     doc: "whether regions are clickable for editing"
@@ -997,11 +1001,13 @@ defmodule GallformersWeb.DataDisplayComponents do
   def range_map(assigns) do
     in_range_json = Jason.encode!(assigns.in_range)
     excluded_range_json = Jason.encode!(assigns.excluded_range)
+    inherited_range_json = Jason.encode!(assigns.inherited_range)
 
     assigns =
       assigns
       |> assign(:in_range_json, in_range_json)
       |> assign(:excluded_range_json, excluded_range_json)
+      |> assign(:inherited_range_json, inherited_range_json)
 
     ~H"""
     <div
@@ -1011,6 +1017,7 @@ defmodule GallformersWeb.DataDisplayComponents do
       phx-update="ignore"
       data-in-range={@in_range_json}
       data-excluded-range={@excluded_range_json}
+      data-inherited-range={@inherited_range_json}
       data-editable={to_string(@editable)}
       data-tiles-url={@tiles_url}
     >
