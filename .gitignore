@@ -16,8 +16,8 @@ cspell.json
 # Git worktrees
 .worktrees/
 
-# Generated tiles for maps
-services/tileserver-gl/boundaries.mbtiles
+# Generated boundary tiles for maps (build artifact from services/boundaries/)
+/priv/static/data/boundaries.pmtiles
 
 # === Elixir/Phoenix ===
 

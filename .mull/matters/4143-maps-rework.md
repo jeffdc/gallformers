@@ -1,5 +1,5 @@
 ---
-status: planned
+status: done
 effort: 3-5 days
 created: 2026-02-13
 updated: 2026-02-18

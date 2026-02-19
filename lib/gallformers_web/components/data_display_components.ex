@@ -958,16 +958,17 @@ defmodule GallformersWeb.DataDisplayComponents do
   @doc """
   Renders a geographic range map showing US and Canadian states/provinces.
 
-  Uses D3.js for SVG-based choropleth rendering. Displays regions in green if
-  in range, coral if excluded, and white otherwise.
+  Uses MapLibre GL JS with PMTiles for WebGL-based choropleth rendering.
+  Shows countries at wide zoom, subdivisions when zoomed in.
+  Displays regions in green if in range, coral if excluded, and white otherwise.
 
   ## Examples
 
-      <.range_map in_range={["CA", "TX", "NY"]} />
+      <.range_map in_range={["US-CA", "US-TX", "US-NY"]} />
 
-      <.range_map in_range={["CA", "TX"]} excluded_range={["AZ"]} />
+      <.range_map in_range={["US-CA", "US-TX"]} excluded_range={["US-AZ"]} />
 
-      <.range_map in_range={@places} editable on_toggle={JS.push("toggle_region")} />
+      <.range_map in_range={@places} editable />
   """
   attr :in_range, :list,
     required: true,
@@ -989,6 +990,10 @@ defmodule GallformersWeb.DataDisplayComponents do
     default: nil,
     doc: "additional CSS classes"
 
+  attr :tiles_url, :string,
+    default: "/data/boundaries.pmtiles",
+    doc: "URL to PMTiles boundary file"
+
   def range_map(assigns) do
     in_range_json = Jason.encode!(assigns.in_range)
     excluded_range_json = Jason.encode!(assigns.excluded_range)
@@ -1001,12 +1006,13 @@ defmodule GallformersWeb.DataDisplayComponents do
     ~H"""
     <div
       id={@id}
-      class={["relative", @class]}
+      class={["relative h-[400px]", @class]}
       phx-hook="RangeMap"
       phx-update="ignore"
       data-in-range={@in_range_json}
       data-excluded-range={@excluded_range_json}
       data-editable={to_string(@editable)}
+      data-tiles-url={@tiles_url}
     >
       <div class="flex items-center justify-center p-8 text-gray-500">
         <.icon name="ph-map-trifold" class="size-8 animate-pulse" />

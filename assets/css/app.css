@@ -1,6 +1,7 @@
 /* See the Tailwind configuration guide for advanced usage
    https://tailwindcss.com/docs/configuration */
 
+@import "../vendor/maplibre-gl.css";
 @import "tailwindcss" source(none);
 @source "../css";
 @source "../js";
