@@ -476,27 +476,12 @@ defmodule GallformersWeb.Admin.GallHostLive do
       end)
 
     # Expand higher-level codes to their leaf descendant codes
+    place_by_id = Map.new(all_places, &{&1.id, &1})
+
     inherited_leaf_codes =
-      Enum.flat_map(higher_codes, fn code ->
-        case Map.get(place_by_code, code) do
-          %{id: id} ->
-            leaf_ids = Places.leaf_descendant_ids(id)
-
-            leaf_ids
-            |> Enum.map(fn lid ->
-              case Enum.find(all_places, &(&1.id == lid)) do
-                %{code: c} -> c
-                nil -> nil
-              end
-            end)
-            |> Enum.reject(&is_nil/1)
-
-          nil ->
-            []
-        end
-      end)
+      higher_codes
+      |> Enum.flat_map(&expand_to_leaf_codes(&1, place_by_code, place_by_id))
       |> Enum.uniq()
-      # Don't include codes that already have exact ranges
       |> Enum.reject(&(&1 in leaf_codes))
 
     # All leaf codes (exact + inherited) — used for host_places and toggle logic
@@ -514,6 +499,21 @@ defmodule GallformersWeb.Admin.GallHostLive do
     |> assign(:excluded_places, excluded_places)
     |> assign(:in_range, exact_in_range)
     |> assign(:inherited_range, inherited_in_range)
+  end
+
+  # Expands a higher-level place code to its leaf descendant codes
+  defp expand_to_leaf_codes(code, place_by_code, place_by_id) do
+    case Map.get(place_by_code, code) do
+      %{id: id} ->
+        id
+        |> Places.leaf_descendant_ids()
+        |> Enum.map(&Map.get(place_by_id, &1))
+        |> Enum.reject(&is_nil/1)
+        |> Enum.map(& &1.code)
+
+      nil ->
+        []
+    end
   end
 
   @impl true
@@ -635,7 +635,11 @@ defmodule GallformersWeb.Admin.GallHostLive do
                         <span class="text-xs text-gray-600">Gall & Host</span>
                       </div>
                       <div class="flex items-center gap-2">
-                        <div class="w-4 h-4 rounded border border-gray-400" style="background-color: #90EE90;"></div>
+                        <div
+                          class="w-4 h-4 rounded border border-gray-400"
+                          style="background-color: #90EE90;"
+                        >
+                        </div>
                         <span class="text-xs text-gray-600">Country-level</span>
                       </div>
                       <div class="flex items-center gap-2">
@@ -714,9 +718,9 @@ defmodule GallformersWeb.Admin.GallHostLive do
             <%!-- Range Info --%>
             <div :if={@selected_gall} class="text-sm text-gray-600 mb-4">
               <span class="font-medium">Range summary:</span>
-              {length(@in_range)} confirmed, {length(@inherited_range)} country-level, {length(@excluded_places)} excluded, {length(
-                @host_places
-              )} total from hosts
+              {length(@in_range)} confirmed, {length(@inherited_range)} country-level, {length(
+                @excluded_places
+              )} excluded, {length(@host_places)} total from hosts
             </div>
 
             <%!-- Actions --%>

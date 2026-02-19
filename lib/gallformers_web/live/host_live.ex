@@ -577,7 +577,11 @@ defmodule GallformersWeb.HostLive do
                   :if={@inherited_range != []}
                   class="mt-1 text-xs text-gray-500"
                 >
-                  <span class="inline-block w-3 h-3 rounded border border-gray-300" style="background-color: #90EE90;"></span>
+                  <span
+                    class="inline-block w-3 h-3 rounded border border-gray-300"
+                    style="background-color: #90EE90;"
+                  >
+                  </span>
                   = reported at country level (state not confirmed)
                 </div>
               </div>

@@ -304,7 +304,10 @@ defmodule Gallformers.Ranges do
     {exact_codes, inherited_codes} = split_by_precision(host_ranges)
 
     # Don't show inherited where there's already an exact entry or where excluded
-    inherited_codes = inherited_codes -- exact_codes -- excluded
+    inherited_codes =
+      inherited_codes
+      |> Kernel.--(exact_codes)
+      |> Kernel.--(excluded)
 
     %{
       in_range: Enum.uniq(exact_codes),
