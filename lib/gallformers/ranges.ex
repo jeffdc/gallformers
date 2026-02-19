@@ -151,12 +151,16 @@ defmodule Gallformers.Ranges do
   # ============================================
 
   @doc """
-  Adds a place to a host's range.
+  Adds a place to a host's range with optional precision.
   """
-  @spec add_place_to_host(integer(), integer()) :: {:ok, map()}
-  def add_place_to_host(host_species_id, place_id) do
+  @spec add_place_to_host(integer(), integer(), String.t()) :: {:ok, map()}
+  def add_place_to_host(host_species_id, place_id, precision \\ "exact") do
     %HostRange{}
-    |> HostRange.changeset(%{species_id: host_species_id, place_id: place_id})
+    |> HostRange.changeset(%{
+      species_id: host_species_id,
+      place_id: place_id,
+      precision: precision
+    })
     |> Repo.insert(on_conflict: :nothing)
 
     {:ok, %{id: host_species_id}}
@@ -199,19 +203,27 @@ defmodule Gallformers.Ranges do
 
   @doc """
   Bulk updates all places for a host (replaces existing).
+
+  Accepts either plain place IDs or `{place_id, precision}` tuples.
   """
-  @spec update_host_places(integer(), [integer()]) :: {:ok, map()}
-  def update_host_places(host_species_id, place_ids) do
+  @spec update_host_places(integer(), [{integer(), String.t()}] | [integer()]) :: {:ok, map()}
+  def update_host_places(host_species_id, place_entries) do
     Repo.transaction(fn ->
-      # Delete existing
       from(hr in HostRange,
         where: hr.species_id == ^host_species_id
       )
       |> Repo.delete_all()
 
-      # Insert new
-      if place_ids != [] do
-        entries = Enum.map(place_ids, &%{species_id: host_species_id, place_id: &1})
+      if place_entries != [] do
+        entries =
+          Enum.map(place_entries, fn
+            {place_id, precision} ->
+              %{species_id: host_species_id, place_id: place_id, precision: precision}
+
+            place_id when is_integer(place_id) ->
+              %{species_id: host_species_id, place_id: place_id, precision: "exact"}
+          end)
+
         Repo.insert_all(HostRange, entries)
       end
 
@@ -319,20 +331,26 @@ defmodule Gallformers.Ranges do
   @doc """
   Bulk updates all range exclusions for a gall (replaces existing).
 
-  Takes a list of place IDs that should be excluded from the gall's range.
+  Accepts either plain place IDs or `{place_id, precision}` tuples.
   """
-  @spec set_range_exclusions_for_gall(integer(), [integer()]) :: :ok
-  def set_range_exclusions_for_gall(gall_species_id, place_ids) do
+  @spec set_range_exclusions_for_gall(integer(), [{integer(), String.t()}] | [integer()]) :: :ok
+  def set_range_exclusions_for_gall(gall_species_id, place_entries) do
     Repo.transaction(fn ->
-      # Delete existing exclusions
       from(gre in GallRangeExclusion,
         where: gre.species_id == ^gall_species_id
       )
       |> Repo.delete_all()
 
-      # Insert new exclusions
-      if place_ids != [] do
-        entries = Enum.map(place_ids, &%{species_id: gall_species_id, place_id: &1})
+      if place_entries != [] do
+        entries =
+          Enum.map(place_entries, fn
+            {place_id, precision} ->
+              %{species_id: gall_species_id, place_id: place_id, precision: precision}
+
+            place_id when is_integer(place_id) ->
+              %{species_id: gall_species_id, place_id: place_id, precision: "exact"}
+          end)
+
         Repo.insert_all(GallRangeExclusion, entries)
       end
 
@@ -340,6 +358,20 @@ defmodule Gallformers.Ranges do
     end)
 
     :ok
+  end
+
+  @doc """
+  Gets excluded places with precision metadata for a gall species.
+  """
+  @spec get_excluded_places_with_precision_for_gall(integer()) :: [map()]
+  def get_excluded_places_with_precision_for_gall(gall_species_id) do
+    from(p in "place",
+      join: gre in GallRangeExclusion,
+      on: gre.place_id == p.id,
+      where: gre.species_id == ^gall_species_id,
+      select: %{code: p.code, precision: gre.precision}
+    )
+    |> Repo.all()
   end
 
   @doc """
