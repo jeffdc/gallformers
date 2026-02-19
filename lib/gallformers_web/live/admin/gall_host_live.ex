@@ -44,10 +44,12 @@ defmodule GallformersWeb.Admin.GallHostLive do
       |> assign(:host_dropdown_open, false)
       # Range/exclusion state (manual tracking)
       |> assign(:host_places, [])
+      |> assign(:host_places_raw, [])
       |> assign(:original_excluded_place_ids, [])
       |> assign(:excluded_place_ids, [])
       |> assign(:excluded_places, [])
       |> assign(:in_range, [])
+      |> assign(:inherited_range, [])
       # Form state
       |> init_form_state()
 
@@ -114,6 +116,8 @@ defmodule GallformersWeb.Admin.GallHostLive do
       |> assign(DeferredChanges.init(:hosts, []))
       |> assign(:original_excluded_place_ids, [])
       |> assign(:excluded_place_ids, [])
+      |> assign(:host_places_raw, [])
+      |> assign(:inherited_range, [])
       |> assign_range_data([], [])
       |> assign(:page_title, "Gall-Host Mappings")
       |> reset_dirty()
@@ -238,6 +242,44 @@ defmodule GallformersWeb.Admin.GallHostLive do
     else
       _ -> {:noreply, socket}
     end
+  end
+
+  @impl true
+  def handle_event("toggle_country", %{"code" => code}, socket) do
+    with %{id: _gall_id} <- socket.assigns.selected_gall,
+         %{id: place_id} = _place <- Places.get_place_by_code(code) do
+      # Get all leaf descendant IDs for this country
+      leaf_ids = Places.leaf_descendant_ids(place_id)
+      excluded_place_ids = socket.assigns.excluded_place_ids
+
+      # If all leaves are excluded, un-exclude them. Otherwise exclude them all.
+      all_excluded? = Enum.all?(leaf_ids, &(&1 in excluded_place_ids))
+
+      new_excluded_place_ids =
+        if all_excluded? do
+          Enum.reject(excluded_place_ids, &(&1 in leaf_ids))
+        else
+          (excluded_place_ids ++ leaf_ids) |> Enum.uniq()
+        end
+
+      excluded_places = place_ids_to_codes(socket.assigns.all_places, new_excluded_place_ids)
+
+      socket =
+        socket
+        |> assign(:excluded_place_ids, new_excluded_place_ids)
+        |> assign_range_data(socket.assigns.host_places, excluded_places)
+        |> push_range_update()
+        |> mark_dirty()
+
+      {:noreply, socket}
+    else
+      _ -> {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("drill_into_country", %{"code" => code}, socket) do
+    {:noreply, push_event(socket, "zoom-to-country", %{code: code})}
   end
 
   @impl true
@@ -411,18 +453,67 @@ defmodule GallformersWeb.Admin.GallHostLive do
   defp push_range_update(socket) do
     push_event(socket, "range-update", %{
       in_range: socket.assigns.in_range,
-      excluded_range: socket.assigns.excluded_places
+      excluded_range: socket.assigns.excluded_places,
+      inherited_range: socket.assigns.inherited_range
     })
   end
 
-  # Assigns host_places, excluded_places, and computed in_range together
+  # Assigns host_places, excluded_places, and computed in_range together.
+  # Also computes inherited_range (leaf codes expanded from country-level host ranges).
   defp assign_range_data(socket, host_places, excluded_places) do
-    in_range = Enum.reject(host_places, &(&1 in excluded_places))
+    # Separate exact leaf codes from country/higher-level codes
+    all_places = socket.assigns.all_places
+    place_by_code = Map.new(all_places, &{&1.code, &1})
+
+    {leaf_codes, higher_codes} =
+      Enum.split_with(host_places, fn code ->
+        case Map.get(place_by_code, code) do
+          %{type: type} when type in ["state", "province"] -> true
+          # Leaf countries (no subdivisions) are also leaf codes
+          %{type: "country", id: id} -> Places.leaf_descendant_ids(id) == [id]
+          _ -> false
+        end
+      end)
+
+    # Expand higher-level codes to their leaf descendant codes
+    inherited_leaf_codes =
+      Enum.flat_map(higher_codes, fn code ->
+        case Map.get(place_by_code, code) do
+          %{id: id} ->
+            leaf_ids = Places.leaf_descendant_ids(id)
+
+            leaf_ids
+            |> Enum.map(fn lid ->
+              case Enum.find(all_places, &(&1.id == lid)) do
+                %{code: c} -> c
+                nil -> nil
+              end
+            end)
+            |> Enum.reject(&is_nil/1)
+
+          nil ->
+            []
+        end
+      end)
+      |> Enum.uniq()
+      # Don't include codes that already have exact ranges
+      |> Enum.reject(&(&1 in leaf_codes))
+
+    # All leaf codes (exact + inherited) — used for host_places and toggle logic
+    all_leaf_codes = Enum.uniq(leaf_codes ++ inherited_leaf_codes)
+
+    # Inherited codes that are in range (not excluded)
+    inherited_in_range = Enum.reject(inherited_leaf_codes, &(&1 in excluded_places))
+
+    # Exact codes that are in range (not excluded)
+    exact_in_range = Enum.reject(leaf_codes, &(&1 in excluded_places))
 
     socket
-    |> assign(:host_places, host_places)
+    |> assign(:host_places, all_leaf_codes)
+    |> assign(:host_places_raw, host_places)
     |> assign(:excluded_places, excluded_places)
-    |> assign(:in_range, in_range)
+    |> assign(:in_range, exact_in_range)
+    |> assign(:inherited_range, inherited_in_range)
   end
 
   @impl true
@@ -544,6 +635,10 @@ defmodule GallformersWeb.Admin.GallHostLive do
                         <span class="text-xs text-gray-600">Gall & Host</span>
                       </div>
                       <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 rounded border border-gray-400" style="background-color: #90EE90;"></div>
+                        <span class="text-xs text-gray-600">Country-level</span>
+                      </div>
+                      <div class="flex items-center gap-2">
                         <div class="w-4 h-4 rounded border border-gray-400 bg-red-300"></div>
                         <span class="text-xs text-gray-600">Host Only</span>
                       </div>
@@ -552,6 +647,9 @@ defmodule GallformersWeb.Admin.GallHostLive do
                         <span class="text-xs text-gray-600">Neither</span>
                       </div>
                     </div>
+                    <p class="text-xs text-gray-500 mb-4">
+                      Shift+click a country to exclude/include all its states
+                    </p>
 
                     <div class="text-sm font-medium text-gray-700 mb-2">Map Actions:</div>
                     <div class="space-y-2">
@@ -595,7 +693,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
                         phx-update="ignore"
                         data-in-range={Jason.encode!(@in_range)}
                         data-excluded-range={Jason.encode!(@excluded_places)}
-                        data-inherited-range={Jason.encode!(Map.get(assigns, :inherited_range, []))}
+                        data-inherited-range={Jason.encode!(@inherited_range)}
                         data-editable="true"
                         class="border border-gray-300 rounded bg-gray-50 min-h-[350px]"
                       >
@@ -616,7 +714,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
             <%!-- Range Info --%>
             <div :if={@selected_gall} class="text-sm text-gray-600 mb-4">
               <span class="font-medium">Range summary:</span>
-              {length(@in_range)} places in range, {length(@excluded_places)} excluded, {length(
+              {length(@in_range)} confirmed, {length(@inherited_range)} country-level, {length(@excluded_places)} excluded, {length(
                 @host_places
               )} total from hosts
             </div>
