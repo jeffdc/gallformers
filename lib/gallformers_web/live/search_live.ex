@@ -235,9 +235,10 @@ defmodule GallformersWeb.SearchLive do
   }
 
   defp result_link(%{type: "glossary", name: name}), do: ~p"/glossary##{String.downcase(name)}"
+  defp result_link(%{type: "place", code: code}), do: "/place/#{code}"
   defp result_link(%{type: type, id: id}), do: build_entity_link(type, id)
 
-  defp build_entity_link(type, id) when type in ~w(gall host source genus family section place) do
+  defp build_entity_link(type, id) when type in ~w(gall host source genus family section) do
     "/#{type}/#{id}"
   end
 
