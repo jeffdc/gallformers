@@ -167,14 +167,6 @@ defmodule GallformersWeb.PlaceLive do
                   <h1 class="text-2xl font-bold text-gf-maroon">
                     {@place.name} - {@place.code}
                   </h1>
-                  <.link
-                    :if={@current_user}
-                    href={~p"/admin/places/#{@place.id}"}
-                    class="text-gray-400 hover:text-gf-maroon"
-                    title="Edit in admin"
-                  >
-                    <.icon name="ph-pencil-simple" class="h-5 w-5" />
-                  </.link>
                 </div>
               </div>
 

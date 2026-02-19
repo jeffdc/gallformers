@@ -128,11 +128,6 @@ defmodule GallformersWeb.Router do
   scope "/admin", GallformersWeb do
     pipe_through [:browser, :superadmin]
 
-    # Place admin (superadmin only)
-    live "/places", Admin.PlaceLive.Index, :index
-    live "/places/new", Admin.PlaceLive.Form, :new
-    live "/places/:id", Admin.PlaceLive.Form, :edit
-
     # Filter terms admin (superadmin only)
     live "/filter-terms", Admin.FilterTermsLive.Index, :index
     live "/filter-terms/new", Admin.FilterTermsLive.Form, :new
