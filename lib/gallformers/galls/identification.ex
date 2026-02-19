@@ -24,6 +24,8 @@ defmodule Gallformers.Galls.Identification do
   alias Gallformers.Galls
   alias Gallformers.Galls.GallTraits
   alias Gallformers.Images.Image
+  alias Gallformers.Places
+  alias Gallformers.Ranges
   alias Gallformers.Repo
   alias Gallformers.Species.Species, as: SpeciesSchema
   alias Gallformers.Taxonomy.Taxonomy
@@ -395,6 +397,20 @@ defmodule Gallformers.Galls.Identification do
   defp apply_place_filter(query, place_codes, host_ids, genus_id) do
     host_scope = resolve_host_scope(host_ids, genus_id)
 
+    # Resolve place codes to IDs, then expand hierarchy in both directions
+    place_ids =
+      Enum.map(place_codes, &Ranges.get_place_id_by_code/1)
+      |> Enum.reject(&is_nil/1)
+
+    # Descendant IDs: when user selects "US", include all US states
+    descendant_ids = Enum.flat_map(place_ids, &Places.descendant_ids/1) |> Enum.uniq()
+
+    # Ancestor IDs: when user selects "US-CA", match country-level US ranges
+    ancestor_ids = Enum.flat_map(place_ids, &Places.ancestor_ids/1) |> Enum.uniq()
+
+    # Combined: a host_range row matches if its place_id is in either set
+    all_matching_place_ids = Enum.uniq(descendant_ids ++ ancestor_ids)
+
     case host_scope do
       nil ->
         from [s, gt] in query,
@@ -402,10 +418,8 @@ defmodule Gallformers.Galls.Identification do
           on: h.gall_species_id == s.id,
           join: hr in "host_range",
           on: hr.species_id == h.host_species_id,
-          join: p in "place",
-          on: hr.place_id == p.id,
-          where: p.code in ^place_codes,
-          where: s.id not in subquery(exclusion_subquery(place_codes))
+          where: hr.place_id in ^all_matching_place_ids,
+          where: s.id not in subquery(exclusion_subquery_by_ids(all_matching_place_ids))
 
       ids ->
         from [s, gt] in query,
@@ -413,11 +427,9 @@ defmodule Gallformers.Galls.Identification do
           on: h.gall_species_id == s.id,
           join: hr in "host_range",
           on: hr.species_id == h.host_species_id,
-          join: p in "place",
-          on: hr.place_id == p.id,
-          where: p.code in ^place_codes,
+          where: hr.place_id in ^all_matching_place_ids,
           where: h.host_species_id in ^ids,
-          where: s.id not in subquery(exclusion_subquery(place_codes))
+          where: s.id not in subquery(exclusion_subquery_by_ids(all_matching_place_ids))
     end
   end
 
@@ -438,11 +450,9 @@ defmodule Gallformers.Galls.Identification do
     |> Repo.all()
   end
 
-  defp exclusion_subquery(place_codes) do
+  defp exclusion_subquery_by_ids(place_ids) do
     from gre in "gall_range_exclusion",
-      join: p2 in "place",
-      on: gre.place_id == p2.id,
-      where: p2.code in ^place_codes,
+      where: gre.place_id in ^place_ids,
       select: gre.species_id
   end
 
