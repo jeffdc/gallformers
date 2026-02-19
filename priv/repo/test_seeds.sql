@@ -103,17 +103,52 @@ INSERT INTO gallhost (id, host_species_id, gall_species_id, inserted_at, updated
   (2, 8, 100, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),  -- gall 100 → M. arvensis (GenusBeta) — cross-genus!
   (3, 7, 101, '2026-01-01T00:00:00', '2026-01-01T00:00:00');   -- gall 101 → T. serpyllum (GenusAlpha only)
 
--- Places
-INSERT INTO place (id, name, code, type) VALUES
-  (1, 'Alberta', 'AB', 'province'),
-  (2, 'California', 'CA', 'state');
+-- =============================================================================
+-- Places and Hierarchy (ISO 3166-2 codes)
+-- =============================================================================
+-- The western hemisphere migration already inserts places with auto-generated IDs.
+-- We clear everything and re-insert with controlled IDs for test assertions.
 
--- Host ranges: which hosts occur in which places
-INSERT INTO host_range (species_id, place_id) VALUES
-  (6, 2),   -- T. alpinus in California
-  (8, 1),   -- M. arvensis in Alberta
-  (8, 2),   -- M. arvensis in California
-  (7, 2);   -- T. serpyllum in California
+DELETE FROM host_range;
+DELETE FROM gall_range_exclusion;
+DELETE FROM place_hierarchy;
+DELETE FROM place;
+
+-- Hierarchy structure: Western Hemisphere → North America / Caribbean → countries → subdivisions
+INSERT INTO place (id, name, code, type) VALUES
+  (900, 'Western Hemisphere', 'WH', 'region'),
+  (901, 'North America', 'NA', 'continent'),
+  (902, 'United States', 'US', 'country'),
+  (903, 'Canada', 'CA', 'country'),
+  (904, 'Mexico', 'MX', 'country'),
+  (905, 'Caribbean', 'XB', 'continent'),
+  (906, 'Bahamas', 'BS', 'country');
+
+-- Test subdivisions (ISO 3166-2 codes)
+INSERT INTO place (id, name, code, type) VALUES
+  (1, 'Alberta', 'CA-AB', 'province'),
+  (2, 'California', 'US-CA', 'state'),
+  (3, 'Jalisco', 'MX-JAL', 'state');
+
+-- Hierarchy links
+INSERT INTO place_hierarchy (place_id, parent_id) VALUES
+  (901, 900),  -- North America → Western Hemisphere
+  (902, 901),  -- United States → North America
+  (903, 901),  -- Canada → North America
+  (904, 901),  -- Mexico → North America
+  (905, 900),  -- Caribbean → Western Hemisphere
+  (906, 905),  -- Bahamas → Caribbean
+  (1, 903),    -- Alberta → Canada
+  (2, 902),    -- California → United States
+  (3, 904);    -- Jalisco → Mexico
+
+-- Host ranges: which hosts occur in which places (with precision)
+INSERT INTO host_range (species_id, place_id, precision) VALUES
+  (6, 2, 'exact'),      -- T. alpinus in California (exact)
+  (8, 1, 'exact'),      -- M. arvensis in Alberta (exact)
+  (8, 2, 'exact'),      -- M. arvensis in California (exact)
+  (7, 2, 'exact'),      -- T. serpyllum in California (exact)
+  (8, 902, 'country');   -- M. arvensis in United States (country-level)
 
 -- =============================================================================
 -- Articles
