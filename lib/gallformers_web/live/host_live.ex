@@ -74,7 +74,9 @@ defmodule GallformersWeb.HostLive do
         sources = Sources.get_sources_for_species(host_id)
         aliases = Species.get_aliases_for_species(host_id)
         taxonomy = get_taxonomy_info(host_id)
-        range = Ranges.get_places_for_host(host_id) |> MapSet.new()
+        range_data = Ranges.get_display_range_for_host(host_id)
+        range = MapSet.new(range_data.in_range)
+        inherited_range = range_data.inherited_range
 
         # Check if Gallformers notes exist for this species
         gallformers_notes = Enum.find(sources, fn s -> s.id == @gallformers_notes_source_id end)
@@ -108,6 +110,7 @@ defmodule GallformersWeb.HostLive do
            sources: sources,
            taxonomy: taxonomy,
            range: range,
+           inherited_range: inherited_range,
            has_gallformers_notes: has_gallformers_notes,
            notes_alert_dismissed: false,
            current_page: 1,
@@ -565,7 +568,18 @@ defmodule GallformersWeb.HostLive do
 
               <div class="mt-auto">
                 <div class="mb-1"><strong>Range:</strong></div>
-                <.range_map id="host-range-map" in_range={MapSet.to_list(@range)} />
+                <.range_map
+                  id="host-range-map"
+                  in_range={MapSet.to_list(@range)}
+                  inherited_range={@inherited_range}
+                />
+                <div
+                  :if={@inherited_range != []}
+                  class="mt-1 text-xs text-gray-500"
+                >
+                  <span class="inline-block w-3 h-3 rounded border border-gray-300" style="background-color: #90EE90;"></span>
+                  = reported at country level (state not confirmed)
+                </div>
               </div>
             </div>
           </div>

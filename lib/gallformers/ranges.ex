@@ -280,6 +280,97 @@ defmodule Gallformers.Ranges do
   end
 
   # ============================================
+  # Display Range (expanding precision for maps)
+  # ============================================
+
+  @doc """
+  Gets the full range display data for a gall, expanding country-level ranges
+  to leaf descendant codes for map display.
+
+  Returns `%{in_range: [codes], inherited_range: [codes], excluded_range: [codes]}`.
+  - `in_range`: exact subdivision codes (host confirmed in this specific state)
+  - `inherited_range`: leaf codes expanded from country/continent-level ranges
+  - `excluded_range`: explicitly excluded codes
+  """
+  @spec get_display_range_for_gall(integer()) :: %{
+          in_range: [String.t()],
+          inherited_range: [String.t()],
+          excluded_range: [String.t()]
+        }
+  def get_display_range_for_gall(gall_species_id) do
+    host_ranges = get_host_ranges_with_precision_for_gall(gall_species_id)
+    excluded = get_excluded_places_for_gall(gall_species_id)
+
+    {exact_codes, inherited_codes} = split_by_precision(host_ranges)
+
+    # Don't show inherited where there's already an exact entry or where excluded
+    inherited_codes = inherited_codes -- exact_codes -- excluded
+
+    %{
+      in_range: Enum.uniq(exact_codes),
+      inherited_range: Enum.uniq(inherited_codes),
+      excluded_range: excluded
+    }
+  end
+
+  @doc """
+  Gets display range data for a host species, expanding country-level ranges.
+
+  Returns `%{in_range: [codes], inherited_range: [codes]}`.
+  """
+  @spec get_display_range_for_host(integer()) :: %{
+          in_range: [String.t()],
+          inherited_range: [String.t()]
+        }
+  def get_display_range_for_host(host_species_id) do
+    host_ranges = get_places_for_host_with_precision(host_species_id)
+
+    {exact_codes, inherited_codes} = split_by_precision(host_ranges)
+
+    # Don't show inherited where there's already an exact entry
+    inherited_codes = inherited_codes -- exact_codes
+
+    %{
+      in_range: Enum.uniq(exact_codes),
+      inherited_range: Enum.uniq(inherited_codes)
+    }
+  end
+
+  # Gets host ranges with precision for a gall (via host relationships)
+  defp get_host_ranges_with_precision_for_gall(gall_species_id) do
+    from(p in "place",
+      join: hr in HostRange,
+      on: hr.place_id == p.id,
+      join: h in GallHost,
+      on: h.host_species_id == hr.species_id,
+      where: h.gall_species_id == ^gall_species_id,
+      distinct: true,
+      select: %{code: p.code, precision: hr.precision, place_id: p.id}
+    )
+    |> Repo.all()
+  end
+
+  # Splits host ranges into exact leaf codes and inherited leaf codes
+  # (expanding country/continent-level ranges to their leaf descendants)
+  defp split_by_precision(host_ranges) do
+    Enum.reduce(host_ranges, {[], []}, fn range, {exact, inherited} ->
+      case range.precision do
+        "exact" ->
+          {[range.code | exact], inherited}
+
+        _higher ->
+          leaf_ids = Places.leaf_descendant_ids(range.place_id)
+
+          leaf_codes =
+            from(p in "place", where: p.id in ^leaf_ids, select: p.code)
+            |> Repo.all()
+
+          {exact, leaf_codes ++ inherited}
+      end
+    end)
+  end
+
+  # ============================================
   # Gall Range Exclusion Queries
   # ============================================
 

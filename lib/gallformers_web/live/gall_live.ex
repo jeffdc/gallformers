@@ -84,8 +84,10 @@ defmodule GallformersWeb.GallLive do
         sources = Sources.get_sources_for_species(gall_id)
         aliases = Species.get_aliases_for_species(gall_id)
         taxonomy = get_taxonomy_info(gall_id)
-        range = Ranges.get_places_for_gall(gall_id) |> MapSet.new()
-        excluded_range = Ranges.get_excluded_places_for_gall(gall_id) |> MapSet.new()
+        range_data = Ranges.get_display_range_for_gall(gall_id)
+        range = MapSet.new(range_data.in_range)
+        inherited_range = range_data.inherited_range
+        excluded_range = MapSet.new(range_data.excluded_range)
         gall_filters = Galls.get_gall_filter_values(gall_id)
         related_galls = Galls.get_related_galls(gall)
 
@@ -137,6 +139,7 @@ defmodule GallformersWeb.GallLive do
            sources: sources,
            taxonomy: taxonomy,
            range: range,
+           inherited_range: inherited_range,
            excluded_range: excluded_range,
            related_galls: related_galls,
            common_names: common_names,
@@ -492,8 +495,16 @@ defmodule GallformersWeb.GallLive do
                   <.range_map
                     id="gall-range-map"
                     in_range={MapSet.to_list(@range)}
+                    inherited_range={@inherited_range}
                     excluded_range={MapSet.to_list(@excluded_range)}
                   />
+                  <div
+                    :if={@inherited_range != []}
+                    class="mt-1 text-xs text-gray-500"
+                  >
+                    <span class="inline-block w-3 h-3 rounded border border-gray-300" style="background-color: #90EE90;"></span>
+                    = reported at country level (state not confirmed)
+                  </div>
                 </div>
               </div>
 
