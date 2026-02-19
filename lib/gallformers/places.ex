@@ -96,6 +96,44 @@ defmodule Gallformers.Places do
   end
 
   @doc """
+  Searches places for the grouped typeahead. Returns countries and subdivisions
+  (not continents or regions) with group labels and parent names for display.
+
+  Results are ordered: countries first, then subdivisions, alphabetical within each.
+  """
+  @spec search_places_grouped(String.t(), non_neg_integer()) :: [map()]
+  def search_places_grouped(query, limit \\ 10) do
+    like_query = "%#{String.downcase(query)}%"
+
+    from(p in Place,
+      left_join: ph in "place_hierarchy",
+      on: ph.place_id == p.id,
+      left_join: parent in Place,
+      on: parent.id == ph.parent_id,
+      where: p.type in ["country", "state", "province"],
+      where: fragment("lower(?) LIKE ?", p.name, ^like_query),
+      order_by: [
+        fragment("CASE WHEN ? = 'country' THEN 0 ELSE 1 END", p.type),
+        p.name
+      ],
+      limit: ^limit,
+      select: %{
+        id: p.id,
+        name: p.name,
+        code: p.code,
+        type: p.type,
+        parent_name: parent.name,
+        group:
+          fragment(
+            "CASE WHEN ? = 'country' THEN 'Countries' ELSE 'States & Provinces' END",
+            p.type
+          )
+      }
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Searches subdivision-level places (states/provinces) by name.
 
   Used by the ID tool where only subdivisions are relevant for filtering.
