@@ -16,6 +16,7 @@
  *   data-excluded-range:  JSON array of ISO 3166-2 codes excluded (optional)
  *   data-inherited-range: JSON array of codes with country/continent-level range (optional)
  *   data-editable:        "true" if regions are clickable (admin mode)
+ *   data-navigable:       "true" if clicking a region navigates to its place page
  *   data-tiles-url:       URL to boundaries.pmtiles (default: /data/boundaries.pmtiles)
  *
  * PMTiles feature properties used:
@@ -117,6 +118,7 @@ const RangeMap = {
     this.excludedRange = new Set(JSON.parse(this.el.dataset.excludedRange || '[]'))
     this.inheritedRange = new Set(JSON.parse(this.el.dataset.inheritedRange || '[]'))
     this.editable = this.el.dataset.editable === 'true'
+    this.navigable = this.el.dataset.navigable === 'true'
     this.tilesUrl = this.el.dataset.tilesUrl || '/data/boundaries.pmtiles'
 
     // Listen for range updates from the server (used by gall_host_live)
@@ -158,16 +160,19 @@ const RangeMap = {
     const newExcludedRange = new Set(JSON.parse(this.el.dataset.excludedRange || '[]'))
     const newInheritedRange = new Set(JSON.parse(this.el.dataset.inheritedRange || '[]'))
     const newEditable = this.el.dataset.editable === 'true'
+    const newNavigable = this.el.dataset.navigable === 'true'
 
     // Only update if something actually changed
     if (!setsEqual(newInRange, this.inRange) ||
         !setsEqual(newExcludedRange, this.excludedRange) ||
         !setsEqual(newInheritedRange, this.inheritedRange) ||
-        newEditable !== this.editable) {
+        newEditable !== this.editable ||
+        newNavigable !== this.navigable) {
       this.inRange = newInRange
       this.excludedRange = newExcludedRange
       this.inheritedRange = newInheritedRange
       this.editable = newEditable
+      this.navigable = newNavigable
       this.updateChoropleth()
       this.fitToRange(true)
     }
@@ -338,7 +343,7 @@ const RangeMap = {
     map.on('mousemove', 'subdivisions-fill', (e) => {
       if (!e.features || e.features.length === 0) return
 
-      map.getCanvas().style.cursor = this.editable ? 'pointer' : 'default'
+      map.getCanvas().style.cursor = (this.editable || this.navigable) ? 'pointer' : 'default'
 
       const feature = e.features[0]
       const name = feature.properties.name || ''
@@ -387,15 +392,17 @@ const RangeMap = {
       this.popup.remove()
     })
 
-    // Click on subdivisions: toggle region (admin) or no-op (public)
+    // Click on subdivisions: toggle region (admin), navigate (public), or no-op
     map.on('click', 'subdivisions-fill', (e) => {
       if (!e.features || e.features.length === 0) return
 
+      const code = e.features[0].properties.code
+      if (!code) return
+
       if (this.editable) {
-        const code = e.features[0].properties.code
-        if (code) {
-          this.pushEvent('toggle_region', { code })
-        }
+        this.pushEvent('toggle_region', { code })
+      } else if (this.navigable) {
+        this.pushEvent('navigate_to_place', { code })
       }
     })
 

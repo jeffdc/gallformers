@@ -986,6 +986,10 @@ defmodule GallformersWeb.DataDisplayComponents do
     default: false,
     doc: "whether regions are clickable for editing"
 
+  attr :navigable, :boolean,
+    default: false,
+    doc: "whether clicking a region navigates to its place page"
+
   attr :id, :string,
     default: "range-map",
     doc: "unique id for the map element"
@@ -1019,6 +1023,7 @@ defmodule GallformersWeb.DataDisplayComponents do
       data-excluded-range={@excluded_range_json}
       data-inherited-range={@inherited_range_json}
       data-editable={to_string(@editable)}
+      data-navigable={to_string(@navigable)}
       data-tiles-url={@tiles_url}
     >
       <div class="flex items-center justify-center p-8 text-gray-500">
