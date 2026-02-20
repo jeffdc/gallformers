@@ -77,6 +77,8 @@ defmodule Gallformers.MixProject do
       {:hackney, "~> 1.20"},
       # Image processing
       {:image, "~> 0.54"},
+      # CSV parsing for WCVP reconciliation
+      {:nimble_csv, "~> 1.2"},
       # User agent parsing for analytics
       {:browser, "~> 0.5.5"},
       # Dev/Test tools
