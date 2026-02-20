@@ -119,6 +119,47 @@ defmodule Gallformers.PlantsTest do
     end
   end
 
+  describe "host_traits management" do
+    setup do
+      {:ok, family} =
+        Taxonomy.create_taxonomy(%{name: "Testaceae HT Mgmt", type: "family", description: "Plant"})
+
+      {:ok, genus} =
+        Taxonomy.create_taxonomy(%{name: "Testus HT Mgmt", type: "genus", parent_id: family.id})
+
+      {:ok, species} =
+        Repo.insert(%Species{name: "Testus htmgmt", taxoncode: "plant"})
+
+      Taxonomy.link_species_to_taxonomy(species.id, genus.id)
+
+      {:ok, species: species}
+    end
+
+    test "upsert_host_traits/2 creates traits for a host", %{species: species} do
+      {:ok, traits} =
+        Plants.upsert_host_traits(species.id, %{wcvp_id: "12345", powo_id: "powo-12345"})
+
+      assert traits.wcvp_id == "12345"
+      assert traits.powo_id == "powo-12345"
+    end
+
+    test "upsert_host_traits/2 updates existing traits", %{species: species} do
+      {:ok, _} = Plants.upsert_host_traits(species.id, %{wcvp_id: "12345"})
+      {:ok, traits} = Plants.upsert_host_traits(species.id, %{wcvp_id: "99999"})
+
+      assert traits.wcvp_id == "99999"
+    end
+
+    test "get_host_traits/1 returns traits or nil", %{species: species} do
+      assert Plants.get_host_traits(species.id) == nil
+
+      {:ok, _} = Plants.upsert_host_traits(species.id, %{wcvp_id: "12345"})
+      traits = Plants.get_host_traits(species.id)
+
+      assert traits.wcvp_id == "12345"
+    end
+  end
+
   describe "update_host_with_associations/2" do
     setup do
       {:ok, family} =

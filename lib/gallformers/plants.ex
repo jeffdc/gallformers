@@ -12,6 +12,7 @@ defmodule Gallformers.Plants do
 
   import Ecto.Query
 
+  alias Gallformers.Plants.HostTraits
   alias Gallformers.Ranges
   alias Gallformers.Repo
   alias Gallformers.Species.{Abundance, Species}
@@ -282,6 +283,42 @@ defmodule Gallformers.Plants do
       |> Map.put(:aliases, aliases)
     else
       nil
+    end
+  end
+
+  # ============================================
+  # Host Traits
+  # ============================================
+
+  @doc """
+  Gets host traits for a species.
+
+  Returns `nil` if no host traits record exists for the given species.
+  """
+  @spec get_host_traits(integer()) :: HostTraits.t() | nil
+  def get_host_traits(species_id) do
+    Repo.get(HostTraits, species_id)
+  end
+
+  @doc """
+  Creates or updates host traits for a species.
+
+  If no record exists for the species_id, inserts a new one.
+  If one exists, updates it with the given attrs.
+  """
+  @spec upsert_host_traits(integer(), map()) ::
+          {:ok, HostTraits.t()} | {:error, Ecto.Changeset.t()}
+  def upsert_host_traits(species_id, attrs) do
+    case Repo.get(HostTraits, species_id) do
+      nil ->
+        %HostTraits{species_id: species_id}
+        |> HostTraits.changeset(attrs)
+        |> Repo.insert()
+
+      existing ->
+        existing
+        |> HostTraits.changeset(attrs)
+        |> Repo.update()
     end
   end
 
