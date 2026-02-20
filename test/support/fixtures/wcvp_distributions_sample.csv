@@ -1,0 +1,14 @@
+plant_locality_id|plant_name_id|continent_code_l1|continent|region_code_l2|region|area_code_l3|area|introduced|extinct|location_doubtful
+1|100|7|NORTHERN AMERICA|71|Southeastern U.S.A.|ALB|Alabama|0|0|0
+2|100|7|NORTHERN AMERICA|74|North-Central U.S.A.|ILL|Illinois|0|0|0
+3|100|7|NORTHERN AMERICA|75|Northeastern U.S.A.|NWY|New York|0|0|0
+4|101|7|NORTHERN AMERICA|74|North-Central U.S.A.|ILL|Illinois|0|0|0
+5|101|7|NORTHERN AMERICA|75|Northeastern U.S.A.|NWY|New York|0|0|0
+6|101|7|NORTHERN AMERICA|75|Northeastern U.S.A.|PEN|Pennsylvania|0|0|0
+7|103|7|NORTHERN AMERICA|71|Southeastern U.S.A.|ALB|Alabama|0|0|0
+8|104|6|EUROPE|11|Middle Europe|GER|Germany|0|0|0
+9|105|6|EUROPE|10|Northern Europe|SWE|Sweden|0|0|0
+10|106|7|NORTHERN AMERICA|71|Southeastern U.S.A.|FLA|Florida|0|0|0
+11|106|8|SOUTHERN AMERICA|81|Caribbean|CUB|Cuba|0|0|0
+12|100|7|NORTHERN AMERICA|74|North-Central U.S.A.|ILL|Illinois|1|0|0
+13|103|7|NORTHERN AMERICA|71|Southeastern U.S.A.|ALB|Alabama|0|1|0

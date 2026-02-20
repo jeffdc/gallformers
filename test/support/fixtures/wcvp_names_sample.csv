@@ -1,0 +1,10 @@
+plant_name_id|ipni_id|taxon_rank|taxon_status|family|genus_hybrid|genus|species_hybrid|species|infraspecific_rank|infraspecies|parenthetical_author|primary_author|publication_author|place_of_publication|volume_and_page|first_published|nomenclatural_remarks|geographic_area|lifeform_description|climate_description|taxon_name|taxon_authors|accepted_plant_name_id|basionym_plant_name_id|replaced_synonym_author|homotypic_synonym|parent_plant_name_id|powo_id|hybrid_formula|reviewed
+100|1000-1|Species|Accepted|Fagaceae||Quercus||alba|||||||||||||Quercus alba|L.|100|||||||
+101|1001-1|Species|Accepted|Fagaceae||Quercus||rubra|||||||||||||Quercus rubra|L.|101|||||||
+102|1002-1|Species|Synonym|Fagaceae||Quercus||borealis|||||||||||||Quercus borealis|F.Michx.|101|||||||
+103|1003-1|Species|Accepted|Fagaceae||Quercus||velutina|||||||||||||Quercus velutina|Lam.|103|||||||
+104|1004-1|Species|Accepted|Rosaceae||Rosa||canina|||||||||||||Rosa canina|L.|104|||||||
+105|1005-1|Species|Accepted|Betulaceae||Betula||pendula|||||||||||||Betula pendula|Roth|105|||||||
+106|1006-1|Species|Accepted|Fagaceae||Quercus||virginiana|||||||||||||Quercus virginiana|Mill.|106|||||||
+107|1007-1|Species|Unplaced|Asteraceae||Fictus||plantus|||||||||||||Fictus plantus|Auth.|107|||||||
+108|1008-1|Variety|Accepted|Fagaceae||Quercus||alba|var.|latiloba||||||||||||Quercus alba var. latiloba|Sarg.|108|||||||
