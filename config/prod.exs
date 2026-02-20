@@ -23,13 +23,18 @@ config :swoosh, local: false
 config :logger, level: :info
 
 # Ueberauth callback URL must be set at compile time (Ueberauth.init runs at compile time)
-# This overrides the default behavior of using the request's host
-config :ueberauth, Ueberauth,
-  providers: [
-    auth0:
-      {Ueberauth.Strategy.Auth0,
-       [callback_url: "https://www.gallformers.org/auth/auth0/callback"]}
-  ]
+# For preview deploys, omit callback_url so Ueberauth derives it from the request host.
+unless System.get_env("PREVIEW_DEPLOY") do
+  config :ueberauth, Ueberauth,
+    providers: [
+      auth0:
+        {Ueberauth.Strategy.Auth0,
+         [callback_url: "https://www.gallformers.org/auth/auth0/callback"]}
+    ]
+end
+
+config :gallformers, Gallformers.Repo.WCVP,
+  database: "/data/wcvp.sqlite"
 
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.

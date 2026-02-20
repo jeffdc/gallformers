@@ -91,6 +91,10 @@ config :ueberauth, Ueberauth,
     auth0: {Ueberauth.Strategy.Auth0, []}
   ]
 
+# WCVP lookup database (read-only, no migrations)
+config :gallformers, Gallformers.Repo.WCVP,
+  pool_size: 2
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

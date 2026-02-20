@@ -18,6 +18,9 @@ config :gallformers, Gallformers.Repo,
   # Override ecto_sqlite3's default of -64000 (62.5 MB per connection)
   cache_size: -2000
 
+config :gallformers, Gallformers.Repo.WCVP,
+  database: Path.expand("../priv/data/wcvp_test.sqlite", __DIR__)
+
 # Server is disabled by default for fast unit tests.
 # E2E tests enable the server via GALLFORMERS_E2E=1 environment variable (in runtime.exs).
 config :gallformers, GallformersWeb.Endpoint,

@@ -15,6 +15,9 @@ config :gallformers, Gallformers.Repo,
   # Override ecto_sqlite3's default of -64000 (62.5 MB per connection)
   cache_size: -2000
 
+config :gallformers, Gallformers.Repo.WCVP,
+  database: Path.expand("../priv/data/wcvp.sqlite", __DIR__)
+
 # For development, we disable any cache and enable
 # debugging and code reloading.
 #
