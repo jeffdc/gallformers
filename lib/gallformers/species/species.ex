@@ -31,6 +31,7 @@ defmodule Gallformers.Species.Species do
 
     has_many :images, Gallformers.Images.Image
     has_one :gall_traits, Gallformers.Galls.GallTraits, foreign_key: :species_id
+    has_one :host_traits, Gallformers.Plants.HostTraits, foreign_key: :species_id
     has_many :species_sources, Gallformers.Species.SpeciesSource
 
     # Host relationships - this species as a gall

@@ -70,6 +70,55 @@ defmodule Gallformers.PlantsTest do
     end
   end
 
+  describe "host_traits" do
+    setup do
+      {:ok, family} =
+        Taxonomy.create_taxonomy(%{
+          name: "TestHostTraitsFamily",
+          type: "family",
+          description: "Plant"
+        })
+
+      {:ok, genus} =
+        Taxonomy.create_taxonomy(%{
+          name: "Testhosttraitsgenus",
+          type: "genus",
+          parent_id: family.id
+        })
+
+      {:ok, species} =
+        Repo.insert(%Species{name: "Testhosttraitsgenus testhost", taxoncode: "plant"})
+
+      Taxonomy.link_species_to_taxonomy(species.id, genus.id)
+
+      {:ok, species: species}
+    end
+
+    test "creates host_traits with WCVP and POWO IDs", %{species: species} do
+      {:ok, traits} =
+        Repo.insert(%Gallformers.Plants.HostTraits{
+          species_id: species.id,
+          wcvp_id: "12345",
+          powo_id: "urn:lsid:ipni.org:names:12345-1"
+        })
+
+      assert traits.species_id == species.id
+      assert traits.wcvp_id == "12345"
+      assert traits.powo_id == "urn:lsid:ipni.org:names:12345-1"
+    end
+
+    test "species can preload host_traits", %{species: species} do
+      {:ok, _} =
+        Repo.insert(%Gallformers.Plants.HostTraits{
+          species_id: species.id,
+          wcvp_id: "99999"
+        })
+
+      loaded = Repo.get!(Species, species.id) |> Repo.preload(:host_traits)
+      assert loaded.host_traits.wcvp_id == "99999"
+    end
+  end
+
   describe "update_host_with_associations/2" do
     setup do
       {:ok, family} =
