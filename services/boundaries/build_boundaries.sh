@@ -219,22 +219,15 @@ for shp in "$TRIM_DIR"/*.shp; do
   temp_json="$GEOJSON_DIR/${base}_temp.geojson"
   final_json="$GEOJSON_DIR/$base.geojson"
 
-  # Convert to GeoJSON with proper encoding handling
+  # Convert to GeoJSON (ogr2ogr handles encoding via -lco ENCODING)
   if ! ogr2ogr -f GeoJSON \
        -preserve_fid \
        -lco ENCODING=UTF-8 \
-       "$temp_json" \
+       "$final_json" \
        "$shp" 2>/dev/null; then
     echo "Error: Failed to convert $base to GeoJSON" >&2
     exit 1
   fi
-
-  # Clean up any problematic characters and ensure UTF-8
-  if ! iconv -f UTF-8 -t UTF-8//IGNORE "$temp_json" > "$final_json" 2>/dev/null; then
-    echo "Error: Failed to process encoding for $base" >&2
-    exit 1
-  fi
-  rm "$temp_json"
 done
 
 # Verify expected GeoJSON files exist
@@ -246,6 +239,41 @@ if [ ! -f "$COUNTRIES_GEOJSON" ] || [ ! -f "$SUBDIVISIONS_GEOJSON" ]; then
   echo "Error: Expected GeoJSON files not found in $GEOJSON_DIR" >&2
   exit 1
 fi
+
+# -------- 3b. Merge non-subdivided countries into subdivisions ----------------
+# Countries/territories without admin-1 subdivisions (small islands, territories)
+# need to appear in the subdivisions layer so they're clickable on the map.
+# We extract their country polygons and add them with subdivision-compatible
+# properties: code (ISO alpha-2), name, iso_a2 (same as code for these).
+echo "==> Merging non-subdivided countries into subdivisions layer..." >&2
+
+# Build the list of STATE_COUNTRIES alpha-3 codes for jq filtering
+STATE_CODES_JSON=$(printf '"%s",' "${STATE_COUNTRIES[@]}" | sed 's/,$//')
+
+# Extract non-subdivided country features as a standalone GeoJSON file.
+# Rather than merging into the large subdivisions GeoJSON (which corrupts
+# under jq with large files), we pass this as a second input to tippecanoe
+# with the same layer name — tippecanoe merges them automatically.
+NON_SUBDIV_GEOJSON="$GEOJSON_DIR/non_subdivided.geojson"
+jq --argjson subdivided "[$STATE_CODES_JSON]" '{
+  type: "FeatureCollection",
+  features: [
+    .features[]
+    | select(.properties.ADM0_A3 as $a3 | $subdivided | index($a3) | not)
+    | {
+        type: .type,
+        geometry: .geometry,
+        properties: {
+          code: .properties.code,
+          name: .properties.NAME,
+          iso_a2: .properties.code
+        }
+      }
+  ]
+}' "$COUNTRIES_GEOJSON" > "$NON_SUBDIV_GEOJSON"
+
+NON_SUBDIV_COUNT=$(jq '.features | length' "$NON_SUBDIV_GEOJSON")
+echo "    Adding $NON_SUBDIV_COUNT non-subdivided countries/territories" >&2
 
 # -------- 4. Encode vector tiles with Tippecanoe -----------------------------
 echo "==> Encoding vector tiles ($OUT_PM)..." >&2
@@ -259,15 +287,15 @@ fi
 if ! tippecanoe -o "$OUT_PM" \
     --named-layer=countries:"$COUNTRIES_GEOJSON" \
     --named-layer=subdivisions:"$SUBDIVISIONS_GEOJSON" \
+    --named-layer=subdivisions:"$NON_SUBDIV_GEOJSON" \
     $LAKES_ARG \
     --force \
-    --minimum-zoom=2 \
+    --minimum-zoom=1 \
     --maximum-zoom=10 \
-    --simplification=10 \
-    --coalesce-densest-as-needed \
+    --no-feature-limit \
+    --no-tile-size-limit \
     --detect-shared-borders \
-    --read-parallel \
-    -zg; then
+    --read-parallel; then
   echo "Error: Failed to create vector tiles" >&2
   exit 1
 fi

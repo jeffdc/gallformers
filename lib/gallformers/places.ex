@@ -11,12 +11,19 @@ defmodule Gallformers.Places do
   alias Gallformers.Species.Species
 
   @doc """
-  Returns all places (states/provinces) ordered by name.
+  Returns all selectable places ordered by name.
+
+  Includes states/provinces and leaf countries (countries with no subdivisions,
+  e.g., territories like Puerto Rico, Bahamas, Bermuda).
   """
   @spec list_places() :: [Place.t()]
   def list_places do
+    has_children = from(ph in "place_hierarchy", select: ph.parent_id)
+
     from(p in Place,
-      where: p.type in ["state", "province"],
+      where:
+        p.type in ["state", "province"] or
+          (p.type == "country" and p.id not in subquery(has_children)),
       order_by: p.name
     )
     |> Repo.all()

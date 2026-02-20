@@ -159,8 +159,19 @@ gallformers/
 ├── priv/                # Static files, migrations, database
 ├── test/                # Tests
 ├── config/              # Phoenix configuration
-└── services/            # Auxiliary services (tileserver, usda_plants)
+└── services/            # Auxiliary services (boundaries, usda_plants)
 ```
+
+## Boundary Tiles (Range Maps)
+
+The range map component uses PMTiles vector tiles generated from Natural Earth shapefiles. The tiles are pre-built and committed to `priv/static/data/boundaries.pmtiles`. To rebuild after changing the pipeline:
+
+```bash
+cd services/boundaries
+./build_boundaries.sh ../../priv/static/data/boundaries.pmtiles
+```
+
+Requires: `gdal`, `tippecanoe`, `jq`. See [services/boundaries/README.md](services/boundaries/README.md) for the full pipeline documentation.
 
 ## Deployment
 

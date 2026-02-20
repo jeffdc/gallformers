@@ -234,6 +234,11 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   end
 
   @impl true
+  def handle_event("toggle_country", %{"code" => code}, socket) do
+    {:noreply, toggle_country(socket, code)}
+  end
+
+  @impl true
   def handle_event("select_all_places", _params, socket) do
     if socket.assigns.mode == :edit do
       # Select all in local state - don't save to DB yet
@@ -265,6 +270,32 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Failed to delete host")}
+    end
+  end
+
+  defp toggle_country(%{assigns: %{mode: mode}} = socket, _code) when mode != :edit, do: socket
+
+  defp toggle_country(socket, code) do
+    case Places.get_place_by_code(code) do
+      nil ->
+        socket
+
+      %{id: place_id} ->
+        leaf_ids = Places.leaf_descendant_ids(place_id)
+        id_to_code = Map.new(socket.assigns.all_places, &{&1.id, &1.code})
+        leaf_codes = leaf_ids |> Enum.map(&Map.get(id_to_code, &1)) |> Enum.reject(&is_nil/1)
+
+        places = socket.assigns.places
+        all_selected? = Enum.all?(leaf_codes, &(&1 in places))
+
+        new_places =
+          if all_selected? do
+            Enum.reject(places, &(&1 in leaf_codes))
+          else
+            (places ++ leaf_codes) |> Enum.uniq()
+          end
+
+        socket |> assign(:places, new_places) |> mark_dirty()
     end
   end
 

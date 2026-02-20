@@ -52,14 +52,15 @@ const COLORS = {
 const HEMISPHERE_BOUNDS = [[-170, -56], [-30, 72]]
 
 /**
- * Build a MapLibre case expression for subdivision choropleth coloring.
+ * Build a MapLibre case expression for choropleth coloring.
+ * Used for both subdivisions-fill and countries-fill layers.
  *
- *   1. Check ISO 3166-2 code in range → green
+ *   1. Check code in range → green
  *   2. Check code inherited → light green
  *   3. Check code excluded → light red (admin only)
- *   4. Fallback → white (not in range)
+ *   4. Fallback → fallbackColor
  */
-function buildSubdivisionFillExpression(inRange, excludedRange, inheritedRange, editable) {
+function buildFillExpression(inRange, excludedRange, inheritedRange, editable, fallbackColor) {
   // Helper: build a match expression, or return literal false if the set is empty
   // (MapLibre match requires at least one label-output pair before the fallback)
   function codeMatch(codes) {
@@ -105,7 +106,7 @@ function buildSubdivisionFillExpression(inRange, excludedRange, inheritedRange, 
     }
   }
 
-  expr.push(COLORS.default)
+  expr.push(fallbackColor)
 
   return expr
 }
@@ -128,24 +129,6 @@ const RangeMap = {
       this.inheritedRange = new Set(inherited_range || [])
       this.updateChoropleth()
       this.fitToRange(true)
-    })
-
-    // Listen for zoom-to-country events (admin drill-down)
-    this.handleEvent('zoom-to-country', ({ code }) => {
-      if (!this.map) return
-      const features = this.map.querySourceFeatures('boundaries', {
-        sourceLayer: 'countries',
-        filter: ['==', ['get', 'code'], code]
-      })
-      if (features.length > 0) {
-        const bounds = new maplibregl.LngLatBounds()
-        for (const feature of features) {
-          forEachCoord(feature.geometry, (lng, lat) => {
-            bounds.extend([lng, lat])
-          })
-        }
-        this.map.fitBounds(bounds, { padding: 50, animate: true })
-      }
     })
 
     this.initMap()
@@ -190,6 +173,8 @@ const RangeMap = {
 
     this.map = new maplibregl.Map({
       container,
+      // Disable box zoom so shift+click can be used for country-level toggle
+      boxZoom: false,
       style: {
         version: 8,
         sources: {
@@ -205,14 +190,17 @@ const RangeMap = {
             type: 'background',
             paint: { 'background-color': '#ADD8E6' }
           },
-          // Country fills — neutral land color (not range-based)
+          // Country fills — range-based for leaf countries (territories),
+          // neutral land color fallback for countries with subdivisions
           {
             id: 'countries-fill',
             type: 'fill',
             source: 'boundaries',
             'source-layer': 'countries',
             paint: {
-              'fill-color': COLORS.land
+              'fill-color': buildFillExpression(
+                this.inRange, this.excludedRange, this.inheritedRange, this.editable, COLORS.land
+              )
             }
           },
           // Subdivision fills — range-based choropleth at all zoom levels
@@ -222,8 +210,8 @@ const RangeMap = {
             source: 'boundaries',
             'source-layer': 'subdivisions',
             paint: {
-              'fill-color': buildSubdivisionFillExpression(
-                this.inRange, this.excludedRange, this.inheritedRange, this.editable
+              'fill-color': buildFillExpression(
+                this.inRange, this.excludedRange, this.inheritedRange, this.editable, COLORS.default
               ),
               'fill-opacity': 1
             }
@@ -375,6 +363,10 @@ const RangeMap = {
     map.on('mousemove', 'countries-fill', (e) => {
       if (!this.editable || !e.features || e.features.length === 0) return
 
+      // Only show country tooltip when no subdivision is under cursor
+      const subdivs = map.queryRenderedFeatures(e.point, { layers: ['subdivisions-fill'] })
+      if (subdivs.length > 0) return
+
       map.getCanvas().style.cursor = 'pointer'
 
       const feature = e.features[0]
@@ -382,7 +374,7 @@ const RangeMap = {
 
       this.popup
         .setLngLat(e.lngLat)
-        .setHTML(`<strong>${name}</strong> — Click to browse states · Shift+click to select all`)
+        .setHTML(`<strong>${name}</strong> — Click to select · Shift+click to select all`)
         .addTo(map)
     })
 
@@ -392,33 +384,41 @@ const RangeMap = {
       this.popup.remove()
     })
 
-    // Click on subdivisions: toggle region (admin), navigate (public), or no-op
-    map.on('click', 'subdivisions-fill', (e) => {
-      if (!e.features || e.features.length === 0) return
+    // Unified click handler — uses queryRenderedFeatures to resolve layer priority.
+    // Without this, both subdivisions-fill and countries-fill handlers fire on
+    // the same click (they overlap geographically), causing double events.
+    map.on('click', (e) => {
+      const subdivs = map.queryRenderedFeatures(e.point, { layers: ['subdivisions-fill'] })
+      const countries = map.queryRenderedFeatures(e.point, { layers: ['countries-fill'] })
 
-      const code = e.features[0].properties.code
-      if (!code) return
+      // At low zoom, tippecanoe may coalesce subdivision features, producing
+      // entries with bare country codes (e.g., "BR") alongside real subdivision
+      // codes (e.g., "BR-AM"). Prefer the most specific (hyphenated) code.
+      const subdivCode = pickSubdivisionCode(subdivs)
+      const countryCode = countries.length > 0 ? countries[0].properties.code : null
+
+      // A bare country code from the subdivisions layer means the features are
+      // coalesced at this zoom level — treat as a country click, not subdivision.
+      const isRealSubdiv = subdivCode && subdivCode.includes('-')
 
       if (this.editable) {
-        this.pushEvent('toggle_region', { code })
+        if (e.originalEvent.shiftKey && countryCode) {
+          // Shift+click: toggle all subdivisions in the country (or the country itself if leaf)
+          this.pushEvent('toggle_country', { code: countryCode })
+        } else if (isRealSubdiv) {
+          // Regular click on a real subdivision: toggle single region
+          this.pushEvent('toggle_region', { code: subdivCode })
+        } else if (countryCode) {
+          // Regular click on a country (leaf territory, or coalesced at low zoom):
+          // toggle the country directly
+          this.pushEvent('toggle_country', { code: countryCode })
+        }
       } else if (this.navigable) {
-        this.pushEvent('navigate_to_place', { code })
-      }
-    })
-
-    // Click on countries: drill-in or shift+click to select (admin only)
-    map.on('click', 'countries-fill', (e) => {
-      if (!this.editable || !e.features || e.features.length === 0) return
-
-      const code = e.features[0].properties.code
-      if (!code) return
-
-      if (e.originalEvent.shiftKey) {
-        // Shift+click: select/deselect entire country at country precision
-        this.pushEvent('toggle_country', { code })
-      } else {
-        // Regular click: drill into country subdivisions
-        this.pushEvent('drill_into_country', { code })
+        if (isRealSubdiv) {
+          this.pushEvent('navigate_to_place', { code: subdivCode })
+        } else if (countryCode) {
+          this.pushEvent('navigate_to_place', { code: countryCode })
+        }
       }
     })
   },
@@ -427,10 +427,18 @@ const RangeMap = {
     if (!this.map || !this.map.isStyleLoaded()) return
 
     this.map.setPaintProperty(
+      'countries-fill',
+      'fill-color',
+      buildFillExpression(
+        this.inRange, this.excludedRange, this.inheritedRange, this.editable, COLORS.land
+      )
+    )
+
+    this.map.setPaintProperty(
       'subdivisions-fill',
       'fill-color',
-      buildSubdivisionFillExpression(
-        this.inRange, this.excludedRange, this.inheritedRange, this.editable
+      buildFillExpression(
+        this.inRange, this.excludedRange, this.inheritedRange, this.editable, COLORS.default
       )
     )
   },
@@ -481,6 +489,24 @@ const RangeMap = {
       animate
     })
   }
+}
+
+/**
+ * Pick the best subdivision code from queryRenderedFeatures results.
+ * At low zoom, tippecanoe may coalesce features, producing entries with
+ * bare country codes (e.g., "BR") alongside real subdivision codes
+ * (e.g., "BR-AM"). Prefer hyphenated (most specific) codes.
+ * Returns null if no valid code found.
+ */
+function pickSubdivisionCode(features) {
+  if (features.length === 0) return null
+  // Prefer a code containing a hyphen (real subdivision like BR-AM, US-SD)
+  for (const f of features) {
+    const code = f.properties.code
+    if (code && code.includes('-')) return code
+  }
+  // Fall back to first code (may be a bare country code for leaf territories)
+  return features[0].properties.code || null
 }
 
 /**

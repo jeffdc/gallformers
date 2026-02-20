@@ -278,11 +278,6 @@ defmodule GallformersWeb.Admin.GallHostLive do
   end
 
   @impl true
-  def handle_event("drill_into_country", %{"code" => code}, socket) do
-    {:noreply, push_event(socket, "zoom-to-country", %{code: code})}
-  end
-
-  @impl true
   def handle_event("select_all_places", _params, socket) do
     gall = socket.assigns.selected_gall
 
