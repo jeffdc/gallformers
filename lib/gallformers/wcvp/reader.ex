@@ -21,7 +21,8 @@ defmodule Gallformers.Wcvp.Reader do
       :taxon_name,
       :taxon_authors,
       :accepted_plant_name_id,
-      :parent_plant_name_id
+      :parent_plant_name_id,
+      :powo_id
     ]
   end
 
@@ -52,7 +53,8 @@ defmodule Gallformers.Wcvp.Reader do
     "taxon_name" => :taxon_name,
     "taxon_authors" => :taxon_authors,
     "accepted_plant_name_id" => :accepted_plant_name_id,
-    "parent_plant_name_id" => :parent_plant_name_id
+    "parent_plant_name_id" => :parent_plant_name_id,
+    "powo_id" => :powo_id
   }
 
   @dist_fields %{
