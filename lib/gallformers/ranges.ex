@@ -361,7 +361,7 @@ defmodule Gallformers.Ranges do
         "exact" ->
           {[range.code | exact], inherited}
 
-        _higher ->
+        "country" ->
           leaf_ids = Places.leaf_descendant_ids(range.place_id)
 
           leaf_codes =

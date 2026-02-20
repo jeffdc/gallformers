@@ -16,7 +16,7 @@ defmodule Gallformers.Ranges.GallRangeExclusion do
 
   @required_fields [:species_id, :place_id]
   @optional_fields [:precision]
-  @valid_precisions ~w(exact country continent)
+  @valid_precisions ~w(exact country)
 
   @primary_key false
   schema "gall_range_exclusion" do

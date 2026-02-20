@@ -42,6 +42,34 @@ defmodule Gallformers.RangesTest do
     end
   end
 
+  describe "precision validation" do
+    test "rejects continent precision" do
+      alias Gallformers.Ranges.HostRange
+
+      changeset =
+        HostRange.changeset(%HostRange{}, %{
+          species_id: 1,
+          place_id: 1,
+          precision: "continent"
+        })
+
+      assert %{precision: ["is invalid"]} = errors_on(changeset)
+    end
+
+    test "rejects continent precision for gall range exclusion" do
+      alias Gallformers.Ranges.GallRangeExclusion
+
+      changeset =
+        GallRangeExclusion.changeset(%GallRangeExclusion{}, %{
+          species_id: 1,
+          place_id: 1,
+          precision: "continent"
+        })
+
+      assert %{precision: ["is invalid"]} = errors_on(changeset)
+    end
+  end
+
   describe "precision-aware range management" do
     test "add_place_to_host/3 accepts precision parameter" do
       bahamas = Places.get_place_by_code("BS")
