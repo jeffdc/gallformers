@@ -1,9 +1,9 @@
 ---
-status: raw
+status: done
 created: 2026-02-18
-updated: 2026-02-18
+updated: 2026-02-19
 epic: geo-expansion
-blocks: [1db6]
+blocks: [1db6, 554e, 67e0]
 needs: [4143]
 ---
 

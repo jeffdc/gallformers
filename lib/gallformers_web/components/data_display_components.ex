@@ -990,6 +990,10 @@ defmodule GallformersWeb.DataDisplayComponents do
     default: false,
     doc: "whether clicking a region navigates to its place page"
 
+  attr :place_mode, :boolean,
+    default: false,
+    doc: "when true, uses blue highlights and skips host-range labels (for place detail pages)"
+
   attr :id, :string,
     default: "range-map",
     doc: "unique id for the map element"
@@ -1016,7 +1020,7 @@ defmodule GallformersWeb.DataDisplayComponents do
     ~H"""
     <div
       id={@id}
-      class={["relative h-[400px]", @class]}
+      class={["relative", !@class && "h-[400px]", @class]}
       phx-hook="RangeMap"
       phx-update="ignore"
       data-in-range={@in_range_json}
@@ -1024,6 +1028,7 @@ defmodule GallformersWeb.DataDisplayComponents do
       data-inherited-range={@inherited_range_json}
       data-editable={to_string(@editable)}
       data-navigable={to_string(@navigable)}
+      data-place-mode={to_string(@place_mode)}
       data-tiles-url={@tiles_url}
     >
       <div class="flex items-center justify-center p-8 text-gray-500">

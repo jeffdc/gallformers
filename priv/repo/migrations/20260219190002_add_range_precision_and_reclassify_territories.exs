@@ -8,38 +8,29 @@ defmodule Gallformers.Repo.Migrations.AddRangePrecisionAndReclassifyTerritories 
     # Add precision column to gall_range_exclusion
     execute "ALTER TABLE gall_range_exclusion ADD COLUMN precision TEXT NOT NULL DEFAULT 'exact'"
 
-    # Reclassify Puerto Rico: update the original US-PR row in place.
-    # The western hemisphere migration inserted a separate PR country row under
-    # Caribbean. The original US-PR row has host_range records pointing to it;
-    # the duplicate PR country row has none. We update the original and delete
-    # the duplicate.
+    # Reclassify Puerto Rico.
+    # The western hemisphere migration inserted a PR country row (code='PR')
+    # under Caribbean. The original US-PR state row has host_range records.
+    # Delete the duplicate first (to free the UNIQUE code), then update the original.
+
+    # Delete duplicate PR country entry's hierarchy link
+    execute """
+    DELETE FROM place_hierarchy WHERE place_id = (
+      SELECT id FROM place WHERE code = 'PR' AND type = 'country'
+    )
+    """
+
+    # Delete duplicate PR country entry
+    execute "DELETE FROM place WHERE code = 'PR' AND type = 'country'"
+
+    # Now update the original US-PR to become PR country
     execute "UPDATE place SET code = 'PR', type = 'country' WHERE code = 'US-PR'"
 
     # Rewire PR hierarchy from US to Caribbean (XB)
     execute """
     UPDATE place_hierarchy
     SET parent_id = (SELECT id FROM place WHERE code = 'XB')
-    WHERE place_id = (SELECT id FROM place WHERE code = 'PR'
-                      AND id IN (SELECT DISTINCT place_id FROM host_range))
-    """
-
-    # Delete the duplicate PR country entry (the one with zero host_range records).
-    # After the UPDATE above, both rows have code='PR' and type='country'.
-    # The duplicate is the one NOT referenced by host_range.
-    execute """
-    DELETE FROM place_hierarchy WHERE place_id IN (
-      SELECT p.id FROM place p
-      WHERE p.code = 'PR' AND p.type = 'country'
-      AND p.id NOT IN (SELECT DISTINCT place_id FROM host_range)
-    )
-    """
-
-    execute """
-    DELETE FROM place WHERE id IN (
-      SELECT p.id FROM place p
-      WHERE p.code = 'PR' AND p.type = 'country'
-      AND p.id NOT IN (SELECT DISTINCT place_id FROM host_range)
-    )
+    WHERE place_id = (SELECT id FROM place WHERE code = 'PR')
     """
   end
 

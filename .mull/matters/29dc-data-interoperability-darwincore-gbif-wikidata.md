@@ -1,8 +1,9 @@
 ---
 status: raw
 created: 2026-02-13
-updated: 2026-02-18
+updated: 2026-02-19
 epic: external
+relates: [9737]
 needs: [cc12]
 ---
 
@@ -545,4 +546,3 @@ Items 1-2 are quick wins that enable everything else. Item 3 is the foundational
 - **Identifiers**: Raw numeric IDs vs. prefixed URIs (`https://gallformers.org/species/1234`)?
 - **Undescribed species**: Include in archives? GBIF supports `taxonomicStatus: "undescribed"`.
 - **External ID mapping**: Run GNVerifier first to build a cross-reference table, or start publishing without external IDs?
-

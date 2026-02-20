@@ -94,7 +94,7 @@ setup: deps assets check-db
 # Start development server (ensures deps and assets are ready)
 # Loads .env if present for Auth0 and other local config
 dev: setup
-	set -a && [ -f .env ] && . .env; set +a && mix phx.server
+	set -a && [ -f .env ] && . .env; set +a && PREVIEW_DEPLOY=true mix phx.server
 
 # Start dev server on port 4002 for LAN access (dev already binds 0.0.0.0)
 # Usage: make dev-lan              # default port 4002
@@ -103,7 +103,7 @@ LAN_PORT ?= 4002
 dev-lan: setup
 	@echo "Starting LAN dev server on port $(LAN_PORT)..."
 	@echo "Access from other devices at http://$$(ipconfig getifaddr en0 2>/dev/null || hostname -I | awk '{print $$1}'):$(LAN_PORT)"
-	set -a && [ -f .env ] && . .env; set +a && PHX_BIND=0.0.0.0 PORT=$(LAN_PORT) mix phx.server
+	set -a && [ -f .env ] && . .env; set +a && PHX_BIND=0.0.0.0 PORT=$(LAN_PORT) PREVIEW_DEPLOY=true mix phx.server
 
 # =============================================================================
 # Production Build
@@ -470,4 +470,3 @@ help:
 	@echo "  MSG=\"desc\" make sync-finish  Push, PR, merge to integration (for code1/code2)"
 	@echo "  make sync-bugfix             Pull latest integration (for bugfix)"
 	@echo "  make sync-main-to-integration  Sync main specs into integration via PR"
-

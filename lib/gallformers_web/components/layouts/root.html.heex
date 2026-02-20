@@ -45,6 +45,12 @@
     </script>
   </head>
   <body class="min-h-screen">
+    <div
+      :if={Application.get_env(:gallformers, :preview_deploy)}
+      class="bg-red-600 text-white text-center py-2 font-bold text-sm sticky top-0 z-[100]"
+    >
+      PREVIEW — this is not production
+    </div>
     {@inner_content}
   </body>
 </html>

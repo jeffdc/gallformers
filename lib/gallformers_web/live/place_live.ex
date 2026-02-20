@@ -74,6 +74,8 @@ defmodule GallformersWeb.PlaceLive do
               id="place-range-map"
               in_range={@descendant_codes}
               navigable
+              place_mode
+              class="h-[60vh] min-h-[400px]"
             />
           </div>
 

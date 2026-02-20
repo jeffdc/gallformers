@@ -917,7 +917,18 @@ defmodule GallformersWeb.IDLive do
                 query={@place_query}
                 results={@place_results}
                 selected={@selected_place}
-                display_fn={fn place -> place.name end}
+                display_fn={
+                  fn place ->
+                    type = Map.get(place, :type)
+                    parent = Map.get(place, :parent_name)
+
+                    if type in ["state", "province"] and parent not in [nil, ""] do
+                      "#{place.name} — #{parent}"
+                    else
+                      place.name
+                    end
+                  end
+                }
                 group_key={:group}
               />
             </div>

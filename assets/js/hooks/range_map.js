@@ -45,11 +45,14 @@ const COLORS = {
   default: '#FFFFFF',       // White — not in range
   stroke: '#333333',        // Dark gray border
   countryStroke: '#666666',
-  land: '#F3F4F6'           // Gray-100 — base land color for country fills
+  land: '#F3F4F6',          // Gray-100 — base land color for country fills
+  // Place mode: geographic presence (not host data)
+  placeHighlight: '#3B82F6', // Blue-500 — place membership
+  placeHighlightLight: '#93C5FD' // Blue-300 — lighter variant
 }
 
-// Default bounds: Western Hemisphere
-const HEMISPHERE_BOUNDS = [[-170, -56], [-30, 72]]
+// Default bounds: Western Hemisphere (with padding for Greenland and southern tip)
+const HEMISPHERE_BOUNDS = [[-170, -58], [-10, 84]]
 
 /**
  * Build a MapLibre case expression for choropleth coloring.
@@ -60,7 +63,7 @@ const HEMISPHERE_BOUNDS = [[-170, -56], [-30, 72]]
  *   3. Check code excluded → light red (admin only)
  *   4. Fallback → fallbackColor
  */
-function buildFillExpression(inRange, excludedRange, inheritedRange, editable, fallbackColor) {
+function buildFillExpression(inRange, excludedRange, inheritedRange, editable, fallbackColor, colorOverrides) {
   // Helper: build a match expression, or return literal false if the set is empty
   // (MapLibre match requires at least one label-output pair before the fallback)
   function codeMatch(codes) {
@@ -88,15 +91,18 @@ function buildFillExpression(inRange, excludedRange, inheritedRange, editable, f
   const inRangeMatch = codeMatch(effectiveInRange)
   const inheritedMatch = codeMatch(effectiveInherited)
 
+  const inRangeColor = (colorOverrides && colorOverrides.inRange) || COLORS.inRange
+  const inheritedColor = (colorOverrides && colorOverrides.inheritedRange) || COLORS.inheritedRange
+
   // Build the case expression, omitting conditions for empty sets
   const expr = ['case']
 
   if (inRangeMatch !== false) {
-    expr.push(inRangeMatch, COLORS.inRange)
+    expr.push(inRangeMatch, inRangeColor)
   }
 
   if (inheritedMatch !== false) {
-    expr.push(inheritedMatch, COLORS.inheritedRange)
+    expr.push(inheritedMatch, inheritedColor)
   }
 
   if (editable) {
@@ -120,7 +126,11 @@ const RangeMap = {
     this.inheritedRange = new Set(JSON.parse(this.el.dataset.inheritedRange || '[]'))
     this.editable = this.el.dataset.editable === 'true'
     this.navigable = this.el.dataset.navigable === 'true'
+    this.placeMode = this.el.dataset.placeMode === 'true'
     this.tilesUrl = this.el.dataset.tilesUrl || '/data/boundaries.pmtiles'
+    this.colorOverrides = this.placeMode
+      ? { inRange: COLORS.placeHighlight, inheritedRange: COLORS.placeHighlightLight }
+      : null
 
     // Listen for range updates from the server (used by gall_host_live)
     this.handleEvent('range-update', ({ in_range, excluded_range, inherited_range }) => {
@@ -144,18 +154,24 @@ const RangeMap = {
     const newInheritedRange = new Set(JSON.parse(this.el.dataset.inheritedRange || '[]'))
     const newEditable = this.el.dataset.editable === 'true'
     const newNavigable = this.el.dataset.navigable === 'true'
+    const newPlaceMode = this.el.dataset.placeMode === 'true'
 
     // Only update if something actually changed
     if (!setsEqual(newInRange, this.inRange) ||
         !setsEqual(newExcludedRange, this.excludedRange) ||
         !setsEqual(newInheritedRange, this.inheritedRange) ||
         newEditable !== this.editable ||
-        newNavigable !== this.navigable) {
+        newNavigable !== this.navigable ||
+        newPlaceMode !== this.placeMode) {
       this.inRange = newInRange
       this.excludedRange = newExcludedRange
       this.inheritedRange = newInheritedRange
       this.editable = newEditable
       this.navigable = newNavigable
+      this.placeMode = newPlaceMode
+      this.colorOverrides = this.placeMode
+        ? { inRange: COLORS.placeHighlight, inheritedRange: COLORS.placeHighlightLight }
+        : null
       this.updateChoropleth()
       this.fitToRange(true)
     }
@@ -199,7 +215,7 @@ const RangeMap = {
             'source-layer': 'countries',
             paint: {
               'fill-color': buildFillExpression(
-                this.inRange, this.excludedRange, this.inheritedRange, this.editable, COLORS.land
+                this.inRange, this.excludedRange, this.inheritedRange, this.editable, COLORS.land, this.colorOverrides
               )
             }
           },
@@ -211,7 +227,7 @@ const RangeMap = {
             'source-layer': 'subdivisions',
             paint: {
               'fill-color': buildFillExpression(
-                this.inRange, this.excludedRange, this.inheritedRange, this.editable, COLORS.default
+                this.inRange, this.excludedRange, this.inheritedRange, this.editable, COLORS.default, this.colorOverrides
               ),
               'fill-opacity': 1
             }
@@ -273,7 +289,7 @@ const RangeMap = {
       center: [-96, 48],
       zoom: 3,
       minZoom: 1,
-      maxBounds: [[-180, -60], [0, 85]],
+      maxBounds: [[-180, -62], [10, 86]],
       attributionControl: false
     })
 
@@ -338,7 +354,10 @@ const RangeMap = {
       const code = feature.properties.code || ''
 
       let status = ''
-      if (this.inRange.has(code) && !this.excludedRange.has(code)) {
+      if (this.placeMode) {
+        // Place detail pages: no range status, just show the name
+        status = ''
+      } else if (this.inRange.has(code) && !this.excludedRange.has(code)) {
         status = ' — Host confirmed'
       } else if (this.inheritedRange.has(code) && !this.excludedRange.has(code)) {
         status = ' — Reported at country level (state not confirmed)'
@@ -359,27 +378,44 @@ const RangeMap = {
       this.popup.remove()
     })
 
-    // Hover: show tooltip on countries (admin mode — shift+click hint)
+    // Hover: show tooltip on countries (leaf territories without subdivisions)
     map.on('mousemove', 'countries-fill', (e) => {
-      if (!this.editable || !e.features || e.features.length === 0) return
+      if (!e.features || e.features.length === 0) return
 
       // Only show country tooltip when no subdivision is under cursor
       const subdivs = map.queryRenderedFeatures(e.point, { layers: ['subdivisions-fill'] })
       if (subdivs.length > 0) return
 
-      map.getCanvas().style.cursor = 'pointer'
-
       const feature = e.features[0]
       const name = feature.properties.name || ''
+      const code = feature.properties.code || ''
 
-      this.popup
-        .setLngLat(e.lngLat)
-        .setHTML(`<strong>${name}</strong> — Click to select · Shift+click to select all`)
-        .addTo(map)
+      if (this.editable) {
+        map.getCanvas().style.cursor = 'pointer'
+        this.popup
+          .setLngLat(e.lngLat)
+          .setHTML(`<strong>${name}</strong> — Click to select · Shift+click to select all`)
+          .addTo(map)
+      } else {
+        map.getCanvas().style.cursor = this.navigable ? 'pointer' : 'default'
+
+        let status = ''
+        if (this.inRange.has(code)) {
+          status = this.placeMode ? '' : ' — Host confirmed'
+        } else if (this.inheritedRange.has(code)) {
+          status = ' — Reported at country level (state not confirmed)'
+        } else {
+          status = this.placeMode ? '' : ' — Not reported'
+        }
+
+        this.popup
+          .setLngLat(e.lngLat)
+          .setHTML(`<strong>${name}</strong> (${code})${status}`)
+          .addTo(map)
+      }
     })
 
     map.on('mouseleave', 'countries-fill', () => {
-      if (!this.editable) return
       map.getCanvas().style.cursor = ''
       this.popup.remove()
     })
@@ -430,7 +466,7 @@ const RangeMap = {
       'countries-fill',
       'fill-color',
       buildFillExpression(
-        this.inRange, this.excludedRange, this.inheritedRange, this.editable, COLORS.land
+        this.inRange, this.excludedRange, this.inheritedRange, this.editable, COLORS.land, this.colorOverrides
       )
     )
 
@@ -438,7 +474,7 @@ const RangeMap = {
       'subdivisions-fill',
       'fill-color',
       buildFillExpression(
-        this.inRange, this.excludedRange, this.inheritedRange, this.editable, COLORS.default
+        this.inRange, this.excludedRange, this.inheritedRange, this.editable, COLORS.default, this.colorOverrides
       )
     )
   },
@@ -457,24 +493,40 @@ const RangeMap = {
       return
     }
 
-    const features = this.map.querySourceFeatures('boundaries', {
+    // Query both subdivisions and countries layers — leaf countries (territories
+    // like Grenada, Puerto Rico) only exist in the countries layer
+    const subdivFeatures = this.map.querySourceFeatures('boundaries', {
       sourceLayer: 'subdivisions'
+    })
+    const countryFeatures = this.map.querySourceFeatures('boundaries', {
+      sourceLayer: 'countries'
     })
 
     // Compute bounding box from features matching inRange or inheritedRange codes
     let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity
     let matched = 0
 
-    for (const feature of features) {
-      const code = feature.properties.code
-      if (!this.inRange.has(code) && !this.inheritedRange.has(code)) continue
-      matched++
+    const updateBounds = (feature) => {
       forEachCoord(feature.geometry, (lng, lat) => {
         if (lng < minLng) minLng = lng
         if (lng > maxLng) maxLng = lng
         if (lat < minLat) minLat = lat
         if (lat > maxLat) maxLat = lat
       })
+    }
+
+    for (const feature of subdivFeatures) {
+      const code = feature.properties.code
+      if (!this.inRange.has(code) && !this.inheritedRange.has(code)) continue
+      matched++
+      updateBounds(feature)
+    }
+
+    for (const feature of countryFeatures) {
+      const code = feature.properties.code
+      if (!this.inRange.has(code) && !this.inheritedRange.has(code)) continue
+      matched++
+      updateBounds(feature)
     }
 
     if (matched === 0) {
