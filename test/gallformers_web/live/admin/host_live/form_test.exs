@@ -445,7 +445,8 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
       {:ok, _view, html} = live(conn, ~p"/admin/hosts/#{host.id}")
 
       assert html =~ "Legend"
-      assert html =~ "In Range"
+      assert html =~ "Documented"
+      assert html =~ "Country-level"
       assert html =~ "Out of Range"
     end
 

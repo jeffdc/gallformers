@@ -13,6 +13,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   alias Gallformers.Species.Species, as: SpeciesSchema
   alias Gallformers.Taxonomy
   alias GallformersWeb.Admin.AliasHandlers
+  alias GallformersWeb.Admin.CountryDrillDown
   alias GallformersWeb.Admin.DeferredChanges
 
   import GallformersWeb.Admin.FormComponents,
@@ -311,27 +312,13 @@ defmodule GallformersWeb.Admin.HostLive.Form do
           |> compute_map_range()
           |> mark_dirty()
         else
-          # Country with subdivisions: toggle all leaf codes as exact for now.
-          # Will be replaced with drill-down panel in Task 4.
-          id_to_code = Map.new(socket.assigns.all_places, &{&1.id, &1.code})
+          # Country with subdivisions: open drill-down panel
+          send_update(CountryDrillDown,
+            id: "country-drill-down",
+            action: {:open, place}
+          )
 
-          leaf_codes =
-            leaf_ids |> Enum.map(&Map.get(id_to_code, &1)) |> Enum.reject(&is_nil/1)
-
-          exact = socket.assigns.exact_places
-          all_selected? = Enum.all?(leaf_codes, &(&1 in exact))
-
-          new_exact =
-            if all_selected? do
-              Enum.reject(exact, &(&1 in leaf_codes))
-            else
-              (exact ++ leaf_codes) |> Enum.uniq()
-            end
-
-          socket
-          |> assign(:exact_places, new_exact)
-          |> compute_map_range()
-          |> mark_dirty()
+          push_event(socket, "range-zoom-to-country", %{code: code})
         end
     end
   end
@@ -588,6 +575,65 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   end
 
   # =================================================================
+  # CountryDrillDown callbacks
+  # =================================================================
+
+  @impl true
+  def handle_info({CountryDrillDown, {:set_country_level, code, true}}, socket) do
+    new_country = Enum.uniq([code | socket.assigns.country_places])
+
+    {:noreply,
+     socket
+     |> assign(:country_places, new_country)
+     |> compute_map_range()
+     |> mark_dirty()}
+  end
+
+  def handle_info({CountryDrillDown, {:set_country_level, code, false}}, socket) do
+    new_country = Enum.reject(socket.assigns.country_places, &(&1 == code))
+
+    {:noreply,
+     socket
+     |> assign(:country_places, new_country)
+     |> compute_map_range()
+     |> mark_dirty()}
+  end
+
+  def handle_info({CountryDrillDown, {:toggle_exact, code}}, socket) do
+    new_exact = toggle_place_code(socket.assigns.exact_places, code)
+
+    {:noreply,
+     socket
+     |> assign(:exact_places, new_exact)
+     |> compute_map_range()
+     |> mark_dirty()}
+  end
+
+  def handle_info({CountryDrillDown, {:select_all_exact, codes}}, socket) do
+    new_exact = Enum.uniq(socket.assigns.exact_places ++ codes)
+
+    {:noreply,
+     socket
+     |> assign(:exact_places, new_exact)
+     |> compute_map_range()
+     |> mark_dirty()}
+  end
+
+  def handle_info({CountryDrillDown, {:deselect_all_exact, codes}}, socket) do
+    new_exact = Enum.reject(socket.assigns.exact_places, &(&1 in codes))
+
+    {:noreply,
+     socket
+     |> assign(:exact_places, new_exact)
+     |> compute_map_range()
+     |> mark_dirty()}
+  end
+
+  def handle_info({CountryDrillDown, :zoom_out}, socket) do
+    {:noreply, push_event(socket, "range-zoom-out", %{})}
+  end
+
+  # =================================================================
   # PubSub handlers
   # =================================================================
 
@@ -811,7 +857,11 @@ defmodule GallformersWeb.Admin.HostLive.Form do
                   <div class="space-y-1">
                     <div class="flex items-center gap-2">
                       <div class="w-4 h-4 rounded bg-green-700"></div>
-                      <span class="text-xs text-gray-600">In Range</span>
+                      <span class="text-xs text-gray-600">Documented</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <div class="w-4 h-4 rounded bg-green-700/40"></div>
+                      <span class="text-xs text-gray-600">Country-level</span>
                     </div>
                     <div class="flex items-center gap-2">
                       <div class="w-4 h-4 rounded border border-gray-300 bg-white"></div>
@@ -838,17 +888,28 @@ defmodule GallformersWeb.Admin.HostLive.Form do
                     </button>
                   </div>
                 </div>
-                <%!-- Map --%>
+                <%!-- Map + Drill-down panel --%>
                 <div class="col-span-5">
                   <label class="gf-label">Range:</label>
                   <%= if @mode == :edit do %>
-                    <.range_map
-                      id="host-range-map"
-                      in_range={@in_range}
-                      inherited_range={@inherited_range}
-                      editable
-                      class="border border-gray-300 rounded bg-gray-50 min-h-[300px]"
-                    />
+                    <div class="flex">
+                      <div class="flex-1">
+                        <.range_map
+                          id="host-range-map"
+                          in_range={@in_range}
+                          inherited_range={@inherited_range}
+                          editable
+                          class="border border-gray-300 rounded bg-gray-50 min-h-[300px]"
+                        />
+                      </div>
+                      <.live_component
+                        module={CountryDrillDown}
+                        id="country-drill-down"
+                        exact_places={@exact_places}
+                        country_places={@country_places}
+                        all_places={@all_places}
+                      />
+                    </div>
                   <% else %>
                     <div class="border border-gray-300 rounded bg-gray-100 min-h-[200px] flex items-center justify-center">
                       <p class="text-gray-500 text-sm">Save host first to edit range</p>
