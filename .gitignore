@@ -71,6 +71,9 @@ npm-debug.log
 *.sqlite-shm
 *.sqlite-wal
 
+# Cached WCVP data (large, downloadable from Kew)
+/priv/repo/data/wcvp/
+
 # Dialyzer PLT files (large, environment-specific)
 /priv/plts/
 
