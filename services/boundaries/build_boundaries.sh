@@ -54,14 +54,24 @@ PHYSICAL_URL="https://naturalearth.s3.amazonaws.com/10m_physical/10m_physical.zi
 
 # List of Western Hemisphere countries and territories
 # Format: ISO-3166-1 alpha-3 code
+# NOTE: GUF, GLP, MTQ are NOT in NE admin_0_countries — they're in map_subunits
+# (French overseas departments, treated as geo-units of France). Extracted separately below.
+# BES (Caribbean Netherlands) is also absent from admin_0_countries — its islands
+# (Bonaire, Saba, Sint Eustatius) appear as NLD subdivisions in admin_1.
 COUNTRIES=(
     "USA" "CAN" "MEX" "BLZ" "CRI" "SLV" "GTM" "HND" "NIC" "PAN"
-    "ATG" "BHS" "BRB" "CUB" "DMA" "DOM" "GRD" "HTI" "JAM"
+    "ATG" "BHS" "BRB" "CUB" "DMA" "DOM" "GRD" "HTI" "JAM" "KNA" "LCA" "TTO" "VCT"
     "ARG" "BOL" "BRA" "CHL" "COL" "ECU" "GUY" "PRY" "PER" "SUR" "URY" "VEN"
-    # Territories
-    "ABW" "BES" "CUW" "GUF" "GRL" "GLP" "MTQ" "BLM" "MAF" "SPM" "SXM"
+    # Territories (in admin_0_countries)
+    "ABW" "CUW" "GRL" "BLM" "MAF" "SPM" "SXM"
     "AIA" "BMU" "VGB" "CYM" "FLK" "MSR" "PRI" "SGS" "TCA" "VIR"
 )
+
+# French overseas departments — in NE map_subunits, not admin_0_countries.
+# SU_A3 code → desired ISO alpha-2 code for our tiles.
+# Parallel arrays because macOS bash 3.2 lacks associative arrays.
+SUBUNIT_SU_A3=( "GUF"  "GLP"  "MTQ" )
+SUBUNIT_ALPHA2=("GF"   "GP"   "MQ"  )
 
 # Countries that should have state/province subdivision boundaries
 # Includes all sovereign nations with meaningful administrative subdivisions
@@ -137,9 +147,10 @@ echo "==> Processing shapefiles..." >&2
 ADM0_SHAPE=$(find "$SRC_DIR" -name "ne_10m_admin_0_countries.shp" -print -quit)
 ADM1_SHAPE=$(find "$SRC_DIR" -name "ne_10m_admin_1_states_provinces.shp" -print -quit)
 LAKES_SHAPE=$(find "$SRC_DIR" -name "ne_10m_lakes.shp" -print -quit)
+SUBUNITS_SHAPE=$(find "$SRC_DIR" -name "ne_10m_admin_0_map_subunits.shp" -print -quit)
 
 # Verify we found the required shapefiles
-if [ -z "$ADM0_SHAPE" ] || [ -z "$ADM1_SHAPE" ] || [ -z "$LAKES_SHAPE" ]; then
+if [ -z "$ADM0_SHAPE" ] || [ -z "$ADM1_SHAPE" ] || [ -z "$LAKES_SHAPE" ] || [ -z "$SUBUNITS_SHAPE" ]; then
   echo "Error: Could not find required shapefiles in $SRC_DIR" >&2
   echo "Please check if the zip files were extracted correctly." >&2
   exit 1
@@ -147,6 +158,7 @@ fi
 
 ADM0_LAYER=$(basename "${ADM0_SHAPE%.shp}")
 ADM1_LAYER=$(basename "${ADM1_SHAPE%.shp}")
+SUBUNITS_LAYER=$(basename "${SUBUNITS_SHAPE%.shp}")
 
 # First, create a temporary shapefile with our countries (used for lake clipping)
 echo "Creating temporary country boundaries..." >&2
@@ -170,6 +182,51 @@ if ! ogr2ogr -f "ESRI Shapefile" \
     -dialect SQLITE 2>/dev/null; then
   echo "Error: Failed to process countries" >&2
   exit 1
+fi
+
+# -------- 2b. Extract French overseas departments from map_subunits -----------
+# GUF (French Guiana), GLP (Guadeloupe), MTQ (Martinique) are geo-units of France
+# in Natural Earth — they appear in map_subunits with SU_A3 codes, not in
+# admin_0_countries. We extract each one with its correct ISO alpha-2 code and
+# append to the countries shapefile.
+echo "Extracting French overseas departments from map_subunits..." >&2
+
+for i in "${!SUBUNIT_SU_A3[@]}"; do
+  su_a3="${SUBUNIT_SU_A3[$i]}"
+  alpha2="${SUBUNIT_ALPHA2[$i]}"
+  echo "    $su_a3 → code=$alpha2" >&2
+  if ! ogr2ogr -f "ESRI Shapefile" \
+      -lco ENCODING=UTF-8 \
+      -append \
+      "$TRIM_DIR/ne_10m_admin_0_countries.shp" "$SUBUNITS_SHAPE" \
+      -sql "SELECT *, '$alpha2' AS code FROM \"$SUBUNITS_LAYER\" WHERE SU_A3 = '$su_a3'" \
+      -dialect SQLITE 2>/dev/null; then
+    echo "Error: Failed to extract $su_a3 from map_subunits" >&2
+    exit 1
+  fi
+
+  # Also append to the lake-clipping boundary
+  ogr2ogr -f "ESRI Shapefile" \
+      -lco ENCODING=UTF-8 \
+      -append \
+      "$TRIM_DIR/countries_temp.shp" "$SUBUNITS_SHAPE" \
+      -sql "SELECT * FROM \"$SUBUNITS_LAYER\" WHERE SU_A3 = '$su_a3'" \
+      -dialect SQLITE 2>/dev/null
+done
+
+# -------- 2c. Extract Caribbean Netherlands (BES) from admin-1 ----------------
+# Bonaire, Sint Eustatius, and Saba are NLD subdivisions in Natural Earth.
+# We extract them and assign code=BQ (ISO alpha-2 for Caribbean Netherlands).
+# ogr2ogr -append merges the three island features into the countries shapefile.
+echo "Extracting Caribbean Netherlands (BQ) from admin-1..." >&2
+if ! ogr2ogr -f "ESRI Shapefile" \
+    -lco ENCODING=UTF-8 \
+    -append \
+    "$TRIM_DIR/ne_10m_admin_0_countries.shp" "$ADM1_SHAPE" \
+    -sql "SELECT *, 'BQ' AS code FROM \"$ADM1_LAYER\" WHERE iso_3166_2 IN ('NL-BQ1', 'NL-BQ2', 'NL-BQ3') OR (adm0_a3 = 'NLD' AND name IN ('Bonaire', 'Saba', 'Sint Eustatius'))" \
+    -dialect SQLITE 2>/dev/null; then
+  echo "Warning: Failed to extract Caribbean Netherlands from admin-1" >&2
+  # Non-fatal — BES islands are tiny and may not be in all NE versions
 fi
 
 # Process states/provinces for selected countries
@@ -254,8 +311,14 @@ STATE_CODES_JSON=$(printf '"%s",' "${STATE_COUNTRIES[@]}" | sed 's/,$//')
 # Rather than merging into the large subdivisions GeoJSON (which corrupts
 # under jq with large files), we pass this as a second input to tippecanoe
 # with the same layer name — tippecanoe merges them automatically.
+#
+# IMPORTANT: Output as newline-delimited GeoJSON (one feature per line via
+# jq -c) because tippecanoe's --read-parallel splits input at newline
+# boundaries. Pretty-printed multi-line GeoJSON causes features with large
+# coordinate arrays (Greenland, French Guiana, etc.) to be silently
+# truncated, dropping them from the output tiles.
 NON_SUBDIV_GEOJSON="$GEOJSON_DIR/non_subdivided.geojson"
-jq --argjson subdivided "[$STATE_CODES_JSON]" '{
+jq -c --argjson subdivided "[$STATE_CODES_JSON]" '{
   type: "FeatureCollection",
   features: [
     .features[]

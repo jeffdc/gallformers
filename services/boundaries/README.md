@@ -48,6 +48,10 @@ Natural Earth 10m shapefiles (remote, cached locally)
 |------|---------|
 | `services/boundaries/build_boundaries.sh` | One-shot tile generator script |
 | `services/boundaries/extract_places.sh` | Generates `western_hemisphere_places.json` for DB seeding (not tiles) |
+| `services/boundaries/verify_tiles.py` | Verifies PMTiles coverage against the place database |
+| `services/boundaries/inspect_tile.py` | Finds where a specific place code appears in tiles |
+| `services/boundaries/inspect_natural_earth.py` | Searches Natural Earth layers for a territory |
+| `services/boundaries/PLACE_REFERENCE.md` | Canonical reference of all expected places and tile coverage |
 | `priv/static/data/boundaries.pmtiles` | Output: vector tiles (~106MB on disk, served via HTTP range requests — browsers fetch only the tiles needed for the current viewport, typically a few hundred KB) |
 | `assets/js/hooks/range_map.js` | MapLibre GL JS hook that consumes the tiles |
 | `lib/gallformers/places.ex` | Places context — range queries, hierarchy traversal |
@@ -83,7 +87,7 @@ Countries/territories without admin-1 subdivisions in Natural Earth (e.g., Puert
 
 The script maintains two arrays:
 
-- **`COUNTRIES`** (52 entries): All Western Hemisphere countries and territories to include. Uses ISO 3166-1 alpha-3 codes.
+- **`COUNTRIES`** (56 entries): All Western Hemisphere countries and territories to include. Uses ISO 3166-1 alpha-3 codes.
 - **`STATE_COUNTRIES`** (26 entries): Subset of `COUNTRIES` that have meaningful admin-1 subdivisions. Countries NOT in this list get their polygons merged into the `subdivisions` layer.
 
 ### Processing Steps
@@ -160,17 +164,100 @@ This means selected territories (like Puerto Rico) turn green in BOTH layers —
 
 After a successful build, tippecanoe should report approximately:
 
-- **581 features total** (as of Feb 2026)
-  - ~52 countries
+- **~595 features total** (as of Feb 2026)
+  - ~59 countries (includes French overseas departments from map_subunits and BES islands from admin-1)
   - ~508 subdivisions (from Natural Earth Admin-1)
-  - ~22 non-subdivided countries/territories (merged into subdivisions layer)
+  - ~32 non-subdivided countries/territories (merged into subdivisions layer)
   - A small number of lakes
 
 If the count is significantly different, something went wrong:
-- **Much higher** (~608+): The non-subdivided filter isn't excluding STATE_COUNTRIES — check property casing in the jq filter
+- **Much higher** (~630+): The non-subdivided filter isn't excluding STATE_COUNTRIES — check property casing in the jq filter
 - **Much lower** (~100-200): tippecanoe is dropping features — check for `--coalesce-densest-as-needed` or other dropping flags
 
+Run `python3 verify_tiles.py` after any rebuild to check for gaps.
+
+## Diagnostic Scripts
+
+Three Python scripts in `services/boundaries/` help debug tile coverage issues. All require `tippecanoe` and/or `gdal` to be installed.
+
+### `verify_tiles.py` — Coverage verification
+
+Compares the PMTiles file against the `place` database table and reports:
+- Countries in DB but missing from tiles entirely
+- Non-subdivided countries missing from the subdivisions layer
+- DB subdivisions missing from tiles (code mismatches)
+- Codes in tiles but not in DB (unexpected extras)
+
+```bash
+python3 verify_tiles.py                              # defaults: priv/static/data/boundaries.pmtiles + priv/gallformers.sqlite
+python3 verify_tiles.py path/to/tiles.pmtiles        # custom PMTiles path
+python3 verify_tiles.py tiles.pmtiles db.sqlite      # custom both
+```
+
+**Run this after every tile rebuild.** Exit code 0 = all checks pass.
+
+### `inspect_tile.py` — Single place lookup
+
+Finds which tiles contain a specific place code, in which layers, at which zoom levels.
+
+```bash
+python3 inspect_tile.py GF      # French Guiana — should be in both countries and subdivisions
+python3 inspect_tile.py US-CA   # California — should be in subdivisions only
+python3 inspect_tile.py PR      # Puerto Rico — should be in countries + subdivisions (non-subdivided)
+```
+
+### `inspect_natural_earth.py` — Source data lookup
+
+Searches all Natural Earth 10m layers (admin_0_countries, admin_0_map_subunits, admin_1_states_provinces) for a given ISO alpha-3 code. Shows which layer the territory lives in and its field values.
+
+```bash
+python3 inspect_natural_earth.py KNA    # Saint Kitts and Nevis — in admin_0_countries
+python3 inspect_natural_earth.py GUF    # French Guiana — in map_subunits, NOT admin_0_countries
+python3 inspect_natural_earth.py BES    # Caribbean Netherlands — in admin_1, NOT admin_0_countries
+```
+
+Use this when adding a new territory to find out which NE layer to extract from.
+
+## Adding New Territories
+
+Checklist for adding a country or territory to the map:
+
+1. **Find the ISO alpha-3 code** for the territory
+2. **Run `inspect_natural_earth.py`** to determine which NE layer it appears in:
+   - `admin_0_countries` → add to `COUNTRIES` array
+   - `admin_0_map_subunits` → add to `SUBUNIT_SU_A3` / `SUBUNIT_ALPHA2` arrays
+   - `admin_1_states_provinces` → add extraction logic like the BES/Caribbean Netherlands block
+3. **If it has admin-1 subdivisions** you want in the tiles, add to `STATE_COUNTRIES`
+4. **Run `build_boundaries.sh`** to rebuild tiles
+5. **Run `verify_tiles.py`** to confirm zero gaps
+6. **Add the place to the database** via migration (with matching `code` value)
+7. **Update `PLACE_REFERENCE.md`** with the new entry
+
 ## Known Gotchas
+
+### French Overseas Departments and Caribbean Netherlands
+
+Natural Earth does NOT include French Guiana (GUF), Guadeloupe (GLP), or Martinique (MTQ) in `ne_10m_admin_0_countries`. They are classified as "Geo unit" sub-units of France and appear only in `ne_10m_admin_0_map_subunits` with `ADM0_A3 = FRA` and `SU_A3 = GUF/GLP/MTQ`. Their `ISO_A2` values are French departmental codes (`FR-973`, `FR-971`, `FR-972`), not the ISO alpha-2 codes our database uses (`GF`, `GP`, `MQ`).
+
+The build script handles this by extracting these territories from `map_subunits` and assigning the correct alpha-2 codes via the `SUBUNIT_TERRITORIES` and `SUBUNIT_CODE_MAP` arrays.
+
+Similarly, the Caribbean Netherlands (BES — Bonaire, Sint Eustatius, Saba) doesn't appear as a country at all. The three islands are subdivisions of the Netherlands (`adm0_a3 = NLD`) in the admin-1 layer. The build script extracts them and assigns `code = BQ`.
+
+If you add new territories and they don't appear in the tiles, check which NE layer they're actually in:
+
+```bash
+# Check admin-0 countries
+ogrinfo -q ne_10m_admin_0_countries.shp -sql \
+  "SELECT ADM0_A3, NAME FROM ne_10m_admin_0_countries WHERE ADM0_A3 = 'XXX'" -dialect SQLITE
+
+# Check map subunits (French-style overseas departments)
+ogrinfo -q ne_10m_admin_0_map_subunits.shp -sql \
+  "SELECT SU_A3, NAME, ADM0_A3 FROM ne_10m_admin_0_map_subunits WHERE SU_A3 = 'XXX'" -dialect SQLITE
+
+# Check admin-1 (subdivisions of another country)
+ogrinfo -q ne_10m_admin_1_states_provinces.shp -sql \
+  "SELECT name, adm0_a3, iso_3166_2 FROM ne_10m_admin_1_states_provinces WHERE name LIKE '%YourTerritory%'" -dialect SQLITE
+```
 
 ### Property Name Casing
 
@@ -191,6 +278,14 @@ countries.geojson:17: Reached EOF without all containers being closed
 
 **These are benign.** They come from tippecanoe's streaming GeoJSON parser encountering the `crs` member that ogr2ogr includes in its output. All features are still read correctly. Verify by checking the feature count in the "N features, ... bytes" summary line.
 
+### Tippecanoe `--read-parallel` and Multi-Line GeoJSON
+
+`--read-parallel` makes tippecanoe split input files at newline boundaries for parallel parsing. This is safe for:
+- Newline-delimited GeoJSON (one feature per line)
+- GeoJSON where features fit on single lines
+
+It **silently corrupts** pretty-printed GeoJSON where features span multiple lines — large coordinate arrays get split mid-feature, and tippecanoe silently drops the truncated features. The non_subdivided.geojson uses `jq -c` (compact output) to avoid this. If you add new jq-generated inputs, always use `-c`.
+
 ### Tippecanoe Feature Dropping
 
 Never use `--coalesce-densest-as-needed` — it merges large subdivision features (e.g., Brazilian states) into single country-level polygons at lower zoom levels, making them unclickable. Use `--no-feature-limit --no-tile-size-limit` instead.
@@ -207,23 +302,24 @@ After rebuilding tiles, browsers cache the old PMTiles aggressively. Always hard
 
 ### Feature Verification
 
-To verify features exist in the built PMTiles:
+Use the diagnostic scripts (see "Diagnostic Scripts" section above):
 
 ```bash
-# Decode a specific tile and check its contents
-tippecanoe-decode boundaries.pmtiles Z X Y > tile.json
+# Full coverage check against DB
+python3 verify_tiles.py
 
-# Check with python
-python3 -c "
-import json
-with open('tile.json') as f:
-    data = json.load(f)
-for feat in data['features']:
-    if feat['type'] == 'FeatureCollection':
-        layer = feat['properties'].get('layer', '?')
-        codes = [f['properties'].get('code','') for f in feat.get('features',[])]
-        print(f'{layer}: {len(codes)} features')
-"
+# Check a specific place
+python3 inspect_tile.py PR
+
+# Find where a territory lives in Natural Earth
+python3 inspect_natural_earth.py GUF
+```
+
+For manual tile inspection, use `tippecanoe-decode`:
+
+```bash
+tippecanoe-decode boundaries.pmtiles Z X Y          # all layers
+tippecanoe-decode -l countries boundaries.pmtiles Z X Y   # single layer
 ```
 
 Tile coordinates (Z/X/Y) can be found using online tools or calculated from lat/lng at a given zoom level.
