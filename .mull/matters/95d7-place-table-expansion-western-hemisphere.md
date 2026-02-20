@@ -1,7 +1,7 @@
 ---
 status: done
 created: 2026-02-18
-updated: 2026-02-19
+updated: 2026-02-20
 epic: geo-expansion
 blocks: [1db6, 554e, 67e0]
 needs: [4143]
@@ -65,3 +65,5 @@ Natural Earth 10m Admin-1 dataset. ISO 3166-2 codes nearly complete since NE v4.
 - Panama's 4 indigenous comarcas — verify presence in NE Admin-1
 - Place codes shift from postal (CA, TX) to ISO 3166-2 (BR-SP, CO-ANT) — code field max:10 is sufficient
 - Small Caribbean nations: subdivisions below ~5,000 km² get country-level treatment only
+
+Select All button in host admin range map is useless (never a real use case); Deselect All does not work. Low priority, note for future cleanup.
