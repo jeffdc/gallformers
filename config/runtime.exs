@@ -75,7 +75,12 @@ if config_env() == :prod do
   config :gallformers, Gallformers.Repo,
     database: database_path,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
-    busy_timeout: 10_000
+    busy_timeout: 10_000,
+    # Override ecto_sqlite3's default of -64000 (62.5 MB per connection).
+    # With 10 connections that's a 625 MB page cache ceiling — exceeds machine RAM.
+    # SQLite default of -2000 (2 MB per connection, 20 MB total) is sufficient
+    # for a 38 MB database at <1 req/sec.
+    cache_size: -2000
 
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you

@@ -14,7 +14,9 @@ config :gallformers, Gallformers.Repo,
   # Use :wal (the adapter's default) for better concurrency
   # WAL allows reads during write transactions, preventing "Database busy" errors
   journal_mode: :wal,
-  busy_timeout: 5000
+  busy_timeout: 5000,
+  # Override ecto_sqlite3's default of -64000 (62.5 MB per connection)
+  cache_size: -2000
 
 # Server is disabled by default for fast unit tests.
 # E2E tests enable the server via GALLFORMERS_E2E=1 environment variable (in runtime.exs).

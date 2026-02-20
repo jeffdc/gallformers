@@ -11,7 +11,9 @@ config :gallformers, Gallformers.Repo,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
   # Match test.exs settings for SQLite consistency
-  busy_timeout: 5000
+  busy_timeout: 5000,
+  # Override ecto_sqlite3's default of -64000 (62.5 MB per connection)
+  cache_size: -2000
 
 # For development, we disable any cache and enable
 # debugging and code reloading.

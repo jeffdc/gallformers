@@ -40,7 +40,7 @@ kill_timeout = "30s"
     path = "/health"
 
 [[vm]]
-  memory = "512mb"
+  memory = "1024mb"
   cpu_kind = "shared"
   cpus = 1
 
