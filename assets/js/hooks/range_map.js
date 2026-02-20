@@ -141,6 +141,15 @@ const RangeMap = {
       this.fitToRange(true)
     })
 
+    // Drill-down zoom events from CountryDrillDown panel
+    this.handleEvent('range-zoom-to-country', ({ code }) => {
+      this.zoomToCountry(code)
+    })
+
+    this.handleEvent('range-zoom-out', () => {
+      this.fitToRange(true)
+    })
+
     this.initMap()
   },
 
@@ -189,7 +198,6 @@ const RangeMap = {
 
     this.map = new maplibregl.Map({
       container,
-      // Disable box zoom so shift+click can be used for country-level toggle
       boxZoom: false,
       style: {
         version: 8,
@@ -358,9 +366,9 @@ const RangeMap = {
         // Place detail pages: no range status, just show the name
         status = ''
       } else if (this.inRange.has(code) && !this.excludedRange.has(code)) {
-        status = ' — Host confirmed'
+        status = ' — Documented'
       } else if (this.inheritedRange.has(code) && !this.excludedRange.has(code)) {
-        status = ' — Reported at country level (state not confirmed)'
+        status = ' — Country-level record only'
       } else if (this.editable && this.excludedRange.has(code)) {
         status = ' — Excluded'
       } else {
@@ -394,16 +402,16 @@ const RangeMap = {
         map.getCanvas().style.cursor = 'pointer'
         this.popup
           .setLngLat(e.lngLat)
-          .setHTML(`<strong>${name}</strong> — Click to select · Shift+click to select all`)
+          .setHTML(`<strong>${name}</strong> — Click to edit range`)
           .addTo(map)
       } else {
         map.getCanvas().style.cursor = this.navigable ? 'pointer' : 'default'
 
         let status = ''
         if (this.inRange.has(code)) {
-          status = this.placeMode ? '' : ' — Host confirmed'
+          status = this.placeMode ? '' : ' — Documented'
         } else if (this.inheritedRange.has(code)) {
-          status = ' — Reported at country level (state not confirmed)'
+          status = ' — Country-level record only'
         } else {
           status = this.placeMode ? '' : ' — Not reported'
         }
@@ -438,15 +446,11 @@ const RangeMap = {
       const isRealSubdiv = subdivCode && subdivCode.includes('-')
 
       if (this.editable) {
-        if (e.originalEvent.shiftKey && countryCode) {
-          // Shift+click: toggle all subdivisions in the country (or the country itself if leaf)
-          this.pushEvent('toggle_country', { code: countryCode })
-        } else if (isRealSubdiv) {
-          // Regular click on a real subdivision: toggle single region
+        if (isRealSubdiv) {
+          // Click on a subdivision: toggle single region
           this.pushEvent('toggle_region', { code: subdivCode })
         } else if (countryCode) {
-          // Regular click on a country (leaf territory, or coalesced at low zoom):
-          // toggle the country directly
+          // Click on a country: open drill-down panel (or toggle directly for leaf countries)
           this.pushEvent('toggle_country', { code: countryCode })
         }
       } else if (this.navigable) {
@@ -540,6 +544,54 @@ const RangeMap = {
       maxZoom: 8,
       animate
     })
+  },
+
+  /**
+   * Zoom the map to show a specific country and its subdivisions.
+   * Used when the drill-down panel opens for a country.
+   */
+  zoomToCountry(code) {
+    if (!this.map || !this.map.isStyleLoaded()) return
+
+    let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity
+    let matched = 0
+
+    const updateBounds = (lng, lat) => {
+      if (lng < minLng) minLng = lng
+      if (lng > maxLng) maxLng = lng
+      if (lat < minLat) minLat = lat
+      if (lat > maxLat) maxLat = lat
+    }
+
+    // Check country features
+    const countryFeatures = this.map.querySourceFeatures('boundaries', {
+      sourceLayer: 'countries'
+    })
+
+    for (const feature of countryFeatures) {
+      if (feature.properties.code !== code) continue
+      matched++
+      forEachCoord(feature.geometry, updateBounds)
+    }
+
+    // Check subdivision features for this country (iso_a2 property)
+    const subdivFeatures = this.map.querySourceFeatures('boundaries', {
+      sourceLayer: 'subdivisions'
+    })
+
+    for (const feature of subdivFeatures) {
+      if (feature.properties.iso_a2 !== code) continue
+      matched++
+      forEachCoord(feature.geometry, updateBounds)
+    }
+
+    if (matched > 0) {
+      this.map.fitBounds([[minLng, minLat], [maxLng, maxLat]], {
+        padding: 40,
+        maxZoom: 8,
+        animate: true
+      })
+    }
   }
 }
 
