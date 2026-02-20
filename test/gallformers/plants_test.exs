@@ -152,8 +152,10 @@ defmodule Gallformers.PlantsTest do
         species_attrs: %{"datacomplete" => true},
         alias_changes: {[], []},
         place_changes: %{
-          original_places: [],
-          current_places: [],
+          original_exact_places: [],
+          original_country_places: [],
+          exact_places: [],
+          country_places: [],
           all_places: []
         },
         section_update: %{
@@ -177,8 +179,10 @@ defmodule Gallformers.PlantsTest do
         species_attrs: %{},
         alias_changes: {[], []},
         place_changes: %{
-          original_places: [],
-          current_places: [place.code],
+          original_exact_places: [],
+          original_country_places: [],
+          exact_places: [place.code],
+          country_places: [],
           all_places: all_places
         },
         section_update: %{
@@ -200,8 +204,10 @@ defmodule Gallformers.PlantsTest do
         species_attrs: %{"name" => ""},
         alias_changes: {[], []},
         place_changes: %{
-          original_places: [],
-          current_places: [],
+          original_exact_places: [],
+          original_country_places: [],
+          exact_places: [],
+          country_places: [],
           all_places: []
         },
         section_update: %{

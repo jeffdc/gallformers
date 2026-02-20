@@ -494,20 +494,28 @@ defmodule Gallformers.Plants do
   end
 
   defp save_place_changes(host_id, %{
-         original_places: original_places,
-         current_places: current_places,
+         original_exact_places: original_exact,
+         original_country_places: original_country,
+         exact_places: exact_places,
+         country_places: country_places,
          all_places: all_places
        }) do
     place_code_to_id = Map.new(all_places, &{&1.code, &1.id})
 
-    original_set = MapSet.new(original_places)
-    current_set = MapSet.new(current_places)
+    original_set = MapSet.new(original_exact ++ original_country)
+    current_set = MapSet.new(exact_places ++ country_places)
 
     if original_set != current_set do
-      place_ids =
-        Enum.map(current_places, &Map.get(place_code_to_id, &1)) |> Enum.reject(&is_nil/1)
+      entries =
+        Enum.map(exact_places, fn code ->
+          {Map.get(place_code_to_id, code), "exact"}
+        end) ++
+          Enum.map(country_places, fn code ->
+            {Map.get(place_code_to_id, code), "country"}
+          end)
 
-      Ranges.update_host_places(host_id, place_ids)
+      entries = Enum.reject(entries, fn {id, _} -> is_nil(id) end)
+      Ranges.update_host_places(host_id, entries)
     end
   end
 

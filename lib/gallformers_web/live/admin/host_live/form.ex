@@ -80,7 +80,14 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   defp load_host_for_edit(socket, host) do
     host_id = host.id
     aliases = Plants.get_aliases_for_host_full(host_id)
-    places = Ranges.get_places_for_host(host_id)
+    place_entries = Ranges.get_places_for_host_with_precision(host_id)
+
+    exact_places =
+      place_entries |> Enum.filter(&(&1.precision == "exact")) |> Enum.map(& &1.code)
+
+    country_places =
+      place_entries |> Enum.filter(&(&1.precision == "country")) |> Enum.map(& &1.code)
+
     taxonomy = Taxonomy.get_taxonomy_for_species(host_id)
 
     socket
@@ -91,8 +98,11 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> assign(:form, to_form(Plants.change_host(host)))
     # Deferred changes tracking (override defaults with loaded data)
     |> assign(DeferredChanges.init(:aliases, aliases))
-    |> assign(:original_places, places)
-    |> assign(:places, places)
+    |> assign(:original_exact_places, exact_places)
+    |> assign(:original_country_places, country_places)
+    |> assign(:exact_places, exact_places)
+    |> assign(:country_places, country_places)
+    |> compute_map_range()
     |> assign_taxonomy_fields(taxonomy)
   end
 
@@ -241,9 +251,14 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   @impl true
   def handle_event("select_all_places", _params, socket) do
     if socket.assigns.mode == :edit do
-      # Select all in local state - don't save to DB yet
       all_codes = Enum.map(socket.assigns.all_places, & &1.code)
-      {:noreply, socket |> assign(:places, all_codes) |> mark_dirty()}
+
+      socket
+      |> assign(:exact_places, all_codes)
+      |> assign(:country_places, [])
+      |> compute_map_range()
+      |> mark_dirty()
+      |> then(&{:noreply, &1})
     else
       {:noreply, socket}
     end
@@ -252,8 +267,12 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   @impl true
   def handle_event("deselect_all_places", _params, socket) do
     if socket.assigns.mode == :edit do
-      # Deselect all in local state - don't save to DB yet
-      {:noreply, socket |> assign(:places, []) |> mark_dirty()}
+      socket
+      |> assign(:exact_places, [])
+      |> assign(:country_places, [])
+      |> compute_map_range()
+      |> mark_dirty()
+      |> then(&{:noreply, &1})
     else
       {:noreply, socket}
     end
@@ -280,22 +299,40 @@ defmodule GallformersWeb.Admin.HostLive.Form do
       nil ->
         socket
 
-      %{id: place_id} ->
-        leaf_ids = Places.leaf_descendant_ids(place_id)
-        id_to_code = Map.new(socket.assigns.all_places, &{&1.id, &1.code})
-        leaf_codes = leaf_ids |> Enum.map(&Map.get(id_to_code, &1)) |> Enum.reject(&is_nil/1)
+      place ->
+        leaf_ids = Places.leaf_descendant_ids(place.id)
 
-        places = socket.assigns.places
-        all_selected? = Enum.all?(leaf_codes, &(&1 in places))
+        if leaf_ids == [place.id] do
+          # Leaf country (no subdivisions): toggle directly as exact
+          new_exact = toggle_place_code(socket.assigns.exact_places, code)
 
-        new_places =
-          if all_selected? do
-            Enum.reject(places, &(&1 in leaf_codes))
-          else
-            (places ++ leaf_codes) |> Enum.uniq()
-          end
+          socket
+          |> assign(:exact_places, new_exact)
+          |> compute_map_range()
+          |> mark_dirty()
+        else
+          # Country with subdivisions: toggle all leaf codes as exact for now.
+          # Will be replaced with drill-down panel in Task 4.
+          id_to_code = Map.new(socket.assigns.all_places, &{&1.id, &1.code})
 
-        socket |> assign(:places, new_places) |> mark_dirty()
+          leaf_codes =
+            leaf_ids |> Enum.map(&Map.get(id_to_code, &1)) |> Enum.reject(&is_nil/1)
+
+          exact = socket.assigns.exact_places
+          all_selected? = Enum.all?(leaf_codes, &(&1 in exact))
+
+          new_exact =
+            if all_selected? do
+              Enum.reject(exact, &(&1 in leaf_codes))
+            else
+              (exact ++ leaf_codes) |> Enum.uniq()
+            end
+
+          socket
+          |> assign(:exact_places, new_exact)
+          |> compute_map_range()
+          |> mark_dirty()
+        end
     end
   end
 
@@ -305,8 +342,12 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     place = Enum.find(socket.assigns.all_places, &(&1.code == code))
 
     if place do
-      new_places = toggle_place_code(socket.assigns.places, code)
-      socket |> assign(:places, new_places) |> mark_dirty()
+      new_exact = toggle_place_code(socket.assigns.exact_places, code)
+
+      socket
+      |> assign(:exact_places, new_exact)
+      |> compute_map_range()
+      |> mark_dirty()
     else
       socket
     end
@@ -314,6 +355,35 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
   defp toggle_place_code(places, code) do
     if code in places, do: Enum.reject(places, &(&1 == code)), else: places ++ [code]
+  end
+
+  # Computes @in_range (exact codes) and @inherited_range (expanded country codes)
+  # for the map display. Called after every change to exact_places or country_places.
+  defp compute_map_range(socket) do
+    exact = socket.assigns.exact_places
+    country_codes = socket.assigns.country_places
+    all_places = socket.assigns.all_places
+    place_by_code = Map.new(all_places, &{&1.code, &1})
+
+    inherited =
+      country_codes
+      |> Enum.flat_map(fn code ->
+        case Map.get(place_by_code, code) do
+          %{id: id} ->
+            leaf_ids = Places.leaf_descendant_ids(id)
+            id_to_code = Map.new(all_places, &{&1.id, &1.code})
+            Enum.map(leaf_ids, &Map.get(id_to_code, &1)) |> Enum.reject(&is_nil/1)
+
+          nil ->
+            []
+        end
+      end)
+      |> Enum.uniq()
+      |> Enum.reject(&(&1 in exact))
+
+    socket
+    |> assign(:in_range, exact)
+    |> assign(:inherited_range, inherited)
   end
 
   # Sets ALL host form assigns to their default/empty values.
@@ -325,8 +395,12 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> assign(:form, nil)
     # Deferred changes tracking
     |> assign(DeferredChanges.init(:aliases, []))
-    |> assign(:original_places, [])
-    |> assign(:places, [])
+    |> assign(:original_exact_places, [])
+    |> assign(:original_country_places, [])
+    |> assign(:exact_places, [])
+    |> assign(:country_places, [])
+    |> assign(:in_range, [])
+    |> assign(:inherited_range, [])
     |> assign(:taxonomy, nil)
     |> assign(:genus_is_new, false)
     |> assign(:selected_family_id, nil)
@@ -437,8 +511,10 @@ defmodule GallformersWeb.Admin.HostLive.Form do
       species_attrs: params,
       alias_changes: DeferredChanges.compute_changes(socket, :aliases),
       place_changes: %{
-        original_places: socket.assigns.original_places,
-        current_places: socket.assigns.places,
+        original_exact_places: socket.assigns.original_exact_places,
+        original_country_places: socket.assigns.original_country_places,
+        exact_places: socket.assigns.exact_places,
+        country_places: socket.assigns.country_places,
         all_places: socket.assigns.all_places
       },
       section_update: %{
@@ -452,7 +528,14 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     case Plants.update_host_with_associations(socket.assigns.host, update_params) do
       {:ok, updated_host} ->
         aliases = Plants.get_aliases_for_host_full(host_id)
-        places = Ranges.get_places_for_host(host_id)
+        place_entries = Ranges.get_places_for_host_with_precision(host_id)
+
+        exact_places =
+          place_entries |> Enum.filter(&(&1.precision == "exact")) |> Enum.map(& &1.code)
+
+        country_places =
+          place_entries |> Enum.filter(&(&1.precision == "country")) |> Enum.map(& &1.code)
+
         taxonomy = Taxonomy.get_taxonomy_for_species(host_id)
 
         {:noreply,
@@ -460,8 +543,11 @@ defmodule GallformersWeb.Admin.HostLive.Form do
          |> assign(:host, updated_host)
          |> assign(:taxonomy, taxonomy)
          |> DeferredChanges.refresh(:aliases, aliases)
-         |> assign(:original_places, places)
-         |> assign(:places, places)
+         |> assign(:original_exact_places, exact_places)
+         |> assign(:original_country_places, country_places)
+         |> assign(:exact_places, exact_places)
+         |> assign(:country_places, country_places)
+         |> compute_map_range()
          |> reset_dirty()
          |> put_flash(:info, "Host saved successfully")}
 
@@ -758,8 +844,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
                   <%= if @mode == :edit do %>
                     <.range_map
                       id="host-range-map"
-                      in_range={@places}
-                      excluded_range={[]}
+                      in_range={@in_range}
+                      inherited_range={@inherited_range}
                       editable
                       class="border border-gray-300 rounded bg-gray-50 min-h-[300px]"
                     />
