@@ -588,7 +588,7 @@ defmodule GallformersWeb.HostLive do
                     style="background-color: #90EE90;"
                   >
                   </span>
-                  = reported at country level (state not confirmed)
+                  = Country-level record only
                 </div>
               </div>
             </div>

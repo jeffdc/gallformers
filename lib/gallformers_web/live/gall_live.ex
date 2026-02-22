@@ -501,7 +501,7 @@ defmodule GallformersWeb.GallLive do
                     id="gall-range-map"
                     in_range={MapSet.to_list(@range)}
                     inherited_range={@inherited_range}
-                    excluded_range={MapSet.to_list(@excluded_range)}
+                    excluded_range={[]}
                     navigable
                   />
                   <div
@@ -513,7 +513,7 @@ defmodule GallformersWeb.GallLive do
                       style="background-color: #90EE90;"
                     >
                     </span>
-                    = reported at country level (state not confirmed)
+                    = Country-level record only
                   </div>
                 </div>
               </div>
