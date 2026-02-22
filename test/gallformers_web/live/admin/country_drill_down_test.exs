@@ -3,8 +3,8 @@ defmodule GallformersWeb.Admin.CountryDrillDownTest do
 
   import Phoenix.LiveViewTest
 
-  alias GallformersWeb.Admin.CountryDrillDown
   alias Gallformers.Places
+  alias GallformersWeb.Admin.CountryDrillDown
 
   describe "rendering" do
     test "renders closed state by default" do

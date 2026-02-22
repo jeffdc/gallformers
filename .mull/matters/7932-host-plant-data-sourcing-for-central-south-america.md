@@ -5,6 +5,7 @@ created: 2026-02-13
 updated: 2026-02-20
 epic: geo-expansion
 docs: [docs/plans/2026-02-19-wcvp-reconciliation-pipeline-design.md, docs/plans/2026-02-19-wcvp-reconciliation-pipeline.md]
+relates: [e617]
 blocks: [1db6]
 ---
 
