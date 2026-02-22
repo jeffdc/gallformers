@@ -1330,7 +1330,10 @@ defmodule GallformersWeb.IDLive do
           </p>
         </div>
       </.link>
-      <div :if={@gall.undescribed || @gall.non_gall} class="flex flex-wrap gap-1 px-2 pb-2">
+      <div
+        :if={@gall.undescribed || @gall.non_gall || @gall[:place_match] == :country_level}
+        class="flex flex-wrap gap-1 px-2 pb-2"
+      >
         <span
           :if={@gall.undescribed}
           class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700 cursor-help"
@@ -1344,6 +1347,13 @@ defmodule GallformersWeb.IDLive do
           title="This is not a true gall but a different type of plant growth or damage caused by an organism that is often mistaken for a gall."
         >
           Non-gall
+        </span>
+        <span
+          :if={@gall[:place_match] == :country_level}
+          class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-700 cursor-help"
+          title="This gall occurs on hosts with country-level range records — state-level data unavailable for your selected region."
+        >
+          Country-level
         </span>
       </div>
     </div>

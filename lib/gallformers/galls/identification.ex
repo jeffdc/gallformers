@@ -96,6 +96,7 @@ defmodule Gallformers.Galls.Identification do
     |> Repo.all()
     |> attach_images()
     |> attach_non_gall_flag()
+    |> attach_place_match(filters[:place_codes])
   end
 
   @doc """
@@ -514,6 +515,48 @@ defmodule Gallformers.Galls.Identification do
           small_path = String.replace(path, "original", "small")
           Map.put(gall, :image_url, "#{base_url}/#{small_path}")
       end
+    end)
+  end
+
+  defp attach_place_match(galls, nil), do: galls
+  defp attach_place_match(galls, []), do: galls
+
+  defp attach_place_match(galls, place_codes) do
+    # Resolve place codes to IDs for hierarchy expansion
+    place_ids =
+      Enum.map(place_codes, &Ranges.get_place_id_by_code/1)
+      |> Enum.reject(&is_nil/1)
+
+    # Descendant IDs: exact matches for the selected place and its subdivisions
+    descendant_ids = Enum.flat_map(place_ids, &Places.descendant_ids/1) |> Enum.uniq()
+
+    # Get all gall IDs for batch query
+    gall_ids = Enum.map(galls, & &1.id)
+
+    # Query: for each gall, check if any of its hosts have exact range records
+    # that match the selected place or its descendants
+    exact_match_gall_ids =
+      from(h in GallHost,
+        join: hr in "host_range",
+        on: hr.species_id == h.host_species_id,
+        where: h.gall_species_id in ^gall_ids,
+        where: hr.place_id in ^descendant_ids,
+        select: h.gall_species_id,
+        distinct: true
+      )
+      |> Repo.all()
+      |> MapSet.new()
+
+    # Tag each gall with its place match type
+    Enum.map(galls, fn gall ->
+      place_match =
+        if MapSet.member?(exact_match_gall_ids, gall.id) do
+          :documented
+        else
+          :country_level
+        end
+
+      Map.put(gall, :place_match, place_match)
     end)
   end
 end
