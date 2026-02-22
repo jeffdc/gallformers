@@ -328,7 +328,12 @@ defmodule Mix.Tasks.Gallformers.Wcvp.Reconcile do
   end
 
   defp get_current_place_codes(species_id) do
-    Gallformers.Ranges.get_places_for_host_with_precision(species_id)
-    |> Enum.map(fn %{code: code} -> code end)
+    from(hr in "host_range",
+      join: p in "place",
+      on: hr.place_id == p.id,
+      where: hr.species_id == ^species_id,
+      select: p.code
+    )
+    |> Repo.all()
   end
 end
