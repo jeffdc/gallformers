@@ -22,6 +22,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
   alias Gallformers.Repo
   alias Gallformers.Species
   alias GallformersWeb.Admin.DeferredChanges
+  alias GallformersWeb.Admin.ExclusionDrillDown
 
   @impl true
   def mount(_params, session, socket) do
@@ -247,31 +248,39 @@ defmodule GallformersWeb.Admin.GallHostLive do
   @impl true
   def handle_event("toggle_country", %{"code" => code}, socket) do
     with %{id: _gall_id} <- socket.assigns.selected_gall,
-         %{id: place_id} = _place <- Places.get_place_by_code(code) do
-      # Get all leaf descendant IDs for this country
+         %{id: place_id} = place <- Places.get_place_by_code(code) do
       leaf_ids = Places.leaf_descendant_ids(place_id)
-      excluded_place_ids = socket.assigns.excluded_place_ids
 
-      # If all leaves are excluded, un-exclude them. Otherwise exclude them all.
-      all_excluded? = Enum.all?(leaf_ids, &(&1 in excluded_place_ids))
+      if leaf_ids == [place_id] do
+        # Leaf country (no subdivisions): toggle exclusion directly
+        excluded_place_ids = socket.assigns.excluded_place_ids
 
-      new_excluded_place_ids =
-        if all_excluded? do
-          Enum.reject(excluded_place_ids, &(&1 in leaf_ids))
-        else
-          (excluded_place_ids ++ leaf_ids) |> Enum.uniq()
-        end
+        new_excluded_place_ids =
+          if place_id in excluded_place_ids do
+            List.delete(excluded_place_ids, place_id)
+          else
+            [place_id | excluded_place_ids]
+          end
 
-      excluded_places = place_ids_to_codes(socket.assigns.all_places, new_excluded_place_ids)
+        excluded_places = place_ids_to_codes(socket.assigns.all_places, new_excluded_place_ids)
 
-      socket =
-        socket
-        |> assign(:excluded_place_ids, new_excluded_place_ids)
-        |> assign_range_data(socket.assigns.host_places, excluded_places)
-        |> push_range_update()
-        |> mark_dirty()
+        socket =
+          socket
+          |> assign(:excluded_place_ids, new_excluded_place_ids)
+          |> assign_range_data(socket.assigns.host_places_raw, excluded_places)
+          |> push_range_update()
+          |> mark_dirty()
 
-      {:noreply, socket}
+        {:noreply, socket}
+      else
+        # Country with subdivisions: open drill-down panel
+        send_update(ExclusionDrillDown,
+          id: "exclusion-drill-down",
+          action: {:open, place}
+        )
+
+        {:noreply, push_event(socket, "range-zoom-to-country", %{code: code})}
+      end
     else
       _ -> {:noreply, socket}
     end
@@ -374,6 +383,83 @@ defmodule GallformersWeb.Admin.GallHostLive do
   def handle_event(event, params, socket)
       when event in ~w(request_cancel cancel_discard confirm_discard) do
     handle_form_event(event, params, socket)
+  end
+
+  # =================================================================
+  # ExclusionDrillDown callbacks
+  # =================================================================
+
+  @impl true
+  def handle_info({ExclusionDrillDown, {:toggle_exclusion, code}}, socket) do
+    case Enum.find(socket.assigns.all_places, &(&1.code == code)) do
+      %{id: place_id} ->
+        excluded_place_ids = socket.assigns.excluded_place_ids
+
+        new_excluded_place_ids =
+          if place_id in excluded_place_ids do
+            List.delete(excluded_place_ids, place_id)
+          else
+            [place_id | excluded_place_ids]
+          end
+
+        excluded_places = place_ids_to_codes(socket.assigns.all_places, new_excluded_place_ids)
+
+        socket =
+          socket
+          |> assign(:excluded_place_ids, new_excluded_place_ids)
+          |> assign_range_data(socket.assigns.host_places_raw, excluded_places)
+          |> push_range_update()
+          |> mark_dirty()
+
+        {:noreply, socket}
+
+      nil ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_info({ExclusionDrillDown, {:exclude_all, codes}}, socket) do
+    place_ids =
+      codes
+      |> Enum.map(fn code -> Enum.find(socket.assigns.all_places, &(&1.code == code)) end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(& &1.id)
+
+    new_excluded_place_ids = Enum.uniq(socket.assigns.excluded_place_ids ++ place_ids)
+    excluded_places = place_ids_to_codes(socket.assigns.all_places, new_excluded_place_ids)
+
+    socket =
+      socket
+      |> assign(:excluded_place_ids, new_excluded_place_ids)
+      |> assign_range_data(socket.assigns.host_places_raw, excluded_places)
+      |> push_range_update()
+      |> mark_dirty()
+
+    {:noreply, socket}
+  end
+
+  def handle_info({ExclusionDrillDown, {:include_all, codes}}, socket) do
+    place_ids =
+      codes
+      |> Enum.map(fn code -> Enum.find(socket.assigns.all_places, &(&1.code == code)) end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(& &1.id)
+
+    new_excluded_place_ids = Enum.reject(socket.assigns.excluded_place_ids, &(&1 in place_ids))
+    excluded_places = place_ids_to_codes(socket.assigns.all_places, new_excluded_place_ids)
+
+    socket =
+      socket
+      |> assign(:excluded_place_ids, new_excluded_place_ids)
+      |> assign_range_data(socket.assigns.host_places_raw, excluded_places)
+      |> push_range_update()
+      |> mark_dirty()
+
+    {:noreply, socket}
+  end
+
+  def handle_info({ExclusionDrillDown, :zoom_out}, socket) do
+    {:noreply, push_event(socket, "range-zoom-out", %{})}
   end
 
   # ============================================
@@ -646,9 +732,6 @@ defmodule GallformersWeb.Admin.GallHostLive do
                         <span class="text-xs text-gray-600">Neither</span>
                       </div>
                     </div>
-                    <p class="text-xs text-gray-500 mb-4">
-                      Shift+click a country to exclude/include all its states
-                    </p>
 
                     <div class="text-sm font-medium text-gray-700 mb-2">Map Actions:</div>
                     <div class="space-y-2">
@@ -683,22 +766,33 @@ defmodule GallformersWeb.Admin.GallHostLive do
                     </div>
                   </div>
 
-                  <%!-- Map --%>
+                  <%!-- Map + Drill-down panel --%>
                   <div class="col-span-5">
                     <%= if @selected_gall do %>
-                      <div
-                        id="gallhost-range-map"
-                        phx-hook="RangeMap"
-                        phx-update="ignore"
-                        data-in-range={Jason.encode!(@in_range)}
-                        data-excluded-range={Jason.encode!(@excluded_places)}
-                        data-inherited-range={Jason.encode!(@inherited_range)}
-                        data-editable="true"
-                        class="border border-gray-300 rounded bg-gray-50 min-h-[350px]"
-                      >
-                        <div class="flex items-center justify-center h-64 text-gray-400">
-                          Loading map...
+                      <div class="flex">
+                        <div class="flex-1">
+                          <div
+                            id="gallhost-range-map"
+                            phx-hook="RangeMap"
+                            phx-update="ignore"
+                            data-in-range={Jason.encode!(@in_range)}
+                            data-excluded-range={Jason.encode!(@excluded_places)}
+                            data-inherited-range={Jason.encode!(@inherited_range)}
+                            data-editable="true"
+                            class="border border-gray-300 rounded bg-gray-50 min-h-[350px]"
+                          >
+                            <div class="flex items-center justify-center h-64 text-gray-400">
+                              Loading map...
+                            </div>
+                          </div>
                         </div>
+                        <.live_component
+                          module={ExclusionDrillDown}
+                          id="exclusion-drill-down"
+                          excluded_place_ids={@excluded_place_ids}
+                          host_places={@host_places}
+                          all_places={@all_places}
+                        />
                       </div>
                     <% else %>
                       <div class="border border-gray-300 rounded bg-gray-100 min-h-[350px] flex items-center justify-center">
