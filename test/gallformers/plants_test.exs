@@ -122,7 +122,11 @@ defmodule Gallformers.PlantsTest do
   describe "host_traits management" do
     setup do
       {:ok, family} =
-        Taxonomy.create_taxonomy(%{name: "Testaceae HT Mgmt", type: "family", description: "Plant"})
+        Taxonomy.create_taxonomy(%{
+          name: "Testaceae HT Mgmt",
+          type: "family",
+          description: "Plant"
+        })
 
       {:ok, genus} =
         Taxonomy.create_taxonomy(%{name: "Testus HT Mgmt", type: "genus", parent_id: family.id})

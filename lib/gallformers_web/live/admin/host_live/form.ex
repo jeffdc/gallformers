@@ -97,6 +97,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> assign(:page_title, "Edit Host - #{host.name}")
     |> assign(:host, host)
     |> assign(:form, to_form(Plants.change_host(host)))
+    |> assign(:host_traits, Plants.get_host_traits(host_id))
     # Deferred changes tracking (override defaults with loaded data)
     |> assign(DeferredChanges.init(:aliases, aliases))
     |> assign(:original_exact_places, exact_places)
@@ -183,6 +184,109 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   def handle_event("clear_host", _params, socket) do
     # Clear selection and return to search mode
     {:noreply, close_form(socket)}
+  end
+
+  # =================================================================
+  # Event handlers - WCVP search/select (typeahead)
+  # =================================================================
+
+  @impl true
+  def handle_event("search_wcvp", %{"value" => query}, socket) do
+    results =
+      if String.length(query) >= 3 do
+        Gallformers.Wcvp.Lookup.search(query, limit: 10)
+        |> Enum.map(fn r -> Map.put(r, :id, r.plant_name_id) end)
+      else
+        []
+      end
+
+    {:noreply,
+     socket
+     |> assign(:wcvp_search_query, query)
+     |> assign(:wcvp_search_results, results)}
+  end
+
+  @impl true
+  def handle_event("select_wcvp", %{"id" => plant_name_id}, socket) do
+    case Gallformers.Wcvp.Lookup.get(plant_name_id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "WCVP species not found")}
+
+      wcvp_data ->
+        {:noreply,
+         socket
+         |> assign(:wcvp_selected, wcvp_data)
+         |> assign(:wcvp_search_results, [])
+         |> init_new_host_from_wcvp(wcvp_data)}
+    end
+  end
+
+  @impl true
+  def handle_event("clear_wcvp", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:wcvp_selected, nil)
+     |> assign(:wcvp_search_query, "")
+     |> assign(:wcvp_search_results, [])}
+  end
+
+  # =================================================================
+  # Event handlers - WCVP refresh (edit mode)
+  # =================================================================
+
+  @impl true
+  def handle_event("refresh_from_wcvp", _params, socket) do
+    host_traits = socket.assigns[:host_traits]
+    host = socket.assigns.host
+
+    # Look up by wcvp_id if available, otherwise by name
+    wcvp_data =
+      cond do
+        host_traits && host_traits.wcvp_id not in [nil, ""] ->
+          Gallformers.Wcvp.Lookup.get(host_traits.wcvp_id)
+
+        true ->
+          case Gallformers.Wcvp.Lookup.search(host.name, limit: 1) do
+            [match] -> Gallformers.Wcvp.Lookup.get(match.plant_name_id)
+            [] -> nil
+          end
+      end
+
+    case wcvp_data do
+      nil ->
+        {:noreply, put_flash(socket, :error, "No matching species found in WCVP")}
+
+      data ->
+        diff = build_wcvp_diff(socket, data)
+        {:noreply, assign(socket, :wcvp_diff, diff)}
+    end
+  end
+
+  @impl true
+  def handle_event("apply_wcvp_updates", _params, socket) do
+    diff = socket.assigns.wcvp_diff
+
+    with {:ok, _} <- apply_wcvp_range_updates(socket, diff),
+         {:ok, _} <-
+           Plants.upsert_host_traits(socket.assigns.host.id, %{
+             wcvp_id: diff.wcvp_data.plant_name_id,
+             powo_id: diff.wcvp_data.powo_id
+           }) do
+      {:noreply,
+       socket
+       |> assign(:wcvp_diff, nil)
+       |> put_flash(:info, "Host updated from WCVP")
+       |> push_navigate(to: ~p"/admin/hosts/#{socket.assigns.host.id}")}
+    else
+      {:error, reason} ->
+        {:noreply,
+         put_flash(socket, :error, "Failed to apply WCVP updates: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("cancel_wcvp_refresh", _params, socket) do
+    {:noreply, assign(socket, :wcvp_diff, nil)}
   end
 
   @impl true
@@ -403,6 +507,14 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     # Typeahead search state
     |> assign(:host_search_query, "")
     |> assign(:host_search_results, [])
+    # WCVP search state
+    |> assign(:wcvp_search_query, "")
+    |> assign(:wcvp_search_results, [])
+    |> assign(:wcvp_selected, nil)
+    |> assign(:wcvp_available, Gallformers.Wcvp.Lookup.available?())
+    |> assign(:wcvp_prefilled, nil)
+    |> assign(:wcvp_diff, nil)
+    |> assign(:host_traits, nil)
     |> reset_dirty()
   end
 
@@ -447,6 +559,92 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> mark_dirty()
   end
 
+  defp init_new_host_from_wcvp(socket, wcvp_data) do
+    # Use the existing init_new_host_state flow but with WCVP name
+    socket = init_new_host_state(socket, wcvp_data.taxon_name)
+
+    # WCVP is authoritative for plant taxonomy — always use the WCVP family,
+    # overriding whatever taxonomy resolution may have guessed.
+    socket =
+      case Enum.find(socket.assigns.families, fn {name, _id} -> name == wcvp_data.family end) do
+        {_name, family_id} ->
+          assign(socket, :selected_family_id, family_id)
+
+        nil ->
+          # Family doesn't exist yet — create it from WCVP data
+          case Taxonomy.create_taxonomy(%{
+                 name: wcvp_data.family,
+                 type: "family",
+                 description: "Plant"
+               }) do
+            {:ok, family} ->
+              families = Taxonomy.list_families_for_select(:plant)
+
+              socket
+              |> assign(:families, families)
+              |> assign(:selected_family_id, family.id)
+
+            {:error, _} ->
+              socket
+          end
+      end
+
+    # Resolve WCVP distribution to gallformers place codes for saving after create
+    tdwg_lookup = Gallformers.Wcvp.Tdwg.load()
+    wcvp_places = Gallformers.Wcvp.Tdwg.convert_tdwg_codes(wcvp_data.distribution, tdwg_lookup)
+    wcvp_place_codes = Enum.map(wcvp_places, & &1.code)
+
+    wcvp_place_ids =
+      socket.assigns.all_places
+      |> Enum.filter(fn p -> p.code in wcvp_place_codes end)
+      |> Enum.map(& &1.id)
+
+    socket
+    |> assign(:wcvp_prefilled, %{
+      wcvp_id: wcvp_data.plant_name_id,
+      powo_id: wcvp_data.powo_id,
+      place_ids: wcvp_place_ids
+    })
+  end
+
+  # =================================================================
+  # WCVP diff helpers
+  # =================================================================
+
+  defp build_wcvp_diff(socket, wcvp_data) do
+    tdwg_lookup = Gallformers.Wcvp.Tdwg.load()
+    wcvp_places = Gallformers.Wcvp.Tdwg.convert_tdwg_codes(wcvp_data.distribution, tdwg_lookup)
+    wcvp_place_codes = MapSet.new(wcvp_places, & &1.code)
+
+    # Current places are stored as codes in exact_places and country_places
+    current_place_codes =
+      MapSet.new(socket.assigns.exact_places ++ socket.assigns.country_places)
+
+    added = MapSet.difference(wcvp_place_codes, current_place_codes)
+    removed = MapSet.difference(current_place_codes, wcvp_place_codes)
+
+    %{
+      wcvp_data: wcvp_data,
+      places_added: MapSet.to_list(added),
+      places_removed: MapSet.to_list(removed),
+      has_changes: MapSet.size(added) > 0 or MapSet.size(removed) > 0
+    }
+  end
+
+  defp apply_wcvp_range_updates(socket, diff) do
+    host_id = socket.assigns.host.id
+    tdwg_lookup = Gallformers.Wcvp.Tdwg.load()
+    wcvp_places = Gallformers.Wcvp.Tdwg.convert_tdwg_codes(diff.wcvp_data.distribution, tdwg_lookup)
+    wcvp_place_codes = Enum.map(wcvp_places, & &1.code)
+
+    new_place_ids =
+      socket.assigns.all_places
+      |> Enum.filter(fn p -> p.code in wcvp_place_codes end)
+      |> Enum.map(& &1.id)
+
+    Ranges.update_host_places(host_id, new_place_ids)
+  end
+
   defp assign_taxonomy_fields(socket, nil) do
     socket
     |> assign(:taxonomy, nil)
@@ -477,6 +675,15 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
     case Plants.create_host_with_associations(create_params) do
       {:ok, host} ->
+        # Save WCVP IDs and places if this host was pre-filled from WCVP
+        if wcvp = socket.assigns[:wcvp_prefilled] do
+          Plants.upsert_host_traits(host.id, %{wcvp_id: wcvp.wcvp_id, powo_id: wcvp.powo_id})
+
+          if place_ids = wcvp[:place_ids] do
+            Ranges.update_host_places(host.id, place_ids)
+          end
+        end
+
         {:noreply,
          socket
          |> put_flash(:info, "Host created successfully")
@@ -725,6 +932,33 @@ defmodule GallformersWeb.Admin.HostLive.Form do
           </.link>
         </:quick_links>
 
+        <%!-- WCVP pre-fill search (new mode only) --%>
+        <div :if={@wcvp_available && @mode != :edit} class="mb-4">
+          <.card title="Pre-fill from WCVP" icon="ph-leaf" class="overflow-visible">
+            <p class="text-sm text-gray-600 mb-3">
+              Search the World Checklist of Vascular Plants to pre-fill name, taxonomy, and range data for a new host.
+            </p>
+            <.typeahead
+              id="wcvp-picker"
+              label="WCVP Search:"
+              placeholder="Search WCVP by species name (min 3 characters)..."
+              search_event="search_wcvp"
+              select_event="select_wcvp"
+              clear_event="clear_wcvp"
+              query={@wcvp_search_query}
+              results={@wcvp_search_results}
+              selected={@wcvp_selected}
+              display_fn={fn item -> item.taxon_name end}
+            >
+              <:result :let={item}>
+                <span class="italic">{item.taxon_name}</span>
+                <span class="text-gray-500 text-sm ml-1">{item.taxon_authors}</span>
+                <span class="text-gray-400 text-xs ml-2">({item.family})</span>
+              </:result>
+            </.typeahead>
+          </.card>
+        </div>
+
         <%!-- Name field with typeahead for search/create --%>
         <div class="mb-3">
           <%= if @mode == :edit do %>
@@ -845,6 +1079,60 @@ defmodule GallformersWeb.Admin.HostLive.Form do
                   prompt=""
                   class="gf-select w-full text-sm"
                 />
+              </div>
+            </div>
+
+            <%!-- WCVP Refresh (edit mode only) --%>
+            <div :if={@mode == :edit && @wcvp_available} class="mb-4">
+              <.button
+                :if={is_nil(@wcvp_diff)}
+                phx-click="refresh_from_wcvp"
+                type="button"
+                variant="secondary"
+                size="sm"
+              >
+                Refresh from WCVP
+              </.button>
+
+              <div
+                :if={@wcvp_diff}
+                class="border rounded-lg p-4 bg-amber-50 dark:bg-amber-950"
+              >
+                <h4 class="font-medium mb-2">WCVP Data Comparison</h4>
+
+                <div :if={!@wcvp_diff.has_changes} class="text-sm text-gray-600">
+                  No differences found. Host data matches WCVP.
+                </div>
+
+                <div :if={@wcvp_diff.has_changes} class="text-sm space-y-2">
+                  <div :if={@wcvp_diff.places_added != []}>
+                    <span class="font-medium text-green-700">+ Places to add:</span>
+                    {Enum.join(@wcvp_diff.places_added, ", ")}
+                  </div>
+                  <div :if={@wcvp_diff.places_removed != []}>
+                    <span class="font-medium text-red-700">- Places to remove:</span>
+                    {Enum.join(@wcvp_diff.places_removed, ", ")}
+                  </div>
+                </div>
+
+                <div class="mt-3 flex gap-2">
+                  <.button
+                    :if={@wcvp_diff.has_changes}
+                    phx-click="apply_wcvp_updates"
+                    type="button"
+                    size="sm"
+                  >
+                    Apply Updates
+                  </.button>
+                  <.button
+                    phx-click="cancel_wcvp_refresh"
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                  >
+                    Cancel
+                  </.button>
+                </div>
               </div>
             </div>
 

@@ -43,10 +43,34 @@ defmodule Gallformers.Wcvp.LookupTest do
       )
 
     names = [
-      ["100", "Quercus alba", "Fagaceae", "Quercus", "alba", "L.", "urn:lsid:ipni.org:names:295763-1"],
-      ["101", "Quercus rubra", "Fagaceae", "Quercus", "rubra", "L.", "urn:lsid:ipni.org:names:295776-1"],
+      [
+        "100",
+        "Quercus alba",
+        "Fagaceae",
+        "Quercus",
+        "alba",
+        "L.",
+        "urn:lsid:ipni.org:names:295763-1"
+      ],
+      [
+        "101",
+        "Quercus rubra",
+        "Fagaceae",
+        "Quercus",
+        "rubra",
+        "L.",
+        "urn:lsid:ipni.org:names:295776-1"
+      ],
       ["102", "Quercus velutina", "Fagaceae", "Quercus", "velutina", "Lam.", nil],
-      ["200", "Rosa carolina", "Rosaceae", "Rosa", "carolina", "L.", "urn:lsid:ipni.org:names:726498-1"]
+      [
+        "200",
+        "Rosa carolina",
+        "Rosaceae",
+        "Rosa",
+        "carolina",
+        "L.",
+        "urn:lsid:ipni.org:names:726498-1"
+      ]
     ]
 
     for params <- names do
