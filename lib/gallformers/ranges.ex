@@ -17,6 +17,7 @@ defmodule Gallformers.Ranges do
 
   alias Gallformers.GallHosts.GallHost
   alias Gallformers.Places
+  alias Gallformers.Places.Place
   alias Gallformers.Ranges.{DisplayRange, GallRangeExclusion, HostRange}
   alias Gallformers.Repo
   alias Gallformers.Species.Species
@@ -32,6 +33,7 @@ defmodule Gallformers.Ranges do
     from(s in Species,
       join: hr in HostRange,
       on: hr.species_id == s.id,
+      # No AliasSpecies schema exists; Alias uses "alias_species" as join_through
       left_join: als in "alias_species",
       on: als.species_id == s.id,
       left_join: a in "alias",
@@ -54,7 +56,7 @@ defmodule Gallformers.Ranges do
   @spec get_places_for_host(integer()) :: [String.t()]
   def get_places_for_host(host_species_id) do
     from(hr in HostRange,
-      join: p in "place",
+      join: p in Place,
       on: hr.place_id == p.id,
       where: hr.species_id == ^host_species_id,
       select: p.code
@@ -80,7 +82,7 @@ defmodule Gallformers.Ranges do
   @spec get_places_for_host_with_precision(integer()) :: [map()]
   def get_places_for_host_with_precision(host_species_id) do
     from(hr in HostRange,
-      join: p in "place",
+      join: p in Place,
       on: hr.place_id == p.id,
       where: hr.species_id == ^host_species_id,
       select: %{code: p.code, precision: hr.precision, place_id: p.id}
@@ -117,7 +119,7 @@ defmodule Gallformers.Ranges do
   def get_places_for_host_species_ids([]), do: []
 
   def get_places_for_host_species_ids(host_species_ids) do
-    from(p in "place",
+    from(p in Place,
       join: hr in HostRange,
       on: hr.place_id == p.id,
       where: hr.species_id in ^host_species_ids,
@@ -137,7 +139,7 @@ defmodule Gallformers.Ranges do
 
   def get_places_for_hosts(host_species_ids) do
     from(hr in HostRange,
-      join: p in "place",
+      join: p in Place,
       on: hr.place_id == p.id,
       where: hr.species_id in ^host_species_ids,
       select: {hr.species_id, p.code}
@@ -229,7 +231,7 @@ defmodule Gallformers.Ranges do
   """
   @spec get_places_for_gall(integer()) :: [String.t()]
   def get_places_for_gall(gall_species_id) do
-    from(p in "place",
+    from(p in Place,
       join: hr in HostRange,
       on: hr.place_id == p.id,
       join: h in GallHost,
@@ -250,7 +252,7 @@ defmodule Gallformers.Ranges do
   def get_places_for_galls([]), do: %{}
 
   def get_places_for_galls(gall_species_ids) do
-    from(p in "place",
+    from(p in Place,
       join: hr in HostRange,
       on: hr.place_id == p.id,
       join: h in GallHost,
@@ -336,7 +338,7 @@ defmodule Gallformers.Ranges do
 
   # Gets host ranges with precision for a gall (via host relationships)
   defp get_host_ranges_with_precision_for_gall(gall_species_id) do
-    from(p in "place",
+    from(p in Place,
       join: hr in HostRange,
       on: hr.place_id == p.id,
       join: h in GallHost,
@@ -360,7 +362,7 @@ defmodule Gallformers.Ranges do
           leaf_ids = Places.leaf_descendant_ids(range.place_id)
 
           leaf_codes =
-            from(p in "place", where: p.id in ^leaf_ids, select: p.code)
+            from(p in Place, where: p.id in ^leaf_ids, select: p.code)
             |> Repo.all()
 
           {exact, leaf_codes ++ inherited}
@@ -377,7 +379,7 @@ defmodule Gallformers.Ranges do
   """
   @spec get_excluded_places_for_gall(integer()) :: [String.t()]
   def get_excluded_places_for_gall(gall_species_id) do
-    from(p in "place",
+    from(p in Place,
       join: gre in GallRangeExclusion,
       on: gre.place_id == p.id,
       where: gre.species_id == ^gall_species_id,
@@ -428,7 +430,7 @@ defmodule Gallformers.Ranges do
   """
   @spec get_excluded_places_with_precision_for_gall(integer()) :: [map()]
   def get_excluded_places_with_precision_for_gall(gall_species_id) do
-    from(p in "place",
+    from(p in Place,
       join: gre in GallRangeExclusion,
       on: gre.place_id == p.id,
       where: gre.species_id == ^gall_species_id,
@@ -479,7 +481,7 @@ defmodule Gallformers.Ranges do
   """
   @spec get_place_id_by_code(String.t()) :: integer() | nil
   def get_place_id_by_code(code) do
-    from(p in "place",
+    from(p in Place,
       where: p.code == ^code,
       select: p.id
     )
