@@ -46,7 +46,7 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
 
   @impl true
   def handle_event("close", _params, socket) do
-    notify_parent(socket, :zoom_out)
+    notify_parent(:zoom_out)
     {:noreply, assign(socket, open: false, country: nil)}
   end
 
@@ -55,31 +55,31 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
     new_val = !socket.assigns.country_level_on
     code = socket.assigns.country.code
 
-    notify_parent(socket, {:set_country_level, code, new_val})
+    notify_parent({:set_country_level, code, new_val})
     {:noreply, assign(socket, country_level_on: new_val)}
   end
 
   @impl true
   def handle_event("toggle_subdivision", %{"code" => code}, socket) do
-    notify_parent(socket, {:toggle_exact, code})
+    notify_parent({:toggle_exact, code})
     {:noreply, socket}
   end
 
   @impl true
   def handle_event("select_all", _params, socket) do
     codes = Enum.map(socket.assigns.subdivisions, & &1.code)
-    notify_parent(socket, {:select_all_exact, codes})
+    notify_parent({:select_all_exact, codes})
     {:noreply, socket}
   end
 
   @impl true
   def handle_event("deselect_all", _params, socket) do
     codes = Enum.map(socket.assigns.subdivisions, & &1.code)
-    notify_parent(socket, {:deselect_all_exact, codes})
+    notify_parent({:deselect_all_exact, codes})
     {:noreply, socket}
   end
 
-  defp notify_parent(_socket, message) do
+  defp notify_parent(message) do
     send(self(), {__MODULE__, message})
   end
 

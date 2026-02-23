@@ -38,11 +38,20 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
   end
 
   def update(assigns, socket) do
-    {:ok,
-     assign(
-       socket,
-       Map.take(assigns, [:excluded_place_ids, :host_places, :all_places, :id])
-     )}
+    socket =
+      socket
+      |> assign(:id, assigns.id)
+      |> assign(:host_places, assigns.host_places)
+      |> assign(:excluded_place_ids, assigns.excluded_place_ids)
+      |> assign(:all_places, assigns.all_places)
+
+    # Precompute excluded codes MapSet for O(1) lookups in template
+    excluded_codes =
+      assigns.all_places
+      |> Enum.filter(&(&1.id in assigns.excluded_place_ids))
+      |> MapSet.new(& &1.code)
+
+    {:ok, assign(socket, :excluded_codes, excluded_codes)}
   end
 
   @impl true
@@ -73,13 +82,6 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
 
   defp notify_parent(message) do
     send(self(), {__MODULE__, message})
-  end
-
-  defp excluded?(code, excluded_place_ids, all_places) do
-    case Enum.find(all_places, &(&1.code == code)) do
-      %{id: id} -> id in excluded_place_ids
-      nil -> false
-    end
   end
 
   @impl true
@@ -122,12 +124,12 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
           <li :for={subdiv <- @subdivisions} class="flex items-center">
             <label class={[
               "flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm cursor-pointer hover:bg-gray-50",
-              excluded?(subdiv.code, @excluded_place_ids, @all_places) && "bg-red-50",
-              !excluded?(subdiv.code, @excluded_place_ids, @all_places) && "bg-green-50"
+              MapSet.member?(@excluded_codes, subdiv.code) && "bg-red-50",
+              !MapSet.member?(@excluded_codes, subdiv.code) && "bg-green-50"
             ]}>
               <input
                 type="checkbox"
-                checked={!excluded?(subdiv.code, @excluded_place_ids, @all_places)}
+                checked={!MapSet.member?(@excluded_codes, subdiv.code)}
                 phx-click="toggle_exclusion"
                 phx-target={@myself}
                 phx-value-code={subdiv.code}
