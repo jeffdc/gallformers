@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # -----------------------------------------------------------------------------
-# build_boundaries.sh — one-shot generator for Western-Hemisphere admin
-#                       boundaries vector tiles (countries + states/provinces)
+# build_boundaries.sh — one-shot generator for global admin boundaries
+#                       vector tiles (countries + states/provinces)
 #
 # Usage:  ./build_boundaries.sh [OUTPUT_PMTILES]
 #         ./build_boundaries.sh boundaries.pmtiles
@@ -12,10 +12,10 @@
 #   * ogr2ogr / ogrinfo     — GDAL >= 3.0 (MIT)
 #   * tippecanoe            — Felt Tippecanoe (BSD)
 #
-# The script downloads Natural Earth Admin-0 & Admin-1 shapefiles, trims them
-# to the Western Hemisphere countries and territories, adds a stable "code"
-# property (ISO-3166-1 alpha-2 for countries, ISO-3166-2 for states), and
-# outputs two named layers in a single PMTiles file:
+# The script downloads Natural Earth Admin-0 & Admin-1 shapefiles, includes
+# all countries and territories globally (excluding Antarctica), adds a stable
+# "code" property (ISO-3166-1 alpha-2 for countries, ISO-3166-2 for states),
+# and outputs two named layers in a single PMTiles file:
 #   * countries     — Admin-0 polygons with ISO alpha-2 `code` property
 #   * subdivisions  — Admin-1 polygons with ISO 3166-2 `code` property
 # -----------------------------------------------------------------------------
@@ -52,35 +52,11 @@ CACHE_PHYSICAL="${CACHE_DIR}/10m_physical.zip"
 CULTURAL_URL="https://naturalearth.s3.amazonaws.com/10m_cultural/10m_cultural.zip"
 PHYSICAL_URL="https://naturalearth.s3.amazonaws.com/10m_physical/10m_physical.zip"
 
-# List of Western Hemisphere countries and territories
-# Format: ISO-3166-1 alpha-3 code
-# NOTE: GUF, GLP, MTQ are NOT in NE admin_0_countries — they're in map_subunits
-# (French overseas departments, treated as geo-units of France). Extracted separately below.
-# BES (Caribbean Netherlands) is also absent from admin_0_countries — its islands
-# (Bonaire, Saba, Sint Eustatius) appear as NLD subdivisions in admin_1.
-COUNTRIES=(
-    "USA" "CAN" "MEX" "BLZ" "CRI" "SLV" "GTM" "HND" "NIC" "PAN"
-    "ATG" "BHS" "BRB" "CUB" "DMA" "DOM" "GRD" "HTI" "JAM" "KNA" "LCA" "TTO" "VCT"
-    "ARG" "BOL" "BRA" "CHL" "COL" "ECU" "GUY" "PRY" "PER" "SUR" "URY" "VEN"
-    # Territories (in admin_0_countries)
-    "ABW" "CUW" "GRL" "BLM" "MAF" "SPM" "SXM"
-    "AIA" "BMU" "VGB" "CYM" "FLK" "MSR" "PRI" "SGS" "TCA" "VIR"
-)
-
-# French overseas departments — in NE map_subunits, not admin_0_countries.
-# SU_A3 code → desired ISO alpha-2 code for our tiles.
+# Territories in NE map_subunits (not in admin_0_countries).
+# SU_A3 code -> desired ISO alpha-2 code for our tiles.
 # Parallel arrays because macOS bash 3.2 lacks associative arrays.
-SUBUNIT_SU_A3=( "GUF"  "GLP"  "MTQ" )
-SUBUNIT_ALPHA2=("GF"   "GP"   "MQ"  )
-
-# Countries that should have state/province subdivision boundaries
-# Includes all sovereign nations with meaningful administrative subdivisions
-STATE_COUNTRIES=(
-    "USA" "CAN" "MEX"
-    "BLZ" "CRI" "SLV" "GTM" "HND" "NIC" "PAN"
-    "CUB" "DOM" "HTI" "JAM"
-    "ARG" "BOL" "BRA" "CHL" "COL" "ECU" "GUY" "PRY" "PER" "SUR" "URY" "VEN"
-)
+SUBUNIT_SU_A3=( "GUF" "GLP" "MTQ" "REU" "MYT" "NLY" "CXR" "CCK" "TKL" "NSV" "BVT" )
+SUBUNIT_ALPHA2=("GF"  "GP"  "MQ"  "RE"  "YT"  "BQ"  "CX"  "CC"  "TK"  "SJ"  "BV"  )
 
 mkdir -p "$SRC_DIR" "$TRIM_DIR" "$CACHE_DIR"
 
@@ -160,13 +136,24 @@ ADM0_LAYER=$(basename "${ADM0_SHAPE%.shp}")
 ADM1_LAYER=$(basename "${ADM1_SHAPE%.shp}")
 SUBUNITS_LAYER=$(basename "${SUBUNITS_SHAPE%.shp}")
 
-# First, create a temporary shapefile with our countries (used for lake clipping)
+# Derive STATE_COUNTRIES dynamically: countries with >3 admin-1 subdivisions
+echo "Determining countries with subdivisions..." >&2
+STATE_COUNTRIES=()
+while IFS=, read -r a3code cnt; do
+  [ "$a3code" = "adm0_a3" ] && continue  # skip header
+  [ -z "$a3code" ] && continue
+  STATE_COUNTRIES+=("$a3code")
+done < <(ogr2ogr -f CSV /vsistdout/ "$ADM1_SHAPE" \
+  -sql "SELECT adm0_a3, COUNT(*) as cnt FROM \"$ADM1_LAYER\" WHERE adm0_a3 != '-99' GROUP BY adm0_a3 HAVING cnt > 3" \
+  -dialect SQLITE 2>/dev/null)
+echo "    Found ${#STATE_COUNTRIES[@]} countries with subdivisions" >&2
+
+# Create a temporary shapefile with all countries except Antarctica (used for lake clipping)
 echo "Creating temporary country boundaries..." >&2
-COUNTRY_CODES=$(printf "'%s'," "${COUNTRIES[@]}" | sed 's/,$//')
 if ! ogr2ogr -f "ESRI Shapefile" \
     -lco ENCODING=UTF-8 \
     "$TRIM_DIR/countries_temp.shp" "$ADM0_SHAPE" \
-    -sql "SELECT * FROM \"$ADM0_LAYER\" WHERE adm0_a3 IN ($COUNTRY_CODES)" \
+    -sql "SELECT * FROM \"$ADM0_LAYER\" WHERE adm0_a3 != 'ATA'" \
     -dialect SQLITE 2>/dev/null; then
   echo "Error: Failed to create temporary country boundaries" >&2
   exit 1
@@ -178,18 +165,18 @@ echo "Processing countries and territories..." >&2
 if ! ogr2ogr -f "ESRI Shapefile" \
     -lco ENCODING=UTF-8 \
     "$TRIM_DIR/ne_10m_admin_0_countries.shp" "$ADM0_SHAPE" \
-    -sql "SELECT *, CASE WHEN ISO_A2 IS NOT NULL AND ISO_A2 != '-99' THEN ISO_A2 ELSE SUBSTR(adm0_a3, 1, 2) END AS code FROM \"$ADM0_LAYER\" WHERE adm0_a3 IN ($COUNTRY_CODES)" \
+    -sql "SELECT *, CASE WHEN ISO_A2 IS NOT NULL AND ISO_A2 != '-99' THEN ISO_A2 ELSE SUBSTR(adm0_a3, 1, 2) END AS code FROM \"$ADM0_LAYER\" WHERE adm0_a3 != 'ATA'" \
     -dialect SQLITE 2>/dev/null; then
   echo "Error: Failed to process countries" >&2
   exit 1
 fi
 
-# -------- 2b. Extract French overseas departments from map_subunits -----------
-# GUF (French Guiana), GLP (Guadeloupe), MTQ (Martinique) are geo-units of France
-# in Natural Earth — they appear in map_subunits with SU_A3 codes, not in
-# admin_0_countries. We extract each one with its correct ISO alpha-2 code and
-# append to the countries shapefile.
-echo "Extracting French overseas departments from map_subunits..." >&2
+# -------- 2b. Extract territories from map_subunits --------------------------
+# Some territories (French overseas departments, Caribbean Netherlands, Christmas
+# Island, etc.) are geo-units in Natural Earth — they appear in map_subunits with
+# SU_A3 codes, not in admin_0_countries. We extract each one with its correct ISO
+# alpha-2 code and append to the countries shapefile.
+echo "Extracting territories from map_subunits..." >&2
 
 for i in "${!SUBUNIT_SU_A3[@]}"; do
   su_a3="${SUBUNIT_SU_A3[$i]}"
@@ -214,22 +201,7 @@ for i in "${!SUBUNIT_SU_A3[@]}"; do
       -dialect SQLITE 2>/dev/null
 done
 
-# -------- 2c. Extract Caribbean Netherlands (BES) from admin-1 ----------------
-# Bonaire, Sint Eustatius, and Saba are NLD subdivisions in Natural Earth.
-# We extract them and assign code=BQ (ISO alpha-2 for Caribbean Netherlands).
-# ogr2ogr -append merges the three island features into the countries shapefile.
-echo "Extracting Caribbean Netherlands (BQ) from admin-1..." >&2
-if ! ogr2ogr -f "ESRI Shapefile" \
-    -lco ENCODING=UTF-8 \
-    -append \
-    "$TRIM_DIR/ne_10m_admin_0_countries.shp" "$ADM1_SHAPE" \
-    -sql "SELECT *, 'BQ' AS code FROM \"$ADM1_LAYER\" WHERE iso_3166_2 IN ('NL-BQ1', 'NL-BQ2', 'NL-BQ3') OR (adm0_a3 = 'NLD' AND name IN ('Bonaire', 'Saba', 'Sint Eustatius'))" \
-    -dialect SQLITE 2>/dev/null; then
-  echo "Warning: Failed to extract Caribbean Netherlands from admin-1" >&2
-  # Non-fatal — BES islands are tiny and may not be in all NE versions
-fi
-
-# Process states/provinces for selected countries
+# Process states/provinces for countries with subdivisions
 echo "Processing states/provinces..." >&2
 STATE_CODES=$(printf "'%s'," "${STATE_COUNTRIES[@]}" | sed 's/,$//')
 if ! ogr2ogr -f "ESRI Shapefile" \
@@ -241,29 +213,20 @@ if ! ogr2ogr -f "ESRI Shapefile" \
   exit 1
 fi
 
-# Process lakes (only large ones within our countries)
+# Process lakes (only large ones — scalerank filter only, no spatial clipping
+# since we're global and large lakes are already on land)
 echo "Processing lakes..." >&2
-# First, filter lakes by scalerank
 if ! ogr2ogr -f "ESRI Shapefile" \
     -lco ENCODING=UTF-8 \
-    "$TRIM_DIR/lakes_temp.shp" "$LAKES_SHAPE" \
+    "$TRIM_DIR/ne_10m_lakes.shp" "$LAKES_SHAPE" \
     -sql "SELECT * FROM \"$(basename "${LAKES_SHAPE%.shp}")\" WHERE scalerank < 2" \
     -dialect SQLITE 2>/dev/null; then
   echo "Error: Failed to filter lakes by scalerank" >&2
   exit 1
 fi
 
-# Then, filter lakes that intersect with our countries
-if ! ogr2ogr -f "ESRI Shapefile" \
-    -lco ENCODING=UTF-8 \
-    "$TRIM_DIR/ne_10m_lakes.shp" "$TRIM_DIR/lakes_temp.shp" \
-    -clipsrc "$TRIM_DIR/countries_temp.shp" 2>/dev/null; then
-  echo "Error: Failed to filter lakes by spatial intersection" >&2
-  exit 1
-fi
-
 # Clean up temporary files
-rm -f "$TRIM_DIR/countries_temp."* "$TRIM_DIR/lakes_temp."*
+rm -f "$TRIM_DIR/countries_temp."*
 
 # -------- 3. Convert shapefiles to GeoJSON -----------------------------------
 echo "==> Converting shapefiles to GeoJSON..." >&2
@@ -273,7 +236,6 @@ mkdir -p "$GEOJSON_DIR"
 
 for shp in "$TRIM_DIR"/*.shp; do
   base=$(basename "$shp" .shp)
-  temp_json="$GEOJSON_DIR/${base}_temp.geojson"
   final_json="$GEOJSON_DIR/$base.geojson"
 
   # Convert to GeoJSON (ogr2ogr handles encoding via -lco ENCODING)
