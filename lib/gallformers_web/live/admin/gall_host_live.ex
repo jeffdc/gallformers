@@ -306,6 +306,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
     end
   end
 
+  @impl true
   def handle_info({ExclusionDrillDown, :zoom_out}, socket) do
     {:noreply, push_event(socket, "range-zoom-out", %{})}
   end

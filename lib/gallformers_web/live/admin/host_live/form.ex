@@ -418,7 +418,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   end
 
   defp toggle_place_code(places, code) do
-    if code in places, do: Enum.reject(places, &(&1 == code)), else: places ++ [code]
+    if code in places, do: Enum.reject(places, &(&1 == code)), else: [code | places]
   end
 
   # Computes @in_range (exact codes) and @inherited_range (expanded country codes)
@@ -772,6 +772,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
      |> mark_dirty()}
   end
 
+  @impl true
   def handle_info({CountryDrillDown, {:set_country_level, code, false}}, socket) do
     new_country = Enum.reject(socket.assigns.country_places, &(&1 == code))
 
@@ -782,6 +783,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
      |> mark_dirty()}
   end
 
+  @impl true
   def handle_info({CountryDrillDown, {:toggle_exact, code}}, socket) do
     new_exact = toggle_place_code(socket.assigns.exact_places, code)
 
@@ -792,6 +794,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
      |> mark_dirty()}
   end
 
+  @impl true
   def handle_info({CountryDrillDown, {:select_all_exact, codes}}, socket) do
     new_exact = Enum.uniq(socket.assigns.exact_places ++ codes)
 
@@ -802,6 +805,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
      |> mark_dirty()}
   end
 
+  @impl true
   def handle_info({CountryDrillDown, {:deselect_all_exact, codes}}, socket) do
     new_exact = Enum.reject(socket.assigns.exact_places, &(&1 in codes))
 
@@ -812,6 +816,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
      |> mark_dirty()}
   end
 
+  @impl true
   def handle_info({CountryDrillDown, :zoom_out}, socket) do
     {:noreply, push_event(socket, "range-zoom-out", %{})}
   end
