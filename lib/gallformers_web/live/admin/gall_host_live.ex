@@ -537,27 +537,8 @@ defmodule GallformersWeb.Admin.GallHostLive do
                   <%!-- Legend and Actions --%>
                   <div class="col-span-1">
                     <div class="text-sm font-medium text-gray-700 mb-2">Legend:</div>
-                    <div class="space-y-1 mb-4">
-                      <div class="flex items-center gap-2">
-                        <div class="w-4 h-4 rounded border border-gray-400 bg-green-700"></div>
-                        <span class="text-xs text-gray-600">Gall & Host</span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <div
-                          class="w-4 h-4 rounded border border-gray-400"
-                          style="background-color: #90EE90;"
-                        >
-                        </div>
-                        <span class="text-xs text-gray-600">Country-level</span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <div class="w-4 h-4 rounded border border-gray-400 bg-red-300"></div>
-                        <span class="text-xs text-gray-600">Host Only</span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <div class="w-4 h-4 rounded border border-gray-300 bg-white"></div>
-                        <span class="text-xs text-gray-600">Neither</span>
-                      </div>
+                    <div class="mb-4">
+                      <.range_map_legend mode={:gall_admin} />
                     </div>
                   </div>
 

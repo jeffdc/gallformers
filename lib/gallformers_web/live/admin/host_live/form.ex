@@ -1123,20 +1123,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
                 <%!-- Legend --%>
                 <div class="col-span-1">
                   <div class="text-sm font-medium text-gray-700 mb-2">Legend:</div>
-                  <div class="space-y-1">
-                    <div class="flex items-center gap-2">
-                      <div class="w-4 h-4 rounded bg-green-700"></div>
-                      <span class="text-xs text-gray-600">Documented</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <div class="w-4 h-4 rounded bg-green-700/40"></div>
-                      <span class="text-xs text-gray-600">Country-level</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <div class="w-4 h-4 rounded border border-gray-300 bg-white"></div>
-                      <span class="text-xs text-gray-600">Out of Range</span>
-                    </div>
-                  </div>
+                  <.range_map_legend mode={:host_admin} />
                 </div>
                 <%!-- Map + Drill-down panel --%>
                 <div class="col-span-5">

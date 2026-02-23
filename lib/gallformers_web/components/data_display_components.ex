@@ -956,6 +956,44 @@ defmodule GallformersWeb.DataDisplayComponents do
   end
 
   @doc """
+  Renders a legend for the range map.
+
+  ## Modes
+
+  - `:public` — Documented, Country-level (for gall and host detail pages)
+  - `:host_admin` — Documented, Country-level, Out of Range
+  - `:gall_admin` — Gall & Host, Country-level, Host Only, Neither
+  """
+  attr :mode, :atom, required: true, values: [:public, :host_admin, :gall_admin]
+
+  def range_map_legend(assigns) do
+    ~H"""
+    <div class="space-y-1">
+      <div class="flex items-center gap-2">
+        <div class="w-4 h-4 rounded border border-gray-400 bg-[#228B22]"></div>
+        <span class="text-xs text-gray-600">
+          {if @mode == :gall_admin, do: "Gall & Host", else: "Documented"}
+        </span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-4 h-4 rounded border border-gray-400 bg-[#90EE90]"></div>
+        <span class="text-xs text-gray-600">Country-level record only</span>
+      </div>
+      <div :if={@mode == :gall_admin} class="flex items-center gap-2">
+        <div class="w-4 h-4 rounded border border-gray-400 bg-red-300"></div>
+        <span class="text-xs text-gray-600">Host Only</span>
+      </div>
+      <div :if={@mode in [:host_admin, :gall_admin]} class="flex items-center gap-2">
+        <div class="w-4 h-4 rounded border border-gray-300 bg-white"></div>
+        <span class="text-xs text-gray-600">
+          {if @mode == :gall_admin, do: "Neither", else: "Out of Range"}
+        </span>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
   Renders a geographic range map showing US and Canadian states/provinces.
 
   Uses MapLibre GL JS with PMTiles for WebGL-based choropleth rendering.
