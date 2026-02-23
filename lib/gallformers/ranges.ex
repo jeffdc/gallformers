@@ -297,22 +297,25 @@ defmodule Gallformers.Ranges do
   @spec get_display_range_for_gall(integer()) :: DisplayRange.t()
   def get_display_range_for_gall(gall_species_id) do
     host_ranges = get_host_ranges_with_precision_for_gall(gall_species_id)
-    excluded = get_excluded_places_for_gall(gall_species_id)
+    excluded = MapSet.new(get_excluded_places_for_gall(gall_species_id))
 
     {exact_codes, inherited_codes} = split_by_precision(host_ranges)
 
-    # Remove excluded from both exact and inherited ranges
-    exact_codes = exact_codes -- excluded
+    exact_set = MapSet.new(exact_codes)
+    inherited_set = MapSet.new(inherited_codes)
 
-    inherited_codes =
-      inherited_codes
-      |> Kernel.--(exact_codes)
-      |> Kernel.--(excluded)
+    # Remove excluded from both; remove exact from inherited (exact takes priority)
+    effective_exact = MapSet.difference(exact_set, excluded)
+
+    effective_inherited =
+      inherited_set
+      |> MapSet.difference(exact_set)
+      |> MapSet.difference(excluded)
 
     %DisplayRange{
-      in_range: Enum.uniq(exact_codes),
-      inherited_range: Enum.uniq(inherited_codes),
-      excluded_range: excluded
+      in_range: MapSet.to_list(effective_exact),
+      inherited_range: MapSet.to_list(effective_inherited),
+      excluded_range: MapSet.to_list(excluded)
     }
   end
 
@@ -327,12 +330,14 @@ defmodule Gallformers.Ranges do
 
     {exact_codes, inherited_codes} = split_by_precision(host_ranges)
 
-    # Don't show inherited where there's already an exact entry
-    inherited_codes = inherited_codes -- exact_codes
+    exact_set = MapSet.new(exact_codes)
+    inherited_set = MapSet.new(inherited_codes)
+
+    effective_inherited = MapSet.difference(inherited_set, exact_set)
 
     %DisplayRange{
-      in_range: Enum.uniq(exact_codes),
-      inherited_range: Enum.uniq(inherited_codes)
+      in_range: MapSet.to_list(exact_set),
+      inherited_range: MapSet.to_list(effective_inherited)
     }
   end
 
@@ -350,24 +355,33 @@ defmodule Gallformers.Ranges do
     |> Repo.all()
   end
 
-  # Splits host ranges into exact leaf codes and inherited leaf codes
-  # (expanding country/continent-level ranges to their leaf descendants)
+  # Splits host ranges into exact leaf codes and inherited leaf codes.
+  # Country-level ranges are expanded to their leaf descendants in a single
+  # batched query instead of one query per country.
   defp split_by_precision(host_ranges) do
-    Enum.reduce(host_ranges, {[], []}, fn range, {exact, inherited} ->
-      case range.precision do
-        "exact" ->
-          {[range.code | exact], inherited}
+    {exact, country_entries} =
+      Enum.split_with(host_ranges, &(&1.precision == "exact"))
 
-        "country" ->
-          leaf_ids = Places.leaf_descendant_ids(range.place_id)
+    exact_codes = Enum.map(exact, & &1.code)
 
-          leaf_codes =
-            from(p in Place, where: p.id in ^leaf_ids, select: p.code)
-            |> Repo.all()
+    inherited_codes =
+      case country_entries do
+        [] ->
+          []
 
-          {exact, leaf_codes ++ inherited}
+        entries ->
+          # Collect all country place_ids, expand each to leaf descendants,
+          # then batch-fetch all leaf codes in a single query
+          leaf_ids =
+            entries
+            |> Enum.flat_map(&Places.leaf_descendant_ids(&1.place_id))
+            |> Enum.uniq()
+
+          from(p in Place, where: p.id in ^leaf_ids, select: p.code)
+          |> Repo.all()
       end
-    end)
+
+    {exact_codes, inherited_codes}
   end
 
   # ============================================
