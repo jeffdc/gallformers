@@ -18,6 +18,9 @@
  *   data-editable:        "true" if regions are clickable (admin mode)
  *   data-navigable:       "true" if clicking a region navigates to its place page
  *   data-tiles-url:       URL to boundaries.pmtiles (default: /data/boundaries.pmtiles)
+ *   data-empty-text:      Text shown when no range data exists (default: "No range data available")
+ *   data-max-bounds:      JSON [[west, south], [east, north]] max bounds (optional)
+ *   data-bounds:          JSON [[west, south], [east, north]] server-provided initial bounds (optional)
  *
  * PMTiles feature properties used:
  *   subdivisions: code (ISO 3166-2), name, iso_a2 (country code)
@@ -55,15 +58,33 @@ const COLORS = {
 const HEMISPHERE_BOUNDS = [[-170, -58], [-10, 84]]
 
 /**
+ * Compute effective in-range and inherited sets by subtracting exclusions.
+ * Returns { effectiveInRange, effectiveInherited } as Sets.
+ */
+function computeEffectiveSets(inRange, excludedRange, inheritedRange) {
+  const effectiveInRange = new Set()
+  for (const code of inRange) {
+    if (!excludedRange.has(code)) effectiveInRange.add(code)
+  }
+
+  const effectiveInherited = new Set()
+  for (const code of inheritedRange) {
+    if (!inRange.has(code) && !excludedRange.has(code)) effectiveInherited.add(code)
+  }
+
+  return { effectiveInRange, effectiveInherited }
+}
+
+/**
  * Build a MapLibre case expression for choropleth coloring.
- * Used for both subdivisions-fill and countries-fill layers.
+ * Accepts pre-computed effective sets from computeEffectiveSets().
  *
- *   1. Check code in range → green
- *   2. Check code inherited → light green
+ *   1. Check code in effective range → green
+ *   2. Check code in effective inherited → light green
  *   3. Check code excluded → light red (admin only)
  *   4. Fallback → fallbackColor
  */
-function buildFillExpression(inRange, excludedRange, inheritedRange, editable, fallbackColor, colorOverrides) {
+function buildFillExpression(effectiveInRange, effectiveInherited, excludedRange, editable, fallbackColor, colorOverrides) {
   // Helper: build a match expression, or return literal false if the set is empty
   // (MapLibre match requires at least one label-output pair before the fallback)
   function codeMatch(codes) {
@@ -74,18 +95,6 @@ function buildFillExpression(inRange, excludedRange, inheritedRange, editable, f
     }
     expr.push(false)
     return expr
-  }
-
-  // Codes in range minus any excluded
-  const effectiveInRange = new Set()
-  for (const code of inRange) {
-    if (!excludedRange.has(code)) effectiveInRange.add(code)
-  }
-
-  // Inherited codes minus any exact (exact takes priority) and minus excluded
-  const effectiveInherited = new Set()
-  for (const code of inheritedRange) {
-    if (!inRange.has(code) && !excludedRange.has(code)) effectiveInherited.add(code)
   }
 
   const inRangeMatch = codeMatch(effectiveInRange)
@@ -128,6 +137,11 @@ const RangeMap = {
     this.navigable = this.el.dataset.navigable === 'true'
     this.placeMode = this.el.dataset.placeMode === 'true'
     this.tilesUrl = this.el.dataset.tilesUrl || '/data/boundaries.pmtiles'
+    this.emptyText = this.el.dataset.emptyText || 'No range data available'
+
+    const maxBoundsAttr = this.el.dataset.maxBounds
+    this.maxBounds = maxBoundsAttr ? JSON.parse(maxBoundsAttr) : [[-180, -62], [10, 86]]
+
     this.colorOverrides = this.placeMode
       ? { inRange: COLORS.placeHighlight, inheritedRange: COLORS.placeHighlightLight }
       : null
@@ -198,6 +212,9 @@ const RangeMap = {
 
   initMap() {
     const container = this.el
+    const { effectiveInRange, effectiveInherited } = computeEffectiveSets(
+      this.inRange, this.excludedRange, this.inheritedRange
+    )
 
     this.map = new maplibregl.Map({
       container,
@@ -226,7 +243,7 @@ const RangeMap = {
             'source-layer': 'countries',
             paint: {
               'fill-color': buildFillExpression(
-                this.inRange, this.excludedRange, this.inheritedRange, this.editable, COLORS.land, this.colorOverrides
+                effectiveInRange, effectiveInherited, this.excludedRange, this.editable, COLORS.land, this.colorOverrides
               )
             }
           },
@@ -238,7 +255,7 @@ const RangeMap = {
             'source-layer': 'subdivisions',
             paint: {
               'fill-color': buildFillExpression(
-                this.inRange, this.excludedRange, this.inheritedRange, this.editable, COLORS.default, this.colorOverrides
+                effectiveInRange, effectiveInherited, this.excludedRange, this.editable, COLORS.default, this.colorOverrides
               ),
               'fill-opacity': 1
             }
@@ -300,7 +317,7 @@ const RangeMap = {
       center: [-96, 48],
       zoom: 3,
       minZoom: 1,
-      maxBounds: [[-180, -62], [10, 86]],
+      maxBounds: this.maxBounds,
       attributionControl: false
     })
 
@@ -325,13 +342,8 @@ const RangeMap = {
     container.addEventListener('fullscreenchange', () => {
       if (document.fullscreenElement === container) {
         const hint = document.createElement('div')
-        hint.className = 'range-map-fullscreen-hint'
         hint.textContent = 'Press Esc to exit fullscreen'
-        hint.style.cssText =
-          'position:fixed;top:16px;left:50%;transform:translateX(-50%);' +
-          'background:rgba(0,0,0,0.7);color:#fff;padding:8px 16px;border-radius:6px;' +
-          'font-size:14px;z-index:9999;pointer-events:none;' +
-          'transition:opacity 0.5s ease;opacity:1;'
+        hint.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-black/70 text-white px-4 py-2 rounded-md text-sm z-[9999] pointer-events-none transition-opacity duration-500'
         container.appendChild(hint)
         setTimeout(() => { hint.style.opacity = '0' }, 2000)
         setTimeout(() => { hint.remove() }, 2500)
@@ -345,9 +357,19 @@ const RangeMap = {
       offset: 10
     })
 
+    this.map.on('error', (e) => {
+      if (e.error && e.error.message && e.error.message.includes('pmtiles')) {
+        const errorDiv = document.createElement('div')
+        errorDiv.className = 'absolute inset-0 flex items-center justify-center bg-gray-100'
+        errorDiv.innerHTML = '<span class="text-gray-500 text-sm">Map data unavailable</span>'
+        this.el.appendChild(errorDiv)
+      }
+    })
+
     this.map.on('load', () => {
       this.setupInteractions()
       this.fitToRange(false)
+      this.updateEmptyState()
     })
   },
 
@@ -403,9 +425,19 @@ const RangeMap = {
 
       if (this.editable) {
         map.getCanvas().style.cursor = 'pointer'
+
+        let status = ''
+        if (this.excludedRange.has(code)) {
+          status = ' — Excluded'
+        } else if (this.inRange.has(code)) {
+          status = ' — Documented'
+        } else if (this.inheritedRange.has(code)) {
+          status = ' — Country-level record only'
+        }
+
         this.popup
           .setLngLat(e.lngLat)
-          .setHTML(`<strong>${name}</strong> — Click to edit range`)
+          .setHTML(`<strong>${name}</strong> (${code})${status} — Click to edit range`)
           .addTo(map)
       } else {
         map.getCanvas().style.cursor = this.navigable ? 'pointer' : 'default'
@@ -478,11 +510,15 @@ const RangeMap = {
   updateChoropleth() {
     if (!this.map || !this.map.isStyleLoaded()) return
 
+    const { effectiveInRange, effectiveInherited } = computeEffectiveSets(
+      this.inRange, this.excludedRange, this.inheritedRange
+    )
+
     this.map.setPaintProperty(
       'countries-fill',
       'fill-color',
       buildFillExpression(
-        this.inRange, this.excludedRange, this.inheritedRange, this.editable, COLORS.land, this.colorOverrides
+        effectiveInRange, effectiveInherited, this.excludedRange, this.editable, COLORS.land, this.colorOverrides
       )
     )
 
@@ -490,9 +526,28 @@ const RangeMap = {
       'subdivisions-fill',
       'fill-color',
       buildFillExpression(
-        this.inRange, this.excludedRange, this.inheritedRange, this.editable, COLORS.default, this.colorOverrides
+        effectiveInRange, effectiveInherited, this.excludedRange, this.editable, COLORS.default, this.colorOverrides
       )
     )
+
+    this.updateEmptyState()
+  },
+
+  /**
+   * Show or hide an overlay when there is no range data to display.
+   */
+  updateEmptyState() {
+    const hasData = this.inRange.size > 0 || this.inheritedRange.size > 0
+    const existing = this.el.querySelector('.range-map-empty-overlay')
+
+    if (hasData && existing) {
+      existing.remove()
+    } else if (!hasData && !existing) {
+      const overlay = document.createElement('div')
+      overlay.className = 'range-map-empty-overlay absolute inset-0 flex items-center justify-center bg-gray-100/60 pointer-events-none z-10'
+      overlay.innerHTML = `<span class="text-gray-500 text-sm">${this.emptyText}</span>`
+      this.el.appendChild(overlay)
+    }
   },
 
   /**
@@ -506,6 +561,14 @@ const RangeMap = {
     if (!this.map || !this.map.isStyleLoaded()) return
     if (this.inRange.size === 0 && this.inheritedRange.size === 0) {
       this.map.fitBounds(HEMISPHERE_BOUNDS, { padding: 20, animate })
+      return
+    }
+
+    // Prefer server-provided bounds when available
+    const boundsAttr = this.el.dataset.bounds
+    if (boundsAttr) {
+      const bounds = JSON.parse(boundsAttr)
+      this.map.fitBounds(bounds, { padding: 40, maxZoom: 8, animate })
       return
     }
 
@@ -575,26 +638,20 @@ const RangeMap = {
       if (lat > maxLat) maxLat = lat
     }
 
-    // Check country features
-    const countryFeatures = this.map.querySourceFeatures('boundaries', {
-      sourceLayer: 'countries'
-    })
+    // Scan both country and subdivision features in a single pass per layer.
+    // Country features match on code; subdivision features match on iso_a2.
+    const layers = [
+      { sourceLayer: 'countries', matchKey: 'code' },
+      { sourceLayer: 'subdivisions', matchKey: 'iso_a2' }
+    ]
 
-    for (const feature of countryFeatures) {
-      if (feature.properties.code !== code) continue
-      matched++
-      forEachCoord(feature.geometry, updateBounds)
-    }
-
-    // Check subdivision features for this country (iso_a2 property)
-    const subdivFeatures = this.map.querySourceFeatures('boundaries', {
-      sourceLayer: 'subdivisions'
-    })
-
-    for (const feature of subdivFeatures) {
-      if (feature.properties.iso_a2 !== code) continue
-      matched++
-      forEachCoord(feature.geometry, updateBounds)
+    for (const { sourceLayer, matchKey } of layers) {
+      const features = this.map.querySourceFeatures('boundaries', { sourceLayer })
+      for (const feature of features) {
+        if (feature.properties[matchKey] !== code) continue
+        matched++
+        forEachCoord(feature.geometry, updateBounds)
+      }
     }
 
     if (matched > 0) {

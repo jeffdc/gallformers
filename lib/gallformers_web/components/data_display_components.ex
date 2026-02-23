@@ -1044,6 +1044,18 @@ defmodule GallformersWeb.DataDisplayComponents do
     default: "/data/boundaries.pmtiles",
     doc: "URL to PMTiles boundary file"
 
+  attr :empty_text, :string,
+    default: "No range data available",
+    doc: "text shown when no range data exists"
+
+  attr :max_bounds, :any,
+    default: nil,
+    doc: "JSON-encodable [[west, south], [east, north]] max bounds for the map"
+
+  attr :bounds, :any,
+    default: nil,
+    doc: "JSON-encodable [[west, south], [east, north]] initial bounds to fit"
+
   def range_map(assigns) do
     in_range_json = Jason.encode!(assigns.in_range)
     excluded_range_json = Jason.encode!(assigns.excluded_range)
@@ -1054,11 +1066,13 @@ defmodule GallformersWeb.DataDisplayComponents do
       |> assign(:in_range_json, in_range_json)
       |> assign(:excluded_range_json, excluded_range_json)
       |> assign(:inherited_range_json, inherited_range_json)
+      |> assign(:max_bounds_json, if(assigns.max_bounds, do: Jason.encode!(assigns.max_bounds)))
+      |> assign(:bounds_json, if(assigns.bounds, do: Jason.encode!(assigns.bounds)))
 
     ~H"""
     <div
       id={@id}
-      class={["relative", !@class && "h-[400px]", @class]}
+      class={["relative min-h-[400px]", @class]}
       phx-hook="RangeMap"
       phx-update="ignore"
       data-in-range={@in_range_json}
@@ -1068,6 +1082,9 @@ defmodule GallformersWeb.DataDisplayComponents do
       data-navigable={to_string(@navigable)}
       data-place-mode={to_string(@place_mode)}
       data-tiles-url={@tiles_url}
+      data-empty-text={@empty_text}
+      data-max-bounds={@max_bounds_json}
+      data-bounds={@bounds_json}
     >
       <div class="flex items-center justify-center p-8 text-gray-500">
         <.icon name="ph-map-trifold" class="size-8 animate-pulse" />
