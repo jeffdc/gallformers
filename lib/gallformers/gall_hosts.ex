@@ -14,6 +14,7 @@ defmodule Gallformers.GallHosts do
 
   alias Gallformers.GallHosts.GallHost
   alias Gallformers.Galls.GallTraits
+  alias Gallformers.Ranges
   alias Gallformers.Repo
   alias Gallformers.Species.Species
 
@@ -196,6 +197,30 @@ defmodule Gallformers.GallHosts do
   """
   @spec get_gall_host(integer()) :: GallHost.t() | nil
   def get_gall_host(id), do: Repo.get(GallHost, id)
+
+  @doc """
+  Saves all gall-host mapping changes in a single transaction.
+
+  Adds and removes host associations, then sets range exclusions.
+  `hosts_to_remove` is a MapSet of relation IDs. `hosts_to_add` is a list of
+  maps with `:host_species_id`.
+  """
+  @spec save_gall_host_changes(integer(), [map()], MapSet.t(), [integer()]) ::
+          {:ok, :ok} | {:error, term()}
+  def save_gall_host_changes(gall_id, hosts_to_add, hosts_to_remove, excluded_place_ids) do
+    Repo.transaction(fn ->
+      for relation_id <- hosts_to_remove do
+        remove_host_from_gall(relation_id)
+      end
+
+      for host <- hosts_to_add do
+        add_host_to_gall(gall_id, host.host_species_id)
+      end
+
+      Ranges.set_range_exclusions_for_gall(gall_id, excluded_place_ids)
+      :ok
+    end)
+  end
 
   # Broadcasts on the species PubSub topic so admin forms pick up changes.
   defp broadcast_species_change(species_id, event) do

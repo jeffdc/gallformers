@@ -57,7 +57,6 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
     {:noreply, socket}
   end
 
-
   defp notify_parent(message) do
     send(self(), {__MODULE__, message})
   end
@@ -68,7 +67,6 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
       nil -> false
     end
   end
-
 
   @impl true
   def render(assigns) do

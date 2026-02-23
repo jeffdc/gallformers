@@ -19,7 +19,6 @@ defmodule GallformersWeb.Admin.GallHostLive do
   alias Gallformers.GallHosts
   alias Gallformers.Places
   alias Gallformers.Ranges
-  alias Gallformers.Repo
   alias Gallformers.Species
   alias GallformersWeb.Admin.DeferredChanges
   alias GallformersWeb.Admin.ExclusionDrillDown
@@ -286,7 +285,6 @@ defmodule GallformersWeb.Admin.GallHostLive do
     end
   end
 
-
   # ============================================
   # Save/Cancel Events
   # ============================================
@@ -296,38 +294,17 @@ defmodule GallformersWeb.Admin.GallHostLive do
     gall = socket.assigns.selected_gall
 
     if gall do
-      # Compute host changes
       {hosts_to_add, hosts_to_remove} =
         DeferredChanges.compute_changes(socket, :hosts, id_field: :host_relation_id)
 
-      # Wrap in transaction
-      result =
-        Repo.transaction(fn ->
-          # Remove hosts
-          for relation_id <- hosts_to_remove do
-            GallHosts.remove_host_from_gall(relation_id)
-          end
-
-          # Add hosts
-          for host <- hosts_to_add do
-            GallHosts.add_host_to_gall(gall.id, host.host_species_id)
-          end
-
-          # Set exclusions (replaces existing)
-          Ranges.set_range_exclusions_for_gall(gall.id, socket.assigns.excluded_place_ids)
-
-          :ok
-        end)
-
-      case result do
+      case GallHosts.save_gall_host_changes(
+             gall.id,
+             hosts_to_add,
+             hosts_to_remove,
+             socket.assigns.excluded_place_ids
+           ) do
         {:ok, :ok} ->
-          # Refresh state from DB
-          socket =
-            socket
-            |> load_gall(gall.id)
-            |> put_flash(:info, "Changes saved")
-
-          {:noreply, socket}
+          {:noreply, socket |> load_gall(gall.id) |> put_flash(:info, "Changes saved")}
 
         {:error, _reason} ->
           {:noreply, put_flash(socket, :error, "Failed to save changes")}
@@ -375,7 +352,6 @@ defmodule GallformersWeb.Admin.GallHostLive do
         {:noreply, socket}
     end
   end
-
 
   def handle_info({ExclusionDrillDown, :zoom_out}, socket) do
     {:noreply, push_event(socket, "range-zoom-out", %{})}
@@ -651,7 +627,6 @@ defmodule GallformersWeb.Admin.GallHostLive do
                         <span class="text-xs text-gray-600">Neither</span>
                       </div>
                     </div>
-
                   </div>
 
                   <%!-- Map + Drill-down panel --%>

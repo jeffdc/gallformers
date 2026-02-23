@@ -279,8 +279,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
        |> push_navigate(to: ~p"/admin/hosts/#{socket.assigns.host.id}")}
     else
       {:error, reason} ->
-        {:noreply,
-         put_flash(socket, :error, "Failed to apply WCVP updates: #{inspect(reason)}")}
+        {:noreply, put_flash(socket, :error, "Failed to apply WCVP updates: #{inspect(reason)}")}
     end
   end
 
@@ -604,7 +603,10 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   defp apply_wcvp_range_updates(socket, diff) do
     host_id = socket.assigns.host.id
     tdwg_lookup = Gallformers.Wcvp.Tdwg.load()
-    wcvp_places = Gallformers.Wcvp.Tdwg.convert_tdwg_codes(diff.wcvp_data.distribution, tdwg_lookup)
+
+    wcvp_places =
+      Gallformers.Wcvp.Tdwg.convert_tdwg_codes(diff.wcvp_data.distribution, tdwg_lookup)
+
     wcvp_place_codes = Enum.map(wcvp_places, & &1.code)
 
     new_place_ids =

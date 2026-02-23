@@ -290,7 +290,6 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
       # Should not crash
       assert html =~ host.name
     end
-
   end
 
   describe "Rename/Reclassify modal" do

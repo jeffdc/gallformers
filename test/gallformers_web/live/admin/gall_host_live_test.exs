@@ -358,7 +358,6 @@ defmodule GallformersWeb.Admin.GallHostLiveTest do
       end
     end
 
-
     test "range summary is displayed when gall selected", %{conn: conn} do
       gall = find_gall_with_hosts()
 
@@ -445,7 +444,6 @@ defmodule GallformersWeb.Admin.GallHostLiveTest do
         assert has_element?(view, "#host-picker-input")
       end
     end
-
 
     test "cancel button present for navigation", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/gallhost")
