@@ -1,6 +1,8 @@
 defmodule Mix.Tasks.Gallformers.Wcvp.BuildDbTest do
   use ExUnit.Case, async: false
 
+  alias Mix.Tasks.Gallformers.Wcvp.BuildDb
+
   @test_dir "test/tmp/wcvp_build"
 
   setup do
@@ -38,7 +40,7 @@ defmodule Mix.Tasks.Gallformers.Wcvp.BuildDbTest do
   test "builds SQLite database with filtered data", %{dir: dir} do
     db_path = Path.join(dir, "wcvp.sqlite")
 
-    Mix.Tasks.Gallformers.Wcvp.BuildDb.run([
+    BuildDb.run([
       "--names",
       Path.join(dir, "wcvp_names.csv"),
       "--dist",
@@ -83,7 +85,7 @@ defmodule Mix.Tasks.Gallformers.Wcvp.BuildDbTest do
   test "excludes species with only non-Western-Hemisphere distribution", %{dir: dir} do
     db_path = Path.join(dir, "wcvp.sqlite")
 
-    Mix.Tasks.Gallformers.Wcvp.BuildDb.run([
+    BuildDb.run([
       "--names",
       Path.join(dir, "wcvp_names.csv"),
       "--dist",
@@ -111,7 +113,7 @@ defmodule Mix.Tasks.Gallformers.Wcvp.BuildDbTest do
   test "excludes synonyms from names table", %{dir: dir} do
     db_path = Path.join(dir, "wcvp.sqlite")
 
-    Mix.Tasks.Gallformers.Wcvp.BuildDb.run([
+    BuildDb.run([
       "--names",
       Path.join(dir, "wcvp_names.csv"),
       "--dist",

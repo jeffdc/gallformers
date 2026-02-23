@@ -12,6 +12,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   alias Gallformers.Species
   alias Gallformers.Species.Species, as: SpeciesSchema
   alias Gallformers.Taxonomy
+  alias Gallformers.Wcvp
   alias GallformersWeb.Admin.AliasHandlers
   alias GallformersWeb.Admin.CountryDrillDown
   alias GallformersWeb.Admin.DeferredChanges
@@ -198,7 +199,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   def handle_event("search_wcvp", %{"value" => query}, socket) do
     results =
       if String.length(query) >= 3 do
-        Gallformers.Wcvp.Lookup.search(query, limit: 10)
+        Wcvp.Lookup.search(query, limit: 10)
         |> Enum.map(fn r -> Map.put(r, :id, r.plant_name_id) end)
       else
         []
@@ -212,7 +213,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
   @impl true
   def handle_event("select_wcvp", %{"id" => plant_name_id}, socket) do
-    case Gallformers.Wcvp.Lookup.get(plant_name_id) do
+    case Wcvp.Lookup.get(plant_name_id) do
       nil ->
         {:noreply, put_flash(socket, :error, "WCVP species not found")}
 
@@ -245,15 +246,13 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
     # Look up by wcvp_id if available, otherwise by name
     wcvp_data =
-      cond do
-        host_traits && host_traits.wcvp_id not in [nil, ""] ->
-          Gallformers.Wcvp.Lookup.get(host_traits.wcvp_id)
-
-        true ->
-          case Gallformers.Wcvp.Lookup.search(host.name, limit: 1) do
-            [match] -> Gallformers.Wcvp.Lookup.get(match.plant_name_id)
-            [] -> nil
-          end
+      if host_traits && host_traits.wcvp_id not in [nil, ""] do
+        Wcvp.Lookup.get(host_traits.wcvp_id)
+      else
+        case Wcvp.Lookup.search(host.name, limit: 1) do
+          [match] -> Wcvp.Lookup.get(match.plant_name_id)
+          [] -> nil
+        end
       end
 
     case wcvp_data do
@@ -482,7 +481,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> assign(:wcvp_search_query, "")
     |> assign(:wcvp_search_results, [])
     |> assign(:wcvp_selected, nil)
-    |> assign(:wcvp_available, Gallformers.Wcvp.Lookup.available?())
+    |> assign(:wcvp_available, Wcvp.Lookup.available?())
     |> assign(:wcvp_prefilled, nil)
     |> assign(:wcvp_diff, nil)
     |> assign(:host_traits, nil)
@@ -561,8 +560,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
       end
 
     # Resolve WCVP distribution to gallformers place codes for saving after create
-    tdwg_lookup = Gallformers.Wcvp.Tdwg.load()
-    wcvp_places = Gallformers.Wcvp.Tdwg.convert_tdwg_codes(wcvp_data.distribution, tdwg_lookup)
+    tdwg_lookup = Wcvp.Tdwg.load()
+    wcvp_places = Wcvp.Tdwg.convert_tdwg_codes(wcvp_data.distribution, tdwg_lookup)
     wcvp_place_codes = Enum.map(wcvp_places, & &1.code)
 
     wcvp_place_ids =
@@ -584,8 +583,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   # =================================================================
 
   defp build_wcvp_diff(socket, wcvp_data) do
-    tdwg_lookup = Gallformers.Wcvp.Tdwg.load()
-    wcvp_places = Gallformers.Wcvp.Tdwg.convert_tdwg_codes(wcvp_data.distribution, tdwg_lookup)
+    tdwg_lookup = Wcvp.Tdwg.load()
+    wcvp_places = Wcvp.Tdwg.convert_tdwg_codes(wcvp_data.distribution, tdwg_lookup)
     wcvp_place_codes = MapSet.new(wcvp_places, & &1.code)
 
     # Current places are stored as codes in exact_places and country_places
@@ -605,10 +604,10 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
   defp apply_wcvp_range_updates(socket, diff) do
     host_id = socket.assigns.host.id
-    tdwg_lookup = Gallformers.Wcvp.Tdwg.load()
+    tdwg_lookup = Wcvp.Tdwg.load()
 
     wcvp_places =
-      Gallformers.Wcvp.Tdwg.convert_tdwg_codes(diff.wcvp_data.distribution, tdwg_lookup)
+      Wcvp.Tdwg.convert_tdwg_codes(diff.wcvp_data.distribution, tdwg_lookup)
 
     wcvp_place_codes = Enum.map(wcvp_places, & &1.code)
 
@@ -652,13 +651,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     case Plants.create_host_with_associations(create_params) do
       {:ok, host} ->
         # Save WCVP IDs and places if this host was pre-filled from WCVP
-        if wcvp = socket.assigns[:wcvp_prefilled] do
-          Plants.upsert_host_traits(host.id, %{wcvp_id: wcvp.wcvp_id, powo_id: wcvp.powo_id})
-
-          if place_ids = wcvp[:place_ids] do
-            Ranges.update_host_places(host.id, place_ids)
-          end
-        end
+        save_wcvp_data(socket, host)
 
         {:noreply,
          socket
@@ -726,6 +719,17 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Failed to save host. Please try again.")}
+    end
+  end
+
+  defp save_wcvp_data(socket, host) do
+    case socket.assigns[:wcvp_prefilled] do
+      nil ->
+        :ok
+
+      wcvp ->
+        Plants.upsert_host_traits(host.id, %{wcvp_id: wcvp.wcvp_id, powo_id: wcvp.powo_id})
+        if place_ids = wcvp[:place_ids], do: Ranges.update_host_places(host.id, place_ids)
     end
   end
 

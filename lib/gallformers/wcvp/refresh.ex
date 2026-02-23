@@ -3,13 +3,15 @@ defmodule Gallformers.Wcvp.Refresh do
   Handles downloading and hot-swapping the WCVP SQLite database.
   """
 
+  alias Gallformers.Repo
+
   require Logger
 
   @s3_bucket "gallformers-backups"
   @s3_key "wcvp/wcvp.sqlite"
 
   def refresh do
-    db_path = Application.get_env(:gallformers, Gallformers.Repo.WCVP)[:database]
+    db_path = Application.get_env(:gallformers, Repo.WCVP)[:database]
     tmp_path = db_path <> ".tmp"
 
     with :ok <- stop_repo(),
@@ -27,15 +29,11 @@ defmodule Gallformers.Wcvp.Refresh do
   end
 
   defp stop_repo do
-    case Gallformers.Repo.WCVP.stop() do
-      :ok -> :ok
-      {:error, {:not_found, _}} -> :ok
-      error -> error
-    end
+    Repo.WCVP.stop()
   end
 
   defp start_repo do
-    case Gallformers.Repo.WCVP.start_link() do
+    case Repo.WCVP.start_link() do
       {:ok, _pid} -> :ok
       {:error, {:already_started, _pid}} -> :ok
       error -> error

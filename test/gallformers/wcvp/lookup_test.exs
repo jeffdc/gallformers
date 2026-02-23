@@ -1,9 +1,10 @@
 defmodule Gallformers.Wcvp.LookupTest do
   use ExUnit.Case, async: false
 
+  alias Gallformers.Repo
   alias Gallformers.Wcvp.Lookup
 
-  @db_path Application.compile_env(:gallformers, Gallformers.Repo.WCVP)[:database]
+  @db_path Application.compile_env(:gallformers, Repo.WCVP)[:database]
 
   setup_all do
     # Ensure the directory exists
@@ -105,10 +106,10 @@ defmodule Gallformers.Wcvp.LookupTest do
     Exqlite.Sqlite3.close(conn)
 
     # Start the WCVP repo
-    {:ok, _pid} = Gallformers.Repo.WCVP.start_link()
+    {:ok, _pid} = Repo.WCVP.start_link()
 
     on_exit(fn ->
-      Gallformers.Repo.WCVP.stop()
+      Repo.WCVP.stop()
       File.rm(@db_path)
     end)
 

@@ -47,15 +47,7 @@ defmodule Mix.Tasks.Gallformers.Wcvp.BackfillIds do
       Enum.reduce(hosts, 0, fn host, count ->
         case Lookup.search(host.name, limit: 1) do
           [match] when match.taxon_name == host.name ->
-            if commit? do
-              wcvp_data = Lookup.get(match.plant_name_id)
-
-              Plants.upsert_host_traits(host.id, %{
-                wcvp_id: match.plant_name_id,
-                powo_id: wcvp_data && wcvp_data.powo_id
-              })
-            end
-
+            maybe_commit_wcvp(commit?, host.id, match.plant_name_id)
             Logger.info("  Matched: #{host.name} -> WCVP #{match.plant_name_id}")
             count + 1
 
@@ -69,5 +61,16 @@ defmodule Mix.Tasks.Gallformers.Wcvp.BackfillIds do
     unless commit? do
       Logger.info("Dry run complete. Use --commit to write changes.")
     end
+  end
+
+  defp maybe_commit_wcvp(false, _host_id, _plant_name_id), do: :ok
+
+  defp maybe_commit_wcvp(true, host_id, plant_name_id) do
+    wcvp_data = Lookup.get(plant_name_id)
+
+    Plants.upsert_host_traits(host_id, %{
+      wcvp_id: plant_name_id,
+      powo_id: wcvp_data && wcvp_data.powo_id
+    })
   end
 end
