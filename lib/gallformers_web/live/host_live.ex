@@ -75,7 +75,7 @@ defmodule GallformersWeb.HostLive do
         aliases = Species.get_aliases_for_species(host_id)
         taxonomy = get_taxonomy_info(host_id)
         range_data = Ranges.get_display_range_for_host(host_id)
-        range = MapSet.new(range_data.in_range)
+        range = range_data.in_range
         inherited_range = range_data.inherited_range
 
         # Check if Gallformers notes exist for this species
@@ -575,7 +575,7 @@ defmodule GallformersWeb.HostLive do
                 <div class="mb-1"><strong>Range:</strong></div>
                 <.range_map
                   id="host-range-map"
-                  in_range={MapSet.to_list(@range)}
+                  in_range={@range}
                   inherited_range={@inherited_range}
                   navigable
                 />

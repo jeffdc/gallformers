@@ -85,9 +85,9 @@ defmodule GallformersWeb.GallLive do
         aliases = Species.get_aliases_for_species(gall_id)
         taxonomy = get_taxonomy_info(gall_id)
         range_data = Ranges.get_display_range_for_gall(gall_id)
-        range = MapSet.new(range_data.in_range)
+        range = range_data.in_range
         inherited_range = range_data.inherited_range
-        excluded_range = MapSet.new(range_data.excluded_range)
+        excluded_range = range_data.excluded_range
         gall_filters = Galls.get_gall_filter_values(gall_id)
         related_galls = Galls.get_related_galls(gall)
 
@@ -499,7 +499,7 @@ defmodule GallformersWeb.GallLive do
                   </div>
                   <.range_map
                     id="gall-range-map"
-                    in_range={MapSet.to_list(@range)}
+                    in_range={@range}
                     inherited_range={@inherited_range}
                     excluded_range={[]}
                     navigable
