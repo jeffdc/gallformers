@@ -17,7 +17,7 @@ defmodule Gallformers.Ranges do
 
   alias Gallformers.GallHosts.GallHost
   alias Gallformers.Places
-  alias Gallformers.Ranges.{GallRangeExclusion, HostRange}
+  alias Gallformers.Ranges.{DisplayRange, GallRangeExclusion, HostRange}
   alias Gallformers.Repo
   alias Gallformers.Species.Species
 
@@ -292,11 +292,7 @@ defmodule Gallformers.Ranges do
   - `inherited_range`: leaf codes expanded from country/continent-level ranges
   - `excluded_range`: explicitly excluded codes
   """
-  @spec get_display_range_for_gall(integer()) :: %{
-          in_range: [String.t()],
-          inherited_range: [String.t()],
-          excluded_range: [String.t()]
-        }
+  @spec get_display_range_for_gall(integer()) :: DisplayRange.t()
   def get_display_range_for_gall(gall_species_id) do
     host_ranges = get_host_ranges_with_precision_for_gall(gall_species_id)
     excluded = get_excluded_places_for_gall(gall_species_id)
@@ -311,7 +307,7 @@ defmodule Gallformers.Ranges do
       |> Kernel.--(exact_codes)
       |> Kernel.--(excluded)
 
-    %{
+    %DisplayRange{
       in_range: Enum.uniq(exact_codes),
       inherited_range: Enum.uniq(inherited_codes),
       excluded_range: excluded
@@ -323,10 +319,7 @@ defmodule Gallformers.Ranges do
 
   Returns `%{in_range: [codes], inherited_range: [codes]}`.
   """
-  @spec get_display_range_for_host(integer()) :: %{
-          in_range: [String.t()],
-          inherited_range: [String.t()]
-        }
+  @spec get_display_range_for_host(integer()) :: DisplayRange.t()
   def get_display_range_for_host(host_species_id) do
     host_ranges = get_places_for_host_with_precision(host_species_id)
 
@@ -335,7 +328,7 @@ defmodule Gallformers.Ranges do
     # Don't show inherited where there's already an exact entry
     inherited_codes = inherited_codes -- exact_codes
 
-    %{
+    %DisplayRange{
       in_range: Enum.uniq(exact_codes),
       inherited_range: Enum.uniq(inherited_codes)
     }
