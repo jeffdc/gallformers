@@ -151,6 +151,14 @@ INSERT INTO host_range (species_id, place_id, precision) VALUES
   (8, 902, 'country');   -- M. arvensis in United States (country-level)
 
 -- =============================================================================
+-- Gall range exclusions (gall 100 excludes Jalisco from its range)
+-- =============================================================================
+
+INSERT INTO gall_range_exclusion (species_id, place_id, precision)
+VALUES
+  (100, 3, 'exact');   -- Gall 100 excludes Jalisco (MX-JAL)
+
+-- =============================================================================
 -- Articles
 -- =============================================================================
 -- Note: Article tests use Ecto sandbox and create their own test data.

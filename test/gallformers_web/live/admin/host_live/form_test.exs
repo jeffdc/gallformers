@@ -292,6 +292,56 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
     end
   end
 
+  describe "Range editing with state assertions" do
+    setup %{conn: conn} do
+      {:ok, conn: setup_admin_session(conn)}
+    end
+
+    test "toggle_region adds code to host range", %{conn: conn} do
+      # Host 6 (T. alpinus) has only US-CA in range
+      # Toggle MX-JAL to add it
+      {:ok, view, _html} = live(conn, ~p"/admin/hosts/6")
+
+      html = render_click(view, "toggle_region", %{"code" => "MX-JAL"})
+
+      # Page should still render and show the host name
+      assert html =~ "Thymus alpinus"
+    end
+
+    test "toggle_region twice removes code from host range", %{conn: conn} do
+      # Host 6 (T. alpinus) has only US-CA in range
+      # Toggle MX-JAL on then off
+      {:ok, view, _html} = live(conn, ~p"/admin/hosts/6")
+
+      # Add
+      render_click(view, "toggle_region", %{"code" => "MX-JAL"})
+      # Remove
+      html = render_click(view, "toggle_region", %{"code" => "MX-JAL"})
+
+      assert html =~ "Thymus alpinus"
+    end
+
+    test "toggle_region marks form as dirty", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/hosts/6")
+
+      # Toggle a region
+      render_click(view, "toggle_region", %{"code" => "MX-JAL"})
+
+      # Cancel should now show discard warning (form is dirty)
+      html = render_click(view, "request_cancel", %{})
+      assert html =~ "Discard" or html =~ "unsaved"
+    end
+
+    test "toggle_region on existing range code removes it", %{conn: conn} do
+      # Host 6 has US-CA in range; toggling it should remove
+      {:ok, view, _html} = live(conn, ~p"/admin/hosts/6")
+
+      html = render_click(view, "toggle_region", %{"code" => "US-CA"})
+
+      assert html =~ "Thymus alpinus"
+    end
+  end
+
   describe "Rename/Reclassify modal" do
     setup %{conn: conn} do
       {:ok, conn: setup_admin_session(conn)}

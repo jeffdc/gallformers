@@ -189,21 +189,22 @@ defmodule Gallformers.Ranges do
           {:added, integer()} | {:removed, integer()} | {:error, term()}
   def toggle_place_for_host(host_species_id, place_id) do
     Repo.transaction(fn ->
-      existing =
+      query =
         from(hr in HostRange,
           where: hr.species_id == ^host_species_id and hr.place_id == ^place_id
         )
-        |> Repo.one()
 
-      if existing do
-        Repo.delete!(existing)
-        {:removed, place_id}
-      else
-        %HostRange{}
-        |> HostRange.changeset(%{species_id: host_species_id, place_id: place_id})
-        |> Repo.insert!()
+      case Repo.one(query) do
+        nil ->
+          %HostRange{}
+          |> HostRange.changeset(%{species_id: host_species_id, place_id: place_id})
+          |> Repo.insert!()
 
-        {:added, place_id}
+          {:added, place_id}
+
+        _existing ->
+          Repo.delete_all(query)
+          {:removed, place_id}
       end
     end)
     |> case do
@@ -489,23 +490,24 @@ defmodule Gallformers.Ranges do
           {:added, integer()} | {:removed, integer()} | {:error, term()}
   def toggle_exclusion_for_gall(gall_species_id, place_id) do
     Repo.transaction(fn ->
-      existing =
+      query =
         from(gre in GallRangeExclusion,
           where: gre.species_id == ^gall_species_id and gre.place_id == ^place_id
         )
-        |> Repo.one()
 
-      if existing do
-        # Remove exclusion (place is now in range)
-        Repo.delete!(existing)
-        {:removed, place_id}
-      else
-        # Add exclusion (place is now excluded)
-        %GallRangeExclusion{}
-        |> GallRangeExclusion.changeset(%{species_id: gall_species_id, place_id: place_id})
-        |> Repo.insert!()
+      case Repo.one(query) do
+        nil ->
+          # Add exclusion (place is now excluded)
+          %GallRangeExclusion{}
+          |> GallRangeExclusion.changeset(%{species_id: gall_species_id, place_id: place_id})
+          |> Repo.insert!()
 
-        {:added, place_id}
+          {:added, place_id}
+
+        _existing ->
+          # Remove exclusion (place is now in range)
+          Repo.delete_all(query)
+          {:removed, place_id}
       end
     end)
     |> case do
