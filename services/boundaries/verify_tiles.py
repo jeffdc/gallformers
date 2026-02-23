@@ -28,24 +28,6 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_PMTILES = SCRIPT_DIR / "../../priv/static/data/boundaries.pmtiles"
 DEFAULT_DB = SCRIPT_DIR / "../../priv/gallformers.sqlite"
 
-# STATE_COUNTRIES from build_boundaries.sh — countries with admin-1 subdivisions
-STATE_COUNTRIES_A3 = {
-    "USA", "CAN", "MEX",
-    "BLZ", "CRI", "SLV", "GTM", "HND", "NIC", "PAN",
-    "CUB", "DOM", "HTI", "JAM",
-    "ARG", "BOL", "BRA", "CHL", "COL", "ECU", "GUY", "PRY", "PER", "SUR", "URY", "VEN",
-}
-
-# Alpha-3 → Alpha-2 mapping for STATE_COUNTRIES
-A3_TO_A2 = {
-    "USA": "US", "CAN": "CA", "MEX": "MX",
-    "BLZ": "BZ", "CRI": "CR", "SLV": "SV", "GTM": "GT", "HND": "HN", "NIC": "NI", "PAN": "PA",
-    "CUB": "CU", "DOM": "DO", "HTI": "HT", "JAM": "JM",
-    "ARG": "AR", "BOL": "BO", "BRA": "BR", "CHL": "CL", "COL": "CO", "ECU": "EC",
-    "GUY": "GY", "PRY": "PY", "PER": "PE", "SUR": "SR", "URY": "UY", "VEN": "VE",
-}
-STATE_COUNTRIES_A2 = set(A3_TO_A2.values())
-
 
 def get_db_places(db_path):
     """Load all places from the database, grouped by type."""
@@ -63,8 +45,19 @@ def get_db_places(db_path):
         elif place["type"] in ("state", "province"):
             subdivisions[place["code"]] = place
 
+    # Determine which countries have subdivisions via place_hierarchy
+    subdivided_country_codes = set()
+    for row in cursor.execute("""
+        SELECT DISTINCT c.code
+        FROM place c
+        JOIN place_hierarchy ph ON ph.parent_id = c.id
+        JOIN place s ON s.id = ph.place_id AND s.type IN ('state', 'province')
+        WHERE c.type = 'country'
+    """):
+        subdivided_country_codes.add(row["code"])
+
     conn.close()
-    return countries, subdivisions
+    return countries, subdivisions, subdivided_country_codes
 
 
 def scan_tiles(pmtiles_path, zoom=3):
@@ -117,9 +110,10 @@ def main():
     print()
 
     # Load DB data
-    db_countries, db_subdivisions = get_db_places(db_path)
+    db_countries, db_subdivisions, subdivided_country_codes = get_db_places(db_path)
     print(f"DB countries: {len(db_countries)}")
     print(f"DB subdivisions: {len(db_subdivisions)}")
+    print(f"DB countries with subdivisions: {len(subdivided_country_codes)}")
     print()
 
     # Scan tiles at multiple zoom levels for completeness
@@ -160,7 +154,7 @@ def main():
     print("=" * 60)
     non_subdivided_missing = []
     for code, place in sorted(db_countries.items()):
-        if code not in STATE_COUNTRIES_A2:
+        if code not in subdivided_country_codes:
             # This is a non-subdivided country — should appear in subdivisions layer
             if code not in tile_subdiv_codes:
                 non_subdivided_missing.append(place)
