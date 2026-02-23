@@ -156,7 +156,7 @@ defmodule Gallformers.Ranges do
   Adds a place to a host's range with optional precision.
   """
   @spec add_place_to_host(integer(), integer(), String.t()) ::
-          {:ok, %HostRange{}} | {:error, Ecto.Changeset.t()}
+          {:ok, Ecto.Schema.t()} | {:error, Ecto.Changeset.t()}
   def add_place_to_host(host_species_id, place_id, precision \\ "exact") do
     %HostRange{}
     |> HostRange.changeset(%{
