@@ -565,20 +565,14 @@ defmodule GallformersWeb.Admin.GallHostLive do
                     <%= if @selected_gall do %>
                       <div class="flex">
                         <div class="flex-1">
-                          <div
+                          <.range_map
                             id="gallhost-range-map"
-                            phx-hook="RangeMap"
-                            phx-update="ignore"
-                            data-in-range={Jason.encode!(@in_range)}
-                            data-excluded-range={Jason.encode!(@excluded_places)}
-                            data-inherited-range={Jason.encode!(@inherited_range)}
-                            data-editable="true"
+                            in_range={@in_range}
+                            excluded_range={@excluded_places}
+                            inherited_range={@inherited_range}
+                            editable
                             class="border border-gray-300 rounded bg-gray-50 min-h-[350px]"
-                          >
-                            <div class="flex items-center justify-center h-64 text-gray-400">
-                              Loading map...
-                            </div>
-                          </div>
+                          />
                         </div>
                         <.live_component
                           module={ExclusionDrillDown}
