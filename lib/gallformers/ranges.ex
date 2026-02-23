@@ -217,7 +217,7 @@ defmodule Gallformers.Ranges do
 
   Accepts either plain place IDs or `{place_id, precision}` tuples.
   """
-  @spec update_host_places(integer(), [{integer(), String.t()}] | [integer()]) :: {:ok, map()}
+  @spec update_host_places(integer(), [{integer(), String.t()}] | [integer()]) :: {:ok, :ok}
   def update_host_places(host_species_id, place_entries) do
     entries = normalize_entries(host_species_id, place_entries)
 
@@ -226,8 +226,6 @@ defmodule Gallformers.Ranges do
       if entries != [], do: Repo.insert_all(HostRange, entries)
       :ok
     end)
-
-    {:ok, %{id: host_species_id}}
   end
 
   # ============================================
@@ -453,7 +451,8 @@ defmodule Gallformers.Ranges do
 
   Accepts either plain place IDs or `{place_id, precision}` tuples.
   """
-  @spec set_range_exclusions_for_gall(integer(), [{integer(), String.t()}] | [integer()]) :: :ok
+  @spec set_range_exclusions_for_gall(integer(), [{integer(), String.t()}] | [integer()]) ::
+          {:ok, :ok}
   def set_range_exclusions_for_gall(gall_species_id, place_entries) do
     entries = normalize_entries(gall_species_id, place_entries)
 
@@ -464,8 +463,6 @@ defmodule Gallformers.Ranges do
       if entries != [], do: Repo.insert_all(GallRangeExclusion, entries)
       :ok
     end)
-
-    :ok
   end
 
   @doc """

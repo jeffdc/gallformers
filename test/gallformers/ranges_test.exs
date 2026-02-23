@@ -115,7 +115,7 @@ defmodule Gallformers.RangesTest do
 
     test "set_range_exclusions_for_gall/2 accepts {place_id, precision} tuples" do
       mexico = Places.get_place_by_code("MX")
-      :ok = Ranges.set_range_exclusions_for_gall(100, [{mexico.id, "country"}])
+      {:ok, :ok} = Ranges.set_range_exclusions_for_gall(100, [{mexico.id, "country"}])
       excluded = Ranges.get_excluded_places_with_precision_for_gall(100)
       mx = Enum.find(excluded, &(&1.code == "MX"))
       assert mx.precision == "country"
@@ -123,7 +123,7 @@ defmodule Gallformers.RangesTest do
 
     test "set_range_exclusions_for_gall/2 remains backwards-compatible with plain IDs" do
       mexico = Places.get_place_by_code("MX")
-      :ok = Ranges.set_range_exclusions_for_gall(100, [mexico.id])
+      {:ok, :ok} = Ranges.set_range_exclusions_for_gall(100, [mexico.id])
       excluded = Ranges.get_excluded_places_with_precision_for_gall(100)
       mx = Enum.find(excluded, &(&1.code == "MX"))
       assert mx.precision == "exact"
