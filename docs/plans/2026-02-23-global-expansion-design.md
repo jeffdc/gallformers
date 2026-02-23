@@ -65,16 +65,19 @@ Still open:
 - Drill-down workflow integration tests
 - Exclusion fixtures in test seeds
 
-### Stream 0.5: Browse/Search Continent Scoping — Design Pass
+### Stream 0.5: Browse/Search Continent Scoping — Design Pass (COMPLETE)
 
-**Research and design only, no code.** Analyze how continent-level scoping would affect the Browse and Search pages. Produce a recommendation before starting infrastructure work, in case it surfaces data model or architectural requirements that affect Streams 1-4.
+See [continent-scoping-design.md](2026-02-23-continent-scoping-design.md).
 
-Questions to answer:
-- Does the Browse page need continent scoping, or is it already navigable enough?
-- Does Search need scoping, or should it always be global with results annotated by region?
-- If scoped, does it use the same sticky continent selector as the ID tool?
-- Are there any data model implications (e.g., need continent IDs in denormalized places for query performance)?
-- Does this affect the place hierarchy design or the continent selector component?
+**Key finding: No schema or data model changes needed.** Continent scoping is purely a query/UI concern. Streams 1-4 are unaffected.
+
+Summary:
+- **ID tool and Search** are scoped by continent (gall/host results only; glossary, source, taxonomy results stay global)
+- **Browse/Explore and taxonomy pages** (Family, Genus, Section) stay global — they're taxonomic views
+- **Individual species pages** stay global — show full worldwide range
+- Global pages display "Showing all regions" indicator for clarity
+- Continent selector lives in the main header, always visible, compact
+- Temporary override available without changing sticky preference
 
 ### Stream 1: Place Data Expansion
 
