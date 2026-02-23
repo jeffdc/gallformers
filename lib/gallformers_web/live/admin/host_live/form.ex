@@ -424,29 +424,28 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   # Computes @in_range (exact codes) and @inherited_range (expanded country codes)
   # for the map display. Called after every change to exact_places or country_places.
   defp compute_map_range(socket) do
-    exact = socket.assigns.exact_places
-    country_codes = socket.assigns.country_places
     place_by_code = socket.assigns.place_by_code
-    place_by_id = socket.assigns.place_by_id
 
-    inherited =
-      country_codes
-      |> Enum.flat_map(fn code ->
-        case Map.get(place_by_code, code) do
-          %{id: id} ->
-            leaf_ids = Places.leaf_descendant_ids(id)
-            Enum.map(leaf_ids, fn lid -> place_by_id[lid] end) |> Enum.reject(&is_nil/1) |> Enum.map(& &1.code)
+    host_ranges =
+      (Enum.map(socket.assigns.exact_places, fn code ->
+         case Map.get(place_by_code, code) do
+           %{id: id} -> %{code: code, precision: "exact", place_id: id}
+           nil -> nil
+         end
+       end) ++
+         Enum.map(socket.assigns.country_places, fn code ->
+           case Map.get(place_by_code, code) do
+             %{id: id} -> %{code: code, precision: "country", place_id: id}
+             nil -> nil
+           end
+         end))
+      |> Enum.reject(&is_nil/1)
 
-          nil ->
-            []
-        end
-      end)
-      |> Enum.uniq()
-      |> Enum.reject(&(&1 in exact))
+    display = Ranges.compute_display_range(host_ranges)
 
     socket
-    |> assign(:in_range, exact)
-    |> assign(:inherited_range, inherited)
+    |> assign(:in_range, display.in_range)
+    |> assign(:inherited_range, display.inherited_range)
   end
 
   # Sets ALL host form assigns to their default/empty values.

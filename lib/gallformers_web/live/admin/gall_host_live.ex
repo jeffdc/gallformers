@@ -48,7 +48,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
       |> assign(:host_dropdown_open, false)
       # Range/exclusion state (manual tracking)
       |> assign(:host_places, [])
-      |> assign(:host_places_raw, [])
+      |> assign(:host_ranges, [])
       |> assign(:original_excluded_place_ids, [])
       |> assign(:excluded_place_ids, [])
       |> assign(:excluded_places, [])
@@ -120,9 +120,11 @@ defmodule GallformersWeb.Admin.GallHostLive do
       |> assign(DeferredChanges.init(:hosts, []))
       |> assign(:original_excluded_place_ids, [])
       |> assign(:excluded_place_ids, [])
-      |> assign(:host_places_raw, [])
+      |> assign(:host_ranges, [])
+      |> assign(:host_places, [])
+      |> assign(:excluded_places, [])
+      |> assign(:in_range, [])
       |> assign(:inherited_range, [])
-      |> assign_range_data([], [])
       |> assign(:page_title, "Gall-Host Mappings")
       |> reset_dirty()
 
@@ -183,7 +185,8 @@ defmodule GallformersWeb.Admin.GallHostLive do
             |> assign(:host_search_query, "")
             |> assign(:host_search_results, [])
             |> assign(:host_dropdown_open, false)
-            |> recompute_host_places_and_range()
+            |> recompute_range()
+            |> push_range_update()
             |> mark_dirty()
 
           {:noreply, socket}
@@ -204,7 +207,8 @@ defmodule GallformersWeb.Admin.GallHostLive do
         socket =
           socket
           |> DeferredChanges.remove_pending(:hosts, relation_id, id_field: :host_relation_id)
-          |> recompute_host_places_and_range()
+          |> recompute_range()
+          |> push_range_update()
           |> mark_dirty()
 
         {:noreply, socket}
@@ -223,26 +227,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
     with %{id: _gall_id} <- socket.assigns.selected_gall,
          %{id: place_id} <- Map.get(socket.assigns.place_by_code, code),
          true <- code in socket.assigns.host_places do
-      # Toggle in local excluded_place_ids list
-      excluded_place_ids = socket.assigns.excluded_place_ids
-
-      new_excluded_place_ids =
-        if place_id in excluded_place_ids do
-          List.delete(excluded_place_ids, place_id)
-        else
-          [place_id | excluded_place_ids]
-        end
-
-      excluded_places = place_ids_to_codes(socket.assigns.place_by_id, new_excluded_place_ids)
-
-      socket =
-        socket
-        |> assign(:excluded_place_ids, new_excluded_place_ids)
-        |> assign_range_data(socket.assigns.host_places, excluded_places)
-        |> push_range_update()
-        |> mark_dirty()
-
-      {:noreply, socket}
+      {:noreply, toggle_exclusion(socket, place_id)}
     else
       _ -> {:noreply, socket}
     end
@@ -256,25 +241,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
 
       if leaf_ids == [place_id] do
         # Leaf country (no subdivisions): toggle exclusion directly
-        excluded_place_ids = socket.assigns.excluded_place_ids
-
-        new_excluded_place_ids =
-          if place_id in excluded_place_ids do
-            List.delete(excluded_place_ids, place_id)
-          else
-            [place_id | excluded_place_ids]
-          end
-
-        excluded_places = place_ids_to_codes(socket.assigns.place_by_id, new_excluded_place_ids)
-
-        socket =
-          socket
-          |> assign(:excluded_place_ids, new_excluded_place_ids)
-          |> assign_range_data(socket.assigns.host_places_raw, excluded_places)
-          |> push_range_update()
-          |> mark_dirty()
-
-        {:noreply, socket}
+        {:noreply, toggle_exclusion(socket, place_id)}
       else
         # Country with subdivisions: open drill-down panel
         send_update(ExclusionDrillDown,
@@ -332,25 +299,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
   def handle_info({ExclusionDrillDown, {:toggle_exclusion, code}}, socket) do
     case Map.get(socket.assigns.place_by_code, code) do
       %{id: place_id} ->
-        excluded_place_ids = socket.assigns.excluded_place_ids
-
-        new_excluded_place_ids =
-          if place_id in excluded_place_ids do
-            List.delete(excluded_place_ids, place_id)
-          else
-            [place_id | excluded_place_ids]
-          end
-
-        excluded_places = place_ids_to_codes(socket.assigns.place_by_id, new_excluded_place_ids)
-
-        socket =
-          socket
-          |> assign(:excluded_place_ids, new_excluded_place_ids)
-          |> assign_range_data(socket.assigns.host_places_raw, excluded_places)
-          |> push_range_update()
-          |> mark_dirty()
-
-        {:noreply, socket}
+        {:noreply, toggle_exclusion(socket, place_id)}
 
       nil ->
         {:noreply, socket}
@@ -375,56 +324,80 @@ defmodule GallformersWeb.Admin.GallHostLive do
           put_flash(socket, :error, "Selected species is not a gall")
         else
           hosts = GallHosts.get_hosts_for_gall(gall_id)
-          host_places = Ranges.get_places_for_gall(gall_id)
           excluded_place_ids = Ranges.get_excluded_place_ids_for_gall(gall_id)
-          excluded_places = place_ids_to_codes(socket.assigns.place_by_id, excluded_place_ids)
 
           socket
           |> assign(:selected_gall, gall)
           |> assign(DeferredChanges.init(:hosts, hosts))
           |> assign(:original_excluded_place_ids, excluded_place_ids)
           |> assign(:excluded_place_ids, excluded_place_ids)
-          |> assign_range_data(host_places, excluded_places)
+          |> recompute_range()
           |> assign(:page_title, "Gall-Host Mappings - #{gall.name}")
           |> reset_dirty()
         end
     end
   end
 
-  # Convert list of place IDs to list of place codes using the cached place_by_id map
-  defp place_ids_to_codes(place_by_id, place_ids) do
-    place_ids
-    |> Enum.map(&Map.get(place_by_id, &1))
-    |> Enum.reject(&is_nil/1)
-    |> Enum.map(& &1.code)
-  end
+  # Recompute range from current hosts and exclusions (hits DB for host ranges).
+  # Called when hosts change or when loading a gall from DB.
+  defp recompute_range(socket) do
+    host_species_ids = Enum.map(socket.assigns.hosts, & &1.host_species_id)
+    host_ranges = Ranges.get_host_ranges_with_precision_for_species_ids(host_species_ids)
 
-  # Convert list of place codes to list of place IDs using the cached place_by_code map
-  defp place_codes_to_ids(place_by_code, codes) do
-    codes
-    |> Enum.map(&Map.get(place_by_code, &1))
-    |> Enum.reject(&is_nil/1)
-    |> Enum.map(& &1.id)
-  end
+    excluded_codes = ids_to_codes(socket.assigns.place_by_id, socket.assigns.excluded_place_ids)
 
-  # Compute host places from local hosts list and update range data
-  defp recompute_host_places_and_range(socket) do
-    hosts = socket.assigns.hosts
-    host_species_ids = Enum.map(hosts, & &1.host_species_id)
-    host_places = Ranges.get_places_for_host_species_ids(host_species_ids)
+    # Clean up excluded_place_ids that no longer apply (host was removed).
+    # Compute the full set of leaf codes from host_ranges to check validity.
+    display = Ranges.compute_display_range(host_ranges, excluded_codes)
+    all_host_codes = Enum.uniq(display.in_range ++ display.inherited_range ++ display.excluded_range)
 
-    # Clean up excluded_place_ids that no longer apply (host was removed)
-    excluded_place_ids = socket.assigns.excluded_place_ids
-    excluded_places = place_ids_to_codes(socket.assigns.place_by_id, excluded_place_ids)
-    valid_exclusions = Enum.filter(excluded_places, &(&1 in host_places))
+    valid_excluded_codes = Enum.filter(excluded_codes, &(&1 in all_host_codes))
 
-    # Update excluded_place_ids to only include valid ones
-    valid_excluded_place_ids = place_codes_to_ids(socket.assigns.place_by_code, valid_exclusions)
+    valid_excluded_place_ids =
+      codes_to_ids(socket.assigns.place_by_code, valid_excluded_codes)
+
+    # Recompute with cleaned exclusions if any were removed
+    display =
+      if length(valid_excluded_codes) != length(excluded_codes),
+        do: Ranges.compute_display_range(host_ranges, valid_excluded_codes),
+        else: display
 
     socket
+    |> assign(:host_ranges, host_ranges)
+    |> assign(:host_places, all_host_codes)
     |> assign(:excluded_place_ids, valid_excluded_place_ids)
-    |> assign_range_data(host_places, valid_exclusions)
+    |> assign(:excluded_places, valid_excluded_codes)
+    |> assign(:in_range, display.in_range)
+    |> assign(:inherited_range, display.inherited_range)
+  end
+
+  # Toggle a place's exclusion status (no DB query, uses cached host_ranges)
+  defp toggle_exclusion(socket, place_id) do
+    excluded_place_ids = socket.assigns.excluded_place_ids
+
+    new_excluded =
+      if place_id in excluded_place_ids,
+        do: List.delete(excluded_place_ids, place_id),
+        else: [place_id | excluded_place_ids]
+
+    socket
+    |> assign(:excluded_place_ids, new_excluded)
+    |> recompute_range_from_assigns()
     |> push_range_update()
+    |> mark_dirty()
+  end
+
+  # Recompute range from cached host_ranges (no DB query)
+  defp recompute_range_from_assigns(socket) do
+    excluded_codes = ids_to_codes(socket.assigns.place_by_id, socket.assigns.excluded_place_ids)
+    display = Ranges.compute_display_range(socket.assigns.host_ranges, excluded_codes)
+    all_host_codes = Enum.uniq(display.in_range ++ display.inherited_range ++ display.excluded_range)
+
+    socket
+    |> assign(:host_places, all_host_codes)
+    |> assign(:excluded_places, excluded_codes)
+    |> assign(:in_range, display.in_range)
+    |> assign(:inherited_range, display.inherited_range)
   end
 
   # Push range data update to the RangeMap hook
@@ -436,61 +409,18 @@ defmodule GallformersWeb.Admin.GallHostLive do
     })
   end
 
-  # Assigns host_places, excluded_places, and computed in_range together.
-  # Also computes inherited_range (leaf codes expanded from country-level host ranges).
-  defp assign_range_data(socket, host_places, excluded_places) do
-    # Separate exact leaf codes from country/higher-level codes
-    place_by_code = socket.assigns.place_by_code
-
-    {leaf_codes, higher_codes} =
-      Enum.split_with(host_places, fn code ->
-        case Map.get(place_by_code, code) do
-          %{type: type} when type in ["state", "province"] -> true
-          # Leaf countries (no subdivisions) are also leaf codes
-          %{type: "country", id: id} -> Places.leaf_descendant_ids(id) == [id]
-          _ -> false
-        end
-      end)
-
-    # Expand higher-level codes to their leaf descendant codes
-    place_by_id = socket.assigns.place_by_id
-
-    inherited_leaf_codes =
-      higher_codes
-      |> Enum.flat_map(&expand_to_leaf_codes(&1, place_by_code, place_by_id))
-      |> Enum.uniq()
-      |> Enum.reject(&(&1 in leaf_codes))
-
-    # All leaf codes (exact + inherited) — used for host_places and toggle logic
-    all_leaf_codes = Enum.uniq(leaf_codes ++ inherited_leaf_codes)
-
-    # Inherited codes that are in range (not excluded)
-    inherited_in_range = Enum.reject(inherited_leaf_codes, &(&1 in excluded_places))
-
-    # Exact codes that are in range (not excluded)
-    exact_in_range = Enum.reject(leaf_codes, &(&1 in excluded_places))
-
-    socket
-    |> assign(:host_places, all_leaf_codes)
-    |> assign(:host_places_raw, host_places)
-    |> assign(:excluded_places, excluded_places)
-    |> assign(:in_range, exact_in_range)
-    |> assign(:inherited_range, inherited_in_range)
+  defp ids_to_codes(place_by_id, place_ids) do
+    place_ids
+    |> Enum.map(&Map.get(place_by_id, &1))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(& &1.code)
   end
 
-  # Expands a higher-level place code to its leaf descendant codes
-  defp expand_to_leaf_codes(code, place_by_code, place_by_id) do
-    case Map.get(place_by_code, code) do
-      %{id: id} ->
-        id
-        |> Places.leaf_descendant_ids()
-        |> Enum.map(&Map.get(place_by_id, &1))
-        |> Enum.reject(&is_nil/1)
-        |> Enum.map(& &1.code)
-
-      nil ->
-        []
-    end
+  defp codes_to_ids(place_by_code, codes) do
+    codes
+    |> Enum.map(&Map.get(place_by_code, &1))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(& &1.id)
   end
 
   @impl true
