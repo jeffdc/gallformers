@@ -29,6 +29,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
     abundances = Species.list_abundances()
     all_places = Places.list_all_places()
+    place_by_code = Map.new(all_places, &{&1.code, &1})
+    place_by_id = Map.new(all_places, &{&1.id, &1})
     families = Taxonomy.list_families_for_select(:plant)
 
     socket =
@@ -37,6 +39,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
       |> assign(:page_title, "Host")
       |> assign(:abundances, abundances)
       |> assign(:all_places, all_places)
+      |> assign(:place_by_code, place_by_code)
+      |> assign(:place_by_id, place_by_id)
       |> assign(:families, families)
       |> init_form_state()
 
@@ -399,7 +403,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   defp toggle_region(%{assigns: %{mode: mode}} = socket, _code) when mode != :edit, do: socket
 
   defp toggle_region(socket, code) do
-    place = Enum.find(socket.assigns.all_places, &(&1.code == code))
+    place = Map.get(socket.assigns.place_by_code, code)
 
     if place do
       new_exact = toggle_place_code(socket.assigns.exact_places, code)
@@ -422,8 +426,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   defp compute_map_range(socket) do
     exact = socket.assigns.exact_places
     country_codes = socket.assigns.country_places
-    all_places = socket.assigns.all_places
-    place_by_code = Map.new(all_places, &{&1.code, &1})
+    place_by_code = socket.assigns.place_by_code
+    place_by_id = socket.assigns.place_by_id
 
     inherited =
       country_codes
@@ -431,8 +435,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
         case Map.get(place_by_code, code) do
           %{id: id} ->
             leaf_ids = Places.leaf_descendant_ids(id)
-            id_to_code = Map.new(all_places, &{&1.id, &1.code})
-            Enum.map(leaf_ids, &Map.get(id_to_code, &1)) |> Enum.reject(&is_nil/1)
+            Enum.map(leaf_ids, fn lid -> place_by_id[lid] end) |> Enum.reject(&is_nil/1) |> Enum.map(& &1.code)
 
           nil ->
             []
@@ -564,8 +567,9 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     wcvp_place_codes = Enum.map(wcvp_places, & &1.code)
 
     wcvp_place_ids =
-      socket.assigns.all_places
-      |> Enum.filter(fn p -> p.code in wcvp_place_codes end)
+      wcvp_place_codes
+      |> Enum.map(&Map.get(socket.assigns.place_by_code, &1))
+      |> Enum.reject(&is_nil/1)
       |> Enum.map(& &1.id)
 
     socket
@@ -610,8 +614,9 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     wcvp_place_codes = Enum.map(wcvp_places, & &1.code)
 
     new_place_ids =
-      socket.assigns.all_places
-      |> Enum.filter(fn p -> p.code in wcvp_place_codes end)
+      wcvp_place_codes
+      |> Enum.map(&Map.get(socket.assigns.place_by_code, &1))
+      |> Enum.reject(&is_nil/1)
       |> Enum.map(& &1.id)
 
     Ranges.update_host_places(host_id, new_place_ids)

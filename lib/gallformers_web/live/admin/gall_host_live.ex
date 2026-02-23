@@ -27,12 +27,16 @@ defmodule GallformersWeb.Admin.GallHostLive do
   def mount(_params, session, socket) do
     current_user = session["current_user"]
     all_places = Places.list_all_places()
+    place_by_code = Map.new(all_places, &{&1.code, &1})
+    place_by_id = Map.new(all_places, &{&1.id, &1})
 
     socket =
       socket
       |> assign(:current_user, current_user)
       |> assign(:page_title, "Gall-Host Mappings")
       |> assign(:all_places, all_places)
+      |> assign(:place_by_code, place_by_code)
+      |> assign(:place_by_id, place_by_id)
       # Gall selection state
       |> assign(:gall_search_query, "")
       |> assign(:gall_search_results, [])
@@ -217,7 +221,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
   @impl true
   def handle_event("toggle_region", %{"code" => code}, socket) do
     with %{id: _gall_id} <- socket.assigns.selected_gall,
-         %{id: place_id} <- Enum.find(socket.assigns.all_places, &(&1.code == code)),
+         %{id: place_id} <- Map.get(socket.assigns.place_by_code, code),
          true <- code in socket.assigns.host_places do
       # Toggle in local excluded_place_ids list
       excluded_place_ids = socket.assigns.excluded_place_ids
@@ -229,7 +233,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
           [place_id | excluded_place_ids]
         end
 
-      excluded_places = place_ids_to_codes(socket.assigns.all_places, new_excluded_place_ids)
+      excluded_places = place_ids_to_codes(socket.assigns.place_by_id, new_excluded_place_ids)
 
       socket =
         socket
@@ -261,7 +265,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
             [place_id | excluded_place_ids]
           end
 
-        excluded_places = place_ids_to_codes(socket.assigns.all_places, new_excluded_place_ids)
+        excluded_places = place_ids_to_codes(socket.assigns.place_by_id, new_excluded_place_ids)
 
         socket =
           socket
@@ -326,7 +330,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
 
   @impl true
   def handle_info({ExclusionDrillDown, {:toggle_exclusion, code}}, socket) do
-    case Enum.find(socket.assigns.all_places, &(&1.code == code)) do
+    case Map.get(socket.assigns.place_by_code, code) do
       %{id: place_id} ->
         excluded_place_ids = socket.assigns.excluded_place_ids
 
@@ -337,7 +341,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
             [place_id | excluded_place_ids]
           end
 
-        excluded_places = place_ids_to_codes(socket.assigns.all_places, new_excluded_place_ids)
+        excluded_places = place_ids_to_codes(socket.assigns.place_by_id, new_excluded_place_ids)
 
         socket =
           socket
@@ -373,7 +377,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
           hosts = GallHosts.get_hosts_for_gall(gall_id)
           host_places = Ranges.get_places_for_gall(gall_id)
           excluded_place_ids = Ranges.get_excluded_place_ids_for_gall(gall_id)
-          excluded_places = place_ids_to_codes(socket.assigns.all_places, excluded_place_ids)
+          excluded_places = place_ids_to_codes(socket.assigns.place_by_id, excluded_place_ids)
 
           socket
           |> assign(:selected_gall, gall)
@@ -387,21 +391,19 @@ defmodule GallformersWeb.Admin.GallHostLive do
     end
   end
 
-  # Convert list of place IDs to list of place codes
-  defp place_ids_to_codes(all_places, place_ids) do
-    place_id_set = MapSet.new(place_ids)
-
-    all_places
-    |> Enum.filter(&MapSet.member?(place_id_set, &1.id))
+  # Convert list of place IDs to list of place codes using the cached place_by_id map
+  defp place_ids_to_codes(place_by_id, place_ids) do
+    place_ids
+    |> Enum.map(&Map.get(place_by_id, &1))
+    |> Enum.reject(&is_nil/1)
     |> Enum.map(& &1.code)
   end
 
-  # Convert list of place codes to list of place IDs
-  defp place_codes_to_ids(all_places, codes) do
-    code_set = MapSet.new(codes)
-
-    all_places
-    |> Enum.filter(&MapSet.member?(code_set, &1.code))
+  # Convert list of place codes to list of place IDs using the cached place_by_code map
+  defp place_codes_to_ids(place_by_code, codes) do
+    codes
+    |> Enum.map(&Map.get(place_by_code, &1))
+    |> Enum.reject(&is_nil/1)
     |> Enum.map(& &1.id)
   end
 
@@ -413,11 +415,11 @@ defmodule GallformersWeb.Admin.GallHostLive do
 
     # Clean up excluded_place_ids that no longer apply (host was removed)
     excluded_place_ids = socket.assigns.excluded_place_ids
-    excluded_places = place_ids_to_codes(socket.assigns.all_places, excluded_place_ids)
+    excluded_places = place_ids_to_codes(socket.assigns.place_by_id, excluded_place_ids)
     valid_exclusions = Enum.filter(excluded_places, &(&1 in host_places))
 
     # Update excluded_place_ids to only include valid ones
-    valid_excluded_place_ids = place_codes_to_ids(socket.assigns.all_places, valid_exclusions)
+    valid_excluded_place_ids = place_codes_to_ids(socket.assigns.place_by_code, valid_exclusions)
 
     socket
     |> assign(:excluded_place_ids, valid_excluded_place_ids)
@@ -438,8 +440,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
   # Also computes inherited_range (leaf codes expanded from country-level host ranges).
   defp assign_range_data(socket, host_places, excluded_places) do
     # Separate exact leaf codes from country/higher-level codes
-    all_places = socket.assigns.all_places
-    place_by_code = Map.new(all_places, &{&1.code, &1})
+    place_by_code = socket.assigns.place_by_code
 
     {leaf_codes, higher_codes} =
       Enum.split_with(host_places, fn code ->
@@ -452,7 +453,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
       end)
 
     # Expand higher-level codes to their leaf descendant codes
-    place_by_id = Map.new(all_places, &{&1.id, &1})
+    place_by_id = socket.assigns.place_by_id
 
     inherited_leaf_codes =
       higher_codes
