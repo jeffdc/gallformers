@@ -57,6 +57,20 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_event("include_all", _params, socket) do
+    codes = Enum.map(socket.assigns.subdivisions, & &1.code)
+    notify_parent({:include_all, codes})
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("exclude_all", _params, socket) do
+    codes = Enum.map(socket.assigns.subdivisions, & &1.code)
+    notify_parent({:exclude_all, codes})
+    {:noreply, socket}
+  end
+
   defp notify_parent(message) do
     send(self(), {__MODULE__, message})
   end
@@ -79,9 +93,28 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
         target={@myself}
       >
         <:header_extra>
-          <p class="text-xs text-gray-500 mb-3">
+          <p class="text-xs text-gray-500 mb-2">
             Uncheck states to exclude them from this gall's range.
           </p>
+          <div class="flex gap-2 mb-3">
+            <button
+              type="button"
+              phx-click="include_all"
+              phx-target={@myself}
+              class="text-xs text-green-700 hover:text-green-900 underline"
+            >
+              Select All
+            </button>
+            <span class="text-xs text-gray-300">|</span>
+            <button
+              type="button"
+              phx-click="exclude_all"
+              phx-target={@myself}
+              class="text-xs text-red-700 hover:text-red-900 underline"
+            >
+              Deselect All
+            </button>
+          </div>
         </:header_extra>
 
         <%!-- Subdivision list --%>

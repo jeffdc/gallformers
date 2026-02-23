@@ -307,6 +307,46 @@ defmodule GallformersWeb.Admin.GallHostLive do
   end
 
   @impl true
+  def handle_info({ExclusionDrillDown, {:include_all, codes}}, socket) do
+    place_by_code = socket.assigns.place_by_code
+
+    place_ids_to_remove =
+      codes
+      |> Enum.map(&Map.get(place_by_code, &1))
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(& &1.id)
+
+    new_excluded = Enum.reject(socket.assigns.excluded_place_ids, &(&1 in place_ids_to_remove))
+
+    {:noreply,
+     socket
+     |> assign(:excluded_place_ids, new_excluded)
+     |> recompute_range_from_assigns()
+     |> push_range_update()
+     |> mark_dirty()}
+  end
+
+  @impl true
+  def handle_info({ExclusionDrillDown, {:exclude_all, codes}}, socket) do
+    place_by_code = socket.assigns.place_by_code
+
+    place_ids_to_add =
+      codes
+      |> Enum.map(&Map.get(place_by_code, &1))
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(& &1.id)
+
+    new_excluded = Enum.uniq(socket.assigns.excluded_place_ids ++ place_ids_to_add)
+
+    {:noreply,
+     socket
+     |> assign(:excluded_place_ids, new_excluded)
+     |> recompute_range_from_assigns()
+     |> push_range_update()
+     |> mark_dirty()}
+  end
+
+  @impl true
   def handle_info({ExclusionDrillDown, :zoom_out}, socket) do
     {:noreply, push_event(socket, "range-zoom-out", %{})}
   end
