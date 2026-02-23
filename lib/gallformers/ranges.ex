@@ -83,7 +83,7 @@ defmodule Gallformers.Ranges do
       join: p in "place",
       on: hr.place_id == p.id,
       where: hr.species_id == ^host_species_id,
-      select: %{code: p.code, precision: hr.precision}
+      select: %{code: p.code, precision: hr.precision, place_id: p.id}
     )
     |> Repo.all()
   end
@@ -303,7 +303,9 @@ defmodule Gallformers.Ranges do
 
     {exact_codes, inherited_codes} = split_by_precision(host_ranges)
 
-    # Don't show inherited where there's already an exact entry or where excluded
+    # Remove excluded from both exact and inherited ranges
+    exact_codes = exact_codes -- excluded
+
     inherited_codes =
       inherited_codes
       |> Kernel.--(exact_codes)

@@ -28,7 +28,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     if connected?(socket), do: Species.subscribe()
 
     abundances = Species.list_abundances()
-    all_places = Places.list_places()
+    all_places = Places.list_all_places()
     families = Taxonomy.list_families_for_select(:plant)
 
     socket =
@@ -351,36 +351,6 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   @impl true
   def handle_event("toggle_country", %{"code" => code}, socket) do
     {:noreply, toggle_country(socket, code)}
-  end
-
-  @impl true
-  def handle_event("select_all_places", _params, socket) do
-    if socket.assigns.mode == :edit do
-      all_codes = Enum.map(socket.assigns.all_places, & &1.code)
-
-      socket
-      |> assign(:exact_places, all_codes)
-      |> assign(:country_places, [])
-      |> compute_map_range()
-      |> mark_dirty()
-      |> then(&{:noreply, &1})
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("deselect_all_places", _params, socket) do
-    if socket.assigns.mode == :edit do
-      socket
-      |> assign(:exact_places, [])
-      |> assign(:country_places, [])
-      |> compute_map_range()
-      |> mark_dirty()
-      |> then(&{:noreply, &1})
-    else
-      {:noreply, socket}
-    end
   end
 
   @impl true
@@ -1156,25 +1126,6 @@ defmodule GallformersWeb.Admin.HostLive.Form do
                       <span class="text-xs text-gray-600">Out of Range</span>
                     </div>
                   </div>
-                  <div class="text-sm font-medium text-gray-700 mt-4 mb-2">Map Actions:</div>
-                  <div class="space-y-2">
-                    <button
-                      type="button"
-                      phx-click="select_all_places"
-                      class="block w-full px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded"
-                      disabled={@mode == :new}
-                    >
-                      Select All
-                    </button>
-                    <button
-                      type="button"
-                      phx-click="deselect_all_places"
-                      class="block w-full px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded"
-                      disabled={@mode == :new}
-                    >
-                      De-select All
-                    </button>
-                  </div>
                 </div>
                 <%!-- Map + Drill-down panel --%>
                 <div class="col-span-5">
@@ -1187,7 +1138,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
                           in_range={@in_range}
                           inherited_range={@inherited_range}
                           editable
-                          class="border border-gray-300 rounded bg-gray-50 min-h-[300px]"
+                          class="border border-gray-300 rounded bg-gray-50 min-h-[500px]"
                         />
                       </div>
                       <.live_component

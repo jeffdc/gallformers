@@ -141,12 +141,15 @@ const RangeMap = {
       this.fitToRange(true)
     })
 
-    // Drill-down zoom events from CountryDrillDown panel
+    // Drill-down zoom events from CountryDrillDown / ExclusionDrillDown panel
+    this.drillDownCountry = null
     this.handleEvent('range-zoom-to-country', ({ code }) => {
+      this.drillDownCountry = code
       this.zoomToCountry(code)
     })
 
     this.handleEvent('range-zoom-out', () => {
+      this.drillDownCountry = null
       this.fitToRange(true)
     })
 
@@ -446,12 +449,21 @@ const RangeMap = {
       const isRealSubdiv = subdivCode && subdivCode.includes('-')
 
       if (this.editable) {
-        if (isRealSubdiv) {
-          // Click on a subdivision: toggle single region
+        // When zoomed into a country (drill-down open), clicking a subdivision
+        // toggles it directly instead of re-opening the drill-down panel.
+        if (this.drillDownCountry && isRealSubdiv && subdivCode.startsWith(this.drillDownCountry + '-')) {
           this.pushEvent('toggle_region', { code: subdivCode })
-        } else if (countryCode) {
-          // Click on a country: open drill-down panel (or toggle directly for leaf countries)
-          this.pushEvent('toggle_country', { code: countryCode })
+        } else {
+          // Determine the country for this click point
+          const clickCountry = countryCode || (isRealSubdiv && subdivCode.split('-')[0]) || null
+
+          if (clickCountry) {
+            // Open the country drill-down panel (or toggle directly for leaf countries)
+            this.pushEvent('toggle_country', { code: clickCountry })
+          } else if (isRealSubdiv) {
+            // Fallback: subdivision with no country (shouldn't happen normally)
+            this.pushEvent('toggle_region', { code: subdivCode })
+          }
         }
       } else if (this.navigable) {
         if (isRealSubdiv) {

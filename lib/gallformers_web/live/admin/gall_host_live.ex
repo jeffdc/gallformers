@@ -27,7 +27,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
   @impl true
   def mount(_params, session, socket) do
     current_user = session["current_user"]
-    all_places = Places.list_places()
+    all_places = Places.list_all_places()
 
     socket =
       socket
@@ -286,48 +286,6 @@ defmodule GallformersWeb.Admin.GallHostLive do
     end
   end
 
-  @impl true
-  def handle_event("select_all_places", _params, socket) do
-    gall = socket.assigns.selected_gall
-
-    if gall do
-      # Select all = remove all exclusions (all host places are in range)
-      socket =
-        socket
-        |> assign(:excluded_place_ids, [])
-        |> assign_range_data(socket.assigns.host_places, [])
-        |> push_range_update()
-        |> mark_dirty()
-
-      {:noreply, socket}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("deselect_all_places", _params, socket) do
-    gall = socket.assigns.selected_gall
-
-    if gall do
-      # Deselect all = exclude all host places
-      all_host_place_ids =
-        place_codes_to_ids(socket.assigns.all_places, socket.assigns.host_places)
-
-      excluded_places = socket.assigns.host_places
-
-      socket =
-        socket
-        |> assign(:excluded_place_ids, all_host_place_ids)
-        |> assign_range_data(socket.assigns.host_places, excluded_places)
-        |> push_range_update()
-        |> mark_dirty()
-
-      {:noreply, socket}
-    else
-      {:noreply, socket}
-    end
-  end
 
   # ============================================
   # Save/Cancel Events
@@ -418,45 +376,6 @@ defmodule GallformersWeb.Admin.GallHostLive do
     end
   end
 
-  def handle_info({ExclusionDrillDown, {:exclude_all, codes}}, socket) do
-    place_ids =
-      codes
-      |> Enum.map(fn code -> Enum.find(socket.assigns.all_places, &(&1.code == code)) end)
-      |> Enum.reject(&is_nil/1)
-      |> Enum.map(& &1.id)
-
-    new_excluded_place_ids = Enum.uniq(socket.assigns.excluded_place_ids ++ place_ids)
-    excluded_places = place_ids_to_codes(socket.assigns.all_places, new_excluded_place_ids)
-
-    socket =
-      socket
-      |> assign(:excluded_place_ids, new_excluded_place_ids)
-      |> assign_range_data(socket.assigns.host_places_raw, excluded_places)
-      |> push_range_update()
-      |> mark_dirty()
-
-    {:noreply, socket}
-  end
-
-  def handle_info({ExclusionDrillDown, {:include_all, codes}}, socket) do
-    place_ids =
-      codes
-      |> Enum.map(fn code -> Enum.find(socket.assigns.all_places, &(&1.code == code)) end)
-      |> Enum.reject(&is_nil/1)
-      |> Enum.map(& &1.id)
-
-    new_excluded_place_ids = Enum.reject(socket.assigns.excluded_place_ids, &(&1 in place_ids))
-    excluded_places = place_ids_to_codes(socket.assigns.all_places, new_excluded_place_ids)
-
-    socket =
-      socket
-      |> assign(:excluded_place_ids, new_excluded_place_ids)
-      |> assign_range_data(socket.assigns.host_places_raw, excluded_places)
-      |> push_range_update()
-      |> mark_dirty()
-
-    {:noreply, socket}
-  end
 
   def handle_info({ExclusionDrillDown, :zoom_out}, socket) do
     {:noreply, push_event(socket, "range-zoom-out", %{})}
@@ -733,37 +652,6 @@ defmodule GallformersWeb.Admin.GallHostLive do
                       </div>
                     </div>
 
-                    <div class="text-sm font-medium text-gray-700 mb-2">Map Actions:</div>
-                    <div class="space-y-2">
-                      <button
-                        type="button"
-                        phx-click="select_all_places"
-                        disabled={@selected_gall == nil}
-                        class={[
-                          "block w-full px-2 py-1 text-xs border border-gray-300 rounded",
-                          if(@selected_gall,
-                            do: "bg-gray-100 hover:bg-gray-200",
-                            else: "bg-gray-50 text-gray-400 cursor-not-allowed"
-                          )
-                        ]}
-                      >
-                        Select All
-                      </button>
-                      <button
-                        type="button"
-                        phx-click="deselect_all_places"
-                        disabled={@selected_gall == nil}
-                        class={[
-                          "block w-full px-2 py-1 text-xs border border-gray-300 rounded",
-                          if(@selected_gall,
-                            do: "bg-gray-100 hover:bg-gray-200",
-                            else: "bg-gray-50 text-gray-400 cursor-not-allowed"
-                          )
-                        ]}
-                      >
-                        De-select All
-                      </button>
-                    </div>
                   </div>
 
                   <%!-- Map + Drill-down panel --%>

@@ -3,7 +3,7 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
   LiveComponent for the exclusion drill-down panel in the gall-host admin page.
 
   When a curator clicks a country on the gall range map, this panel slides in
-  showing checkboxes for each subdivision. Checked = excluded from range.
+  showing checkboxes for each subdivision. Checked = in range, unchecked = excluded.
   """
   use GallformersWeb, :live_component
 
@@ -21,8 +21,12 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
 
   @impl true
   def update(%{action: {:open, country}}, socket) do
+    host_places = socket.assigns.host_places
+
+    # Only show subdivisions that are in the host range
     subdivisions =
       Places.get_children(country.id)
+      |> Enum.filter(&(&1.code in host_places))
       |> Enum.sort_by(& &1.name)
 
     {:ok,
@@ -53,19 +57,6 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
     {:noreply, socket}
   end
 
-  @impl true
-  def handle_event("exclude_all", _params, socket) do
-    codes = Enum.map(socket.assigns.subdivisions, & &1.code)
-    notify_parent({:exclude_all, codes})
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("include_all", _params, socket) do
-    codes = Enum.map(socket.assigns.subdivisions, & &1.code)
-    notify_parent({:include_all, codes})
-    {:noreply, socket}
-  end
 
   defp notify_parent(message) do
     send(self(), {__MODULE__, message})
@@ -78,9 +69,6 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
     end
   end
 
-  defp in_host_range?(code, host_places) do
-    code in host_places
-  end
 
   @impl true
   def render(assigns) do
@@ -105,28 +93,8 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
         </div>
 
         <p class="text-xs text-gray-500 mb-3">
-          Check states to exclude them from this gall's range.
+          Uncheck states to exclude them from this gall's range.
         </p>
-
-        <%!-- Bulk buttons --%>
-        <div class="flex gap-2 mb-3">
-          <button
-            type="button"
-            phx-click="exclude_all"
-            phx-target={@myself}
-            class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50"
-          >
-            Exclude all
-          </button>
-          <button
-            type="button"
-            phx-click="include_all"
-            phx-target={@myself}
-            class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50"
-          >
-            Include all
-          </button>
-        </div>
 
         <%!-- Subdivision list --%>
         <ul class="space-y-1">
@@ -134,16 +102,15 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
             <label class={[
               "flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm cursor-pointer hover:bg-gray-50",
               excluded?(subdiv.code, @excluded_place_ids, @all_places) && "bg-red-50",
-              !excluded?(subdiv.code, @excluded_place_ids, @all_places) &&
-                in_host_range?(subdiv.code, @host_places) && "bg-green-50"
+              !excluded?(subdiv.code, @excluded_place_ids, @all_places) && "bg-green-50"
             ]}>
               <input
                 type="checkbox"
-                checked={excluded?(subdiv.code, @excluded_place_ids, @all_places)}
+                checked={!excluded?(subdiv.code, @excluded_place_ids, @all_places)}
                 phx-click="toggle_exclusion"
                 phx-target={@myself}
                 phx-value-code={subdiv.code}
-                class="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                class="rounded border-gray-300 text-green-600 focus:ring-green-500"
               />
               <span>{subdiv.name}</span>
               <span class="ml-auto text-xs text-gray-400">{subdiv.code}</span>

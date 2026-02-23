@@ -291,39 +291,6 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
       assert html =~ host.name
     end
 
-    test "select_all_places in search mode is no-op", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin/hosts/new")
-
-      html = render_click(view, "select_all_places", %{})
-
-      assert html =~ "Add Host" or html =~ "host-picker"
-    end
-
-    test "select_all_places in edit mode works", %{conn: conn} do
-      host = require_host()
-      {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
-
-      html = render_click(view, "select_all_places", %{})
-
-      assert html =~ host.name
-    end
-
-    test "deselect_all_places in search mode is no-op", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin/hosts/new")
-
-      html = render_click(view, "deselect_all_places", %{})
-
-      assert html =~ "Add Host" or html =~ "host-picker"
-    end
-
-    test "deselect_all_places in edit mode works", %{conn: conn} do
-      host = require_host()
-      {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
-
-      html = render_click(view, "deselect_all_places", %{})
-
-      assert html =~ host.name
-    end
   end
 
   describe "Rename/Reclassify modal" do
@@ -448,14 +415,6 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
       assert html =~ "Documented"
       assert html =~ "Country-level"
       assert html =~ "Out of Range"
-    end
-
-    test "shows map action buttons in edit mode", %{conn: conn} do
-      host = require_host()
-      {:ok, _view, html} = live(conn, ~p"/admin/hosts/#{host.id}")
-
-      assert html =~ "Select All"
-      assert html =~ "De-select All"
     end
 
     test "shows data complete checkbox in edit mode", %{conn: conn} do

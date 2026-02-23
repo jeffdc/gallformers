@@ -2,9 +2,9 @@
 status: active
 effort: 10-12 days
 created: 2026-02-13
-updated: 2026-02-19
+updated: 2026-02-23
 epic: geo-expansion
-relates: [ccee, 1374, 9005]
+relates: [ccee, 1374, 9005, 8900]
 needs: [4143, 7932, 95d7]
 ---
 

@@ -358,51 +358,6 @@ defmodule GallformersWeb.Admin.GallHostLiveTest do
       end
     end
 
-    test "select_all_places clears exclusions", %{conn: conn} do
-      gall = find_gall_with_hosts()
-
-      if gall do
-        {:ok, view, _html} = live(conn, ~p"/admin/gallhost?id=#{gall.id}")
-
-        # Click select all
-        html = render_click(view, "select_all_places", %{})
-
-        # Should show range summary with 0 excluded
-        assert html =~ "0 excluded" or html =~ "excluded"
-      end
-    end
-
-    test "deselect_all_places excludes all host places", %{conn: conn} do
-      gall = find_gall_with_hosts()
-
-      if gall do
-        {:ok, view, _html} = live(conn, ~p"/admin/gallhost?id=#{gall.id}")
-
-        # Click deselect all
-        html = render_click(view, "deselect_all_places", %{})
-
-        # Should show range summary with places excluded
-        assert html =~ "excluded" or html =~ "total from hosts"
-      end
-    end
-
-    test "select_all without gall selected is no-op", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin/gallhost")
-
-      html = render_click(view, "select_all_places", %{})
-
-      # Should not crash
-      assert html =~ "Select a gall" or html =~ "Gall - Host Mappings"
-    end
-
-    test "deselect_all without gall selected is no-op", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin/gallhost")
-
-      html = render_click(view, "deselect_all_places", %{})
-
-      # Should not crash
-      assert html =~ "Select a gall" or html =~ "Gall - Host Mappings"
-    end
 
     test "range summary is displayed when gall selected", %{conn: conn} do
       gall = find_gall_with_hosts()
@@ -491,17 +446,6 @@ defmodule GallformersWeb.Admin.GallHostLiveTest do
       end
     end
 
-    test "select all button is present", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin/gallhost")
-
-      assert html =~ "Select All"
-    end
-
-    test "deselect all button is present", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin/gallhost")
-
-      assert html =~ "De-select All"
-    end
 
     test "cancel button present for navigation", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/gallhost")
