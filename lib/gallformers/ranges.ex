@@ -281,30 +281,45 @@ defmodule Gallformers.Ranges do
     |> Repo.all()
   end
 
+  @doc """
+  Gets host ranges with precision for a list of host species IDs.
+  Returns the union of all ranges with precision metadata.
+  """
+  @spec get_host_ranges_with_precision_for_species_ids([integer()]) :: [map()]
+  def get_host_ranges_with_precision_for_species_ids([]), do: []
+
+  def get_host_ranges_with_precision_for_species_ids(host_species_ids) do
+    from(hr in HostRange,
+      join: p in Place,
+      on: hr.place_id == p.id,
+      where: hr.species_id in ^host_species_ids,
+      distinct: true,
+      select: %{code: p.code, precision: hr.precision, place_id: p.id}
+    )
+    |> Repo.all()
+  end
+
   # ============================================
   # Display Range (expanding precision for maps)
   # ============================================
 
   @doc """
-  Gets the full range display data for a gall, expanding country-level ranges
-  to leaf descendant codes for map display.
+  Computes display range from raw host range entries and exclusions.
 
-  Returns `%{in_range: [codes], inherited_range: [codes], excluded_range: [codes]}`.
-  - `in_range`: exact subdivision codes (host confirmed in this specific state)
-  - `inherited_range`: leaf codes expanded from country/continent-level ranges
-  - `excluded_range`: explicitly excluded codes
+  Used by admin pages that have pending (unsaved) changes. Accepts the same
+  format as `get_host_ranges_with_precision_for_gall/1` returns:
+  `[%{code, precision, place_id}]`.
+
+  Exclusions is a list of place codes to subtract from the range.
   """
-  @spec get_display_range_for_gall(integer()) :: DisplayRange.t()
-  def get_display_range_for_gall(gall_species_id) do
-    host_ranges = get_host_ranges_with_precision_for_gall(gall_species_id)
-    excluded = MapSet.new(get_excluded_places_for_gall(gall_species_id))
-
+  @spec compute_display_range([map()], [String.t()]) :: DisplayRange.t()
+  def compute_display_range(host_ranges, excluded_codes \\ []) do
+    excluded = MapSet.new(excluded_codes)
     {exact_codes, inherited_codes} = split_by_precision(host_ranges)
 
     exact_set = MapSet.new(exact_codes)
     inherited_set = MapSet.new(inherited_codes)
 
-    # Remove excluded from both; remove exact from inherited (exact takes priority)
     effective_exact = MapSet.difference(exact_set, excluded)
 
     effective_inherited =
@@ -320,6 +335,22 @@ defmodule Gallformers.Ranges do
   end
 
   @doc """
+  Gets the full range display data for a gall, expanding country-level ranges
+  to leaf descendant codes for map display.
+
+  Returns `%{in_range: [codes], inherited_range: [codes], excluded_range: [codes]}`.
+  - `in_range`: exact subdivision codes (host confirmed in this specific state)
+  - `inherited_range`: leaf codes expanded from country/continent-level ranges
+  - `excluded_range`: explicitly excluded codes
+  """
+  @spec get_display_range_for_gall(integer()) :: DisplayRange.t()
+  def get_display_range_for_gall(gall_species_id) do
+    host_ranges = get_host_ranges_with_precision_for_gall(gall_species_id)
+    excluded = get_excluded_places_for_gall(gall_species_id)
+    compute_display_range(host_ranges, excluded)
+  end
+
+  @doc """
   Gets display range data for a host species, expanding country-level ranges.
 
   Returns `%{in_range: [codes], inherited_range: [codes]}`.
@@ -327,18 +358,7 @@ defmodule Gallformers.Ranges do
   @spec get_display_range_for_host(integer()) :: DisplayRange.t()
   def get_display_range_for_host(host_species_id) do
     host_ranges = get_places_for_host_with_precision(host_species_id)
-
-    {exact_codes, inherited_codes} = split_by_precision(host_ranges)
-
-    exact_set = MapSet.new(exact_codes)
-    inherited_set = MapSet.new(inherited_codes)
-
-    effective_inherited = MapSet.difference(inherited_set, exact_set)
-
-    %DisplayRange{
-      in_range: MapSet.to_list(exact_set),
-      inherited_range: MapSet.to_list(effective_inherited)
-    }
+    compute_display_range(host_ranges)
   end
 
   # Gets host ranges with precision for a gall (via host relationships)
