@@ -4,7 +4,7 @@
 #                     Natural Earth shapefiles for the place table migration
 #
 # Usage:  ./extract_places.sh [OUTPUT_JSON]
-#         ./extract_places.sh ../../priv/repo/data/western_hemisphere_places.json
+#         ./extract_places.sh ../../priv/repo/data/global_places.json
 #
 # Requirements: ogr2ogr (GDAL), jq
 #
@@ -14,7 +14,7 @@
 # -----------------------------------------------------------------------------
 set -euo pipefail
 
-OUT=${1:-"western_hemisphere_places.json"}
+OUT=${1:-"global_places.json"}
 CACHE_DIR="${HOME}/.cache/naturalearth"
 CACHE_CULTURAL="${CACHE_DIR}/10m_cultural.zip"
 CULTURAL_URL="https://naturalearth.s3.amazonaws.com/10m_cultural/10m_cultural.zip"
@@ -46,70 +46,103 @@ if [ -z "$ADM1" ]; then
   exit 1
 fi
 
-# Countries with subdivisions (matches build_boundaries.sh STATE_COUNTRIES)
-STATE_COUNTRIES=(
-    "US" "CA" "MX"
-    "BZ" "CR" "SV" "GT" "HN" "NI" "PA"
-    "CU" "DO" "HT" "JM"
-    "AR" "BO" "BR" "CL" "CO" "EC" "GY" "PY" "PE" "SR" "UY" "VE"
-)
+# Dynamically determine countries with >3 admin-1 subdivisions
+# Use iso_a2 since that's what our DB uses
+echo "==> Detecting countries with subdivisions..." >&2
+STATE_COUNTRIES=()
+while IFS=, read -r code cnt; do
+  [ "$code" = "iso_a2" ] && continue  # skip CSV header
+  [ -z "$code" ] || [ "$code" = "-99" ] && continue
+  STATE_COUNTRIES+=("$code")
+done < <(ogr2ogr -f CSV /vsistdout/ "$ADM1" \
+  -sql "SELECT iso_a2, COUNT(*) as cnt FROM ne_10m_admin_1_states_provinces WHERE iso_a2 != '-99' GROUP BY iso_a2 HAVING cnt > 3 ORDER BY iso_a2" \
+  -dialect SQLITE 2>/dev/null)
 
 CODES=$(printf "'%s'," "${STATE_COUNTRIES[@]}" | sed 's/,$//')
 
 echo "==> Extracting subdivisions for ${#STATE_COUNTRIES[@]} countries..." >&2
 
-# Extract to CSV, then convert to JSON with jq
+# Extract to GeoJSON to avoid CSV quoting issues with commas in place names
+# (e.g., "Rhondda, Cynon, Taff" in GB, "Southern Nations, Nationalities and
+# Peoples" in ET). GeoJSON handles special characters natively.
 # The build script uses iso_3166_2 as the code for subdivisions in the PMTiles
-ogr2ogr -f CSV "$TMP/subdivisions.csv" "$ADM1" \
+ogr2ogr -f GeoJSON "$TMP/subdivisions.geojson" "$ADM1" \
   -sql "SELECT name, iso_3166_2, iso_a2, type_en FROM ne_10m_admin_1_states_provinces WHERE iso_a2 IN ($CODES) ORDER BY iso_a2, name" \
   -dialect SQLITE 2>/dev/null
 
-# Convert CSV to JSON, mapping type_en to our place types
+# Convert GeoJSON to our JSON format, mapping type_en to our place types
 # Natural Earth uses: State, Province, Department, Region, etc.
 # We map to: state, province (our two subdivision types)
-jq -R -s '
-  split("\n") | .[1:] | map(select(length > 0)) |
-  map(
-    split(",") |
-    if length >= 4 then
-      {
-        name: .[0],
-        code: .[1],
-        type: (.[3] | ascii_downcase |
-          if . == "state" then "state"
-          elif . == "province" then "province"
-          else "province"
-          end),
-        country: .[2]
-      }
-    else empty end
-  ) |
-  # Filter out entries with empty/null codes or names (NE placeholder regions)
-  map(select(.code != "" and .code != null and .name != "" and .name != null and (.code | test("~$") | not)))
-' "$TMP/subdivisions.csv" > "$TMP/raw.json"
+jq '[
+  .features[].properties |
+  {
+    name: .name,
+    code: .iso_3166_2,
+    type: ((.type_en // "") | ascii_downcase |
+      if . == "state" then "state"
+      else "province"
+      end),
+    country: .iso_a2
+  }
+] |
+# Filter out entries with empty/null codes or names (NE placeholder regions)
+map(select(.code != "" and .code != null and .name != "" and .name != null and (.code | test("~$") | not)))
+' "$TMP/subdivisions.geojson" > "$TMP/raw.json"
 
-# Check for any names with commas (CSV parsing issue) and fix
-# Natural Earth names shouldn't have commas, but let's verify
-PROBLEM_COUNT=$(jq '[.[] | select(.name | test(","))] | length' "$TMP/raw.json")
-if [ "$PROBLEM_COUNT" -gt 0 ]; then
-  echo "Warning: $PROBLEM_COUNT entries have commas in names (CSV parse issue)" >&2
+# Check for duplicate codes before fixes
+echo "==> Checking for duplicate codes..." >&2
+DUPES=$(jq -r '[.[].code] | group_by(.) | map(select(length > 1)) | .[][0]' "$TMP/raw.json")
+if [ -n "$DUPES" ]; then
+  echo "    Duplicate codes found (will fix known ones):" >&2
+  echo "$DUPES" | while read -r d; do
+    echo "    - $d: $(jq -r --arg c "$d" '[.[] | select(.code == $c) | .name] | join(", ")' "$TMP/raw.json")" >&2
+  done
 fi
 
 # Fix known Natural Earth duplicate code issues:
 # - Bogota and Cundinamarca both get CO-CUN; Bogota's ISO code is CO-DC
 # - Lima (region) and Lima Province both get PE-LIM; Lima Province is PE-LMA
+# - Tehran and Alborz both get IR-07; Alborz's ISO code is IR-30
 jq '
   map(
     if .name == "Bogota" and .code == "CO-CUN" then .code = "CO-DC"
     elif .name == "Lima Province" and .code == "PE-LIM" then .code = "PE-LMA"
+    elif .name == "Alborz" and .code == "IR-07" then .code = "IR-30"
     else . end
   ) | sort_by(.country, .name)
-' "$TMP/raw.json" > "$OUT"
+' "$TMP/raw.json" > "$TMP/fixed.json"
+
+# Deduplicate remaining codes. Natural Earth has sub-entities (cities within
+# provinces, historical admin splits, etc.) that share ISO codes. For our place
+# table we need exactly one entry per code. Strategy: keep the first entry per
+# code (alphabetically by name within each country, since we sorted above).
+DEDUPED_COUNT_BEFORE=$(jq length "$TMP/fixed.json")
+jq '
+  reduce .[] as $item ([];
+    if (map(.code) | index($item.code)) == null then . + [$item]
+    else . end
+  )
+' "$TMP/fixed.json" > "$OUT"
+DEDUPED_COUNT_AFTER=$(jq length "$OUT")
+DROPPED=$((DEDUPED_COUNT_BEFORE - DEDUPED_COUNT_AFTER))
+if [ "$DROPPED" -gt 0 ]; then
+  echo "    Deduplicated $DROPPED entries sharing codes with primary subdivisions" >&2
+fi
+
+# Verify no duplicates remain
+REMAINING_DUPES=$(jq -r '[.[].code] | group_by(.) | map(select(length > 1)) | .[][0]' "$OUT")
+if [ -n "$REMAINING_DUPES" ]; then
+  echo "ERROR: Duplicate codes remain after deduplication:" >&2
+  echo "$REMAINING_DUPES" | while read -r d; do
+    echo "    - $d: $(jq -r --arg c "$d" '[.[] | select(.code == $c) | .name] | join(", ")' "$OUT")" >&2
+  done
+  exit 1
+fi
 
 COUNT=$(jq length "$OUT")
 echo "==> Wrote $COUNT subdivisions to $OUT" >&2
 echo "==> Countries represented:" >&2
 jq -r '[.[].country] | unique | .[]' "$OUT" | while read -r c; do
-  n=$(jq "[.[] | select(.country==\"$c\")] | length" "$OUT")
+  n=$(jq --arg c "$c" '[.[] | select(.country == $c)] | length' "$OUT")
   echo "    $c: $n subdivisions" >&2
 done
