@@ -155,7 +155,8 @@ defmodule Gallformers.Ranges do
   @doc """
   Adds a place to a host's range with optional precision.
   """
-  @spec add_place_to_host(integer(), integer(), String.t()) :: {:ok, map()}
+  @spec add_place_to_host(integer(), integer(), String.t()) ::
+          {:ok, %HostRange{}} | {:error, Ecto.Changeset.t()}
   def add_place_to_host(host_species_id, place_id, precision \\ "exact") do
     %HostRange{}
     |> HostRange.changeset(%{
@@ -164,42 +165,50 @@ defmodule Gallformers.Ranges do
       precision: precision
     })
     |> Repo.insert(on_conflict: :nothing)
-
-    {:ok, %{id: host_species_id}}
   end
 
   @doc """
   Removes a place from a host's range.
   """
-  @spec remove_place_from_host(integer(), integer()) :: {:ok, map()}
+  @spec remove_place_from_host(integer(), integer()) :: {:ok, non_neg_integer()}
   def remove_place_from_host(host_species_id, place_id) do
-    from(hr in HostRange,
-      where: hr.species_id == ^host_species_id and hr.place_id == ^place_id
-    )
-    |> Repo.delete_all()
+    {count, _} =
+      from(hr in HostRange,
+        where: hr.species_id == ^host_species_id and hr.place_id == ^place_id
+      )
+      |> Repo.delete_all()
 
-    {:ok, %{id: host_species_id}}
+    {:ok, count}
   end
 
   @doc """
   Toggles a place in a host's range (add if not present, remove if present).
   Returns {:added, place_id} or {:removed, place_id}.
   """
-  @spec toggle_place_for_host(integer(), integer()) :: {:added | :removed, integer()}
+  @spec toggle_place_for_host(integer(), integer()) ::
+          {:added, integer()} | {:removed, integer()} | {:error, term()}
   def toggle_place_for_host(host_species_id, place_id) do
-    existing =
-      from(hr in HostRange,
-        where: hr.species_id == ^host_species_id and hr.place_id == ^place_id,
-        select: count()
-      )
-      |> Repo.one()
+    Repo.transaction(fn ->
+      existing =
+        from(hr in HostRange,
+          where: hr.species_id == ^host_species_id and hr.place_id == ^place_id
+        )
+        |> Repo.one()
 
-    if existing > 0 do
-      remove_place_from_host(host_species_id, place_id)
-      {:removed, place_id}
-    else
-      add_place_to_host(host_species_id, place_id)
-      {:added, place_id}
+      if existing do
+        Repo.delete!(existing)
+        {:removed, place_id}
+      else
+        %HostRange{}
+        |> HostRange.changeset(%{species_id: host_species_id, place_id: place_id})
+        |> Repo.insert!()
+
+        {:added, place_id}
+      end
+    end)
+    |> case do
+      {:ok, result} -> result
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -479,30 +488,32 @@ defmodule Gallformers.Ranges do
 
   Note: "added" means the place is now EXCLUDED from the gall's range.
   """
-  @spec toggle_exclusion_for_gall(integer(), integer()) :: {:added | :removed, integer()}
+  @spec toggle_exclusion_for_gall(integer(), integer()) ::
+          {:added, integer()} | {:removed, integer()} | {:error, term()}
   def toggle_exclusion_for_gall(gall_species_id, place_id) do
-    existing =
-      from(gre in GallRangeExclusion,
-        where: gre.species_id == ^gall_species_id and gre.place_id == ^place_id,
-        select: count()
-      )
-      |> Repo.one()
+    Repo.transaction(fn ->
+      existing =
+        from(gre in GallRangeExclusion,
+          where: gre.species_id == ^gall_species_id and gre.place_id == ^place_id
+        )
+        |> Repo.one()
 
-    if existing > 0 do
-      # Remove exclusion (place is now in range)
-      from(gre in GallRangeExclusion,
-        where: gre.species_id == ^gall_species_id and gre.place_id == ^place_id
-      )
-      |> Repo.delete_all()
+      if existing do
+        # Remove exclusion (place is now in range)
+        Repo.delete!(existing)
+        {:removed, place_id}
+      else
+        # Add exclusion (place is now excluded)
+        %GallRangeExclusion{}
+        |> GallRangeExclusion.changeset(%{species_id: gall_species_id, place_id: place_id})
+        |> Repo.insert!()
 
-      {:removed, place_id}
-    else
-      # Add exclusion (place is now excluded)
-      %GallRangeExclusion{}
-      |> GallRangeExclusion.changeset(%{species_id: gall_species_id, place_id: place_id})
-      |> Repo.insert(on_conflict: :nothing)
-
-      {:added, place_id}
+        {:added, place_id}
+      end
+    end)
+    |> case do
+      {:ok, result} -> result
+      {:error, reason} -> {:error, reason}
     end
   end
 
