@@ -86,61 +86,51 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class={[
-      "transition-all duration-300 overflow-hidden",
-      if(@open, do: "w-80 border-l border-gray-200", else: "w-0")
-    ]}>
-      <div :if={@open} class="p-4 h-full overflow-y-auto">
-        <%!-- Header --%>
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-gray-900">{@country.name}</h3>
-          <button
-            type="button"
-            phx-click="close"
-            phx-target={@myself}
-            class="text-gray-400 hover:text-gray-600"
-            aria-label="Close panel"
-          >
-            <.icon name="ph-x" class="size-5" />
-          </button>
-        </div>
+    <div>
+      <.drill_down_panel
+        open={@open}
+        country_name={@country && @country.name}
+        on_close="close"
+        target={@myself}
+      >
+        <:header_extra>
+          <%!-- Country-level toggle --%>
+          <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+            <label class="flex items-center justify-between cursor-pointer">
+              <span class="text-sm font-medium text-gray-700">Country-level range</span>
+              <.toggle
+                id={"country-level-#{@country.code}"}
+                name="country_level"
+                checked={@country_level_on}
+                phx-click="toggle_country_level"
+                phx-target={@myself}
+              />
+            </label>
+            <p :if={@country_level_on} class="mt-2 text-xs text-gray-500">
+              All states shown as probable — check individual states to mark as documented.
+            </p>
+          </div>
 
-        <%!-- Country-level toggle --%>
-        <div class="mb-4 p-3 bg-gray-50 rounded-lg">
-          <label class="flex items-center justify-between cursor-pointer">
-            <span class="text-sm font-medium text-gray-700">Country-level range</span>
-            <.toggle
-              id={"country-level-#{@country.code}"}
-              name="country_level"
-              checked={@country_level_on}
-              phx-click="toggle_country_level"
+          <%!-- Bulk buttons --%>
+          <div class="flex gap-2 mb-3">
+            <button
+              type="button"
+              phx-click="select_all"
               phx-target={@myself}
-            />
-          </label>
-          <p :if={@country_level_on} class="mt-2 text-xs text-gray-500">
-            All states shown as probable — check individual states to mark as documented.
-          </p>
-        </div>
-
-        <%!-- Bulk buttons --%>
-        <div class="flex gap-2 mb-3">
-          <button
-            type="button"
-            phx-click="select_all"
-            phx-target={@myself}
-            class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50"
-          >
-            Select all
-          </button>
-          <button
-            type="button"
-            phx-click="deselect_all"
-            phx-target={@myself}
-            class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50"
-          >
-            Deselect all
-          </button>
-        </div>
+              class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50"
+            >
+              Select all
+            </button>
+            <button
+              type="button"
+              phx-click="deselect_all"
+              phx-target={@myself}
+              class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50"
+            >
+              Deselect all
+            </button>
+          </div>
+        </:header_extra>
 
         <%!-- Subdivision list --%>
         <ul class="space-y-1">
@@ -163,7 +153,7 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
             </label>
           </li>
         </ul>
-      </div>
+      </.drill_down_panel>
     </div>
     """
   end

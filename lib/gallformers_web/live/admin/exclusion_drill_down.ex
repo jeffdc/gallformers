@@ -71,28 +71,18 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class={[
-      "transition-all duration-300 overflow-hidden",
-      if(@open, do: "w-80 border-l border-gray-200", else: "w-0")
-    ]}>
-      <div :if={@open} class="p-4 h-full overflow-y-auto">
-        <%!-- Header --%>
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-gray-900">{@country.name}</h3>
-          <button
-            type="button"
-            phx-click="close"
-            phx-target={@myself}
-            class="text-gray-400 hover:text-gray-600"
-            aria-label="Close panel"
-          >
-            <.icon name="ph-x" class="size-5" />
-          </button>
-        </div>
-
-        <p class="text-xs text-gray-500 mb-3">
-          Uncheck states to exclude them from this gall's range.
-        </p>
+    <div>
+      <.drill_down_panel
+        open={@open}
+        country_name={@country && @country.name}
+        on_close="close"
+        target={@myself}
+      >
+        <:header_extra>
+          <p class="text-xs text-gray-500 mb-3">
+            Uncheck states to exclude them from this gall's range.
+          </p>
+        </:header_extra>
 
         <%!-- Subdivision list --%>
         <ul class="space-y-1">
@@ -115,7 +105,7 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
             </label>
           </li>
         </ul>
-      </div>
+      </.drill_down_panel>
     </div>
     """
   end

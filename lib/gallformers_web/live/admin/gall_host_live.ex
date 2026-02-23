@@ -350,7 +350,9 @@ defmodule GallformersWeb.Admin.GallHostLive do
     # Clean up excluded_place_ids that no longer apply (host was removed).
     # Compute the full set of leaf codes from host_ranges to check validity.
     display = Ranges.compute_display_range(host_ranges, excluded_codes)
-    all_host_codes = Enum.uniq(display.in_range ++ display.inherited_range ++ display.excluded_range)
+
+    all_host_codes =
+      Enum.uniq(display.in_range ++ display.inherited_range ++ display.excluded_range)
 
     valid_excluded_codes = Enum.filter(excluded_codes, &(&1 in all_host_codes))
 
@@ -392,7 +394,9 @@ defmodule GallformersWeb.Admin.GallHostLive do
   defp recompute_range_from_assigns(socket) do
     excluded_codes = ids_to_codes(socket.assigns.place_by_id, socket.assigns.excluded_place_ids)
     display = Ranges.compute_display_range(socket.assigns.host_ranges, excluded_codes)
-    all_host_codes = Enum.uniq(display.in_range ++ display.inherited_range ++ display.excluded_range)
+
+    all_host_codes =
+      Enum.uniq(display.in_range ++ display.inherited_range ++ display.excluded_range)
 
     socket
     |> assign(:host_places, all_host_codes)

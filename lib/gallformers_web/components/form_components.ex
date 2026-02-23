@@ -904,6 +904,63 @@ defmodule GallformersWeb.FormComponents do
   end
 
   @doc """
+  Renders a slide-in drill-down panel for country subdivision editing.
+
+  Used by both CountryDrillDown and ExclusionDrillDown. Provides the
+  panel chrome (slide-in transition, header, close button) and slots for
+  custom content.
+
+  ## Example
+
+      <.drill_down_panel
+        open={@open}
+        country_name={@country.name}
+        on_close="close"
+        target={@myself}
+      >
+        <:header_extra>
+          <p class="text-xs text-gray-500 mb-3">Help text here.</p>
+        </:header_extra>
+        <ul>...</ul>
+      </.drill_down_panel>
+  """
+  attr :open, :boolean, required: true
+  attr :country_name, :string, default: nil
+  attr :on_close, :string, required: true
+  attr :target, :any, required: true
+
+  slot :header_extra,
+    doc: "Content after the header, before the list (e.g., toggles, bulk buttons)"
+
+  slot :inner_block, required: true, doc: "The subdivision list content"
+
+  def drill_down_panel(assigns) do
+    ~H"""
+    <div class={[
+      "transition-all duration-300 overflow-hidden",
+      if(@open, do: "w-80 border-l border-gray-200", else: "w-0")
+    ]}>
+      <div :if={@open} class="p-4 h-full overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-gray-900">{@country_name}</h3>
+          <button
+            type="button"
+            phx-click={@on_close}
+            phx-target={@target}
+            class="text-gray-400 hover:text-gray-600"
+            aria-label="Close panel"
+          >
+            <.icon name="ph-x" class="size-5" />
+          </button>
+        </div>
+        {render_slot(@header_extra)}
+        {render_slot(@inner_block)}
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
   Renders a cascade delete confirmation modal.
 
   Shows the impact of deleting an entity with cascading relationships:
