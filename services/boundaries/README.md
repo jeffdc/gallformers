@@ -26,7 +26,7 @@ Natural Earth 10m shapefiles (remote, cached locally)
     ├─ 10m_cultural.zip → Admin-0 countries, Admin-1 states/provinces
     └─ 10m_physical.zip → Lakes
     │
-    ↓  ogr2ogr: filter to Western Hemisphere, add `code` property
+    ↓  ogr2ogr: extract and filter, add `code` property
     │
     ├─ countries shapefile     → countries GeoJSON
     ├─ subdivisions shapefile  → subdivisions GeoJSON
@@ -47,12 +47,12 @@ Natural Earth 10m shapefiles (remote, cached locally)
 | File | Purpose |
 |------|---------|
 | `services/boundaries/build_boundaries.sh` | One-shot tile generator script |
-| `services/boundaries/extract_places.sh` | Generates `western_hemisphere_places.json` for DB seeding (not tiles) |
+| `services/boundaries/extract_places.sh` | Generates `global_places.json` for DB seeding (not tiles) |
 | `services/boundaries/verify_tiles.py` | Verifies PMTiles coverage against the place database |
 | `services/boundaries/inspect_tile.py` | Finds where a specific place code appears in tiles |
 | `services/boundaries/inspect_natural_earth.py` | Searches Natural Earth layers for a territory |
 | `services/boundaries/PLACE_REFERENCE.md` | Canonical reference of all expected places and tile coverage |
-| `priv/static/data/boundaries.pmtiles` | Output: vector tiles (~106MB on disk, served via HTTP range requests — browsers fetch only the tiles needed for the current viewport, typically a few hundred KB) |
+| `priv/static/data/boundaries.pmtiles` | Output: vector tiles (~370MB on disk, served via HTTP range requests — browsers fetch only the tiles needed for the current viewport, typically a few hundred KB) |
 | `assets/js/hooks/range_map.js` | MapLibre GL JS hook that consumes the tiles |
 | `lib/gallformers/places.ex` | Places context — range queries, hierarchy traversal |
 | `lib/gallformers/places/place.ex` | Place schema (id, name, code, type) |
@@ -79,7 +79,7 @@ The fallbacks handle territories where Natural Earth sets `ISO_A2` to `-99` (e.g
 
 ### Non-Subdivided Countries
 
-Countries/territories without admin-1 subdivisions in Natural Earth (e.g., Puerto Rico, Bermuda, Greenland, Bahamas) need special handling. Their country polygons are copied into the `subdivisions` layer so the JS click handler can treat everything uniformly. The jq filter in the build script excludes countries listed in `STATE_COUNTRIES` (those that DO have subdivisions).
+Countries/territories without admin-1 subdivisions in Natural Earth (e.g., Puerto Rico, Bermuda, Greenland, Bahamas) need special handling. Their country polygons are copied into the `subdivisions` layer so the JS click handler can treat everything uniformly. The jq filter in the build script excludes countries listed in `STATE_COUNTRIES` (those that DO have subdivisions). Countries are included in `STATE_COUNTRIES` if they have more than 3 admin-1 subdivisions in Natural Earth — this threshold ensures only meaningfully subdivided countries get detailed tiles.
 
 ## Build Script Internals
 
@@ -87,8 +87,8 @@ Countries/territories without admin-1 subdivisions in Natural Earth (e.g., Puert
 
 The script maintains two arrays:
 
-- **`COUNTRIES`** (56 entries): All Western Hemisphere countries and territories to include. Uses ISO 3166-1 alpha-3 codes.
-- **`STATE_COUNTRIES`** (26 entries): Subset of `COUNTRIES` that have meaningful admin-1 subdivisions. Countries NOT in this list get their polygons merged into the `subdivisions` layer.
+- **`COUNTRIES`**: All countries worldwide except Antarctica. Uses ISO 3166-1 alpha-3 codes. Dynamically derived from Natural Earth data.
+- **`STATE_COUNTRIES`**: Subset of `COUNTRIES` that have meaningful admin-1 subdivisions (>3 subdivisions in Natural Earth). Dynamically derived. Countries NOT in this list get their polygons merged into the `subdivisions` layer.
 
 ### Processing Steps
 
@@ -164,14 +164,14 @@ This means selected territories (like Puerto Rico) turn green in BOTH layers —
 
 After a successful build, tippecanoe should report approximately:
 
-- **~595 features total** (as of Feb 2026)
-  - ~59 countries (includes French overseas departments from map_subunits and BES islands from admin-1)
-  - ~508 subdivisions (from Natural Earth Admin-1)
-  - ~32 non-subdivided countries/territories (merged into subdivisions layer)
+- **~4,880 features total** (as of Feb 2026)
+  - ~249 countries (includes French overseas departments from map_subunits and BES islands from admin-1)
+  - ~4,290 subdivisions (from Natural Earth Admin-1)
+  - ~86 non-subdivided countries/territories (merged into subdivisions layer)
   - A small number of lakes
 
 If the count is significantly different, something went wrong:
-- **Much higher** (~630+): The non-subdivided filter isn't excluding STATE_COUNTRIES — check property casing in the jq filter
+- **Much higher**: The non-subdivided filter isn't excluding STATE_COUNTRIES — check property casing in the jq filter
 - **Much lower** (~100-200): tippecanoe is dropping features — check for `--coalesce-densest-as-needed` or other dropping flags
 
 Run `python3 verify_tiles.py` after any rebuild to check for gaps.
@@ -220,18 +220,19 @@ Use this when adding a new territory to find out which NE layer to extract from.
 
 ## Adding New Territories
 
-Checklist for adding a country or territory to the map:
+The pipeline now includes all countries globally except Antarctica, so most territories are already covered. However, if you need to add a new territory or verify coverage:
 
 1. **Find the ISO alpha-3 code** for the territory
 2. **Run `inspect_natural_earth.py`** to determine which NE layer it appears in:
-   - `admin_0_countries` → add to `COUNTRIES` array
-   - `admin_0_map_subunits` → add to `SUBUNIT_SU_A3` / `SUBUNIT_ALPHA2` arrays
-   - `admin_1_states_provinces` → add extraction logic like the BES/Caribbean Netherlands block
-3. **If it has admin-1 subdivisions** you want in the tiles, add to `STATE_COUNTRIES`
-4. **Run `build_boundaries.sh`** to rebuild tiles
-5. **Run `verify_tiles.py`** to confirm zero gaps
-6. **Add the place to the database** via migration (with matching `code` value)
-7. **Update `PLACE_REFERENCE.md`** with the new entry
+   - `admin_0_countries` → automatically included
+   - `admin_0_map_subunits` → these are extracted separately (check `SUBUNIT_TERRITORIES` array)
+   - `admin_1_states_provinces` → some territories exist only as subdivisions (like BES/Caribbean Netherlands)
+3. **Check subdivision threshold**: Countries with >3 admin-1 subdivisions are automatically added to `STATE_COUNTRIES`
+4. **For subunits NOT in admin_0_countries** (like French overseas departments), verify they're in the `SUBUNIT_TERRITORIES` array
+5. **Run `build_boundaries.sh`** to rebuild tiles
+6. **Run `verify_tiles.py`** to confirm coverage
+7. **Add the place to the database** via migration (with matching `code` value)
+8. **Update `PLACE_REFERENCE.md`** with the new entry
 
 ## Known Gotchas
 
@@ -329,9 +330,10 @@ Tile coordinates (Z/X/Y) can be found using online tools or calculated from lat/
 The PMTiles and the `place` database table are populated from the same Natural Earth source but through independent pipelines:
 
 - **Tiles**: `build_boundaries.sh` → `boundaries.pmtiles` (geometry for rendering)
-- **Database**: `extract_places.sh` → `western_hemisphere_places.json` → Ecto migration (names, codes, hierarchy for queries)
+- **Database**: `extract_places.sh` → `global_places.json` → Ecto migration (names, codes, hierarchy for queries)
 
-The `code` property is the join key between them. If you add a new country or territory, it needs to be added to BOTH:
+The `code` property is the join key between them. Both pipelines now process all countries globally (except Antarctica), so coverage should be automatically synchronized. If you add a new territory or subdivision:
 
-1. The `COUNTRIES` array in `build_boundaries.sh` (and `STATE_COUNTRIES` if it has subdivisions)
-2. The places data in `western_hemisphere_places.json` and corresponding migration
+1. Verify it's extracted correctly in `build_boundaries.sh` (check for special cases like map subunits)
+2. Ensure it appears in `global_places.json` via `extract_places.sh`
+3. Add the migration to populate the database `place` table

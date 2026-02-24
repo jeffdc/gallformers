@@ -7,11 +7,12 @@ Generated from `priv/gallformers.sqlite` place table, cross-referenced against
 
 | Category | Count |
 |----------|-------|
-| Countries in DB | 55 |
-| Countries covered by build script | 55 |
-| **Missing from build script** | **0** |
-| Countries with subdivisions (STATE_COUNTRIES) | 26 |
-| Total subdivision places in DB | 446 |
+| Continents | 8 |
+| Countries | 249 |
+| States | 268 |
+| Provinces | 4,022 |
+| Place hierarchy entries | 4,539 |
+| Countries with subdivisions | 163 |
 
 ## Known Code Mismatches (DB vs Natural Earth)
 
@@ -23,146 +24,293 @@ The features exist in tiles under different codes — no geometry is missing.
 | CO-DC | Bogota | CO-CUN | Cundinamarca | NE treats Bogota as part of Cundinamarca |
 | PE-LMA | Lima Province | PE-LIM | Lima | NE uses PE-LIM for both Lima and Lima Province |
 
-## ~~Missing Countries~~ (RESOLVED)
+## Countries by Continent
 
-All countries are now covered. KNA, LCA, TTO, VCT were added to the COUNTRIES array.
+### Africa (60 countries)
 
-~~These countries exist in the database but have NO geometry in the tiles:~~
+| Code | Name | Subdivided |
+|------|------|------------|
+| DZ | Algeria | yes |
+| AO | Angola | yes |
+| BJ | Benin | yes |
+| BW | Botswana | yes |
+| BV | Bouvet Island | no |
+| BF | Burkina Faso | yes |
+| BI | Burundi | yes |
+| CV | Cabo Verde | yes |
+| CM | Cameroon | yes |
+| CF | Central African Republic | yes |
+| TD | Chad | yes |
+| KM | Comoros | no |
+| CI | Côte d'Ivoire | yes |
+| CD | Democratic Republic of the Congo | yes |
+| DJ | Djibouti | yes |
+| EG | Egypt | yes |
+| GQ | Equatorial Guinea | yes |
+| ER | Eritrea | yes |
+| SZ | Eswatini | yes |
+| ET | Ethiopia | yes |
+| TF | French Southern Territories | no |
+| GA | Gabon | yes |
+| GM | Gambia | yes |
+| GH | Ghana | yes |
+| GN | Guinea | yes |
+| GW | Guinea-Bissau | yes |
+| KE | Kenya | yes |
+| LS | Lesotho | yes |
+| LR | Liberia | yes |
+| LY | Libya | yes |
+| MG | Madagascar | yes |
+| MW | Malawi | yes |
+| ML | Mali | yes |
+| MR | Mauritania | yes |
+| MU | Mauritius | yes |
+| YT | Mayotte | no |
+| MA | Morocco | yes |
+| MZ | Mozambique | yes |
+| NA | Namibia | yes |
+| NE | Niger | yes |
+| NG | Nigeria | yes |
+| CG | Republic of the Congo | yes |
+| RW | Rwanda | yes |
+| RE | Réunion | no |
+| SH | Saint Helena, Ascension and Tristan da Cunha | no |
+| SN | Senegal | yes |
+| SC | Seychelles | yes |
+| SL | Sierra Leone | yes |
+| SO | Somalia | yes |
+| ZA | South Africa | yes |
+| SS | South Sudan | yes |
+| SD | Sudan | yes |
+| ST | São Tomé and Príncipe | no |
+| TZ | Tanzania | yes |
+| TG | Togo | yes |
+| TN | Tunisia | yes |
+| UG | Uganda | yes |
+| EH | Western Sahara | no |
+| ZM | Zambia | yes |
+| ZW | Zimbabwe | yes |
 
-| DB Code | Name | Alpha-3 | Parent |
-|---------|------|---------|--------|
-| KN | Saint Kitts and Nevis | KNA | Caribbean |
-| LC | Saint Lucia | LCA | Caribbean |
-| TT | Trinidad and Tobago | TTO | Caribbean |
-| VC | Saint Vincent and the Grenadines | VCT | Caribbean |
+### Asia (51 countries)
 
-All four are Caribbean island nations in `admin_0_countries` (standard NE layer).
+| Code | Name | Subdivided |
+|------|------|------------|
+| AF | Afghanistan | yes |
+| AM | Armenia | yes |
+| AZ | Azerbaijan | yes |
+| BH | Bahrain | yes |
+| BD | Bangladesh | yes |
+| BT | Bhutan | yes |
+| IO | British Indian Ocean Territory | no |
+| BN | Brunei | yes |
+| KH | Cambodia | yes |
+| CN | China | yes |
+| CY | Cyprus | yes |
+| GE | Georgia | yes |
+| HK | Hong Kong | no |
+| IN | India | yes |
+| ID | Indonesia | yes |
+| IR | Iran | yes |
+| IQ | Iraq | yes |
+| IL | Israel | yes |
+| JP | Japan | yes |
+| JO | Jordan | yes |
+| KZ | Kazakhstan | yes |
+| KW | Kuwait | yes |
+| KG | Kyrgyzstan | yes |
+| LA | Laos | yes |
+| LB | Lebanon | yes |
+| MO | Macau | no |
+| MY | Malaysia | yes |
+| MV | Maldives | yes |
+| MN | Mongolia | yes |
+| MM | Myanmar | yes |
+| NP | Nepal | yes |
+| KP | North Korea | yes |
+| OM | Oman | yes |
+| PK | Pakistan | yes |
+| PS | Palestine | no |
+| PH | Philippines | yes |
+| QA | Qatar | yes |
+| SA | Saudi Arabia | yes |
+| SG | Singapore | yes |
+| KR | South Korea | yes |
+| LK | Sri Lanka | yes |
+| SY | Syria | yes |
+| TW | Taiwan | yes |
+| TJ | Tajikistan | yes |
+| TH | Thailand | yes |
+| TL | Timor-Leste | yes |
+| TR | Turkey | yes |
+| TM | Turkmenistan | yes |
+| AE | United Arab Emirates | yes |
+| UZ | Uzbekistan | yes |
+| VN | Vietnam | yes |
+| YE | Yemen | yes |
 
-## Countries — Full Cross-Reference
+### Caribbean (27 countries/territories)
 
-Legend:
-- **Source**: `admin0` = ne_10m_admin_0_countries, `subunit` = ne_10m_admin_0_map_subunits, `admin1` = ne_10m_admin_1_states_provinces
-- **Tile layers**: `countries` = appears in countries layer, `subdivisions` = appears in subdivisions layer
-- **subdivided**: Has STATE_COUNTRIES entry (admin-1 subdivision tiles generated)
+| Code | Name | Subdivided |
+|------|------|------------|
+| AI | Anguilla | no |
+| AG | Antigua and Barbuda | yes |
+| AW | Aruba | no |
+| BS | Bahamas | yes |
+| BB | Barbados | yes |
+| BM | Bermuda | yes |
+| BQ | Bonaire, Sint Eustatius and Saba | no |
+| VG | British Virgin Islands | no |
+| KY | Cayman Islands | no |
+| CU | Cuba | yes |
+| CW | Curaçao | no |
+| DM | Dominica | yes |
+| DO | Dominican Republic | yes |
+| GD | Grenada | yes |
+| GP | Guadeloupe | no |
+| HT | Haiti | yes |
+| JM | Jamaica | yes |
+| MQ | Martinique | no |
+| MS | Montserrat | no |
+| PR | Puerto Rico | no |
+| BL | Saint Barthélemy | no |
+| KN | Saint Kitts and Nevis | yes |
+| LC | Saint Lucia | yes |
+| MF | Saint Martin | no |
+| VC | Saint Vincent and the Grenadines | yes |
+| SX | Sint Maarten | no |
+| TT | Trinidad and Tobago | yes |
+| TC | Turks and Caicos Islands | no |
+| VI | United States Virgin Islands | no |
 
-### North America
+### Central America (7 countries)
 
-| DB Code | Name | Alpha-3 | Source | Tile Layers | Subdivided |
-|---------|------|---------|--------|-------------|------------|
-| CA | Canada | CAN | admin0 | countries, subdivisions | yes |
-| GL | Greenland | GRL | admin0 | countries, subdivisions* | no |
-| MX | Mexico | MEX | admin0 | countries, subdivisions | yes |
-| PM | Saint Pierre and Miquelon | SPM | admin0 | countries, subdivisions* | no |
-| US | United States | USA | admin0 | countries, subdivisions | yes |
+| Code | Name | Subdivided |
+|------|------|------------|
+| BZ | Belize | yes |
+| CR | Costa Rica | yes |
+| SV | El Salvador | yes |
+| GT | Guatemala | yes |
+| HN | Honduras | yes |
+| NI | Nicaragua | yes |
+| PA | Panama | yes |
 
-*Non-subdivided countries should appear in subdivisions layer via non_subdivided.geojson merge.
+### Europe (47 countries/territories)
 
-### Central America
+| Code | Name | Subdivided |
+|------|------|------------|
+| AL | Albania | yes |
+| AD | Andorra | yes |
+| AT | Austria | yes |
+| BY | Belarus | yes |
+| BE | Belgium | yes |
+| BA | Bosnia and Herzegovina | yes |
+| BG | Bulgaria | yes |
+| HR | Croatia | yes |
+| CZ | Czechia | yes |
+| DK | Denmark | yes |
+| EE | Estonia | yes |
+| FO | Faroe Islands | no |
+| FI | Finland | yes |
+| FR | France | yes |
+| DE | Germany | yes |
+| GI | Gibraltar | no |
+| GR | Greece | yes |
+| GG | Guernsey | no |
+| HU | Hungary | yes |
+| IS | Iceland | yes |
+| IE | Ireland | yes |
+| IM | Isle of Man | no |
+| IT | Italy | yes |
+| JE | Jersey | no |
+| XK | Kosovo | no |
+| LV | Latvia | yes |
+| LI | Liechtenstein | yes |
+| LT | Lithuania | yes |
+| LU | Luxembourg | no |
+| MT | Malta | yes |
+| MD | Moldova | yes |
+| MC | Monaco | no |
+| ME | Montenegro | yes |
+| NL | Netherlands | yes |
+| MK | North Macedonia | yes |
+| NO | Norway | yes |
+| PL | Poland | yes |
+| PT | Portugal | yes |
+| RO | Romania | yes |
+| RU | Russia | yes |
+| SM | San Marino | yes |
+| RS | Serbia | yes |
+| SK | Slovakia | yes |
+| SI | Slovenia | yes |
+| ES | Spain | yes |
+| SJ | Svalbard and Jan Mayen | no |
+| SE | Sweden | yes |
+| CH | Switzerland | yes |
+| UA | Ukraine | yes |
+| GB | United Kingdom | yes |
+| VA | Vatican City | no |
+| AX | Åland Islands | no |
 
-| DB Code | Name | Alpha-3 | Source | Tile Layers | Subdivided |
-|---------|------|---------|--------|-------------|------------|
-| BZ | Belize | BLZ | admin0 | countries, subdivisions | yes |
-| CR | Costa Rica | CRI | admin0 | countries, subdivisions | yes |
-| GT | Guatemala | GTM | admin0 | countries, subdivisions | yes |
-| HN | Honduras | HND | admin0 | countries, subdivisions | yes |
-| NI | Nicaragua | NIC | admin0 | countries, subdivisions | yes |
-| PA | Panama | PAN | admin0 | countries, subdivisions | yes |
-| SV | El Salvador | SLV | admin0 | countries, subdivisions | yes |
+### North America (5 countries/territories)
 
-### Caribbean
+| Code | Name | Subdivided |
+|------|------|------------|
+| CA | Canada | yes |
+| GL | Greenland | yes |
+| MX | Mexico | yes |
+| PM | Saint Pierre and Miquelon | no |
+| US | United States | yes |
 
-| DB Code | Name | Alpha-3 | Source | Tile Layers | Subdivided |
-|---------|------|---------|--------|-------------|------------|
-| AG | Antigua and Barbuda | ATG | admin0 | countries, subdivisions* | no |
-| AI | Anguilla | AIA | admin0 | countries, subdivisions* | no |
-| AW | Aruba | ABW | admin0 | countries, subdivisions* | no |
-| BB | Barbados | BRB | admin0 | countries, subdivisions* | no |
-| BL | Saint Barthélemy | BLM | admin0 | countries, subdivisions* | no |
-| BM | Bermuda | BMU | admin0 | countries, subdivisions* | no |
-| BQ | Caribbean Netherlands | BES | admin1 | countries, subdivisions* | no |
-| BS | Bahamas | BHS | admin0 | countries, subdivisions* | no |
-| CU | Cuba | CUB | admin0 | countries, subdivisions | yes |
-| CW | Curaçao | CUW | admin0 | countries, subdivisions* | no |
-| DM | Dominica | DMA | admin0 | countries, subdivisions* | no |
-| DO | Dominican Republic | DOM | admin0 | countries, subdivisions | yes |
-| GD | Grenada | GRD | admin0 | countries, subdivisions* | no |
-| GP | Guadeloupe | GLP | subunit | countries, subdivisions* | no |
-| HT | Haiti | HTI | admin0 | countries, subdivisions | yes |
-| JM | Jamaica | JAM | admin0 | countries, subdivisions | yes |
-| **KN** | **Saint Kitts and Nevis** | **KNA** | **MISSING** | **none** | no |
-| KY | Cayman Islands | CYM | admin0 | countries, subdivisions* | no |
-| **LC** | **Saint Lucia** | **LCA** | **MISSING** | **none** | no |
-| MF | Saint Martin | MAF | admin0 | countries, subdivisions* | no |
-| MQ | Martinique | MTQ | subunit | countries, subdivisions* | no |
-| MS | Montserrat | MSR | admin0 | countries, subdivisions* | no |
-| PR | Puerto Rico | PRI | admin0 | countries, subdivisions* | no |
-| SX | Sint Maarten | SXM | admin0 | countries, subdivisions* | no |
-| TC | Turks and Caicos Islands | TCA | admin0 | countries, subdivisions* | no |
-| **TT** | **Trinidad and Tobago** | **TTO** | **MISSING** | **none** | no |
-| **VC** | **Saint Vincent and the Grenadines** | **VCT** | **MISSING** | **none** | no |
-| VG | British Virgin Islands | VGB | admin0 | countries, subdivisions* | no |
-| VI | United States Virgin Islands | VIR | admin0 | countries, subdivisions* | no |
+### Oceania (27 countries/territories)
 
-### South America
+| Code | Name | Subdivided |
+|------|------|------------|
+| AS | American Samoa | no |
+| AU | Australia | yes |
+| CX | Christmas Island | no |
+| CC | Cocos (Keeling) Islands | no |
+| CK | Cook Islands | no |
+| FJ | Fiji | yes |
+| PF | French Polynesia | no |
+| GU | Guam | no |
+| HM | Heard Island and McDonald Islands | no |
+| KI | Kiribati | no |
+| MH | Marshall Islands | no |
+| FM | Micronesia | yes |
+| NR | Nauru | yes |
+| NC | New Caledonia | no |
+| NZ | New Zealand | yes |
+| NU | Niue | no |
+| NF | Norfolk Island | no |
+| MP | Northern Mariana Islands | no |
+| PW | Palau | yes |
+| PG | Papua New Guinea | yes |
+| PN | Pitcairn Islands | no |
+| WS | Samoa | yes |
+| SB | Solomon Islands | yes |
+| TK | Tokelau | no |
+| TO | Tonga | yes |
+| TV | Tuvalu | no |
+| UM | United States Minor Outlying Islands | yes |
+| VU | Vanuatu | yes |
+| WF | Wallis and Futuna | no |
 
-| DB Code | Name | Alpha-3 | Source | Tile Layers | Subdivided |
-|---------|------|---------|--------|-------------|------------|
-| AR | Argentina | ARG | admin0 | countries, subdivisions | yes |
-| BO | Bolivia | BOL | admin0 | countries, subdivisions | yes |
-| BR | Brazil | BRA | admin0 | countries, subdivisions | yes |
-| CL | Chile | CHL | admin0 | countries, subdivisions | yes |
-| CO | Colombia | COL | admin0 | countries, subdivisions | yes |
-| EC | Ecuador | ECU | admin0 | countries, subdivisions | yes |
-| FK | Falkland Islands | FLK | admin0 | countries, subdivisions* | no |
-| GF | French Guiana | GUF | subunit | countries, subdivisions* | no |
-| GS | South Georgia & SSI | SGS | admin0 | countries, subdivisions* | no |
-| GY | Guyana | GUY | admin0 | countries, subdivisions | yes |
-| PE | Peru | PER | admin0 | countries, subdivisions | yes |
-| PY | Paraguay | PRY | admin0 | countries, subdivisions | yes |
-| SR | Suriname | SUR | admin0 | countries, subdivisions | yes |
-| UY | Uruguay | URY | admin0 | countries, subdivisions | yes |
-| VE | Venezuela | VEN | admin0 | countries, subdivisions | yes |
+### South America (14 countries/territories)
 
-## Non-Subdivided → Subdivisions Layer (FIXED)
-
-Entries marked with `subdivisions*` are non-subdivided countries that appear in the
-subdivisions layer via the non_subdivided.geojson merge in step 3b of build_boundaries.sh.
-
-**Previous bug**: tippecanoe's `--read-parallel` flag splits input at newline boundaries.
-jq's default pretty-printed output caused large multi-line features (Greenland, French
-Guiana, etc.) to be silently truncated. **Fix**: use `jq -c` (compact output, one line
-per feature) so `--read-parallel` can safely split the file.
-
-## Subdivision Coverage
-
-All 26 STATE_COUNTRIES have matching subdivision records in the DB.
-Total subdivision records: 446 (types: state, province).
-
-| Country | DB Code | Subdivision Count |
-|---------|---------|-------------------|
-| Argentina | AR | 24 |
-| Belize | BZ | 6 |
-| Bolivia | BO | 9 |
-| Brazil | BR | 27 |
-| Canada | CA | 13 |
-| Chile | CL | 16 |
-| Colombia | CO | 33 |
-| Costa Rica | CR | 7 |
-| Cuba | CU | 17 |
-| Dominican Republic | DO | 32 |
-| Ecuador | EC | 24 |
-| El Salvador | SV | 14 |
-| Guatemala | GT | 22 |
-| Guyana | GY | 10 |
-| Honduras | HN | 18 |
-| Haiti | HT | 10 |
-| Jamaica | JM | 14 |
-| Mexico | MX | 32 |
-| Nicaragua | NI | 17 |
-| Panama | PA | 12 |
-| Peru | PE | 26 |
-| Paraguay | PY | 19 |
-| Suriname | SR | 10 |
-| United States | US | 51 |
-| Uruguay | UY | 19 |
-| Venezuela | VE | 25 |
+| Code | Name | Subdivided |
+|------|------|------------|
+| AR | Argentina | yes |
+| BO | Bolivia | yes |
+| BR | Brazil | yes |
+| CL | Chile | yes |
+| CO | Colombia | yes |
+| EC | Ecuador | yes |
+| FK | Falkland Islands | no |
+| GF | French Guiana | no |
+| GY | Guyana | yes |
+| PY | Paraguay | yes |
+| PE | Peru | yes |
+| GS | South Georgia and the South Sandwich Islands | no |
+| SR | Suriname | yes |
+| UY | Uruguay | yes |
+| VE | Venezuela | yes |
