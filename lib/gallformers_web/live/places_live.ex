@@ -2,7 +2,7 @@ defmodule GallformersWeb.PlacesLive do
   @moduledoc """
   LiveView for browsing places by geographic hierarchy.
 
-  Displays the place hierarchy (Region -> Continent -> Country -> Subdivision)
+  Displays the place hierarchy (Continent -> Country -> Subdivision)
   in an expandable tree with search.
   """
   use GallformersWeb, :live_view
@@ -21,7 +21,7 @@ defmodule GallformersWeb.PlacesLive do
      assign(socket,
        page_title: "Places",
        page_description:
-         "Browse geographic places in the Gallformers database - regions, countries, and subdivisions of the Western Hemisphere.",
+         "Browse geographic places in the Gallformers database - continents, countries, and subdivisions worldwide.",
        page_url: "/places",
        page_image: nil,
        page_json_ld: nil,
@@ -151,7 +151,7 @@ defmodule GallformersWeb.PlacesLive do
     <Layouts.app flash={@flash} current_user={@current_user}>
       <div id="places-container">
         <p class="text-lg text-gray-600 mb-6">
-          Browse geographic places in the Western Hemisphere. Click on regions, countries,
+          Browse geographic places worldwide. Click on continents, countries,
           and subdivisions to explore.
         </p>
 

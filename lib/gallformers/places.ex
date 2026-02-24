@@ -10,6 +10,82 @@ defmodule Gallformers.Places do
   alias Gallformers.Repo
   alias Gallformers.Species.Species
 
+  # Bounding boxes per place code, extracted from PMTiles by extract_bounds.py.
+  # Format: %{"US-CA" => [west, south, east, north], ...}
+  # Antimeridian-crossing features have west > east (e.g., NZ: [165.88, ..., -171.18, ...]).
+  @place_bounds Path.join(:code.priv_dir(:gallformers), "repo/data/place_bounds.json")
+                |> File.read!()
+                |> Jason.decode!()
+
+  @doc """
+  Returns the bounding box for a set of place codes as `[[west, south], [east, north]]`,
+  or nil if no bounds data is available for any of the codes.
+
+  Computes the union of individual code bounding boxes. Handles antimeridian-crossing
+  features where west > east.
+  """
+  @spec get_bounds_for_codes([String.t()]) :: [[float()]] | nil
+  def get_bounds_for_codes(codes) when is_list(codes) do
+    bboxes =
+      codes
+      |> Enum.map(&Map.get(@place_bounds, &1))
+      |> Enum.reject(&is_nil/1)
+
+    case bboxes do
+      [] -> nil
+      bboxes -> union_bboxes(bboxes)
+    end
+  end
+
+  # Compute the union of bounding boxes, handling the antimeridian.
+  #
+  # Individual bboxes may cross the antimeridian (west > east from extract_bounds.py).
+  # The union may also need to cross the antimeridian even if no individual bbox does
+  # (e.g., NZ mainland at 165-178°E plus Chatham Islands at 176°W).
+  #
+  # Strategy: try both a normal union and an antimeridian-crossing union,
+  # pick whichever produces the smaller longitude span.
+  defp union_bboxes(bboxes) do
+    south = bboxes |> Enum.map(&Enum.at(&1, 1)) |> Enum.min()
+    north = bboxes |> Enum.map(&Enum.at(&1, 3)) |> Enum.max()
+
+    # Collect all longitude edges, normalizing antimeridian-crossing bboxes
+    # into pairs of [west, east] where east may be > 180
+    lon_ranges =
+      Enum.map(bboxes, fn [w, _s, e, _n] ->
+        if w > e, do: {w, e + 360}, else: {w, e}
+      end)
+
+    # Normal union: simple min/max
+    normal_west = lon_ranges |> Enum.map(&elem(&1, 0)) |> Enum.min()
+    normal_east = lon_ranges |> Enum.map(&elem(&1, 1)) |> Enum.max()
+    normal_span = normal_east - normal_west
+
+    # Antimeridian-crossing union: shift everything to [0, 360] space
+    shifted_ranges =
+      Enum.map(lon_ranges, fn {w, e} ->
+        w360 = if w < 0, do: w + 360, else: w
+        e360 = if e < 0, do: e + 360, else: e
+        {w360, e360}
+      end)
+
+    shifted_west = shifted_ranges |> Enum.map(&elem(&1, 0)) |> Enum.min()
+    shifted_east = shifted_ranges |> Enum.map(&elem(&1, 1)) |> Enum.max()
+    shifted_span = shifted_east - shifted_west
+
+    # Pick the union with the smaller span
+    {west, east} =
+      if shifted_span < normal_span do
+        # The antimeridian-crossing union is tighter — use it.
+        # MapLibre handles coordinates > 180, so pass as-is.
+        {shifted_west, shifted_east}
+      else
+        {normal_west, normal_east}
+      end
+
+    [[west, south], [east, north]]
+  end
+
   @doc """
   Returns all selectable places ordered by name.
 
@@ -294,7 +370,7 @@ defmodule Gallformers.Places do
   @doc """
   Returns the full place hierarchy as a nested tree for the tree browser.
 
-  The tree is rooted at the "Western Hemisphere" region node. Each node follows
+  The tree has multiple continent roots (no single root node). Each node follows
   the `TreeComponents.tree_browser` contract:
   - Branch nodes have a `:nodes` key with child nodes
   - Leaf nodes have no `:nodes` key

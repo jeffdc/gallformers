@@ -54,8 +54,8 @@ const COLORS = {
   placeHighlightLight: '#93C5FD' // Blue-300 — lighter variant
 }
 
-// Default bounds: Western Hemisphere (with padding for Greenland and southern tip)
-const HEMISPHERE_BOUNDS = [[-170, -58], [-10, 84]]
+// Default bounds: global view (excludes Antarctica)
+const WORLD_BOUNDS = [[-180, -58], [180, 84]]
 
 /**
  * Compute effective in-range and inherited sets by subtracting exclusions.
@@ -140,7 +140,7 @@ const RangeMap = {
     this.emptyText = this.el.dataset.emptyText || 'No range data available'
 
     const maxBoundsAttr = this.el.dataset.maxBounds
-    this.maxBounds = maxBoundsAttr ? JSON.parse(maxBoundsAttr) : [[-180, -62], [10, 86]]
+    this.maxBounds = maxBoundsAttr ? JSON.parse(maxBoundsAttr) : undefined
 
     this.colorOverrides = this.placeMode
       ? { inRange: COLORS.placeHighlight, inheritedRange: COLORS.placeHighlightLight }
@@ -247,7 +247,9 @@ const RangeMap = {
               )
             }
           },
-          // Subdivision fills — range-based choropleth at all zoom levels
+          // Subdivision fills — range-based choropleth at all zoom levels.
+          // In place mode, use transparent fallback so countries-fill shows through
+          // for non-subdivided countries (leaf countries like MP, NR, etc.)
           {
             id: 'subdivisions-fill',
             type: 'fill',
@@ -255,7 +257,8 @@ const RangeMap = {
             'source-layer': 'subdivisions',
             paint: {
               'fill-color': buildFillExpression(
-                effectiveInRange, effectiveInherited, this.excludedRange, this.editable, COLORS.default, this.colorOverrides
+                effectiveInRange, effectiveInherited, this.excludedRange, this.editable,
+                this.placeMode ? 'transparent' : COLORS.default, this.colorOverrides
               ),
               'fill-opacity': 1
             }
@@ -314,15 +317,15 @@ const RangeMap = {
         ]
       },
       // fitBounds below overrides center/zoom
-      center: [-96, 48],
+      center: [0, 30],
       zoom: 3,
       minZoom: 1,
       maxBounds: this.maxBounds,
       attributionControl: false
     })
 
-    // Default to hemisphere view; fitToRange will narrow once tiles load
-    this.map.fitBounds(HEMISPHERE_BOUNDS, { padding: 20, animate: false })
+    // Default to world view; fitToRange will narrow once tiles load
+    this.map.fitBounds(WORLD_BOUNDS, { padding: 20, animate: false })
 
     // Add minimal attribution
     this.map.addControl(new maplibregl.AttributionControl({
@@ -526,7 +529,8 @@ const RangeMap = {
       'subdivisions-fill',
       'fill-color',
       buildFillExpression(
-        effectiveInRange, effectiveInherited, this.excludedRange, this.editable, COLORS.default, this.colorOverrides
+        effectiveInRange, effectiveInherited, this.excludedRange, this.editable,
+        this.placeMode ? 'transparent' : COLORS.default, this.colorOverrides
       )
     )
 
@@ -552,7 +556,7 @@ const RangeMap = {
 
   /**
    * Fit the map viewport to the bounding box of in-range subdivisions.
-   * Falls back to the full hemisphere when there's no range data.
+   * Falls back to the full world view when there's no range data.
    *
    * Uses querySourceFeatures to get geometries from loaded vector tiles.
    * The map must be at a zoom level where subdivision features are available.
@@ -560,7 +564,7 @@ const RangeMap = {
   fitToRange(animate) {
     if (!this.map || !this.map.isStyleLoaded()) return
     if (this.inRange.size === 0 && this.inheritedRange.size === 0) {
-      this.map.fitBounds(HEMISPHERE_BOUNDS, { padding: 20, animate })
+      this.map.fitBounds(WORLD_BOUNDS, { padding: 20, animate })
       return
     }
 
@@ -609,8 +613,8 @@ const RangeMap = {
     }
 
     if (matched === 0) {
-      // Tiles may not be loaded yet — fall back to hemisphere
-      this.map.fitBounds(HEMISPHERE_BOUNDS, { padding: 20, animate })
+      // Tiles may not be loaded yet — fall back to world view
+      this.map.fitBounds(WORLD_BOUNDS, { padding: 20, animate })
       return
     }
 

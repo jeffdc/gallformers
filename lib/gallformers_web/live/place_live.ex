@@ -15,6 +15,7 @@ defmodule GallformersWeb.PlaceLive do
     ancestors = Places.get_ancestors(place.id)
     children = Places.get_children(place.id)
     descendant_codes = Places.get_descendant_codes(place.id)
+    bounds = Places.get_bounds_for_codes(descendant_codes)
 
     {:ok,
      assign(socket,
@@ -27,7 +28,8 @@ defmodule GallformersWeb.PlaceLive do
        place: place,
        ancestors: ancestors,
        children: children,
-       descendant_codes: descendant_codes
+       descendant_codes: descendant_codes,
+       bounds: bounds
      )}
   end
 
@@ -42,8 +44,14 @@ defmodule GallformersWeb.PlaceLive do
     <Layouts.app flash={@flash} current_user={@current_user}>
       <div class="mx-auto max-w-7xl">
         <%!-- Breadcrumb --%>
-        <nav :if={@ancestors != []} class="mb-4 text-sm text-gray-500" aria-label="Breadcrumb">
+        <nav class="mb-4 text-sm text-gray-500" aria-label="Breadcrumb">
           <ol class="flex items-center gap-1">
+            <li>
+              <.link navigate="/places" class="hover:underline hover:text-gf-maroon">
+                Places
+              </.link>
+              <span class="mx-1 text-gray-400">&rsaquo;</span>
+            </li>
             <li :for={ancestor <- @ancestors}>
               <.link navigate={"/place/#{ancestor.code}"} class="hover:underline hover:text-gf-maroon">
                 {ancestor.name}
@@ -73,6 +81,7 @@ defmodule GallformersWeb.PlaceLive do
             <.range_map
               id="place-range-map"
               in_range={@descendant_codes}
+              bounds={@bounds}
               navigable
               place_mode
               class="h-[60vh] min-h-[400px]"
