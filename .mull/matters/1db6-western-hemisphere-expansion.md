@@ -1,5 +1,5 @@
 ---
-status: active
+status: done
 effort: 10-12 days
 created: 2026-02-13
 updated: 2026-02-23
@@ -183,3 +183,7 @@ Infrastructure complete. All code/data prerequisites delivered on maps-rework br
 - Navigable range maps on all public pages
 
 Remaining blocker: 7932 (host plant data sourcing for Central/South America). No code work needed — purely a content/research effort to populate host ranges for the new regions.
+
+## Status Update (2026-02-23)
+
+Superseded by 8900 (global expansion). Western Hemisphere scope expanded to worldwide. All WH infrastructure work is now part of the global expansion. Marking as done — remaining work (continent scoping, data sourcing, branding) tracked under 8900.

@@ -35,7 +35,19 @@ config :wallaby,
   screenshot_dir: "test/screenshots",
   screenshot_on_failure: true,
   chromedriver: [
-    headless: System.get_env("E2E_HEADED") != "1"
+    headless: System.get_env("E2E_HEADED") != "1",
+    capabilities: %{
+      chromeOptions: %{
+        args: [
+          "--no-sandbox",
+          "window-size=1280,800",
+          "--disable-gpu",
+          "--fullscreen",
+          "--disable-features=MacAppCodeSignClone",
+          "--user-agent=Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36"
+        ]
+      }
+    }
   ]
 
 # In test we don't send emails
