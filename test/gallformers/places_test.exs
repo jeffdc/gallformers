@@ -21,17 +21,15 @@ defmodule Gallformers.PlacesTest do
       california = Places.get_place_by_code("US-CA")
       ids = Places.ancestor_ids(california.id)
       us = Places.get_place_by_code("US")
-      na = Places.get_place_by_code("NA")
-      wh = Places.get_place_by_code("WH")
+      xn = Places.get_place_by_code("XN")
       assert california.id in ids
       assert us.id in ids
-      assert na.id in ids
-      assert wh.id in ids
+      assert xn.id in ids
     end
 
-    test "ancestor_ids/1 for the root returns just itself" do
-      wh = Places.get_place_by_code("WH")
-      assert Places.ancestor_ids(wh.id) == [wh.id]
+    test "ancestor_ids/1 for a continent returns just itself" do
+      xn = Places.get_place_by_code("XN")
+      assert Places.ancestor_ids(xn.id) == [xn.id]
     end
 
     test "leaf_descendant_ids/1 returns only leaf nodes" do
@@ -117,19 +115,19 @@ defmodule Gallformers.PlacesTest do
       california = Places.get_place_by_code!("US-CA")
       ancestors = Places.get_ancestors(california.id)
       codes = Enum.map(ancestors, & &1.code)
-      assert codes == ["WH", "NA", "US"]
+      assert codes == ["XN", "US"]
     end
 
     test "returns ancestors for a country" do
       us = Places.get_place_by_code!("US")
       ancestors = Places.get_ancestors(us.id)
       codes = Enum.map(ancestors, & &1.code)
-      assert codes == ["WH", "NA"]
+      assert codes == ["XN"]
     end
 
-    test "returns empty list for the root" do
-      wh = Places.get_place_by_code!("WH")
-      assert Places.get_ancestors(wh.id) == []
+    test "returns empty list for a continent" do
+      xn = Places.get_place_by_code!("XN")
+      assert Places.get_ancestors(xn.id) == []
     end
   end
 
@@ -147,8 +145,8 @@ defmodule Gallformers.PlacesTest do
     end
 
     test "returns children of a continent" do
-      na = Places.get_place_by_code!("NA")
-      children = Places.get_children(na.id)
+      xn = Places.get_place_by_code!("XN")
+      children = Places.get_children(xn.id)
       codes = Enum.map(children, & &1.code) |> Enum.sort()
       assert codes == ["CA", "MX", "US"]
     end
@@ -156,21 +154,21 @@ defmodule Gallformers.PlacesTest do
 
   describe "get_descendant_codes/1" do
     test "returns codes for all descendants of a country" do
-      us = Places.get_place_by_code!("US")
+      us = Places.get_place_by_code("US")
       codes = Places.get_descendant_codes(us.id)
       assert "US" in codes
       assert "US-CA" in codes
     end
 
     test "returns just the place's own code for a leaf" do
-      california = Places.get_place_by_code!("US-CA")
+      california = Places.get_place_by_code("US-CA")
       assert Places.get_descendant_codes(california.id) == ["US-CA"]
     end
 
     test "returns full tree for a continent" do
-      na = Places.get_place_by_code!("NA")
-      codes = Places.get_descendant_codes(na.id)
-      assert "NA" in codes
+      xn = Places.get_place_by_code("XN")
+      codes = Places.get_descendant_codes(xn.id)
+      assert "XN" in codes
       assert "US" in codes
       assert "US-CA" in codes
       assert "CA" in codes
@@ -181,33 +179,34 @@ defmodule Gallformers.PlacesTest do
   end
 
   describe "get_places_tree/0" do
-    test "returns a nested tree rooted at Western Hemisphere" do
+    test "returns a tree with continent roots" do
       tree = Places.get_places_tree()
-      assert length(tree) == 1
-      root = hd(tree)
-      assert root.key == "p-WH"
-      assert root.name == "Western Hemisphere"
-      assert root.url == "/place/WH"
-      assert is_list(root.nodes)
+      # Should have multiple continent roots (XN, XB, XE in test data)
+      assert length(tree) >= 3
+      keys = Enum.map(tree, & &1.key)
+      assert "p-XN" in keys
+      assert "p-XB" in keys
+      assert "p-XE" in keys
     end
 
-    test "tree has correct continent children" do
-      [root] = Places.get_places_tree()
-      continent_keys = Enum.map(root.nodes, & &1.key) |> Enum.sort()
-      assert "p-NA" in continent_keys
-      assert "p-XB" in continent_keys
+    test "continents contain countries" do
+      tree = Places.get_places_tree()
+      xn = Enum.find(tree, &(&1.key == "p-XN"))
+      country_keys = Enum.map(xn.nodes, & &1.key)
+      assert "p-US" in country_keys
+      assert "p-CA" in country_keys
     end
 
     test "countries contain subdivisions" do
-      [root] = Places.get_places_tree()
-      na = Enum.find(root.nodes, &(&1.key == "p-NA"))
-      us = Enum.find(na.nodes, &(&1.key == "p-US"))
+      tree = Places.get_places_tree()
+      xn = Enum.find(tree, &(&1.key == "p-XN"))
+      us = Enum.find(xn.nodes, &(&1.key == "p-US"))
       assert Enum.any?(us.nodes, &(&1.key == "p-US-CA"))
     end
 
     test "leaf countries have no nodes key" do
-      [root] = Places.get_places_tree()
-      caribbean = Enum.find(root.nodes, &(&1.key == "p-XB"))
+      tree = Places.get_places_tree()
+      caribbean = Enum.find(tree, &(&1.key == "p-XB"))
       bahamas = Enum.find(caribbean.nodes, &(&1.key == "p-BS"))
       refute Map.has_key?(bahamas, :nodes)
     end

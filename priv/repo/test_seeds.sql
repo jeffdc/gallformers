@@ -106,7 +106,7 @@ INSERT INTO gallhost (id, host_species_id, gall_species_id, inserted_at, updated
 -- =============================================================================
 -- Places and Hierarchy (ISO 3166-2 codes)
 -- =============================================================================
--- The western hemisphere migration already inserts places with auto-generated IDs.
+-- The global migration inserts places with auto-generated IDs.
 -- We clear everything and re-insert with controlled IDs for test assertions.
 
 DELETE FROM host_range;
@@ -114,33 +114,35 @@ DELETE FROM gall_range_exclusion;
 DELETE FROM place_hierarchy;
 DELETE FROM place;
 
--- Hierarchy structure: Western Hemisphere → North America / Caribbean → countries → subdivisions
+-- Hierarchy structure: Continents → countries → subdivisions (no region level)
 INSERT INTO place (id, name, code, type) VALUES
-  (900, 'Western Hemisphere', 'WH', 'region'),
-  (901, 'North America', 'NA', 'continent'),
+  (901, 'North America', 'XN', 'continent'),
   (902, 'United States', 'US', 'country'),
   (903, 'Canada', 'CA', 'country'),
   (904, 'Mexico', 'MX', 'country'),
   (905, 'Caribbean', 'XB', 'continent'),
-  (906, 'Bahamas', 'BS', 'country');
+  (906, 'Bahamas', 'BS', 'country'),
+  (907, 'Europe', 'XE', 'continent'),
+  (908, 'Romania', 'RO', 'country');
 
 -- Test subdivisions (ISO 3166-2 codes)
 INSERT INTO place (id, name, code, type) VALUES
   (1, 'Alberta', 'CA-AB', 'province'),
   (2, 'California', 'US-CA', 'state'),
-  (3, 'Jalisco', 'MX-JAL', 'state');
+  (3, 'Jalisco', 'MX-JAL', 'state'),
+  (4, 'Bucharest', 'RO-B', 'state');
 
--- Hierarchy links
+-- Hierarchy links (continents are top-level, no region)
 INSERT INTO place_hierarchy (place_id, parent_id) VALUES
-  (901, 900),  -- North America → Western Hemisphere
   (902, 901),  -- United States → North America
   (903, 901),  -- Canada → North America
   (904, 901),  -- Mexico → North America
-  (905, 900),  -- Caribbean → Western Hemisphere
   (906, 905),  -- Bahamas → Caribbean
+  (908, 907),  -- Romania → Europe
   (1, 903),    -- Alberta → Canada
   (2, 902),    -- California → United States
-  (3, 904);    -- Jalisco → Mexico
+  (3, 904),    -- Jalisco → Mexico
+  (4, 908);    -- Bucharest → Romania
 
 -- Host ranges: which hosts occur in which places (with precision)
 INSERT INTO host_range (species_id, place_id, precision) VALUES

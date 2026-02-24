@@ -14,22 +14,23 @@ defmodule GallformersWeb.PlacesLiveTest do
       assert page_title(view) =~ "Places"
     end
 
-    test "renders the tree with Western Hemisphere root", %{conn: conn} do
+    test "renders the tree with continent roots", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/places")
 
-      assert html =~ "Western Hemisphere"
+      assert html =~ "North America"
+      assert html =~ "Europe"
     end
 
-    test "shows continents when root is expanded", %{conn: conn} do
+    test "shows countries when continent is expanded", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/places")
 
       html =
         view
-        |> element(~s{button[phx-click="toggle_node"][phx-value-key="p-WH"]})
+        |> element(~s{button[phx-click="toggle_node"][phx-value-key="p-XN"]})
         |> render_click()
 
-      assert html =~ "North America"
-      assert html =~ "Caribbean"
+      assert html =~ "United States"
+      assert html =~ "Canada"
     end
 
     test "expand all reveals the full tree", %{conn: conn} do
@@ -40,7 +41,6 @@ defmodule GallformersWeb.PlacesLiveTest do
         |> element(~s{button[phx-click="expand_all"]})
         |> render_click()
 
-      assert html =~ "Western Hemisphere"
       assert html =~ "North America"
       assert html =~ "United States"
       assert html =~ "California"
@@ -60,9 +60,9 @@ defmodule GallformersWeb.PlacesLiveTest do
         |> element(~s{button[phx-click="collapse_all"]})
         |> render_click()
 
-      # Root should still be visible but children should not be expanded
-      assert html =~ "Western Hemisphere"
-      # North America should not be visible (collapsed)
+      # Continents should still be visible but children should not be expanded
+      assert html =~ "North America"
+      # California should not be visible (collapsed)
       refute html =~ "California"
     end
 
@@ -102,7 +102,7 @@ defmodule GallformersWeb.PlacesLiveTest do
         |> element("#places-tree-search-form")
         |> render_change(%{"query" => ""})
 
-      assert html =~ "Western Hemisphere"
+      assert html =~ "North America"
     end
   end
 end

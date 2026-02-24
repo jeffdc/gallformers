@@ -21,7 +21,6 @@ defmodule GallformersWeb.PlaceLiveTest do
     test "renders breadcrumb ancestors", %{conn: conn} do
       {:ok, _view, html} = live(conn, "/place/US-CA")
 
-      assert html =~ "Western Hemisphere"
       assert html =~ "North America"
       assert html =~ "United States"
     end
@@ -33,12 +32,12 @@ defmodule GallformersWeb.PlaceLiveTest do
       refute html =~ "Subdivisions"
     end
 
-    test "renders the root region", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/place/WH")
+    test "renders a continent with countries", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/place/XN")
 
-      assert html =~ "Western Hemisphere"
       assert html =~ "North America"
-      assert html =~ "Caribbean"
+      assert html =~ "United States"
+      assert html =~ "Canada"
     end
 
     test "includes range map", %{conn: conn} do
