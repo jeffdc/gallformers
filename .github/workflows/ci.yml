@@ -60,6 +60,7 @@ jobs:
           rm -f priv/gallformers_test.sqlite*
           MIX_ENV=test mix ecto.create --quiet
           MIX_ENV=test mix ecto.load --quiet
+          MIX_ENV=test mix ecto.migrate --quiet
           sqlite3 priv/gallformers_test.sqlite < priv/repo/test_seeds.sql
 
       - name: Setup ChromeDriver for E2E tests
