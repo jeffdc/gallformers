@@ -159,12 +159,17 @@ defmodule GallformersWeb.FormComponents do
   attr :label, :string, default: nil, doc: "optional label"
   attr :disabled, :boolean, default: false, doc: "whether the toggle is disabled"
   attr :class, :any, default: nil, doc: "additional CSS classes"
+
+  attr :form, :string,
+    default: nil,
+    doc: "form id to associate with, or arbitrary value to disassociate from parent form"
+
   attr :rest, :global
 
   def toggle(assigns) do
     ~H"""
     <label class={["inline-flex items-center cursor-pointer", @disabled && "opacity-50", @class]}>
-      <input type="hidden" name={@name} value="false" />
+      <input type="hidden" name={@name} value="false" form={@form} />
       <div class="relative">
         <input
           type="checkbox"
@@ -174,6 +179,7 @@ defmodule GallformersWeb.FormComponents do
           checked={@checked}
           disabled={@disabled}
           class="sr-only peer"
+          form={@form}
           {@rest}
         />
         <div class="gf-toggle-track peer peer-checked:bg-gf-maroon peer-focus:ring-2 peer-focus:ring-gf-maroon/50 peer-checked:after:translate-x-full peer-checked:after:border-white">

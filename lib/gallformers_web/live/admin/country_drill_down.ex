@@ -102,6 +102,7 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
                 id={"country-level-#{@country.code}"}
                 name="country_level"
                 checked={@country_level_on}
+                form="detached"
                 phx-click="toggle_country_level"
                 phx-target={@myself}
               />
