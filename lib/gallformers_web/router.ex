@@ -122,6 +122,9 @@ defmodule GallformersWeb.Router do
 
     # User profile
     live "/profile", Admin.ProfileLive
+
+    # Reconciliation reports
+    live "/reconciliation", Admin.ReconciliationLive
   end
 
   # Super admin routes (require superadmin role)
