@@ -54,6 +54,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
       |> assign(:excluded_places, [])
       |> assign(:in_range, [])
       |> assign(:inherited_range, [])
+      |> assign(:range_bounds, nil)
       # Form state
       |> init_form_state()
 
@@ -125,6 +126,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
       |> assign(:excluded_places, [])
       |> assign(:in_range, [])
       |> assign(:inherited_range, [])
+      |> assign(:range_bounds, nil)
       |> assign(:page_title, "Gall-Host Mappings")
       |> reset_dirty()
 
@@ -405,6 +407,8 @@ defmodule GallformersWeb.Admin.GallHostLive do
         do: Ranges.compute_display_range(host_ranges, valid_excluded_codes),
         else: display
 
+    range_bounds = Places.get_bounds_for_codes(display.in_range ++ display.inherited_range)
+
     socket
     |> assign(:host_ranges, host_ranges)
     |> assign(:host_places, all_host_codes)
@@ -412,6 +416,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
     |> assign(:excluded_places, valid_excluded_codes)
     |> assign(:in_range, display.in_range)
     |> assign(:inherited_range, display.inherited_range)
+    |> assign(:range_bounds, range_bounds)
   end
 
   # Toggle a place's exclusion status (no DB query, uses cached host_ranges)
@@ -438,11 +443,14 @@ defmodule GallformersWeb.Admin.GallHostLive do
     all_host_codes =
       Enum.uniq(display.in_range ++ display.inherited_range ++ display.excluded_range)
 
+    range_bounds = Places.get_bounds_for_codes(display.in_range ++ display.inherited_range)
+
     socket
     |> assign(:host_places, all_host_codes)
     |> assign(:excluded_places, excluded_codes)
     |> assign(:in_range, display.in_range)
     |> assign(:inherited_range, display.inherited_range)
+    |> assign(:range_bounds, range_bounds)
   end
 
   # Push range data update to the RangeMap hook
@@ -596,6 +604,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
                             in_range={@in_range}
                             excluded_range={@excluded_places}
                             inherited_range={@inherited_range}
+                            bounds={@range_bounds}
                             editable
                             class="border border-gray-300 rounded bg-gray-50 min-h-[350px]"
                           />

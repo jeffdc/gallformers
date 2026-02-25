@@ -7,7 +7,7 @@ defmodule GallformersWeb.HostLive do
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.{GallHosts, Markdown, Ranges, Sources, Species, Taxonomy}
+  alias Gallformers.{GallHosts, Markdown, Places, Ranges, Sources, Species, Taxonomy}
   alias Gallformers.Images.Image
   alias Gallformers.Plants
   alias GallformersWeb.SEO
@@ -77,6 +77,7 @@ defmodule GallformersWeb.HostLive do
         range_data = Ranges.get_display_range_for_host(host_id)
         range = range_data.in_range
         inherited_range = range_data.inherited_range
+        range_bounds = Places.get_bounds_for_codes(range ++ inherited_range)
 
         # Check if Gallformers notes exist for this species
         gallformers_notes = Enum.find(sources, fn s -> s.id == @gallformers_notes_source_id end)
@@ -111,6 +112,7 @@ defmodule GallformersWeb.HostLive do
            taxonomy: taxonomy,
            range: range,
            inherited_range: inherited_range,
+           range_bounds: range_bounds,
            has_gallformers_notes: has_gallformers_notes,
            notes_alert_dismissed: false,
            current_page: 1,
@@ -577,6 +579,7 @@ defmodule GallformersWeb.HostLive do
                   id="host-range-map"
                   in_range={@range}
                   inherited_range={@inherited_range}
+                  bounds={@range_bounds}
                   navigable
                 />
                 <div :if={@inherited_range != []} class="mt-1">

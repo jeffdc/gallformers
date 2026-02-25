@@ -7,7 +7,18 @@ defmodule GallformersWeb.GallLive do
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.{GallHosts, Galls, Glossaries, Markdown, Ranges, Sources, Species, Taxonomy}
+  alias Gallformers.{
+    GallHosts,
+    Galls,
+    Glossaries,
+    Markdown,
+    Places,
+    Ranges,
+    Sources,
+    Species,
+    Taxonomy
+  }
+
   alias Gallformers.Images.Image
   alias GallformersWeb.SEO
 
@@ -88,6 +99,7 @@ defmodule GallformersWeb.GallLive do
         range = range_data.in_range
         inherited_range = range_data.inherited_range
         excluded_range = range_data.excluded_range
+        range_bounds = Places.get_bounds_for_codes(range ++ inherited_range)
         gall_filters = Galls.get_gall_filter_values(gall_id)
         related_galls = Galls.get_related_galls(gall)
 
@@ -141,6 +153,7 @@ defmodule GallformersWeb.GallLive do
            range: range,
            inherited_range: inherited_range,
            excluded_range: excluded_range,
+           range_bounds: range_bounds,
            related_galls: related_galls,
            common_names: common_names,
            scientific_aliases: scientific_aliases,
@@ -502,6 +515,7 @@ defmodule GallformersWeb.GallLive do
                     in_range={@range}
                     inherited_range={@inherited_range}
                     excluded_range={[]}
+                    bounds={@range_bounds}
                     navigable
                   />
                   <div :if={@inherited_range != []} class="mt-1">

@@ -235,6 +235,24 @@ defmodule GallformersWeb.Admin.HostLive.Form do
      |> assign(:wcvp_search_results, [])}
   end
 
+  @impl true
+  def handle_event("toggle_wcvp_introduced", _params, socket) do
+    prefilled = socket.assigns.wcvp_prefilled
+    include = !prefilled.include_introduced
+
+    place_ids =
+      if include do
+        Enum.uniq(prefilled.place_ids ++ prefilled.introduced_place_ids)
+      else
+        prefilled.place_ids
+      end
+
+    {:noreply,
+     socket
+     |> assign(:wcvp_prefilled, %{prefilled | include_introduced: include})
+     |> assign(:wcvp_effective_place_ids, place_ids)}
+  end
+
   # =================================================================
   # Event handlers - WCVP refresh (edit mode)
   # =================================================================
@@ -269,26 +287,107 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   def handle_event("apply_wcvp_updates", _params, socket) do
     diff = socket.assigns.wcvp_diff
 
-    with {:ok, _} <- apply_wcvp_range_updates(socket, diff),
-         {:ok, _} <-
-           Plants.upsert_host_traits(socket.assigns.host.id, %{
-             wcvp_id: diff.wcvp_data.plant_name_id,
-             powo_id: diff.wcvp_data.powo_id
-           }) do
-      {:noreply,
-       socket
-       |> assign(:wcvp_diff, nil)
-       |> put_flash(:info, "Host updated from WCVP")
-       |> push_navigate(to: ~p"/admin/hosts/#{socket.assigns.host.id}")}
-    else
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to apply WCVP updates: #{inspect(reason)}")}
-    end
+    # Surgical merge: start from current places, apply only selected changes
+    # For all sections, checked = include in range:
+    #   selected_adds: checked places get added
+    #   selected_removes: checked places are KEPT, unchecked ones get removed
+    #   selected_introduced: checked places get added (when include_introduced is on)
+    current = MapSet.new(socket.assigns.exact_places ++ socket.assigns.country_places)
+    actually_remove = MapSet.difference(MapSet.new(diff.places_removed), diff.selected_removes)
+
+    merged =
+      current
+      |> MapSet.union(diff.selected_adds)
+      |> MapSet.difference(actually_remove)
+      |> MapSet.union(diff.selected_introduced)
+
+    {:noreply,
+     socket
+     |> assign(:exact_places, MapSet.to_list(merged))
+     |> assign(:country_places, [])
+     |> assign(:pending_host_traits, %{
+       wcvp_id: diff.wcvp_data.plant_name_id,
+       powo_id: diff.wcvp_data.powo_id
+     })
+     |> assign(:wcvp_diff, nil)
+     |> compute_map_range()
+     |> mark_dirty()
+     |> put_flash(:info, "WCVP range data staged. Press Save to apply.")}
   end
 
   @impl true
   def handle_event("cancel_wcvp_refresh", _params, socket) do
     {:noreply, assign(socket, :wcvp_diff, nil)}
+  end
+
+  @impl true
+  def handle_event("toggle_wcvp_diff_introduced", _params, socket) do
+    diff = socket.assigns.wcvp_diff
+    {:noreply, assign(socket, :wcvp_diff, %{diff | include_introduced: !diff.include_introduced})}
+  end
+
+  @impl true
+  def handle_event("toggle_wcvp_diff_add", %{"code" => code}, socket) do
+    diff = socket.assigns.wcvp_diff
+    updated = %{diff | selected_adds: toggle_in_set(diff.selected_adds, code)}
+    {:noreply, assign(socket, :wcvp_diff, updated)}
+  end
+
+  @impl true
+  def handle_event("toggle_wcvp_diff_remove", %{"code" => code}, socket) do
+    diff = socket.assigns.wcvp_diff
+    updated = %{diff | selected_removes: toggle_in_set(diff.selected_removes, code)}
+    {:noreply, assign(socket, :wcvp_diff, updated)}
+  end
+
+  @impl true
+  def handle_event("toggle_wcvp_diff_introduced_place", %{"code" => code}, socket) do
+    diff = socket.assigns.wcvp_diff
+    updated = %{diff | selected_introduced: toggle_in_set(diff.selected_introduced, code)}
+    {:noreply, assign(socket, :wcvp_diff, updated)}
+  end
+
+  @impl true
+  def handle_event("select_all_wcvp_diff_adds", _params, socket) do
+    diff = socket.assigns.wcvp_diff
+    {:noreply, assign(socket, :wcvp_diff, %{diff | selected_adds: MapSet.new(diff.places_added)})}
+  end
+
+  @impl true
+  def handle_event("deselect_all_wcvp_diff_adds", _params, socket) do
+    diff = socket.assigns.wcvp_diff
+    {:noreply, assign(socket, :wcvp_diff, %{diff | selected_adds: MapSet.new()})}
+  end
+
+  @impl true
+  def handle_event("select_all_wcvp_diff_removes", _params, socket) do
+    diff = socket.assigns.wcvp_diff
+
+    {:noreply,
+     assign(socket, :wcvp_diff, %{diff | selected_removes: MapSet.new(diff.places_removed)})}
+  end
+
+  @impl true
+  def handle_event("deselect_all_wcvp_diff_removes", _params, socket) do
+    diff = socket.assigns.wcvp_diff
+    {:noreply, assign(socket, :wcvp_diff, %{diff | selected_removes: MapSet.new()})}
+  end
+
+  @impl true
+  def handle_event("select_all_wcvp_diff_introduced", _params, socket) do
+    diff = socket.assigns.wcvp_diff
+
+    {:noreply,
+     assign(socket, :wcvp_diff, %{
+       diff
+       | selected_introduced: MapSet.new(diff.introduced_places)
+     })}
+  end
+
+  @impl true
+  def handle_event("deselect_all_wcvp_diff_introduced", _params, socket) do
+    diff = socket.assigns.wcvp_diff
+    {:noreply, assign(socket, :wcvp_diff, %{diff | selected_introduced: MapSet.new()})}
   end
 
   @impl true
@@ -442,9 +541,12 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
     display = Ranges.compute_display_range(host_ranges)
 
+    range_bounds = Places.get_bounds_for_codes(display.in_range ++ display.inherited_range)
+
     socket
     |> assign(:in_range, display.in_range)
     |> assign(:inherited_range, display.inherited_range)
+    |> assign(:range_bounds, range_bounds)
   end
 
   # Sets ALL host form assigns to their default/empty values.
@@ -462,6 +564,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> assign(:country_places, [])
     |> assign(:in_range, [])
     |> assign(:inherited_range, [])
+    |> assign(:range_bounds, nil)
     |> assign(:taxonomy, nil)
     |> assign(:genus_is_new, false)
     |> assign(:selected_family_id, nil)
@@ -483,8 +586,10 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> assign(:wcvp_selected, nil)
     |> assign(:wcvp_available, Wcvp.Lookup.available?())
     |> assign(:wcvp_prefilled, nil)
+    |> assign(:wcvp_effective_place_ids, nil)
     |> assign(:wcvp_diff, nil)
     |> assign(:host_traits, nil)
+    |> assign(:pending_host_traits, nil)
     |> reset_dirty()
   end
 
@@ -559,23 +664,44 @@ defmodule GallformersWeb.Admin.HostLive.Form do
           end
       end
 
-    # Resolve WCVP distribution to gallformers place codes for saving after create
+    # Resolve WCVP distributions to gallformers place codes for saving after create
     tdwg_lookup = Wcvp.Tdwg.load()
-    wcvp_places = Wcvp.Tdwg.convert_tdwg_codes(wcvp_data.distribution, tdwg_lookup)
-    wcvp_place_codes = Enum.map(wcvp_places, & &1.code)
 
-    wcvp_place_ids =
-      wcvp_place_codes
+    native_places = Wcvp.Tdwg.convert_tdwg_codes(wcvp_data.native_distribution, tdwg_lookup)
+    native_place_codes = Enum.map(native_places, & &1.code)
+
+    native_place_ids =
+      native_place_codes
       |> Enum.map(&Map.get(socket.assigns.place_by_code, &1))
       |> Enum.reject(&is_nil/1)
       |> Enum.map(& &1.id)
+
+    introduced_places =
+      Wcvp.Tdwg.convert_tdwg_codes(wcvp_data.introduced_distribution, tdwg_lookup)
+
+    introduced_place_codes = Enum.map(introduced_places, & &1.code)
+
+    introduced_place_ids =
+      introduced_place_codes
+      |> Enum.map(&Map.get(socket.assigns.place_by_code, &1))
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(& &1.id)
+
+    introduced_suffix =
+      if introduced_place_ids != [],
+        do: " (+ #{length(introduced_place_ids)} introduced)",
+        else: ""
 
     socket
     |> assign(:wcvp_prefilled, %{
       wcvp_id: wcvp_data.plant_name_id,
       powo_id: wcvp_data.powo_id,
-      place_ids: wcvp_place_ids
+      place_ids: native_place_ids,
+      introduced_place_ids: introduced_place_ids,
+      include_introduced: false,
+      summary: "WCVP matched #{length(native_place_ids)} native places#{introduced_suffix}."
     })
+    |> assign(:wcvp_effective_place_ids, native_place_ids)
   end
 
   # =================================================================
@@ -584,40 +710,72 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
   defp build_wcvp_diff(socket, wcvp_data) do
     tdwg_lookup = Wcvp.Tdwg.load()
-    wcvp_places = Wcvp.Tdwg.convert_tdwg_codes(wcvp_data.distribution, tdwg_lookup)
-    wcvp_place_codes = MapSet.new(wcvp_places, & &1.code)
+
+    native_places =
+      Wcvp.Tdwg.convert_tdwg_codes(wcvp_data.native_distribution, tdwg_lookup)
+
+    native_codes = MapSet.new(native_places, & &1.code)
+
+    introduced_places =
+      Wcvp.Tdwg.convert_tdwg_codes(wcvp_data.introduced_distribution, tdwg_lookup)
+
+    introduced_codes = MapSet.new(introduced_places, & &1.code)
 
     # Current places are stored as codes in exact_places and country_places
     current_place_codes =
       MapSet.new(socket.assigns.exact_places ++ socket.assigns.country_places)
 
-    added = MapSet.difference(wcvp_place_codes, current_place_codes)
-    removed = MapSet.difference(current_place_codes, wcvp_place_codes)
+    added = MapSet.difference(native_codes, current_place_codes)
+    removed = MapSet.difference(current_place_codes, native_codes)
 
     %{
       wcvp_data: wcvp_data,
+      native_codes: native_codes,
+      introduced_codes: introduced_codes,
       places_added: MapSet.to_list(added),
       places_removed: MapSet.to_list(removed),
-      has_changes: MapSet.size(added) > 0 or MapSet.size(removed) > 0
+      introduced_places: MapSet.to_list(introduced_codes),
+      selected_adds: added,
+      selected_removes: removed,
+      selected_introduced: introduced_codes,
+      include_introduced: true,
+      has_changes:
+        MapSet.size(added) > 0 or MapSet.size(removed) > 0 or
+          MapSet.size(introduced_codes) > 0
     }
   end
 
-  defp apply_wcvp_range_updates(socket, diff) do
-    host_id = socket.assigns.host.id
-    tdwg_lookup = Wcvp.Tdwg.load()
+  defp toggle_in_set(set, item) do
+    if MapSet.member?(set, item), do: MapSet.delete(set, item), else: MapSet.put(set, item)
+  end
 
-    wcvp_places =
-      Wcvp.Tdwg.convert_tdwg_codes(diff.wcvp_data.distribution, tdwg_lookup)
+  defp place_display(code, place_by_code) do
+    case Map.get(place_by_code, code) do
+      %{name: name} -> "#{name} (#{code})"
+      nil -> code
+    end
+  end
 
-    wcvp_place_codes = Enum.map(wcvp_places, & &1.code)
+  # Groups place codes by country, returning [{country_name, [codes]}] sorted by country then code.
+  # Codes like "US-CA" group under "US"; bare country codes like "BR" group under themselves.
+  defp group_places_by_country(codes, place_by_code) do
+    codes
+    |> Enum.group_by(fn code ->
+      case String.split(code, "-", parts: 2) do
+        [country, _region] -> country
+        [bare] -> bare
+      end
+    end)
+    |> Enum.map(fn {country_code, group_codes} ->
+      country_name =
+        case Map.get(place_by_code, country_code) do
+          %{name: name} -> name
+          nil -> country_code
+        end
 
-    new_place_ids =
-      wcvp_place_codes
-      |> Enum.map(&Map.get(socket.assigns.place_by_code, &1))
-      |> Enum.reject(&is_nil/1)
-      |> Enum.map(& &1.id)
-
-    Ranges.update_host_places(host_id, new_place_ids)
+      {country_name, Enum.sort(group_codes)}
+    end)
+    |> Enum.sort_by(&elem(&1, 0))
   end
 
   defp assign_taxonomy_fields(socket, nil) do
@@ -685,7 +843,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
         genus_id: taxonomy && taxonomy.genus && taxonomy.genus.id,
         selected_section_id: socket.assigns.selected_section_id,
         section_id: taxonomy && taxonomy.section && taxonomy.section.id
-      }
+      },
+      host_traits: socket.assigns[:pending_host_traits]
     }
 
     case Plants.update_host_with_associations(socket.assigns.host, update_params) do
@@ -705,6 +864,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
          socket
          |> assign(:host, updated_host)
          |> assign(:taxonomy, taxonomy)
+         |> assign(:host_traits, Plants.get_host_traits(host_id))
+         |> assign(:pending_host_traits, nil)
          |> DeferredChanges.refresh(:aliases, aliases)
          |> assign(:original_exact_places, exact_places)
          |> assign(:original_country_places, country_places)
@@ -729,7 +890,9 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
       wcvp ->
         Plants.upsert_host_traits(host.id, %{wcvp_id: wcvp.wcvp_id, powo_id: wcvp.powo_id})
-        if place_ids = wcvp[:place_ids], do: Ranges.update_host_places(host.id, place_ids)
+
+        place_ids = socket.assigns[:wcvp_effective_place_ids] || wcvp[:place_ids]
+        if place_ids, do: Ranges.update_host_places(host.id, place_ids)
     end
   end
 
@@ -919,9 +1082,18 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
         <%!-- WCVP pre-fill search (new mode only) --%>
         <div :if={@wcvp_available && @mode != :edit} class="mb-4">
-          <.card title="Pre-fill from WCVP" icon="ph-leaf" class="overflow-visible">
+          <.card title="Look up species on POWO-WCVP" icon="ph-leaf" class="overflow-visible">
             <p class="text-sm text-gray-600 mb-3">
-              Search the World Checklist of Vascular Plants to pre-fill name, taxonomy, and range data for a new host.
+              Search the
+              <a
+                href="https://powo.science.kew.org/about-wcvp"
+                target="_blank"
+                class="text-blue-600 hover:underline"
+              >
+                POWO World Checklist of Vascular Plants
+              </a>
+              to pre-fill name, taxonomy, and range data for a new host.
+              Range data will appear on the map after saving.
             </p>
             <.typeahead
               id="wcvp-picker"
@@ -941,6 +1113,26 @@ defmodule GallformersWeb.Admin.HostLive.Form do
                 <span class="text-gray-400 text-xs ml-2">({item.family})</span>
               </:result>
             </.typeahead>
+            <div
+              :if={@wcvp_prefilled && @wcvp_prefilled[:place_ids] != []}
+              class="mt-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2"
+            >
+              <p>
+                {@wcvp_prefilled.summary} Range will appear on the map after saving.
+              </p>
+              <label
+                :if={@wcvp_prefilled.introduced_place_ids != []}
+                class="mt-2 flex items-center gap-2 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={@wcvp_prefilled.include_introduced}
+                  phx-click="toggle_wcvp_introduced"
+                  class="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                />
+                <span>Include introduced range</span>
+              </label>
+            </div>
           </.card>
         </div>
 
@@ -1076,38 +1268,182 @@ defmodule GallformersWeb.Admin.HostLive.Form do
                 variant="secondary"
                 size="sm"
               >
-                Refresh from WCVP
+                Refresh from POWO-WCVP
               </.button>
 
               <div
                 :if={@wcvp_diff}
-                class="border rounded-lg p-4 bg-amber-50 dark:bg-amber-950"
+                class="border border-blue-200 rounded-lg p-4 bg-blue-50"
               >
-                <h4 class="font-medium mb-2">WCVP Data Comparison</h4>
+                <h4 class="font-medium mb-2">POWO-WCVP Data Comparison</h4>
 
                 <div :if={!@wcvp_diff.has_changes} class="text-sm text-gray-600">
                   No differences found. Host data matches WCVP.
                 </div>
 
-                <div :if={@wcvp_diff.has_changes} class="text-sm space-y-2">
-                  <div :if={@wcvp_diff.places_added != []}>
-                    <span class="font-medium text-green-700">+ Places to add:</span>
-                    {Enum.join(@wcvp_diff.places_added, ", ")}
+                <div :if={@wcvp_diff.has_changes} class="text-sm space-y-3">
+                  <%!-- Green: native places to add --%>
+                  <div
+                    :if={@wcvp_diff.places_added != []}
+                    class="bg-green-50 border border-green-200 rounded p-3"
+                  >
+                    <div class="flex items-center justify-between">
+                      <span class="font-medium text-green-700">
+                        + Native places in WCVP but not in current range ({length(
+                          @wcvp_diff.places_added
+                        )})
+                      </span>
+                      <% all_adds_selected =
+                        MapSet.size(@wcvp_diff.selected_adds) ==
+                          length(@wcvp_diff.places_added) %>
+                      <button
+                        type="button"
+                        phx-click={
+                          if all_adds_selected,
+                            do: "deselect_all_wcvp_diff_adds",
+                            else: "select_all_wcvp_diff_adds"
+                        }
+                        class="text-xs text-green-700 hover:underline"
+                      >
+                        {if all_adds_selected, do: "Deselect all", else: "Select all"}
+                      </button>
+                    </div>
+                    <div class="mt-2 max-h-60 overflow-y-auto space-y-2">
+                      <div :for={
+                        {country, codes} <-
+                          group_places_by_country(@wcvp_diff.places_added, @place_by_code)
+                      }>
+                        <div class="text-xs font-medium text-green-800 mb-1">{country}</div>
+                        <ul class="space-y-1 ml-2">
+                          <li :for={code <- codes}>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={MapSet.member?(@wcvp_diff.selected_adds, code)}
+                                phx-click="toggle_wcvp_diff_add"
+                                phx-value-code={code}
+                                class="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                              />
+                              <span>{place_display(code, @place_by_code)}</span>
+                            </label>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
                   </div>
-                  <div :if={@wcvp_diff.places_removed != []}>
-                    <span class="font-medium text-red-700">- Places to remove:</span>
-                    {Enum.join(@wcvp_diff.places_removed, ", ")}
+
+                  <%!-- Red: places to remove --%>
+                  <div
+                    :if={@wcvp_diff.places_removed != []}
+                    class="bg-red-50 border border-red-200 rounded p-3"
+                  >
+                    <div class="flex items-center justify-between">
+                      <span class="font-medium text-red-700">
+                        - Places in current range but not in WCVP native ({length(
+                          @wcvp_diff.places_removed
+                        )})
+                      </span>
+                      <% all_removes_selected =
+                        MapSet.size(@wcvp_diff.selected_removes) ==
+                          length(@wcvp_diff.places_removed) %>
+                      <button
+                        type="button"
+                        phx-click={
+                          if all_removes_selected,
+                            do: "deselect_all_wcvp_diff_removes",
+                            else: "select_all_wcvp_diff_removes"
+                        }
+                        class="text-xs text-red-700 hover:underline"
+                      >
+                        {if all_removes_selected, do: "Deselect all", else: "Select all"}
+                      </button>
+                    </div>
+                    <div class="mt-2 max-h-60 overflow-y-auto space-y-2">
+                      <div :for={
+                        {country, codes} <-
+                          group_places_by_country(@wcvp_diff.places_removed, @place_by_code)
+                      }>
+                        <div class="text-xs font-medium text-red-800 mb-1">{country}</div>
+                        <ul class="space-y-1 ml-2">
+                          <li :for={code <- codes}>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={MapSet.member?(@wcvp_diff.selected_removes, code)}
+                                phx-click="toggle_wcvp_diff_remove"
+                                phx-value-code={code}
+                                class="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                              />
+                              <span>{place_display(code, @place_by_code)}</span>
+                            </label>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <%!-- Amber: introduced places --%>
+                  <div
+                    :if={@wcvp_diff.introduced_places != []}
+                    class="bg-amber-50 border border-amber-200 rounded p-3"
+                  >
+                    <div class="flex items-center justify-between">
+                      <span class="font-medium text-amber-700">
+                        Introduced places ({length(@wcvp_diff.introduced_places)})
+                      </span>
+                      <% all_introduced_selected =
+                        MapSet.size(@wcvp_diff.selected_introduced) ==
+                          length(@wcvp_diff.introduced_places) %>
+                      <button
+                        type="button"
+                        phx-click={
+                          if all_introduced_selected,
+                            do: "deselect_all_wcvp_diff_introduced",
+                            else: "select_all_wcvp_diff_introduced"
+                        }
+                        class="text-xs text-amber-700 hover:underline"
+                      >
+                        {if all_introduced_selected, do: "Deselect all", else: "Select all"}
+                      </button>
+                    </div>
+                    <div class="mt-2 max-h-60 overflow-y-auto space-y-2">
+                      <div :for={
+                        {country, codes} <-
+                          group_places_by_country(@wcvp_diff.introduced_places, @place_by_code)
+                      }>
+                        <div class="text-xs font-medium text-amber-800 mb-1">{country}</div>
+                        <ul class="space-y-1 ml-2">
+                          <li :for={code <- codes}>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={MapSet.member?(@wcvp_diff.selected_introduced, code)}
+                                phx-click="toggle_wcvp_diff_introduced_place"
+                                phx-value-code={code}
+                                class="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                              />
+                              <span>{place_display(code, @place_by_code)}</span>
+                            </label>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
+                <% has_selections =
+                  MapSet.size(@wcvp_diff.selected_adds) > 0 or
+                    MapSet.size(@wcvp_diff.selected_removes) > 0 or
+                    MapSet.size(@wcvp_diff.selected_introduced) > 0 %>
                 <div class="mt-3 flex gap-2">
                   <.button
                     :if={@wcvp_diff.has_changes}
                     phx-click="apply_wcvp_updates"
                     type="button"
                     size="sm"
+                    disabled={!has_selections}
                   >
-                    Apply Updates
+                    Apply Selected Changes
                   </.button>
                   <.button
                     phx-click="cancel_wcvp_refresh"
@@ -1139,6 +1475,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
                           id="host-range-map"
                           in_range={@in_range}
                           inherited_range={@inherited_range}
+                          bounds={@range_bounds}
                           editable
                           class="border border-gray-300 rounded bg-gray-50 min-h-[500px]"
                         />
