@@ -40,6 +40,22 @@ function ensureProtocol() {
   }
 }
 
+// Probe WebGL with the same attributes MapLibre uses. Cache the result.
+let webglSupported = null
+function isWebGLSupported() {
+  if (webglSupported !== null) return webglSupported
+  try {
+    const canvas = document.createElement('canvas')
+    const gl = canvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: false })
+      || canvas.getContext('webgl', { antialias: false, preserveDrawingBuffer: false })
+    webglSupported = !!gl
+    if (gl) { const ext = gl.getExtension('WEBGL_lose_context'); if (ext) ext.loseContext() }
+  } catch (_) {
+    webglSupported = false
+  }
+  return webglSupported
+}
+
 // Color scheme
 const COLORS = {
   inRange: '#228B22',       // ForestGreen — exact range
@@ -175,6 +191,7 @@ const RangeMap = {
   // may be updated and the hook callback still fires. This is how the admin
   // host form communicates select_all / deselect_all / toggle_region changes.
   updated() {
+    if (!this.map) return
     const newInRange = new Set(JSON.parse(this.el.dataset.inRange || '[]'))
     const newExcludedRange = new Set(JSON.parse(this.el.dataset.excludedRange || '[]'))
     const newInheritedRange = new Set(JSON.parse(this.el.dataset.inheritedRange || '[]'))
@@ -212,6 +229,12 @@ const RangeMap = {
 
   initMap() {
     const container = this.el
+
+    if (!isWebGLSupported()) {
+      this._showFallback(container)
+      return
+    }
+
     const { effectiveInRange, effectiveInherited } = computeEffectiveSets(
       this.inRange, this.excludedRange, this.inheritedRange
     )
@@ -374,6 +397,13 @@ const RangeMap = {
       this.fitToRange(false)
       this.updateEmptyState()
     })
+  },
+
+  _showFallback(container) {
+    const fallback = document.createElement('div')
+    fallback.className = 'flex items-center justify-center h-full bg-gray-100 text-gray-500 text-sm'
+    fallback.textContent = 'Interactive map requires WebGL, which is not supported by this browser.'
+    container.appendChild(fallback)
   },
 
   setupInteractions() {
