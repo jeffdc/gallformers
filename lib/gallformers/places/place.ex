@@ -6,7 +6,6 @@ defmodule Gallformers.Places.Place do
   Used to track where species are found.
   """
   use Ecto.Schema
-  import Ecto.Changeset
 
   @behaviour Gallformers.SchemaFields
 
@@ -18,8 +17,6 @@ defmodule Gallformers.Places.Place do
           code: String.t() | nil,
           type: String.t() | nil
         }
-
-  @place_types ~w(state province country continent region)
 
   schema "place" do
     field :name, :string
@@ -47,22 +44,4 @@ defmodule Gallformers.Places.Place do
 
   @impl Gallformers.SchemaFields
   def required_fields, do: @required_fields
-
-  @doc """
-  Creates a changeset for a place.
-  """
-  def changeset(place, attrs) do
-    place
-    |> cast(attrs, [:name, :code, :type])
-    |> validate_required(@required_fields)
-    |> validate_inclusion(:type, @place_types)
-    |> validate_length(:name, min: 1, max: 100)
-    |> validate_length(:code, min: 1, max: 10)
-    |> unique_constraint(:code)
-  end
-
-  @doc """
-  Returns the list of valid place types.
-  """
-  def place_types, do: @place_types
 end

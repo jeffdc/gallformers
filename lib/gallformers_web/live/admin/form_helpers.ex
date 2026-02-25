@@ -47,17 +47,17 @@ defmodule GallformersWeb.Admin.FormHelpers do
 
       use GallformersWeb.Admin.FormHelpers, crud_helpers: true
 
-      alias Gallformers.Places
-      alias Gallformers.Places.Place
+      alias Gallformers.Sources
+      alias Gallformers.Sources.Source
 
       # Required callbacks - all explicit, no magic
-      def entity_key, do: :place
-      def entity_struct, do: Place
-      def list_path, do: ~p"/admin/places"
-      def load_entity(id), do: Places.get_place!(id)
-      def change_entity(entity, params \\\\ %{}), do: Places.change_place(entity, params)
-      def create_entity(params), do: Places.create_place(params)
-      def update_entity(entity, params), do: Places.update_place(entity, params)
+      def entity_key, do: :source
+      def entity_struct, do: Source
+      def list_path, do: ~p"/admin/sources"
+      def load_entity(id), do: Sources.get_source!(id)
+      def change_entity(entity, params \\\\ %{}), do: Sources.change_source(entity, params)
+      def create_entity(params), do: Sources.create_source(params)
+      def update_entity(entity, params), do: Sources.update_source(entity, params)
 
       # Use consolidated helpers
       def mount(_params, session, socket) do
@@ -73,13 +73,13 @@ defmodule GallformersWeb.Admin.FormHelpers do
   ## Callbacks
 
   ### Required (when using crud_helpers: true)
-  - `entity_key/0` - Returns the assign key atom (e.g., `:place`)
-  - `entity_struct/0` - Returns the struct module (e.g., `Place`)
+  - `entity_key/0` - Returns the assign key atom (e.g., `:source`)
+  - `entity_struct/0` - Returns the struct module (e.g., `Source`)
   - `list_path/0` - Returns the path to navigate to after save/cancel
-  - `load_entity/1` - Loads entity by id (e.g., `Places.get_place!(id)`)
-  - `change_entity/2` - Returns changeset (e.g., `Places.change_place(entity, params)`)
-  - `create_entity/1` - Creates entity (e.g., `Places.create_place(params)`)
-  - `update_entity/2` - Updates entity (e.g., `Places.update_place(entity, params)`)
+  - `load_entity/1` - Loads entity by id (e.g., `Sources.get_source!(id)`)
+  - `change_entity/2` - Returns changeset (e.g., `Sources.change_source(entity, params)`)
+  - `create_entity/1` - Creates entity (e.g., `Sources.create_source(params)`)
+  - `update_entity/2` - Updates entity (e.g., `Sources.update_source(entity, params)`)
 
   ### Optional (have defaults)
   - `form_key/0` - Form params key, defaults to `to_string(entity_key())`

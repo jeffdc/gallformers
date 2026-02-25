@@ -149,13 +149,6 @@ defmodule GallformersWeb.Admin.DashboardLive do
               small
             />
             <.action_card
-              label="Create a New Place"
-              href="/admin/places/new"
-              icon="ph-map-pin"
-              accent="slate"
-              small
-            />
-            <.action_card
               label="Filter Terms"
               href="/admin/filter-terms"
               icon="ph-funnel"
@@ -193,7 +186,6 @@ defmodule GallformersWeb.Admin.DashboardLive do
         />
         <.stat_card title="Images" value={@stats.image_count} icon="ph-image" href="/admin/images" />
       </div>
-
     </Layouts.admin>
     """
   end
