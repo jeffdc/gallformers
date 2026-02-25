@@ -248,7 +248,10 @@ defmodule GallformersWeb.Admin.ReconciliationLive do
 
                 <div class="mt-4 flex items-center justify-between text-sm text-gray-500">
                   <span>
-                    Showing {min((@current_page - 1) * @page_size + 1, total)}-{min(@current_page * @page_size, total)} of {format_number(total)}
+                    Showing {min((@current_page - 1) * @page_size + 1, total)}-{min(
+                      @current_page * @page_size,
+                      total
+                    )} of {format_number(total)}
                   </span>
                   <div :if={pages > 1} class="flex gap-1">
                     <button
@@ -277,7 +280,8 @@ defmodule GallformersWeb.Admin.ReconciliationLive do
             <.icon name="ph-file-text" class="h-12 w-12 mx-auto mb-4 text-gray-300" />
             <p class="text-lg font-medium">No reconciliation reports found</p>
             <p class="text-sm mt-1">
-              Run <code class="bg-gray-100 px-1 rounded">mix gallformers.wcvp.reconcile</code> to generate reports.
+              Run <code class="bg-gray-100 px-1 rounded">mix gallformers.wcvp.reconcile</code>
+              to generate reports.
             </p>
           </div>
         <% end %>
@@ -388,7 +392,8 @@ defmodule GallformersWeb.Admin.ReconciliationLive do
             <td>
               <span class="text-green-700 font-medium">+{length(item["new_places"])}</span>
               <span class="text-xs text-gray-500 ml-1">
-                {item["new_places"] |> Enum.take(5) |> Enum.join(", ")}{if length(item["new_places"]) > 5, do: "..."}
+                {item["new_places"] |> Enum.take(5) |> Enum.join(", ")}{if length(item["new_places"]) >
+                                                                             5, do: "..."}
               </span>
             </td>
           </tr>
