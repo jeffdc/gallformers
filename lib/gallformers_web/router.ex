@@ -122,7 +122,6 @@ defmodule GallformersWeb.Router do
 
     # User profile
     live "/profile", Admin.ProfileLive
-
   end
 
   # Super admin routes (require superadmin role)
