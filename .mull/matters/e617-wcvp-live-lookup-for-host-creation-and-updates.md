@@ -1,9 +1,9 @@
 ---
 status: done
 created: 2026-02-20
-updated: 2026-02-23
+updated: 2026-02-25
 epic: geo-expansion
-docs: [docs/plans/2026-02-20-wcvp-live-lookup-design.md]
+docs: ['']
 relates: [7932]
 ---
 

@@ -16,6 +16,9 @@ cspell.json
 # Git worktrees
 .worktrees/
 
+# Plan docs (ephemeral working documents, not committed)
+/docs/plans/
+
 # Generated boundary tiles for maps (build artifact from services/boundaries/)
 /priv/static/data/boundaries.pmtiles
 

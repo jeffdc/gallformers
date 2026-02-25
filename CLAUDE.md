@@ -447,6 +447,46 @@ Use the `/release` skill. Before running it, confirm with the user that the full
 
 The primary value is the **data** — gall records, images, and references. Code serves to make it accessible. Be scientifically conservative (mark uncertain species as "undescribed"), keep the site fast and accessible, and attribute sources properly.
 
+## Work Tracking & Planning
+
+### Mull is the single source of truth
+
+All work tracking — ideas, plans, research, status — lives in **mull matters**. There are no separate plan documents committed to git.
+
+- `mull add "title" --epic <name>` to capture new work
+- `mull append <id> "text"` to add details as they emerge
+- `mull append <id> - --replace` to rewrite a matter's body (pipe via stdin)
+- `mull done <id>` when work is complete
+- `mull rm <id>` to permanently delete (done matters are purged periodically; git history preserves them)
+
+### No plan files in git
+
+The `docs/plans/` directory is gitignored. Some skills may write files there as working drafts during a session — that's fine, but those files are ephemeral scratch paper. **The plan content must be captured in the mull matter before the session ends.**
+
+After a planning or brainstorming session:
+1. Distill key decisions, architecture choices, and remaining work into the matter body
+2. The matter should be self-contained — a future session should be able to pick up the work from the matter alone
+3. Don't copy plans verbatim. Summarize decisions and rationale. Drop implementation checklists that will be recreated when work begins.
+
+### What goes where
+
+| Content | Location | Persisted? |
+|---------|----------|------------|
+| Work tracking, plans, status | Mull matter body | Yes (until purged) |
+| Ephemeral planning drafts | `docs/plans/` (gitignored) | No |
+| Durable reference material | `docs/investigations/` | Yes |
+| Operational procedures | `runbooks/` | Yes |
+
+### Planning workflow
+
+When planning work for a matter:
+1. Load the matter with `mull show <id>` to get context
+2. Do research, brainstorm, design — use whatever tools help
+3. Write findings and decisions into the matter via `mull append`
+4. When the plan is solid, mark the matter as `planned` with `mull plan <id>`
+
+Do NOT create separate implementation plan files. The matter body is the plan. If the scope is small enough that the plan fits in a few paragraphs, that's fine — not everything needs a 200-line design doc.
+
 ## External Services
 
 - **Domain**: gallformers.org, gallformers.com (Namecheap)
