@@ -65,8 +65,9 @@ defmodule Gallformers.Wcvp.Lookup do
   @doc """
   Exact lookup by plant_name_id.
 
-  Returns a map with all name fields plus `:distribution` (a list of
-  area_code_l3 strings). Returns nil if not found or repo unavailable.
+  Returns a map with all name fields plus `:native_distribution` and
+  `:introduced_distribution` (each a list of area_code_l3 strings).
+  Returns nil if not found or repo unavailable.
   """
   @spec get(String.t()) :: map() | nil
   def get(plant_name_id) do
@@ -92,11 +93,15 @@ defmodule Gallformers.Wcvp.Lookup do
           from(d in "wcvp_distributions",
             where: d.plant_name_id == ^plant_name_id,
             order_by: d.area_code_l3,
-            select: d.area_code_l3
+            select: %{area_code_l3: d.area_code_l3, introduced: d.introduced}
           )
           |> Repo.WCVP.all()
 
-        Map.put(name, :distribution, distributions)
+        {introduced, native} = Enum.split_with(distributions, &(&1.introduced == 1))
+
+        name
+        |> Map.put(:native_distribution, Enum.map(native, & &1.area_code_l3))
+        |> Map.put(:introduced_distribution, Enum.map(introduced, & &1.area_code_l3))
     end
   rescue
     _ -> nil

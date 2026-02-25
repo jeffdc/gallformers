@@ -56,23 +56,19 @@ defmodule Gallformers.Wcvp.ReaderTest do
     end
   end
 
-  describe "stream_native_distributions/1" do
-    test "filters to native, extant, non-doubtful distributions" do
+  describe "stream_established_distributions/1" do
+    test "includes both native and introduced, excludes extinct and doubtful" do
       path = write_temp_csv("distributions.csv", @distributions_csv)
-      dists = Reader.stream_native_distributions(path) |> Enum.to_list()
+      dists = Reader.stream_established_distributions(path) |> Enum.to_list()
 
-      # Row 4 is introduced (1), row 5 is extinct (1) — both excluded
-      assert length(dists) == 3
-      assert Enum.all?(dists, fn d -> d.introduced == "0" end)
+      # Row 4 is introduced (kept), row 5 is extinct (excluded) — 4 total
+      assert length(dists) == 4
       assert Enum.all?(dists, fn d -> d.extinct == "0" end)
-    end
 
-    test "parses TDWG area code" do
-      path = write_temp_csv("distributions.csv", @distributions_csv)
-      [first | _] = Reader.stream_native_distributions(path) |> Enum.to_list()
-
-      assert first.area_code_l3 == "ALB"
-      assert first.plant_name_id == "1"
+      introduced = Enum.filter(dists, fn d -> d.introduced == "1" end)
+      assert length(introduced) == 1
+      assert hd(introduced).plant_name_id == "3"
+      assert hd(introduced).area_code_l3 == "ILL"
     end
   end
 

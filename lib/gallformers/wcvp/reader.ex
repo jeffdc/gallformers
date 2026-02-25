@@ -90,12 +90,14 @@ defmodule Gallformers.Wcvp.Reader do
   end
 
   @doc """
-  Streams native, extant, non-doubtful distributions from wcvp_distributions.csv.
+  Streams established (non-extinct, non-doubtful) distributions from wcvp_distributions.csv.
+  Includes both native and introduced records. Use the `introduced` field on each
+  struct to distinguish ("0" = native, "1" = introduced).
   """
-  def stream_native_distributions(path) do
+  def stream_established_distributions(path) do
     stream_distributions(path)
     |> Stream.filter(fn dist ->
-      dist.introduced == "0" and dist.extinct == "0" and dist.location_doubtful == "0"
+      dist.extinct == "0" and dist.location_doubtful == "0"
     end)
   end
 
@@ -126,7 +128,10 @@ defmodule Gallformers.Wcvp.Reader do
   Only includes native, extant, non-doubtful distributions.
   """
   def build_distribution_index(distributions_path) do
-    stream_native_distributions(distributions_path)
+    stream_distributions(distributions_path)
+    |> Stream.filter(fn dist ->
+      dist.introduced == "0" and dist.extinct == "0" and dist.location_doubtful == "0"
+    end)
     |> Enum.reduce(%{}, fn dist, acc ->
       Map.update(acc, dist.plant_name_id, [dist.area_code_l3], fn codes ->
         [dist.area_code_l3 | codes]

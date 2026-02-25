@@ -50,11 +50,11 @@ defmodule Mix.Tasks.Gallformers.Wcvp.BuildDb do
     tdwg_lookup = Tdwg.load()
     valid_tdwg_codes = MapSet.new(Map.keys(tdwg_lookup))
 
-    # Step 1: Find species IDs with distribution in our regions
+    # Step 1: Find species IDs with any established distribution in our regions
     Logger.info("Scanning distributions for Western Hemisphere species...")
 
     matching_ids =
-      Reader.stream_native_distributions(dist_path)
+      Reader.stream_established_distributions(dist_path)
       |> Stream.filter(fn dist -> MapSet.member?(valid_tdwg_codes, dist.area_code_l3) end)
       |> Enum.reduce(MapSet.new(), fn dist, acc -> MapSet.put(acc, dist.plant_name_id) end)
 
@@ -76,7 +76,7 @@ defmodule Mix.Tasks.Gallformers.Wcvp.BuildDb do
     Logger.info("Collecting distributions...")
 
     distributions =
-      Reader.stream_native_distributions(dist_path)
+      Reader.stream_established_distributions(dist_path)
       |> Stream.filter(fn dist ->
         MapSet.member?(matching_ids, dist.plant_name_id) and
           MapSet.member?(valid_tdwg_codes, dist.area_code_l3)
@@ -122,7 +122,8 @@ defmodule Mix.Tasks.Gallformers.Wcvp.BuildDb do
       CREATE TABLE wcvp_distributions (
         plant_name_id TEXT NOT NULL,
         area_code_l3 TEXT NOT NULL,
-        PRIMARY KEY (plant_name_id, area_code_l3),
+        introduced INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (plant_name_id, area_code_l3, introduced),
         FOREIGN KEY (plant_name_id) REFERENCES wcvp_names(plant_name_id)
       )
       """)
@@ -158,11 +159,15 @@ defmodule Mix.Tasks.Gallformers.Wcvp.BuildDb do
     {:ok, dist_stmt} =
       Exqlite.Sqlite3.prepare(
         conn,
-        "INSERT OR IGNORE INTO wcvp_distributions (plant_name_id, area_code_l3) VALUES (?1, ?2)"
+        "INSERT OR IGNORE INTO wcvp_distributions (plant_name_id, area_code_l3, introduced) VALUES (?1, ?2, ?3)"
       )
 
     for dist <- distributions do
-      :ok = Exqlite.Sqlite3.bind(dist_stmt, [dist.plant_name_id, dist.area_code_l3])
+      introduced = if dist.introduced == "1", do: 1, else: 0
+
+      :ok =
+        Exqlite.Sqlite3.bind(dist_stmt, [dist.plant_name_id, dist.area_code_l3, introduced])
+
       :done = Exqlite.Sqlite3.step(conn, dist_stmt)
       :ok = Exqlite.Sqlite3.reset(dist_stmt)
     end

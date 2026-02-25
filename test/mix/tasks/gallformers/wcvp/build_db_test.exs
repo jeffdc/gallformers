@@ -27,6 +27,7 @@ defmodule Mix.Tasks.Gallformers.Wcvp.BuildDbTest do
       2|100|7|NORTHERN AMERICA|74|Southeastern U.S.A.|FLA|Florida|0|0|0
       3|200|7|NORTHERN AMERICA|78|Southeastern U.S.A.|NCA|North Carolina|0|0|0
       4|300|3|SOUTHERN AFRICA|30|Southern Africa|ZAF|South Africa|0|0|0
+      5|100|7|NORTHERN AMERICA|78|Southeastern U.S.A.|NCA|North Carolina|1|0|0
       """
 
     File.write!(Path.join(@test_dir, "wcvp_names.csv"), String.trim(names_csv))
@@ -60,10 +61,23 @@ defmodule Mix.Tasks.Gallformers.Wcvp.BuildDbTest do
     assert count == 2
     Exqlite.Sqlite3.release(conn, stmt)
 
-    # Distribution rows: 2 for Quercus alba + 1 for Rosa carolina = 3
+    # Distribution rows: 2 native for Quercus alba + 1 introduced + 1 for Rosa carolina = 4
     {:ok, stmt} = Exqlite.Sqlite3.prepare(conn, "SELECT COUNT(*) FROM wcvp_distributions")
     {:row, [count]} = Exqlite.Sqlite3.step(conn, stmt)
-    assert count == 3
+    assert count == 4
+    Exqlite.Sqlite3.release(conn, stmt)
+
+    # Verify introduced flag is stored correctly
+    {:ok, stmt} =
+      Exqlite.Sqlite3.prepare(
+        conn,
+        "SELECT area_code_l3, introduced FROM wcvp_distributions WHERE plant_name_id = '100' ORDER BY area_code_l3, introduced"
+      )
+
+    {:row, ["ALA", 0]} = Exqlite.Sqlite3.step(conn, stmt)
+    {:row, ["FLA", 0]} = Exqlite.Sqlite3.step(conn, stmt)
+    {:row, ["NCA", 1]} = Exqlite.Sqlite3.step(conn, stmt)
+    :done = Exqlite.Sqlite3.step(conn, stmt)
     Exqlite.Sqlite3.release(conn, stmt)
 
     # Verify Quercus alba data

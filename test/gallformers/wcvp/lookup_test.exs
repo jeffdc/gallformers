@@ -31,7 +31,8 @@ defmodule Gallformers.Wcvp.LookupTest do
       CREATE TABLE wcvp_distributions (
         plant_name_id TEXT NOT NULL,
         area_code_l3 TEXT NOT NULL,
-        PRIMARY KEY (plant_name_id, area_code_l3),
+        introduced INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (plant_name_id, area_code_l3, introduced),
         FOREIGN KEY (plant_name_id) REFERENCES wcvp_names(plant_name_id)
       )
       """)
@@ -82,18 +83,19 @@ defmodule Gallformers.Wcvp.LookupTest do
 
     Exqlite.Sqlite3.release(conn, name_stmt)
 
-    # Insert test distributions
+    # Insert test distributions (plant_name_id, area_code_l3, introduced)
     {:ok, dist_stmt} =
       Exqlite.Sqlite3.prepare(
         conn,
-        "INSERT INTO wcvp_distributions (plant_name_id, area_code_l3) VALUES (?1, ?2)"
+        "INSERT INTO wcvp_distributions (plant_name_id, area_code_l3, introduced) VALUES (?1, ?2, ?3)"
       )
 
     distributions = [
-      ["100", "ALB"],
-      ["100", "FLA"],
-      ["101", "NCA"],
-      ["200", "NCA"]
+      ["100", "ALB", 0],
+      ["100", "FLA", 0],
+      ["100", "NCA", 1],
+      ["101", "NCA", 0],
+      ["200", "NCA", 0]
     ]
 
     for params <- distributions do
@@ -152,7 +154,7 @@ defmodule Gallformers.Wcvp.LookupTest do
   end
 
   describe "get/1" do
-    test "returns species with distributions" do
+    test "returns species with separate native and introduced distributions" do
       result = Lookup.get("100")
       assert result.taxon_name == "Quercus alba"
       assert result.family == "Fagaceae"
@@ -160,7 +162,14 @@ defmodule Gallformers.Wcvp.LookupTest do
       assert result.species == "alba"
       assert result.taxon_authors == "L."
       assert result.powo_id == "urn:lsid:ipni.org:names:295763-1"
-      assert result.distribution == ["ALB", "FLA"]
+      assert result.native_distribution == ["ALB", "FLA"]
+      assert result.introduced_distribution == ["NCA"]
+    end
+
+    test "returns empty introduced list when all distributions are native" do
+      result = Lookup.get("101")
+      assert result.native_distribution == ["NCA"]
+      assert result.introduced_distribution == []
     end
 
     test "returns nil for nonexistent plant_name_id" do

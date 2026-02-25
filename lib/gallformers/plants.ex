@@ -537,6 +537,7 @@ defmodule Gallformers.Plants do
           save_alias_changes(host.id, aliases_to_add, aliases_to_remove)
           save_place_changes(host.id, params.place_changes)
           maybe_update_section(params.section_update)
+          maybe_upsert_host_traits(host.id, params[:host_traits])
           updated_host
 
         {:error, changeset} ->
@@ -592,6 +593,15 @@ defmodule Gallformers.Plants do
   end
 
   defp maybe_update_section(_), do: :ok
+
+  defp maybe_upsert_host_traits(_host_id, nil), do: :ok
+
+  defp maybe_upsert_host_traits(host_id, traits) do
+    case upsert_host_traits(host_id, traits) do
+      {:ok, _} -> :ok
+      {:error, changeset} -> Repo.rollback(changeset)
+    end
+  end
 
   # Updates the species→section link in species_taxonomy when section changes.
   defp update_species_section_link(_species_id, same, same), do: :ok
