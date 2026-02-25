@@ -178,20 +178,25 @@ defmodule Gallformers.Plants do
   """
   @spec search_hosts(String.t(), integer()) :: [map()]
   def search_hosts(query, limit \\ 20) when is_binary(query) do
+    normalized = query |> String.downcase() |> String.trim()
+
     terms =
-      query
-      |> String.downcase()
+      normalized
       |> String.split(~r/\s+/, trim: true)
       |> Enum.map(&"%#{&1}%")
 
     if terms == [] do
       []
     else
-      search_hosts_with_terms(terms, limit)
+      search_hosts_with_terms(terms, normalized, limit)
     end
   end
 
-  defp search_hosts_with_terms(terms, limit) do
+  defp search_hosts_with_terms(terms, raw_query, limit) do
+    prefix_pattern = "#{raw_query}%"
+
+    # Relevance ranking: exact match (0) > prefix match (1) > contains (2)
+    # MIN() picks the best rank across all aliases for a grouped host
     base_query =
       from(s in Species,
         left_join: als in "alias_species",
@@ -200,7 +205,27 @@ defmodule Gallformers.Plants do
         on: a.id == als.alias_id,
         where: s.taxoncode == "plant",
         group_by: [s.id, s.name, s.datacomplete],
-        order_by: s.name,
+        order_by: [
+          asc:
+            fragment(
+              """
+              MIN(CASE
+                WHEN lower(?) = ? OR lower(?) = ? THEN 0
+                WHEN lower(?) LIKE ? OR lower(?) LIKE ? THEN 1
+                ELSE 2
+              END)
+              """,
+              s.name,
+              ^raw_query,
+              a.name,
+              ^raw_query,
+              s.name,
+              ^prefix_pattern,
+              a.name,
+              ^prefix_pattern
+            ),
+          asc: s.name
+        ],
         limit: ^limit,
         select: %{
           id: s.id,

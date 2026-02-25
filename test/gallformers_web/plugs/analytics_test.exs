@@ -17,6 +17,11 @@ defmodule GallformersWeb.Plugs.AnalyticsTest do
       assert get_session(conn, :analytics_device_type) == "mobile"
       assert get_session(conn, :analytics_visitor_hash) != nil
       assert is_binary(get_session(conn, :analytics_visitor_hash))
+
+      # Should store IP, UA, and hash date for LiveView hash regeneration
+      assert get_session(conn, :analytics_ip) == "192.168.1.1"
+      assert get_session(conn, :analytics_user_agent) == "Mozilla/5.0 (iPhone) Safari/604.1"
+      assert get_session(conn, :analytics_hash_date) == Date.utc_today() |> Date.to_iso8601()
     end
 
     test "stores nil browser when user agent is nil", %{conn: conn} do

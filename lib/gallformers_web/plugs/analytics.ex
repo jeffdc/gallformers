@@ -79,5 +79,8 @@ defmodule GallformersWeb.Plugs.Analytics do
     |> put_session(:analytics_browser, browser)
     |> put_session(:analytics_device_type, device_type)
     |> put_session(:analytics_visitor_hash, visitor_hash)
+    |> put_session(:analytics_ip, ip)
+    |> put_session(:analytics_user_agent, user_agent)
+    |> put_session(:analytics_hash_date, Date.utc_today() |> Date.to_iso8601())
   end
 end

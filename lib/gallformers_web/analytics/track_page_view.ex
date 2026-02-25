@@ -18,7 +18,10 @@ defmodule GallformersWeb.Analytics.TrackPageView do
       assign(socket,
         analytics_browser: session["analytics_browser"],
         analytics_device_type: session["analytics_device_type"],
-        analytics_visitor_hash: session["analytics_visitor_hash"]
+        analytics_visitor_hash: session["analytics_visitor_hash"],
+        analytics_ip: session["analytics_ip"],
+        analytics_user_agent: session["analytics_user_agent"],
+        analytics_hash_date: session["analytics_hash_date"]
       )
 
     socket =
@@ -43,12 +46,12 @@ defmodule GallformersWeb.Analytics.TrackPageView do
 
       # Get tracking data from socket assigns (set by initial HTTP request)
       # For LiveView navigations, we reuse the visitor hash from the session
-      if Analytics.should_track?(path, nil) do
-        visitor_hash = get_visitor_hash(socket)
+      visitor_hash = get_visitor_hash(socket)
 
+      if Analytics.should_track?(path, nil) and visitor_hash do
         attrs = %{
           path: path,
-          referrer_host: nil,
+          referrer_host: "(internal)",
           browser: socket.assigns[:analytics_browser],
           device_type: socket.assigns[:analytics_device_type],
           visitor_hash: visitor_hash
@@ -62,8 +65,29 @@ defmodule GallformersWeb.Analytics.TrackPageView do
   end
 
   defp get_visitor_hash(socket) do
-    # Use stored hash from initial page load, or generate a fallback
-    socket.assigns[:analytics_visitor_hash] ||
-      Analytics.generate_visitor_hash("unknown", nil)
+    stored_hash = socket.assigns[:analytics_visitor_hash]
+    hash_date = socket.assigns[:analytics_hash_date]
+    today = Date.utc_today() |> Date.to_iso8601()
+
+    cond do
+      # No hash available — skip tracking (caller checks for nil)
+      is_nil(stored_hash) ->
+        nil
+
+      # Hash is from today — use it
+      hash_date == today ->
+        stored_hash
+
+      # Hash is stale (past midnight UTC) — regenerate from stored IP/UA
+      true ->
+        ip = socket.assigns[:analytics_ip]
+        ua = socket.assigns[:analytics_user_agent]
+
+        if ip do
+          Analytics.generate_visitor_hash(ip, ua)
+        else
+          nil
+        end
+    end
   end
 end

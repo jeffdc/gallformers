@@ -31,6 +31,7 @@ defmodule Gallformers.AnalyticsTest do
       refute Analytics.should_track?("/favicon.ico", nil)
       refute Analytics.should_track?("/robots.txt", nil)
       refute Analytics.should_track?("/sitemap.xml", nil)
+      refute Analytics.should_track?("/analytics", nil)
     end
 
     test "returns false for bot user agents" do
@@ -240,6 +241,20 @@ defmodule Gallformers.AnalyticsTest do
   end
 
   describe "track_page_view/1" do
+    import ExUnit.CaptureLog
+
+    test "logs warning on insert failure" do
+      # Missing required visitor_hash field should fail changeset validation
+      attrs = %{path: "/test"}
+
+      log =
+        capture_log([level: :warning], fn ->
+          Analytics.track_page_view(attrs)
+        end)
+
+      assert log =~ "Analytics: failed to insert page view"
+    end
+
     test "returns :ok immediately" do
       attrs = %{
         path: "/async/test",
@@ -344,6 +359,8 @@ defmodule Gallformers.AnalyticsTest do
 
   describe "daily_stats/2" do
     test "returns daily breakdown for date range" do
+      alias Gallformers.Analytics.Rollup
+
       today = Date.utc_today()
       yesterday = Date.add(today, -1)
 
@@ -365,6 +382,9 @@ defmodule Gallformers.AnalyticsTest do
         visitor_hash: "visitor2",
         inserted_at: NaiveDateTime.new!(yesterday, ~T[14:00:00])
       })
+
+      # Roll up yesterday so summary-backed queries can find it
+      Rollup.rollup_day(yesterday)
 
       # Insert page views for today
       Repo.insert(%PageView{
@@ -422,6 +442,41 @@ defmodule Gallformers.AnalyticsTest do
       assert length(zero_days) == 3
     end
 
+    test "top_referrers distinguishes direct, internal, and external" do
+      today = Date.utc_today()
+
+      # Direct visit (nil referrer)
+      Repo.insert(%PageView{
+        path: "/page1",
+        visitor_hash: "visitor1",
+        referrer_host: nil,
+        inserted_at: NaiveDateTime.new!(today, ~T[10:00:00])
+      })
+
+      # Internal navigation (LiveView)
+      Repo.insert(%PageView{
+        path: "/page2",
+        visitor_hash: "visitor1",
+        referrer_host: "(internal)",
+        inserted_at: NaiveDateTime.new!(today, ~T[10:01:00])
+      })
+
+      # External referrer
+      Repo.insert(%PageView{
+        path: "/page3",
+        visitor_hash: "visitor2",
+        referrer_host: "google.com",
+        inserted_at: NaiveDateTime.new!(today, ~T[10:02:00])
+      })
+
+      referrers = Analytics.top_referrers(today, today)
+
+      labels = Enum.map(referrers, & &1.referrer) |> MapSet.new()
+      assert "Direct" in labels
+      assert "Internal" in labels
+      assert "google.com" in labels
+    end
+
     test "orders results chronologically" do
       today = Date.utc_today()
       two_days_ago = Date.add(today, -2)
@@ -445,6 +500,132 @@ defmodule Gallformers.AnalyticsTest do
       assert dates == Enum.sort_by(dates, & &1, Date)
       assert List.first(dates) == two_days_ago
       assert List.last(dates) == today
+    end
+  end
+
+  describe "summary-backed queries" do
+    alias Gallformers.Analytics.Rollup
+
+    setup do
+      yesterday = Date.add(Date.utc_today(), -1)
+      two_days_ago = Date.add(Date.utc_today(), -2)
+
+      insert_page_views(two_days_ago, [
+        %{
+          path: "/species/1",
+          visitor_hash: "v1",
+          referrer_host: "google.com",
+          browser: "Chrome",
+          device_type: "desktop"
+        },
+        %{
+          path: "/species/1",
+          visitor_hash: "v2",
+          referrer_host: nil,
+          browser: "Firefox",
+          device_type: "mobile"
+        },
+        %{
+          path: "/gall/1",
+          visitor_hash: "v1",
+          referrer_host: "google.com",
+          browser: "Chrome",
+          device_type: "desktop"
+        }
+      ])
+
+      insert_page_views(yesterday, [
+        %{
+          path: "/species/1",
+          visitor_hash: "v3",
+          referrer_host: "reddit.com",
+          browser: "Safari",
+          device_type: "desktop"
+        },
+        %{
+          path: "/host/1",
+          visitor_hash: "v3",
+          referrer_host: "reddit.com",
+          browser: "Safari",
+          device_type: "desktop"
+        }
+      ])
+
+      Rollup.rollup_day(two_days_ago)
+      Rollup.rollup_day(yesterday)
+
+      # Today's raw data (not rolled up)
+      insert_page_views(Date.utc_today(), [
+        %{
+          path: "/species/1",
+          visitor_hash: "v4",
+          referrer_host: nil,
+          browser: "Chrome",
+          device_type: "desktop"
+        }
+      ])
+
+      %{yesterday: yesterday, two_days_ago: two_days_ago}
+    end
+
+    test "daily_stats combines summaries with today's raw data", ctx do
+      daily = Analytics.daily_stats(ctx.two_days_ago, Date.utc_today())
+      assert length(daily) == 3
+
+      day1 = Enum.find(daily, &(&1.date == ctx.two_days_ago))
+      assert day1.page_views == 3
+      assert day1.unique_visitors == 2
+
+      today_stats = Enum.find(daily, &(&1.date == Date.utc_today()))
+      assert today_stats.page_views >= 1
+    end
+
+    test "top_pages combines summaries with today", ctx do
+      pages = Analytics.top_pages(ctx.two_days_ago, Date.utc_today())
+      species_1 = Enum.find(pages, &(&1.path == "/species/1"))
+      # 2 from two_days_ago + 1 from yesterday + 1 from today = 4
+      assert species_1.views >= 4
+    end
+
+    test "top_referrers combines summaries with today", ctx do
+      referrers = Analytics.top_referrers(ctx.two_days_ago, Date.utc_today())
+      labels = Enum.map(referrers, & &1.referrer)
+      assert "google.com" in labels
+      assert "reddit.com" in labels
+      assert "Direct" in labels
+    end
+
+    test "device_breakdown combines summaries with today", ctx do
+      devices = Analytics.device_breakdown(ctx.two_days_ago, Date.utc_today())
+      desktop = Enum.find(devices, &(&1.device_type == "desktop"))
+      assert desktop.count >= 4
+    end
+
+    test "browser_breakdown combines summaries with today", ctx do
+      browsers = Analytics.browser_breakdown(ctx.two_days_ago, Date.utc_today())
+      chrome = Enum.find(browsers, &(&1.browser == "Chrome"))
+      assert chrome.count >= 3
+    end
+
+    test "stats combines summaries with today for multi-day range", ctx do
+      result = Analytics.stats(ctx.two_days_ago, Date.utc_today())
+      # 3 + 2 + 1 = 6 page views total
+      assert result.page_views >= 6
+    end
+  end
+
+  # -- Helpers --
+
+  defp insert_page_views(date, entries) do
+    for {entry, i} <- Enum.with_index(entries) do
+      Repo.insert!(%PageView{
+        path: entry.path,
+        visitor_hash: entry.visitor_hash,
+        referrer_host: entry.referrer_host,
+        browser: entry.browser,
+        device_type: entry.device_type,
+        inserted_at: NaiveDateTime.new!(date, Time.new!(12, i, 0))
+      })
     end
   end
 end

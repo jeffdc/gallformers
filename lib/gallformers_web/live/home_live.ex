@@ -74,7 +74,7 @@ defmodule GallformersWeb.HomeLive do
   def handle_event("search_host", %{"value" => query}, socket) do
     results =
       if String.length(query) >= 2 do
-        Plants.search_hosts(query, 8)
+        Plants.search_hosts(query, 50)
       else
         []
       end

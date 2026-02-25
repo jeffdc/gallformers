@@ -393,6 +393,82 @@ defmodule GallformersWeb.IDLiveTest do
     end
   end
 
+  describe "Name filter" do
+    test "filter_by_name narrows displayed results", %{conn: conn} do
+      # GenusAlpha has galls 100 (Andricus) and 101 (Amphibolips) via seed data
+      {:ok, view, _html} = live(conn, ~p"/id?g=GenusAlpha&gt=genus")
+
+      # Both galls should be visible initially
+      html = render(view)
+      assert html =~ "Andricus"
+      assert html =~ "Amphibolips"
+
+      # Type in the name filter
+      html = render_keyup(view, "filter_by_name", %{"value" => "Andricus"})
+
+      # Only Andricus should remain
+      assert html =~ "Andricus"
+      refute html =~ "Amphibolips"
+    end
+
+    test "name filter is case-insensitive", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/id?g=GenusAlpha&gt=genus")
+
+      html = render_keyup(view, "filter_by_name", %{"value" => "andricus"})
+
+      assert html =~ "Andricus"
+      refute html =~ "Amphibolips"
+    end
+
+    test "clear_name_filter restores all results", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/id?g=GenusAlpha&gt=genus")
+
+      # Filter down
+      render_keyup(view, "filter_by_name", %{"value" => "Andricus"})
+
+      # Clear
+      html = render_click(view, "clear_name_filter")
+
+      assert html =~ "Andricus"
+      assert html =~ "Amphibolips"
+    end
+
+    test "name filter shows correct counts", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/id?g=GenusAlpha&gt=genus")
+
+      html = render_keyup(view, "filter_by_name", %{"value" => "Andricus"})
+
+      # Should show "Showing 1 of 2 galls"
+      assert html =~ "Showing"
+      assert html =~ ">1<"
+      assert html =~ "of 2"
+    end
+
+    test "name filter input not shown when no results", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/id")
+
+      # No selection means no results, so no filter input
+      refute html =~ "Filter by name"
+    end
+
+    test "changing structured filter clears name filter", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/id?g=GenusAlpha&gt=genus")
+
+      # Apply name filter
+      render_keyup(view, "filter_by_name", %{"value" => "Andricus"})
+
+      # Change a structured filter (detachable) — triggers URL patch → handle_params
+      view
+      |> element("form[phx-value-filter='detachable']")
+      |> render_change(%{"value" => "integral"})
+
+      html = render(view)
+
+      # Name filter should be cleared (input value should be empty)
+      refute html =~ ~s(value="Andricus")
+    end
+  end
+
   describe "Page title" do
     test "sets appropriate page title", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/id")

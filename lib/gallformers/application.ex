@@ -20,6 +20,8 @@ defmodule Gallformers.Application do
           {Phoenix.PubSub, name: Gallformers.PubSub},
           # Image audit cache for orphan detection
           Gallformers.Images.AuditCache,
+          # Nightly analytics rollup and pruning
+          Gallformers.Analytics.Rollup,
           # Start to serve requests, typically the last entry
           GallformersWeb.Endpoint
         ]

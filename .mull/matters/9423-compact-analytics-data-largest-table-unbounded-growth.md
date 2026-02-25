@@ -1,9 +1,10 @@
 ---
-status: planned
+status: done
 effort: 1 day
 created: 2026-02-18
-updated: 2026-02-18
+updated: 2026-02-24
 epic: platform
+docs: [docs/plans/completed/2026-02-24-analytics-compaction-design.md, docs/plans/completed/2026-02-24-analytics-compaction.md]
 ---
 
 # Compact analytics data (largest table, unbounded growth)

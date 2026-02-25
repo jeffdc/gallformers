@@ -11,6 +11,7 @@ defmodule GallformersWeb.AnalyticsLive do
   alias Gallformers.Analytics
 
   @default_range "today"
+  @referrer_page_size 15
   @ranges %{
     "today" => 0,
     "7d" => 6,
@@ -43,9 +44,14 @@ defmodule GallformersWeb.AnalyticsLive do
     {:noreply, socket}
   end
 
+  def handle_event("referrer_page", %{"page" => page}, socket) when is_integer(page) do
+    {:noreply, assign_referrer_page(socket, socket.assigns.all_referrers, page)}
+  end
+
   defp load_analytics(socket, range) do
     {from_date, to_date} = date_range(range)
     is_single_day = from_date == to_date
+    all_referrers = Analytics.top_referrers(from_date, to_date)
 
     socket
     |> assign(:from_date, from_date)
@@ -57,9 +63,27 @@ defmodule GallformersWeb.AnalyticsLive do
       if(is_single_day, do: nil, else: Analytics.daily_stats(from_date, to_date))
     )
     |> assign(:top_pages, Analytics.top_pages(from_date, to_date))
-    |> assign(:top_referrers, Analytics.top_referrers(from_date, to_date))
+    |> assign(:all_referrers, all_referrers)
+    |> assign(:referrer_page, 1)
+    |> assign_referrer_page(all_referrers, 1)
     |> assign(:devices, add_percentages(Analytics.device_breakdown(from_date, to_date)))
     |> assign(:browsers, add_percentages(Analytics.browser_breakdown(from_date, to_date)))
+  end
+
+  defp assign_referrer_page(socket, all_referrers, page) do
+    total = length(all_referrers)
+    total_pages = max(1, ceil(total / @referrer_page_size))
+    page = min(page, total_pages)
+
+    paged =
+      all_referrers
+      |> Enum.drop((page - 1) * @referrer_page_size)
+      |> Enum.take(@referrer_page_size)
+
+    socket
+    |> assign(:referrer_page, page)
+    |> assign(:referrer_total_pages, total_pages)
+    |> assign(:top_referrers, paged)
   end
 
   defp date_range(range) do
@@ -130,15 +154,15 @@ defmodule GallformersWeb.AnalyticsLive do
             <thead>
               <tr>
                 <th>Path</th>
-                <th class="text-right">Views</th>
-                <th class="text-right">Unique Visitors</th>
+                <th class="text-center">Views</th>
+                <th class="text-center">Unique Visitors</th>
               </tr>
             </thead>
             <tbody>
               <tr :for={page <- @top_pages}>
                 <td class="font-mono text-sm">{page.path}</td>
-                <td class="text-right">{format_number(page.views)}</td>
-                <td class="text-right">{format_number(page.unique_visitors)}</td>
+                <td class="text-center">{format_number(page.views)}</td>
+                <td class="text-center">{format_number(page.unique_visitors)}</td>
               </tr>
               <tr :if={@top_pages == []}>
                 <td colspan="3" class="text-center text-gray-500 py-8">
@@ -160,13 +184,13 @@ defmodule GallformersWeb.AnalyticsLive do
               <thead>
                 <tr>
                   <th>Source</th>
-                  <th class="text-right">Views</th>
+                  <th class="text-center">Views</th>
                 </tr>
               </thead>
               <tbody>
                 <tr :for={referrer <- @top_referrers}>
                   <td>{referrer.referrer}</td>
-                  <td class="text-right">{format_number(referrer.views)}</td>
+                  <td class="text-center">{format_number(referrer.views)}</td>
                 </tr>
                 <tr :if={@top_referrers == []}>
                   <td colspan="2" class="text-center text-gray-500 py-8">
@@ -175,6 +199,15 @@ defmodule GallformersWeb.AnalyticsLive do
                 </tr>
               </tbody>
             </table>
+            <div :if={@referrer_total_pages > 1} class="px-4 py-2 border-t border-gray-200">
+              <.pagination
+                page={@referrer_page}
+                total_pages={@referrer_total_pages}
+                total_items={length(@all_referrers)}
+                page_size={15}
+                on_page_change={fn page -> JS.push("referrer_page", value: %{page: page}) end}
+              />
+            </div>
           </div>
 
           <%!-- Devices and Browsers --%>
@@ -188,15 +221,15 @@ defmodule GallformersWeb.AnalyticsLive do
                 <thead>
                   <tr>
                     <th>Type</th>
-                    <th class="text-right">Count</th>
-                    <th class="text-right">%</th>
+                    <th class="text-center">Count</th>
+                    <th class="text-center">%</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr :for={device <- @devices}>
                     <td class="capitalize">{device.device_type}</td>
-                    <td class="text-right">{format_number(device.count)}</td>
-                    <td class="text-right">{device.percentage}%</td>
+                    <td class="text-center">{format_number(device.count)}</td>
+                    <td class="text-center">{device.percentage}%</td>
                   </tr>
                   <tr :if={@devices == []}>
                     <td colspan="3" class="text-center text-gray-500 py-8">
@@ -216,15 +249,15 @@ defmodule GallformersWeb.AnalyticsLive do
                 <thead>
                   <tr>
                     <th>Browser</th>
-                    <th class="text-right">Count</th>
-                    <th class="text-right">%</th>
+                    <th class="text-center">Count</th>
+                    <th class="text-center">%</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr :for={browser <- @browsers}>
                     <td>{browser.browser}</td>
-                    <td class="text-right">{format_number(browser.count)}</td>
-                    <td class="text-right">{browser.percentage}%</td>
+                    <td class="text-center">{format_number(browser.count)}</td>
+                    <td class="text-center">{browser.percentage}%</td>
                   </tr>
                   <tr :if={@browsers == []}>
                     <td colspan="3" class="text-center text-gray-500 py-8">
