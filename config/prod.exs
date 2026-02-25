@@ -33,7 +33,8 @@ unless System.get_env("PREVIEW_DEPLOY") do
     ]
 end
 
-config :gallformers, Gallformers.Repo.WCVP, database: "/data/wcvp.sqlite"
+config :gallformers, Gallformers.Repo.WCVP,
+  database: System.get_env("WCVP_DATABASE_PATH", "/data/wcvp.sqlite")
 
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.
