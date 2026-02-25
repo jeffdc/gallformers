@@ -37,9 +37,7 @@ defmodule Gallformers.Wcvp.Reports do
         run_date: run_date,
         taxonomy_mismatches: count_items(dir, "taxonomy-mismatches"),
         gf_not_in_wcvp: count_items(dir, "in-gf-not-wcvp"),
-        range_updates: count_items(dir, "range-updates"),
-        wcvp_not_in_gf_usca: count_items(dir, "in-wcvp-not-gf-usca"),
-        wcvp_not_in_gf_hemisphere: count_items(dir, "in-wcvp-not-gf-hemisphere")
+        range_updates: count_items(dir, "range-updates")
       }
     end
   end

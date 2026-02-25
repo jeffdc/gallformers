@@ -40,20 +40,6 @@ defmodule Gallformers.Wcvp.ReportsTest do
       ])
     )
 
-    File.write!(
-      Path.join(run_dir, "in-wcvp-not-gf-usca.json"),
-      Jason.encode!([
-        %{wcvp_id: "100", wcvp_name: "Rosa carolina", wcvp_family: "Rosaceae"}
-      ])
-    )
-
-    File.write!(
-      Path.join(run_dir, "in-wcvp-not-gf-hemisphere.json"),
-      Jason.encode!([
-        %{wcvp_id: "200", wcvp_name: "Tmesipteris oblongifolia", wcvp_family: "Psilotaceae"}
-      ])
-    )
-
     on_exit(fn -> File.rm_rf!(@fixture_dir) end)
 
     %{run_dir: run_dir}
@@ -78,8 +64,6 @@ defmodule Gallformers.Wcvp.ReportsTest do
       assert summary.taxonomy_mismatches == 1
       assert summary.gf_not_in_wcvp == 1
       assert summary.range_updates == 1
-      assert summary.wcvp_not_in_gf_usca == 1
-      assert summary.wcvp_not_in_gf_hemisphere == 1
     end
 
     test "returns nil for nonexistent run" do

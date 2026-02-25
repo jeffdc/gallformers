@@ -58,6 +58,7 @@ defmodule GallformersWeb.Admin.ReconciliationLive do
        |> assign(:current_page, 1)}
     else
       {:ok, data} = Reports.load_report(socket.assigns.selected_run, report_name)
+      data = sort_report_data(data, report_name)
 
       {:noreply,
        socket
@@ -106,11 +107,18 @@ defmodule GallformersWeb.Admin.ReconciliationLive do
 
   defp total_pages(total, page_size), do: max(1, ceil(total / page_size))
 
+  defp sort_report_data(data, "taxonomy-mismatches"),
+    do: Enum.sort_by(data, & &1["gf_name"])
+
+  defp sort_report_data(data, "in-gf-not-wcvp"),
+    do: Enum.sort_by(data, & &1["gf_name"])
+
+  defp sort_report_data(data, "range-updates"),
+    do: Enum.sort_by(data, & &1["gf_name"])
+
   defp report_label("taxonomy-mismatches"), do: "Taxonomy Mismatches"
   defp report_label("in-gf-not-wcvp"), do: "Not Found in WCVP"
   defp report_label("range-updates"), do: "Range Updates"
-  defp report_label("in-wcvp-not-gf-usca"), do: "US/CA Species Not in Gallformers"
-  defp report_label("in-wcvp-not-gf-hemisphere"), do: "Hemisphere Species Not in Gallformers"
 
   defp report_description("taxonomy-mismatches"),
     do: "Species where gallformers and WCVP disagree on taxonomy"
@@ -121,23 +129,13 @@ defmodule GallformersWeb.Admin.ReconciliationLive do
   defp report_description("range-updates"),
     do: "Matched species where WCVP has additional place data"
 
-  defp report_description("in-wcvp-not-gf-usca"),
-    do: "Accepted WCVP species in US/Canada not yet in gallformers"
-
-  defp report_description("in-wcvp-not-gf-hemisphere"),
-    do: "Accepted WCVP species elsewhere in the Western Hemisphere"
-
   defp report_count(summary, "taxonomy-mismatches"), do: summary.taxonomy_mismatches
   defp report_count(summary, "in-gf-not-wcvp"), do: summary.gf_not_in_wcvp
   defp report_count(summary, "range-updates"), do: summary.range_updates
-  defp report_count(summary, "in-wcvp-not-gf-usca"), do: summary.wcvp_not_in_gf_usca
-  defp report_count(summary, "in-wcvp-not-gf-hemisphere"), do: summary.wcvp_not_in_gf_hemisphere
 
   defp report_icon("taxonomy-mismatches"), do: "ph-arrows-left-right"
   defp report_icon("in-gf-not-wcvp"), do: "ph-magnifying-glass"
   defp report_icon("range-updates"), do: "ph-map-pin"
-  defp report_icon("in-wcvp-not-gf-usca"), do: "ph-check-circle"
-  defp report_icon("in-wcvp-not-gf-hemisphere"), do: "ph-globe"
 
   defp mismatch_badge_variant("synonym"), do: "warning"
   defp mismatch_badge_variant("fuzzy_name"), do: "warning"
@@ -147,8 +145,6 @@ defmodule GallformersWeb.Admin.ReconciliationLive do
     taxonomy-mismatches
     in-gf-not-wcvp
     range-updates
-    in-wcvp-not-gf-usca
-    in-wcvp-not-gf-hemisphere
   )
 
   @impl true
@@ -393,37 +389,9 @@ defmodule GallformersWeb.Admin.ReconciliationLive do
               <span class="text-green-700 font-medium">+{length(item["new_places"])}</span>
               <span class="text-xs text-gray-500 ml-1">
                 {item["new_places"] |> Enum.take(5) |> Enum.join(", ")}{if length(item["new_places"]) >
-                                                                             5, do: "..."}
+                                                                             5,
+                                                                           do: "..."}
               </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    """
-  end
-
-  defp render_report_table(assigns, report_name, items)
-       when report_name in ~w(in-wcvp-not-gf-usca in-wcvp-not-gf-hemisphere) do
-    assigns = assign(assigns, :items, items)
-
-    ~H"""
-    <div class="overflow-x-auto">
-      <table class="gf-table gf-table-dark gf-table-compact">
-        <thead>
-          <tr>
-            <th>WCVP Name</th>
-            <th>Family</th>
-            <th>Distribution</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr :for={item <- @items}>
-            <td><em>{item["wcvp_name"]}</em></td>
-            <td>{item["wcvp_family"]}</td>
-            <td class="text-sm text-gray-600">
-              <% dist = item["wcvp_distribution"] || [] %>
-              {dist |> Enum.take(5) |> Enum.join(", ")}{if length(dist) > 5, do: "..."}
             </td>
           </tr>
         </tbody>

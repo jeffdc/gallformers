@@ -80,15 +80,6 @@ defmodule Mix.Tasks.Gallformers.Wcvp.Reconcile do
     IO.puts("  #{length(taxonomy_mismatches)} taxonomy mismatches")
     IO.puts("  #{length(gf_not_in_wcvp)} not found in WCVP")
 
-    IO.puts("\nFinding WCVP species not in gallformers...")
-    matched_wcvp_ids = MapSet.new(matches, fn m -> m.wcvp_id end)
-
-    {wcvp_not_in_gf_usca, wcvp_not_in_gf_hemisphere} =
-      find_wcvp_not_in_gf(accepted_by_id, matched_wcvp_ids, dist_index, tdwg_lookup)
-
-    IO.puts("  #{length(wcvp_not_in_gf_usca)} US/CA species not in gallformers")
-    IO.puts("  #{length(wcvp_not_in_gf_hemisphere)} other hemisphere species not in gallformers")
-
     IO.puts("\nFinding range updates for matched species...")
     range_updates = find_range_updates(matches, dist_index, tdwg_lookup)
     IO.puts("  #{length(range_updates)} species with new range data")
@@ -99,8 +90,6 @@ defmodule Mix.Tasks.Gallformers.Wcvp.Reconcile do
     reports = [
       {"taxonomy-mismatches", taxonomy_mismatches},
       {"in-gf-not-wcvp", gf_not_in_wcvp},
-      {"in-wcvp-not-gf-usca", wcvp_not_in_gf_usca},
-      {"in-wcvp-not-gf-hemisphere", wcvp_not_in_gf_hemisphere},
       {"range-updates", range_updates}
     ]
 
@@ -253,38 +242,6 @@ defmodule Mix.Tasks.Gallformers.Wcvp.Reconcile do
         detail: "Taxonomy differs: #{mismatches}"
       }
     end
-  end
-
-  # -- WCVP not in gallformers --
-
-  defp find_wcvp_not_in_gf(accepted_by_id, matched_wcvp_ids, dist_index, tdwg_lookup) do
-    # Filter to species rank only (skip varieties, subspecies for now)
-    unmatched =
-      accepted_by_id
-      |> Enum.reject(fn {id, _name} -> MapSet.member?(matched_wcvp_ids, id) end)
-      |> Enum.filter(fn {_id, name} -> name.taxon_rank == "Species" end)
-      |> Enum.map(fn {_id, name} ->
-        tdwg_codes = Map.get(dist_index, name.plant_name_id, [])
-
-        {places, _unknown} =
-          Tdwg.convert_tdwg_codes_with_warnings(tdwg_codes, tdwg_lookup)
-
-        place_codes = Enum.map(places, & &1.code)
-
-        %{
-          wcvp_id: name.plant_name_id,
-          wcvp_name: name.taxon_name,
-          wcvp_family: name.family,
-          wcvp_genus: name.genus,
-          wcvp_distribution: place_codes,
-          wcvp_status: name.taxon_status
-        }
-      end)
-
-    # Split into US/CA vs rest
-    Enum.split_with(unmatched, fn entry ->
-      Enum.any?(entry.wcvp_distribution, &Tdwg.us_canada_code?/1)
-    end)
   end
 
   # -- Range updates --
