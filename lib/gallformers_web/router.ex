@@ -123,13 +123,14 @@ defmodule GallformersWeb.Router do
     # User profile
     live "/profile", Admin.ProfileLive
 
-    # Reconciliation reports
-    live "/reconciliation", Admin.ReconciliationLive
   end
 
   # Super admin routes (require superadmin role)
   scope "/admin", GallformersWeb do
     pipe_through [:browser, :superadmin]
+
+    # Reconciliation reports (superadmin only)
+    live "/reconciliation", Admin.ReconciliationLive
 
     # Filter terms admin (superadmin only)
     live "/filter-terms", Admin.FilterTermsLive.Index, :index

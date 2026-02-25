@@ -169,6 +169,14 @@ defmodule GallformersWeb.Admin.DashboardLive do
               accent="slate"
               small
             />
+            <.action_card
+              :if={@reconciliation}
+              label="WCVP Reconciliation"
+              href="/admin/reconciliation"
+              icon="ph-arrows-clockwise"
+              accent="slate"
+              small
+            />
           </div>
         </div>
       <% end %>
@@ -186,60 +194,6 @@ defmodule GallformersWeb.Admin.DashboardLive do
         <.stat_card title="Images" value={@stats.image_count} icon="ph-image" href="/admin/images" />
       </div>
 
-      <%!-- WCVP Reconciliation --%>
-      <%= if @reconciliation do %>
-        <div class="mt-8">
-          <h2 class="text-sm font-medium text-gray-500 mb-3">WCVP Reconciliation</h2>
-          <a
-            href="/admin/reconciliation"
-            class="block rounded-lg border border-gray-200 bg-white p-4 hover:shadow-md hover:-translate-y-0.5 transition-all group"
-          >
-            <div class="flex items-center justify-between mb-3">
-              <div class="flex items-center gap-2">
-                <div class="rounded-lg bg-blue-50 p-2">
-                  <.icon name="ph-arrows-clockwise" class="h-5 w-5 text-blue-600" />
-                </div>
-                <span class="font-medium text-gray-900 group-hover:text-gf-maroon">
-                  Latest Run: {@reconciliation.run_date}
-                </span>
-              </div>
-              <.icon name="ph-arrow-right" class="h-4 w-4 text-gray-400 group-hover:text-gf-maroon" />
-            </div>
-            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
-              <div>
-                <div class="text-gray-500">Mismatches</div>
-                <div class="font-semibold text-gray-800">
-                  {format_number(@reconciliation.taxonomy_mismatches)}
-                </div>
-              </div>
-              <div>
-                <div class="text-gray-500">Not in WCVP</div>
-                <div class="font-semibold text-gray-800">
-                  {format_number(@reconciliation.gf_not_in_wcvp)}
-                </div>
-              </div>
-              <div>
-                <div class="text-gray-500">Range Updates</div>
-                <div class="font-semibold text-gray-800">
-                  {format_number(@reconciliation.range_updates)}
-                </div>
-              </div>
-              <div>
-                <div class="text-gray-500">US/CA Gaps</div>
-                <div class="font-semibold text-gray-800">
-                  {format_number(@reconciliation.wcvp_not_in_gf_usca)}
-                </div>
-              </div>
-              <div>
-                <div class="text-gray-500">Hemisphere Gaps</div>
-                <div class="font-semibold text-gray-800">
-                  {format_number(@reconciliation.wcvp_not_in_gf_hemisphere)}
-                </div>
-              </div>
-            </div>
-          </a>
-        </div>
-      <% end %>
     </Layouts.admin>
     """
   end
@@ -378,9 +332,11 @@ defmodule GallformersWeb.Admin.DashboardLive do
     }
 
     reconciliation =
-      case Reports.list_runs() do
-        [latest | _] -> Reports.summary(latest)
-        [] -> nil
+      if Gallformers.Accounts.superadmin?(socket.assigns.current_user) do
+        case Reports.list_runs() do
+          [latest | _] -> Reports.summary(latest)
+          [] -> nil
+        end
       end
 
     socket
