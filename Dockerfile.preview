@@ -85,14 +85,8 @@ RUN --mount=type=secret,id=AWS_ACCESS_KEY_ID \
     AWS_SECRET_ACCESS_KEY=$(cat /run/secrets/AWS_SECRET_ACCESS_KEY) \
     litestream restore -o /app/data/gallformers.sqlite s3://gallformers-backups/litestream
 
-# Download WCVP database from S3
-RUN apk add --no-cache aws-cli
-RUN --mount=type=secret,id=AWS_ACCESS_KEY_ID \
-    --mount=type=secret,id=AWS_SECRET_ACCESS_KEY \
-    AWS_ACCESS_KEY_ID=$(cat /run/secrets/AWS_ACCESS_KEY_ID) \
-    AWS_SECRET_ACCESS_KEY=$(cat /run/secrets/AWS_SECRET_ACCESS_KEY) \
-    aws s3 cp s3://gallformers-backups/wcvp/wcvp.sqlite /app/data/wcvp.sqlite
-RUN apk del aws-cli
+# Copy WCVP database from builder (sourced from priv/data/wcvp.sqlite)
+COPY --from=builder /app/priv/data/wcvp.sqlite /app/data/wcvp.sqlite
 
 RUN chown -R gallformers:gallformers /app/data
 
