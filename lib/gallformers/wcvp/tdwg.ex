@@ -4,14 +4,14 @@ defmodule Gallformers.Wcvp.Tdwg do
   Loads from a static JSON mapping file.
   """
 
-  @mapping_path "priv/repo/data/tdwg_to_places.json"
+  @mapping_file "repo/data/tdwg_to_places.json"
 
   @doc """
   Loads the TDWG mapping from the default JSON file.
   Returns the parsed lookup map.
   """
   def load do
-    @mapping_path
+    Application.app_dir(:gallformers, Path.join("priv", @mapping_file))
     |> File.read!()
     |> Jason.decode!()
     |> build_lookup()

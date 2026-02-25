@@ -17,6 +17,7 @@ kill_timeout = "30s"
 
 [env]
   DATABASE_PATH = "/data/gallformers.sqlite"
+  WCVP_DATABASE_PATH = "/data/wcvp.sqlite"
   PHX_HOST = "www.gallformers.org"
   PORT = "4000"
 

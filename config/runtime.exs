@@ -65,6 +65,11 @@ if s3_image_prefix = System.get_env("S3_IMAGE_PREFIX") do
   config :gallformers, :s3_image_prefix, s3_image_prefix
 end
 
+# WCVP secondary database (optional — app handles missing gracefully)
+if wcvp_path = System.get_env("WCVP_DATABASE_PATH") do
+  config :gallformers, Gallformers.Repo.WCVP, database: wcvp_path
+end
+
 if config_env() == :prod do
   database_path =
     System.get_env("DATABASE_PATH") ||

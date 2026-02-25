@@ -42,7 +42,7 @@ defmodule Gallformers.Wcvp.Lookup do
     pattern = "#{query}%"
 
     from(n in "wcvp_names",
-      where: fragment("lower(?) LIKE lower(?)", n.taxon_name, ^pattern),
+      where: like(n.taxon_name, ^pattern),
       order_by: n.taxon_name,
       limit: ^limit,
       select: %{

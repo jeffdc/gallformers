@@ -180,7 +180,7 @@ defmodule Mix.Tasks.Gallformers.Wcvp.BuildDb do
     :ok =
       Exqlite.Sqlite3.execute(
         conn,
-        "CREATE INDEX idx_wcvp_names_taxon_name ON wcvp_names(taxon_name)"
+        "CREATE INDEX idx_wcvp_names_taxon_name ON wcvp_names(taxon_name COLLATE NOCASE)"
       )
 
     :ok =
