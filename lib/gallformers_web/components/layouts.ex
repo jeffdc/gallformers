@@ -33,7 +33,11 @@ defmodule GallformersWeb.Layouts do
   def app(assigns) do
     ~H"""
     <div class="flex min-h-screen flex-col">
-      <.site_header current_user={@current_user} />
+      <.site_header
+        current_user={@current_user}
+        continent_code={assigns[:continent_code]}
+        continent_name={assigns[:continent_name]}
+      />
 
       <main class="flex-1 pb-32">
         <div class="px-6 sm:px-10 lg:px-16 py-8">
@@ -43,6 +47,8 @@ defmodule GallformersWeb.Layouts do
 
       <.site_footer current_user={@current_user} />
     </div>
+
+    <.continent_prompt continent_code={assigns[:continent_code]} />
 
     <.flash_group flash={@flash} />
     """
@@ -55,12 +61,24 @@ defmodule GallformersWeb.Layouts do
   """
   attr :current_user, :map, default: nil, doc: "the currently logged in user, if any"
   attr :hide_admin_link, :boolean, default: false, doc: "whether to hide the admin link"
+  attr :continent_code, :string, default: nil, doc: "selected continent code"
+  attr :continent_name, :string, default: nil, doc: "selected continent display name"
+
+  @continents [
+    {"XF", "Africa"},
+    {"XA", "Asia"},
+    {"XB", "Caribbean"},
+    {"XC", "Central America"},
+    {"XE", "Europe"},
+    {"XN", "North America"},
+    {"XO", "Oceania"},
+    {"XS", "South America"}
+  ]
 
   def site_header(assigns) do
     nav_links = [
       %{href: "/id", label: "Identify"},
-      %{href: "/explore", label: "Explore"},
-      %{href: "/places", label: "Places"}
+      %{href: "/explore", label: "Explore"}
     ]
 
     resource_links = [
@@ -75,6 +93,7 @@ defmodule GallformersWeb.Layouts do
       assigns
       |> assign(:nav_links, nav_links)
       |> assign(:resource_links, resource_links)
+      |> assign(:continents, @continents)
 
     ~H"""
     <header class="sticky top-0 z-50 bg-gf-sky-blue shadow-md">
@@ -109,6 +128,53 @@ defmodule GallformersWeb.Layouts do
             >
               {link.label}
             </a>
+
+            <%!-- Continent Selector --%>
+            <div id="continent-selector" phx-hook="ContinentSelector" class="relative">
+              <button
+                type="button"
+                data-continent-toggle
+                class="flex items-center gap-1 px-2 text-lg font-medium hover:underline"
+                aria-haspopup="true"
+              >
+                <.icon name="ph-globe" class="h-5 w-5" />
+                <span class="text-sm" data-continent-label>{@continent_name || "All Regions"}</span>
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+              <div
+                data-continent-dropdown
+                class="hidden absolute right-0 z-10 mt-1 w-48 rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5"
+              >
+                <button
+                  type="button"
+                  data-continent-code=""
+                  class={[
+                    "block w-full text-left px-4 py-2 text-sm hover:bg-gray-100",
+                    !@continent_code && "font-bold bg-gray-50"
+                  ]}
+                >
+                  All Regions
+                </button>
+                <button
+                  :for={{code, name} <- @continents}
+                  type="button"
+                  data-continent-code={code}
+                  class={[
+                    "block w-full text-left px-4 py-2 text-sm hover:bg-gray-100",
+                    @continent_code == code && "font-bold bg-gray-50"
+                  ]}
+                >
+                  {name}
+                </button>
+              </div>
+            </div>
 
             <%!-- Search Form --%>
             <form action="/globalsearch" method="get" class="flex items-center">
@@ -207,6 +273,36 @@ defmodule GallformersWeb.Layouts do
             >
               {link.label}
             </a>
+
+            <%!-- Mobile Continent Selector --%>
+            <div class="border-t border-gf-maroon/30 pt-2">
+              <span class="block px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gf-maroon/70">
+                Region
+              </span>
+              <div id="continent-selector-mobile" phx-hook="ContinentSelector">
+                <button
+                  type="button"
+                  data-continent-code=""
+                  class={[
+                    "block w-full text-left rounded-md px-3 py-2 text-lg font-medium hover:bg-white/50",
+                    !@continent_code && "bg-white/30"
+                  ]}
+                >
+                  All Regions
+                </button>
+                <button
+                  :for={{code, name} <- @continents}
+                  type="button"
+                  data-continent-code={code}
+                  class={[
+                    "block w-full text-left rounded-md px-3 py-2 text-lg font-medium hover:bg-white/50",
+                    @continent_code == code && "bg-white/30"
+                  ]}
+                >
+                  {name}
+                </button>
+              </div>
+            </div>
 
             <%!-- Mobile Search --%>
             <form action="/globalsearch" method="get" class="px-3 py-2">
@@ -445,6 +541,51 @@ defmodule GallformersWeb.Layouts do
 
   defp toggle_footer_menu do
     JS.toggle(to: "#footer-menu")
+  end
+
+  @doc false
+  attr :continent_code, :string, default: nil
+
+  def continent_prompt(assigns) do
+    assigns = assign(assigns, :continents, @continents)
+
+    ~H"""
+    <div
+      :if={!@continent_code}
+      id="continent-prompt"
+      phx-hook="ContinentPrompt"
+      class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
+    >
+      <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+        <div class="text-center mb-4">
+          <.icon name="ph-globe" class="h-10 w-10 text-gf-maroon mx-auto mb-2" />
+          <h2 class="text-lg font-semibold text-gray-900">Welcome to Gallformers!</h2>
+          <p class="text-sm text-gray-600 mt-1">
+            Select your region to see the most relevant results.
+          </p>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mb-4">
+          <button
+            :for={{code, name} <- @continents}
+            type="button"
+            data-continent-code={code}
+            class="px-3 py-2 text-sm font-medium rounded-md border border-gray-300 hover:bg-gf-sky-blue hover:border-gf-maroon transition-colors"
+          >
+            {name}
+          </button>
+        </div>
+        <div class="text-center">
+          <button
+            type="button"
+            data-continent-code=""
+            class="text-sm text-gray-500 hover:text-gray-700 underline"
+          >
+            Show all regions
+          </button>
+        </div>
+      </div>
+    </div>
+    """
   end
 
   @doc """

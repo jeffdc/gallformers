@@ -49,6 +49,7 @@ defmodule GallformersWeb.Router do
 
     get "/refindex", RedirectController, :articles
     get "/ref/:slug", RedirectController, :article
+    get "/places", RedirectController, :places
   end
 
   # Auth routes (login/logout via Auth0)
@@ -147,6 +148,7 @@ defmodule GallformersWeb.Router do
     live_session :public,
       on_mount: [
         {GallformersWeb.Live.UserAuth, :fetch_current_user},
+        {GallformersWeb.Live.ContinentScope, :default},
         {GallformersWeb.Analytics.TrackPageView, :default}
       ] do
       # Home
@@ -162,7 +164,6 @@ defmodule GallformersWeb.Router do
       live "/articles/:slug", ArticleLive
       live "/globalsearch", SearchLive
       live "/explore", ExploreLive
-      live "/places", PlacesLive
 
       # ID Tool
       live "/id", IDLive

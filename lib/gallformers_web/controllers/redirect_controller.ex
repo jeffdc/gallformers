@@ -31,4 +31,13 @@ defmodule GallformersWeb.RedirectController do
     |> put_status(:moved_permanently)
     |> redirect(to: "/articles/#{slug}")
   end
+
+  @doc """
+  Redirects /places to /explore?tab=places
+  """
+  def places(conn, _params) do
+    conn
+    |> put_status(:moved_permanently)
+    |> redirect(to: "/explore?tab=places")
+  end
 end

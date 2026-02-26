@@ -12,10 +12,11 @@ defmodule GallformersWeb.ExploreLive do
   use GallformersWeb, :live_view
 
   alias Gallformers.Galls
+  alias Gallformers.Places
   alias Gallformers.Plants
   alias GallformersWeb.TreeComponents
 
-  @tabs ~w(galls undescribed hosts)
+  @tabs ~w(galls undescribed hosts places)
 
   # Smart expand thresholds
   @max_families_to_auto_expand 3
@@ -27,12 +28,13 @@ defmodule GallformersWeb.ExploreLive do
     galls_tree = Galls.get_galls_tree()
     undescribed_tree = Galls.get_undescribed_tree()
     hosts_tree = Plants.get_hosts_tree()
+    places_tree = Places.get_places_tree()
 
     {:ok,
      assign(socket,
        page_title: "Explore",
        page_description:
-         "Explore the Gallformers database - browse galls and host plants organized by taxonomic family, genus, and species.",
+         "Explore the Gallformers database - browse galls, host plants, and geographic places.",
        page_url: "/explore",
        page_image: nil,
        page_json_ld: nil,
@@ -42,12 +44,15 @@ defmodule GallformersWeb.ExploreLive do
        galls_tree: galls_tree,
        undescribed_tree: undescribed_tree,
        hosts_tree: hosts_tree,
+       places_tree: places_tree,
        galls_expanded: MapSet.new(),
        undescribed_expanded: MapSet.new(),
        hosts_expanded: MapSet.new(),
+       places_expanded: MapSet.new(),
        galls_filtered: galls_tree,
        undescribed_filtered: undescribed_tree,
-       hosts_filtered: hosts_tree
+       hosts_filtered: hosts_tree,
+       places_filtered: places_tree
      )}
   end
 
@@ -134,22 +139,27 @@ defmodule GallformersWeb.ExploreLive do
   defp expanded_key_for_tab("galls"), do: :galls_expanded
   defp expanded_key_for_tab("undescribed"), do: :undescribed_expanded
   defp expanded_key_for_tab("hosts"), do: :hosts_expanded
+  defp expanded_key_for_tab("places"), do: :places_expanded
 
   defp filtered_key_for_tab("galls"), do: :galls_filtered
   defp filtered_key_for_tab("undescribed"), do: :undescribed_filtered
   defp filtered_key_for_tab("hosts"), do: :hosts_filtered
+  defp filtered_key_for_tab("places"), do: :places_filtered
 
   defp tree_for_tab(assigns, "galls"), do: assigns.galls_tree
   defp tree_for_tab(assigns, "undescribed"), do: assigns.undescribed_tree
   defp tree_for_tab(assigns, "hosts"), do: assigns.hosts_tree
+  defp tree_for_tab(assigns, "places"), do: assigns.places_tree
 
   defp filtered_tree_for_tab(assigns, "galls"), do: assigns.galls_filtered
   defp filtered_tree_for_tab(assigns, "undescribed"), do: assigns.undescribed_filtered
   defp filtered_tree_for_tab(assigns, "hosts"), do: assigns.hosts_filtered
+  defp filtered_tree_for_tab(assigns, "places"), do: assigns.places_filtered
 
   defp expanded_for_tab(assigns, "galls"), do: assigns.galls_expanded
   defp expanded_for_tab(assigns, "undescribed"), do: assigns.undescribed_expanded
   defp expanded_for_tab(assigns, "hosts"), do: assigns.hosts_expanded
+  defp expanded_for_tab(assigns, "places"), do: assigns.places_expanded
 
   defp collect_branch_keys(nodes) do
     Enum.flat_map(nodes, fn node ->
@@ -218,10 +228,12 @@ defmodule GallformersWeb.ExploreLive do
   defp tab_label("galls"), do: "Galls"
   defp tab_label("undescribed"), do: "Undescribed"
   defp tab_label("hosts"), do: "Hosts"
+  defp tab_label("places"), do: "Places"
 
   defp tab_count(assigns, "galls"), do: count_species(assigns.galls_tree)
   defp tab_count(assigns, "undescribed"), do: count_species(assigns.undescribed_tree)
   defp tab_count(assigns, "hosts"), do: count_species(assigns.hosts_tree)
+  defp tab_count(assigns, "places"), do: count_leaves(assigns.places_tree)
 
   defp count_species(tree) do
     Enum.reduce(tree, 0, fn family, acc ->
@@ -232,14 +244,24 @@ defmodule GallformersWeb.ExploreLive do
     end)
   end
 
+  defp count_leaves(nodes) do
+    Enum.reduce(nodes, 0, fn node, acc ->
+      if Map.has_key?(node, :nodes) and node.nodes != [] do
+        acc + count_leaves(node.nodes)
+      else
+        acc + 1
+      end
+    end)
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
       <div id="explore-container">
         <p class="text-lg text-gray-600 mb-6">
-          Browse galls and host plants organized by taxonomic family. Click on families and genera
-          to expand and see species.
+          Browse galls, host plants, and geographic places. Click to expand families, genera,
+          continents, and countries.
         </p>
 
         <%!-- Tabs --%>

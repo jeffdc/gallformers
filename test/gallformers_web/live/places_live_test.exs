@@ -1,28 +1,21 @@
-defmodule GallformersWeb.PlacesLiveTest do
+defmodule GallformersWeb.PlacesTabTest do
   @moduledoc """
-  LiveView tests for the public Places browse page.
+  LiveView tests for the Places tab within Explore.
   """
   use GallformersWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
 
-  describe "places browse page" do
-    test "renders the page with Places title", %{conn: conn} do
-      {:ok, view, html} = live(conn, ~p"/places")
-
-      assert html =~ "Browse geographic places"
-      assert page_title(view) =~ "Places"
-    end
-
-    test "renders the tree with continent roots", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/places")
+  describe "explore places tab" do
+    test "renders the places tab with tree", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/explore?tab=places")
 
       assert html =~ "North America"
       assert html =~ "Europe"
     end
 
     test "shows countries when continent is expanded", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/places")
+      {:ok, view, _html} = live(conn, ~p"/explore?tab=places")
 
       html =
         view
@@ -34,7 +27,7 @@ defmodule GallformersWeb.PlacesLiveTest do
     end
 
     test "expand all reveals the full tree", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/places")
+      {:ok, view, _html} = live(conn, ~p"/explore?tab=places")
 
       html =
         view
@@ -47,7 +40,7 @@ defmodule GallformersWeb.PlacesLiveTest do
     end
 
     test "collapse all hides expanded nodes", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/places")
+      {:ok, view, _html} = live(conn, ~p"/explore?tab=places")
 
       # First expand all
       view
@@ -67,21 +60,21 @@ defmodule GallformersWeb.PlacesLiveTest do
     end
 
     test "search filters the tree", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/places")
+      {:ok, view, _html} = live(conn, ~p"/explore?tab=places")
 
       html =
         view
-        |> element("#places-tree-search-form")
+        |> element("#explore-places-search-form")
         |> render_change(%{"query" => "California"})
 
       assert html =~ "California"
     end
 
     test "search with no results shows empty tree", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/places")
+      {:ok, view, _html} = live(conn, ~p"/explore?tab=places")
 
       view
-      |> element("#places-tree-search-form")
+      |> element("#explore-places-search-form")
       |> render_change(%{"query" => "Xyzzynotaplace"})
 
       # The tree should have no nodes - no toggle buttons should be present
@@ -89,20 +82,27 @@ defmodule GallformersWeb.PlacesLiveTest do
     end
 
     test "clearing search restores full tree", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/places")
+      {:ok, view, _html} = live(conn, ~p"/explore?tab=places")
 
       # Search first
       view
-      |> element("#places-tree-search-form")
+      |> element("#explore-places-search-form")
       |> render_change(%{"query" => "California"})
 
       # Clear search
       html =
         view
-        |> element("#places-tree-search-form")
+        |> element("#explore-places-search-form")
         |> render_change(%{"query" => ""})
 
       assert html =~ "North America"
+    end
+  end
+
+  describe "/places redirect" do
+    test "redirects /places to /explore?tab=places", %{conn: conn} do
+      conn = get(conn, ~p"/places")
+      assert redirected_to(conn, 301) == "/explore?tab=places"
     end
   end
 end
