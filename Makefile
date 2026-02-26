@@ -347,9 +347,7 @@ preflight: ci download-db
 
 # Build and deploy preview from current local branch
 preview:
-	fly deploy --config fly.preview.toml --dockerfile Dockerfile.preview \
-		--build-secret AWS_ACCESS_KEY_ID=$$AWS_ACCESS_KEY_ID \
-		--build-secret AWS_SECRET_ACCESS_KEY=$$AWS_SECRET_ACCESS_KEY
+	fly deploy --config fly.preview.toml --dockerfile Dockerfile.preview
 
 # Stop the preview machine (preserves app config and secrets)
 preview-stop:
