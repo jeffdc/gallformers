@@ -593,7 +593,7 @@ defmodule GallformersWeb.IDLive do
   def handle_event("search_place", %{"value" => query}, socket) do
     results =
       if String.length(query) >= 2 do
-        Places.search_places_grouped(query, 10)
+        Places.search_places_grouped(query, 10, socket.assigns[:continent_code])
       else
         []
       end
@@ -792,6 +792,14 @@ defmodule GallformersWeb.IDLive do
     # Expand "leaf (anywhere)" to actual leaf plant part IDs
     expanded_plant_parts = expand_plant_part_ids(filters.plant_parts)
 
+    # Use explicit place if selected, otherwise fall back to continent scope
+    place_codes =
+      cond do
+        filters.place -> [filters.place]
+        socket.assigns[:continent_code] -> [socket.assigns[:continent_code]]
+        true -> nil
+      end
+
     %{
       host_ids: wrap_in_list(socket.assigns.selected_host, & &1.id),
       genus_id: maybe_get(socket.assigns.selected_genus, :id),
@@ -803,7 +811,7 @@ defmodule GallformersWeb.IDLive do
       texture_logic: filters.texture_logic,
       alignment_ids: wrap_value(filters.alignment),
       detachable: parse_detachable(filters.detachable),
-      place_codes: wrap_value(filters.place),
+      place_codes: place_codes,
       family_id: filters.family,
       form_ids: wrap_value(filters.form),
       walls_ids: wrap_value(filters.walls),

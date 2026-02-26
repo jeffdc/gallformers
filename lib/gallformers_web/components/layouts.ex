@@ -6,6 +6,8 @@ defmodule GallformersWeb.Layouts do
   """
   use GallformersWeb, :html
 
+  alias GallformersWeb.Live.ContinentScope
+
   # Embed all files in layouts/* within this module.
   embed_templates "layouts/*"
 
@@ -28,6 +30,9 @@ defmodule GallformersWeb.Layouts do
     default: nil,
     doc: "the currently logged in user, if any"
 
+  attr :continent_code, :string, default: nil, doc: "selected continent code"
+  attr :continent_name, :string, default: nil, doc: "selected continent display name"
+
   slot :inner_block, required: true
 
   def app(assigns) do
@@ -35,8 +40,8 @@ defmodule GallformersWeb.Layouts do
     <div class="flex min-h-screen flex-col">
       <.site_header
         current_user={@current_user}
-        continent_code={assigns[:continent_code]}
-        continent_name={assigns[:continent_name]}
+        continent_code={@continent_code}
+        continent_name={@continent_name}
       />
 
       <main class="flex-1 pb-32">
@@ -48,7 +53,7 @@ defmodule GallformersWeb.Layouts do
       <.site_footer current_user={@current_user} />
     </div>
 
-    <.continent_prompt continent_code={assigns[:continent_code]} />
+    <.continent_prompt continent_code={@continent_code} />
 
     <.flash_group flash={@flash} />
     """
@@ -63,17 +68,6 @@ defmodule GallformersWeb.Layouts do
   attr :hide_admin_link, :boolean, default: false, doc: "whether to hide the admin link"
   attr :continent_code, :string, default: nil, doc: "selected continent code"
   attr :continent_name, :string, default: nil, doc: "selected continent display name"
-
-  @continents [
-    {"XF", "Africa"},
-    {"XA", "Asia"},
-    {"XB", "Caribbean"},
-    {"XC", "Central America"},
-    {"XE", "Europe"},
-    {"XN", "North America"},
-    {"XO", "Oceania"},
-    {"XS", "South America"}
-  ]
 
   def site_header(assigns) do
     nav_links = [
@@ -93,7 +87,7 @@ defmodule GallformersWeb.Layouts do
       assigns
       |> assign(:nav_links, nav_links)
       |> assign(:resource_links, resource_links)
-      |> assign(:continents, @continents)
+      |> assign(:continents, ContinentScope.continents_list())
 
     ~H"""
     <header class="sticky top-0 z-50 bg-gf-sky-blue shadow-md">
@@ -139,14 +133,7 @@ defmodule GallformersWeb.Layouts do
               >
                 <.icon name="ph-globe" class="h-5 w-5" />
                 <span class="text-sm" data-continent-label>{@continent_name || "All Regions"}</span>
-                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
+                <.icon name="ph-caret-down" class="h-3 w-3" />
               </button>
               <div
                 data-continent-dropdown
@@ -204,15 +191,7 @@ defmodule GallformersWeb.Layouts do
                 aria-expanded="false"
                 aria-haspopup="true"
               >
-                Resources
-                <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
+                Resources <.icon name="ph-caret-down" class="ml-1 h-4 w-4" />
               </button>
               <div
                 id="resources-menu"
@@ -547,7 +526,7 @@ defmodule GallformersWeb.Layouts do
   attr :continent_code, :string, default: nil
 
   def continent_prompt(assigns) do
-    assigns = assign(assigns, :continents, @continents)
+    assigns = assign(assigns, :continents, ContinentScope.continents_list())
 
     ~H"""
     <div

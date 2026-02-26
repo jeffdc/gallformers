@@ -87,6 +87,18 @@ defmodule Gallformers.Places do
   end
 
   @doc """
+  Returns all continent-type places, ordered by name.
+  """
+  @spec list_continents() :: [Place.t()]
+  def list_continents do
+    from(p in Place,
+      where: p.type == "continent",
+      order_by: p.name
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Returns all selectable places ordered by name.
 
   Includes states/provinces and leaf countries (countries with no subdivisions,
@@ -192,37 +204,52 @@ defmodule Gallformers.Places do
   (not continents or regions) with group labels and parent names for display.
 
   Results are ordered: countries first, then subdivisions, alphabetical within each.
+
+  When `continent_code` is provided, limits results to descendants of that continent.
   """
-  @spec search_places_grouped(String.t(), non_neg_integer()) :: [map()]
-  def search_places_grouped(query, limit \\ 10) do
+  @spec search_places_grouped(String.t(), non_neg_integer(), String.t() | nil) :: [map()]
+  def search_places_grouped(query, limit \\ 10, continent_code \\ nil) do
     like_query = "%#{String.downcase(query)}%"
 
-    from(p in Place,
-      left_join: ph in "place_hierarchy",
-      on: ph.place_id == p.id,
-      left_join: parent in Place,
-      on: parent.id == ph.parent_id,
-      where: p.type in ["country", "state", "province"],
-      where: fragment("lower(?) LIKE ?", p.name, ^like_query),
-      order_by: [
-        fragment("CASE WHEN ? = 'country' THEN 0 ELSE 1 END", p.type),
-        p.name
-      ],
-      limit: ^limit,
-      select: %{
-        id: p.id,
-        name: p.name,
-        code: p.code,
-        type: p.type,
-        parent_name: parent.name,
-        group:
-          fragment(
-            "CASE WHEN ? = 'country' THEN 'Countries' ELSE 'States & Provinces' END",
-            p.type
-          )
-      }
-    )
+    base_query =
+      from(p in Place,
+        left_join: ph in "place_hierarchy",
+        on: ph.place_id == p.id,
+        left_join: parent in Place,
+        on: parent.id == ph.parent_id,
+        where: p.type in ["country", "state", "province"],
+        where: fragment("lower(?) LIKE ?", p.name, ^like_query),
+        order_by: [
+          fragment("CASE WHEN ? = 'country' THEN 0 ELSE 1 END", p.type),
+          p.name
+        ],
+        limit: ^limit,
+        select: %{
+          id: p.id,
+          name: p.name,
+          code: p.code,
+          type: p.type,
+          parent_name: parent.name,
+          group:
+            fragment(
+              "CASE WHEN ? = 'country' THEN 'Countries' ELSE 'States & Provinces' END",
+              p.type
+            )
+        }
+      )
+
+    base_query
+    |> maybe_scope_to_continent(continent_code)
     |> Repo.all()
+  end
+
+  defp maybe_scope_to_continent(query, nil), do: query
+
+  defp maybe_scope_to_continent(query, continent_code) do
+    case get_place_by_code(continent_code) do
+      nil -> query
+      continent -> where(query, [p], p.id in ^descendant_ids(continent.id))
+    end
   end
 
   @doc """

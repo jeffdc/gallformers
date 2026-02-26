@@ -152,6 +152,29 @@ INSERT INTO host_range (species_id, place_id, precision) VALUES
   (7, 2, 'exact'),      -- T. serpyllum in California (exact)
   (8, 902, 'country');   -- M. arvensis in United States (country-level)
 
+-- European host + gall data for continent-scoping tests
+INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id) VALUES
+  (9, 'Quercus robur', 'plant', 0, 1);
+
+INSERT INTO species_fts (species_id, name, aliases) VALUES
+  (9, 'Quercus robur', '');
+
+INSERT INTO host_range (species_id, place_id, precision) VALUES
+  (9, 4, 'exact');     -- Q. robur in Bucharest (RO-B) — European host
+
+-- European gall linked to European host
+INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id) VALUES
+  (103, 'Cynips quercusfolii', 'gall', 0, 1);
+
+INSERT INTO gall_traits (species_id, detachable, undescribed) VALUES
+  (103, 'detachable', 0);
+
+INSERT INTO species_fts (species_id, name, aliases) VALUES
+  (103, 'Cynips quercusfolii', '');
+
+INSERT INTO gallhost (id, host_species_id, gall_species_id, inserted_at, updated_at) VALUES
+  (4, 9, 103, '2026-01-01T00:00:00', '2026-01-01T00:00:00');  -- gall 103 → Q. robur (Europe)
+
 -- =============================================================================
 -- Gall range exclusions (gall 100 excludes Jalisco from its range)
 -- =============================================================================

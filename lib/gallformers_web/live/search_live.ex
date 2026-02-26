@@ -158,7 +158,7 @@ defmodule GallformersWeb.SearchLive do
         selected_index: -1
       )
     else
-      grouped = Search.global_search(trimmed)
+      grouped = Search.global_search(trimmed, socket.assigns[:continent_code])
       results = flatten_results(grouped)
 
       assign(socket,

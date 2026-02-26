@@ -1,11 +1,12 @@
 defmodule GallformersWeb.ExploreLive do
   @moduledoc """
-  LiveView for exploring galls and hosts by taxonomic hierarchy.
+  LiveView for exploring galls, hosts, and places by hierarchy.
 
-  Provides three browse tabs:
+  Provides four browse tabs:
   - Galls: All described gall species organized by Family → Genus → Species
   - Undescribed: Undescribed gall species
   - Hosts: Host plant species organized by Family → Genus → Species
+  - Places: Geographic places organized by Continent → Country → State/Province
 
   Uses an expandable tree UI for navigation with smart expand on search.
   """
@@ -230,19 +231,10 @@ defmodule GallformersWeb.ExploreLive do
   defp tab_label("hosts"), do: "Hosts"
   defp tab_label("places"), do: "Places"
 
-  defp tab_count(assigns, "galls"), do: count_species(assigns.galls_tree)
-  defp tab_count(assigns, "undescribed"), do: count_species(assigns.undescribed_tree)
-  defp tab_count(assigns, "hosts"), do: count_species(assigns.hosts_tree)
+  defp tab_count(assigns, "galls"), do: count_leaves(assigns.galls_tree)
+  defp tab_count(assigns, "undescribed"), do: count_leaves(assigns.undescribed_tree)
+  defp tab_count(assigns, "hosts"), do: count_leaves(assigns.hosts_tree)
   defp tab_count(assigns, "places"), do: count_leaves(assigns.places_tree)
-
-  defp count_species(tree) do
-    Enum.reduce(tree, 0, fn family, acc ->
-      acc +
-        Enum.reduce(family.nodes, 0, fn genus, acc2 ->
-          acc2 + length(genus.nodes)
-        end)
-    end)
-  end
 
   defp count_leaves(nodes) do
     Enum.reduce(nodes, 0, fn node, acc ->

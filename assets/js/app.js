@@ -567,11 +567,99 @@ const AdminNav = {
   }
 }
 
+// Continent code → display name mapping. Canonical source: GallformersWeb.Live.ContinentScope
+const CONTINENT_NAMES = {
+  XF: "Africa", XA: "Asia", XB: "Caribbean", XC: "Central America",
+  XE: "Europe", XN: "North America", XO: "Oceania", XS: "South America"
+}
+
+// ContinentSelector hook for the header continent dropdown
+const ContinentSelector = {
+  mounted() {
+    // Immediately set the display text from localStorage to avoid flash of "All Regions"
+    const stored = localStorage.getItem("gf_continent")
+    const label = this.el.querySelector("[data-continent-label]")
+    if (label && stored && CONTINENT_NAMES[stored]) {
+      label.textContent = CONTINENT_NAMES[stored]
+    }
+
+    // Highlight the active item in the dropdown
+    this.el.querySelectorAll("[data-continent-code]").forEach(btn => {
+      const code = btn.dataset.continentCode
+      const isActive = (stored && code === stored) || (!stored && code === "")
+      btn.classList.toggle("font-bold", isActive)
+      btn.classList.toggle("bg-gray-50", isActive)
+    })
+
+    const toggle = this.el.querySelector("[data-continent-toggle]")
+    const dropdown = this.el.querySelector("[data-continent-dropdown]")
+
+    if (toggle && dropdown) {
+      toggle.addEventListener("click", (e) => {
+        e.stopPropagation()
+        dropdown.classList.toggle("hidden")
+      })
+
+      // Close on click-away
+      document.addEventListener("click", (e) => {
+        if (!this.el.contains(e.target)) {
+          dropdown.classList.add("hidden")
+        }
+      })
+    }
+
+    // Handle continent selection
+    this.el.querySelectorAll("[data-continent-code]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const code = btn.dataset.continentCode
+        if (code === "") {
+          localStorage.removeItem("gf_continent")
+        } else {
+          localStorage.setItem("gf_continent", code)
+        }
+        // Dismiss the first-visit prompt
+        localStorage.setItem("gf_continent_dismissed", "true")
+        window.location.reload()
+      })
+    })
+  }
+}
+
+// ContinentPrompt hook for the first-visit modal
+const ContinentPrompt = {
+  mounted() {
+    // Show only if no continent chosen and not previously dismissed
+    const hasContinent = localStorage.getItem("gf_continent")
+    const dismissed = localStorage.getItem("gf_continent_dismissed")
+
+    if (!hasContinent && !dismissed) {
+      this.el.classList.remove("hidden")
+    }
+
+    // Handle continent selection from the prompt
+    this.el.querySelectorAll("[data-continent-code]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const code = btn.dataset.continentCode
+        if (code === "") {
+          localStorage.setItem("gf_continent_dismissed", "true")
+        } else {
+          localStorage.setItem("gf_continent", code)
+          localStorage.setItem("gf_continent_dismissed", "true")
+        }
+        this.el.classList.add("hidden")
+        if (code !== "") {
+          window.location.reload()
+        }
+      })
+    })
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
-  params: {_csrf_token: csrfToken},
-  hooks: {Tabs, ImageGallery, RangeMap, ImageUpload, SortableImages, AutoDismiss, Typeahead, ArticleImageUpload, CopyToClipboard, DailyChart, InputEvent, ScrollToCouplet, AdminNav},
+  params: () => ({_csrf_token: csrfToken, continent: localStorage.getItem("gf_continent")}),
+  hooks: {Tabs, ImageGallery, RangeMap, ImageUpload, SortableImages, AutoDismiss, Typeahead, ArticleImageUpload, CopyToClipboard, DailyChart, InputEvent, ScrollToCouplet, AdminNav, ContinentSelector, ContinentPrompt},
 })
 
 // Show progress bar on live navigation and form submits

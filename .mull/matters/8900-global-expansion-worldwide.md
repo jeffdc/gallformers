@@ -1,7 +1,7 @@
 ---
 status: active
 created: 2026-02-23
-updated: 2026-02-25
+updated: 2026-02-26
 epic: geo-expansion
 docs: ['']
 relates: [1db6, b99b]
@@ -63,3 +63,11 @@ User accounts, UI localization, bulk data import, Eastern Hemisphere host data s
 ## Territory Reference
 
 Detailed Natural Earth investigation for 60+ overseas territories documented in docs/investigations/20260223-territory-boundary-extraction.md. Covers extraction methods, tricky mappings (BES→NLY, SJM→NSV), and multi-feature territories.
+
+## Resolved Questions
+
+| Question | Decision |
+|----------|----------|
+| Continent grouping | 8 continents as-is, no grouping |
+| First-visit experience | Modal on first visit |
+| Map default view (no data) | Entire world |

@@ -3,6 +3,23 @@ defmodule Gallformers.PlacesTest do
 
   alias Gallformers.Places
 
+  describe "list_continents/0" do
+    test "returns all continents ordered alphabetically" do
+      continents = Places.list_continents()
+      assert length(continents) == 3
+      assert Enum.all?(continents, &(&1.type == "continent"))
+      names = Enum.map(continents, & &1.name)
+      assert names == Enum.sort(names)
+    end
+
+    test "includes expected continent codes" do
+      codes = Places.list_continents() |> Enum.map(& &1.code) |> MapSet.new()
+      assert MapSet.member?(codes, "XN")
+      assert MapSet.member?(codes, "XB")
+      assert MapSet.member?(codes, "XE")
+    end
+  end
+
   describe "hierarchy traversal" do
     test "descendant_ids/1 returns the place and all children recursively" do
       us = Places.get_place_by_code("US")
@@ -93,6 +110,38 @@ defmodule Gallformers.PlacesTest do
       results = Places.search_places_grouped("bahamas", 10)
       bahamas = Enum.find(results, &(&1.code == "BS"))
       assert bahamas.group == "Countries"
+    end
+  end
+
+  describe "search_places_grouped/3 with continent scope" do
+    test "scoped to North America returns California" do
+      results = Places.search_places_grouped("Cal", 10, "XN")
+      codes = Enum.map(results, & &1.code)
+      assert "US-CA" in codes
+    end
+
+    test "scoped to North America excludes European places" do
+      results = Places.search_places_grouped("Buch", 10, "XN")
+      codes = Enum.map(results, & &1.code)
+      refute "RO-B" in codes
+    end
+
+    test "scoped to Europe returns Bucharest" do
+      results = Places.search_places_grouped("Buch", 10, "XE")
+      codes = Enum.map(results, & &1.code)
+      assert "RO-B" in codes
+    end
+
+    test "nil continent returns all places (no filtering)" do
+      results = Places.search_places_grouped("Ca", 10, nil)
+      codes = Enum.map(results, & &1.code)
+      # Should include both North American and other places
+      assert "CA" in codes or "US-CA" in codes
+    end
+
+    test "invalid continent code returns all places" do
+      results = Places.search_places_grouped("Ca", 10, "INVALID")
+      assert length(results) > 0
     end
   end
 

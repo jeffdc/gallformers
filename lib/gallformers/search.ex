@@ -9,6 +9,7 @@ defmodule Gallformers.Search do
 
   alias Gallformers.Galls.GallTraits
   alias Gallformers.Glossaries.Glossary
+  alias Gallformers.Places
   alias Gallformers.Places.Place
   alias Gallformers.Repo
   alias Gallformers.Search.Ranking
@@ -193,23 +194,37 @@ defmodule Gallformers.Search do
   @doc """
   Performs a global search across all entity types.
 
-  Returns a map with results grouped by type.
+  Returns a map with results grouped by type. When `continent_code` is provided,
+  gall and host results are filtered to species with host ranges in that continent's
+  descendant places. Other result types (glossary, sources, taxonomy, places)
+  are not filtered.
   """
-  @spec global_search(String.t()) :: map()
-  def global_search(query) when is_binary(query) do
+  @spec global_search(String.t(), String.t() | nil) :: map()
+  def global_search(query, continent_code \\ nil) when is_binary(query) do
     query
     |> String.trim()
-    |> do_global_search()
+    |> do_global_search(continent_code)
   end
 
-  defp do_global_search(""), do: empty_results()
+  defp do_global_search("", _continent_code), do: empty_results()
 
-  defp do_global_search(query) do
+  defp do_global_search(query, continent_code) do
     search_terms = Ranking.parse_query(query)
 
+    galls = search_galls_with_aliases(query)
+    hosts = search_hosts_with_aliases(query)
+
+    {galls, hosts} =
+      if continent_code do
+        {filter_galls_by_continent(galls, continent_code),
+         filter_hosts_by_continent(hosts, continent_code)}
+      else
+        {galls, hosts}
+      end
+
     %{
-      galls: search_galls_with_aliases(query),
-      hosts: search_hosts_with_aliases(query),
+      galls: galls,
+      hosts: hosts,
       glossary: search_glossary(query) |> Ranking.add_scores_and_sort(search_terms),
       sources: search_sources(query) |> Ranking.add_scores_and_sort(search_terms),
       taxonomy: search_taxonomy(query) |> Ranking.add_scores_and_sort(search_terms),
@@ -530,6 +545,65 @@ defmodule Gallformers.Search do
       }
     )
     |> Repo.all()
+  end
+
+  # Filters gall results to those whose hosts have ranges in the continent's descendants.
+  # Uses gallhost join to find which galls have hosts in the continent.
+  # Note: gall_range_exclusions are not applied here — they're for fine-grained
+  # ID tool filtering, not for broad "does this gall exist on this continent" checks.
+  defp filter_galls_by_continent([], _continent_code), do: []
+
+  defp filter_galls_by_continent(results, continent_code) do
+    continent_desc_ids = continent_descendant_ids(continent_code)
+
+    if continent_desc_ids == nil do
+      results
+    else
+      gall_ids = Enum.map(results, & &1.id)
+
+      galls_in_continent =
+        from(gh in "gallhost",
+          join: hr in "host_range",
+          on: hr.species_id == gh.host_species_id,
+          where: gh.gall_species_id in ^gall_ids and hr.place_id in ^continent_desc_ids,
+          select: gh.gall_species_id
+        )
+        |> Repo.all()
+        |> MapSet.new()
+
+      Enum.filter(results, &MapSet.member?(galls_in_continent, &1.id))
+    end
+  end
+
+  # Filters host results to those with host_range entries in the continent's descendants.
+  defp filter_hosts_by_continent([], _continent_code), do: []
+
+  defp filter_hosts_by_continent(results, continent_code) do
+    continent_desc_ids = continent_descendant_ids(continent_code)
+
+    if continent_desc_ids == nil do
+      results
+    else
+      host_ids = Enum.map(results, & &1.id)
+
+      hosts_in_continent =
+        from(hr in "host_range",
+          where: hr.species_id in ^host_ids and hr.place_id in ^continent_desc_ids,
+          select: hr.species_id
+        )
+        |> Repo.all()
+        |> MapSet.new()
+
+      Enum.filter(results, &MapSet.member?(hosts_in_continent, &1.id))
+    end
+  end
+
+  # Returns descendant IDs for a continent code, or nil if invalid.
+  defp continent_descendant_ids(continent_code) do
+    case Places.get_place_by_code(continent_code) do
+      nil -> nil
+      continent -> Places.descendant_ids(continent.id)
+    end
   end
 
   # Loads all aliases for each species in the results list
