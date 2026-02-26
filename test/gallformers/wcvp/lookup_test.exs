@@ -10,8 +10,11 @@ defmodule Gallformers.Wcvp.LookupTest do
     # Ensure the directory exists
     @db_path |> Path.dirname() |> File.mkdir_p!()
 
-    # Create a minimal WCVP test database
+    # Create a minimal WCVP test database (drop first in case a prior run left stale files)
     {:ok, conn} = Exqlite.Sqlite3.open(@db_path)
+
+    :ok = Exqlite.Sqlite3.execute(conn, "DROP TABLE IF EXISTS wcvp_distributions")
+    :ok = Exqlite.Sqlite3.execute(conn, "DROP TABLE IF EXISTS wcvp_names")
 
     :ok =
       Exqlite.Sqlite3.execute(conn, """
@@ -107,11 +110,13 @@ defmodule Gallformers.Wcvp.LookupTest do
     Exqlite.Sqlite3.release(conn, dist_stmt)
     Exqlite.Sqlite3.close(conn)
 
-    # Start the WCVP repo
-    {:ok, _pid} = Repo.WCVP.start_link()
+    # Start the WCVP repo (may already be running from another test module)
+    case Repo.WCVP.start_link() do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+    end
 
     on_exit(fn ->
-      Repo.WCVP.stop()
       File.rm(@db_path)
     end)
 

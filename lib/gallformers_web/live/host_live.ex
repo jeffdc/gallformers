@@ -567,9 +567,7 @@ defmodule GallformersWeb.HostLive do
                     </tr>
                   </thead>
                   <tbody>
-                    <tr :for={
-                      s <- paginated_synonyms(synonyms, @synonymy_page, @synonymy_page_size)
-                    }>
+                    <tr :for={s <- paginated_synonyms(synonyms, @synonymy_page, @synonymy_page_size)}>
                       <td><.taxon_name name={s.name} /></td>
                       <td class="text-gray-600">{s.description || "—"}</td>
                     </tr>
