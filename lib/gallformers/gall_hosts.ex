@@ -218,6 +218,7 @@ defmodule Gallformers.GallHosts do
       end
 
       Ranges.set_range_exclusions_for_gall(gall_id, excluded_place_ids)
+      Gallformers.Species.touch(gall_id)
       :ok
     end)
   end

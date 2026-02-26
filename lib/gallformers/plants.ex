@@ -538,6 +538,7 @@ defmodule Gallformers.Plants do
           save_place_changes(host.id, params.place_changes)
           maybe_update_section(params.section_update)
           maybe_upsert_host_traits(host.id, params[:host_traits])
+          Gallformers.Species.touch(host.id)
           updated_host
 
         {:error, changeset} ->
