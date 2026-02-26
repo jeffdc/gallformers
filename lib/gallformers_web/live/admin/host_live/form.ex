@@ -391,6 +391,55 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   end
 
   @impl true
+  def handle_event(
+        "toggle_wcvp_country_expand",
+        %{"section" => section, "country" => country},
+        socket
+      ) do
+    diff = socket.assigns.wcvp_diff
+    key = {section, country}
+
+    expanded =
+      if MapSet.member?(diff.expanded_countries, key),
+        do: MapSet.delete(diff.expanded_countries, key),
+        else: MapSet.put(diff.expanded_countries, key)
+
+    {:noreply, assign(socket, :wcvp_diff, %{diff | expanded_countries: expanded})}
+  end
+
+  @impl true
+  def handle_event(
+        "toggle_wcvp_country",
+        %{"section" => section, "country" => country_code},
+        socket
+      ) do
+    diff = socket.assigns.wcvp_diff
+    {codes_list, selected_field} = wcvp_section_fields(section, diff)
+
+    country_codes =
+      codes_list
+      |> Enum.filter(&String.starts_with?(&1, country_code <> "-"))
+      |> MapSet.new()
+
+    # Also include bare country code if it's in the list
+    country_codes =
+      if country_code in codes_list,
+        do: MapSet.put(country_codes, country_code),
+        else: country_codes
+
+    current_selected = Map.get(diff, selected_field)
+    selected_in_country = MapSet.intersection(current_selected, country_codes)
+
+    # If all selected → deselect all; otherwise → select all
+    updated =
+      if MapSet.equal?(selected_in_country, country_codes),
+        do: MapSet.difference(current_selected, country_codes),
+        else: MapSet.union(current_selected, country_codes)
+
+    {:noreply, assign(socket, :wcvp_diff, Map.put(diff, selected_field, updated))}
+  end
+
+  @impl true
   def handle_event("select_family", %{"family_id" => family_id}, socket) do
     family_id = if family_id == "", do: nil, else: String.to_integer(family_id)
 
@@ -726,7 +775,12 @@ defmodule GallformersWeb.Admin.HostLive.Form do
       MapSet.new(socket.assigns.exact_places ++ socket.assigns.country_places)
 
     added = MapSet.difference(native_codes, current_place_codes)
-    removed = MapSet.difference(current_place_codes, native_codes)
+
+    # Exclude introduced places from "removed" — they're not expected to be in WCVP native
+    removed = MapSet.difference(current_place_codes, MapSet.union(native_codes, introduced_codes))
+
+    # Only show introduced places not already in the current range
+    new_introduced = MapSet.difference(introduced_codes, current_place_codes)
 
     %{
       wcvp_data: wcvp_data,
@@ -734,20 +788,26 @@ defmodule GallformersWeb.Admin.HostLive.Form do
       introduced_codes: introduced_codes,
       places_added: MapSet.to_list(added),
       places_removed: MapSet.to_list(removed),
-      introduced_places: MapSet.to_list(introduced_codes),
+      introduced_places: MapSet.to_list(new_introduced),
       selected_adds: added,
       selected_removes: removed,
-      selected_introduced: introduced_codes,
+      selected_introduced: new_introduced,
+      expanded_countries: MapSet.new(),
       include_introduced: true,
       has_changes:
         MapSet.size(added) > 0 or MapSet.size(removed) > 0 or
-          MapSet.size(introduced_codes) > 0
+          MapSet.size(new_introduced) > 0
     }
   end
 
   defp toggle_in_set(set, item) do
     if MapSet.member?(set, item), do: MapSet.delete(set, item), else: MapSet.put(set, item)
   end
+
+  defp wcvp_section_fields("adds", diff), do: {diff.places_added, :selected_adds}
+  defp wcvp_section_fields("removes", diff), do: {diff.places_removed, :selected_removes}
+  defp wcvp_section_fields("introduced", diff), do: {diff.introduced_places, :selected_introduced}
+  defp wcvp_section_fields(_, _), do: {[], :selected_adds}
 
   defp place_display(code, place_by_code) do
     case Map.get(place_by_code, code) do
@@ -756,7 +816,88 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     end
   end
 
-  # Groups place codes by country, returning [{country_name, [codes]}] sorted by country then code.
+  # Renders a collapsible tree section for the WCVP diff (adds, removes, or introduced).
+  # Countries are collapsed by default with tri-state checkboxes.
+  defp wcvp_diff_tree(assigns) do
+    grouped = group_places_by_country(assigns.codes, assigns.place_by_code)
+
+    all_selected =
+      assigns.codes != [] and Enum.all?(assigns.codes, &MapSet.member?(assigns.selected, &1))
+
+    assigns =
+      assigns
+      |> assign(:grouped, grouped)
+      |> assign(:all_selected, all_selected)
+
+    ~H"""
+    <div class={@container_class}>
+      <div class="flex items-center justify-between">
+        <span class={"font-medium #{@text_class}"}>
+          {@label} ({length(@codes)})
+        </span>
+        <button
+          type="button"
+          phx-click={if @all_selected, do: @deselect_all_event, else: @select_all_event}
+          class={"text-xs #{@text_class} hover:underline"}
+        >
+          {if @all_selected, do: "Deselect all", else: "Select all"}
+        </button>
+      </div>
+      <div class="mt-2 max-h-96 overflow-y-auto space-y-1">
+        <div :for={{country_code, country_name, codes} <- @grouped}>
+          <% selected_count = Enum.count(codes, &MapSet.member?(@selected, &1))
+          total_count = length(codes)
+          all_country_selected = selected_count == total_count
+          none_selected = selected_count == 0
+          expanded = MapSet.member?(@expanded_countries, {@section, country_code}) %>
+          <div class="flex items-center gap-1.5">
+            <input
+              id={"#{@section}-country-#{country_code}"}
+              type="checkbox"
+              checked={all_country_selected}
+              data-indeterminate={to_string(!all_country_selected and !none_selected)}
+              phx-hook="IndeterminateCheckbox"
+              phx-click="toggle_wcvp_country"
+              phx-value-section={@section}
+              phx-value-country={country_code}
+              class={"rounded border-gray-300 #{@checkbox_class}"}
+            />
+            <button
+              type="button"
+              phx-click="toggle_wcvp_country_expand"
+              phx-value-section={@section}
+              phx-value-country={country_code}
+              class={"flex items-center gap-1 text-xs font-medium #{@heading_class} hover:underline"}
+            >
+              <span class="w-3 text-center">{if expanded, do: "▾", else: "▸"}</span>
+              {country_name}
+              <span class="font-normal text-gray-500">
+                ({selected_count}/{total_count})
+              </span>
+            </button>
+          </div>
+          <ul :if={expanded} class="ml-6 space-y-0.5 mt-0.5">
+            <li :for={code <- codes}>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={MapSet.member?(@selected, code)}
+                  phx-click={@toggle_event}
+                  phx-value-code={code}
+                  class={"rounded border-gray-300 #{@checkbox_class}"}
+                />
+                <span class="text-xs">{place_display(code, @place_by_code)}</span>
+              </label>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  # Groups place codes by country, returning [{country_code, country_name, [codes]}]
+  # sorted by country name then code.
   # Codes like "US-CA" group under "US"; bare country codes like "BR" group under themselves.
   defp group_places_by_country(codes, place_by_code) do
     codes
@@ -773,9 +914,9 @@ defmodule GallformersWeb.Admin.HostLive.Form do
           nil -> country_code
         end
 
-      {country_name, Enum.sort(group_codes)}
+      {country_code, country_name, Enum.sort(group_codes)}
     end)
-    |> Enum.sort_by(&elem(&1, 0))
+    |> Enum.sort_by(&elem(&1, 1))
   end
 
   defp assign_taxonomy_fields(socket, nil) do
@@ -1282,153 +1423,54 @@ defmodule GallformersWeb.Admin.HostLive.Form do
                 </div>
 
                 <div :if={@wcvp_diff.has_changes} class="text-sm space-y-3">
-                  <%!-- Green: native places to add --%>
-                  <div
+                  <.wcvp_diff_tree
                     :if={@wcvp_diff.places_added != []}
-                    class="bg-green-50 border border-green-200 rounded p-3"
-                  >
-                    <div class="flex items-center justify-between">
-                      <span class="font-medium text-green-700">
-                        + Native places in WCVP but not in current range ({length(
-                          @wcvp_diff.places_added
-                        )})
-                      </span>
-                      <% all_adds_selected =
-                        MapSet.size(@wcvp_diff.selected_adds) ==
-                          length(@wcvp_diff.places_added) %>
-                      <button
-                        type="button"
-                        phx-click={
-                          if all_adds_selected,
-                            do: "deselect_all_wcvp_diff_adds",
-                            else: "select_all_wcvp_diff_adds"
-                        }
-                        class="text-xs text-green-700 hover:underline"
-                      >
-                        {if all_adds_selected, do: "Deselect all", else: "Select all"}
-                      </button>
-                    </div>
-                    <div class="mt-2 max-h-60 overflow-y-auto space-y-2">
-                      <div :for={
-                        {country, codes} <-
-                          group_places_by_country(@wcvp_diff.places_added, @place_by_code)
-                      }>
-                        <div class="text-xs font-medium text-green-800 mb-1">{country}</div>
-                        <ul class="space-y-1 ml-2">
-                          <li :for={code <- codes}>
-                            <label class="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={MapSet.member?(@wcvp_diff.selected_adds, code)}
-                                phx-click="toggle_wcvp_diff_add"
-                                phx-value-code={code}
-                                class="rounded border-gray-300 text-green-600 focus:ring-green-500"
-                              />
-                              <span>{place_display(code, @place_by_code)}</span>
-                            </label>
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-
-                  <%!-- Red: places to remove --%>
-                  <div
+                    section="adds"
+                    codes={@wcvp_diff.places_added}
+                    selected={@wcvp_diff.selected_adds}
+                    expanded_countries={@wcvp_diff.expanded_countries}
+                    place_by_code={@place_by_code}
+                    label="+ Native places in WCVP but not in current range"
+                    select_all_event="select_all_wcvp_diff_adds"
+                    deselect_all_event="deselect_all_wcvp_diff_adds"
+                    toggle_event="toggle_wcvp_diff_add"
+                    container_class="bg-green-50 border border-green-200 rounded p-3"
+                    text_class="text-green-700"
+                    heading_class="text-green-800"
+                    checkbox_class="text-green-600 focus:ring-green-500"
+                  />
+                  <.wcvp_diff_tree
                     :if={@wcvp_diff.places_removed != []}
-                    class="bg-red-50 border border-red-200 rounded p-3"
-                  >
-                    <div class="flex items-center justify-between">
-                      <span class="font-medium text-red-700">
-                        - Places in current range but not in WCVP native ({length(
-                          @wcvp_diff.places_removed
-                        )})
-                      </span>
-                      <% all_removes_selected =
-                        MapSet.size(@wcvp_diff.selected_removes) ==
-                          length(@wcvp_diff.places_removed) %>
-                      <button
-                        type="button"
-                        phx-click={
-                          if all_removes_selected,
-                            do: "deselect_all_wcvp_diff_removes",
-                            else: "select_all_wcvp_diff_removes"
-                        }
-                        class="text-xs text-red-700 hover:underline"
-                      >
-                        {if all_removes_selected, do: "Deselect all", else: "Select all"}
-                      </button>
-                    </div>
-                    <div class="mt-2 max-h-60 overflow-y-auto space-y-2">
-                      <div :for={
-                        {country, codes} <-
-                          group_places_by_country(@wcvp_diff.places_removed, @place_by_code)
-                      }>
-                        <div class="text-xs font-medium text-red-800 mb-1">{country}</div>
-                        <ul class="space-y-1 ml-2">
-                          <li :for={code <- codes}>
-                            <label class="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={MapSet.member?(@wcvp_diff.selected_removes, code)}
-                                phx-click="toggle_wcvp_diff_remove"
-                                phx-value-code={code}
-                                class="rounded border-gray-300 text-red-600 focus:ring-red-500"
-                              />
-                              <span>{place_display(code, @place_by_code)}</span>
-                            </label>
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-
-                  <%!-- Amber: introduced places --%>
-                  <div
+                    section="removes"
+                    codes={@wcvp_diff.places_removed}
+                    selected={@wcvp_diff.selected_removes}
+                    expanded_countries={@wcvp_diff.expanded_countries}
+                    place_by_code={@place_by_code}
+                    label="- Places in current range but not in WCVP native"
+                    select_all_event="select_all_wcvp_diff_removes"
+                    deselect_all_event="deselect_all_wcvp_diff_removes"
+                    toggle_event="toggle_wcvp_diff_remove"
+                    container_class="bg-red-50 border border-red-200 rounded p-3"
+                    text_class="text-red-700"
+                    heading_class="text-red-800"
+                    checkbox_class="text-red-600 focus:ring-red-500"
+                  />
+                  <.wcvp_diff_tree
                     :if={@wcvp_diff.introduced_places != []}
-                    class="bg-amber-50 border border-amber-200 rounded p-3"
-                  >
-                    <div class="flex items-center justify-between">
-                      <span class="font-medium text-amber-700">
-                        Introduced places ({length(@wcvp_diff.introduced_places)})
-                      </span>
-                      <% all_introduced_selected =
-                        MapSet.size(@wcvp_diff.selected_introduced) ==
-                          length(@wcvp_diff.introduced_places) %>
-                      <button
-                        type="button"
-                        phx-click={
-                          if all_introduced_selected,
-                            do: "deselect_all_wcvp_diff_introduced",
-                            else: "select_all_wcvp_diff_introduced"
-                        }
-                        class="text-xs text-amber-700 hover:underline"
-                      >
-                        {if all_introduced_selected, do: "Deselect all", else: "Select all"}
-                      </button>
-                    </div>
-                    <div class="mt-2 max-h-60 overflow-y-auto space-y-2">
-                      <div :for={
-                        {country, codes} <-
-                          group_places_by_country(@wcvp_diff.introduced_places, @place_by_code)
-                      }>
-                        <div class="text-xs font-medium text-amber-800 mb-1">{country}</div>
-                        <ul class="space-y-1 ml-2">
-                          <li :for={code <- codes}>
-                            <label class="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={MapSet.member?(@wcvp_diff.selected_introduced, code)}
-                                phx-click="toggle_wcvp_diff_introduced_place"
-                                phx-value-code={code}
-                                class="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-                              />
-                              <span>{place_display(code, @place_by_code)}</span>
-                            </label>
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
+                    section="introduced"
+                    codes={@wcvp_diff.introduced_places}
+                    selected={@wcvp_diff.selected_introduced}
+                    expanded_countries={@wcvp_diff.expanded_countries}
+                    place_by_code={@place_by_code}
+                    label="Introduced places"
+                    select_all_event="select_all_wcvp_diff_introduced"
+                    deselect_all_event="deselect_all_wcvp_diff_introduced"
+                    toggle_event="toggle_wcvp_diff_introduced_place"
+                    container_class="bg-amber-50 border border-amber-200 rounded p-3"
+                    text_class="text-amber-700"
+                    heading_class="text-amber-800"
+                    checkbox_class="text-amber-600 focus:ring-amber-500"
+                  />
                 </div>
 
                 <% has_selections =

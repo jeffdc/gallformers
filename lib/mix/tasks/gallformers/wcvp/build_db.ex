@@ -1,7 +1,8 @@
 defmodule Mix.Tasks.Gallformers.Wcvp.BuildDb do
   @moduledoc """
-  Reads raw WCVP CSV files, filters to Western Hemisphere accepted species,
-  and produces a SQLite database for use as a secondary read-only data source.
+  Reads raw WCVP CSV files, filters to accepted species with distribution in
+  mapped TDWG regions, and produces a SQLite database for use as a secondary
+  read-only data source.
 
   ## Usage
 
@@ -51,16 +52,14 @@ defmodule Mix.Tasks.Gallformers.Wcvp.BuildDb do
     valid_tdwg_codes = MapSet.new(Map.keys(tdwg_lookup))
 
     # Step 1: Find species IDs with any established distribution in our regions
-    Logger.info("Scanning distributions for Western Hemisphere species...")
+    Logger.info("Scanning distributions for mapped region species...")
 
     matching_ids =
       Reader.stream_established_distributions(dist_path)
       |> Stream.filter(fn dist -> MapSet.member?(valid_tdwg_codes, dist.area_code_l3) end)
       |> Enum.reduce(MapSet.new(), fn dist, acc -> MapSet.put(acc, dist.plant_name_id) end)
 
-    Logger.info(
-      "  Found #{MapSet.size(matching_ids)} species with Western Hemisphere distribution"
-    )
+    Logger.info("  Found #{MapSet.size(matching_ids)} species with mapped region distribution")
 
     # Step 2: Filter accepted names to those with matching distributions
     Logger.info("Filtering accepted names...")

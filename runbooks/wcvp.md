@@ -9,7 +9,7 @@ Two supporting files work alongside the database:
 | File | Purpose | Location |
 |------|---------|----------|
 | `wcvp.sqlite` | Secondary Ecto repo with plant names and distributions | Varies by environment (see below) |
-| `tdwg_to_places.json` | Static mapping from TDWG botanical region codes to gallformers place codes | Bundled in release under `priv/repo/data/` |
+| `tdwg_to_places.json` | Static mapping from all 368 TDWG L3 botanical region codes to gallformers place codes (global coverage) | Bundled in release under `priv/repo/data/` |
 
 ## Architecture
 

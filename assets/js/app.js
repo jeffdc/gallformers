@@ -31,6 +31,13 @@ import SortableImages from "./hooks/sortable_images"
 import ArticleImageUpload from "./hooks/article_image_upload"
 import DailyChart from "./hooks/daily_chart"
 
+// Tri-state checkbox: sets the indeterminate DOM property from data attribute
+// (HTML has no attribute for indeterminate — it's JS-only)
+const IndeterminateCheckbox = {
+  mounted() { this.el.indeterminate = this.el.dataset.indeterminate === "true" },
+  updated() { this.el.indeterminate = this.el.dataset.indeterminate === "true" }
+}
+
 // Custom hooks for UI components
 const Tabs = {
   mounted() {
@@ -659,7 +666,7 @@ const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: () => ({_csrf_token: csrfToken, continent: localStorage.getItem("gf_continent")}),
-  hooks: {Tabs, ImageGallery, RangeMap, ImageUpload, SortableImages, AutoDismiss, Typeahead, ArticleImageUpload, CopyToClipboard, DailyChart, InputEvent, ScrollToCouplet, AdminNav, ContinentSelector, ContinentPrompt},
+  hooks: {Tabs, ImageGallery, RangeMap, ImageUpload, SortableImages, AutoDismiss, Typeahead, ArticleImageUpload, CopyToClipboard, DailyChart, InputEvent, ScrollToCouplet, AdminNav, ContinentSelector, ContinentPrompt, IndeterminateCheckbox},
 })
 
 // Show progress bar on live navigation and form submits
