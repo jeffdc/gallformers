@@ -15,3 +15,10 @@ variable "aws_account_id" {
   type        = string
   default     = "885187511538"
 }
+
+variable "alert_email" {
+  description = "Email address for downdetector alerts"
+  type        = string
+  sensitive   = true
+}
+
