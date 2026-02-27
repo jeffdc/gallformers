@@ -3,7 +3,7 @@ defmodule Gallformers.Analytics.RollupTest do
   Tests for the Analytics Rollup GenServer.
 
   Verifies daily aggregation into summary tables, idempotency,
-  backfill of missing days, and pruning of old raw data.
+  and pruning of old raw data.
   """
   use Gallformers.DataCase
 
@@ -11,7 +11,6 @@ defmodule Gallformers.Analytics.RollupTest do
   alias Gallformers.Analytics.Rollup
 
   @today ~D[2026-01-15]
-  @yesterday ~D[2026-01-14]
 
   describe "rollup_day/1" do
     test "aggregates page views into all 5 summary tables" do
@@ -133,42 +132,6 @@ defmodule Gallformers.Analytics.RollupTest do
 
       assert %{num_rows: 0} =
                Repo.query!("SELECT * FROM daily_stats WHERE date = ?", [Date.to_iso8601(@today)])
-    end
-  end
-
-  describe "backfill_missing/0" do
-    test "rolls up past days that have raw data but no summary" do
-      # Insert data for two days
-      insert_page_views(@yesterday, [
-        %{
-          path: "/",
-          visitor_hash: "aaa",
-          referrer_host: nil,
-          browser: "Chrome",
-          device_type: "desktop"
-        }
-      ])
-
-      insert_page_views(@today, [
-        %{
-          path: "/gall/1",
-          visitor_hash: "bbb",
-          referrer_host: "bing.com",
-          browser: "Firefox",
-          device_type: "mobile"
-        }
-      ])
-
-      # Manually roll up today only — yesterday should be "missing"
-      Rollup.rollup_day(@today)
-
-      # Now backfill should pick up yesterday
-      assert :ok = Rollup.backfill_missing()
-
-      assert %{rows: [[1, 1]]} =
-               Repo.query!("SELECT page_views, unique_visitors FROM daily_stats WHERE date = ?", [
-                 Date.to_iso8601(@yesterday)
-               ])
     end
   end
 

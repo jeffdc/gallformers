@@ -3,7 +3,6 @@ defmodule Gallformers.Analytics.Rollup do
   GenServer that aggregates raw `page_views` into daily summary tables.
 
   Runs nightly at ~00:05 UTC to roll up yesterday's data and prune old raw rows.
-  On startup, backfills any past days that have raw data but no summary.
   """
 
   use GenServer
@@ -58,56 +57,6 @@ defmodule Gallformers.Analytics.Rollup do
   end
 
   @doc """
-  Finds past days with raw page_views but no corresponding daily_stats row,
-  and rolls up each missing day.
-  """
-  @spec backfill_missing() :: :ok
-  def backfill_missing do
-    raw_dates =
-      from(pv in PageView,
-        select: fragment("DISTINCT date(?)", pv.inserted_at)
-      )
-      |> Repo.all()
-
-    %{rows: existing_rows} = Repo.query!("SELECT date FROM daily_stats", [])
-    existing_dates = MapSet.new(existing_rows, fn [d] -> d end)
-
-    today_str = Date.to_iso8601(Date.utc_today())
-
-    missing =
-      raw_dates
-      |> Enum.reject(&(&1 == today_str or MapSet.member?(existing_dates, &1)))
-      |> Enum.sort()
-
-    results =
-      for date_str <- missing do
-        {:ok, date} = Date.from_iso8601(date_str)
-
-        try do
-          rollup_day(date)
-        rescue
-          e ->
-            Logger.error("Analytics backfill failed for #{date_str}: #{Exception.message(e)}")
-            {:error, date_str}
-        end
-      end
-
-    failed = Enum.filter(results, &match?({:error, _}, &1))
-
-    if failed != [] do
-      Logger.warning(
-        "Analytics backfill: #{length(failed)} dates failed out of #{length(missing)}"
-      )
-    end
-
-    if missing != [] do
-      Logger.info("Analytics backfill: processed #{length(missing) - length(failed)} dates")
-    end
-
-    :ok
-  end
-
-  @doc """
   Deletes raw page_views older than `days` days. Returns `{count, nil}`.
   """
   @spec prune_old_page_views(integer()) :: {non_neg_integer(), nil}
@@ -122,7 +71,6 @@ defmodule Gallformers.Analytics.Rollup do
 
   @impl true
   def init(_opts) do
-    Gallformers.Async.run(fn -> backfill_missing() end)
     schedule_next_run()
     {:ok, %{}}
   end
