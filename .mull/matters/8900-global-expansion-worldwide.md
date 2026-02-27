@@ -4,7 +4,7 @@ created: 2026-02-23
 updated: 2026-02-27
 epic: geo-expansion
 docs: ['']
-relates: [1db6, b99b]
+relates: [1db6, b99b, 8166]
 needs: [b99b]
 ---
 
@@ -123,4 +123,3 @@ Detailed Natural Earth investigation for 60+ overseas territories documented in 
 | Scoping indicator | Per-page widget strip, not header selector |
 | Non-sticky override | Temporary, discarded on navigation |
 | Saving override | Explicit "Set as default" action required |
-
