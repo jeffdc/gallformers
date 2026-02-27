@@ -27,7 +27,7 @@ defmodule GallformersWeb.HomeLive do
      assign(socket,
        page_title: "Plant Gall Identification",
        page_description:
-         "Gallformers - The place to identify and learn about galls on plants in the US and Canada. A comprehensive database of plant galls and their causative organisms.",
+         "Gallformers - The place to identify and learn about plant galls. A comprehensive database of plant galls and their causative organisms.",
        page_url: "/",
        page_image: nil,
        page_json_ld: build_website_json_ld(),
