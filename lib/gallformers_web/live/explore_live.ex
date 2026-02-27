@@ -15,6 +15,7 @@ defmodule GallformersWeb.ExploreLive do
   alias Gallformers.Galls
   alias Gallformers.Places
   alias Gallformers.Plants
+  alias GallformersWeb.Live.ContinentScope
   alias GallformersWeb.TreeComponents
 
   @tabs ~w(galls undescribed hosts places)
@@ -53,7 +54,8 @@ defmodule GallformersWeb.ExploreLive do
        galls_filtered: galls_tree,
        undescribed_filtered: undescribed_tree,
        hosts_filtered: hosts_tree,
-       places_filtered: places_tree
+       places_filtered: places_tree,
+       default_continent_code: socket.assigns[:continent_code]
      )}
   end
 
@@ -62,6 +64,17 @@ defmodule GallformersWeb.ExploreLive do
     tab = params["tab"]
     active_tab = if tab in @tabs, do: tab, else: socket.assigns.active_tab
     {:noreply, assign(socket, active_tab: active_tab)}
+  end
+
+  @impl true
+  def handle_event("change_region", %{"code" => code}, socket) do
+    {continent_code, continent_name} =
+      case code do
+        "" -> {nil, nil}
+        code -> {code, ContinentScope.continent_names()[code]}
+      end
+
+    {:noreply, assign(socket, continent_code: continent_code, continent_name: continent_name)}
   end
 
   @impl true
@@ -250,6 +263,13 @@ defmodule GallformersWeb.ExploreLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
+      <:subheader>
+        <.region_scope
+          continent_code={@continent_code}
+          continent_name={@continent_name}
+          default_continent_code={@default_continent_code}
+        />
+      </:subheader>
       <div id="explore-container">
         <p class="text-lg text-gray-600 mb-6">
           Browse galls, host plants, and geographic places. Click to expand families, genera,

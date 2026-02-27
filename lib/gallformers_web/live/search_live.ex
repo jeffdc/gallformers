@@ -13,6 +13,7 @@ defmodule GallformersWeb.SearchLive do
   use GallformersWeb, :live_view
 
   alias Gallformers.Search
+  alias GallformersWeb.Live.ContinentScope
 
   @valid_sort_columns ~w(type name relevance)
   @page_size 50
@@ -36,7 +37,8 @@ defmodule GallformersWeb.SearchLive do
        sort_by: :relevance,
        sort_dir: :asc,
        selected_index: -1,
-       loading: false
+       loading: false,
+       default_continent_code: socket.assigns[:continent_code]
      )}
   end
 
@@ -145,6 +147,22 @@ defmodule GallformersWeb.SearchLive do
   def handle_event("select_result", %{"index" => index_str}, socket) do
     index = String.to_integer(index_str)
     {:noreply, assign(socket, selected_index: index)}
+  end
+
+  @impl true
+  def handle_event("change_region", %{"code" => code}, socket) do
+    {continent_code, continent_name} =
+      case code do
+        "" -> {nil, nil}
+        code -> {code, ContinentScope.continent_names()[code]}
+      end
+
+    socket =
+      socket
+      |> assign(continent_code: continent_code, continent_name: continent_name)
+      |> perform_search(socket.assigns.query)
+
+    {:noreply, socket}
   end
 
   defp perform_search(socket, query) do
@@ -300,6 +318,13 @@ defmodule GallformersWeb.SearchLive do
 
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
+      <:subheader>
+        <.region_scope
+          continent_code={@continent_code}
+          continent_name={@continent_name}
+          default_continent_code={@default_continent_code}
+        />
+      </:subheader>
       <div id="search-container" phx-window-keydown="keydown">
         <form id="search-form" phx-submit="search" phx-change="search_input" class="mb-6">
           <.search_input

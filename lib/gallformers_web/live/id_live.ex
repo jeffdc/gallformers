@@ -9,6 +9,7 @@ defmodule GallformersWeb.IDLive do
 
   alias Gallformers.{Galls, Places, Taxonomy}
   alias Gallformers.Plants
+  alias GallformersWeb.Live.ContinentScope
 
   # URL parameter keys (short codes for compact URLs)
   @url_params %{
@@ -96,7 +97,8 @@ defmodule GallformersWeb.IDLive do
        summaries: %{},
        total_count: 0,
        name_filter: "",
-       show_advanced: false
+       show_advanced: false,
+       default_continent_code: socket.assigns[:continent_code]
      )}
   end
 
@@ -632,6 +634,22 @@ defmodule GallformersWeb.IDLive do
   end
 
   @impl true
+  def handle_event("change_region", %{"code" => code}, socket) do
+    {continent_code, continent_name} =
+      case code do
+        "" -> {nil, nil}
+        code -> {code, ContinentScope.continent_names()[code]}
+      end
+
+    socket =
+      socket
+      |> assign(continent_code: continent_code, continent_name: continent_name)
+      |> push_filter_patch()
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("clear_all", _params, socket) do
     socket =
       socket
@@ -881,6 +899,13 @@ defmodule GallformersWeb.IDLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_user={@current_user}>
+      <:subheader>
+        <.region_scope
+          continent_code={@continent_code}
+          continent_name={@continent_name}
+          default_continent_code={@default_continent_code}
+        />
+      </:subheader>
       <div class="py-4">
         <%!-- Host/Genus Pickers --%>
         <div class="mb-2">

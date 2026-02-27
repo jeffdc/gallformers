@@ -12,6 +12,7 @@ defmodule GallformersWeb.UIComponents do
   import GallformersWeb.CoreComponents, only: [icon: 1]
 
   alias Gallformers.Taxonomy.TaxonName
+  alias GallformersWeb.Live.ContinentScope
   alias Phoenix.LiveView.JS
 
   @doc """
@@ -766,4 +767,153 @@ defmodule GallformersWeb.UIComponents do
   end
 
   defp first_sentence(_), do: ""
+
+  @doc """
+  Renders a region scope widget strip for continent filtering.
+
+  Shows below the header on scoped pages (ID, Search, Explore). Displays the
+  current continent selection with a dropdown to change it. When the user
+  selects a different region from their saved default, "Set as default" and
+  "Reset" actions appear.
+
+  The widget communicates with a `RegionScope` JS hook for localStorage
+  persistence. Region changes fire a `change_region` event to the parent
+  LiveView for immediate result filtering.
+
+  ## Examples
+
+      <.region_scope continent_code={@continent_code} continent_name={@continent_name} />
+  """
+  attr :continent_code, :string, default: nil, doc: "currently active continent code"
+  attr :continent_name, :string, default: nil, doc: "currently active continent display name"
+
+  attr :default_continent_code, :string,
+    default: nil,
+    doc: "saved default continent code from localStorage"
+
+  def region_scope(assigns) do
+    assigns =
+      assigns
+      |> assign(:continents, ContinentScope.continents_list())
+      |> assign(:overridden?, assigns.continent_code != assigns.default_continent_code)
+
+    ~H"""
+    <div
+      :if={!@default_continent_code}
+      id="region-prompt"
+      phx-hook="RegionPrompt"
+      class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
+    >
+      <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+        <div class="text-center mb-4">
+          <.icon name="ph-globe" class="h-10 w-10 text-gf-maroon mx-auto mb-2" />
+          <h2 class="text-lg font-semibold text-gray-900">Welcome to Gallformers!</h2>
+          <p class="text-sm text-gray-600 mt-1">
+            Select your region to see the most relevant results on filterable pages
+            like Search, ID Tool, and Explore.
+          </p>
+          <p class="text-xs text-gray-400 mt-1">
+            You can change this anytime. Your choice is saved in this browser only.
+          </p>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mb-4">
+          <button
+            :for={{code, name} <- @continents}
+            type="button"
+            phx-click="change_region"
+            phx-value-code={code}
+            data-prompt-code={code}
+            class="px-3 py-2 text-sm font-medium rounded-md border border-gray-300 hover:bg-gf-sky-blue hover:border-gf-maroon transition-colors"
+          >
+            {name}
+          </button>
+        </div>
+        <div class="text-center">
+          <button
+            type="button"
+            phx-click="change_region"
+            phx-value-code=""
+            data-prompt-code=""
+            class="text-sm text-gray-500 hover:text-gray-700 underline"
+          >
+            Show all regions
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="region-scope"
+      phx-hook="RegionScope"
+      data-default-code={@default_continent_code || ""}
+      class="bg-gray-100 border-b border-gray-200"
+    >
+      <div class="px-6 sm:px-10 lg:px-16 py-1.5 flex items-center justify-between">
+        <div class="flex items-center gap-1.5">
+          <.icon name="ph-globe" class="h-4 w-4 text-gray-500" />
+          <div class="relative">
+            <button
+              type="button"
+              data-region-toggle
+              class="flex items-center gap-1 text-sm text-gray-700 hover:text-gray-900"
+            >
+              <span data-region-label>{@continent_name || "All Regions"}</span>
+              <.icon name="ph-caret-down" class="h-3 w-3" />
+            </button>
+            <div
+              data-region-dropdown
+              class="hidden absolute left-0 z-10 mt-1 w-48 rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5"
+            >
+              <button
+                type="button"
+                phx-click="change_region"
+                phx-value-code=""
+                data-region-code=""
+                class={[
+                  "block w-full text-left px-4 py-1.5 text-sm hover:bg-gray-100",
+                  !@continent_code && "font-bold bg-gray-50"
+                ]}
+              >
+                All Regions
+              </button>
+              <button
+                :for={{code, name} <- @continents}
+                type="button"
+                phx-click="change_region"
+                phx-value-code={code}
+                data-region-code={code}
+                class={[
+                  "block w-full text-left px-4 py-1.5 text-sm hover:bg-gray-100",
+                  @continent_code == code && "font-bold bg-gray-50"
+                ]}
+              >
+                {name}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div :if={@overridden?} class="flex items-center gap-2 text-sm">
+          <button
+            type="button"
+            data-region-save
+            class="text-gf-maroon hover:underline"
+          >
+            Set as default
+          </button>
+          <span class="text-gray-300">&middot;</span>
+          <button
+            type="button"
+            data-region-reset
+            phx-click="change_region"
+            phx-value-code={@default_continent_code || ""}
+            class="text-gray-500 hover:text-gray-700 hover:underline"
+          >
+            Reset
+          </button>
+        </div>
+      </div>
+    </div>
+    """
+  end
 end

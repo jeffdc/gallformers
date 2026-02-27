@@ -574,32 +574,11 @@ const AdminNav = {
   }
 }
 
-// Continent code → display name mapping. Canonical source: GallformersWeb.Live.ContinentScope
-const CONTINENT_NAMES = {
-  XF: "Africa", XA: "Asia", XB: "Caribbean", XC: "Central America",
-  XE: "Europe", XN: "North America", XO: "Oceania", XS: "South America"
-}
-
-// ContinentSelector hook for the header continent dropdown
-const ContinentSelector = {
+// RegionScope hook for the per-page region scope widget
+const RegionScope = {
   mounted() {
-    // Immediately set the display text from localStorage to avoid flash of "All Regions"
-    const stored = localStorage.getItem("gf_continent")
-    const label = this.el.querySelector("[data-continent-label]")
-    if (label && stored && CONTINENT_NAMES[stored]) {
-      label.textContent = CONTINENT_NAMES[stored]
-    }
-
-    // Highlight the active item in the dropdown
-    this.el.querySelectorAll("[data-continent-code]").forEach(btn => {
-      const code = btn.dataset.continentCode
-      const isActive = (stored && code === stored) || (!stored && code === "")
-      btn.classList.toggle("font-bold", isActive)
-      btn.classList.toggle("bg-gray-50", isActive)
-    })
-
-    const toggle = this.el.querySelector("[data-continent-toggle]")
-    const dropdown = this.el.querySelector("[data-continent-dropdown]")
+    const toggle = this.el.querySelector("[data-region-toggle]")
+    const dropdown = this.el.querySelector("[data-region-dropdown]")
 
     if (toggle && dropdown) {
       toggle.addEventListener("click", (e) => {
@@ -615,27 +594,29 @@ const ContinentSelector = {
       })
     }
 
-    // Handle continent selection
-    this.el.querySelectorAll("[data-continent-code]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const code = btn.dataset.continentCode
-        if (code === "") {
-          localStorage.removeItem("gf_continent")
-        } else {
-          localStorage.setItem("gf_continent", code)
-        }
-        // Dismiss the first-visit prompt
-        localStorage.setItem("gf_continent_dismissed", "true")
-        window.location.reload()
-      })
+    // Use event delegation for "Set as default" since the button is conditionally
+    // rendered (only appears after an override) and won't exist at mount time
+    this.el.addEventListener("click", (e) => {
+      const saveBtn = e.target.closest("[data-region-save]")
+      if (!saveBtn) return
+
+      const active = this.el.querySelector("[data-region-code].font-bold")
+      const currentCode = active ? active.dataset.regionCode : ""
+      if (currentCode === "") {
+        localStorage.removeItem("gf_continent")
+      } else {
+        localStorage.setItem("gf_continent", currentCode)
+      }
+      localStorage.setItem("gf_continent_dismissed", "true")
+      // Reload to propagate the new default across the session
+      window.location.reload()
     })
   }
 }
 
-// ContinentPrompt hook for the first-visit modal
-const ContinentPrompt = {
+// RegionPrompt hook for the contextual first-visit modal on scoped pages
+const RegionPrompt = {
   mounted() {
-    // Show only if no continent chosen and not previously dismissed
     const hasContinent = localStorage.getItem("gf_continent")
     const dismissed = localStorage.getItem("gf_continent_dismissed")
 
@@ -643,10 +624,10 @@ const ContinentPrompt = {
       this.el.classList.remove("hidden")
     }
 
-    // Handle continent selection from the prompt
-    this.el.querySelectorAll("[data-continent-code]").forEach(btn => {
+    // Selection from the prompt saves to localStorage and dismisses
+    this.el.querySelectorAll("[data-prompt-code]").forEach(btn => {
       btn.addEventListener("click", () => {
-        const code = btn.dataset.continentCode
+        const code = btn.dataset.promptCode
         if (code === "") {
           localStorage.setItem("gf_continent_dismissed", "true")
         } else {
@@ -654,9 +635,6 @@ const ContinentPrompt = {
           localStorage.setItem("gf_continent_dismissed", "true")
         }
         this.el.classList.add("hidden")
-        if (code !== "") {
-          window.location.reload()
-        }
       })
     })
   }
@@ -666,7 +644,7 @@ const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: () => ({_csrf_token: csrfToken, continent: localStorage.getItem("gf_continent")}),
-  hooks: {Tabs, ImageGallery, RangeMap, ImageUpload, SortableImages, AutoDismiss, Typeahead, ArticleImageUpload, CopyToClipboard, DailyChart, InputEvent, ScrollToCouplet, AdminNav, ContinentSelector, ContinentPrompt, IndeterminateCheckbox},
+  hooks: {Tabs, ImageGallery, RangeMap, ImageUpload, SortableImages, AutoDismiss, Typeahead, ArticleImageUpload, CopyToClipboard, DailyChart, InputEvent, ScrollToCouplet, AdminNav, RegionScope, RegionPrompt, IndeterminateCheckbox},
 })
 
 // Show progress bar on live navigation and form submits
