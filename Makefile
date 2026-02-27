@@ -302,7 +302,7 @@ e2e-changed:
 # =============================================================================
 
 # Run CI checks (same as GitHub Actions)
-ci: assets/node_modules
+ci: assets/node_modules test-db
 	@echo "==> Running precommit checks (format, compile, credo, migrations, tests)..."
 	mix precommit
 	@echo ""
