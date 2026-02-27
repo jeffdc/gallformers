@@ -79,9 +79,29 @@ defmodule Gallformers.Analytics.Rollup do
       |> Enum.reject(&(&1 == today_str or MapSet.member?(existing_dates, &1)))
       |> Enum.sort()
 
-    for date_str <- missing do
-      {:ok, date} = Date.from_iso8601(date_str)
-      rollup_day(date)
+    results =
+      for date_str <- missing do
+        {:ok, date} = Date.from_iso8601(date_str)
+
+        try do
+          rollup_day(date)
+        rescue
+          e ->
+            Logger.error("Analytics backfill failed for #{date_str}: #{Exception.message(e)}")
+            {:error, date_str}
+        end
+      end
+
+    failed = Enum.filter(results, &match?({:error, _}, &1))
+
+    if failed != [] do
+      Logger.warning(
+        "Analytics backfill: #{length(failed)} dates failed out of #{length(missing)}"
+      )
+    end
+
+    if missing != [] do
+      Logger.info("Analytics backfill: processed #{length(missing) - length(failed)} dates")
     end
 
     :ok
