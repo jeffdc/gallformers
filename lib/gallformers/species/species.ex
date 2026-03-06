@@ -53,9 +53,9 @@ defmodule Gallformers.Species.Species do
       join_through: "host_range",
       join_keys: [species_id: :id, place_id: :id]
 
-    # Gall range exclusions (places excluded from gall's range)
-    many_to_many :gall_range_exclusions, Gallformers.Places.Place,
-      join_through: "gall_range_exclusion",
+    # Gall range (curated places where gall occurs)
+    many_to_many :gall_ranges, Gallformers.Places.Place,
+      join_through: "gall_range",
       join_keys: [species_id: :id, place_id: :id]
 
     timestamps(type: :utc_datetime)
@@ -63,11 +63,11 @@ defmodule Gallformers.Species.Species do
 
   @doc """
   Returns the appropriate range association based on taxoncode.
-  For plants: host_ranges
-  For galls: gall_range_exclusions (places to EXCLUDE)
+  For plants: host_ranges (places where host exists)
+  For galls: gall_ranges (curated places where gall occurs)
   """
   def range_association(%__MODULE__{taxoncode: "plant"}), do: :host_ranges
-  def range_association(%__MODULE__{taxoncode: "gall"}), do: :gall_range_exclusions
+  def range_association(%__MODULE__{taxoncode: "gall"}), do: :gall_ranges
   def range_association(_), do: nil
 
   @impl Gallformers.SchemaFields

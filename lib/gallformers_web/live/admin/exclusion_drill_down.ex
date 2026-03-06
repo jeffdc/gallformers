@@ -96,7 +96,7 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
       >
         <:header_extra>
           <p class="text-xs text-gray-500 mb-2">
-            Uncheck states to exclude them from this gall's range.
+            Check states to include them in this gall's range.
           </p>
           <div class="flex gap-2 mb-3">
             <button

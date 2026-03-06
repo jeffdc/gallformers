@@ -63,6 +63,12 @@ defmodule GallformersWeb.Admin.DashboardLive do
             accent="blue"
           />
           <.action_card
+            label="Review Gall Ranges"
+            href="/admin/gall-range"
+            icon="ph-map-trifold"
+            accent="blue"
+          />
+          <.action_card
             label="Bulk Add Species Descriptions from Sources"
             href="/admin/species-sources/add"
             icon="gf-source"

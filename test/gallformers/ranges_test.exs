@@ -56,11 +56,11 @@ defmodule Gallformers.RangesTest do
       assert %{precision: ["is invalid"]} = errors_on(changeset)
     end
 
-    test "rejects continent precision for gall range exclusion" do
-      alias Gallformers.Ranges.GallRangeExclusion
+    test "rejects continent precision for gall range" do
+      alias Gallformers.Ranges.GallRange
 
       changeset =
-        GallRangeExclusion.changeset(%GallRangeExclusion{}, %{
+        GallRange.changeset(%GallRange{}, %{
           species_id: 1,
           place_id: 1,
           precision: "continent"
@@ -112,22 +112,6 @@ defmodule Gallformers.RangesTest do
       ca = Enum.find(results, &(&1.code == "US-CA"))
       assert ca.precision == "exact"
     end
-
-    test "set_range_exclusions_for_gall/2 accepts {place_id, precision} tuples" do
-      mexico = Places.get_place_by_code("MX")
-      {:ok, :ok} = Ranges.set_range_exclusions_for_gall(100, [{mexico.id, "country"}])
-      excluded = Ranges.get_excluded_places_with_precision_for_gall(100)
-      mx = Enum.find(excluded, &(&1.code == "MX"))
-      assert mx.precision == "country"
-    end
-
-    test "set_range_exclusions_for_gall/2 remains backwards-compatible with plain IDs" do
-      mexico = Places.get_place_by_code("MX")
-      {:ok, :ok} = Ranges.set_range_exclusions_for_gall(100, [mexico.id])
-      excluded = Ranges.get_excluded_places_with_precision_for_gall(100)
-      mx = Enum.find(excluded, &(&1.code == "MX"))
-      assert mx.precision == "exact"
-    end
   end
 
   describe "display range computation" do
@@ -136,25 +120,25 @@ defmodule Gallformers.RangesTest do
       assert %Ranges.DisplayRange{} = result
     end
 
-    test "get_display_range_for_gall subtracts exclusions from both exact and inherited" do
-      # Gall 100 hosts: 6 (US-CA exact) and 8 (CA-AB exact, US-CA exact, US country)
-      # Gall 100 exclusion: MX-JAL (place 3, not in host range)
-      # MX-JAL shows in excluded_range but doesn't affect exact/inherited since it's
-      # not in any host range
+    test "get_display_range_for_gall reads from gall_range table" do
+      # Gall 100 has gall_range entries: US-CA (exact), CA-AB (exact), US (country)
+      # MX-JAL is NOT in gall_range (exclusion is implicit)
       result = Ranges.get_display_range_for_gall(100)
-      excluded_set = MapSet.new(result.excluded_range)
+
       exact_set = MapSet.new(result.in_range)
       inherited_set = MapSet.new(result.inherited_range)
 
-      # No overlap between any of the three sets
-      assert MapSet.disjoint?(excluded_set, exact_set)
-      assert MapSet.disjoint?(excluded_set, inherited_set)
+      # No overlap between exact and inherited
       assert MapSet.disjoint?(exact_set, inherited_set)
 
-      # MX-JAL should be in excluded
-      assert "MX-JAL" in result.excluded_range
+      # excluded_range is always empty now (exclusions are implicit)
+      assert result.excluded_range == []
 
-      # Host range codes should be in exact
+      # MX-JAL is NOT in range (not in gall_range table)
+      refute "MX-JAL" in result.in_range
+      refute "MX-JAL" in result.inherited_range
+
+      # Exact entries from gall_range
       assert "US-CA" in result.in_range
       assert "CA-AB" in result.in_range
     end
@@ -189,8 +173,8 @@ defmodule Gallformers.RangesTest do
   end
 
   describe "gall range queries" do
-    test "get_places_for_gall returns union of host places" do
-      # Gall 100 hosts: 6 (US-CA) and 8 (CA-AB, US-CA, US)
+    test "get_places_for_gall returns curated gall range" do
+      # Gall 100 gall_range: US-CA, CA-AB, US (country)
       places = Ranges.get_places_for_gall(100)
       assert is_list(places)
       assert "US-CA" in places
@@ -203,37 +187,150 @@ defmodule Gallformers.RangesTest do
       assert is_map(result)
       assert is_list(result[100])
       assert "US-CA" in result[100]
-      # Gall 101 host: 7 (US-CA only)
       assert is_list(result[101])
       assert "US-CA" in result[101]
     end
 
-    test "get_places_for_gall with no hosts returns empty list" do
-      # Gall 102 has no host mappings
+    test "get_places_for_gall with no gall_range returns empty list" do
+      # Gall 102 has no gall_range entries
       places = Ranges.get_places_for_gall(102)
       assert places == []
     end
   end
 
-  describe "toggle operations" do
-    test "toggle_exclusion_for_gall adds then removes" do
-      # Gall 101, place 1 (CA-AB) - no existing exclusion
-      result = Ranges.toggle_exclusion_for_gall(101, 1)
-      assert {:added, 1} = result
+  describe "distribution_type" do
+    test "HostRange changeset accepts valid distribution_type values" do
+      alias Gallformers.Ranges.HostRange
 
-      # Verify it was added
-      excluded = Ranges.get_excluded_places_for_gall(101)
-      assert "CA-AB" in excluded
+      for dt <- ~w(native introduced) do
+        changeset =
+          HostRange.changeset(%HostRange{}, %{species_id: 1, place_id: 1, distribution_type: dt})
 
-      # Toggle off
-      result = Ranges.toggle_exclusion_for_gall(101, 1)
-      assert {:removed, 1} = result
-
-      # Verify it was removed
-      excluded = Ranges.get_excluded_places_for_gall(101)
-      refute "CA-AB" in excluded
+        assert changeset.valid?
+      end
     end
 
+    test "HostRange changeset rejects invalid distribution_type" do
+      alias Gallformers.Ranges.HostRange
+
+      changeset =
+        HostRange.changeset(%HostRange{}, %{
+          species_id: 1,
+          place_id: 1,
+          distribution_type: "cultivated"
+        })
+
+      assert %{distribution_type: ["is invalid"]} = errors_on(changeset)
+    end
+
+    test "HostRange changeset defaults distribution_type to native" do
+      alias Gallformers.Ranges.HostRange
+      changeset = HostRange.changeset(%HostRange{}, %{species_id: 1, place_id: 1})
+      assert Ecto.Changeset.get_field(changeset, :distribution_type) == "native"
+    end
+  end
+
+  describe "distribution_type in insert paths" do
+    test "add_place_to_host/4 stores distribution_type" do
+      mexico = Places.get_place_by_code("MX")
+      {:ok, _} = Ranges.add_place_to_host(6, mexico.id, "country", "introduced")
+
+      import Ecto.Query
+
+      row =
+        Gallformers.Repo.one(
+          from(hr in Gallformers.Ranges.HostRange,
+            where: hr.species_id == 6 and hr.place_id == ^mexico.id,
+            select: hr.distribution_type
+          )
+        )
+
+      assert row == "introduced"
+    end
+
+    test "add_place_to_host/3 defaults distribution_type to native" do
+      bahamas = Places.get_place_by_code("BS")
+      {:ok, _} = Ranges.add_place_to_host(6, bahamas.id, "exact")
+
+      import Ecto.Query
+
+      row =
+        Gallformers.Repo.one(
+          from(hr in Gallformers.Ranges.HostRange,
+            where: hr.species_id == 6 and hr.place_id == ^bahamas.id,
+            select: hr.distribution_type
+          )
+        )
+
+      assert row == "native"
+    end
+
+    test "update_host_places/2 accepts {place_id, precision, distribution_type} triples" do
+      california = Places.get_place_by_code("US-CA")
+      mexico = Places.get_place_by_code("MX")
+
+      {:ok, _} =
+        Ranges.update_host_places(6, [
+          {california.id, "exact", "native"},
+          {mexico.id, "country", "introduced"}
+        ])
+
+      import Ecto.Query
+
+      rows =
+        Gallformers.Repo.all(
+          from(hr in Gallformers.Ranges.HostRange,
+            join: p in Gallformers.Places.Place,
+            on: hr.place_id == p.id,
+            where: hr.species_id == 6,
+            select: %{code: p.code, distribution_type: hr.distribution_type}
+          )
+        )
+
+      ca = Enum.find(rows, &(&1.code == "US-CA"))
+      mx = Enum.find(rows, &(&1.code == "MX"))
+      assert ca.distribution_type == "native"
+      assert mx.distribution_type == "introduced"
+    end
+
+    test "normalize_entries backwards compatible with plain IDs defaults to native" do
+      california = Places.get_place_by_code("US-CA")
+
+      {:ok, _} = Ranges.update_host_places(6, [california.id])
+
+      import Ecto.Query
+
+      row =
+        Gallformers.Repo.one(
+          from(hr in Gallformers.Ranges.HostRange,
+            where: hr.species_id == 6 and hr.place_id == ^california.id,
+            select: hr.distribution_type
+          )
+        )
+
+      assert row == "native"
+    end
+
+    test "normalize_entries backwards compatible with pairs defaults to native" do
+      california = Places.get_place_by_code("US-CA")
+
+      {:ok, _} = Ranges.update_host_places(6, [{california.id, "exact"}])
+
+      import Ecto.Query
+
+      row =
+        Gallformers.Repo.one(
+          from(hr in Gallformers.Ranges.HostRange,
+            where: hr.species_id == 6 and hr.place_id == ^california.id,
+            select: hr.distribution_type
+          )
+        )
+
+      assert row == "native"
+    end
+  end
+
+  describe "toggle operations" do
     test "toggle_place_for_host adds then removes" do
       # Host 6 does not have place 3 (MX-JAL)
       result = Ranges.toggle_place_for_host(6, 3)
@@ -250,6 +347,181 @@ defmodule Gallformers.RangesTest do
       # Verify it was removed
       codes = Ranges.get_places_for_host(6)
       refute "MX-JAL" in codes
+    end
+  end
+
+  describe "GallRange schema" do
+    test "changeset accepts valid precision values" do
+      alias Gallformers.Ranges.GallRange
+
+      for p <- ~w(exact country) do
+        changeset = GallRange.changeset(%GallRange{}, %{species_id: 1, place_id: 1, precision: p})
+        assert changeset.valid?
+      end
+    end
+
+    test "changeset rejects invalid precision" do
+      alias Gallformers.Ranges.GallRange
+
+      changeset =
+        GallRange.changeset(%GallRange{}, %{
+          species_id: 1,
+          place_id: 1,
+          precision: "continent"
+        })
+
+      assert %{precision: ["is invalid"]} = errors_on(changeset)
+    end
+
+    test "changeset defaults precision to exact" do
+      alias Gallformers.Ranges.GallRange
+      changeset = GallRange.changeset(%GallRange{}, %{species_id: 1, place_id: 1})
+      assert Ecto.Changeset.get_field(changeset, :precision) == "exact"
+    end
+  end
+
+  describe "set_gall_range/2" do
+    test "replaces all gall_range entries for a species" do
+      california = Places.get_place_by_code("US-CA")
+      alberta = Places.get_place_by_code("CA-AB")
+
+      # Gall 100 has 3 entries: US-CA, CA-AB, US (country)
+      assert length(Ranges.get_gall_range_place_ids(100)) == 3
+
+      # Replace with just US-CA
+      {:ok, :ok} = Ranges.set_gall_range(100, [{california.id, "exact"}])
+
+      ids = Ranges.get_gall_range_place_ids(100)
+      assert ids == [california.id]
+
+      # Replace with both US-CA and CA-AB
+      {:ok, :ok} = Ranges.set_gall_range(100, [{california.id, "exact"}, {alberta.id, "exact"}])
+
+      ids = Ranges.get_gall_range_place_ids(100)
+      assert length(ids) == 2
+      assert california.id in ids
+      assert alberta.id in ids
+    end
+
+    test "accepts plain place_ids (defaults to exact precision)" do
+      california = Places.get_place_by_code("US-CA")
+      {:ok, :ok} = Ranges.set_gall_range(100, [california.id])
+
+      results = Ranges.get_gall_range_with_precision(100)
+      assert length(results) == 1
+      assert hd(results).precision == "exact"
+    end
+
+    test "clears all entries when given empty list" do
+      {:ok, :ok} = Ranges.set_gall_range(100, [])
+      assert Ranges.get_gall_range_place_ids(100) == []
+    end
+  end
+
+  describe "gall range invalidation cascade" do
+    test "update_host_places invalidates range_confirmed for linked galls" do
+      # Confirm gall 100's range
+      Gallformers.Galls.confirm_gall_range(100)
+      traits = Gallformers.Galls.get_gall_traits(100)
+      assert traits.range_confirmed == true
+
+      # Gall 100 is linked to host 6 (T. alpinus)
+      # Update host 6's range — should invalidate gall 100
+      california = Places.get_place_by_code("US-CA")
+      {:ok, _} = Ranges.update_host_places(6, [california.id])
+
+      traits = Gallformers.Galls.get_gall_traits(100)
+      assert traits.range_confirmed == false
+    end
+
+    test "invalidation is idempotent — already-false flags stay false" do
+      # Gall 100 starts unconfirmed (default)
+      traits = Gallformers.Galls.get_gall_traits(100)
+      assert traits.range_confirmed == false
+
+      # Update host range — should not error
+      california = Places.get_place_by_code("US-CA")
+      {:ok, _} = Ranges.update_host_places(6, [california.id])
+
+      traits = Gallformers.Galls.get_gall_traits(100)
+      assert traits.range_confirmed == false
+    end
+
+    test "only galls on the modified host are invalidated" do
+      # Confirm both gall 100 (hosts: 6, 8) and gall 101 (host: 7)
+      Gallformers.Galls.confirm_gall_range(100)
+      Gallformers.Galls.confirm_gall_range(101)
+
+      # Update host 6's range (linked to gall 100 only)
+      california = Places.get_place_by_code("US-CA")
+      {:ok, _} = Ranges.update_host_places(6, [california.id])
+
+      # Gall 100 invalidated (host 6 changed)
+      assert Gallformers.Galls.get_gall_traits(100).range_confirmed == false
+      # Gall 101 still confirmed (host 7 unchanged)
+      assert Gallformers.Galls.get_gall_traits(101).range_confirmed == true
+    end
+
+    test "add_place_to_host invalidates gall range_confirmed" do
+      Gallformers.Galls.confirm_gall_range(100)
+      assert Gallformers.Galls.get_gall_traits(100).range_confirmed == true
+
+      bahamas = Places.get_place_by_code("BS")
+      {:ok, _} = Ranges.add_place_to_host(6, bahamas.id)
+
+      assert Gallformers.Galls.get_gall_traits(100).range_confirmed == false
+    end
+
+    test "remove_place_from_host invalidates gall range_confirmed" do
+      Gallformers.Galls.confirm_gall_range(100)
+      assert Gallformers.Galls.get_gall_traits(100).range_confirmed == true
+
+      california = Places.get_place_by_code("US-CA")
+      {:ok, _} = Ranges.remove_place_from_host(6, california.id)
+
+      assert Gallformers.Galls.get_gall_traits(100).range_confirmed == false
+    end
+
+    test "toggle_place_for_host invalidates gall range_confirmed" do
+      Gallformers.Galls.confirm_gall_range(100)
+      assert Gallformers.Galls.get_gall_traits(100).range_confirmed == true
+
+      bahamas = Places.get_place_by_code("BS")
+      {:added, _} = Ranges.toggle_place_for_host(6, bahamas.id)
+
+      assert Gallformers.Galls.get_gall_traits(100).range_confirmed == false
+    end
+  end
+
+  describe "gall range query functions" do
+    test "get_gall_range_codes returns codes from gall_range table" do
+      codes = Ranges.get_gall_range_codes(100)
+      assert "US-CA" in codes
+      assert "CA-AB" in codes
+      # MX-JAL is NOT in gall_range (was excluded in old system)
+      refute "MX-JAL" in codes
+    end
+
+    test "get_gall_range_place_ids returns place IDs" do
+      ids = Ranges.get_gall_range_place_ids(100)
+      assert is_list(ids)
+      # US-CA
+      assert 2 in ids
+      # CA-AB
+      assert 1 in ids
+    end
+
+    test "get_gall_range_with_precision returns precision metadata" do
+      results = Ranges.get_gall_range_with_precision(100)
+      us_ca = Enum.find(results, &(&1.code == "US-CA"))
+      us = Enum.find(results, &(&1.code == "US"))
+      assert us_ca.precision == "exact"
+      assert us.precision == "country"
+    end
+
+    test "get_gall_range_codes returns empty for gall without range" do
+      # Gall 102 has no hosts, so no gall_range entries
+      assert Ranges.get_gall_range_codes(102) == []
     end
   end
 end

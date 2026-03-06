@@ -513,4 +513,86 @@ defmodule Gallformers.GallsTest do
       assert {false, nil} = Galls.compute_datacomplete_lock(nil)
     end
   end
+
+  describe "get_gall_traits/1" do
+    test "returns gall_traits for a valid species" do
+      # Gall 100 exists in test seeds
+      traits = Galls.get_gall_traits(100)
+      assert %GallTraits{} = traits
+      assert traits.species_id == 100
+    end
+
+    test "returns nil for non-existent species" do
+      assert Galls.get_gall_traits(999_999) == nil
+    end
+  end
+
+  describe "confirm_gall_range/1" do
+    test "sets range_confirmed and range_computed_at" do
+      # Gall 100 starts with range_confirmed = false
+      traits_before = Galls.get_gall_traits(100)
+      refute traits_before.range_confirmed
+
+      Galls.confirm_gall_range(100)
+
+      traits_after = Galls.get_gall_traits(100)
+      assert traits_after.range_confirmed == true
+      assert traits_after.range_computed_at != nil
+    end
+  end
+
+  describe "list_galls_for_range_review/1" do
+    test "returns unconfirmed galls by default" do
+      results = Galls.list_galls_for_range_review()
+
+      # All seed galls start unconfirmed
+      assert length(results) > 0
+      assert Enum.all?(results, fn g -> g.range_confirmed == false end)
+    end
+
+    test "includes host_count and range_count" do
+      results = Galls.list_galls_for_range_review()
+      gall = Enum.find(results, &(&1.id == 100))
+
+      assert is_integer(gall.host_count)
+      assert is_integer(gall.range_count)
+    end
+
+    test "excludes confirmed galls when unconfirmed_only is true" do
+      Galls.confirm_gall_range(100)
+
+      results = Galls.list_galls_for_range_review(unconfirmed_only: true)
+      refute Enum.any?(results, &(&1.id == 100))
+    end
+
+    test "includes confirmed galls when unconfirmed_only is false" do
+      Galls.confirm_gall_range(100)
+
+      results = Galls.list_galls_for_range_review(unconfirmed_only: false)
+      gall = Enum.find(results, &(&1.id == 100))
+
+      assert gall != nil
+      assert gall.range_confirmed == true
+    end
+  end
+
+  describe "bulk_confirm_gall_ranges/1" do
+    test "confirms multiple galls at once" do
+      {count, _} = Galls.bulk_confirm_gall_ranges([100, 101])
+      assert count == 2
+
+      assert Galls.get_gall_traits(100).range_confirmed == true
+      assert Galls.get_gall_traits(101).range_confirmed == true
+    end
+
+    test "returns zero for empty list" do
+      assert {0, nil} = Galls.bulk_confirm_gall_ranges([])
+    end
+
+    test "sets range_computed_at" do
+      Galls.bulk_confirm_gall_ranges([100])
+      traits = Galls.get_gall_traits(100)
+      assert traits.range_computed_at != nil
+    end
+  end
 end

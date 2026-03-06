@@ -1,13 +1,10 @@
-defmodule Gallformers.Ranges.GallRangeExclusion do
+defmodule Gallformers.Ranges.GallRange do
   @moduledoc """
-  Ecto schema for the gall_range_exclusion table.
+  Ecto schema for the gall_range table.
 
-  Represents places where a gall does NOT occur, even though suitable host
-  plants exist there. Used to compute effective gall range:
-
-      effective_range = (union of all host plant ranges) - (exclusions)
-
-  Only used for galls (Species with taxoncode='gall').
+  Represents the curated geographic range for a gall species. This is the
+  source of truth for "where does this gall occur" — all consumers read
+  from this table instead of computing range on the fly from hosts.
   """
   use Ecto.Schema
   import Ecto.Changeset
@@ -19,7 +16,7 @@ defmodule Gallformers.Ranges.GallRangeExclusion do
   @valid_precisions ~w(exact country)
 
   @primary_key false
-  schema "gall_range_exclusion" do
+  schema "gall_range" do
     belongs_to :species, Gallformers.Species.Species
     belongs_to :place, Gallformers.Places.Place
     field :precision, :string, default: "exact"
@@ -29,13 +26,13 @@ defmodule Gallformers.Ranges.GallRangeExclusion do
   def required_fields, do: @required_fields
 
   @doc """
-  Creates a changeset for a gall range exclusion entry.
+  Creates a changeset for a gall range entry.
   """
-  def changeset(exclusion, attrs) do
-    exclusion
+  def changeset(gall_range, attrs) do
+    gall_range
     |> cast(attrs, @required_fields ++ @optional_fields)
     |> validate_required(@required_fields)
     |> validate_inclusion(:precision, @valid_precisions)
-    |> unique_constraint([:species_id, :place_id], name: :gall_range_exclusion_pkey)
+    |> unique_constraint([:species_id, :place_id], name: :gall_range_pkey)
   end
 end

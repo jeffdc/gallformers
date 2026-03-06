@@ -14,7 +14,6 @@ defmodule Gallformers.GallHosts do
 
   alias Gallformers.GallHosts.GallHost
   alias Gallformers.Galls.GallTraits
-  alias Gallformers.Ranges
   alias Gallformers.Repo
   alias Gallformers.Species.Species
 
@@ -201,13 +200,16 @@ defmodule Gallformers.GallHosts do
   @doc """
   Saves all gall-host mapping changes in a single transaction.
 
-  Adds and removes host associations, then sets range exclusions.
+  Adds and removes host associations, and optionally updates the gall's
+  curated range in gall_range.
+
   `hosts_to_remove` is a MapSet of relation IDs. `hosts_to_add` is a list of
-  maps with `:host_species_id`.
+  maps with `:host_species_id`. `gall_range_entries` is an optional list of
+  `{place_id, precision}` tuples for the gall_range table.
   """
-  @spec save_gall_host_changes(integer(), [map()], MapSet.t(), [integer()]) ::
+  @spec save_gall_host_changes(integer(), [map()], MapSet.t(), [{integer(), String.t()}] | nil) ::
           {:ok, :ok} | {:error, term()}
-  def save_gall_host_changes(gall_id, hosts_to_add, hosts_to_remove, excluded_place_ids) do
+  def save_gall_host_changes(gall_id, hosts_to_add, hosts_to_remove, gall_range_entries \\ nil) do
     Repo.transaction(fn ->
       for relation_id <- hosts_to_remove do
         remove_host_from_gall(relation_id)
@@ -217,7 +219,10 @@ defmodule Gallformers.GallHosts do
         add_host_to_gall(gall_id, host.host_species_id)
       end
 
-      Ranges.set_range_exclusions_for_gall(gall_id, excluded_place_ids)
+      if gall_range_entries do
+        Gallformers.Ranges.set_gall_range(gall_id, gall_range_entries)
+      end
+
       Gallformers.Species.touch(gall_id)
       :ok
     end)

@@ -124,22 +124,10 @@ defmodule Gallformers.HostsTest do
       assert Ranges.get_places_for_gall(999_999_999) == []
     end
 
-    test "returns place codes derived from host ranges" do
-      # Gall 100 is on hosts 6 and 8, which have ranges in US-CA and CA-AB
+    test "returns place codes from curated gall range" do
+      # Gall 100 has gall_range entries for US-CA, CA-AB, US
       places = Ranges.get_places_for_gall(100)
       assert length(places) > 0
-    end
-  end
-
-  describe "get_excluded_places_for_gall/1" do
-    test "returns excluded places for gall with exclusions" do
-      # Gall 100 excludes MX-JAL
-      excluded = Ranges.get_excluded_places_for_gall(100)
-      assert "MX-JAL" in excluded
-    end
-
-    test "returns empty list for gall with no exclusions" do
-      assert Ranges.get_excluded_places_for_gall(101) == []
     end
   end
 

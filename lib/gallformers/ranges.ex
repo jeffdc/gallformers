@@ -4,21 +4,18 @@ defmodule Gallformers.Ranges do
 
   Manages geographic range data for species:
   - **Host ranges** (host_range table): Where host plants exist geographically
-  - **Gall range exclusions** (gall_range_exclusion table): Where galls do NOT occur
-    despite suitable hosts existing
+  - **Gall ranges** (gall_range table): Curated stored range for gall species
 
-  Gall effective range is computed as:
-      (union of all host plant ranges) - (explicit exclusions)
-
-  This is not stored directly but computed from the two tables.
+  Gall range is stored directly in the gall_range table as the source of truth.
   """
 
   import Ecto.Query
 
   alias Gallformers.GallHosts.GallHost
+  alias Gallformers.Galls.GallTraits
   alias Gallformers.Places
   alias Gallformers.Places.Place
-  alias Gallformers.Ranges.{DisplayRange, GallRangeExclusion, HostRange}
+  alias Gallformers.Ranges.{DisplayRange, GallRange, HostRange}
   alias Gallformers.Repo
   alias Gallformers.Species.Species
 
@@ -77,7 +74,7 @@ defmodule Gallformers.Ranges do
   end
 
   @doc """
-  Gets place codes and precision for a host species.
+  Gets place codes, precision, and distribution type for a host species.
   """
   @spec get_places_for_host_with_precision(integer()) :: [map()]
   def get_places_for_host_with_precision(host_species_id) do
@@ -85,7 +82,12 @@ defmodule Gallformers.Ranges do
       join: p in Place,
       on: hr.place_id == p.id,
       where: hr.species_id == ^host_species_id,
-      select: %{code: p.code, precision: hr.precision, place_id: p.id}
+      select: %{
+        code: p.code,
+        precision: hr.precision,
+        place_id: p.id,
+        distribution_type: hr.distribution_type
+      }
     )
     |> Repo.all()
   end
@@ -153,18 +155,34 @@ defmodule Gallformers.Ranges do
   # ============================================
 
   @doc """
-  Adds a place to a host's range with optional precision.
+  Adds a place to a host's range with optional precision and distribution type.
   """
-  @spec add_place_to_host(integer(), integer(), String.t()) ::
+  @spec add_place_to_host(integer(), integer(), String.t(), String.t()) ::
           {:ok, Ecto.Schema.t()} | {:error, Ecto.Changeset.t()}
-  def add_place_to_host(host_species_id, place_id, precision \\ "exact") do
-    %HostRange{}
-    |> HostRange.changeset(%{
-      species_id: host_species_id,
-      place_id: place_id,
-      precision: precision
-    })
-    |> Repo.insert(on_conflict: :nothing)
+  def add_place_to_host(
+        host_species_id,
+        place_id,
+        precision \\ "exact",
+        distribution_type \\ "native"
+      ) do
+    result =
+      %HostRange{}
+      |> HostRange.changeset(%{
+        species_id: host_species_id,
+        place_id: place_id,
+        precision: precision,
+        distribution_type: distribution_type
+      })
+      |> Repo.insert(on_conflict: :nothing)
+
+    case result do
+      {:ok, _} ->
+        invalidate_gall_ranges_for_host(host_species_id)
+        result
+
+      error ->
+        error
+    end
   end
 
   @doc """
@@ -178,6 +196,7 @@ defmodule Gallformers.Ranges do
       )
       |> Repo.delete_all()
 
+    invalidate_gall_ranges_for_host(host_species_id)
     {:ok, count}
   end
 
@@ -188,28 +207,42 @@ defmodule Gallformers.Ranges do
   @spec toggle_place_for_host(integer(), integer()) ::
           {:added, integer()} | {:removed, integer()} | {:error, term()}
   def toggle_place_for_host(host_species_id, place_id) do
-    Repo.transaction(fn ->
-      query =
-        from(hr in HostRange,
-          where: hr.species_id == ^host_species_id and hr.place_id == ^place_id
-        )
+    result =
+      Repo.transaction(fn ->
+        query =
+          from(hr in HostRange,
+            where: hr.species_id == ^host_species_id and hr.place_id == ^place_id
+          )
 
-      case Repo.one(query) do
-        nil ->
-          %HostRange{}
-          |> HostRange.changeset(%{species_id: host_species_id, place_id: place_id})
-          |> Repo.insert!()
+        case Repo.one(query) do
+          nil ->
+            %HostRange{}
+            |> HostRange.changeset(%{species_id: host_species_id, place_id: place_id})
+            |> Repo.insert!()
 
-          {:added, place_id}
+            {:added, place_id}
 
-        _existing ->
-          Repo.delete_all(query)
-          {:removed, place_id}
+          _existing ->
+            Repo.delete_all(query)
+            {:removed, place_id}
+        end
+      end)
+      |> case do
+        {:ok, result} -> result
+        {:error, reason} -> {:error, reason}
       end
-    end)
-    |> case do
-      {:ok, result} -> result
-      {:error, reason} -> {:error, reason}
+
+    case result do
+      {:added, _} ->
+        invalidate_gall_ranges_for_host(host_species_id)
+        result
+
+      {:removed, _} ->
+        invalidate_gall_ranges_for_host(host_species_id)
+        result
+
+      {:error, _} ->
+        result
     end
   end
 
@@ -218,37 +251,40 @@ defmodule Gallformers.Ranges do
 
   Accepts either plain place IDs or `{place_id, precision}` tuples.
   """
-  @spec update_host_places(integer(), [{integer(), String.t()}] | [integer()]) :: {:ok, :ok}
+  @spec update_host_places(
+          integer(),
+          [{integer(), String.t(), String.t()} | {integer(), String.t()} | integer()]
+        ) :: {:ok, :ok}
   def update_host_places(host_species_id, place_entries) do
-    entries = normalize_entries(host_species_id, place_entries)
+    entries = normalize_entries(host_species_id, place_entries, distribution_type: true)
 
-    Repo.transaction(fn ->
-      from(hr in HostRange, where: hr.species_id == ^host_species_id) |> Repo.delete_all()
-      if entries != [], do: Repo.insert_all(HostRange, entries)
-      :ok
-    end)
+    result =
+      Repo.transaction(fn ->
+        from(hr in HostRange, where: hr.species_id == ^host_species_id) |> Repo.delete_all()
+        if entries != [], do: Repo.insert_all(HostRange, entries)
+        :ok
+      end)
+
+    case result do
+      {:ok, :ok} ->
+        invalidate_gall_ranges_for_host(host_species_id)
+        {:ok, :ok}
+
+      error ->
+        error
+    end
   end
 
   # ============================================
-  # Gall Range Queries (via hosts)
+  # Gall Range Queries (from gall_range table)
   # ============================================
 
   @doc """
-  Gets place codes for a gall species via its hosts.
-  This is the POTENTIAL range (before exclusions are applied).
+  Gets place codes for a gall species from the curated gall_range table.
   """
   @spec get_places_for_gall(integer()) :: [String.t()]
   def get_places_for_gall(gall_species_id) do
-    from(p in Place,
-      join: hr in HostRange,
-      on: hr.place_id == p.id,
-      join: h in GallHost,
-      on: h.host_species_id == hr.species_id,
-      where: h.gall_species_id == ^gall_species_id,
-      distinct: true,
-      select: p.code
-    )
-    |> Repo.all()
+    get_gall_range_codes(gall_species_id)
   end
 
   @doc """
@@ -260,33 +296,14 @@ defmodule Gallformers.Ranges do
   def get_places_for_galls([]), do: %{}
 
   def get_places_for_galls(gall_species_ids) do
-    from(p in Place,
-      join: hr in HostRange,
-      on: hr.place_id == p.id,
-      join: h in GallHost,
-      on: h.host_species_id == hr.species_id,
-      where: h.gall_species_id in ^gall_species_ids,
-      distinct: true,
-      select: {h.gall_species_id, p.code}
+    from(gr in GallRange,
+      join: p in Place,
+      on: gr.place_id == p.id,
+      where: gr.species_id in ^gall_species_ids,
+      select: {gr.species_id, p.code}
     )
     |> Repo.all()
     |> Enum.group_by(fn {gall_id, _code} -> gall_id end, fn {_gall_id, code} -> code end)
-  end
-
-  @doc """
-  Gets the union of all host places for a gall as place IDs (not codes).
-  Used for computing which places can potentially be excluded.
-  """
-  @spec get_host_place_ids_for_gall(integer()) :: [integer()]
-  def get_host_place_ids_for_gall(gall_species_id) do
-    from(hr in HostRange,
-      join: h in GallHost,
-      on: h.host_species_id == hr.species_id,
-      where: h.gall_species_id == ^gall_species_id,
-      distinct: true,
-      select: hr.place_id
-    )
-    |> Repo.all()
   end
 
   @doc """
@@ -343,19 +360,25 @@ defmodule Gallformers.Ranges do
   end
 
   @doc """
-  Gets the full range display data for a gall, expanding country-level ranges
-  to leaf descendant codes for map display.
+  Gets the full range display data for a gall from the curated gall_range table,
+  expanding country-level ranges to leaf descendant codes for map display.
 
-  Returns `%{in_range: [codes], inherited_range: [codes], excluded_range: [codes]}`.
-  - `in_range`: exact subdivision codes (host confirmed in this specific state)
-  - `inherited_range`: leaf codes expanded from country/continent-level ranges
-  - `excluded_range`: explicitly excluded codes
+  Returns `%{in_range: [codes], inherited_range: [codes], excluded_range: []}`.
+  - `in_range`: exact subdivision codes
+  - `inherited_range`: leaf codes expanded from country-level ranges
   """
   @spec get_display_range_for_gall(integer()) :: DisplayRange.t()
   def get_display_range_for_gall(gall_species_id) do
-    host_ranges = get_host_ranges_with_precision_for_gall(gall_species_id)
-    excluded = get_excluded_places_for_gall(gall_species_id)
-    compute_display_range(host_ranges, excluded)
+    gall_ranges = get_gall_range_with_precision(gall_species_id)
+    {exact_codes, inherited_codes} = split_by_precision(gall_ranges)
+
+    exact_set = MapSet.new(exact_codes)
+
+    %DisplayRange{
+      in_range: exact_codes,
+      inherited_range: Enum.reject(inherited_codes, &(&1 in exact_set)),
+      excluded_range: []
+    }
   end
 
   @doc """
@@ -367,20 +390,6 @@ defmodule Gallformers.Ranges do
   def get_display_range_for_host(host_species_id) do
     host_ranges = get_places_for_host_with_precision(host_species_id)
     compute_display_range(host_ranges)
-  end
-
-  # Gets host ranges with precision for a gall (via host relationships)
-  defp get_host_ranges_with_precision_for_gall(gall_species_id) do
-    from(p in Place,
-      join: hr in HostRange,
-      on: hr.place_id == p.id,
-      join: h in GallHost,
-      on: h.host_species_id == hr.species_id,
-      where: h.gall_species_id == ^gall_species_id,
-      distinct: true,
-      select: %{code: p.code, precision: hr.precision, place_id: p.id}
-    )
-    |> Repo.all()
   end
 
   # Splits host ranges into exact leaf codes and inherited leaf codes.
@@ -413,107 +422,75 @@ defmodule Gallformers.Ranges do
   end
 
   # ============================================
-  # Gall Range Exclusion Queries
+  # Gall Range Queries
   # ============================================
 
   @doc """
-  Gets excluded place codes for a gall species (direct range exclusions).
+  Gets gall range entries with precision and place metadata.
   """
-  @spec get_excluded_places_for_gall(integer()) :: [String.t()]
-  def get_excluded_places_for_gall(gall_species_id) do
-    from(p in Place,
-      join: gre in GallRangeExclusion,
-      on: gre.place_id == p.id,
-      where: gre.species_id == ^gall_species_id,
-      distinct: true,
+  @spec get_gall_range_with_precision(integer()) :: [map()]
+  def get_gall_range_with_precision(gall_species_id) do
+    from(gr in GallRange,
+      join: p in Place,
+      on: gr.place_id == p.id,
+      where: gr.species_id == ^gall_species_id,
+      select: %{code: p.code, precision: gr.precision, place_id: p.id}
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets gall range place IDs for a gall species.
+  """
+  @spec get_gall_range_place_ids(integer()) :: [integer()]
+  def get_gall_range_place_ids(gall_species_id) do
+    from(gr in GallRange,
+      where: gr.species_id == ^gall_species_id,
+      select: gr.place_id
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets gall range place codes for a gall species.
+  """
+  @spec get_gall_range_codes(integer()) :: [String.t()]
+  def get_gall_range_codes(gall_species_id) do
+    from(gr in GallRange,
+      join: p in Place,
+      on: gr.place_id == p.id,
+      where: gr.species_id == ^gall_species_id,
       select: p.code
     )
     |> Repo.all()
   end
 
-  @doc """
-  Gets excluded place IDs (not codes) for a gall species.
-  """
-  @spec get_excluded_place_ids_for_gall(integer()) :: [integer()]
-  def get_excluded_place_ids_for_gall(gall_species_id) do
-    from(gre in GallRangeExclusion,
-      where: gre.species_id == ^gall_species_id,
-      select: gre.place_id
-    )
-    |> Repo.all()
-  end
-
   # ============================================
-  # Gall Range Exclusion Management
+  # Gall Range Management
   # ============================================
 
   @doc """
-  Bulk updates all range exclusions for a gall (replaces existing).
+  Replaces all gall_range entries for a gall species.
 
-  Accepts either plain place IDs or `{place_id, precision}` tuples.
+  Accepts a list of `{place_id, precision}` tuples or plain place_ids
+  (which default to "exact" precision).
   """
-  @spec set_range_exclusions_for_gall(integer(), [{integer(), String.t()}] | [integer()]) ::
-          {:ok, :ok}
-  def set_range_exclusions_for_gall(gall_species_id, place_entries) do
-    entries = normalize_entries(gall_species_id, place_entries)
+  @spec set_gall_range(integer(), [{integer(), String.t()} | integer()]) :: {:ok, :ok}
+  def set_gall_range(gall_species_id, place_entries) do
+    entries =
+      Enum.map(place_entries, fn
+        {place_id, precision} ->
+          %{species_id: gall_species_id, place_id: place_id, precision: precision}
+
+        place_id when is_integer(place_id) ->
+          %{species_id: gall_species_id, place_id: place_id, precision: "exact"}
+      end)
 
     Repo.transaction(fn ->
-      from(gre in GallRangeExclusion, where: gre.species_id == ^gall_species_id)
-      |> Repo.delete_all()
-
-      if entries != [], do: Repo.insert_all(GallRangeExclusion, entries)
+      from(gr in GallRange, where: gr.species_id == ^gall_species_id) |> Repo.delete_all()
+      if entries != [], do: Repo.insert_all(GallRange, entries)
       :ok
     end)
-  end
-
-  @doc """
-  Gets excluded places with precision metadata for a gall species.
-  """
-  @spec get_excluded_places_with_precision_for_gall(integer()) :: [map()]
-  def get_excluded_places_with_precision_for_gall(gall_species_id) do
-    from(p in Place,
-      join: gre in GallRangeExclusion,
-      on: gre.place_id == p.id,
-      where: gre.species_id == ^gall_species_id,
-      select: %{code: p.code, precision: gre.precision}
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Toggles a place exclusion for a gall (add if not excluded, remove if excluded).
-  Returns {:added, place_id} or {:removed, place_id}.
-
-  Note: "added" means the place is now EXCLUDED from the gall's range.
-  """
-  @spec toggle_exclusion_for_gall(integer(), integer()) ::
-          {:added, integer()} | {:removed, integer()} | {:error, term()}
-  def toggle_exclusion_for_gall(gall_species_id, place_id) do
-    Repo.transaction(fn ->
-      query =
-        from(gre in GallRangeExclusion,
-          where: gre.species_id == ^gall_species_id and gre.place_id == ^place_id
-        )
-
-      case Repo.one(query) do
-        nil ->
-          # Add exclusion (place is now excluded)
-          %GallRangeExclusion{}
-          |> GallRangeExclusion.changeset(%{species_id: gall_species_id, place_id: place_id})
-          |> Repo.insert!()
-
-          {:added, place_id}
-
-        _existing ->
-          # Remove exclusion (place is now in range)
-          Repo.delete_all(query)
-          {:removed, place_id}
-      end
-    end)
-    |> case do
-      {:ok, result} -> result
-      {:error, reason} -> {:error, reason}
-    end
   end
 
   # ============================================
@@ -533,16 +510,61 @@ defmodule Gallformers.Ranges do
   end
 
   # ============================================
+  # Invalidation Cascade
+  # ============================================
+
+  @doc """
+  Invalidates gall range confirmation for all galls linked to a host species.
+
+  Called when a host's range data changes so that gall ranges can be reviewed.
+  Sets `range_confirmed = false` on `gall_traits` for every gall linked to the host.
+  """
+  @spec invalidate_gall_ranges_for_host(integer()) :: :ok
+  def invalidate_gall_ranges_for_host(host_species_id) do
+    gall_ids =
+      from(gh in GallHost,
+        where: gh.host_species_id == ^host_species_id,
+        select: gh.gall_species_id
+      )
+      |> Repo.all()
+
+    if gall_ids != [] do
+      from(gt in GallTraits,
+        where: gt.species_id in ^gall_ids
+      )
+      |> Repo.update_all(set: [range_confirmed: false])
+    end
+
+    :ok
+  end
+
+  # ============================================
   # Private helpers
   # ============================================
 
-  defp normalize_entries(species_id, entries) do
-    Enum.map(entries, fn
-      {place_id, precision} ->
-        %{species_id: species_id, place_id: place_id, precision: precision}
+  defp normalize_entries(species_id, entries, opts) do
+    include_dt = Keyword.get(opts, :distribution_type, false)
 
-      place_id when is_integer(place_id) ->
-        %{species_id: species_id, place_id: place_id, precision: "exact"}
+    Enum.map(entries, fn entry ->
+      base = normalize_entry(species_id, entry)
+      if include_dt, do: Map.put_new(base, :distribution_type, "native"), else: base
     end)
+  end
+
+  defp normalize_entry(species_id, {place_id, precision, distribution_type}) do
+    %{
+      species_id: species_id,
+      place_id: place_id,
+      precision: precision,
+      distribution_type: distribution_type
+    }
+  end
+
+  defp normalize_entry(species_id, {place_id, precision}) do
+    %{species_id: species_id, place_id: place_id, precision: precision}
+  end
+
+  defp normalize_entry(species_id, place_id) when is_integer(place_id) do
+    %{species_id: species_id, place_id: place_id, precision: "exact"}
   end
 end

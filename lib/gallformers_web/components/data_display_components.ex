@@ -1013,7 +1013,7 @@ defmodule GallformersWeb.DataDisplayComponents do
 
   - `:public` — Documented, Country-level (for gall and host detail pages)
   - `:host_admin` — Documented, Country-level, Out of Range
-  - `:gall_admin` — Gall & Host, Country-level, Host Only, Neither
+  - `:gall_admin` — In Gall Range, Country-level, Host Only (not in gall range), Not in Range
   """
   attr :mode, :atom, required: true, values: [:public, :host_admin, :gall_admin]
 
@@ -1023,7 +1023,7 @@ defmodule GallformersWeb.DataDisplayComponents do
       <div class="flex items-center gap-2">
         <div class="w-4 h-4 rounded border border-gray-400 bg-[#228B22]"></div>
         <span class="text-xs text-gray-600">
-          {if @mode == :gall_admin, do: "Gall & Host", else: "Documented"}
+          {if @mode == :gall_admin, do: "In Gall Range", else: "Documented"}
         </span>
       </div>
       <div class="flex items-center gap-2">
@@ -1032,12 +1032,12 @@ defmodule GallformersWeb.DataDisplayComponents do
       </div>
       <div :if={@mode == :gall_admin} class="flex items-center gap-2">
         <div class="w-4 h-4 rounded border border-gray-400 bg-red-300"></div>
-        <span class="text-xs text-gray-600">Host Only</span>
+        <span class="text-xs text-gray-600">Host Only (not in gall range)</span>
       </div>
       <div :if={@mode in [:host_admin, :gall_admin]} class="flex items-center gap-2">
         <div class="w-4 h-4 rounded border border-gray-300 bg-white"></div>
         <span class="text-xs text-gray-600">
-          {if @mode == :gall_admin, do: "Neither", else: "Out of Range"}
+          {if @mode == :gall_admin, do: "Not in Range", else: "Out of Range"}
         </span>
       </div>
     </div>

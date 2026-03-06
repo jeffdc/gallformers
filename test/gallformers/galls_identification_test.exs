@@ -24,13 +24,16 @@ defmodule Gallformers.GallsIdentificationTest do
   end
 
   describe "filter_galls genus+place interaction" do
-    test "genus + place excludes galls whose genus hosts are not in the place" do
+    test "genus + place returns galls that occur in the place and have hosts in the genus" do
       # Gall 100 is on T. alpinus (GenusAlpha) AND M. arvensis (GenusBeta).
-      # M. arvensis is in Alberta but T. alpinus is NOT in Alberta.
-      # genus=GenusAlpha + place=Alberta should NOT return gall 100.
+      # Gall 100's curated range includes CA-AB (from M. arvensis).
+      # genus=GenusAlpha + place=Alberta returns gall 100 because:
+      #   - genus filter: gall 100 has a host in GenusAlpha (T. alpinus) -> passes
+      #   - place filter: gall 100 has CA-AB in gall_range -> passes
+      # These are independent filters now that gall_range stores the curated range.
       results = Galls.filter_galls(%{genus_id: 10, place_codes: ["CA-AB"]})
       gall_ids = Enum.map(results, & &1.id)
-      refute 100 in gall_ids
+      assert 100 in gall_ids
     end
 
     test "genus + place includes galls whose genus hosts are in the place" do
@@ -41,17 +44,20 @@ defmodule Gallformers.GallsIdentificationTest do
       assert 100 in gall_ids
     end
 
-    test "host + place constrains to selected host" do
+    test "host + place returns galls matching both host and place independently" do
       # Gall 100 is on T. alpinus (6) and M. arvensis (8).
-      # T. alpinus is NOT in Alberta, so host=T. alpinus + place=Alberta should exclude gall 100.
+      # Gall 100's curated range includes CA-AB.
+      # host=T. alpinus + place=Alberta returns gall 100 because:
+      #   - host filter: gall 100 has T. alpinus as host -> passes
+      #   - place filter: gall 100 has CA-AB in gall_range -> passes
       results = Galls.filter_galls(%{host_ids: [6], place_codes: ["CA-AB"]})
       gall_ids = Enum.map(results, & &1.id)
-      refute 100 in gall_ids
+      assert 100 in gall_ids
     end
 
     test "place filter without host/genus is unconstrained" do
       # Place=Alberta with no host/genus filter should still return gall 100,
-      # because M. arvensis (one of its hosts) is in Alberta.
+      # because CA-AB is in gall 100's curated range.
       results = Galls.filter_galls(%{place_codes: ["CA-AB"]})
       gall_ids = Enum.map(results, & &1.id)
       assert 100 in gall_ids

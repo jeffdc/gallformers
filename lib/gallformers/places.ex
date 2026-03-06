@@ -464,14 +464,14 @@ defmodule Gallformers.Places do
   end
 
   @doc """
-  Gets gall range exclusions for a species (places excluded from gall's range).
+  Gets the curated gall range for a species (places where the gall occurs).
   """
-  @spec get_gall_range_exclusions(integer()) :: [Place.t()]
-  def get_gall_range_exclusions(species_id) do
+  @spec get_gall_ranges(integer()) :: [Place.t()]
+  def get_gall_ranges(species_id) do
     from(p in Place,
-      join: gre in "gall_range_exclusion",
-      on: gre.place_id == p.id,
-      where: gre.species_id == ^species_id,
+      join: gr in "gall_range",
+      on: gr.place_id == p.id,
+      where: gr.species_id == ^species_id,
       order_by: p.name
     )
     |> Repo.all()
@@ -480,7 +480,7 @@ defmodule Gallformers.Places do
   @doc """
   Gets the range for a species based on its taxoncode.
   For plants: returns places where the host exists
-  For galls: returns places EXCLUDED from the gall's range
+  For galls: returns places in the gall's curated range
   """
   @spec get_species_range(Species.t()) :: [Place.t()]
   def get_species_range(%Species{taxoncode: "plant", id: id}) do
@@ -488,7 +488,7 @@ defmodule Gallformers.Places do
   end
 
   def get_species_range(%Species{taxoncode: "gall", id: id}) do
-    get_gall_range_exclusions(id)
+    get_gall_ranges(id)
   end
 
   def get_species_range(_), do: []

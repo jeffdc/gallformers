@@ -552,8 +552,6 @@ defmodule Gallformers.Search do
 
   # Filters gall results to those whose hosts have ranges in the continent's descendants.
   # Uses gallhost join to find which galls have hosts in the continent.
-  # Note: gall_range_exclusions are not applied here — they're for fine-grained
-  # ID tool filtering, not for broad "does this gall exist on this continent" checks.
   defp filter_galls_by_continent([], _continent_code), do: []
 
   defp filter_galls_by_continent(results, continent_code) do

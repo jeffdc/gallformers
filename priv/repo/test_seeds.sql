@@ -110,7 +110,7 @@ INSERT INTO gallhost (id, host_species_id, gall_species_id, inserted_at, updated
 -- We clear everything and re-insert with controlled IDs for test assertions.
 
 DELETE FROM host_range;
-DELETE FROM gall_range_exclusion;
+DELETE FROM gall_range;
 DELETE FROM place_hierarchy;
 DELETE FROM place;
 
@@ -162,6 +162,12 @@ INSERT INTO species_fts (species_id, name, aliases) VALUES
 INSERT INTO host_range (species_id, place_id, precision) VALUES
   (9, 4, 'exact');     -- Q. robur in Bucharest (RO-B) — European host
 
+-- Introduced range for distribution_type tests (T. serpyllum as introduced in Bahamas)
+-- T. serpyllum (7) is only hosted by gall 101, which is already NA-scoped,
+-- and Bahamas is in Caribbean (XB), so this doesn't affect continent scoping.
+INSERT INTO host_range (species_id, place_id, precision, distribution_type) VALUES
+  (7, 906, 'exact', 'introduced');    -- T. serpyllum introduced in Bahamas
+
 -- European gall linked to European host
 INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id) VALUES
   (103, 'Cynips quercusfolii', 'gall', 0, 1);
@@ -176,12 +182,23 @@ INSERT INTO gallhost (id, host_species_id, gall_species_id, inserted_at, updated
   (4, 9, 103, '2026-01-01T00:00:00', '2026-01-01T00:00:00');  -- gall 103 → Q. robur (Europe)
 
 -- =============================================================================
--- Gall range exclusions (gall 100 excludes Jalisco from its range)
+-- Gall range (curated stored range for galls)
 -- =============================================================================
 
-INSERT INTO gall_range_exclusion (species_id, place_id, precision)
-VALUES
-  (100, 3, 'exact');   -- Gall 100 excludes Jalisco (MX-JAL)
+-- Gall 100 (hosts: T. alpinus in US-CA, M. arvensis in CA-AB + US-CA + US country)
+-- Curated range: all host range places EXCEPT MX-JAL (was previously excluded)
+INSERT INTO gall_range (species_id, place_id, precision) VALUES
+  (100, 2, 'exact'),      -- US-CA (from T. alpinus and M. arvensis)
+  (100, 1, 'exact'),      -- CA-AB (from M. arvensis)
+  (100, 902, 'country');   -- US (from M. arvensis country-level)
+
+-- Gall 101 (host: T. serpyllum in US-CA)
+INSERT INTO gall_range (species_id, place_id, precision) VALUES
+  (101, 2, 'exact');       -- US-CA (from T. serpyllum)
+
+-- Gall 103 (host: Q. robur in RO-B)
+INSERT INTO gall_range (species_id, place_id, precision) VALUES
+  (103, 4, 'exact');       -- RO-B (from Q. robur)
 
 -- =============================================================================
 -- Intermediate taxonomy ranks (subfamily, tribe)

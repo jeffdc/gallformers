@@ -548,7 +548,8 @@ defmodule Gallformers.Plants do
          original_country_places: original_country,
          exact_places: exact_places,
          country_places: country_places,
-         all_places: all_places
+         all_places: all_places,
+         introduced_place_codes: introduced_codes
        }) do
     place_code_to_id = Map.new(all_places, &{&1.code, &1.id})
 
@@ -557,16 +558,29 @@ defmodule Gallformers.Plants do
 
     if original_set != current_set do
       entries =
-        Enum.map(exact_places, fn code ->
-          {Map.get(place_code_to_id, code), "exact"}
-        end) ++
-          Enum.map(country_places, fn code ->
-            {Map.get(place_code_to_id, code), "country"}
-          end)
+        build_place_change_entries(exact_places, "exact", introduced_codes, place_code_to_id) ++
+          build_place_change_entries(
+            country_places,
+            "country",
+            introduced_codes,
+            place_code_to_id
+          )
 
-      entries = Enum.reject(entries, fn {id, _} -> is_nil(id) end)
+      entries = Enum.reject(entries, fn {id, _, _} -> is_nil(id) end)
       Ranges.update_host_places(host_id, entries)
     end
+  end
+
+  # Backwards-compatible clause for callers that don't pass introduced_place_codes
+  defp save_place_changes(host_id, %{} = changes) do
+    save_place_changes(host_id, Map.put_new(changes, :introduced_place_codes, MapSet.new()))
+  end
+
+  defp build_place_change_entries(codes, precision, introduced_codes, place_code_to_id) do
+    Enum.map(codes, fn code ->
+      dt = if MapSet.member?(introduced_codes, code), do: "introduced", else: "native"
+      {Map.get(place_code_to_id, code), precision, dt}
+    end)
   end
 
   defp maybe_update_section(%{genus_id: _genus_id} = section_update) do

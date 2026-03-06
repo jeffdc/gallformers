@@ -36,9 +36,9 @@ defmodule Gallformers.Places.Place do
       join_through: "host_range",
       join_keys: [place_id: :id, species_id: :id]
 
-    # Gall species that are excluded from this place
-    many_to_many :gall_exclusions, Gallformers.Species.Species,
-      join_through: "gall_range_exclusion",
+    # Gall species that occur in this place
+    many_to_many :gall_species, Gallformers.Species.Species,
+      join_through: "gall_range",
       join_keys: [place_id: :id, species_id: :id]
   end
 

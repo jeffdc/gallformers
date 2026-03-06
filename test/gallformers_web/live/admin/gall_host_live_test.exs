@@ -116,7 +116,7 @@ defmodule GallformersWeb.Admin.GallHostLiveTest do
       {:ok, _view, html} = live(conn, ~p"/admin/gallhost")
 
       # Legend should still be visible
-      assert html =~ "Legend" or html =~ "Gall &amp; Host" or html =~ "Host Only"
+      assert html =~ "Legend" or html =~ "In Gall Range" or html =~ "Host Only"
     end
 
     test "map placeholder shown when no gall selected", %{conn: conn} do
@@ -320,22 +320,22 @@ defmodule GallformersWeb.Admin.GallHostLiveTest do
     end
   end
 
-  describe "Range exclusions" do
+  describe "Range curation" do
     setup %{conn: conn} do
       {:ok, conn: setup_admin_session(conn)}
     end
 
-    test "toggle_region toggles exclusion state", %{conn: conn} do
+    test "toggle_region toggles gall range membership", %{conn: conn} do
       gall = find_gall_with_hosts()
 
       if gall do
-        host_places = Ranges.get_places_for_gall(gall.id)
+        gall_places = Ranges.get_places_for_gall(gall.id)
 
-        if length(host_places) > 0 do
-          place_code = hd(host_places)
+        if length(gall_places) > 0 do
+          place_code = hd(gall_places)
           {:ok, view, _html} = live(conn, ~p"/admin/gallhost?id=#{gall.id}")
 
-          # Toggle a region
+          # Toggle a region (removes from gall range)
           html = render_click(view, "toggle_region", %{"code" => place_code})
 
           # Page should still render correctly
@@ -369,34 +369,29 @@ defmodule GallformersWeb.Admin.GallHostLiveTest do
     end
   end
 
-  describe "Range exclusion workflow" do
+  describe "Range curation workflow" do
     setup %{conn: conn} do
       {:ok, conn: setup_admin_session(conn)}
     end
 
-    test "toggle_region for code in host range adds exclusion", %{conn: conn} do
-      # Gall 100 has hosts 6 (US-CA) and 8 (CA-AB, US-CA, US)
-      # US-CA is in host range. There's already a seed exclusion for US-CA,
-      # so first toggle removes it, second toggle re-adds it.
+    test "toggle_region for code in gall range removes it", %{conn: conn} do
+      # Gall 100 has gall_range entries: US-CA (exact), CA-AB (exact), US (country)
+      # US-CA is in gall range. Toggle removes it, toggle again re-adds it.
       {:ok, view, _html} = live(conn, ~p"/admin/gallhost?id=100")
 
-      # First toggle removes the existing exclusion (US-CA was excluded in seeds)
+      # First toggle removes US-CA from gall range
       html = render_click(view, "toggle_region", %{"code" => "US-CA"})
-
-      # After removing exclusion, US-CA should NOT appear as excluded
-      # The range summary should change
       assert html =~ "Andricus quercuscalifornicus"
 
-      # Second toggle re-adds the exclusion
+      # Second toggle re-adds US-CA to gall range
       html = render_click(view, "toggle_region", %{"code" => "US-CA"})
       assert html =~ "Andricus quercuscalifornicus"
     end
 
     test "toggle_region for code NOT in host range is no-op", %{conn: conn} do
-      # Gall 100's hosts don't have MX-JAL in range
+      # MX-JAL is not in any host range for gall 100
       {:ok, view, _html} = live(conn, ~p"/admin/gallhost?id=100")
 
-      # Toggle a code that's not in the host range - should be silently ignored
       html = render_click(view, "toggle_region", %{"code" => "MX-JAL"})
 
       # Page still renders, no crash
@@ -412,17 +407,58 @@ defmodule GallformersWeb.Admin.GallHostLiveTest do
       assert html =~ "Gall - Host Mappings" or html =~ "Search for a gall"
     end
 
-    test "toggle_region for CA-AB toggles exclusion for gall 100", %{conn: conn} do
-      # CA-AB is in gall 100's host range (via host 8) but not excluded in seeds
+    test "toggle_region for CA-AB toggles gall range for gall 100", %{conn: conn} do
+      # CA-AB is in gall 100's gall_range (exact) and host range
       {:ok, view, _html} = live(conn, ~p"/admin/gallhost?id=100")
 
-      # Toggle CA-AB on (add exclusion)
+      # Toggle CA-AB off (remove from gall range)
       html = render_click(view, "toggle_region", %{"code" => "CA-AB"})
       assert html =~ "Andricus quercuscalifornicus"
 
-      # Toggle CA-AB off (remove exclusion)
+      # Toggle CA-AB back on (re-add to gall range)
       html = render_click(view, "toggle_region", %{"code" => "CA-AB"})
       assert html =~ "Andricus quercuscalifornicus"
+    end
+
+    test "save persists gall_range changes to database", %{conn: conn} do
+      # Gall 100 has gall_range: US-CA, CA-AB, US
+      {:ok, view, _html} = live(conn, ~p"/admin/gallhost?id=100")
+
+      # Toggle CA-AB off (remove from gall range) to make the form dirty
+      render_click(view, "toggle_region", %{"code" => "CA-AB"})
+
+      # Save
+      html = render_click(view, "save", %{})
+      assert html =~ "Changes saved"
+
+      # Verify CA-AB was removed from gall_range
+      gall_range_codes = Ranges.get_gall_range_codes(100)
+      refute "CA-AB" in gall_range_codes
+      assert "US-CA" in gall_range_codes
+    end
+
+    test "save_and_confirm sets range_confirmed flag", %{conn: conn} do
+      # Gall 100 starts with range_confirmed = false (default from seeds)
+      {:ok, view, _html} = live(conn, ~p"/admin/gallhost?id=100")
+
+      # Toggle to make dirty
+      render_click(view, "toggle_region", %{"code" => "CA-AB"})
+
+      # Save and confirm
+      html = render_click(view, "save_and_confirm", %{})
+      assert html =~ "Changes saved and range confirmed"
+
+      # Verify range_confirmed is now true
+      gall_traits = Galls.get_gall_traits(100)
+      assert gall_traits.range_confirmed == true
+      assert gall_traits.range_computed_at != nil
+    end
+
+    test "unconfirmed gall shows confirmation banner", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/admin/gallhost?id=100")
+
+      assert html =~ "not been confirmed"
+      assert html =~ "Save &amp; Confirm Range"
     end
   end
 

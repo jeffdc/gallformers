@@ -95,6 +95,12 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     country_places =
       place_entries |> Enum.filter(&(&1.precision == "country")) |> Enum.map(& &1.code)
 
+    introduced_codes =
+      place_entries
+      |> Enum.filter(&(&1[:distribution_type] == "introduced"))
+      |> Enum.map(& &1.code)
+      |> MapSet.new()
+
     taxonomy = Taxonomy.get_taxonomy_for_species(host_id)
 
     socket
@@ -110,6 +116,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> assign(:original_country_places, country_places)
     |> assign(:exact_places, exact_places)
     |> assign(:country_places, country_places)
+    |> assign(:introduced_place_codes, introduced_codes)
     |> compute_map_range()
     |> assign_taxonomy_fields(taxonomy)
   end
@@ -314,10 +321,17 @@ defmodule GallformersWeb.Admin.HostLive.Form do
       |> MapSet.difference(actually_remove)
       |> MapSet.union(diff.selected_introduced)
 
+    # Track introduced codes: keep existing introduced that survived the merge,
+    # plus newly added introduced from the diff
+    existing_introduced = MapSet.intersection(socket.assigns.introduced_place_codes, merged)
+    new_introduced = MapSet.intersection(diff.selected_introduced, merged)
+    introduced_codes = MapSet.union(existing_introduced, new_introduced)
+
     {:noreply,
      socket
      |> assign(:exact_places, MapSet.to_list(merged))
      |> assign(:country_places, [])
+     |> assign(:introduced_place_codes, introduced_codes)
      |> assign(:pending_host_traits, %{
        wcvp_id: diff.wcvp_data.plant_name_id,
        powo_id: diff.wcvp_data.powo_id
@@ -681,6 +695,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> assign(:wcvp_prefilled, nil)
     |> assign(:wcvp_effective_place_ids, nil)
     |> assign(:wcvp_diff, nil)
+    |> assign(:introduced_place_codes, MapSet.new())
     |> assign(:wcvp_nomatch_search, nil)
     |> assign(:host_traits, nil)
     |> assign(:pending_host_traits, nil)
@@ -990,7 +1005,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
         original_country_places: socket.assigns.original_country_places,
         exact_places: socket.assigns.exact_places,
         country_places: socket.assigns.country_places,
-        all_places: socket.assigns.all_places
+        all_places: socket.assigns.all_places,
+        introduced_place_codes: socket.assigns.introduced_place_codes
       },
       section_update: %{
         species_id: host_id,
@@ -1012,6 +1028,12 @@ defmodule GallformersWeb.Admin.HostLive.Form do
         country_places =
           place_entries |> Enum.filter(&(&1.precision == "country")) |> Enum.map(& &1.code)
 
+        introduced_codes =
+          place_entries
+          |> Enum.filter(&(&1[:distribution_type] == "introduced"))
+          |> Enum.map(& &1.code)
+          |> MapSet.new()
+
         taxonomy = Taxonomy.get_taxonomy_for_species(host_id)
 
         {:noreply,
@@ -1025,6 +1047,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
          |> assign(:original_country_places, country_places)
          |> assign(:exact_places, exact_places)
          |> assign(:country_places, country_places)
+         |> assign(:introduced_place_codes, introduced_codes)
          |> compute_map_range()
          |> reset_dirty()
          |> put_flash(:info, "Host saved successfully")}
@@ -1045,9 +1068,35 @@ defmodule GallformersWeb.Admin.HostLive.Form do
       wcvp ->
         Plants.upsert_host_traits(host.id, %{wcvp_id: wcvp.wcvp_id, powo_id: wcvp.powo_id})
 
-        place_ids = socket.assigns[:wcvp_effective_place_ids] || wcvp[:place_ids]
-        if place_ids, do: Ranges.update_host_places(host.id, place_ids)
+        place_entries = build_place_entries(socket, wcvp)
+        if place_entries != [], do: Ranges.update_host_places(host.id, place_entries)
     end
+  end
+
+  # Builds {place_id, precision, distribution_type} triples from WCVP data,
+  # preserving the native/introduced distinction.
+  defp build_place_entries(socket, wcvp) do
+    native_ids = wcvp[:place_ids] || []
+    introduced_ids = if wcvp[:include_introduced], do: wcvp[:introduced_place_ids] || [], else: []
+    effective_ids = socket.assigns[:wcvp_effective_place_ids]
+
+    if effective_ids do
+      # The effective list is a flat list from toggling include_introduced.
+      # Tag each ID based on whether it's in the introduced set.
+      introduced_set = MapSet.new(wcvp[:introduced_place_ids] || [])
+      tag_place_entries(effective_ids, introduced_set)
+    else
+      native_entries = Enum.map(native_ids, &{&1, "exact", "native"})
+      introduced_entries = Enum.map(introduced_ids, &{&1, "exact", "introduced"})
+      native_entries ++ introduced_entries
+    end
+  end
+
+  defp tag_place_entries(place_ids, introduced_set) do
+    Enum.map(place_ids, fn place_id ->
+      dt = if MapSet.member?(introduced_set, place_id), do: "introduced", else: "native"
+      {place_id, "exact", dt}
+    end)
   end
 
   # =================================================================

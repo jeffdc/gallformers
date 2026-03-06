@@ -395,9 +395,7 @@ defmodule Gallformers.Galls.Identification do
   defp apply_place_filter(query, nil, _host_ids, _genus_id), do: query
   defp apply_place_filter(query, [], _host_ids, _genus_id), do: query
 
-  defp apply_place_filter(query, place_codes, host_ids, genus_id) do
-    host_scope = resolve_host_scope(host_ids, genus_id)
-
+  defp apply_place_filter(query, place_codes, _host_ids, _genus_id) do
     # Resolve place codes to IDs, then expand hierarchy in both directions
     place_ids =
       Enum.map(place_codes, &Ranges.get_place_id_by_code/1)
@@ -409,52 +407,13 @@ defmodule Gallformers.Galls.Identification do
     # Ancestor IDs: when user selects "US-CA", match country-level US ranges
     ancestor_ids = Enum.flat_map(place_ids, &Places.ancestor_ids/1) |> Enum.uniq()
 
-    # Combined: a host_range row matches if its place_id is in either set
+    # Combined: a gall_range row matches if its place_id is in either set
     all_matching_place_ids = Enum.uniq(descendant_ids ++ ancestor_ids)
 
-    case host_scope do
-      nil ->
-        from [s, gt] in query,
-          join: h in GallHost,
-          on: h.gall_species_id == s.id,
-          join: hr in "host_range",
-          on: hr.species_id == h.host_species_id,
-          where: hr.place_id in ^all_matching_place_ids,
-          where: s.id not in subquery(exclusion_subquery_by_ids(all_matching_place_ids))
-
-      ids ->
-        from [s, gt] in query,
-          join: h in GallHost,
-          on: h.gall_species_id == s.id,
-          join: hr in "host_range",
-          on: hr.species_id == h.host_species_id,
-          where: hr.place_id in ^all_matching_place_ids,
-          where: h.host_species_id in ^ids,
-          where: s.id not in subquery(exclusion_subquery_by_ids(all_matching_place_ids))
-    end
-  end
-
-  defp resolve_host_scope(nil, nil), do: nil
-  defp resolve_host_scope([], nil), do: nil
-
-  defp resolve_host_scope(host_ids, _genus_id) when is_list(host_ids) and host_ids != [] do
-    host_ids
-  end
-
-  defp resolve_host_scope(_host_ids, genus_id) when not is_nil(genus_id) do
-    from(st in "species_taxonomy",
-      join: sp in SpeciesSchema,
-      on: sp.id == st.species_id,
-      where: st.taxonomy_id == ^genus_id and sp.taxoncode == "plant",
-      select: sp.id
-    )
-    |> Repo.all()
-  end
-
-  defp exclusion_subquery_by_ids(place_ids) do
-    from gre in "gall_range_exclusion",
-      where: gre.place_id in ^place_ids,
-      select: gre.species_id
+    from [s, gt] in query,
+      join: gr in "gall_range",
+      on: gr.species_id == s.id,
+      where: gr.place_id in ^all_matching_place_ids
   end
 
   defp apply_undescribed_filter(query, nil), do: query
@@ -533,15 +492,14 @@ defmodule Gallformers.Galls.Identification do
     # Get all gall IDs for batch query
     gall_ids = Enum.map(galls, & &1.id)
 
-    # Query: for each gall, check if any of its hosts have exact range records
+    # Query: for each gall, check if it has exact gall_range records
     # that match the selected place or its descendants
     exact_match_gall_ids =
-      from(h in GallHost,
-        join: hr in "host_range",
-        on: hr.species_id == h.host_species_id,
-        where: h.gall_species_id in ^gall_ids,
-        where: hr.place_id in ^descendant_ids,
-        select: h.gall_species_id,
+      from(gr in "gall_range",
+        where: gr.species_id in ^gall_ids,
+        where: gr.place_id in ^descendant_ids,
+        where: gr.precision == "exact",
+        select: gr.species_id,
         distinct: true
       )
       |> Repo.all()
