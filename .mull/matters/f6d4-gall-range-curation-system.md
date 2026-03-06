@@ -1,5 +1,5 @@
 ---
-status: planned
+status: active
 created: 2026-03-03
 updated: 2026-03-06
 epic: geo-expansion
