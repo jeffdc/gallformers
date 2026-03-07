@@ -23,7 +23,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
   alias Gallformers.Ranges
   alias Gallformers.Species
   alias GallformersWeb.Admin.DeferredChanges
-  alias GallformersWeb.Admin.ExclusionDrillDown
+  alias GallformersWeb.Admin.RangeDrillDown
 
   @impl true
   def mount(_params, session, socket) do
@@ -59,8 +59,10 @@ defmodule GallformersWeb.Admin.GallHostLive do
       |> assign(:gall_range_place_ids, [])
       |> assign(:original_gall_range_place_ids, [])
       |> assign(:gall_range_precision_map, %{})
-      |> assign(:excluded_from_gall_range_place_ids, [])
+      |> assign(:omitted_from_range_place_ids, [])
       |> assign(:range_confirmed, false)
+      |> assign(:introduced_range, [])
+      |> assign(:introduced_codes, MapSet.new())
       # Form state
       |> init_form_state()
 
@@ -134,8 +136,10 @@ defmodule GallformersWeb.Admin.GallHostLive do
       |> assign(:gall_range_place_ids, [])
       |> assign(:original_gall_range_place_ids, [])
       |> assign(:gall_range_precision_map, %{})
-      |> assign(:excluded_from_gall_range_place_ids, [])
+      |> assign(:omitted_from_range_place_ids, [])
       |> assign(:range_confirmed, false)
+      |> assign(:introduced_range, [])
+      |> assign(:introduced_codes, MapSet.new())
       |> assign(:page_title, "Gall-Host Mappings")
       |> reset_dirty()
 
@@ -259,8 +263,8 @@ defmodule GallformersWeb.Admin.GallHostLive do
         end
       else
         # Country with subdivisions: open drill-down
-        send_update(ExclusionDrillDown,
-          id: "exclusion-drill-down",
+        send_update(RangeDrillDown,
+          id: "range-drill-down",
           action: {:open, place}
         )
 
@@ -307,11 +311,10 @@ defmodule GallformersWeb.Admin.GallHostLive do
            gall.id,
            hosts_to_add,
            hosts_to_remove,
-           gall_range_entries
+           gall_range_entries,
+           confirm_range: confirm_range
          ) do
       {:ok, :ok} ->
-        if confirm_range, do: Galls.confirm_gall_range(gall.id)
-
         message =
           if confirm_range, do: "Changes saved and range confirmed", else: "Changes saved"
 
@@ -323,11 +326,11 @@ defmodule GallformersWeb.Admin.GallHostLive do
   end
 
   # =================================================================
-  # ExclusionDrillDown callbacks
+  # RangeDrillDown callbacks
   # =================================================================
 
   @impl true
-  def handle_info({ExclusionDrillDown, {:toggle_exclusion, code}}, socket) do
+  def handle_info({RangeDrillDown, {:toggle_place, code}}, socket) do
     case Map.get(socket.assigns.place_by_code, code) do
       %{id: place_id} -> {:noreply, toggle_gall_range(socket, place_id)}
       nil -> {:noreply, socket}
@@ -335,7 +338,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
   end
 
   @impl true
-  def handle_info({ExclusionDrillDown, {:include_all, codes}}, socket) do
+  def handle_info({RangeDrillDown, {:include_all, codes}}, socket) do
     place_by_code = socket.assigns.place_by_code
 
     place_ids_to_add =
@@ -355,7 +358,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
   end
 
   @impl true
-  def handle_info({ExclusionDrillDown, {:exclude_all, codes}}, socket) do
+  def handle_info({RangeDrillDown, {:exclude_all, codes}}, socket) do
     place_by_code = socket.assigns.place_by_code
 
     place_ids_to_remove =
@@ -375,7 +378,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
   end
 
   @impl true
-  def handle_info({ExclusionDrillDown, :zoom_out}, socket) do
+  def handle_info({RangeDrillDown, :zoom_out}, socket) do
     {:noreply, push_event(socket, "range-zoom-out", %{})}
   end
 
@@ -427,7 +430,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
   # Used after toggling a place in gall_range.
   defp recompute_range_from_assigns(socket) do
     # Compute the host range "canvas"
-    host_display = Ranges.compute_display_range(socket.assigns.host_ranges)
+    host_display = Ranges.compute_display_range(socket.assigns.host_ranges, with_introduced: true)
     all_host_codes = Enum.uniq(host_display.in_range ++ host_display.inherited_range)
 
     # Compute gall range display (expand country-level entries)
@@ -462,13 +465,17 @@ defmodule GallformersWeb.Admin.GallHostLive do
 
     range_bounds = Places.get_bounds_for_codes(gall_in_range ++ gall_inherited ++ excluded_codes)
 
+    introduced_codes_set = MapSet.new(host_display.introduced_range)
+
     socket
     |> assign(:host_places, all_host_codes)
     |> assign(:in_range, gall_in_range)
     |> assign(:inherited_range, gall_inherited)
     |> assign(:excluded_places, excluded_codes)
-    |> assign(:excluded_from_gall_range_place_ids, excluded_place_ids)
+    |> assign(:omitted_from_range_place_ids, excluded_place_ids)
     |> assign(:range_bounds, range_bounds)
+    |> assign(:introduced_range, host_display.introduced_range)
+    |> assign(:introduced_codes, introduced_codes_set)
   end
 
   # Toggle a place's membership in gall_range
@@ -497,7 +504,8 @@ defmodule GallformersWeb.Admin.GallHostLive do
     push_event(socket, "range-update", %{
       in_range: socket.assigns.in_range,
       excluded_range: socket.assigns.excluded_places,
-      inherited_range: socket.assigns.inherited_range
+      inherited_range: socket.assigns.inherited_range,
+      introduced_range: socket.assigns.introduced_range
     })
   end
 
@@ -553,6 +561,22 @@ defmodule GallformersWeb.Admin.GallHostLive do
                   <.taxon_name name={gall.name} />
                 </:result>
               </.typeahead>
+              <div :if={@selected_gall} class="mt-1 flex items-center gap-2">
+                <.link
+                  navigate={~p"/gall/#{@selected_gall.id}"}
+                  class="text-gray-400 hover:text-gf-maroon"
+                  title="View public page"
+                >
+                  <.icon name="ph-arrow-square-out" class="h-4 w-4" />
+                </.link>
+                <.link
+                  navigate={~p"/admin/galls/#{@selected_gall.id}"}
+                  class="text-gray-400 hover:text-gf-maroon"
+                  title="Edit gall details"
+                >
+                  <.icon name="ph-pencil-simple" class="h-4 w-4" />
+                </.link>
+              </div>
             </div>
 
             <%!-- Bidirectional Arrow --%>
@@ -594,6 +618,23 @@ defmodule GallformersWeb.Admin.GallHostLive do
                   <span class="text-gray-400 text-sm">Select a gall first</span>
                 </div>
               <% end %>
+
+              <%!-- Host edit links --%>
+              <div
+                :if={@selected_gall && @hosts != []}
+                class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1"
+              >
+                <span class="text-xs text-gray-500">Edit host ranges:</span>
+                <.link
+                  :for={host <- @hosts}
+                  navigate={~p"/admin/hosts/#{host.host_species_id}"}
+                  target="_blank"
+                  class="text-xs text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-0.5"
+                >
+                  <.taxon_name name={host.host_name} />
+                  <.icon name="ph-arrow-square-out" class="h-3 w-3" />
+                </.link>
+              </div>
             </div>
 
             <%!-- Range Confirmation Banner --%>
@@ -640,17 +681,19 @@ defmodule GallformersWeb.Admin.GallHostLive do
                             in_range={@in_range}
                             excluded_range={@excluded_places}
                             inherited_range={@inherited_range}
+                            introduced_range={@introduced_range}
                             bounds={@range_bounds}
                             editable
                             class="border border-gray-300 rounded bg-gray-50 min-h-[350px]"
                           />
                         </div>
                         <.live_component
-                          module={ExclusionDrillDown}
-                          id="exclusion-drill-down"
-                          excluded_place_ids={@excluded_from_gall_range_place_ids}
+                          module={RangeDrillDown}
+                          id="range-drill-down"
+                          omitted_place_ids={@omitted_from_range_place_ids}
                           host_places={@host_places}
                           all_places={@all_places}
+                          introduced_codes={@introduced_codes}
                         />
                       </div>
                     <% else %>
@@ -672,22 +715,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
             </div>
 
             <%!-- Actions --%>
-            <div class="flex justify-between items-center pt-3 border-t border-gray-200">
-              <div :if={@selected_gall}>
-                <.link
-                  navigate={~p"/gall/#{@selected_gall.id}"}
-                  class="text-sm hover:underline"
-                >
-                  View public page
-                </.link>
-                <span class="mx-2 text-gray-300">|</span>
-                <.link
-                  navigate={~p"/admin/galls/#{@selected_gall.id}"}
-                  class="text-sm hover:underline"
-                >
-                  Edit gall details
-                </.link>
-              </div>
+            <div class="flex justify-end items-center pt-3 border-t border-gray-200">
               <div class="flex gap-2">
                 <button type="button" phx-click="request_cancel" class="gf-btn gf-btn-soft">
                   Cancel
@@ -696,14 +724,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
                   :if={@selected_gall && !@range_confirmed}
                   type="button"
                   phx-click="save_and_confirm"
-                  disabled={not @form_dirty}
-                  class={[
-                    "gf-btn",
-                    if(@form_dirty,
-                      do: "bg-green-600 text-white hover:bg-green-700",
-                      else: "gf-btn-disabled"
-                    )
-                  ]}
+                  class="gf-btn bg-green-600 text-white hover:bg-green-700"
                 >
                   Save &amp; Confirm Range
                 </button>

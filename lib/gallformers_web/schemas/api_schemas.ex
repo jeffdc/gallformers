@@ -106,8 +106,7 @@ defmodule GallformersWeb.Schemas do
         cells: %Schema{type: :array, items: GallformersWeb.Schemas.FilterField},
         seasons: %Schema{type: :array, items: GallformersWeb.Schemas.FilterField},
         forms: %Schema{type: :array, items: GallformersWeb.Schemas.FilterField},
-        places: %Schema{type: :array, items: %Schema{type: :string}},
-        excludedPlaces: %Schema{type: :array, items: %Schema{type: :string}}
+        places: %Schema{type: :array, items: %Schema{type: :string}}
       },
       required: [:id, :name, :gall_id, :undescribed]
     })

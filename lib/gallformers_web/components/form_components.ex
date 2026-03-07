@@ -912,7 +912,7 @@ defmodule GallformersWeb.FormComponents do
   @doc """
   Renders a slide-in drill-down panel for country subdivision editing.
 
-  Used by both CountryDrillDown and ExclusionDrillDown. Provides the
+  Used by both CountryDrillDown and RangeDrillDown. Provides the
   panel chrome (slide-in transition, header, close button) and slots for
   custom content.
 

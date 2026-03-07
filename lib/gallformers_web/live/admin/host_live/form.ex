@@ -648,11 +648,16 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
     display = Ranges.compute_display_range(host_ranges)
 
+    introduced_range =
+      (display.in_range ++ display.inherited_range)
+      |> Enum.filter(&MapSet.member?(socket.assigns.introduced_place_codes, &1))
+
     range_bounds = Places.get_bounds_for_codes(display.in_range ++ display.inherited_range)
 
     socket
     |> assign(:in_range, display.in_range)
     |> assign(:inherited_range, display.inherited_range)
+    |> assign(:introduced_range, introduced_range)
     |> assign(:range_bounds, range_bounds)
   end
 
@@ -671,6 +676,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> assign(:country_places, [])
     |> assign(:in_range, [])
     |> assign(:inherited_range, [])
+    |> assign(:introduced_range, [])
     |> assign(:range_bounds, nil)
     |> assign(:taxonomy, nil)
     |> assign(:genus_is_new, false)
@@ -1589,6 +1595,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
                           id="host-range-map"
                           in_range={@in_range}
                           inherited_range={@inherited_range}
+                          introduced_range={@introduced_range}
                           bounds={@range_bounds}
                           editable
                           class="border border-gray-300 rounded bg-gray-50 min-h-[500px]"

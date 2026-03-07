@@ -77,6 +77,7 @@ defmodule GallformersWeb.HostLive do
         range_data = Ranges.get_display_range_for_host(host_id)
         range = range_data.in_range
         inherited_range = range_data.inherited_range
+        introduced_range = range_data.introduced_range
         range_bounds = Places.get_bounds_for_codes(range ++ inherited_range)
 
         # Check if Gallformers notes exist for this species
@@ -112,6 +113,7 @@ defmodule GallformersWeb.HostLive do
            taxonomy: taxonomy,
            range: range,
            inherited_range: inherited_range,
+           introduced_range: introduced_range,
            range_bounds: range_bounds,
            has_gallformers_notes: has_gallformers_notes,
            notes_alert_dismissed: false,
@@ -499,10 +501,11 @@ defmodule GallformersWeb.HostLive do
                 class="flex-1"
                 in_range={@range}
                 inherited_range={@inherited_range}
+                introduced_range={@introduced_range}
                 bounds={@range_bounds}
                 navigable
               />
-              <div :if={@inherited_range != []} class="mt-1">
+              <div :if={@inherited_range != [] or @introduced_range != []} class="mt-1">
                 <.range_map_legend mode={:public} />
               </div>
             </div>

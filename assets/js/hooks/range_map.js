@@ -10,11 +10,13 @@
  *   - Light green: inherited range (country/continent-level, not state-confirmed)
  *   - Light red: excluded from range (admin mode only)
  *   - White: not in range
+ *   - Diagonal hatching overlay: introduced range (orthogonal to color)
  *
  * Data attributes:
  *   data-in-range:        JSON array of ISO 3166-2 codes in range (e.g., ["US-CA", "US-TX"])
  *   data-excluded-range:  JSON array of ISO 3166-2 codes excluded (optional)
  *   data-inherited-range: JSON array of codes with country/continent-level range (optional)
+ *   data-introduced-range: JSON array of codes where species is introduced (optional)
  *   data-editable:        "true" if regions are clickable (admin mode)
  *   data-navigable:       "true" if clicking a region navigates to its place page
  *   data-tiles-url:       URL to boundaries.pmtiles (default: /data/boundaries.pmtiles)
@@ -137,6 +139,7 @@ const RangeMap = {
     this.inRange = new Set(JSON.parse(this.el.dataset.inRange || '[]'))
     this.excludedRange = new Set(JSON.parse(this.el.dataset.excludedRange || '[]'))
     this.inheritedRange = new Set(JSON.parse(this.el.dataset.inheritedRange || '[]'))
+    this.introducedRange = new Set(JSON.parse(this.el.dataset.introducedRange || '[]'))
     this.editable = this.el.dataset.editable === 'true'
     this.navigable = this.el.dataset.navigable === 'true'
     this.placeMode = this.el.dataset.placeMode === 'true'
@@ -151,10 +154,11 @@ const RangeMap = {
       : null
 
     // Listen for range updates from the server (used by gall_host_live)
-    this.handleEvent('range-update', ({ in_range, excluded_range, inherited_range }) => {
+    this.handleEvent('range-update', ({ in_range, excluded_range, inherited_range, introduced_range }) => {
       this.inRange = new Set(in_range || [])
       this.excludedRange = new Set(excluded_range || [])
       this.inheritedRange = new Set(inherited_range || [])
+      this.introducedRange = new Set(introduced_range || [])
       this.updateChoropleth()
       this.fitToRange(true)
     })
@@ -182,6 +186,7 @@ const RangeMap = {
     const newInRange = new Set(JSON.parse(this.el.dataset.inRange || '[]'))
     const newExcludedRange = new Set(JSON.parse(this.el.dataset.excludedRange || '[]'))
     const newInheritedRange = new Set(JSON.parse(this.el.dataset.inheritedRange || '[]'))
+    const newIntroducedRange = new Set(JSON.parse(this.el.dataset.introducedRange || '[]'))
     const newEditable = this.el.dataset.editable === 'true'
     const newNavigable = this.el.dataset.navigable === 'true'
     const newPlaceMode = this.el.dataset.placeMode === 'true'
@@ -190,12 +195,14 @@ const RangeMap = {
     if (!setsEqual(newInRange, this.inRange) ||
         !setsEqual(newExcludedRange, this.excludedRange) ||
         !setsEqual(newInheritedRange, this.inheritedRange) ||
+        !setsEqual(newIntroducedRange, this.introducedRange) ||
         newEditable !== this.editable ||
         newNavigable !== this.navigable ||
         newPlaceMode !== this.placeMode) {
       this.inRange = newInRange
       this.excludedRange = newExcludedRange
       this.inheritedRange = newInheritedRange
+      this.introducedRange = newIntroducedRange
       this.editable = newEditable
       this.navigable = newNavigable
       this.placeMode = newPlaceMode
@@ -375,6 +382,65 @@ const RangeMap = {
     })
 
     this.map.on('load', () => {
+      // Create hatching pattern for introduced range
+      const patternCanvas = document.createElement('canvas')
+      const patternSize = 8
+      patternCanvas.width = patternSize
+      patternCanvas.height = patternSize
+      const pCtx = patternCanvas.getContext('2d')
+      // Transparent background (the color layer shows through)
+      pCtx.clearRect(0, 0, patternSize, patternSize)
+      // Draw diagonal lines
+      pCtx.strokeStyle = 'rgba(0, 0, 0, 0.3)'
+      pCtx.lineWidth = 1.5
+      // Main diagonal
+      pCtx.beginPath()
+      pCtx.moveTo(0, patternSize)
+      pCtx.lineTo(patternSize, 0)
+      pCtx.stroke()
+      // Wrap-around diagonals for seamless tiling
+      pCtx.beginPath()
+      pCtx.moveTo(-patternSize, patternSize)
+      pCtx.lineTo(patternSize, -patternSize)
+      pCtx.stroke()
+      pCtx.beginPath()
+      pCtx.moveTo(0, 2 * patternSize)
+      pCtx.lineTo(2 * patternSize, 0)
+      pCtx.stroke()
+
+      // addImage requires ImageData or {width,height,data}, not HTMLCanvasElement
+      const imageData = pCtx.getImageData(0, 0, patternSize, patternSize)
+      this.map.addImage('introduced-hatch', {
+        width: patternSize,
+        height: patternSize,
+        data: new Uint8Array(imageData.data.buffer)
+      })
+
+      // Add hatch overlay layers (after color fills, before border lines)
+      this.map.addLayer({
+        id: 'subdivisions-hatch',
+        type: 'fill',
+        source: 'boundaries',
+        'source-layer': 'subdivisions',
+        paint: {
+          'fill-pattern': 'introduced-hatch',
+          'fill-opacity': 1
+        },
+        filter: this.buildIntroducedFilter()
+      }, 'subdivisions-line')
+
+      this.map.addLayer({
+        id: 'countries-hatch',
+        type: 'fill',
+        source: 'boundaries',
+        'source-layer': 'countries',
+        paint: {
+          'fill-pattern': 'introduced-hatch',
+          'fill-opacity': 1
+        },
+        filter: this.buildIntroducedFilter()
+      }, 'countries-line')
+
       this.setupInteractions()
       this.fitToRange(false)
       this.updateEmptyState()
@@ -406,6 +472,10 @@ const RangeMap = {
         status = ' — Excluded'
       } else {
         status = ' — Not reported'
+      }
+
+      if (this.introducedRange.has(code)) {
+        status += ' (Introduced)'
       }
 
       this.popup
@@ -443,6 +513,10 @@ const RangeMap = {
           status = ' — Country-level record only'
         }
 
+        if (this.introducedRange.has(code)) {
+          status += ' (Introduced)'
+        }
+
         this.popup
           .setLngLat(e.lngLat)
           .setHTML(`<strong>${name}</strong> (${code})${status} — Click to edit range`)
@@ -457,6 +531,10 @@ const RangeMap = {
           status = ' — Country-level record only'
         } else {
           status = this.placeMode ? '' : ' — Not reported'
+        }
+
+        if (this.introducedRange.has(code)) {
+          status += ' (Introduced)'
         }
 
         this.popup
@@ -539,7 +617,20 @@ const RangeMap = {
       )
     )
 
+    // Update hatch overlay filters for introduced range
+    if (this.map.getLayer('subdivisions-hatch')) {
+      this.map.setFilter('subdivisions-hatch', this.buildIntroducedFilter())
+    }
+    if (this.map.getLayer('countries-hatch')) {
+      this.map.setFilter('countries-hatch', this.buildIntroducedFilter())
+    }
+
     this.updateEmptyState()
+  },
+
+  buildIntroducedFilter() {
+    if (this.introducedRange.size === 0) return ['in', 'code', '']
+    return ['in', 'code', ...this.introducedRange]
   },
 
   /**

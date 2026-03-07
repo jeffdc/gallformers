@@ -563,11 +563,9 @@ defmodule Gallformers.Search do
       gall_ids = Enum.map(results, & &1.id)
 
       galls_in_continent =
-        from(gh in "gallhost",
-          join: hr in "host_range",
-          on: hr.species_id == gh.host_species_id,
-          where: gh.gall_species_id in ^gall_ids and hr.place_id in ^continent_desc_ids,
-          select: gh.gall_species_id
+        from(gr in "gall_range",
+          where: gr.species_id in ^gall_ids and gr.place_id in ^continent_desc_ids,
+          select: gr.species_id
         )
         |> Repo.all()
         |> MapSet.new()

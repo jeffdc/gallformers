@@ -98,7 +98,6 @@ defmodule GallformersWeb.GallLive do
         range_data = Ranges.get_display_range_for_gall(gall_id)
         range = range_data.in_range
         inherited_range = range_data.inherited_range
-        excluded_range = range_data.excluded_range
         range_bounds = Places.get_bounds_for_codes(range ++ inherited_range)
         gall_filters = Galls.get_gall_filter_values(gall_id)
         related_galls = Galls.get_related_galls(gall)
@@ -152,7 +151,6 @@ defmodule GallformersWeb.GallLive do
            taxonomy: taxonomy,
            range: range,
            inherited_range: inherited_range,
-           excluded_range: excluded_range,
            range_bounds: range_bounds,
            related_galls: related_galls,
            common_names: common_names,

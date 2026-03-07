@@ -207,9 +207,21 @@ defmodule Gallformers.GallHosts do
   maps with `:host_species_id`. `gall_range_entries` is an optional list of
   `{place_id, precision}` tuples for the gall_range table.
   """
-  @spec save_gall_host_changes(integer(), [map()], MapSet.t(), [{integer(), String.t()}] | nil) ::
+  @spec save_gall_host_changes(
+          integer(),
+          [map()],
+          MapSet.t(),
+          [{integer(), String.t()}] | nil,
+          keyword()
+        ) ::
           {:ok, :ok} | {:error, term()}
-  def save_gall_host_changes(gall_id, hosts_to_add, hosts_to_remove, gall_range_entries \\ nil) do
+  def save_gall_host_changes(
+        gall_id,
+        hosts_to_add,
+        hosts_to_remove,
+        gall_range_entries \\ nil,
+        opts \\ []
+      ) do
     Repo.transaction(fn ->
       for relation_id <- hosts_to_remove do
         remove_host_from_gall(relation_id)
@@ -221,6 +233,10 @@ defmodule Gallformers.GallHosts do
 
       if gall_range_entries do
         Gallformers.Ranges.set_gall_range(gall_id, gall_range_entries)
+      end
+
+      if opts[:confirm_range] do
+        Gallformers.Galls.confirm_gall_range(gall_id)
       end
 
       Gallformers.Species.touch(gall_id)

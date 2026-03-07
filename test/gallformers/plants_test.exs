@@ -240,7 +240,8 @@ defmodule Gallformers.PlantsTest do
           original_country_places: [],
           exact_places: [],
           country_places: [],
-          all_places: []
+          all_places: [],
+          introduced_place_codes: MapSet.new()
         },
         section_update: %{
           genus_id: genus.id,
@@ -267,7 +268,8 @@ defmodule Gallformers.PlantsTest do
           original_country_places: [],
           exact_places: [place.code],
           country_places: [],
-          all_places: all_places
+          all_places: all_places,
+          introduced_place_codes: MapSet.new()
         },
         section_update: %{
           genus_id: genus.id,
@@ -292,7 +294,8 @@ defmodule Gallformers.PlantsTest do
           original_country_places: [],
           exact_places: [],
           country_places: [],
-          all_places: []
+          all_places: [],
+          introduced_place_codes: MapSet.new()
         },
         section_update: %{
           genus_id: genus.id,

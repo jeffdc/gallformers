@@ -1,9 +1,9 @@
-defmodule GallformersWeb.Admin.ExclusionDrillDown do
+defmodule GallformersWeb.Admin.RangeDrillDown do
   @moduledoc """
-  LiveComponent for the exclusion drill-down panel in the gall-host admin page.
+  LiveComponent for the range drill-down panel in the gall-host admin page.
 
   When a curator clicks a country on the gall range map, this panel slides in
-  showing checkboxes for each subdivision. Checked = in range, unchecked = excluded.
+  showing checkboxes for each subdivision. Checked = in range, unchecked = not in range.
   """
   use GallformersWeb, :live_component
 
@@ -42,16 +42,17 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
       socket
       |> assign(:id, assigns.id)
       |> assign(:host_places, assigns.host_places)
-      |> assign(:excluded_place_ids, assigns.excluded_place_ids)
+      |> assign(:omitted_place_ids, assigns.omitted_place_ids)
       |> assign(:all_places, assigns.all_places)
+      |> assign(:introduced_codes, Map.get(assigns, :introduced_codes, MapSet.new()))
 
-    # Precompute excluded codes MapSet for O(1) lookups in template
-    excluded_codes =
+    # Precompute omitted codes MapSet for O(1) lookups in template
+    omitted_codes =
       assigns.all_places
-      |> Enum.filter(&(&1.id in assigns.excluded_place_ids))
+      |> Enum.filter(&(&1.id in assigns.omitted_place_ids))
       |> MapSet.new(& &1.code)
 
-    {:ok, assign(socket, :excluded_codes, excluded_codes)}
+    {:ok, assign(socket, :omitted_codes, omitted_codes)}
   end
 
   @impl true
@@ -61,8 +62,8 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
   end
 
   @impl true
-  def handle_event("toggle_exclusion", %{"code" => code}, socket) do
-    notify_parent({:toggle_exclusion, code})
+  def handle_event("toggle_place", %{"code" => code}, socket) do
+    notify_parent({:toggle_place, code})
     {:noreply, socket}
   end
 
@@ -124,18 +125,25 @@ defmodule GallformersWeb.Admin.ExclusionDrillDown do
           <li :for={subdiv <- @subdivisions} class="flex items-center">
             <label class={[
               "flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm cursor-pointer hover:bg-gray-50",
-              MapSet.member?(@excluded_codes, subdiv.code) && "bg-red-50",
-              !MapSet.member?(@excluded_codes, subdiv.code) && "bg-green-50"
+              MapSet.member?(@omitted_codes, subdiv.code) && "bg-red-50",
+              !MapSet.member?(@omitted_codes, subdiv.code) && "bg-green-50"
             ]}>
               <input
                 type="checkbox"
-                checked={!MapSet.member?(@excluded_codes, subdiv.code)}
-                phx-click="toggle_exclusion"
+                checked={!MapSet.member?(@omitted_codes, subdiv.code)}
+                phx-click="toggle_place"
                 phx-target={@myself}
                 phx-value-code={subdiv.code}
                 class="rounded border-gray-300 text-green-600 focus:ring-green-500"
               />
               <span>{subdiv.name}</span>
+              <span
+                :if={MapSet.member?(@introduced_codes, subdiv.code)}
+                class="text-xs text-amber-600 font-medium"
+                title="Introduced host range"
+              >
+                intro
+              </span>
               <span class="ml-auto text-xs text-gray-400">{subdiv.code}</span>
             </label>
           </li>

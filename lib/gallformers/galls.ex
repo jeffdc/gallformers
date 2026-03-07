@@ -280,6 +280,7 @@ defmodule Gallformers.Galls do
           detachable: gt.detachable,
           undescribed: gt.undescribed,
           gallformers_code: gt.gallformers_code,
+          range_confirmed: gt.range_confirmed,
           inserted_at: s.inserted_at,
           updated_at: s.updated_at
         }

@@ -120,6 +120,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(:datacomplete_lock_reason, nil)
     |> assign(:gallformers_code, nil)
     |> assign(:gallformers_code_error, nil)
+    |> assign(:range_confirmed, false)
     |> assign(:new_alias_name, "")
     |> assign(:new_alias_type, "common")
     |> assign(:host_search_query, "")
@@ -307,6 +308,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
           |> assign(:detachable, detachable)
           |> assign(:undescribed, undescribed)
           |> assign(:gallformers_code, gallformers_code)
+          |> assign(:range_confirmed, gall_data.range_confirmed || false)
           |> apply_undescribed_lock(taxonomy, species_id)
           |> apply_datacomplete_lock(species_id)
         end
@@ -907,6 +909,23 @@ defmodule GallformersWeb.Admin.GallLive.Form do
             Add Source Mapping
           </.link>
         </:quick_links>
+
+        <%!-- Range confirmation warning --%>
+        <div
+          :if={@mode == :edit && !@range_confirmed}
+          class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded flex items-center gap-2"
+        >
+          <.icon name="ph-warning" class="h-5 w-5 text-amber-600 flex-shrink-0" />
+          <p class="text-sm text-amber-800">
+            This gall's range has not been confirmed.
+            <.link
+              navigate={~p"/admin/gallhost?id=#{@gall.id}"}
+              class="underline font-medium"
+            >
+              Review and confirm in Gall-Host Mappings
+            </.link>
+          </p>
+        </div>
 
         <%!-- Name field with typeahead for search/create --%>
         <div class="mb-3">

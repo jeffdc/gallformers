@@ -571,11 +571,6 @@ defmodule Gallformers.Plants do
     end
   end
 
-  # Backwards-compatible clause for callers that don't pass introduced_place_codes
-  defp save_place_changes(host_id, %{} = changes) do
-    save_place_changes(host_id, Map.put_new(changes, :introduced_place_codes, MapSet.new()))
-  end
-
   defp build_place_change_entries(codes, precision, introduced_codes, place_code_to_id) do
     Enum.map(codes, fn code ->
       dt = if MapSet.member?(introduced_codes, code), do: "introduced", else: "native"

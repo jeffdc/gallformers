@@ -319,7 +319,12 @@ defmodule Gallformers.Ranges do
       on: hr.place_id == p.id,
       where: hr.species_id in ^host_species_ids,
       distinct: true,
-      select: %{code: p.code, precision: hr.precision, place_id: p.id}
+      select: %{
+        code: p.code,
+        precision: hr.precision,
+        place_id: p.id,
+        distribution_type: hr.distribution_type
+      }
     )
     |> Repo.all()
   end
@@ -329,33 +334,42 @@ defmodule Gallformers.Ranges do
   # ============================================
 
   @doc """
-  Computes display range from raw host range entries and exclusions.
+  Computes display range from raw range entries.
 
   Used by admin pages that have pending (unsaved) changes. Accepts the same
   format as `get_host_ranges_with_precision_for_gall/1` returns:
   `[%{code, precision, place_id}]`.
 
-  Exclusions is a list of place codes to subtract from the range.
+  ## Options
+
+    * `:with_introduced` — when `true`, partitions entries by `distribution_type`
+      and populates `introduced_range` with leaf codes from "introduced" entries.
   """
-  @spec compute_display_range([map()], [String.t()]) :: DisplayRange.t()
-  def compute_display_range(host_ranges, excluded_codes \\ []) do
-    excluded = MapSet.new(excluded_codes)
+  @spec compute_display_range([map()], keyword()) :: DisplayRange.t()
+  def compute_display_range(host_ranges, opts \\ []) do
     {exact_codes, inherited_codes} = split_by_precision(host_ranges)
 
     exact_set = MapSet.new(exact_codes)
     inherited_set = MapSet.new(inherited_codes)
+    clean_inherited = MapSet.difference(inherited_set, exact_set)
 
-    effective_exact = MapSet.difference(exact_set, excluded)
+    introduced_range =
+      if Keyword.get(opts, :with_introduced, false) do
+        introduced_entries =
+          Enum.filter(host_ranges, &(Map.get(&1, :distribution_type) == "introduced"))
 
-    effective_inherited =
-      inherited_set
-      |> MapSet.difference(exact_set)
-      |> MapSet.difference(excluded)
+        {intro_exact, intro_inherited} = split_by_precision(introduced_entries)
+        intro_set = MapSet.new(intro_exact ++ intro_inherited)
+        all_range = MapSet.union(exact_set, clean_inherited)
+        MapSet.intersection(intro_set, all_range) |> MapSet.to_list()
+      else
+        []
+      end
 
     %DisplayRange{
-      in_range: MapSet.to_list(effective_exact),
-      inherited_range: MapSet.to_list(effective_inherited),
-      excluded_range: MapSet.to_list(excluded)
+      in_range: MapSet.to_list(exact_set),
+      inherited_range: MapSet.to_list(clean_inherited),
+      introduced_range: introduced_range
     }
   end
 
@@ -363,7 +377,7 @@ defmodule Gallformers.Ranges do
   Gets the full range display data for a gall from the curated gall_range table,
   expanding country-level ranges to leaf descendant codes for map display.
 
-  Returns `%{in_range: [codes], inherited_range: [codes], excluded_range: []}`.
+  Returns `%{in_range: [codes], inherited_range: [codes]}`.
   - `in_range`: exact subdivision codes
   - `inherited_range`: leaf codes expanded from country-level ranges
   """
@@ -376,8 +390,7 @@ defmodule Gallformers.Ranges do
 
     %DisplayRange{
       in_range: exact_codes,
-      inherited_range: Enum.reject(inherited_codes, &(&1 in exact_set)),
-      excluded_range: []
+      inherited_range: Enum.reject(inherited_codes, &MapSet.member?(exact_set, &1))
     }
   end
 
@@ -389,7 +402,7 @@ defmodule Gallformers.Ranges do
   @spec get_display_range_for_host(integer()) :: DisplayRange.t()
   def get_display_range_for_host(host_species_id) do
     host_ranges = get_places_for_host_with_precision(host_species_id)
-    compute_display_range(host_ranges)
+    compute_display_range(host_ranges, with_introduced: true)
   end
 
   # Splits host ranges into exact leaf codes and inherited leaf codes.

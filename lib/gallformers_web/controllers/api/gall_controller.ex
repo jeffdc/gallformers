@@ -242,8 +242,7 @@ defmodule GallformersWeb.API.GallController do
       cells: filter_fields.cells,
       seasons: filter_fields.seasons,
       forms: filter_fields.forms,
-      places: places,
-      excludedPlaces: []
+      places: places
     }
   end
 

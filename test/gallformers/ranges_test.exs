@@ -131,9 +131,6 @@ defmodule Gallformers.RangesTest do
       # No overlap between exact and inherited
       assert MapSet.disjoint?(exact_set, inherited_set)
 
-      # excluded_range is always empty now (exclusions are implicit)
-      assert result.excluded_range == []
-
       # MX-JAL is NOT in range (not in gall_range table)
       refute "MX-JAL" in result.in_range
       refute "MX-JAL" in result.inherited_range
@@ -143,32 +140,76 @@ defmodule Gallformers.RangesTest do
       assert "CA-AB" in result.in_range
     end
 
-    test "compute_display_range subtracts exclusions from exact set" do
-      # Use compute_display_range directly to test exclusion of a code
-      # that IS in the host range
-      ranges = Ranges.get_places_for_host_with_precision(8)
-      result = Ranges.compute_display_range(ranges, ["US-CA"])
-      refute "US-CA" in result.in_range
-      assert "US-CA" in result.excluded_range
-      # CA-AB should still be in range
-      assert "CA-AB" in result.in_range
-    end
-
-    test "get_display_range_for_host returns DisplayRange with empty excluded_range" do
+    test "get_display_range_for_host returns DisplayRange" do
       result = Ranges.get_display_range_for_host(8)
       assert %Ranges.DisplayRange{} = result
-      assert result.excluded_range == []
       # Host 8 has exact entries for CA-AB and US-CA
       assert "CA-AB" in result.in_range
       assert "US-CA" in result.in_range
     end
 
-    test "compute_display_range with no exclusions passes through all codes" do
+    test "compute_display_range passes through all codes" do
       # Host 6 only has US-CA exact
       ranges = Ranges.get_places_for_host_with_precision(6)
       result = Ranges.compute_display_range(ranges)
       assert "US-CA" in result.in_range
-      assert result.excluded_range == []
+    end
+
+    test "compute_display_range with with_introduced partitions by distribution_type" do
+      california = Places.get_place_by_code("US-CA")
+      alberta = Places.get_place_by_code("CA-AB")
+
+      entries = [
+        %{
+          code: "US-CA",
+          precision: "exact",
+          place_id: california.id,
+          distribution_type: "native"
+        },
+        %{
+          code: "CA-AB",
+          precision: "exact",
+          place_id: alberta.id,
+          distribution_type: "introduced"
+        }
+      ]
+
+      result = Ranges.compute_display_range(entries, with_introduced: true)
+      assert %Ranges.DisplayRange{} = result
+      assert "US-CA" in result.in_range
+      assert "CA-AB" in result.in_range
+      # CA-AB is introduced
+      assert "CA-AB" in result.introduced_range
+      # US-CA is native, not introduced
+      refute "US-CA" in result.introduced_range
+    end
+
+    test "compute_display_range without with_introduced returns empty introduced_range" do
+      california = Places.get_place_by_code("US-CA")
+      entries = [%{code: "US-CA", precision: "exact", place_id: california.id}]
+      result = Ranges.compute_display_range(entries)
+      assert result.introduced_range == []
+    end
+
+    test "get_display_range_for_host returns introduced_range" do
+      # Host 7 (T. serpyllum) has US-CA native + BS introduced
+      result = Ranges.get_display_range_for_host(7)
+      assert %Ranges.DisplayRange{} = result
+      assert is_list(result.introduced_range)
+      # BS (Bahamas) is introduced for host 7
+      assert "BS" in result.introduced_range
+      # US-CA is native, should not be in introduced_range
+      refute "US-CA" in result.introduced_range
+    end
+
+    test "get_host_ranges_with_precision_for_species_ids includes distribution_type" do
+      results = Ranges.get_host_ranges_with_precision_for_species_ids([7])
+      assert length(results) > 0
+
+      for entry <- results do
+        assert Map.has_key?(entry, :distribution_type)
+        assert entry.distribution_type in ["native", "introduced"]
+      end
     end
   end
 

@@ -1040,6 +1040,31 @@ defmodule GallformersWeb.DataDisplayComponents do
           {if @mode == :gall_admin, do: "Not in Range", else: "Out of Range"}
         </span>
       </div>
+      <%!-- Hatched entries for introduced range --%>
+      <div :if={@mode == :gall_admin} class="flex items-center gap-2">
+        <div
+          class="w-4 h-4 rounded border border-gray-400"
+          style="background: repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(0,0,0,0.25) 2px, rgba(0,0,0,0.25) 4px), #228B22;"
+        >
+        </div>
+        <span class="text-xs text-gray-600">Introduced (in gall range)</span>
+      </div>
+      <div :if={@mode == :gall_admin} class="flex items-center gap-2">
+        <div
+          class="w-4 h-4 rounded border border-gray-400"
+          style="background: repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(0,0,0,0.25) 2px, rgba(0,0,0,0.25) 4px), #FCA5A5;"
+        >
+        </div>
+        <span class="text-xs text-gray-600">Introduced (not in gall range)</span>
+      </div>
+      <div :if={@mode in [:public, :host_admin]} class="flex items-center gap-2">
+        <div
+          class="w-4 h-4 rounded border border-gray-400"
+          style="background: repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(0,0,0,0.25) 2px, rgba(0,0,0,0.25) 4px), #228B22;"
+        >
+        </div>
+        <span class="text-xs text-gray-600">Introduced range</span>
+      </div>
     </div>
     """
   end
@@ -1070,6 +1095,10 @@ defmodule GallformersWeb.DataDisplayComponents do
   attr :inherited_range, :list,
     default: [],
     doc: "list of postal codes with country/continent-level range (shown lighter green)"
+
+  attr :introduced_range, :list,
+    default: [],
+    doc: "list of codes with introduced host range (shown with hatching pattern)"
 
   attr :editable, :boolean,
     default: false,
@@ -1111,12 +1140,14 @@ defmodule GallformersWeb.DataDisplayComponents do
     in_range_json = Jason.encode!(assigns.in_range)
     excluded_range_json = Jason.encode!(assigns.excluded_range)
     inherited_range_json = Jason.encode!(assigns.inherited_range)
+    introduced_range_json = Jason.encode!(assigns.introduced_range)
 
     assigns =
       assigns
       |> assign(:in_range_json, in_range_json)
       |> assign(:excluded_range_json, excluded_range_json)
       |> assign(:inherited_range_json, inherited_range_json)
+      |> assign(:introduced_range_json, introduced_range_json)
       |> assign(:max_bounds_json, if(assigns.max_bounds, do: Jason.encode!(assigns.max_bounds)))
       |> assign(:bounds_json, if(assigns.bounds, do: Jason.encode!(assigns.bounds)))
 
@@ -1129,6 +1160,7 @@ defmodule GallformersWeb.DataDisplayComponents do
       data-in-range={@in_range_json}
       data-excluded-range={@excluded_range_json}
       data-inherited-range={@inherited_range_json}
+      data-introduced-range={@introduced_range_json}
       data-editable={to_string(@editable)}
       data-navigable={to_string(@navigable)}
       data-place-mode={to_string(@place_mode)}
