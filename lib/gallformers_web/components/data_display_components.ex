@@ -1041,30 +1041,34 @@ defmodule GallformersWeb.DataDisplayComponents do
         </span>
       </div>
       <%!-- Hatched entries for introduced range --%>
-      <div :if={@mode == :gall_admin} class="flex items-center gap-2">
-        <div
-          class="w-4 h-4 rounded border border-gray-400"
-          style="background: repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(0,0,0,0.25) 2px, rgba(0,0,0,0.25) 4px), #228B22;"
-        >
-        </div>
-        <span class="text-xs text-gray-600">Introduced (in gall range)</span>
-      </div>
-      <div :if={@mode == :gall_admin} class="flex items-center gap-2">
-        <div
-          class="w-4 h-4 rounded border border-gray-400"
-          style="background: repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(0,0,0,0.25) 2px, rgba(0,0,0,0.25) 4px), #FCA5A5;"
-        >
-        </div>
-        <span class="text-xs text-gray-600">Introduced (not in gall range)</span>
-      </div>
-      <div :if={@mode in [:public, :host_admin]} class="flex items-center gap-2">
-        <div
-          class="w-4 h-4 rounded border border-gray-400"
-          style="background: repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(0,0,0,0.25) 2px, rgba(0,0,0,0.25) 4px), #228B22;"
-        >
-        </div>
-        <span class="text-xs text-gray-600">Introduced range</span>
-      </div>
+      <.hatched_legend_swatch
+        :if={@mode == :gall_admin}
+        color="#228B22"
+        label="Introduced (in gall range)"
+      />
+      <.hatched_legend_swatch
+        :if={@mode == :gall_admin}
+        color="#FCA5A5"
+        label="Introduced (not in gall range)"
+      />
+      <.hatched_legend_swatch
+        :if={@mode in [:public, :host_admin]}
+        color="#228B22"
+        label="Introduced range"
+      />
+    </div>
+    """
+  end
+
+  @hatch_gradient "repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(0,0,0,0.25) 2px, rgba(0,0,0,0.25) 4px)"
+
+  defp hatched_legend_swatch(assigns) do
+    assigns = assign(assigns, :style, "background: #{@hatch_gradient}, #{assigns.color};")
+
+    ~H"""
+    <div class="flex items-center gap-2">
+      <div class="w-4 h-4 rounded border border-gray-400" style={@style}></div>
+      <span class="text-xs text-gray-600">{@label}</span>
     </div>
     """
   end

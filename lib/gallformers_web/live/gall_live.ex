@@ -487,7 +487,6 @@ defmodule GallformersWeb.GallLive do
                   class="min-h-[250px] h-[300px]"
                   in_range={@range}
                   inherited_range={@inherited_range}
-                  excluded_range={[]}
                   bounds={@range_bounds}
                   navigable
                 />

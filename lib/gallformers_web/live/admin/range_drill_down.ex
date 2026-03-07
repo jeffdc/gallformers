@@ -44,7 +44,7 @@ defmodule GallformersWeb.Admin.RangeDrillDown do
       |> assign(:host_places, assigns.host_places)
       |> assign(:omitted_place_ids, assigns.omitted_place_ids)
       |> assign(:all_places, assigns.all_places)
-      |> assign(:introduced_codes, Map.get(assigns, :introduced_codes, MapSet.new()))
+      |> assign(:introduced_codes, MapSet.new(Map.get(assigns, :introduced_range, [])))
 
     # Precompute omitted codes MapSet for O(1) lookups in template
     omitted_codes =

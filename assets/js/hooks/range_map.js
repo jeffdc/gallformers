@@ -474,9 +474,7 @@ const RangeMap = {
         status = ' — Not reported'
       }
 
-      if (this.introducedRange.has(code)) {
-        status += ' (Introduced)'
-      }
+      status = this.appendIntroducedSuffix(status, code)
 
       this.popup
         .setLngLat(e.lngLat)
@@ -513,9 +511,7 @@ const RangeMap = {
           status = ' — Country-level record only'
         }
 
-        if (this.introducedRange.has(code)) {
-          status += ' (Introduced)'
-        }
+        status = this.appendIntroducedSuffix(status, code)
 
         this.popup
           .setLngLat(e.lngLat)
@@ -533,9 +529,7 @@ const RangeMap = {
           status = this.placeMode ? '' : ' — Not reported'
         }
 
-        if (this.introducedRange.has(code)) {
-          status += ' (Introduced)'
-        }
+        status = this.appendIntroducedSuffix(status, code)
 
         this.popup
           .setLngLat(e.lngLat)
@@ -631,6 +625,10 @@ const RangeMap = {
   buildIntroducedFilter() {
     if (this.introducedRange.size === 0) return ['in', 'code', '']
     return ['in', 'code', ...this.introducedRange]
+  },
+
+  appendIntroducedSuffix(status, code) {
+    return this.introducedRange.has(code) ? status + ' (Introduced)' : status
   },
 
   /**

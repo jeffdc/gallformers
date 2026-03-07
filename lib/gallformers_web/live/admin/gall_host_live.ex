@@ -48,21 +48,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
       |> assign(:host_search_query, "")
       |> assign(:host_search_results, [])
       |> assign(:host_dropdown_open, false)
-      # Range display state
-      |> assign(:host_places, [])
-      |> assign(:host_ranges, [])
-      |> assign(:in_range, [])
-      |> assign(:inherited_range, [])
-      |> assign(:excluded_places, [])
-      |> assign(:range_bounds, nil)
-      # Gall range curation state
-      |> assign(:gall_range_place_ids, [])
-      |> assign(:original_gall_range_place_ids, [])
-      |> assign(:gall_range_precision_map, %{})
-      |> assign(:omitted_from_range_place_ids, [])
-      |> assign(:range_confirmed, false)
-      |> assign(:introduced_range, [])
-      |> assign(:introduced_codes, MapSet.new())
+      |> reset_range_state()
       # Form state
       |> init_form_state()
 
@@ -127,19 +113,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
       socket
       |> assign(:selected_gall, nil)
       |> assign(DeferredChanges.init(:hosts, []))
-      |> assign(:host_ranges, [])
-      |> assign(:host_places, [])
-      |> assign(:in_range, [])
-      |> assign(:inherited_range, [])
-      |> assign(:excluded_places, [])
-      |> assign(:range_bounds, nil)
-      |> assign(:gall_range_place_ids, [])
-      |> assign(:original_gall_range_place_ids, [])
-      |> assign(:gall_range_precision_map, %{})
-      |> assign(:omitted_from_range_place_ids, [])
-      |> assign(:range_confirmed, false)
-      |> assign(:introduced_range, [])
-      |> assign(:introduced_codes, MapSet.new())
+      |> reset_range_state()
       |> assign(:page_title, "Gall-Host Mappings")
       |> reset_dirty()
 
@@ -415,6 +389,22 @@ defmodule GallformersWeb.Admin.GallHostLive do
     end
   end
 
+  defp reset_range_state(socket) do
+    socket
+    |> assign(:host_places, [])
+    |> assign(:host_ranges, [])
+    |> assign(:in_range, [])
+    |> assign(:inherited_range, [])
+    |> assign(:excluded_places, [])
+    |> assign(:range_bounds, nil)
+    |> assign(:gall_range_place_ids, [])
+    |> assign(:original_gall_range_place_ids, [])
+    |> assign(:gall_range_precision_map, %{})
+    |> assign(:omitted_from_range_place_ids, [])
+    |> assign(:range_confirmed, false)
+    |> assign(:introduced_range, [])
+  end
+
   # Recompute range from current hosts (hits DB for host ranges).
   # Computes the visual categories by comparing gall_range against host range.
   defp recompute_range(socket) do
@@ -465,8 +455,6 @@ defmodule GallformersWeb.Admin.GallHostLive do
 
     range_bounds = Places.get_bounds_for_codes(gall_in_range ++ gall_inherited ++ excluded_codes)
 
-    introduced_codes_set = MapSet.new(host_display.introduced_range)
-
     socket
     |> assign(:host_places, all_host_codes)
     |> assign(:in_range, gall_in_range)
@@ -475,7 +463,6 @@ defmodule GallformersWeb.Admin.GallHostLive do
     |> assign(:omitted_from_range_place_ids, excluded_place_ids)
     |> assign(:range_bounds, range_bounds)
     |> assign(:introduced_range, host_display.introduced_range)
-    |> assign(:introduced_codes, introduced_codes_set)
   end
 
   # Toggle a place's membership in gall_range
@@ -693,7 +680,7 @@ defmodule GallformersWeb.Admin.GallHostLive do
                           omitted_place_ids={@omitted_from_range_place_ids}
                           host_places={@host_places}
                           all_places={@all_places}
-                          introduced_codes={@introduced_codes}
+                          introduced_range={@introduced_range}
                         />
                       </div>
                     <% else %>
