@@ -1,8 +1,10 @@
 defmodule GallformersWeb.Admin.GallRangeLiveTest do
   @moduledoc """
   LiveView tests for the gall range review admin page.
+  Disabled while the route is commented out — re-enable with the route.
   """
   use GallformersWeb.ConnCase
+  @moduletag :skip
   import Phoenix.LiveViewTest
 
   alias Gallformers.Accounts.Auth0User
