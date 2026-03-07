@@ -112,12 +112,12 @@ Use this when a species has been formally re-described, moved to a different gen
 ## How Do I Add a New Host Plant?
 
 1. From the dashboard, click **Create a New Host** (or go to `/admin/hosts/new`).
-2. **WCVP pre-fill (recommended):** If the host exists in the World Checklist of Vascular Plants, use the WCVP search card at the top of the form. Search by name, select a match, and the form auto-fills the species name, family (created if it doesn't exist yet), and geographic range. Toggle "Include introduced range" if you want introduced distributions too.
+2. **WCVP pre-fill (recommended):** If the host exists in the World Checklist of Vascular Plants, use the WCVP search card at the top of the form. Search by name, select a match, and the form auto-fills the species name, family (created if it doesn't exist yet), and geographic range. **By default, only native distributions are included.** Check "Include introduced range" to also add regions where the host has been introduced by human activity. Be thoughtful about this — introduced host ranges can inflate a gall's apparent range if the gall hasn't followed the host to those regions.
 3. **Or fill in manually:** Select **Family** and **Genus**, enter the **specific epithet**.
 4. Optionally assign a **Section** (for genera that have them, like *Quercus*).
 5. Add **common names** as aliases.
 6. Set **Abundance**.
-7. **Edit the range map** — click states/provinces to toggle them in or out of range. Click a country to open the drill-down panel for sub-national editing. Colors: dark green = exact, light green = country-level, white = not in range.
+7. **Edit the range map** — click states/provinces to toggle them in or out of range. Click a country to open the drill-down panel for sub-national editing. Colors: dark green = exact, light green = country-level, white = not in range. If you included introduced ranges, those regions show a diagonal hatching overlay so you can distinguish native from introduced presence.
 8. Click **Save**.
 
 **After creating:** You'll probably want to [map galls to this host](#how-do-i-manage-gall-host-associations).
@@ -128,9 +128,9 @@ When editing an existing host, the **Refresh from POWO-WCVP** button (below the 
 
 - **Green (to add)** — places in WCVP but not in the current range
 - **Red (to remove)** — places in the current range but not in WCVP
-- **Amber (introduced)** — introduced distributions you can optionally include
+- **Amber (introduced)** — introduced distributions you can individually select or deselect
 
-Check or uncheck individual items, then click **Apply Selected Changes** to stage the updates. Changes aren't saved until you click **Save**.
+Each item can be toggled independently. For introduced distributions, consider whether the gall is known to occur in those regions before including them. Click **Apply Selected Changes** to stage the updates. Changes aren't saved until you click **Save**.
 
 ### Quick Links (Edit Mode)
 
@@ -264,17 +264,24 @@ There are two workflows depending on your starting point.
 
 ## How Do I Manage Gall-Host Associations?
 
-This dedicated page manages which galls form on which host plants, plus geographic range exclusions.
+This dedicated page manages which galls form on which host plants and lets you curate the gall's geographic range. This is where range curation happens — an important admin responsibility, since gall ranges don't compute themselves.
 
 1. From the dashboard, click **Manage Gall-Host Associations** (or go to `/admin/gallhost`).
-2. **Select a gall** using the typeahead search (or arrive via a link from the gall form/list, which pre-selects it).
+2. **Select a gall** using the typeahead search (or arrive via a link from the gall form/list, which pre-selects it). Quick links next to the gall name open the public page or the gall edit form.
 3. The current hosts are shown. **Add hosts** by searching the dropdown, or **remove** them with the remove button.
-4. The **range map** shows the gall's computed range — the union of all its hosts' ranges minus any exclusions. A summary line shows counts: confirmed places, country-level places, excluded places, and total from hosts.
-5. **Manage exclusions:** Click a country on the map to open the exclusion drill-down panel. This shows only the subdivisions that are in the host range. Toggle individual states/provinces to exclude them, or use "Select All" / "Deselect All" for bulk changes. Green = in range, red = excluded.
-6. The map updates live as you add/remove hosts or change exclusions.
-7. Click **Save** to apply all changes.
+4. The **range map** shows two layers: the gall's confirmed range (dark green) and the host range canvas — everywhere the hosts grow. Places in the host range but not yet in the gall range appear in light red ("host only"). A summary line shows counts of confirmed, country-level, host-only, and total places.
+5. **Curate the range:** Click a state/province on the map to toggle it in or out of the gall's range. Click a country to open the range drill-down panel showing its subdivisions. Use checkboxes to include or exclude individual states, or "Select All" / "Deselect All" for bulk changes. Green = in gall range, red = host only.
+6. **Introduced ranges:** If any hosts have introduced distributions included (see [Adding a Host](#how-do-i-add-a-new-host-plant)), those regions show a **diagonal hatching overlay** on the map and an amber **"intro" badge** in the drill-down panel. This helps you distinguish native from introduced host presence when deciding which places belong in the gall's range. Remember: introduced host ranges are opt-in per host — if you don't see hatching where you expect it, the host's introduced ranges may not have been included during creation or WCVP refresh.
+7. The map updates live as you add/remove hosts or change the range.
+8. **Saving:**
+   - **Save** — saves host changes and any range edits.
+   - **Save & Confirm Range** — saves everything and marks the gall's range as confirmed. This signals to other admins that the range has been intentionally reviewed, not just left as a default from host data.
 
-**Tip:** Links at the top take you to the gall's public page and edit form.
+### Range Confirmation Status
+
+The gall edit form and gall-host page both show whether a gall's range has been confirmed. Unconfirmed galls need admin attention — their range is derived from hosts but hasn't been curated yet. After adding or removing hosts, the range should be re-reviewed and re-confirmed.
+
+The typical workflow is: assign hosts → curate range on the map → Save & Confirm Range.
 
 ---
 

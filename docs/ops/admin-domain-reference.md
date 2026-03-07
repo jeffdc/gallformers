@@ -242,15 +242,38 @@ Each host plant has a set of **places** where it grows, stored at two levels of 
 
 Host range data can be entered manually or pre-filled from **WCVP** (the World Checklist of Vascular Plants), Kew Gardens' authoritative global plant distribution database. When creating a new host, admins can search WCVP to auto-populate the range. For existing hosts, a "Refresh from POWO-WCVP" tool shows a diff of what's changed.
 
+### Native vs. Introduced Host Ranges
+
+WCVP classifies each host distribution as **native** or **introduced**. Gallformers tracks this distinction:
+
+- **Native** — the host occurs naturally in the region.
+- **Introduced** — the host has been brought to the region by human activity.
+
+**The default is conservative: only native ranges are included.** When creating a host from WCVP, introduced distributions are excluded unless the admin explicitly checks "Include introduced range." This avoids inflating a gall's apparent range with regions where the host exists but the gall may not have followed.
+
+When refreshing an existing host from WCVP, introduced distributions appear in the diff as **amber items** that can be individually selected or deselected — they aren't silently added or removed.
+
+Once introduced ranges are included on a host, the introduced status is stored per-entry and flows downstream to any gall range displays for that host.
+
 ### How Gall Ranges Work
 
-Galls have no range of their own — their geographic range is **computed** from their hosts:
+A gall's geographic range is **curated** by admins, starting from its hosts' ranges as a canvas:
 
 1. Each host plant has places where it grows (its range, at exact and country-level precision).
-2. A gall's **possible range** is the union of all its hosts' ranges.
-3. **Range exclusions** let admins remove specific places from that computed range. This handles cases where a gall's host grows somewhere but the gall itself doesn't occur there.
+2. The **host range canvas** is the union of all hosts' ranges — this is everywhere the gall *could* exist.
+3. Admins select which places from the canvas the gall actually occurs in. This becomes the gall's **confirmed range**, stored in a dedicated `gall_range` table as the source of truth.
+4. Places in the host range but not in the gall range appear as "host only" on the admin map, making it easy to see what hasn't been confirmed.
 
-**Example:** A gall forms on *Quercus alba* and *Quercus montana*. Both oaks grow across the eastern US, so the gall's range covers the eastern US. But if the gall has only been observed south of New York, an admin can exclude northern states.
+**Example:** A gall forms on *Quercus alba* and *Quercus montana*. Both oaks grow across the eastern US, so the host range canvas covers the eastern US. An admin reviews records and confirms the gall in states where it's been documented, leaving unconfirmed states as "host only."
+
+### Range Confirmation
+
+Gall ranges need to be **confirmed** by an admin. This is a deliberate step — not just saving, but affirming that the range has been reviewed and curated.
+
+- **Unconfirmed** — the range hasn't been reviewed yet, or hosts were changed since the last confirmation. The gall edit form and gall-host admin page show confirmation status so admins can see which galls still need attention.
+- **Confirmed** — an admin has reviewed the host range canvas, selected the appropriate places, and clicked **Save & Confirm Range**.
+
+Confirmation is a signal to other admins that the range is intentional, not just an automatic default from host data. When hosts are added or removed, the range should be re-reviewed.
 
 ### Range Maps
 
@@ -260,10 +283,13 @@ Ranges are displayed as interactive maps using vector tiles. The color coding:
 |---|---|
 | **Dark green** | Documented at state/province level (exact precision) |
 | **Light green** | Documented at country level only (inherited precision) |
-| **Red** | Excluded from gall range (admin only) |
+| **Red / light red** | Host range only, not in gall range (gall-host admin only) |
+| **Diagonal hatching** | Host is introduced in this region (overlays any color) |
 | **White** | Not in range |
 
-On admin pages, maps are interactive — click a state/province to toggle it, or click a country to open a drill-down panel for sub-national editing.
+Hatching is orthogonal to the color — a region can be green-hatched (in gall range, host introduced) or red-hatched (host only, host introduced). This tells you at a glance where the host is present but not native.
+
+On admin pages, maps are interactive — click a state/province to toggle it in or out of the gall's range, or click a country to open a drill-down panel for sub-national editing.
 
 ### Places
 
@@ -390,7 +416,7 @@ Family (Cynipidae, type: Wasp)
             └── Species: Callirhytis furva (taxoncode: gall)
         ├── Traits: spherical, brown, on leaf...
         ├── Hosts: Quercus alba, Quercus rubra
-        │   └── Range: computed from host places minus exclusions
+        │   └── Range: curated from host range canvas (confirmed by admin)
         ├── Sources: Smith 2020, Jones 2018...
         ├── Aliases: "oak apple gall" (common)
         ├── Images: 3 photos with credits and licenses
