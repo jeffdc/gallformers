@@ -37,6 +37,8 @@ Before diving in, a few things that apply everywhere in the admin:
 
 **Edit shortcuts on public pages.** When you're logged in as an admin, small pencil icons appear throughout the public site — next to the species name, the host list, individual source mappings, and more. Clicking one takes you straight to the relevant admin page. This is often the fastest way to edit something: find it on the public site, click the pencil.
 
+**Range review indicators.** On gall public pages, if the gall's range hasn't been confirmed by an admin, an amber **"Needs review"** link appears next to "Possible Range." Clicking it takes you directly to the gall-host admin page to curate and confirm the range. This makes it easy to spot galls that need attention while browsing the site.
+
 **View links on admin pages.** Going the other direction, admin list pages have a **View** button (arrow icon) on each record that opens its public page. Use this to check how your edits look to visitors.
 
 ---

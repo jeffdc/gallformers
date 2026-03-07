@@ -270,7 +270,7 @@ A gall's geographic range is **curated** by admins, starting from its hosts' ran
 
 Gall ranges need to be **confirmed** by an admin. This is a deliberate step — not just saving, but affirming that the range has been reviewed and curated.
 
-- **Unconfirmed** — the range hasn't been reviewed yet, or hosts were changed since the last confirmation. The gall edit form and gall-host admin page show confirmation status so admins can see which galls still need attention.
+- **Unconfirmed** — the range hasn't been reviewed yet, or hosts were changed since the last confirmation. The gall edit form and gall-host admin page show confirmation status so admins can see which galls still need attention. On the public gall page, logged-in admins see an amber **"Needs review"** link next to "Possible Range" that goes directly to the gall-host admin page.
 - **Confirmed** — an admin has reviewed the host range canvas, selected the appropriate places, and clicked **Save & Confirm Range**.
 
 Confirmation is a signal to other admins that the range is intentional, not just an automatic default from host data. When hosts are added or removed, the range should be re-reviewed.

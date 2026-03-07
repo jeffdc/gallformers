@@ -481,6 +481,15 @@ defmodule GallformersWeb.GallLive do
                 <div class="flex items-center gap-1">
                   <strong>Possible Range:</strong>
                   <.info_tip content="The gall's range is computed from the range of all hosts that the gall occurs on. In some cases we have evidence that the gall does not occur across the full range of the hosts and we will remove these places from the range. For undescribed species we will show the expected range based on hosts plus where the galls have been observed." />
+                  <.link
+                    :if={@current_user && !@gall.range_confirmed}
+                    href={~p"/admin/gallhost?id=#{@gall.id}"}
+                    class="inline-flex items-center gap-1 text-xs text-amber-500 hover:text-amber-700"
+                    title="Range not yet confirmed — click to review"
+                  >
+                    <.icon name="ph-warning" class="h-3.5 w-3.5" />
+                    <span>Needs review</span>
+                  </.link>
                 </div>
                 <.range_map
                   id="gall-range-map"
