@@ -98,7 +98,8 @@ defmodule GallformersWeb.IDLive do
        total_count: 0,
        name_filter: "",
        show_advanced: false,
-       default_continent_code: socket.assigns[:continent_code]
+       default_continent_code: socket.assigns[:continent_code],
+       unscoped_count: 0
      )}
   end
 
@@ -765,20 +766,31 @@ defmodule GallformersWeb.IDLive do
     # Generate summaries for galls without images
     summaries = generate_summaries_for_imageless(results)
 
+    # When results are empty and a place/region filter is active, check if
+    # galls exist without the geographic filter so we can hint to the user.
+    unscoped_count =
+      if results == [] && filter_params[:place_codes] != nil do
+        Galls.count_filtered_galls(%{filter_params | place_codes: nil})
+      else
+        0
+      end
+
     if socket.assigns.filters == default_filters() do
       assign(socket,
         results: results,
         filtered_results: results,
         summaries: summaries,
         total_count: length(results),
-        name_filter: ""
+        name_filter: "",
+        unscoped_count: unscoped_count
       )
     else
       assign(socket,
         results: results,
         filtered_results: results,
         summaries: summaries,
-        name_filter: ""
+        name_filter: "",
+        unscoped_count: unscoped_count
       )
     end
   end
@@ -1082,6 +1094,8 @@ defmodule GallformersWeb.IDLive do
           has_selection={@selected_host != nil or @selected_genus != nil}
           selected_host={@selected_host}
           show_non_galls={@filters.show_non_galls}
+          unscoped_count={@unscoped_count}
+          continent_name={@continent_name}
         />
       </div>
     </Layouts.app>
@@ -1333,6 +1347,8 @@ defmodule GallformersWeb.IDLive do
   attr :filter_count, :integer, required: true
   attr :name_filter, :string, required: true
   attr :show_non_galls, :boolean, required: true
+  attr :unscoped_count, :integer, required: true
+  attr :continent_name, :string, default: nil
 
   defp results_grid(assigns) do
     ~H"""
@@ -1385,15 +1401,25 @@ defmodule GallformersWeb.IDLive do
 
         <%= if length(@results) == 0 do %>
           <div class="p-4 bg-blue-50 border border-blue-200 rounded text-sm">
-            <p>
-              There are no galls that match your filter. It's possible there are no described species that fit this set of traits and your gall is undescribed.
-            </p>
-            <p class="mt-2">
-              However, before giving up, try <.link
-                href="/articles/IDGuide#troubleshooting"
-                class="underline"
-              >altering your filter choices</.link>.
-            </p>
+            <%= if @unscoped_count > 0 do %>
+              <p>
+                No galls found in <strong>{@continent_name || "your selected region"}</strong>, but
+                there {if @unscoped_count == 1, do: "is", else: "are"}
+                <strong>{@unscoped_count}</strong>
+                {if @unscoped_count == 1, do: "gall", else: "galls"} matching your filters in other regions.
+                Try changing your region or selecting "All Regions" to see them.
+              </p>
+            <% else %>
+              <p>
+                There are no galls that match your filter. It's possible there are no described species that fit this set of traits and your gall is undescribed.
+              </p>
+              <p class="mt-2">
+                However, before giving up, try <.link
+                  href="/articles/IDGuide#troubleshooting"
+                  class="underline"
+                >altering your filter choices</.link>.
+              </p>
+            <% end %>
           </div>
         <% else %>
           <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">

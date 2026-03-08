@@ -469,6 +469,37 @@ defmodule GallformersWeb.IDLiveTest do
     end
   end
 
+  describe "Region scope hint" do
+    test "shows hint when region filter produces zero results but other regions have galls", %{
+      conn: conn
+    } do
+      # GenusAlpha has galls 100 and 101 in North America (via California host ranges).
+      # Selecting Europe as region should produce 0 results with a hint.
+      {:ok, view, _html} = live(conn, ~p"/id?g=GenusAlpha&gt=genus")
+
+      # Verify galls exist without region filter
+      html = render(view)
+      assert html =~ "Showing"
+
+      # Set region to Europe — GenusAlpha has no galls there
+      html = render_click(view, "change_region", %{"code" => "XE"})
+
+      # Should show a hint about galls existing in other regions
+      assert html =~ "other regions"
+    end
+
+    test "does not show hint when no region filter is active and results are empty", %{
+      conn: conn
+    } do
+      # Use impossible filter combination to get 0 results without region scope
+      {:ok, _view, html} =
+        live(conn, ~p"/id?g=GenusAlpha&gt=genus&de=integral&co=99&sh=99")
+
+      # Should show the normal "no galls match" message, not the region hint
+      refute html =~ "other regions"
+    end
+  end
+
   describe "Page title" do
     test "sets appropriate page title", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/id")
