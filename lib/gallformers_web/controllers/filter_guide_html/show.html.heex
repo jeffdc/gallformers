@@ -1,0 +1,82 @@
+<Layouts.app flash={@flash} current_user={@current_user}>
+  <div class="max-w-4xl">
+    <h1 class="text-3xl font-bold text-gf-maroon mb-2">ID Tool Filter Guide</h1>
+    <p class="text-gray-600 mb-6">
+      This guide explains the filter terms used in our gall identification tool.
+    </p>
+
+    <%!-- Jump links --%>
+    <nav class="mb-8 flex flex-wrap gap-2">
+      <.jump_link href="#alignment">Alignment</.jump_link>
+      <.jump_link href="#cells">Cells</.jump_link>
+      <.jump_link href="#detachable">Detachable</.jump_link>
+      <.jump_link href="#forms">Forms</.jump_link>
+      <.jump_link href="#plant_part">Plant Part</.jump_link>
+      <.jump_link href="#shape">Shape</.jump_link>
+      <.jump_link href="#texture">Texture</.jump_link>
+      <.jump_link href="#walls">Walls</.jump_link>
+    </nav>
+
+    <div class="space-y-8">
+      <%!-- Alignment --%>
+      <.filter_section
+        id="alignment"
+        title="Alignment"
+        items={sort_by_field(@filter_fields.alignment)}
+      />
+
+      <%!-- Cells --%>
+      <.filter_section
+        id="cells"
+        title="Cells"
+        items={sort_by_field(@filter_fields.cells)}
+        note="If multiple larvae are found in one space, these may be inquilines rather than gall-inducers."
+      />
+
+      <%!-- Detachable (hardcoded values) --%>
+      <section id="detachable">
+        <h2 class="text-xl font-semibold text-gf-maroon mb-3 border-b border-gray-200 pb-2">
+          Detachable
+        </h2>
+        <dl class="space-y-2">
+          <div>
+            <dt class="inline font-medium text-gray-900">Yes</dt>
+            <dd class="inline text-gray-700">
+              – the gall could be removed from the plant without destroying the tissue it's attached to (detachable).
+            </dd>
+          </div>
+          <div>
+            <dt class="inline font-medium text-gray-900">No</dt>
+            <dd class="inline text-gray-700">
+              – the gall could only be removed from the plant by destroying the tissue it's attached to (integral).
+            </dd>
+          </div>
+        </dl>
+        <p class="mt-3 text-sm text-gray-600 italic">
+          Note: Galls that have detachable parts but leave some galled tissue behind (more than a scar
+          or blister), are only detachable in some parts of the season, or may be detachable or not, are
+          included in both terms.
+        </p>
+      </section>
+
+      <%!-- Forms --%>
+      <.filter_section id="forms" title="Forms" items={sort_by_field(@filter_fields.form)} />
+
+      <%!-- Plant Part --%>
+      <.filter_section
+        id="plant_part"
+        title="Plant Part"
+        items={sort_by_field(@filter_fields.plant_part)}
+      />
+
+      <%!-- Shape --%>
+      <.filter_section id="shape" title="Shape" items={sort_by_field(@filter_fields.shape)} />
+
+      <%!-- Texture --%>
+      <.filter_section id="texture" title="Texture" items={sort_by_field(@filter_fields.texture)} />
+
+      <%!-- Walls --%>
+      <.filter_section id="walls" title="Walls" items={sort_by_field(@filter_fields.walls)} />
+    </div>
+  </div>
+</Layouts.app>

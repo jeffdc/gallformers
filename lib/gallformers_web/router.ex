@@ -148,6 +148,14 @@ defmodule GallformersWeb.Router do
   scope "/", GallformersWeb do
     pipe_through :browser
 
+    # Controller-rendered pages (no WebSocket needed)
+    get "/about", AboutController, :show
+    get "/articles", ArticlesController, :index
+    get "/articles/:slug", ArticleController, :show
+    get "/privacy", PrivacyController, :show
+    get "/keys", KeysController, :index
+    get "/filterguide", FilterGuideController, :show
+
     live_session :public,
       on_mount: [
         {GallformersWeb.Live.UserAuth, :fetch_current_user},
@@ -158,13 +166,8 @@ defmodule GallformersWeb.Router do
       live "/", HomeLive
 
       # Content pages
-      live "/about", AboutLive
-      live "/privacy", PrivacyLive
       live "/analytics", AnalyticsLive
-      live "/filterguide", FilterGuideLive
       live "/glossary", GlossaryLive
-      live "/articles", ArticlesLive
-      live "/articles/:slug", ArticleLive
       live "/globalsearch", SearchLive
       live "/galls", GallsBrowseLive
       live "/hosts", HostsBrowseLive
@@ -174,7 +177,6 @@ defmodule GallformersWeb.Router do
       live "/id", IDLive
 
       # Identification Keys
-      live "/keys", KeysLive
       live "/keys/:slug", KeyLive
 
       # Entity pages

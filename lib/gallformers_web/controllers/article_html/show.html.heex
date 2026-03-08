@@ -1,0 +1,96 @@
+<Layouts.app flash={@flash} current_user={@current_user}>
+  <div class="mx-auto max-w-4xl">
+    <%!-- Draft preview banner --%>
+    <div
+      :if={@is_draft_preview}
+      class="mb-6 px-4 py-3 bg-yellow-100 border border-yellow-300 rounded-lg"
+    >
+      <div class="flex items-center gap-2 text-yellow-800">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+          />
+        </svg>
+        <span class="font-medium">Draft Preview</span>
+        <span class="text-sm">
+          — This article is not published and only visible to administrators.
+        </span>
+      </div>
+    </div>
+
+    <%!-- Back link --%>
+    <div class="mb-6">
+      <.link
+        href={~p"/articles"}
+        class="hover:underline inline-flex items-center gap-1"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15 19l-7-7 7-7"
+          />
+        </svg>
+        Back to Articles
+      </.link>
+    </div>
+
+    <%!-- Article header --%>
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold text-gf-maroon mb-4">
+        <span class="inline-flex items-center gap-3">
+          {@article.title}
+          <.link
+            :if={@is_admin}
+            navigate={~p"/admin/articles/#{@article.id}"}
+            class="text-gray-400 hover:text-gf-maroon"
+            title="Edit in admin"
+          >
+            <.icon name="ph-pencil-simple" class="h-5 w-5" />
+          </.link>
+        </span>
+      </h1>
+      <div class="flex flex-wrap items-center gap-4 text-gray-600">
+        <span>By {@article.author}</span>
+        <span>•</span>
+        <span>{format_date(display_date(@article))}</span>
+        <span :if={@article.updated_at != @article.inserted_at} class="text-sm text-gray-500">
+          (Updated {format_date(@article.updated_at)})
+        </span>
+      </div>
+      <div :if={@article.tags != []} class="flex flex-wrap gap-2 mt-4">
+        <.link
+          :for={tag <- @article.tags}
+          href={~p"/articles?tag=#{tag}"}
+          class="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full hover:bg-gray-200 transition-colors"
+        >
+          {tag}
+        </.link>
+      </div>
+    </header>
+
+    <%!-- Article content --%>
+    <article class="prose prose-lg max-w-none">
+      {Phoenix.HTML.raw(@rendered_content)}
+    </article>
+
+    <%!-- Related articles --%>
+    <aside :if={@related_articles != []} class="mt-12 pt-8 border-t border-gray-200">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">Related Articles</h2>
+      <div class="space-y-4">
+        <.link
+          :for={related <- @related_articles}
+          href={~p"/articles/#{related.slug}"}
+          class="block p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+        >
+          <h3 class="font-medium hover:underline">{related.title}</h3>
+          <p class="text-sm text-gray-500 mt-1">By {related.author}</p>
+        </.link>
+      </div>
+    </aside>
+  </div>
+</Layouts.app>

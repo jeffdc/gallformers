@@ -1,0 +1,151 @@
+<Layouts.app flash={@flash} current_user={@current_user}>
+  <div>
+    <h1 class="text-3xl font-bold text-gf-maroon mb-8">Privacy Policy</h1>
+
+    <div class="prose prose-lg max-w-none">
+      <h2>Privacy-Protecting Analytics</h2>
+      <p>
+        Gallformers uses a custom analytics system designed to respect visitor privacy while providing useful
+        insights for site improvement. We believe in transparency about data collection and have built our
+        analytics from the ground up to protect your privacy.
+      </p>
+
+      <h3>How It Works</h3>
+      <p>
+        We generate a daily visitor ID by hashing your IP address with a salt that changes every 24 hours. This
+        cryptographic hash allows us to count unique daily visitors without storing any personally identifiable
+        information. The process is one-way - we cannot reverse the hash to discover your IP address.
+      </p>
+      <p>
+        Once the daily salt changes (at midnight UTC), all previous visitor IDs become invalid and cannot be
+        recreated. This makes cross-day tracking technically impossible, even if we wanted to do it.
+      </p>
+      <p>
+        The analytics system is fully open source and can be inspected on GitHub. View the implementation:
+        <.link
+          href="https://github.com/jeffdc/gallformers/blob/main/lib/gallformers/analytics.ex"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Analytics module
+        </.link>
+        and <.link
+          href="https://github.com/jeffdc/gallformers/blob/main/lib/gallformers_web/plugs/analytics.ex"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Analytics plug
+        </.link>.
+      </p>
+
+      <h3>View Live Analytics</h3>
+      <p>
+        You can view real-time site analytics at our public <.link
+          href="/analytics"
+          class="text-gf-maroon hover:underline"
+        >
+          Analytics page
+        </.link>, which shows the same data collected using this privacy-protecting approach.
+      </p>
+
+      <h3>What We Don't Store</h3>
+      <ul>
+        <li><strong>IP Addresses:</strong> Never stored or logged</li>
+        <li>
+          <strong>User Agents:</strong>
+          Not stored in full - only the browser family and device type are extracted
+        </li>
+        <li><strong>Cookies:</strong> No tracking cookies are set</li>
+        <li>
+          <strong>Cross-Session Data:</strong> We cannot track you across sessions or days
+        </li>
+        <li>
+          <strong>Personal Information:</strong>
+          No email addresses, names, or other identifying information
+        </li>
+      </ul>
+
+      <h3>What We Do Collect</h3>
+      <p>
+        The following information is collected and aggregated for statistical purposes only:
+      </p>
+      <ul>
+        <li>
+          <strong>Page Paths:</strong> Which pages are visited (e.g., "/about", "/gall/123")
+        </li>
+        <li>
+          <strong>Referrer Domains:</strong>
+          Where visitors come from (e.g., "google.com", "twitter.com")
+        </li>
+        <li><strong>Device Types:</strong> Whether you're on mobile, tablet, or desktop</li>
+        <li>
+          <strong>Browser Families:</strong>
+          General browser category (e.g., "Chrome", "Firefox", "Safari")
+        </li>
+        <li>
+          <strong>Daily Unique Visitors:</strong>
+          Count of unique visitors per day (using the hashed ID)
+        </li>
+      </ul>
+
+      <h3>Data Retention</h3>
+      <p>
+        Analytics data is retained indefinitely in aggregate form to help us understand long-term trends and site
+        usage patterns. However, since we only store the daily hashed visitor ID (which changes every 24 hours),
+        there is no way to connect visits across different days or identify individual users.
+      </p>
+
+      <h3>No Third-Party Trackers</h3>
+      <p>
+        Gallformers does not use Google Analytics, Facebook Pixel, or any other third-party tracking services. All
+        analytics are performed in-house using our custom system.
+      </p>
+
+      <h3>Authentication (Auth0)</h3>
+      <p>
+        If you log in to Gallformers to become an administrator, we use Auth0 for authentication. When you
+        authenticate, Auth0 may collect information according to their privacy policy. We only receive and store:
+      </p>
+      <ul>
+        <li>Your Auth0 user ID</li>
+        <li>Your email address (if you provide it)</li>
+        <li>Your display name and profile picture (if you provide them)</li>
+      </ul>
+      <p>
+        This information is used solely for authentication and attribution of your contributions to the site.
+      </p>
+
+      <h3>Cookies</h3>
+      <p>
+        Gallformers uses session cookies for authenticated users (administrators) to maintain login state. These
+        cookies are essential for the site to function and do not track your behavior. No cookies are set for
+        anonymous visitors.
+      </p>
+
+      <h3>External Services</h3>
+      <p>
+        Gallformers uses the following external services:
+      </p>
+      <ul>
+        <li><strong>AWS S3:</strong> For hosting images</li>
+        <li><strong>Fly.io:</strong> For application hosting</li>
+        <li><strong>Auth0:</strong> For user authentication (administrators only)</li>
+      </ul>
+
+      <h3>Changes to This Policy</h3>
+      <p>
+        We may update this privacy policy from time to time. Any changes will be posted on this page with an
+        updated revision date. We encourage you to review this policy periodically.
+      </p>
+
+      <h3>Contact Us</h3>
+      <p>
+        If you have questions about this privacy policy or our data practices, please contact us at <.link href="mailto:gallformers@gmail.com">gallformers@gmail.com</.link>.
+      </p>
+
+      <p class="text-sm text-gray-500 mt-12">
+        Last updated: January 31, 2026
+      </p>
+    </div>
+  </div>
+</Layouts.app>

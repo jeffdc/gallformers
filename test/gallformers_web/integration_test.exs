@@ -22,8 +22,8 @@ defmodule GallformersWeb.IntegrationTest do
     end
 
     test "about page loads successfully", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/about")
-      assert is_binary(html)
+      conn = get(conn, ~p"/about")
+      assert html_response(conn, 200) =~ "About Us"
     end
 
     test "glossary page loads successfully", %{conn: conn} do
@@ -32,8 +32,8 @@ defmodule GallformersWeb.IntegrationTest do
     end
 
     test "filter guide page loads successfully", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/filterguide")
-      assert is_binary(html)
+      conn = get(conn, ~p"/filterguide")
+      assert html_response(conn, 200) =~ "ID Tool Filter Guide"
     end
 
     test "galls browse page loads successfully", %{conn: conn} do
@@ -52,8 +52,8 @@ defmodule GallformersWeb.IntegrationTest do
     end
 
     test "articles page loads successfully", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/articles")
-      assert is_binary(html)
+      conn = get(conn, ~p"/articles")
+      assert html_response(conn, 200) =~ "Articles"
     end
 
     test "ID tool page loads successfully", %{conn: conn} do
