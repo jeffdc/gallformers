@@ -153,7 +153,6 @@ defmodule GallformersWeb.Router do
     get "/articles", ArticlesController, :index
     get "/articles/:slug", ArticleController, :show
     get "/privacy", PrivacyController, :show
-    get "/keys", KeysController, :index
     get "/filterguide", FilterGuideController, :show
 
     live_session :public,
@@ -177,6 +176,7 @@ defmodule GallformersWeb.Router do
       live "/id", IDLive
 
       # Identification Keys
+      live "/keys", KeysLive
       live "/keys/:slug", KeyLive
 
       # Entity pages
