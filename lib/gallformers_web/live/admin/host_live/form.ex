@@ -88,12 +88,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     host_id = host.id
     aliases = Plants.get_aliases_for_host_full(host_id)
     place_entries = Ranges.get_places_for_host_with_precision(host_id)
-
-    range_entries =
-      Map.new(place_entries, fn entry ->
-        {entry.code,
-         %{precision: entry.precision, distribution_type: entry[:distribution_type] || "native"}}
-      end)
+    range_entries = place_entries_to_range_entries(place_entries)
 
     taxonomy = Taxonomy.get_taxonomy_for_species(host_id)
 
@@ -289,19 +284,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
          })}
 
       data ->
-        tdwg_lookup = Wcvp.Tdwg.load()
-        native_places = Wcvp.Tdwg.convert_tdwg_codes(data.native_distribution, tdwg_lookup)
-        native_codes = MapSet.new(native_places, & &1.code)
-
-        introduced_places =
-          Wcvp.Tdwg.convert_tdwg_codes(data.introduced_distribution, tdwg_lookup)
-
-        introduced_codes = MapSet.new(introduced_places, & &1.code)
-
-        diff =
-          Plants.compute_powo_diff(socket.assigns.range_entries, native_codes, introduced_codes)
-
-        {:noreply, assign(socket, :powo_diff, Map.put(diff, :wcvp_data, data))}
+        diff = build_powo_diff(data, socket.assigns.range_entries)
+        {:noreply, assign(socket, :powo_diff, diff)}
     end
   end
 
@@ -347,22 +331,12 @@ defmodule GallformersWeb.Admin.HostLive.Form do
         {:noreply, put_flash(socket, :error, "WCVP species not found")}
 
       data ->
-        tdwg_lookup = Wcvp.Tdwg.load()
-        native_places = Wcvp.Tdwg.convert_tdwg_codes(data.native_distribution, tdwg_lookup)
-        native_codes = MapSet.new(native_places, & &1.code)
-
-        introduced_places =
-          Wcvp.Tdwg.convert_tdwg_codes(data.introduced_distribution, tdwg_lookup)
-
-        introduced_codes = MapSet.new(introduced_places, & &1.code)
-
-        diff =
-          Plants.compute_powo_diff(socket.assigns.range_entries, native_codes, introduced_codes)
+        diff = build_powo_diff(data, socket.assigns.range_entries)
 
         {:noreply,
          socket
          |> assign(:wcvp_nomatch_search, nil)
-         |> assign(:powo_diff, Map.put(diff, :wcvp_data, data))}
+         |> assign(:powo_diff, diff)}
     end
   end
 
@@ -507,7 +481,33 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
       %{distribution_type: "introduced"} ->
         Map.delete(range_entries, code)
+
+      # Defensive: treat unknown distribution_type as removal
+      %{} ->
+        Map.delete(range_entries, code)
     end
+  end
+
+  defp place_entries_to_range_entries(place_entries) do
+    Map.new(place_entries, fn entry ->
+      {entry.code,
+       %{precision: entry.precision, distribution_type: entry[:distribution_type] || "native"}}
+    end)
+  end
+
+  # Converts WCVP data to a POWO diff map with :wcvp_data attached.
+  defp build_powo_diff(wcvp_data, range_entries) do
+    tdwg_lookup = Wcvp.Tdwg.load()
+    native_places = Wcvp.Tdwg.convert_tdwg_codes(wcvp_data.native_distribution, tdwg_lookup)
+    native_codes = MapSet.new(native_places, & &1.code)
+
+    introduced_places =
+      Wcvp.Tdwg.convert_tdwg_codes(wcvp_data.introduced_distribution, tdwg_lookup)
+
+    introduced_codes = MapSet.new(introduced_places, & &1.code)
+
+    Plants.compute_powo_diff(range_entries, native_codes, introduced_codes)
+    |> Map.put(:wcvp_data, wcvp_data)
   end
 
   # Computes @in_range (exact codes) and @inherited_range (expanded country codes)
@@ -806,15 +806,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
       {:ok, updated_host} ->
         aliases = Plants.get_aliases_for_host_full(host_id)
         place_entries = Ranges.get_places_for_host_with_precision(host_id)
-
-        range_entries =
-          Map.new(place_entries, fn entry ->
-            {entry.code,
-             %{
-               precision: entry.precision,
-               distribution_type: entry[:distribution_type] || "native"
-             }}
-          end)
+        range_entries = place_entries_to_range_entries(place_entries)
 
         taxonomy = Taxonomy.get_taxonomy_for_species(host_id)
 
@@ -951,23 +943,9 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
   @impl true
   def handle_info({CountryDrillDown, {:cycle_entry, code}}, socket) do
-    range_entries = socket.assigns.range_entries
-
-    new_entries =
-      case Map.get(range_entries, code) do
-        nil ->
-          Map.put(range_entries, code, %{precision: "exact", distribution_type: "native"})
-
-        %{distribution_type: "native"} ->
-          Map.put(range_entries, code, %{precision: "exact", distribution_type: "introduced"})
-
-        %{distribution_type: "introduced"} ->
-          Map.delete(range_entries, code)
-      end
-
     {:noreply,
      socket
-     |> assign(:range_entries, new_entries)
+     |> assign(:range_entries, cycle_range_entry(socket.assigns.range_entries, code))
      |> compute_map_range()
      |> mark_dirty()}
   end
@@ -1322,7 +1300,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
               </div>
               <p class="text-gray-500 mt-1">
                 <%= if @host_traits.wcvp_synced_at do %>
-                  Last synced with WCVP: {Calendar.strftime(@host_traits.wcvp_synced_at, "%b %d, %Y")}
+                  Last synced with WCVP: {format_date(@host_traits.wcvp_synced_at, :short)}
                   <%= if @wcvp_built_at && DateTime.compare(@host_traits.wcvp_synced_at, @wcvp_built_at) == :lt do %>
                     <span class="text-amber-600 font-medium">
                       — WCVP data updated since last sync

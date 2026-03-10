@@ -589,7 +589,6 @@ defmodule Gallformers.Plants do
   defp update_species_section_link(nil, _new, _old), do: :ok
 
   defp update_species_section_link(species_id, new_section_id, old_section_id) do
-    import Ecto.Query
 
     # Remove old section link if any
     if old_section_id do
@@ -734,7 +733,7 @@ defmodule Gallformers.Plants do
       left_join: f in "taxonomy",
       on: f.id == g.parent_id and f.type == "family",
       where: s.taxoncode == "plant",
-      group_by: [s.id]
+      group_by: [s.id, s.name]
     )
     |> apply_range_review_filter(filter, wcvp_built_at)
     |> apply_wcvp_match_filter(wcvp_match)

@@ -70,20 +70,13 @@ defmodule Gallformers.Wcvp.Lookup do
     pattern = "#{query}%"
 
     base =
-      from(n in "wcvp_names",
+      from(n in name_query(),
         where: like(n.taxon_name, ^pattern),
         order_by: n.taxon_name,
         limit: ^limit,
-        select: %{
-          plant_name_id: n.plant_name_id,
-          taxon_name: n.taxon_name,
+        select_merge: %{
           taxon_status: n.taxon_status,
-          accepted_plant_name_id: n.accepted_plant_name_id,
-          family: n.family,
-          genus: n.genus,
-          species: n.species,
-          taxon_authors: n.taxon_authors,
-          powo_id: n.powo_id
+          accepted_plant_name_id: n.accepted_plant_name_id
         }
       )
 
@@ -125,19 +118,12 @@ defmodule Gallformers.Wcvp.Lookup do
       |> Enum.map(&"%#{String.downcase(&1)}%")
 
     base =
-      from(n in "wcvp_names",
+      from(n in name_query(),
         order_by: n.taxon_name,
         limit: ^limit,
-        select: %{
-          plant_name_id: n.plant_name_id,
-          taxon_name: n.taxon_name,
+        select_merge: %{
           taxon_status: n.taxon_status,
-          accepted_plant_name_id: n.accepted_plant_name_id,
-          family: n.family,
-          genus: n.genus,
-          species: n.species,
-          taxon_authors: n.taxon_authors,
-          powo_id: n.powo_id
+          accepted_plant_name_id: n.accepted_plant_name_id
         }
       )
 
@@ -169,19 +155,10 @@ defmodule Gallformers.Wcvp.Lookup do
   @spec match_by_name(String.t()) :: map() | nil
   def match_by_name(name) do
     Repo.WCVP.one(
-      from(n in "wcvp_names",
+      from(n in name_query(),
         where: n.taxon_name == ^name and n.taxon_status == "Accepted",
         limit: 1,
-        select: %{
-          plant_name_id: n.plant_name_id,
-          taxon_name: n.taxon_name,
-          taxon_status: n.taxon_status,
-          family: n.family,
-          genus: n.genus,
-          species: n.species,
-          taxon_authors: n.taxon_authors,
-          powo_id: n.powo_id
-        }
+        select_merge: %{taxon_status: n.taxon_status}
       )
     )
   rescue
@@ -199,20 +176,7 @@ defmodule Gallformers.Wcvp.Lookup do
   """
   @spec get(String.t()) :: map() | nil
   def get(plant_name_id) do
-    case Repo.WCVP.one(
-           from(n in "wcvp_names",
-             where: n.plant_name_id == ^plant_name_id,
-             select: %{
-               plant_name_id: n.plant_name_id,
-               taxon_name: n.taxon_name,
-               family: n.family,
-               genus: n.genus,
-               species: n.species,
-               taxon_authors: n.taxon_authors,
-               powo_id: n.powo_id
-             }
-           )
-         ) do
+    case Repo.WCVP.one(from(n in name_query(), where: n.plant_name_id == ^plant_name_id)) do
       nil ->
         nil
 
@@ -269,18 +233,9 @@ defmodule Gallformers.Wcvp.Lookup do
 
       %{accepted_plant_name_id: accepted_id} ->
         Repo.WCVP.one(
-          from(n in "wcvp_names",
+          from(n in name_query(),
             where: n.plant_name_id == ^accepted_id,
-            select: %{
-              plant_name_id: n.plant_name_id,
-              taxon_name: n.taxon_name,
-              taxon_status: n.taxon_status,
-              family: n.family,
-              genus: n.genus,
-              species: n.species,
-              taxon_authors: n.taxon_authors,
-              powo_id: n.powo_id
-            }
+            select_merge: %{taxon_status: n.taxon_status}
           )
         )
     end
@@ -288,5 +243,21 @@ defmodule Gallformers.Wcvp.Lookup do
     _ -> nil
   catch
     :exit, _ -> nil
+  end
+
+  # Base query with the 7 core name fields shared across all lookup functions.
+  # Callers use select_merge to add taxon_status, accepted_plant_name_id, etc.
+  defp name_query do
+    from(n in "wcvp_names",
+      select: %{
+        plant_name_id: n.plant_name_id,
+        taxon_name: n.taxon_name,
+        family: n.family,
+        genus: n.genus,
+        species: n.species,
+        taxon_authors: n.taxon_authors,
+        powo_id: n.powo_id
+      }
+    )
   end
 end

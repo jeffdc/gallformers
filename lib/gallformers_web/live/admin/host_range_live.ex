@@ -259,10 +259,7 @@ defmodule GallformersWeb.Admin.HostRangeLive do
   end
 
   defp format_synced_at(nil), do: "Never"
-
-  defp format_synced_at(datetime) do
-    Calendar.strftime(datetime, "%b %d, %Y")
-  end
+  defp format_synced_at(datetime), do: format_date(datetime, :short)
 
   # ============================================
   # Template
@@ -285,7 +282,7 @@ defmodule GallformersWeb.Admin.HostRangeLive do
             <span class="text-sm text-gray-500">
               {@total_count} host(s)
               <span :if={@wcvp_built_at} class="text-xs text-gray-400 ml-2">
-                WCVP data: {Calendar.strftime(@wcvp_built_at, "%b %d, %Y")}
+                WCVP data: {format_date(@wcvp_built_at, :short)}
               </span>
             </span>
           </div>

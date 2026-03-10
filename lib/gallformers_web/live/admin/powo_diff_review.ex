@@ -190,8 +190,7 @@ defmodule GallformersWeb.Admin.PowoDiffReview do
   # Per-bucket event handlers generated from bucket config.
   # Each bucket gets toggle_item, toggle_group, expand_group, select_all, deselect_all.
 
-  for bucket <-
-        ~w(add_native add_introduced remove reclassify_to_introduced reclassify_to_native)a do
+  for bucket <- @buckets do
     bid =
       case bucket do
         :add_native -> "add-native"

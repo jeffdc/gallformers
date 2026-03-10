@@ -45,8 +45,10 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
 
   def update(assigns, socket) do
     range_entries = Map.get(assigns, :range_entries, socket.assigns[:range_entries] || %{})
-    exact_codes = for {code, %{precision: "exact"}} <- range_entries, do: code
-    introduced_codes = for {code, %{distribution_type: "introduced"}} <- range_entries, do: code
+    exact_codes = for({code, %{precision: "exact"}} <- range_entries, do: code) |> MapSet.new()
+
+    introduced_codes =
+      for({code, %{distribution_type: "introduced"}} <- range_entries, do: code) |> MapSet.new()
 
     {:ok,
      socket

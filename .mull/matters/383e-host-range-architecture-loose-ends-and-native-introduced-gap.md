@@ -86,3 +86,8 @@ All buckets default to "accept POWO" (all selected). Admin can uncheck individua
 ### Sequencing
 
 Layers 1+2 execute together on branch be9d. Layer 3 is a separate branch after be9d merges.
+
+### Known limitation: range review family column
+
+The `base_range_review_query` in `Plants` joins genus→family via direct `parent_id`, which skips intermediate taxonomy ranks (subfamily, tribe). Hosts with intermediate ranks will show "---" for Family in the host range review table. The recursive CTE approach from `get_hosts_tree` would fix this but adds query complexity. Tracking here for awareness — affects UX only, not data correctness.
+
