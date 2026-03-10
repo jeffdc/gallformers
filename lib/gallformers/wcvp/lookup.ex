@@ -12,6 +12,33 @@ defmodule Gallformers.Wcvp.Lookup do
   alias Gallformers.Repo
 
   @doc """
+  Returns the built_at timestamp from the WCVP database meta table.
+  Returns nil if the repo is unavailable or the meta table doesn't exist.
+  """
+  @spec built_at() :: DateTime.t() | nil
+  def built_at do
+    case Repo.WCVP.one(
+           from(m in "meta",
+             where: m.key == "built_at",
+             select: m.value
+           )
+         ) do
+      nil ->
+        nil
+
+      iso_string ->
+        case DateTime.from_iso8601(iso_string) do
+          {:ok, dt, _offset} -> dt
+          _ -> nil
+        end
+    end
+  rescue
+    _ -> nil
+  catch
+    :exit, _ -> nil
+  end
+
+  @doc """
   Returns whether the WCVP repo is started and queryable.
   """
   @spec available?() :: boolean()
@@ -134,6 +161,36 @@ defmodule Gallformers.Wcvp.Lookup do
   end
 
   @doc """
+  Finds a WCVP accepted name record by exact species name match.
+
+  Returns the matching record as a map (same shape as search results)
+  or nil if no match found. Only matches accepted names.
+  """
+  @spec match_by_name(String.t()) :: map() | nil
+  def match_by_name(name) do
+    Repo.WCVP.one(
+      from(n in "wcvp_names",
+        where: n.taxon_name == ^name and n.taxon_status == "Accepted",
+        limit: 1,
+        select: %{
+          plant_name_id: n.plant_name_id,
+          taxon_name: n.taxon_name,
+          taxon_status: n.taxon_status,
+          family: n.family,
+          genus: n.genus,
+          species: n.species,
+          taxon_authors: n.taxon_authors,
+          powo_id: n.powo_id
+        }
+      )
+    )
+  rescue
+    _ -> nil
+  catch
+    :exit, _ -> nil
+  end
+
+  @doc """
   Exact lookup by plant_name_id.
 
   Returns a map with all name fields plus `:native_distribution` and
@@ -162,13 +219,15 @@ defmodule Gallformers.Wcvp.Lookup do
       name ->
         distributions =
           from(d in "wcvp_distributions",
-            where: d.plant_name_id == ^plant_name_id,
+            where:
+              d.plant_name_id == ^plant_name_id and
+                d.extinct == "0" and d.location_doubtful == "0",
             order_by: d.area_code_l3,
             select: %{area_code_l3: d.area_code_l3, introduced: d.introduced}
           )
           |> Repo.WCVP.all()
 
-        {introduced, native} = Enum.split_with(distributions, &(&1.introduced == 1))
+        {introduced, native} = Enum.split_with(distributions, &(&1.introduced == "1"))
 
         name
         |> Map.put(:native_distribution, Enum.map(native, & &1.area_code_l3))

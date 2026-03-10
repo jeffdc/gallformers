@@ -17,8 +17,6 @@ Two supporting files work alongside the database:
 Wcvp.Lookup          — search/get queries against Repo.WCVP (wcvp.sqlite)
 Wcvp.Tdwg            — TDWG-to-places mapping (reads tdwg_to_places.json)
 Wcvp.Refresh         — downloads wcvp.sqlite from public S3, hot-swaps the repo
-Wcvp.Matcher         — three-pass name matching (exact, fuzzy, synonym)
-Wcvp.Reader          — streams raw WCVP CSV files (pipe-delimited)
 Repo.WCVP            — read-only Ecto repo for the secondary database
 ```
 

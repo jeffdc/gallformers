@@ -5,6 +5,7 @@ defmodule Gallformers.PlantsTest do
   use Gallformers.DataCase, async: false
 
   alias Gallformers.Plants
+  alias Gallformers.Plants.HostTraits
   alias Gallformers.Ranges
   alias Gallformers.Species.Species
   alias Gallformers.Taxonomy
@@ -135,7 +136,7 @@ defmodule Gallformers.PlantsTest do
 
     test "creates host_traits with WCVP and POWO IDs", %{species: species} do
       {:ok, traits} =
-        Repo.insert(%Gallformers.Plants.HostTraits{
+        Repo.insert(%HostTraits{
           species_id: species.id,
           wcvp_id: "12345",
           powo_id: "urn:lsid:ipni.org:names:12345-1"
@@ -147,18 +148,18 @@ defmodule Gallformers.PlantsTest do
     end
 
     test "creates host_traits with range_confirmed defaulting to false", %{species: species} do
-      {:ok, traits} = Repo.insert(%Gallformers.Plants.HostTraits{species_id: species.id})
+      {:ok, traits} = Repo.insert(%HostTraits{species_id: species.id})
       assert traits.range_confirmed == false
       assert traits.wcvp_synced_at == nil
     end
 
     test "updates range_confirmed and wcvp_synced_at", %{species: species} do
-      {:ok, traits} = Repo.insert(%Gallformers.Plants.HostTraits{species_id: species.id})
+      {:ok, traits} = Repo.insert(%HostTraits{species_id: species.id})
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       {:ok, updated} =
         traits
-        |> Gallformers.Plants.HostTraits.changeset(%{range_confirmed: true, wcvp_synced_at: now})
+        |> HostTraits.changeset(%{range_confirmed: true, wcvp_synced_at: now})
         |> Repo.update()
 
       assert updated.range_confirmed == true
@@ -167,7 +168,7 @@ defmodule Gallformers.PlantsTest do
 
     test "species can preload host_traits", %{species: species} do
       {:ok, _} =
-        Repo.insert(%Gallformers.Plants.HostTraits{
+        Repo.insert(%HostTraits{
           species_id: species.id,
           wcvp_id: "99999"
         })
@@ -255,12 +256,9 @@ defmodule Gallformers.PlantsTest do
         species_attrs: %{"datacomplete" => true},
         alias_changes: {[], []},
         place_changes: %{
-          original_exact_places: [],
-          original_country_places: [],
-          exact_places: [],
-          country_places: [],
-          all_places: [],
-          introduced_place_codes: MapSet.new()
+          range_entries: %{},
+          original_range_entries: %{},
+          all_places: []
         },
         section_update: %{
           genus_id: genus.id,
@@ -283,12 +281,11 @@ defmodule Gallformers.PlantsTest do
         species_attrs: %{},
         alias_changes: {[], []},
         place_changes: %{
-          original_exact_places: [],
-          original_country_places: [],
-          exact_places: [place.code],
-          country_places: [],
-          all_places: all_places,
-          introduced_place_codes: MapSet.new()
+          range_entries: %{
+            place.code => %{precision: "exact", distribution_type: "native"}
+          },
+          original_range_entries: %{},
+          all_places: all_places
         },
         section_update: %{
           genus_id: genus.id,
@@ -309,12 +306,9 @@ defmodule Gallformers.PlantsTest do
         species_attrs: %{"name" => ""},
         alias_changes: {[], []},
         place_changes: %{
-          original_exact_places: [],
-          original_country_places: [],
-          exact_places: [],
-          country_places: [],
-          all_places: [],
-          introduced_place_codes: MapSet.new()
+          range_entries: %{},
+          original_range_entries: %{},
+          all_places: []
         },
         section_update: %{
           genus_id: genus.id,
@@ -326,6 +320,164 @@ defmodule Gallformers.PlantsTest do
 
       assert {:error, %Ecto.Changeset{}} =
                Plants.update_host_with_associations(species, params)
+    end
+  end
+
+  describe "compute_powo_diff/3" do
+    test "empty range with POWO data returns add_native and add_introduced" do
+      range_entries = %{}
+      native_codes = MapSet.new(["US-AL", "US-CA"])
+      introduced_codes = MapSet.new(["CA-ON"])
+
+      result = Plants.compute_powo_diff(range_entries, native_codes, introduced_codes)
+
+      assert Enum.sort(result.add_native) == ["US-AL", "US-CA"]
+      assert result.add_introduced == ["CA-ON"]
+      assert result.remove == []
+      assert result.reclassify_to_introduced == []
+      assert result.reclassify_to_native == []
+      assert result.agree_count == 0
+      assert result.has_changes == true
+    end
+
+    test "exact match returns agree_count and no changes" do
+      range_entries = %{
+        "US-AL" => %{precision: "exact", distribution_type: "native"},
+        "CA-ON" => %{precision: "exact", distribution_type: "introduced"}
+      }
+
+      native_codes = MapSet.new(["US-AL"])
+      introduced_codes = MapSet.new(["CA-ON"])
+
+      result = Plants.compute_powo_diff(range_entries, native_codes, introduced_codes)
+
+      assert result.add_native == []
+      assert result.add_introduced == []
+      assert result.remove == []
+      assert result.reclassify_to_introduced == []
+      assert result.reclassify_to_native == []
+      assert result.agree_count == 2
+      assert result.has_changes == false
+    end
+
+    test "range has places POWO doesn't lists them in remove" do
+      range_entries = %{
+        "US-AL" => %{precision: "exact", distribution_type: "native"},
+        "US-CA" => %{precision: "exact", distribution_type: "introduced"}
+      }
+
+      native_codes = MapSet.new()
+      introduced_codes = MapSet.new()
+
+      result = Plants.compute_powo_diff(range_entries, native_codes, introduced_codes)
+
+      assert Enum.sort(result.remove) == ["US-AL", "US-CA"]
+      assert result.add_native == []
+      assert result.add_introduced == []
+      assert result.agree_count == 0
+      assert result.has_changes == true
+    end
+
+    test "range has native but POWO says introduced → reclassify_to_introduced" do
+      range_entries = %{
+        "US-AL" => %{precision: "exact", distribution_type: "native"}
+      }
+
+      native_codes = MapSet.new()
+      introduced_codes = MapSet.new(["US-AL"])
+
+      result = Plants.compute_powo_diff(range_entries, native_codes, introduced_codes)
+
+      assert result.reclassify_to_introduced == ["US-AL"]
+      assert result.reclassify_to_native == []
+      assert result.remove == []
+      assert result.agree_count == 0
+      assert result.has_changes == true
+    end
+
+    test "range has introduced but POWO says native → reclassify_to_native" do
+      range_entries = %{
+        "US-AL" => %{precision: "exact", distribution_type: "introduced"}
+      }
+
+      native_codes = MapSet.new(["US-AL"])
+      introduced_codes = MapSet.new()
+
+      result = Plants.compute_powo_diff(range_entries, native_codes, introduced_codes)
+
+      assert result.reclassify_to_native == ["US-AL"]
+      assert result.reclassify_to_introduced == []
+      assert result.remove == []
+      assert result.agree_count == 0
+      assert result.has_changes == true
+    end
+
+    test "mixed scenario distributes correctly across all buckets" do
+      range_entries = %{
+        "US-AL" => %{precision: "exact", distribution_type: "native"},
+        "US-CA" => %{precision: "exact", distribution_type: "introduced"},
+        "US-TX" => %{precision: "exact", distribution_type: "native"},
+        "US-FL" => %{precision: "exact", distribution_type: "introduced"},
+        "US-NY" => %{precision: "exact", distribution_type: "native"}
+      }
+
+      # US-AL: native in both → agree
+      # US-CA: we have introduced, POWO says native → reclassify_to_native
+      # US-TX: we have native, POWO says introduced → reclassify_to_introduced
+      # US-FL: introduced in both → agree
+      # US-NY: we have native, POWO doesn't list → remove
+      # CA-ON: POWO says native, we don't have → add_native
+      # CA-BC: POWO says introduced, we don't have → add_introduced
+      native_codes = MapSet.new(["US-AL", "US-CA", "CA-ON"])
+      introduced_codes = MapSet.new(["US-TX", "US-FL", "CA-BC"])
+
+      result = Plants.compute_powo_diff(range_entries, native_codes, introduced_codes)
+
+      assert result.add_native == ["CA-ON"]
+      assert result.add_introduced == ["CA-BC"]
+      assert result.remove == ["US-NY"]
+      assert result.reclassify_to_introduced == ["US-TX"]
+      assert result.reclassify_to_native == ["US-CA"]
+      assert result.agree_count == 2
+      assert result.has_changes == true
+
+      # No place appears in multiple buckets
+      all_changed =
+        result.add_native ++
+          result.add_introduced ++
+          result.remove ++ result.reclassify_to_introduced ++ result.reclassify_to_native
+
+      assert length(all_changed) == length(Enum.uniq(all_changed))
+    end
+
+    test "POWO data empty puts all current entries in remove" do
+      range_entries = %{
+        "US-AL" => %{precision: "exact", distribution_type: "native"},
+        "US-CA" => %{precision: "exact", distribution_type: "introduced"}
+      }
+
+      native_codes = MapSet.new()
+      introduced_codes = MapSet.new()
+
+      result = Plants.compute_powo_diff(range_entries, native_codes, introduced_codes)
+
+      assert Enum.sort(result.remove) == ["US-AL", "US-CA"]
+      assert result.add_native == []
+      assert result.add_introduced == []
+      assert result.agree_count == 0
+      assert result.has_changes == true
+    end
+
+    test "both empty returns no changes" do
+      result = Plants.compute_powo_diff(%{}, MapSet.new(), MapSet.new())
+
+      assert result.add_native == []
+      assert result.add_introduced == []
+      assert result.remove == []
+      assert result.reclassify_to_introduced == []
+      assert result.reclassify_to_native == []
+      assert result.agree_count == 0
+      assert result.has_changes == false
     end
   end
 end

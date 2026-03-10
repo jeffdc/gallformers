@@ -1520,6 +1520,7 @@ defmodule GallformersWeb.FormComponents do
   attr :text_class, :string, default: "text-gray-700"
   attr :heading_class, :string, default: "text-gray-700"
   attr :checkbox_class, :string, default: "text-gf-maroon focus:ring-gf-maroon"
+  attr :target, :any, default: nil, doc: "phx-target for events (use @myself for LiveComponents)"
 
   slot :group_footer, doc: "optional per-group content rendered when group is expanded"
 
@@ -1548,6 +1549,7 @@ defmodule GallformersWeb.FormComponents do
         <button
           type="button"
           phx-click={if @all_selected, do: @deselect_all_event, else: @select_all_event}
+          phx-target={@target}
           class={"text-xs #{@text_class} hover:underline"}
         >
           {if @all_selected, do: "Deselect all", else: "Select all"}
@@ -1564,12 +1566,14 @@ defmodule GallformersWeb.FormComponents do
               data-indeterminate={to_string(!gs.all_selected and !gs.none_selected)}
               phx-hook="IndeterminateCheckbox"
               phx-click={@toggle_group_event}
+              phx-target={@target}
               phx-value-group={to_string(group.id)}
               class={"rounded border-gray-300 #{@checkbox_class}"}
             />
             <button
               type="button"
               phx-click={@expand_group_event}
+              phx-target={@target}
               phx-value-group={to_string(group.id)}
               class={"flex items-center gap-1 text-xs font-medium #{@heading_class} hover:underline"}
             >
@@ -1586,6 +1590,7 @@ defmodule GallformersWeb.FormComponents do
                 type="checkbox"
                 checked={MapSet.member?(@selected, item.id)}
                 phx-click={@toggle_item_event}
+                phx-target={@target}
                 phx-value-id={to_string(item.id)}
                 class={"rounded border-gray-300 #{@checkbox_class}"}
               />

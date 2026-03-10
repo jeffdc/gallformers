@@ -1,5 +1,5 @@
 defmodule Gallformers.Repo.Migrations.AddRangeTrackingToHostTraits do
-  use Ecto.Migration
+  use Gallformers.Migration
 
   def change do
     alter table(:host_traits) do

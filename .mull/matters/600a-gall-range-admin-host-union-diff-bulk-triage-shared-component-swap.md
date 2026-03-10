@@ -4,7 +4,7 @@ created: 2026-03-10
 updated: 2026-03-10
 epic: geo-expansion
 relates: [383e, be9d, f6d4]
-needs: [0df8]
+needs: [0df8, 6b43]
 ---
 
 # Gall range admin — host-union diff, bulk triage, shared component swap
@@ -275,4 +275,3 @@ The PowoDiffReview component (Layer 2, Task 4) needs to support:
 - Configurable default selections per bucket (gall diff defaults `add_introduced` to unselected)
 - Bucket labels passed as props (host diff says "POWO native", gall diff says "Host native range")
 - This should be factored into Layer 2 design, not bolted on after.
-

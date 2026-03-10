@@ -19,7 +19,8 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
        open: false,
        country: nil,
        subdivisions: [],
-       country_level_on: false
+       country_level_on: false,
+       introduced_places: []
      )}
   end
 
@@ -29,7 +30,9 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
       Places.get_children(country.id)
       |> Enum.sort_by(& &1.name)
 
-    country_level_on = country.code in socket.assigns.country_places
+    range_entries = socket.assigns[:range_entries] || %{}
+    country_entry = Map.get(range_entries, country.code)
+    country_level_on = country_entry != nil and country_entry.precision == "country"
 
     {:ok,
      assign(socket,
@@ -41,7 +44,15 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
   end
 
   def update(assigns, socket) do
-    {:ok, assign(socket, Map.take(assigns, [:exact_places, :country_places, :all_places, :id]))}
+    range_entries = Map.get(assigns, :range_entries, socket.assigns[:range_entries] || %{})
+    exact_codes = for {code, %{precision: "exact"}} <- range_entries, do: code
+    introduced_codes = for {code, %{distribution_type: "introduced"}} <- range_entries, do: code
+
+    {:ok,
+     socket
+     |> assign(Map.take(assigns, [:range_entries, :all_places, :id]))
+     |> assign(:exact_places, exact_codes)
+     |> assign(:introduced_places, introduced_codes)}
   end
 
   @impl true
@@ -61,7 +72,7 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
 
   @impl true
   def handle_event("toggle_subdivision", %{"code" => code}, socket) do
-    notify_parent({:toggle_exact, code})
+    notify_parent({:cycle_entry, code})
     {:noreply, socket}
   end
 
@@ -136,11 +147,20 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
         <%!-- Subdivision list --%>
         <ul class="space-y-1">
           <li :for={subdiv <- @subdivisions} class="flex items-center">
-            <label class={[
-              "flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm cursor-pointer hover:bg-gray-50",
-              subdiv.code in @exact_places && "bg-green-50",
-              subdiv.code not in @exact_places && @country_level_on && "bg-emerald-50/50"
-            ]}>
+            <label
+              class={[
+                "flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm cursor-pointer hover:bg-gray-50",
+                subdiv.code in @exact_places && subdiv.code not in @introduced_places && "bg-green-50",
+                subdiv.code not in @exact_places && @country_level_on && "bg-emerald-50/50"
+              ]}
+              style={
+                if(subdiv.code in @introduced_places,
+                  do:
+                    "background: repeating-linear-gradient(-45deg, #dcfce7, #dcfce7 3px, #bbf7d0 3px, #bbf7d0 6px)",
+                  else: nil
+                )
+              }
+            >
               <input
                 type="checkbox"
                 checked={subdiv.code in @exact_places}
@@ -150,6 +170,12 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
                 class="rounded border-gray-300 text-green-600 focus:ring-green-500"
               />
               <span>{subdiv.name}</span>
+              <span
+                :if={subdiv.code in @introduced_places}
+                class="ml-1 text-xs text-green-700 font-medium"
+              >
+                (introduced)
+              </span>
               <span class="ml-auto text-xs text-gray-400">{subdiv.code}</span>
             </label>
           </li>

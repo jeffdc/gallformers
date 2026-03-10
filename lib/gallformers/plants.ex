@@ -12,12 +12,14 @@ defmodule Gallformers.Plants do
 
   import Ecto.Query
 
+  alias Gallformers.Places
   alias Gallformers.Plants.HostTraits
   alias Gallformers.Ranges
   alias Gallformers.Repo
   alias Gallformers.Species.{Abundance, Species}
   alias Gallformers.Taxonomy
   alias Gallformers.Taxonomy.TreeBuilder
+  alias Gallformers.Wcvp
 
   @topic "hosts"
 
@@ -544,38 +546,21 @@ defmodule Gallformers.Plants do
   end
 
   defp save_place_changes(host_id, %{
-         original_exact_places: original_exact,
-         original_country_places: original_country,
-         exact_places: exact_places,
-         country_places: country_places,
-         all_places: all_places,
-         introduced_place_codes: introduced_codes
+         range_entries: range_entries,
+         original_range_entries: original_range_entries,
+         all_places: all_places
        }) do
-    place_code_to_id = Map.new(all_places, &{&1.code, &1.id})
+    if range_entries != original_range_entries do
+      place_code_to_id = Map.new(all_places, &{&1.code, &1.id})
 
-    original_set = MapSet.new(original_exact ++ original_country)
-    current_set = MapSet.new(exact_places ++ country_places)
-
-    if original_set != current_set do
       entries =
-        build_place_change_entries(exact_places, "exact", introduced_codes, place_code_to_id) ++
-          build_place_change_entries(
-            country_places,
-            "country",
-            introduced_codes,
-            place_code_to_id
-          )
+        Enum.map(range_entries, fn {code, %{precision: precision, distribution_type: dt}} ->
+          {Map.get(place_code_to_id, code), precision, dt}
+        end)
+        |> Enum.reject(fn {id, _, _} -> is_nil(id) end)
 
-      entries = Enum.reject(entries, fn {id, _, _} -> is_nil(id) end)
       Ranges.update_host_places(host_id, entries)
     end
-  end
-
-  defp build_place_change_entries(codes, precision, introduced_codes, place_code_to_id) do
-    Enum.map(codes, fn code ->
-      dt = if MapSet.member?(introduced_codes, code), do: "introduced", else: "native"
-      {Map.get(place_code_to_id, code), precision, dt}
-    end)
   end
 
   defp maybe_update_section(%{genus_id: _genus_id} = section_update) do
@@ -672,5 +657,389 @@ defmodule Gallformers.Plants do
           {:ok, map()} | {:error, Ecto.Changeset.t()}
   def remove_alias_from_host(host_id, alias_id) do
     Gallformers.Species.remove_alias_from_species(host_id, alias_id)
+  end
+
+  # ============================================
+  # Range Review
+  # ============================================
+
+  @doc """
+  Lists hosts for range review with optional filters.
+
+  ## Options
+
+    * `:filter` - `:all | :confirmed | :unconfirmed` (default `:unconfirmed`)
+    * `:wcvp_match` - `:all | :yes | :no` (default `:all`)
+    * `:has_range` - `:all | :yes | :no` (default `:all`)
+    * `:search` - string prefix match on species name (default `""`)
+    * `:limit` - max results to return (default `50`)
+    * `:offset` - number of results to skip (default `0`)
+
+  Returns a list of maps with id, name, family_name, genus_name, range_count,
+  wcvp_id, wcvp_synced_at, and range_confirmed.
+  """
+  @spec list_hosts_for_range_review(keyword()) :: [map()]
+  def list_hosts_for_range_review(opts \\ []) do
+    limit = Keyword.get(opts, :limit, 50)
+    offset = Keyword.get(opts, :offset, 0)
+
+    base_range_review_query(opts)
+    |> group_by([s, ht, _hr, _st, _g, _f], [ht.wcvp_id, ht.wcvp_synced_at, ht.range_confirmed])
+    |> order_by([s], s.name)
+    |> limit(^limit)
+    |> offset(^offset)
+    |> select([s, ht, hr, _st, g, f], %{
+      id: s.id,
+      name: s.name,
+      family_name: max(f.name),
+      genus_name: max(g.name),
+      range_count: count(hr.place_id),
+      wcvp_id: ht.wcvp_id,
+      wcvp_synced_at: ht.wcvp_synced_at,
+      range_confirmed: ht.range_confirmed
+    })
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns the count of hosts matching range review filters.
+
+  Accepts the same filter options as `list_hosts_for_range_review/1`
+  (`:filter`, `:wcvp_match`, `:has_range`, `:search`) but ignores
+  `:limit` and `:offset`.
+  """
+  @spec count_hosts_for_range_review(keyword()) :: non_neg_integer()
+  def count_hosts_for_range_review(opts \\ []) do
+    sub = base_range_review_query(opts) |> select([s], s.id)
+    from(x in subquery(sub), select: count()) |> Repo.one()
+  end
+
+  defp base_range_review_query(opts) do
+    filter = Keyword.get(opts, :filter, :unconfirmed)
+    wcvp_match = Keyword.get(opts, :wcvp_match, :all)
+    has_range = Keyword.get(opts, :has_range, :all)
+    search = Keyword.get(opts, :search, "")
+    wcvp_built_at = Keyword.get(opts, :wcvp_built_at)
+    sync_status = Keyword.get(opts, :sync_status, :all)
+
+    from(s in Species,
+      left_join: ht in HostTraits,
+      on: ht.species_id == s.id,
+      left_join: hr in "host_range",
+      on: hr.species_id == s.id,
+      left_join: st in "species_taxonomy",
+      on: st.species_id == s.id,
+      left_join: g in "taxonomy",
+      on: g.id == st.taxonomy_id and g.type == "genus",
+      left_join: f in "taxonomy",
+      on: f.id == g.parent_id and f.type == "family",
+      where: s.taxoncode == "plant",
+      group_by: [s.id]
+    )
+    |> apply_range_review_filter(filter, wcvp_built_at)
+    |> apply_wcvp_match_filter(wcvp_match)
+    |> apply_has_range_filter(has_range)
+    |> apply_sync_status_filter(sync_status, wcvp_built_at)
+    |> apply_search_filter(search)
+  end
+
+  defp apply_range_review_filter(query, :all, _wcvp_built_at), do: query
+
+  defp apply_range_review_filter(query, :confirmed, _wcvp_built_at) do
+    from([s, ht] in query, where: ht.range_confirmed == true)
+  end
+
+  defp apply_range_review_filter(query, :unconfirmed, nil) do
+    from([s, ht] in query,
+      where: is_nil(ht.range_confirmed) or ht.range_confirmed == false
+    )
+  end
+
+  defp apply_range_review_filter(query, :unconfirmed, wcvp_built_at) do
+    from([s, ht] in query,
+      where:
+        is_nil(ht.range_confirmed) or ht.range_confirmed == false or
+          (not is_nil(ht.wcvp_synced_at) and ht.wcvp_synced_at < ^wcvp_built_at)
+    )
+  end
+
+  defp apply_wcvp_match_filter(query, :all), do: query
+
+  defp apply_wcvp_match_filter(query, :yes) do
+    from([s, ht] in query, where: not is_nil(ht.wcvp_id) and ht.wcvp_id != "")
+  end
+
+  defp apply_wcvp_match_filter(query, :no) do
+    from([s, ht] in query, where: is_nil(ht.wcvp_id) or ht.wcvp_id == "")
+  end
+
+  defp apply_has_range_filter(query, :all), do: query
+
+  defp apply_has_range_filter(query, :yes) do
+    from([s, _ht, hr] in query, having: count(hr.place_id) > 0)
+  end
+
+  defp apply_has_range_filter(query, :no) do
+    from([s, _ht, hr] in query, having: count(hr.place_id) == 0)
+  end
+
+  defp apply_sync_status_filter(query, :all, _wcvp_built_at), do: query
+
+  defp apply_sync_status_filter(query, :never, _wcvp_built_at) do
+    from([s, ht] in query, where: is_nil(ht.wcvp_synced_at))
+  end
+
+  defp apply_sync_status_filter(query, :stale, nil), do: query
+
+  defp apply_sync_status_filter(query, :stale, wcvp_built_at) do
+    from([s, ht] in query,
+      where: not is_nil(ht.wcvp_synced_at) and ht.wcvp_synced_at < ^wcvp_built_at
+    )
+  end
+
+  defp apply_sync_status_filter(query, :current, nil) do
+    from([s, ht] in query, where: not is_nil(ht.wcvp_synced_at))
+  end
+
+  defp apply_sync_status_filter(query, :current, wcvp_built_at) do
+    from([s, ht] in query,
+      where: not is_nil(ht.wcvp_synced_at) and ht.wcvp_synced_at >= ^wcvp_built_at
+    )
+  end
+
+  defp apply_search_filter(query, ""), do: query
+  defp apply_search_filter(query, nil), do: query
+
+  defp apply_search_filter(query, search) do
+    pattern = "%#{String.downcase(search)}%"
+
+    from([s, ht, hr, st, g, f] in query,
+      having:
+        fragment("lower(?) LIKE ?", s.name, ^pattern) or
+          fragment("lower(coalesce(max(?), '')) LIKE ?", g.name, ^pattern) or
+          fragment("lower(coalesce(max(?), '')) LIKE ?", f.name, ^pattern)
+    )
+  end
+
+  @doc """
+  Marks hosts as range-confirmed in bulk.
+
+  For hosts with existing host_traits rows, updates them.
+  For hosts without host_traits rows, creates them.
+
+  Returns `{count, nil}` where count is the number of hosts confirmed.
+  """
+  @spec bulk_confirm_host_ranges([integer()]) :: {integer(), nil}
+  def bulk_confirm_host_ranges([]), do: {0, nil}
+
+  def bulk_confirm_host_ranges(species_ids) do
+    # Find which species already have host_traits rows
+    existing_ids =
+      from(ht in HostTraits,
+        where: ht.species_id in ^species_ids,
+        select: ht.species_id
+      )
+      |> Repo.all()
+      |> MapSet.new()
+
+    # Update existing rows
+    {updated, _} =
+      from(ht in HostTraits,
+        where: ht.species_id in ^species_ids
+      )
+      |> Repo.update_all(set: [range_confirmed: true])
+
+    # Insert missing rows
+    missing_ids = Enum.reject(species_ids, &MapSet.member?(existing_ids, &1))
+
+    inserted =
+      if missing_ids != [] do
+        entries =
+          Enum.map(missing_ids, fn id ->
+            %{species_id: id, range_confirmed: true}
+          end)
+
+        {count, _} = Repo.insert_all(HostTraits, entries)
+        count
+      else
+        0
+      end
+
+    {updated + inserted, nil}
+  end
+
+  @doc """
+  Syncs a single host's range from WCVP data.
+
+  Looks up the host's WCVP data by wcvp_id (or name-matches if no wcvp_id),
+  converts TDWG codes to place entries, and updates the host's range.
+  Updates wcvp_synced_at on success.
+
+  Accepts optional `ref_data` map with preloaded `:tdwg_lookup` and
+  `:place_code_to_id` to avoid reloading per call in bulk operations.
+
+  Returns `{:ok, summary}` or `{:error, reason}`.
+  """
+  @spec sync_host_from_wcvp(integer(), map()) :: {:ok, map()} | {:error, String.t()}
+  def sync_host_from_wcvp(species_id, ref_data \\ %{}) do
+    host_traits = get_host_traits(species_id)
+    species = Repo.get(Species, species_id)
+
+    cond do
+      is_nil(species) ->
+        {:error, "Species not found"}
+
+      # Has wcvp_id — sync directly
+      host_traits && host_traits.wcvp_id not in [nil, ""] ->
+        do_sync_host_from_wcvp(species_id, host_traits, ref_data)
+
+      # No wcvp_id — try name matching
+      true ->
+        case Wcvp.Lookup.match_by_name(species.name) do
+          nil ->
+            {:error, "No WCVP match found for #{species.name}"}
+
+          wcvp_match ->
+            # Store the link first
+            {:ok, updated_traits} =
+              upsert_host_traits(species_id, %{
+                wcvp_id: wcvp_match.plant_name_id,
+                powo_id: wcvp_match.powo_id
+              })
+
+            # Then sync range
+            do_sync_host_from_wcvp(species_id, updated_traits, ref_data)
+        end
+    end
+  end
+
+  @doc """
+  Returns preloaded reference data for bulk sync operations.
+
+  Load once before calling `sync_host_from_wcvp/2` in a loop.
+  """
+  @spec load_sync_ref_data() :: map()
+  def load_sync_ref_data do
+    tdwg_lookup = Wcvp.Tdwg.load()
+    all_places = Places.list_all_places()
+
+    %{
+      tdwg_lookup: tdwg_lookup,
+      place_code_to_id: Map.new(all_places, &{&1.code, &1.id})
+    }
+  end
+
+  defp do_sync_host_from_wcvp(species_id, host_traits, ref_data) do
+    case Wcvp.Lookup.get(host_traits.wcvp_id) do
+      nil ->
+        {:error, "WCVP record not found for ID #{host_traits.wcvp_id}"}
+
+      wcvp_data ->
+        tdwg_lookup = Map.get_lazy(ref_data, :tdwg_lookup, &Wcvp.Tdwg.load/0)
+
+        place_code_to_id =
+          Map.get_lazy(ref_data, :place_code_to_id, fn ->
+            Map.new(Places.list_all_places(), &{&1.code, &1.id})
+          end)
+
+        native_entries =
+          Wcvp.Tdwg.convert_tdwg_codes(
+            wcvp_data.native_distribution,
+            tdwg_lookup
+          )
+
+        introduced_entries =
+          Wcvp.Tdwg.convert_tdwg_codes(
+            wcvp_data.introduced_distribution,
+            tdwg_lookup
+          )
+
+        place_entries =
+          build_sync_place_entries(native_entries, introduced_entries, place_code_to_id)
+
+        Ranges.update_host_places(species_id, place_entries)
+
+        now = DateTime.utc_now() |> DateTime.truncate(:second)
+        upsert_host_traits(species_id, %{wcvp_synced_at: now})
+
+        {:ok,
+         %{
+           native_count: length(native_entries),
+           introduced_count: length(introduced_entries),
+           total_places: length(place_entries)
+         }}
+    end
+  end
+
+  @doc """
+  Computes a six-bucket diff between current host range and POWO/WCVP data.
+
+  Takes:
+  - `range_entries` — the unified map: `%{code => %{precision, distribution_type}}`
+  - `native_codes` — MapSet of place codes POWO says are native (already converted from TDWG)
+  - `introduced_codes` — MapSet of place codes POWO says are introduced (already converted from TDWG)
+
+  Returns a map with six buckets based on the 3x3 state matrix:
+
+  | Existing \\ POWO | Not present | Native           | Introduced               |
+  |------------------|-------------|------------------|--------------------------|
+  | Not present      | no-op       | add_native       | add_introduced           |
+  | Native           | remove      | agree            | reclassify_to_introduced |
+  | Introduced       | remove      | reclassify_to_native | agree                |
+  """
+  @spec compute_powo_diff(map(), MapSet.t(), MapSet.t()) :: map()
+  def compute_powo_diff(range_entries, native_codes, introduced_codes) do
+    current_codes = MapSet.new(Map.keys(range_entries))
+    all_powo = MapSet.union(native_codes, introduced_codes)
+
+    current_native =
+      range_entries
+      |> Enum.filter(fn {_, %{distribution_type: dt}} -> dt == "native" end)
+      |> MapSet.new(fn {code, _} -> code end)
+
+    current_introduced =
+      range_entries
+      |> Enum.filter(fn {_, %{distribution_type: dt}} -> dt == "introduced" end)
+      |> MapSet.new(fn {code, _} -> code end)
+
+    # Six buckets from the state matrix
+    add_native = MapSet.difference(native_codes, current_codes)
+    add_introduced = MapSet.difference(introduced_codes, current_codes)
+    remove = MapSet.difference(current_codes, all_powo)
+    reclassify_to_introduced = MapSet.intersection(current_native, introduced_codes)
+    reclassify_to_native = MapSet.intersection(current_introduced, native_codes)
+
+    agree_native = MapSet.intersection(current_native, native_codes)
+    agree_introduced = MapSet.intersection(current_introduced, introduced_codes)
+    agree_count = MapSet.size(agree_native) + MapSet.size(agree_introduced)
+
+    has_changes =
+      MapSet.size(add_native) > 0 or MapSet.size(add_introduced) > 0 or
+        MapSet.size(remove) > 0 or MapSet.size(reclassify_to_introduced) > 0 or
+        MapSet.size(reclassify_to_native) > 0
+
+    %{
+      add_native: MapSet.to_list(add_native),
+      add_introduced: MapSet.to_list(add_introduced),
+      remove: MapSet.to_list(remove),
+      reclassify_to_introduced: MapSet.to_list(reclassify_to_introduced),
+      reclassify_to_native: MapSet.to_list(reclassify_to_native),
+      agree_count: agree_count,
+      has_changes: has_changes
+    }
+  end
+
+  defp build_sync_place_entries(native_entries, introduced_entries, place_code_to_id) do
+    native =
+      Enum.map(native_entries, fn %{code: code, precision: precision} ->
+        {Map.get(place_code_to_id, code), precision, "native"}
+      end)
+
+    introduced =
+      Enum.map(introduced_entries, fn %{code: code, precision: precision} ->
+        {Map.get(place_code_to_id, code), precision, "introduced"}
+      end)
+
+    (native ++ introduced) |> Enum.reject(fn {id, _, _} -> is_nil(id) end)
   end
 end

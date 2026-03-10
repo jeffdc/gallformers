@@ -31,12 +31,27 @@ defmodule Gallformers.Wcvp.LookupTest do
       )
       """)
 
+    :ok = Exqlite.Sqlite3.execute(conn, "DROP TABLE IF EXISTS meta")
+
+    :ok =
+      Exqlite.Sqlite3.execute(conn, """
+      CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)
+      """)
+
+    :ok =
+      Exqlite.Sqlite3.execute(
+        conn,
+        "INSERT INTO meta (key, value) VALUES ('built_at', '2026-03-01T00:00:00Z')"
+      )
+
     :ok =
       Exqlite.Sqlite3.execute(conn, """
       CREATE TABLE wcvp_distributions (
         plant_name_id TEXT NOT NULL,
         area_code_l3 TEXT NOT NULL,
-        introduced INTEGER NOT NULL DEFAULT 0,
+        introduced TEXT NOT NULL DEFAULT '0',
+        extinct TEXT NOT NULL DEFAULT '0',
+        location_doubtful TEXT NOT NULL DEFAULT '0',
         PRIMARY KEY (plant_name_id, area_code_l3, introduced),
         FOREIGN KEY (plant_name_id) REFERENCES wcvp_names(plant_name_id)
       )
@@ -145,11 +160,11 @@ defmodule Gallformers.Wcvp.LookupTest do
       )
 
     distributions = [
-      ["100", "ALB", 0],
-      ["100", "FLA", 0],
-      ["100", "NCA", 1],
-      ["101", "NCA", 0],
-      ["200", "NCA", 0]
+      ["100", "ALB", "0"],
+      ["100", "FLA", "0"],
+      ["100", "NCA", "1"],
+      ["101", "NCA", "0"],
+      ["200", "NCA", "0"]
     ]
 
     for params <- distributions do
@@ -177,6 +192,14 @@ defmodule Gallformers.Wcvp.LookupTest do
   describe "available?/0" do
     test "returns true when repo is started" do
       assert Lookup.available?()
+    end
+  end
+
+  describe "built_at/0" do
+    test "returns a DateTime from the meta table" do
+      result = Lookup.built_at()
+      assert %DateTime{} = result
+      assert result == ~U[2026-03-01 00:00:00Z]
     end
   end
 
@@ -300,6 +323,28 @@ defmodule Gallformers.Wcvp.LookupTest do
       results = Lookup.search_contains("Quercus", include_synonyms: true)
       assert length(results) == 4
       assert Enum.any?(results, fn r -> r.taxon_status == "Synonym" end)
+    end
+  end
+
+  describe "match_by_name/1" do
+    test "returns accepted name record for exact match" do
+      result = Lookup.match_by_name("Quercus alba")
+      assert result.plant_name_id == "100"
+      assert result.taxon_name == "Quercus alba"
+      assert result.taxon_status == "Accepted"
+      assert result.family == "Fagaceae"
+      assert result.genus == "Quercus"
+      assert result.species == "alba"
+      assert result.taxon_authors == "L."
+      assert result.powo_id == "urn:lsid:ipni.org:names:295763-1"
+    end
+
+    test "returns nil for non-existent name" do
+      assert Lookup.match_by_name("Nonexistent species") == nil
+    end
+
+    test "returns nil for synonym name (only matches accepted)" do
+      assert Lookup.match_by_name("Quercus borealis") == nil
     end
   end
 
