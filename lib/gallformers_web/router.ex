@@ -82,6 +82,9 @@ defmodule GallformersWeb.Router do
     # Gall range review (disabled — not ready for production)
     # live "/gall-range", Admin.GallRangeLive
 
+    # Host range review
+    live "/host-range", Admin.HostRangeLive
+
     # Host admin
     live "/hosts", Admin.HostLive.Index, :index
     live "/hosts/new", Admin.HostLive.Form, :new
@@ -131,9 +134,6 @@ defmodule GallformersWeb.Router do
   # Super admin routes (require superadmin role)
   scope "/admin", GallformersWeb do
     pipe_through [:browser, :superadmin]
-
-    # Reconciliation reports (superadmin only)
-    live "/reconciliation", Admin.ReconciliationLive
 
     # Filter terms admin (superadmin only)
     live "/filter-terms", Admin.FilterTermsLive.Index, :index
