@@ -3,7 +3,7 @@ status: refined
 created: 2026-03-10
 updated: 2026-03-10
 epic: geo-expansion
-relates: [b9e5, be9d]
+relates: [b9e5, be9d, 600a]
 blocks: [0df8]
 ---
 
