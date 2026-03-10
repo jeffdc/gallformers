@@ -597,6 +597,8 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
         CREATE TABLE wcvp_names (
           plant_name_id TEXT PRIMARY KEY,
           taxon_name TEXT NOT NULL,
+          taxon_status TEXT NOT NULL DEFAULT 'Accepted',
+          accepted_plant_name_id TEXT,
           family TEXT NOT NULL,
           genus TEXT NOT NULL,
           species TEXT NOT NULL,
@@ -620,14 +622,14 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
       :ok =
         Exqlite.Sqlite3.execute(
           db,
-          "INSERT INTO wcvp_names VALUES ('500', 'Zzyzx wcvponly', 'Testaceae', 'Zzyzx', 'wcvponly', 'Test', NULL)"
+          "INSERT INTO wcvp_names VALUES ('500', 'Zzyzx wcvponly', 'Accepted', '500', 'Testaceae', 'Zzyzx', 'wcvponly', 'Test', NULL)"
         )
 
       # A subspecies entry searchable by "Quercus alba" contains-match
       :ok =
         Exqlite.Sqlite3.execute(
           db,
-          "INSERT INTO wcvp_names VALUES ('501', 'Quercus alnobetula subsp. alba', 'Fagaceae', 'Quercus', 'alnobetula', 'L.', 'urn:test')"
+          "INSERT INTO wcvp_names VALUES ('501', 'Quercus alnobetula subsp. alba', 'Accepted', '501', 'Fagaceae', 'Quercus', 'alnobetula', 'L.', 'urn:test')"
         )
 
       :ok =

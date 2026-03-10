@@ -3,152 +3,173 @@ defmodule Mix.Tasks.Gallformers.Wcvp.BuildDbTest do
 
   alias Mix.Tasks.Gallformers.Wcvp.BuildDb
 
-  @test_dir "test/tmp/wcvp_build"
+  @names_path "test/support/fixtures/wcvp_names_sample.csv"
+  @dist_path "test/support/fixtures/wcvp_distributions_sample.csv"
 
   setup do
-    File.rm_rf!(@test_dir)
-    File.mkdir_p!(@test_dir)
+    output =
+      Path.join(System.tmp_dir!(), "test_wcvp_#{System.unique_integer([:positive])}.sqlite")
 
-    # Write minimal test CSV files (pipe-delimited, matching real WCVP format)
-    # Headers must match the real WCVP file headers exactly
-    names_csv =
-      """
-      plant_name_id|ipni_id|taxon_rank|taxon_status|family|genus_hybrid|genus|species_hybrid|species|infraspecific_rank|infraspecies|parenthetical_author|primary_author|publication_author|place_of_publication|volume_and_page|first_published|nomenclatural_remarks|geographic_area|lifeform_description|climate_description|taxon_name|taxon_authors|accepted_plant_name_id|basionym_plant_name_id|replaced_synonym_author|homotypic_synonym|parent_plant_name_id|powo_id|hybrid_formula|reviewed
-      100|ipni-100|Species|Accepted|Fagaceae||Quercus||alba|||||||||||||Quercus alba|L.|100|||||urn:lsid:ipni.org:names:100-1||
-      200|ipni-200|Species|Accepted|Rosaceae||Rosa||carolina|||||||||||||Rosa carolina|L.|200|||||urn:lsid:ipni.org:names:200-1||
-      300|ipni-300|Species|Accepted|Poaceae||Zea||mays|||||||||||||Zea mays|L.|300|||||urn:lsid:ipni.org:names:300-1||
-      400|ipni-400|Species|Synonym|Fagaceae||Quercus||stellata|||||||||||||Quercus stellata|Wangenh.|100|||||urn:lsid:ipni.org:names:400-1||
-      """
-
-    dist_csv =
-      """
-      plant_locality_id|plant_name_id|continent_code_l1|continent|region_code_l2|region|area_code_l3|area|introduced|extinct|location_doubtful
-      1|100|7|NORTHERN AMERICA|71|Southeastern U.S.A.|ALA|Alabama|0|0|0
-      2|100|7|NORTHERN AMERICA|74|Southeastern U.S.A.|FLA|Florida|0|0|0
-      3|200|7|NORTHERN AMERICA|78|Southeastern U.S.A.|NCA|North Carolina|0|0|0
-      4|300|3|SOUTHERN AFRICA|30|Southern Africa|ZAF|South Africa|0|0|0
-      5|100|7|NORTHERN AMERICA|78|Southeastern U.S.A.|NCA|North Carolina|1|0|0
-      """
-
-    File.write!(Path.join(@test_dir, "wcvp_names.csv"), String.trim(names_csv))
-    File.write!(Path.join(@test_dir, "wcvp_distribution.csv"), String.trim(dist_csv))
-
-    on_exit(fn -> File.rm_rf!(@test_dir) end)
-
-    {:ok, dir: @test_dir}
+    on_exit(fn -> File.rm(output) end)
+    {:ok, output: output}
   end
 
-  test "builds SQLite database with filtered data", %{dir: dir} do
-    db_path = Path.join(dir, "wcvp.sqlite")
+  describe "build_db" do
+    test "creates all three tables", %{output: output} do
+      BuildDb.run(["--names", @names_path, "--dist", @dist_path, "--output", output])
 
-    BuildDb.run([
-      "--names",
-      Path.join(dir, "wcvp_names.csv"),
-      "--dist",
-      Path.join(dir, "wcvp_distribution.csv"),
-      "--output",
-      db_path
-    ])
+      {:ok, conn} = Exqlite.Sqlite3.open(output)
 
-    assert File.exists?(db_path)
+      tables = query_all(conn, "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+      assert tables == [["meta"], ["wcvp_distributions"], ["wcvp_names"]]
 
-    {:ok, conn} = Exqlite.Sqlite3.open(db_path)
+      :ok = Exqlite.Sqlite3.close(conn)
+    end
 
-    # Quercus alba and Rosa carolina should be present (have Western Hemisphere distribution)
-    # Zea mays should NOT be present (only has South Africa distribution)
-    {:ok, stmt} = Exqlite.Sqlite3.prepare(conn, "SELECT COUNT(*) FROM wcvp_names")
-    {:row, [count]} = Exqlite.Sqlite3.step(conn, stmt)
-    assert count == 2
-    Exqlite.Sqlite3.release(conn, stmt)
+    test "wcvp_names has ALL rows from sample (including synonyms, unplaced, varieties)", %{
+      output: output
+    } do
+      BuildDb.run(["--names", @names_path, "--dist", @dist_path, "--output", output])
 
-    # Distribution rows: 2 native for Quercus alba + 1 introduced + 1 for Rosa carolina = 4
-    {:ok, stmt} = Exqlite.Sqlite3.prepare(conn, "SELECT COUNT(*) FROM wcvp_distributions")
-    {:row, [count]} = Exqlite.Sqlite3.step(conn, stmt)
-    assert count == 4
-    Exqlite.Sqlite3.release(conn, stmt)
+      {:ok, conn} = Exqlite.Sqlite3.open(output)
 
-    # Verify introduced flag is stored correctly
-    {:ok, stmt} =
-      Exqlite.Sqlite3.prepare(
-        conn,
-        "SELECT area_code_l3, introduced FROM wcvp_distributions WHERE plant_name_id = '100' ORDER BY area_code_l3, introduced"
-      )
+      [[count]] = query_all(conn, "SELECT COUNT(*) FROM wcvp_names")
+      assert count == 9
 
-    {:row, ["ALA", 0]} = Exqlite.Sqlite3.step(conn, stmt)
-    {:row, ["FLA", 0]} = Exqlite.Sqlite3.step(conn, stmt)
-    {:row, ["NCA", 1]} = Exqlite.Sqlite3.step(conn, stmt)
-    :done = Exqlite.Sqlite3.step(conn, stmt)
-    Exqlite.Sqlite3.release(conn, stmt)
+      # Verify synonym is present
+      [[status]] =
+        query_all(conn, "SELECT taxon_status FROM wcvp_names WHERE plant_name_id = '102'")
 
-    # Verify Quercus alba data
-    {:ok, stmt} =
-      Exqlite.Sqlite3.prepare(
-        conn,
-        "SELECT taxon_name, family, powo_id FROM wcvp_names WHERE plant_name_id = '100'"
-      )
+      assert status == "Synonym"
 
-    {:row, [name, family, powo_id]} = Exqlite.Sqlite3.step(conn, stmt)
-    assert name == "Quercus alba"
-    assert family == "Fagaceae"
-    assert powo_id == "urn:lsid:ipni.org:names:100-1"
-    Exqlite.Sqlite3.release(conn, stmt)
+      # Verify unplaced is present
+      [[status]] =
+        query_all(conn, "SELECT taxon_status FROM wcvp_names WHERE plant_name_id = '107'")
 
-    :ok = Exqlite.Sqlite3.close(conn)
+      assert status == "Unplaced"
+
+      # Verify variety is present
+      [[rank]] =
+        query_all(conn, "SELECT taxon_rank FROM wcvp_names WHERE plant_name_id = '108'")
+
+      assert rank == "Variety"
+
+      :ok = Exqlite.Sqlite3.close(conn)
+    end
+
+    test "wcvp_distributions has ALL rows (including introduced and extinct)", %{output: output} do
+      BuildDb.run(["--names", @names_path, "--dist", @dist_path, "--output", output])
+
+      {:ok, conn} = Exqlite.Sqlite3.open(output)
+
+      [[count]] = query_all(conn, "SELECT COUNT(*) FROM wcvp_distributions")
+      assert count == 13
+
+      # Verify introduced row is present
+      [[introduced]] =
+        query_all(
+          conn,
+          "SELECT introduced FROM wcvp_distributions WHERE plant_locality_id = '12'"
+        )
+
+      assert introduced == "1"
+
+      # Verify extinct row is present
+      [[extinct]] =
+        query_all(
+          conn,
+          "SELECT extinct FROM wcvp_distributions WHERE plant_locality_id = '13'"
+        )
+
+      assert extinct == "1"
+
+      :ok = Exqlite.Sqlite3.close(conn)
+    end
+
+    test "meta table has built_at with ISO 8601 timestamp", %{output: output} do
+      BuildDb.run(["--names", @names_path, "--dist", @dist_path, "--output", output])
+
+      {:ok, conn} = Exqlite.Sqlite3.open(output)
+
+      [[value]] = query_all(conn, "SELECT value FROM meta WHERE key = 'built_at'")
+      # ISO 8601 format: 2026-03-09T...
+      assert value =~ ~r/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/
+
+      :ok = Exqlite.Sqlite3.close(conn)
+    end
+
+    test "all 31 name columns are present", %{output: output} do
+      BuildDb.run(["--names", @names_path, "--dist", @dist_path, "--output", output])
+
+      {:ok, conn} = Exqlite.Sqlite3.open(output)
+
+      columns =
+        query_all(conn, "PRAGMA table_info(wcvp_names)")
+        |> Enum.map(fn row -> Enum.at(row, 1) end)
+
+      assert length(columns) == 31
+
+      expected = ~w[
+        plant_name_id ipni_id taxon_rank taxon_status family genus_hybrid genus
+        species_hybrid species infraspecific_rank infraspecies parenthetical_author
+        primary_author publication_author place_of_publication volume_and_page
+        first_published nomenclatural_remarks geographic_area lifeform_description
+        climate_description taxon_name taxon_authors accepted_plant_name_id
+        basionym_plant_name_id replaced_synonym_author homotypic_synonym
+        parent_plant_name_id powo_id hybrid_formula reviewed
+      ]
+
+      assert columns == expected
+    end
+
+    test "all 11 distribution columns are present", %{output: output} do
+      BuildDb.run(["--names", @names_path, "--dist", @dist_path, "--output", output])
+
+      {:ok, conn} = Exqlite.Sqlite3.open(output)
+
+      columns =
+        query_all(conn, "PRAGMA table_info(wcvp_distributions)")
+        |> Enum.map(fn row -> Enum.at(row, 1) end)
+
+      assert length(columns) == 11
+
+      expected = ~w[
+        plant_locality_id plant_name_id continent_code_l1 continent region_code_l2
+        region area_code_l3 area introduced extinct location_doubtful
+      ]
+
+      assert columns == expected
+    end
+
+    test "synonym record has correct accepted_plant_name_id", %{output: output} do
+      BuildDb.run(["--names", @names_path, "--dist", @dist_path, "--output", output])
+
+      {:ok, conn} = Exqlite.Sqlite3.open(output)
+
+      [[accepted_id]] =
+        query_all(
+          conn,
+          "SELECT accepted_plant_name_id FROM wcvp_names WHERE plant_name_id = '102'"
+        )
+
+      assert accepted_id == "101"
+
+      :ok = Exqlite.Sqlite3.close(conn)
+    end
   end
 
-  test "excludes species with only non-Western-Hemisphere distribution", %{dir: dir} do
-    db_path = Path.join(dir, "wcvp.sqlite")
-
-    BuildDb.run([
-      "--names",
-      Path.join(dir, "wcvp_names.csv"),
-      "--dist",
-      Path.join(dir, "wcvp_distribution.csv"),
-      "--output",
-      db_path
-    ])
-
-    {:ok, conn} = Exqlite.Sqlite3.open(db_path)
-
-    # Zea mays (id 300) has only ZAF distribution, should be excluded
-    {:ok, stmt} =
-      Exqlite.Sqlite3.prepare(
-        conn,
-        "SELECT COUNT(*) FROM wcvp_names WHERE plant_name_id = '300'"
-      )
-
-    {:row, [count]} = Exqlite.Sqlite3.step(conn, stmt)
-    assert count == 0
+  # Helper to run a query and collect all rows
+  defp query_all(conn, sql) do
+    {:ok, stmt} = Exqlite.Sqlite3.prepare(conn, sql)
+    rows = collect_rows(conn, stmt, [])
     Exqlite.Sqlite3.release(conn, stmt)
-
-    :ok = Exqlite.Sqlite3.close(conn)
+    rows
   end
 
-  test "excludes synonyms from names table", %{dir: dir} do
-    db_path = Path.join(dir, "wcvp.sqlite")
-
-    BuildDb.run([
-      "--names",
-      Path.join(dir, "wcvp_names.csv"),
-      "--dist",
-      Path.join(dir, "wcvp_distribution.csv"),
-      "--output",
-      db_path
-    ])
-
-    {:ok, conn} = Exqlite.Sqlite3.open(db_path)
-
-    # Quercus stellata (id 400) is a synonym, should be excluded
-    {:ok, stmt} =
-      Exqlite.Sqlite3.prepare(
-        conn,
-        "SELECT COUNT(*) FROM wcvp_names WHERE plant_name_id = '400'"
-      )
-
-    {:row, [count]} = Exqlite.Sqlite3.step(conn, stmt)
-    assert count == 0
-    Exqlite.Sqlite3.release(conn, stmt)
-
-    :ok = Exqlite.Sqlite3.close(conn)
+  defp collect_rows(conn, stmt, acc) do
+    case Exqlite.Sqlite3.step(conn, stmt) do
+      {:row, row} -> collect_rows(conn, stmt, acc ++ [row])
+      :done -> acc
+    end
   end
 end

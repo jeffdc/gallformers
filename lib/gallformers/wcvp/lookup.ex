@@ -39,23 +39,35 @@ defmodule Gallformers.Wcvp.Lookup do
   @spec search(String.t(), keyword()) :: [map()]
   def search(query, opts \\ []) do
     limit = Keyword.get(opts, :limit, 20)
+    include_synonyms = Keyword.get(opts, :include_synonyms, false)
     pattern = "#{query}%"
 
-    from(n in "wcvp_names",
-      where: like(n.taxon_name, ^pattern),
-      order_by: n.taxon_name,
-      limit: ^limit,
-      select: %{
-        plant_name_id: n.plant_name_id,
-        taxon_name: n.taxon_name,
-        family: n.family,
-        genus: n.genus,
-        species: n.species,
-        taxon_authors: n.taxon_authors,
-        powo_id: n.powo_id
-      }
-    )
-    |> Repo.WCVP.all()
+    base =
+      from(n in "wcvp_names",
+        where: like(n.taxon_name, ^pattern),
+        order_by: n.taxon_name,
+        limit: ^limit,
+        select: %{
+          plant_name_id: n.plant_name_id,
+          taxon_name: n.taxon_name,
+          taxon_status: n.taxon_status,
+          accepted_plant_name_id: n.accepted_plant_name_id,
+          family: n.family,
+          genus: n.genus,
+          species: n.species,
+          taxon_authors: n.taxon_authors,
+          powo_id: n.powo_id
+        }
+      )
+
+    base =
+      if include_synonyms do
+        base
+      else
+        from(n in base, where: n.taxon_status == "Accepted")
+      end
+
+    Repo.WCVP.all(base)
   rescue
     _ -> []
   catch
@@ -78,6 +90,7 @@ defmodule Gallformers.Wcvp.Lookup do
   @spec search_contains(String.t(), keyword()) :: [map()]
   def search_contains(query, opts \\ []) do
     limit = Keyword.get(opts, :limit, 20)
+    include_synonyms = Keyword.get(opts, :include_synonyms, false)
 
     terms =
       query
@@ -91,6 +104,8 @@ defmodule Gallformers.Wcvp.Lookup do
         select: %{
           plant_name_id: n.plant_name_id,
           taxon_name: n.taxon_name,
+          taxon_status: n.taxon_status,
+          accepted_plant_name_id: n.accepted_plant_name_id,
           family: n.family,
           genus: n.genus,
           species: n.species,
@@ -98,6 +113,13 @@ defmodule Gallformers.Wcvp.Lookup do
           powo_id: n.powo_id
         }
       )
+
+    base =
+      if include_synonyms do
+        base
+      else
+        from(n in base, where: n.taxon_status == "Accepted")
+      end
 
     query =
       Enum.reduce(terms, base, fn pattern, q ->
@@ -151,6 +173,57 @@ defmodule Gallformers.Wcvp.Lookup do
         name
         |> Map.put(:native_distribution, Enum.map(native, & &1.area_code_l3))
         |> Map.put(:introduced_distribution, Enum.map(introduced, & &1.area_code_l3))
+    end
+  rescue
+    _ -> nil
+  catch
+    :exit, _ -> nil
+  end
+
+  @doc """
+  Resolves synonyms by looking up the accepted name for a given plant_name_id.
+
+  If the record's `accepted_plant_name_id` differs from its own `plant_name_id`
+  (i.e., it's a synonym), returns the accepted name record as a map.
+  Returns `nil` if the record is already accepted, not found, or the repo is unavailable.
+  """
+  @spec get_accepted_name(String.t()) :: map() | nil
+  def get_accepted_name(plant_name_id) do
+    case Repo.WCVP.one(
+           from(n in "wcvp_names",
+             where: n.plant_name_id == ^plant_name_id,
+             select: %{
+               plant_name_id: n.plant_name_id,
+               accepted_plant_name_id: n.accepted_plant_name_id
+             }
+           )
+         ) do
+      nil ->
+        nil
+
+      %{accepted_plant_name_id: accepted_id} when accepted_id in [nil, ""] ->
+        nil
+
+      %{plant_name_id: id, accepted_plant_name_id: id} ->
+        # Already accepted (accepted_plant_name_id == plant_name_id)
+        nil
+
+      %{accepted_plant_name_id: accepted_id} ->
+        Repo.WCVP.one(
+          from(n in "wcvp_names",
+            where: n.plant_name_id == ^accepted_id,
+            select: %{
+              plant_name_id: n.plant_name_id,
+              taxon_name: n.taxon_name,
+              taxon_status: n.taxon_status,
+              family: n.family,
+              genus: n.genus,
+              species: n.species,
+              taxon_authors: n.taxon_authors,
+              powo_id: n.powo_id
+            }
+          )
+        )
     end
   rescue
     _ -> nil

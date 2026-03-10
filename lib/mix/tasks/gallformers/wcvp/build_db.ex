@@ -1,8 +1,7 @@
 defmodule Mix.Tasks.Gallformers.Wcvp.BuildDb do
   @moduledoc """
-  Reads raw WCVP CSV files, filters to accepted species with distribution in
-  mapped TDWG regions, and produces a SQLite database for use as a secondary
-  read-only data source.
+  Reads raw WCVP CSV files and produces a SQLite database containing ALL data
+  from both files — no filtering by taxon_status, taxon_rank, or TDWG region.
 
   ## Usage
 
@@ -19,10 +18,7 @@ defmodule Mix.Tasks.Gallformers.Wcvp.BuildDb do
   use Mix.Task
   require Logger
 
-  alias Gallformers.Wcvp.Reader
-  alias Gallformers.Wcvp.Tdwg
-
-  @shortdoc "Build filtered WCVP SQLite database from CSV files"
+  @shortdoc "Build WCVP SQLite database from CSV files"
 
   @default_names "priv/repo/data/wcvp/wcvp_names.csv"
   @default_dist "priv/repo/data/wcvp/wcvp_distribution.csv"
@@ -47,158 +43,144 @@ defmodule Mix.Tasks.Gallformers.Wcvp.BuildDb do
     Logger.info("  Distributions: #{dist_path}")
     Logger.info("  Output: #{output_path}")
 
-    # Load TDWG region filter
-    tdwg_lookup = Tdwg.load()
-    valid_tdwg_codes = MapSet.new(Map.keys(tdwg_lookup))
-
-    # Step 1: Find species IDs with any established distribution in our regions
-    Logger.info("Scanning distributions for mapped region species...")
-
-    matching_ids =
-      Reader.stream_established_distributions(dist_path)
-      |> Stream.filter(fn dist -> MapSet.member?(valid_tdwg_codes, dist.area_code_l3) end)
-      |> Enum.reduce(MapSet.new(), fn dist, acc -> MapSet.put(acc, dist.plant_name_id) end)
-
-    Logger.info("  Found #{MapSet.size(matching_ids)} species with mapped region distribution")
-
-    # Step 2: Filter accepted names to those with matching distributions
-    Logger.info("Filtering accepted names...")
-
-    accepted_names =
-      Reader.stream_accepted_names(names_path)
-      |> Stream.filter(fn name -> MapSet.member?(matching_ids, name.plant_name_id) end)
-      |> Enum.to_list()
-
-    Logger.info("  Kept #{length(accepted_names)} accepted names")
-
-    # Step 3: Collect distributions for matching species (only our regions)
-    Logger.info("Collecting distributions...")
-
-    distributions =
-      Reader.stream_established_distributions(dist_path)
-      |> Stream.filter(fn dist ->
-        MapSet.member?(matching_ids, dist.plant_name_id) and
-          MapSet.member?(valid_tdwg_codes, dist.area_code_l3)
-      end)
-      |> Enum.to_list()
-
-    Logger.info("  Collected #{length(distributions)} distribution records")
-
-    # Step 4: Write SQLite database
     File.mkdir_p!(Path.dirname(output_path))
     File.rm(output_path)
 
-    Logger.info("Writing SQLite database...")
-    write_database(output_path, accepted_names, distributions)
+    {:ok, conn} = Exqlite.Sqlite3.open(output_path)
+
+    # Read headers from CSVs
+    names_header = read_header(names_path)
+    dist_header = read_header(dist_path)
+
+    # Create tables
+    create_names_table(conn, names_header)
+    create_distributions_table(conn, dist_header)
+    create_meta_table(conn)
+
+    # Insert all data in a single transaction
+    :ok = Exqlite.Sqlite3.execute(conn, "BEGIN")
+
+    names_count = insert_rows(conn, "wcvp_names", names_header, names_path)
+    Logger.info("  Inserted #{names_count} name records")
+
+    dist_count = insert_rows(conn, "wcvp_distributions", dist_header, dist_path)
+    Logger.info("  Inserted #{dist_count} distribution records")
+
+    # Insert meta
+    insert_meta(conn)
+
+    :ok = Exqlite.Sqlite3.execute(conn, "COMMIT")
+
+    # Create indexes after bulk insert for performance
+    create_indexes(conn)
+
+    :ok = Exqlite.Sqlite3.close(conn)
 
     Logger.info("WCVP database built: #{output_path}")
 
-    # Step 5: Optional S3 upload
     if opts[:upload] do
       upload_to_s3(output_path)
     end
   end
 
-  defp write_database(path, names, distributions) do
-    {:ok, conn} = Exqlite.Sqlite3.open(path)
-
-    # Create tables
-    :ok =
-      Exqlite.Sqlite3.execute(conn, """
-      CREATE TABLE wcvp_names (
-        plant_name_id TEXT PRIMARY KEY,
-        taxon_name TEXT NOT NULL,
-        family TEXT NOT NULL,
-        genus TEXT NOT NULL,
-        species TEXT NOT NULL,
-        taxon_authors TEXT,
-        powo_id TEXT
-      )
-      """)
-
-    :ok =
-      Exqlite.Sqlite3.execute(conn, """
-      CREATE TABLE wcvp_distributions (
-        plant_name_id TEXT NOT NULL,
-        area_code_l3 TEXT NOT NULL,
-        introduced INTEGER NOT NULL DEFAULT 0,
-        PRIMARY KEY (plant_name_id, area_code_l3, introduced),
-        FOREIGN KEY (plant_name_id) REFERENCES wcvp_names(plant_name_id)
-      )
-      """)
-
-    # Insert names in a transaction
-    :ok = Exqlite.Sqlite3.execute(conn, "BEGIN")
-
-    {:ok, name_stmt} =
-      Exqlite.Sqlite3.prepare(
-        conn,
-        "INSERT INTO wcvp_names (plant_name_id, taxon_name, family, genus, species, taxon_authors, powo_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"
-      )
-
-    for name <- names do
-      :ok =
-        Exqlite.Sqlite3.bind(name_stmt, [
-          name.plant_name_id,
-          name.taxon_name,
-          name.family,
-          name.genus,
-          name.species,
-          name.taxon_authors,
-          powo_id_or_nil(name)
-        ])
-
-      :done = Exqlite.Sqlite3.step(conn, name_stmt)
-      :ok = Exqlite.Sqlite3.reset(name_stmt)
-    end
-
-    Exqlite.Sqlite3.release(conn, name_stmt)
-
-    # Insert distributions
-    {:ok, dist_stmt} =
-      Exqlite.Sqlite3.prepare(
-        conn,
-        "INSERT OR IGNORE INTO wcvp_distributions (plant_name_id, area_code_l3, introduced) VALUES (?1, ?2, ?3)"
-      )
-
-    for dist <- distributions do
-      introduced = if dist.introduced == "1", do: 1, else: 0
-
-      :ok =
-        Exqlite.Sqlite3.bind(dist_stmt, [dist.plant_name_id, dist.area_code_l3, introduced])
-
-      :done = Exqlite.Sqlite3.step(conn, dist_stmt)
-      :ok = Exqlite.Sqlite3.reset(dist_stmt)
-    end
-
-    Exqlite.Sqlite3.release(conn, dist_stmt)
-
-    :ok = Exqlite.Sqlite3.execute(conn, "COMMIT")
-
-    # Create indexes after bulk insert (faster)
-    :ok =
-      Exqlite.Sqlite3.execute(
-        conn,
-        "CREATE INDEX idx_wcvp_names_taxon_name ON wcvp_names(taxon_name COLLATE NOCASE)"
-      )
-
-    :ok =
-      Exqlite.Sqlite3.execute(conn, "CREATE INDEX idx_wcvp_names_genus ON wcvp_names(genus)")
-
-    :ok =
-      Exqlite.Sqlite3.execute(conn, "CREATE INDEX idx_wcvp_names_family ON wcvp_names(family)")
-
-    :ok =
-      Exqlite.Sqlite3.execute(
-        conn,
-        "CREATE INDEX idx_wcvp_dist_id ON wcvp_distributions(plant_name_id)"
-      )
-
-    :ok = Exqlite.Sqlite3.close(conn)
+  defp read_header(path) do
+    [header_line | _] = File.stream!(path) |> Enum.take(1)
+    header_line |> String.trim() |> String.split("|")
   end
 
-  defp powo_id_or_nil(%{powo_id: powo_id}) when powo_id not in [nil, ""], do: powo_id
-  defp powo_id_or_nil(_), do: nil
+  defp create_names_table(conn, columns) do
+    col_defs =
+      Enum.map_join(columns, ", ", fn col ->
+        if col == "plant_name_id", do: "plant_name_id TEXT PRIMARY KEY", else: "#{col} TEXT"
+      end)
+
+    :ok = Exqlite.Sqlite3.execute(conn, "CREATE TABLE wcvp_names (#{col_defs})")
+  end
+
+  defp create_distributions_table(conn, columns) do
+    col_defs =
+      Enum.map_join(columns, ", ", fn col ->
+        if col == "plant_locality_id",
+          do: "plant_locality_id TEXT PRIMARY KEY",
+          else: "#{col} TEXT"
+      end)
+
+    :ok = Exqlite.Sqlite3.execute(conn, "CREATE TABLE wcvp_distributions (#{col_defs})")
+  end
+
+  defp create_meta_table(conn) do
+    :ok =
+      Exqlite.Sqlite3.execute(
+        conn,
+        "CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+      )
+  end
+
+  defp insert_rows(conn, table, columns, csv_path) do
+    col_count = length(columns)
+    placeholders = Enum.map_join(1..col_count, ", ", fn i -> "?#{i}" end)
+    col_names = Enum.join(columns, ", ")
+
+    {:ok, stmt} =
+      Exqlite.Sqlite3.prepare(
+        conn,
+        "INSERT INTO #{table} (#{col_names}) VALUES (#{placeholders})"
+      )
+
+    count =
+      csv_path
+      |> File.stream!()
+      |> Stream.drop(1)
+      |> Stream.map(&String.trim/1)
+      |> Stream.reject(&(&1 == ""))
+      |> Enum.reduce(0, fn line, count ->
+        values = String.split(line, "|")
+        # Pad or trim to match column count
+        values = pad_values(values, col_count)
+        :ok = Exqlite.Sqlite3.bind(stmt, values)
+        :done = Exqlite.Sqlite3.step(conn, stmt)
+        :ok = Exqlite.Sqlite3.reset(stmt)
+        count + 1
+      end)
+
+    Exqlite.Sqlite3.release(conn, stmt)
+    count
+  end
+
+  defp pad_values(values, expected) do
+    actual = length(values)
+
+    cond do
+      actual == expected -> values
+      actual < expected -> values ++ List.duplicate("", expected - actual)
+      true -> Enum.take(values, expected)
+    end
+  end
+
+  defp insert_meta(conn) do
+    timestamp = DateTime.utc_now() |> DateTime.to_iso8601()
+
+    {:ok, stmt} =
+      Exqlite.Sqlite3.prepare(conn, "INSERT INTO meta (key, value) VALUES (?1, ?2)")
+
+    :ok = Exqlite.Sqlite3.bind(stmt, ["built_at", timestamp])
+    :done = Exqlite.Sqlite3.step(conn, stmt)
+    Exqlite.Sqlite3.release(conn, stmt)
+  end
+
+  defp create_indexes(conn) do
+    indexes = [
+      "CREATE INDEX idx_wcvp_names_taxon_name ON wcvp_names(taxon_name COLLATE NOCASE)",
+      "CREATE INDEX idx_wcvp_names_genus ON wcvp_names(genus)",
+      "CREATE INDEX idx_wcvp_names_family ON wcvp_names(family)",
+      "CREATE INDEX idx_wcvp_names_accepted ON wcvp_names(accepted_plant_name_id)",
+      "CREATE INDEX idx_wcvp_names_status ON wcvp_names(taxon_status)",
+      "CREATE INDEX idx_wcvp_dist_name_id ON wcvp_distributions(plant_name_id)",
+      "CREATE INDEX idx_wcvp_dist_area ON wcvp_distributions(area_code_l3)"
+    ]
+
+    Enum.each(indexes, fn sql -> :ok = Exqlite.Sqlite3.execute(conn, sql) end)
+  end
 
   defp upload_to_s3(path) do
     Mix.Task.run("app.start")

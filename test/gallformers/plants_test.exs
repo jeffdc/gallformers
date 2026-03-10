@@ -146,6 +146,25 @@ defmodule Gallformers.PlantsTest do
       assert traits.powo_id == "urn:lsid:ipni.org:names:12345-1"
     end
 
+    test "creates host_traits with range_confirmed defaulting to false", %{species: species} do
+      {:ok, traits} = Repo.insert(%Gallformers.Plants.HostTraits{species_id: species.id})
+      assert traits.range_confirmed == false
+      assert traits.wcvp_synced_at == nil
+    end
+
+    test "updates range_confirmed and wcvp_synced_at", %{species: species} do
+      {:ok, traits} = Repo.insert(%Gallformers.Plants.HostTraits{species_id: species.id})
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {:ok, updated} =
+        traits
+        |> Gallformers.Plants.HostTraits.changeset(%{range_confirmed: true, wcvp_synced_at: now})
+        |> Repo.update()
+
+      assert updated.range_confirmed == true
+      assert updated.wcvp_synced_at == now
+    end
+
     test "species can preload host_traits", %{species: species} do
       {:ok, _} =
         Repo.insert(%Gallformers.Plants.HostTraits{

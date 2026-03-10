@@ -21,6 +21,8 @@ defmodule Gallformers.Wcvp.LookupTest do
       CREATE TABLE wcvp_names (
         plant_name_id TEXT PRIMARY KEY,
         taxon_name TEXT NOT NULL,
+        taxon_status TEXT NOT NULL DEFAULT 'Accepted',
+        accepted_plant_name_id TEXT,
         family TEXT NOT NULL,
         genus TEXT NOT NULL,
         species TEXT NOT NULL,
@@ -44,13 +46,15 @@ defmodule Gallformers.Wcvp.LookupTest do
     {:ok, name_stmt} =
       Exqlite.Sqlite3.prepare(
         conn,
-        "INSERT INTO wcvp_names (plant_name_id, taxon_name, family, genus, species, taxon_authors, powo_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"
+        "INSERT INTO wcvp_names (plant_name_id, taxon_name, taxon_status, accepted_plant_name_id, family, genus, species, taxon_authors, powo_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"
       )
 
     names = [
       [
         "100",
         "Quercus alba",
+        "Accepted",
+        "100",
         "Fagaceae",
         "Quercus",
         "alba",
@@ -60,16 +64,30 @@ defmodule Gallformers.Wcvp.LookupTest do
       [
         "101",
         "Quercus rubra",
+        "Accepted",
+        "101",
         "Fagaceae",
         "Quercus",
         "rubra",
         "L.",
         "urn:lsid:ipni.org:names:295776-1"
       ],
-      ["102", "Quercus velutina", "Fagaceae", "Quercus", "velutina", "Lam.", nil],
+      [
+        "102",
+        "Quercus velutina",
+        "Accepted",
+        "102",
+        "Fagaceae",
+        "Quercus",
+        "velutina",
+        "Lam.",
+        nil
+      ],
       [
         "200",
         "Rosa carolina",
+        "Accepted",
+        "200",
         "Rosaceae",
         "Rosa",
         "carolina",
@@ -79,6 +97,8 @@ defmodule Gallformers.Wcvp.LookupTest do
       [
         "300",
         "Alnus alnobetula subsp. sinuata",
+        "Accepted",
+        "300",
         "Betulaceae",
         "Alnus",
         "alnobetula",
@@ -88,10 +108,23 @@ defmodule Gallformers.Wcvp.LookupTest do
       [
         "301",
         "Alnus incana",
+        "Accepted",
+        "301",
         "Betulaceae",
         "Alnus",
         "incana",
         "(L.) Moench",
+        nil
+      ],
+      [
+        "400",
+        "Quercus borealis",
+        "Synonym",
+        "101",
+        "Fagaceae",
+        "Quercus",
+        "borealis",
+        "F.Michx.",
         nil
       ]
     ]
@@ -232,6 +265,58 @@ defmodule Gallformers.Wcvp.LookupTest do
 
     test "returns nil for nonexistent plant_name_id" do
       assert Lookup.get("999") == nil
+    end
+  end
+
+  describe "search/2 with include_synonyms" do
+    test "excludes synonyms by default" do
+      results = Lookup.search("Quercus")
+      assert length(results) == 3
+      refute Enum.any?(results, fn r -> r.taxon_status == "Synonym" end)
+    end
+
+    test "includes synonyms when option is set" do
+      results = Lookup.search("Quercus", include_synonyms: true)
+      assert length(results) == 4
+      assert Enum.any?(results, fn r -> r.taxon_status == "Synonym" end)
+    end
+
+    test "includes taxon_status and accepted_plant_name_id in results" do
+      [result | _] = Lookup.search("Quercus alba")
+      assert Map.has_key?(result, :taxon_status)
+      assert Map.has_key?(result, :accepted_plant_name_id)
+      assert result.taxon_status == "Accepted"
+    end
+  end
+
+  describe "search_contains/2 with include_synonyms" do
+    test "excludes synonyms by default" do
+      results = Lookup.search_contains("Quercus")
+      assert length(results) == 3
+      refute Enum.any?(results, fn r -> r.taxon_status == "Synonym" end)
+    end
+
+    test "includes synonyms when option is set" do
+      results = Lookup.search_contains("Quercus", include_synonyms: true)
+      assert length(results) == 4
+      assert Enum.any?(results, fn r -> r.taxon_status == "Synonym" end)
+    end
+  end
+
+  describe "get_accepted_name/1" do
+    test "returns accepted name for a synonym" do
+      result = Lookup.get_accepted_name("400")
+      assert result.plant_name_id == "101"
+      assert result.taxon_name == "Quercus rubra"
+      assert result.taxon_status == "Accepted"
+    end
+
+    test "returns nil for an already-accepted name" do
+      assert Lookup.get_accepted_name("100") == nil
+    end
+
+    test "returns nil for nonexistent plant_name_id" do
+      assert Lookup.get_accepted_name("999") == nil
     end
   end
 end
