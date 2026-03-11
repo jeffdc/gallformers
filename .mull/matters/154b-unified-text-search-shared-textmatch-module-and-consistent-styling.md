@@ -1,5 +1,5 @@
 ---
-status: raw
+status: done
 created: 2026-03-11
 updated: 2026-03-11
 epic: platform
@@ -69,4 +69,3 @@ Update `.search_input` component to accept a `size` attr (`:default` | `:sm`), d
 ### 4. Host range page toolbar
 
 Replace the raw `<input>` with `.search_input` using the new `:sm` size. All toolbar elements (filters + search) will share consistent `.gf-select` / `.gf-search-input-sm` sizing.
-
