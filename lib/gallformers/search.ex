@@ -13,6 +13,7 @@ defmodule Gallformers.Search do
   alias Gallformers.Places.Place
   alias Gallformers.Repo
   alias Gallformers.Search.Ranking
+  alias Gallformers.Search.TextMatch
   alias Gallformers.Sources.Source
   alias Gallformers.Species.{Alias, Species}
   alias Gallformers.Taxonomy.Taxonomy
@@ -451,12 +452,10 @@ defmodule Gallformers.Search do
   """
   @spec search_glossary(String.t()) :: [map()]
   def search_glossary(query) do
-    search_term = "%#{String.downcase(query)}%"
+    filter = TextMatch.build_filter(query, [:word, :definition])
 
     from(g in Glossary,
-      where:
-        fragment("lower(?) LIKE ?", g.word, ^search_term) or
-          fragment("lower(?) LIKE ?", g.definition, ^search_term),
+      where: ^filter,
       order_by: g.word,
       select: %{
         id: g.id,
@@ -473,12 +472,10 @@ defmodule Gallformers.Search do
   """
   @spec search_sources(String.t()) :: [map()]
   def search_sources(query) do
-    search_term = "%#{String.downcase(query)}%"
+    filter = TextMatch.build_filter(query, [:title, :author])
 
     from(s in Source,
-      where:
-        fragment("lower(?) LIKE ?", s.title, ^search_term) or
-          fragment("lower(?) LIKE ?", s.author, ^search_term),
+      where: ^filter,
       order_by: s.title,
       select: %{
         id: s.id,
@@ -533,12 +530,10 @@ defmodule Gallformers.Search do
   """
   @spec search_places(String.t()) :: [map()]
   def search_places(query) do
-    search_term = "%#{String.downcase(query)}%"
+    filter = TextMatch.build_filter(query, [:name, :code])
 
     from(p in Place,
-      where:
-        fragment("lower(?) LIKE ?", p.name, ^search_term) or
-          fragment("lower(?) LIKE ?", p.code, ^search_term),
+      where: ^filter,
       order_by: p.name,
       select: %{
         id: p.id,

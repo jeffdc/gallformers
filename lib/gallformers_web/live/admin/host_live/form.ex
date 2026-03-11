@@ -19,7 +19,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   alias GallformersWeb.Admin.PowoDiffReview
 
   import GallformersWeb.Admin.FormComponents,
-    only: [alias_collision_warning: 1, alias_editor: 1, form_actions: 1]
+    only: [alias_collision_warning: 1, alias_editor: 1]
 
   import GallformersWeb.Admin.ReclassifyHelpers
 
@@ -126,23 +126,9 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   end
 
   @impl true
-  def handle_event("save", %{"species" => params}, socket) do
-    cond do
-      socket.assigns.genus_is_new && is_nil(socket.assigns.selected_family_id) ->
-        {:noreply, put_flash(socket, :error, "Please select a Family for the new genus")}
-
-      socket.assigns.range_entries == %{} ->
-        {:noreply, put_flash(socket, :error, "Host must have at least one range entry")}
-
-      true ->
-        # Name is captured via typeahead (outside the form), so add it from socket assigns
-        params =
-          params
-          |> Map.put("taxoncode", "plant")
-          |> Map.put("name", socket.assigns.host.name)
-
-        save_host(socket, socket.assigns.mode, params)
-    end
+  def handle_event("save", %{"species" => params} = full_params, socket) do
+    confirm_range = full_params["confirm_range"] == "true"
+    do_save(socket, params, confirm_range)
   end
 
   @impl true
@@ -265,9 +251,9 @@ defmodule GallformersWeb.Admin.HostLive.Form do
       if host_traits && host_traits.wcvp_id not in [nil, ""] do
         Wcvp.Lookup.get(host_traits.wcvp_id)
       else
-        case Wcvp.Lookup.search(host.name, limit: 1) do
-          [match] -> Wcvp.Lookup.get(match.plant_name_id)
-          [] -> nil
+        case Wcvp.Lookup.match_by_name(host.name, resolve_synonyms: true) do
+          %{plant_name_id: id} -> Wcvp.Lookup.get(id)
+          nil -> nil
         end
       end
 
@@ -517,31 +503,24 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
     host_ranges =
       socket.assigns.range_entries
-      |> Enum.map(fn {code, %{precision: precision}} ->
+      |> Enum.map(fn {code, %{precision: precision, distribution_type: dt}} ->
         case Map.get(place_by_code, code) do
-          %{id: id} -> %{code: code, precision: precision, place_id: id}
-          nil -> nil
+          %{id: id} ->
+            %{code: code, precision: precision, place_id: id, distribution_type: dt}
+
+          nil ->
+            nil
         end
       end)
       |> Enum.reject(&is_nil/1)
 
-    display = Ranges.compute_display_range(host_ranges)
-
-    introduced_codes =
-      socket.assigns.range_entries
-      |> Enum.filter(fn {_code, %{distribution_type: dt}} -> dt == "introduced" end)
-      |> MapSet.new(fn {code, _} -> code end)
-
-    introduced_range =
-      (display.in_range ++ display.inherited_range)
-      |> Enum.filter(&MapSet.member?(introduced_codes, &1))
-
+    display = Ranges.compute_display_range(host_ranges, with_introduced: true)
     range_bounds = Places.get_bounds_for_codes(display.in_range ++ display.inherited_range)
 
     socket
     |> assign(:in_range, display.in_range)
     |> assign(:inherited_range, display.inherited_range)
-    |> assign(:introduced_range, introduced_range)
+    |> assign(:introduced_range, display.introduced_range)
     |> assign(:range_bounds, range_bounds)
   end
 
@@ -753,6 +732,33 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> assign(:sections_for_family, sections_for_family)
   end
 
+  defp do_save(socket, params, confirm_range) do
+    cond do
+      socket.assigns.genus_is_new && is_nil(socket.assigns.selected_family_id) ->
+        {:noreply, put_flash(socket, :error, "Please select a Family for the new genus")}
+
+      socket.assigns.range_entries == %{} ->
+        {:noreply, put_flash(socket, :error, "Host must have at least one range entry")}
+
+      true ->
+        # Name is captured via typeahead (outside the form), so add it from socket assigns
+        params =
+          params
+          |> Map.put("taxoncode", "plant")
+          |> Map.put("name", socket.assigns.host.name)
+
+        socket =
+          if confirm_range do
+            traits = socket.assigns[:pending_host_traits] || %{}
+            assign(socket, :pending_host_traits, Map.put(traits, :range_confirmed, true))
+          else
+            socket
+          end
+
+        save_host(socket, socket.assigns.mode, params)
+    end
+  end
+
   defp save_host(socket, :new, params) do
     create_params = %{
       species_attrs: params,
@@ -802,6 +808,9 @@ defmodule GallformersWeb.Admin.HostLive.Form do
       host_traits: socket.assigns[:pending_host_traits]
     }
 
+    confirmed_range =
+      get_in(socket.assigns, [:pending_host_traits, :range_confirmed]) == true
+
     case Plants.update_host_with_associations(socket.assigns.host, update_params) do
       {:ok, updated_host} ->
         aliases = Plants.get_aliases_for_host_full(host_id)
@@ -809,6 +818,11 @@ defmodule GallformersWeb.Admin.HostLive.Form do
         range_entries = place_entries_to_range_entries(place_entries)
 
         taxonomy = Taxonomy.get_taxonomy_for_species(host_id)
+
+        message =
+          if confirmed_range,
+            do: "Host saved and range confirmed",
+            else: "Host saved successfully"
 
         {:noreply,
          socket
@@ -821,7 +835,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
          |> assign(:original_range_entries, range_entries)
          |> compute_map_range()
          |> reset_dirty()
-         |> put_flash(:info, "Host saved successfully")}
+         |> put_flash(:info, message)}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign(socket, :form, to_form(changeset))}
@@ -907,11 +921,12 @@ defmodule GallformersWeb.Admin.HostLive.Form do
   # =================================================================
 
   @impl true
-  def handle_info({CountryDrillDown, {:set_country_level, code, true}}, socket) do
+  def handle_info({CountryDrillDown, {:set_country_level, code, type}}, socket)
+      when type in ["native", "introduced"] do
     new_entries =
       Map.put(socket.assigns.range_entries, code, %{
         precision: "country",
-        distribution_type: "native"
+        distribution_type: type
       })
 
     {:noreply,
@@ -928,15 +943,6 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     {:noreply,
      socket
      |> assign(:range_entries, new_entries)
-     |> compute_map_range()
-     |> mark_dirty()}
-  end
-
-  @impl true
-  def handle_info({CountryDrillDown, {:toggle_exact, code}}, socket) do
-    {:noreply,
-     socket
-     |> assign(:range_entries, cycle_range_entry(socket.assigns.range_entries, code))
      |> compute_map_range()
      |> mark_dirty()}
   end
@@ -1402,7 +1408,27 @@ defmodule GallformersWeb.Admin.HostLive.Form do
                   Delete
                 </button>
               </div>
-              <.form_actions form_dirty={@form_dirty} mode={@mode} />
+              <div class="flex gap-2">
+                <button type="button" phx-click="request_cancel" class="gf-btn gf-btn-soft">
+                  Cancel
+                </button>
+                <button
+                  :if={@mode == :edit && @host_traits && !@host_traits.range_confirmed}
+                  type="submit"
+                  name="confirm_range"
+                  value="true"
+                  class="gf-btn bg-green-600 text-white hover:bg-green-700"
+                >
+                  Save &amp; Confirm Range
+                </button>
+                <button
+                  type="submit"
+                  disabled={not @form_dirty}
+                  class="gf-btn gf-btn-primary"
+                >
+                  {if @mode == :new, do: "Create", else: "Save"}
+                </button>
+              </div>
             </div>
           </.form>
 

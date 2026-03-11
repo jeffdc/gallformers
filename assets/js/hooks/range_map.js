@@ -210,7 +210,6 @@ const RangeMap = {
         ? { inRange: COLORS.placeHighlight, inheritedRange: COLORS.placeHighlightLight }
         : null
       this.updateChoropleth()
-      this.fitToRange(true)
     }
   },
 

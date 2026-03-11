@@ -12,6 +12,7 @@ defmodule GallformersWeb.FormComponents do
   import GallformersWeb.DataDisplayComponents, only: [taxon_name: 1]
   import GallformersWeb.UIComponents, only: [alert: 1]
 
+  alias Gallformers.Search.TextMatch
   alias Phoenix.LiveView.JS
 
   @doc """
@@ -80,13 +81,20 @@ defmodule GallformersWeb.FormComponents do
   attr :placeholder, :string, default: "Search...", doc: "placeholder text"
   attr :label, :string, default: nil, doc: "accessible label for screen readers"
   attr :class, :any, default: nil, doc: "additional CSS classes"
+  attr :size, :atom, values: [:default, :sm], default: :default, doc: "input size variant"
   attr :rest, :global, include: ~w(phx-change phx-submit phx-debounce form data-typeahead-input)
 
   def search_input(assigns) do
     ~H"""
     <div class={["relative", @class]}>
-      <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-        <.icon name="ph-magnifying-glass" class="size-5 text-gray-400" />
+      <div class={[
+        "absolute inset-y-0 left-0 flex items-center pointer-events-none",
+        if(@size == :sm, do: "pl-2.5", else: "pl-3")
+      ]}>
+        <.icon
+          name="ph-magnifying-glass"
+          class={if(@size == :sm, do: "size-4 text-gray-400", else: "size-5 text-gray-400")}
+        />
       </div>
       <input
         type="search"
@@ -95,7 +103,7 @@ defmodule GallformersWeb.FormComponents do
         value={@value}
         placeholder={@placeholder}
         aria-label={@label || @placeholder}
-        class="gf-search-input"
+        class={if(@size == :sm, do: "gf-search-input-sm", else: "gf-search-input")}
         {@rest}
       />
     </div>
@@ -524,13 +532,11 @@ defmodule GallformersWeb.FormComponents do
       # Options and selected items typically have same structure, use item_id for both
       options != nil ->
         selected_ids = MapSet.new(Enum.map(selected, &get_item_id(&1, item_id)))
-        search_lower = String.downcase(query)
 
         options
         |> Enum.reject(&MapSet.member?(selected_ids, get_item_id(&1, item_id)))
         |> Enum.filter(fn opt ->
-          query == "" ||
-            String.contains?(String.downcase(get_display_label(opt, result_label)), search_lower)
+          TextMatch.matches_all_terms?(query, get_display_label(opt, result_label))
         end)
 
       # No options provided
@@ -814,14 +820,12 @@ defmodule GallformersWeb.FormComponents do
     selected_options = Enum.filter(assigns.options, fn opt -> opt.id in assigns.selected end)
 
     # Filter available options based on query
-    query_lower = String.downcase(assigns.query)
-
     filtered_options =
       assigns.options
       |> Enum.reject(fn opt -> opt.id in assigns.selected end)
       |> Enum.filter(fn opt ->
         label = Map.get(opt, option_label, "")
-        assigns.query == "" or String.contains?(String.downcase(label), query_lower)
+        TextMatch.matches_all_terms?(assigns.query, label)
       end)
 
     assigns =

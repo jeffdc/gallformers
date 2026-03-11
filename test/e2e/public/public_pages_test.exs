@@ -30,8 +30,7 @@ defmodule GallformersWeb.E2E.PublicPagesTest do
     test "loads successfully", %{session: session} do
       session
       |> visit("/about")
-      |> assert_has(css(".phx-connected"))
-      |> assert_has(css("h1", text: "About"))
+      |> assert_has(css("h1", text: "About Us"))
     end
   end
 
@@ -47,7 +46,7 @@ defmodule GallformersWeb.E2E.PublicPagesTest do
     test "loads successfully", %{session: session} do
       session
       |> visit("/filterguide")
-      |> assert_has(css(".phx-connected"))
+      |> assert_has(css("h1", text: "ID Tool Filter Guide"))
     end
   end
 
@@ -63,7 +62,7 @@ defmodule GallformersWeb.E2E.PublicPagesTest do
     test "loads successfully", %{session: session} do
       session
       |> visit("/articles")
-      |> assert_has(css(".phx-connected"))
+      |> assert_has(css("h1", text: "Gallformers Articles"))
     end
   end
 end

@@ -14,25 +14,42 @@ defmodule GallformersWeb.Admin.HostRangeLive do
 
   @impl true
   def mount(_params, session, socket) do
-    current_user = session["current_user"]
-
     socket =
       socket
-      |> assign(:current_user, current_user)
+      |> assign(:current_user, session["current_user"])
       |> assign(:page_title, "Host Range Review")
-      |> assign(:filter, :unconfirmed)
-      |> assign(:wcvp_filter, :all)
-      |> assign(:range_filter, :all)
-      |> assign(:search, "")
       |> assign(:selected_ids, MapSet.new())
       |> assign(:syncing, nil)
-      |> assign(:current_page, 1)
+      |> assign(:confirm_action, nil)
+      |> assign(:sync_results, nil)
       |> assign(:page_size, @page_size)
       |> assign(:total_count, 0)
+      |> assign(:hosts, [])
       |> assign(:wcvp_built_at, Wcvp.Lookup.built_at())
-      |> load_hosts()
 
     {:ok, socket}
+  end
+
+  @impl true
+  def handle_params(params, _uri, socket) do
+    socket =
+      socket
+      |> assign(
+        :filter,
+        parse_atom_param(params["filter"], ~w(all confirmed unconfirmed), :unconfirmed)
+      )
+      |> assign(:wcvp_filter, parse_atom_param(params["wcvp"], ~w(yes no all), :all))
+      |> assign(:range_filter, parse_atom_param(params["range"], ~w(yes no all), :all))
+      |> assign(
+        :sync_status,
+        parse_atom_param(params["sync_status"], ~w(never stale current all), :all)
+      )
+      |> assign(:search, params["search"] || "")
+      |> assign(:current_page, parse_int_param(params["page"], 1))
+      |> assign(:selected_ids, MapSet.new())
+      |> load_hosts()
+
+    {:noreply, socket}
   end
 
   # ============================================
@@ -41,74 +58,32 @@ defmodule GallformersWeb.Admin.HostRangeLive do
 
   @impl true
   def handle_event("filter", %{"value" => value}, socket) do
-    filter =
-      case value do
-        "all" -> :all
-        "confirmed" -> :confirmed
-        _ -> :unconfirmed
-      end
-
-    {:noreply,
-     socket
-     |> assign(:filter, filter)
-     |> assign(:current_page, 1)
-     |> assign(:selected_ids, MapSet.new())
-     |> load_hosts()}
+    {:noreply, push_filter_patch(socket, filter: value, page: nil)}
   end
 
   @impl true
   def handle_event("wcvp_filter", %{"value" => value}, socket) do
-    wcvp_filter =
-      case value do
-        "yes" -> :yes
-        "no" -> :no
-        _ -> :all
-      end
-
-    {:noreply,
-     socket
-     |> assign(:wcvp_filter, wcvp_filter)
-     |> assign(:current_page, 1)
-     |> assign(:selected_ids, MapSet.new())
-     |> load_hosts()}
+    {:noreply, push_filter_patch(socket, wcvp: value, page: nil)}
   end
 
   @impl true
   def handle_event("range_filter", %{"value" => value}, socket) do
-    range_filter =
-      case value do
-        "yes" -> :yes
-        "no" -> :no
-        _ -> :all
-      end
+    {:noreply, push_filter_patch(socket, range: value, page: nil)}
+  end
 
-    {:noreply,
-     socket
-     |> assign(:range_filter, range_filter)
-     |> assign(:current_page, 1)
-     |> assign(:selected_ids, MapSet.new())
-     |> load_hosts()}
+  @impl true
+  def handle_event("sync_status_filter", %{"value" => value}, socket) do
+    {:noreply, push_filter_patch(socket, sync_status: value, page: nil)}
   end
 
   @impl true
   def handle_event("search", %{"value" => value}, socket) do
-    {:noreply,
-     socket
-     |> assign(:search, value)
-     |> assign(:current_page, 1)
-     |> assign(:selected_ids, MapSet.new())
-     |> load_hosts()}
+    {:noreply, push_filter_patch(socket, search: value, page: nil)}
   end
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
-    page = max(1, min(page, total_pages(socket)))
-
-    {:noreply,
-     socket
-     |> assign(:current_page, page)
-     |> assign(:selected_ids, MapSet.new())
-     |> load_hosts()}
+    {:noreply, push_filter_patch(socket, page: page)}
   end
 
   # ============================================
@@ -148,27 +123,41 @@ defmodule GallformersWeb.Admin.HostRangeLive do
   # Bulk actions
   # ============================================
 
+  # Show confirmation modals
   @impl true
   def handle_event("confirm_selected", _params, socket) do
-    ids = MapSet.to_list(socket.assigns.selected_ids)
-
-    if ids != [] do
-      {count, _} = Plants.bulk_confirm_host_ranges(ids)
-
-      socket =
-        socket
-        |> assign(:selected_ids, MapSet.new())
-        |> load_hosts()
-        |> put_flash(:info, "Confirmed range for #{count} host(s)")
-
-      {:noreply, socket}
-    else
-      {:noreply, put_flash(socket, :error, "No hosts selected")}
-    end
+    {:noreply, assign(socket, :confirm_action, :confirm)}
   end
 
   @impl true
   def handle_event("sync_selected", _params, socket) do
+    {:noreply, assign(socket, :confirm_action, :sync)}
+  end
+
+  @impl true
+  def handle_event("cancel_confirm", _params, socket) do
+    {:noreply, assign(socket, :confirm_action, nil)}
+  end
+
+  # Execute confirmed actions
+  @impl true
+  def handle_event("do_confirm_selected", _params, socket) do
+    ids = MapSet.to_list(socket.assigns.selected_ids)
+
+    {count, _} = Plants.bulk_confirm_host_ranges(ids)
+
+    socket =
+      socket
+      |> assign(:confirm_action, nil)
+      |> assign(:selected_ids, MapSet.new())
+      |> load_hosts()
+      |> put_flash(:info, "Confirmed range for #{count} host(s)")
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("do_sync_selected", _params, socket) do
     hosts = socket.assigns.hosts
     selected_ids = socket.assigns.selected_ids
 
@@ -177,14 +166,21 @@ defmodule GallformersWeb.Admin.HostRangeLive do
         MapSet.member?(selected_ids, host.id)
       end)
 
-    if hosts_to_sync == [] do
-      {:noreply, put_flash(socket, :error, "No hosts selected")}
-    else
-      ref_data = Plants.load_sync_ref_data()
-      send(self(), {:sync_next, hosts_to_sync, %{synced: 0, no_match: 0, failed: 0}, ref_data})
+    ref_data = Plants.load_sync_ref_data()
 
-      {:noreply, assign(socket, :syncing, %{total: length(hosts_to_sync), done: 0})}
-    end
+    summary = %{synced: 0, no_match: [], failed: []}
+    send(self(), {:sync_next, hosts_to_sync, summary, ref_data})
+
+    {:noreply,
+     socket
+     |> assign(:confirm_action, nil)
+     |> assign(:syncing, %{total: length(hosts_to_sync), done: 0})}
+  end
+
+  # Dismiss sync results modal
+  @impl true
+  def handle_event("dismiss_sync_results", _params, socket) do
+    {:noreply, assign(socket, :sync_results, nil)}
   end
 
   # ============================================
@@ -193,15 +189,18 @@ defmodule GallformersWeb.Admin.HostRangeLive do
 
   @impl true
   def handle_info({:sync_next, [], summary, _ref_data}, socket) do
+    results = %{
+      synced: summary.synced,
+      no_match: Enum.reverse(summary.no_match),
+      failed: Enum.reverse(summary.failed)
+    }
+
     socket =
       socket
       |> assign(:syncing, nil)
       |> assign(:selected_ids, MapSet.new())
+      |> assign(:sync_results, results)
       |> load_hosts()
-      |> put_flash(
-        :info,
-        "WCVP sync complete: #{summary.synced} synced, #{summary.no_match} not matched, #{summary.failed} failed"
-      )
 
     {:noreply, socket}
   end
@@ -214,10 +213,10 @@ defmodule GallformersWeb.Admin.HostRangeLive do
           %{summary | synced: summary.synced + 1}
 
         {:error, "No WCVP match found" <> _} ->
-          %{summary | no_match: summary.no_match + 1}
+          %{summary | no_match: [host.name | summary.no_match]}
 
-        {:error, _} ->
-          %{summary | failed: summary.failed + 1}
+        {:error, _reason} ->
+          %{summary | failed: [host.name | summary.failed]}
       end
 
     send(self(), {:sync_next, rest, updated_summary, ref_data})
@@ -240,6 +239,7 @@ defmodule GallformersWeb.Admin.HostRangeLive do
       filter: socket.assigns.filter,
       wcvp_match: socket.assigns.wcvp_filter,
       has_range: socket.assigns.range_filter,
+      sync_status: socket.assigns.sync_status,
       search: socket.assigns.search,
       limit: page_size,
       offset: (page - 1) * page_size,
@@ -254,12 +254,58 @@ defmodule GallformersWeb.Admin.HostRangeLive do
     |> assign(:total_count, total_count)
   end
 
-  defp total_pages(socket) do
-    max(1, ceil(socket.assigns.total_count / socket.assigns.page_size))
-  end
-
   defp format_synced_at(nil), do: "Never"
   defp format_synced_at(datetime), do: format_date(datetime, :short)
+
+  @filter_defaults %{
+    filter: "unconfirmed",
+    wcvp: "all",
+    range: "all",
+    sync_status: "all",
+    search: "",
+    page: "1"
+  }
+
+  defp push_filter_patch(socket, overrides) do
+    current = %{
+      filter: to_string(socket.assigns.filter),
+      wcvp: to_string(socket.assigns.wcvp_filter),
+      range: to_string(socket.assigns.range_filter),
+      sync_status: to_string(socket.assigns.sync_status),
+      search: socket.assigns.search,
+      page: to_string(socket.assigns.current_page)
+    }
+
+    merged = Map.merge(current, Map.new(overrides, fn {k, v} -> {k, to_string(v || "")} end))
+
+    # Only include non-default params in URL
+    params =
+      Enum.reduce(merged, %{}, fn {key, val}, acc ->
+        if val != "" and val != Map.get(@filter_defaults, key) do
+          Map.put(acc, key, val)
+        else
+          acc
+        end
+      end)
+
+    push_patch(socket, to: ~p"/admin/host-range?#{params}")
+  end
+
+  defp parse_atom_param(nil, _valid, default), do: default
+  defp parse_atom_param("", _valid, default), do: default
+
+  defp parse_atom_param(value, valid_strings, default) do
+    if value in valid_strings, do: String.to_existing_atom(value), else: default
+  end
+
+  defp parse_int_param(nil, default), do: default
+
+  defp parse_int_param(value, default) do
+    case Integer.parse(value) do
+      {n, ""} when n >= 1 -> n
+      _ -> default
+    end
+  end
 
   # ============================================
   # Template
@@ -297,55 +343,70 @@ defmodule GallformersWeb.Admin.HostRangeLive do
             <div class="mb-4 flex flex-wrap items-center gap-4">
               <div class="flex items-center gap-2">
                 <label class="text-sm font-medium text-gray-700">Status:</label>
-                <select
-                  phx-change="filter"
-                  name="value"
-                  class="text-sm border-gray-300 rounded"
-                >
-                  <option value="unconfirmed" selected={@filter == :unconfirmed}>Unconfirmed</option>
-                  <option value="confirmed" selected={@filter == :confirmed}>Confirmed</option>
-                  <option value="all" selected={@filter == :all}>All</option>
-                </select>
+                <form phx-change="filter" id="filter" class="w-40">
+                  <.input
+                    type="select"
+                    name="value"
+                    options={[
+                      {"Unconfirmed", "unconfirmed"},
+                      {"Confirmed", "confirmed"},
+                      {"All", "all"}
+                    ]}
+                    value={@filter}
+                  />
+                </form>
               </div>
 
               <div class="flex items-center gap-2">
                 <label class="text-sm font-medium text-gray-700">WCVP:</label>
-                <select
-                  phx-change="wcvp_filter"
-                  name="value"
-                  class="text-sm border-gray-300 rounded"
-                >
-                  <option value="all" selected={@wcvp_filter == :all}>All</option>
-                  <option value="yes" selected={@wcvp_filter == :yes}>Has match</option>
-                  <option value="no" selected={@wcvp_filter == :no}>No match</option>
-                </select>
+                <form phx-change="wcvp_filter" id="wcvp_filter" class="w-30">
+                  <.input
+                    type="select"
+                    name="value"
+                    options={[{"All", "all"}, {"Has match", "yes"}, {"No match", "no"}]}
+                    value={@wcvp_filter}
+                  />
+                </form>
               </div>
 
               <div class="flex items-center gap-2">
                 <label class="text-sm font-medium text-gray-700">Range:</label>
-                <select
-                  phx-change="range_filter"
-                  name="value"
-                  class="text-sm border-gray-300 rounded"
-                >
-                  <option value="all" selected={@range_filter == :all}>All</option>
-                  <option value="yes" selected={@range_filter == :yes}>Has range</option>
-                  <option value="no" selected={@range_filter == :no}>No range</option>
-                </select>
+                <form phx-change="range_filter" id="range_filter" class="w-35">
+                  <.input
+                    type="select"
+                    name="value"
+                    options={[{"All", "all"}, {"Has range", "yes"}, {"No range", "no"}]}
+                    value={@range_filter}
+                  />
+                </form>
               </div>
 
               <div class="flex items-center gap-2">
-                <.icon name="ph-magnifying-glass" class="h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  name="value"
-                  value={@search}
-                  phx-keyup="search"
-                  phx-debounce="300"
-                  placeholder="Search by name..."
-                  class="text-sm border-gray-300 rounded w-48"
-                />
+                <label class="text-sm font-medium text-gray-700">Sync:</label>
+                <form phx-change="sync_status_filter" id="sync_status_filter" class="w-35">
+                  <.input
+                    type="select"
+                    name="value"
+                    options={[
+                      {"All", "all"},
+                      {"Never synched", "never"},
+                      {"Stale", "stale"},
+                      {"Current", "current"}
+                    ]}
+                    value={@sync_status}
+                  />
+                </form>
               </div>
+
+              <.search_input
+                id="host-range-search"
+                name="value"
+                value={@search}
+                placeholder="Search by host name, genus, or family..."
+                size={:sm}
+                phx-keyup="search"
+                phx-debounce="300"
+              />
             </div>
 
             <%!-- Sync progress bar --%>
@@ -478,6 +539,95 @@ defmodule GallformersWeb.Admin.HostRangeLive do
           </div>
         </div>
       </div>
+
+      <%!-- Confirmation modal --%>
+      <.modal
+        :if={@confirm_action == :confirm}
+        id="confirm-modal"
+        show
+        on_cancel={JS.push("cancel_confirm")}
+      >
+        <:header>Confirm Host Ranges</:header>
+        <:body>
+          <p class="text-gray-600">
+            Mark range as confirmed for <strong>{MapSet.size(@selected_ids)}</strong> host(s)?
+          </p>
+        </:body>
+        <:footer>
+          <.button type="button" variant="secondary" phx-click="cancel_confirm">Cancel</.button>
+          <.button type="button" variant="primary" phx-click="do_confirm_selected">
+            Confirm
+          </.button>
+        </:footer>
+      </.modal>
+
+      <.modal
+        :if={@confirm_action == :sync}
+        id="sync-confirm-modal"
+        show
+        on_cancel={JS.push("cancel_confirm")}
+      >
+        <:header>Sync from WCVP</:header>
+        <:body>
+          <p class="text-gray-600">
+            Sync range data from WCVP for <strong>{MapSet.size(@selected_ids)}</strong> host(s)?
+          </p>
+          <p class="text-sm text-gray-500 mt-2">
+            Hosts without a WCVP match will be skipped.
+          </p>
+        </:body>
+        <:footer>
+          <.button type="button" variant="secondary" phx-click="cancel_confirm">Cancel</.button>
+          <.button type="button" variant="primary" phx-click="do_sync_selected">
+            Sync
+          </.button>
+        </:footer>
+      </.modal>
+
+      <%!-- Sync results modal --%>
+      <.modal
+        :if={@sync_results}
+        id="sync-results-modal"
+        show
+        on_cancel={JS.push("dismiss_sync_results")}
+      >
+        <:header>WCVP Sync Complete</:header>
+        <:body>
+          <div class="space-y-3">
+            <div class="flex items-center gap-2 text-green-700">
+              <.icon name="ph-check-circle" class="h-5 w-5" />
+              <span><strong>{@sync_results.synced}</strong> host(s) synced</span>
+            </div>
+            <div :if={@sync_results.no_match != []} class="text-amber-700">
+              <div class="flex items-center gap-2">
+                <.icon name="ph-warning" class="h-5 w-5" />
+                <span><strong>{length(@sync_results.no_match)}</strong> not matched:</span>
+              </div>
+              <ul class="ml-7 mt-1 text-sm list-disc">
+                <li :for={name <- @sync_results.no_match}>
+                  <.taxon_name name={name} />
+                </li>
+              </ul>
+            </div>
+            <div :if={@sync_results.failed != []} class="text-red-700">
+              <div class="flex items-center gap-2">
+                <.icon name="ph-x-circle" class="h-5 w-5" />
+                <span><strong>{length(@sync_results.failed)}</strong> failed:</span>
+              </div>
+              <ul class="ml-7 mt-1 text-sm list-disc">
+                <li :for={name <- @sync_results.failed}>
+                  <.taxon_name name={name} />
+                </li>
+              </ul>
+            </div>
+          </div>
+        </:body>
+        <:footer>
+          <.button type="button" variant="primary" phx-click="dismiss_sync_results">
+            Close
+          </.button>
+        </:footer>
+      </.modal>
     </Layouts.admin>
     """
   end

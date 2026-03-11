@@ -346,6 +346,23 @@ defmodule Gallformers.Wcvp.LookupTest do
     test "returns nil for synonym name (only matches accepted)" do
       assert Lookup.match_by_name("Quercus borealis") == nil
     end
+
+    test "resolves synonym to accepted name when resolve_synonyms is true" do
+      result = Lookup.match_by_name("Quercus borealis", resolve_synonyms: true)
+      assert result.plant_name_id == "101"
+      assert result.taxon_name == "Quercus rubra"
+      assert result.taxon_status == "Accepted"
+    end
+
+    test "still returns accepted name directly with resolve_synonyms" do
+      result = Lookup.match_by_name("Quercus alba", resolve_synonyms: true)
+      assert result.plant_name_id == "100"
+      assert result.taxon_name == "Quercus alba"
+    end
+
+    test "returns nil for non-existent name even with resolve_synonyms" do
+      assert Lookup.match_by_name("Nonexistent species", resolve_synonyms: true) == nil
+    end
   end
 
   describe "get_accepted_name/1" do

@@ -8,6 +8,7 @@ defmodule Gallformers.Places do
   import Ecto.Query
   alias Gallformers.Places.Place
   alias Gallformers.Repo
+  alias Gallformers.Search.TextMatch
   alias Gallformers.Species.Species
 
   # Bounding boxes per place code, extracted from PMTiles by extract_bounds.py.
@@ -193,10 +194,10 @@ defmodule Gallformers.Places do
   """
   @spec search_places(String.t(), integer()) :: [Place.t()]
   def search_places(query, limit \\ 20) do
-    search_pattern = "%#{String.downcase(query)}%"
+    filter = TextMatch.build_filter(query, [:name])
 
     from(p in Place,
-      where: fragment("lower(?) LIKE ?", p.name, ^search_pattern),
+      where: ^filter,
       order_by: p.name,
       limit: ^limit
     )

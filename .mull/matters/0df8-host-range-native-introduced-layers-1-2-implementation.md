@@ -3,7 +3,7 @@ status: done
 created: 2026-03-10
 updated: 2026-03-10
 epic: geo-expansion
-relates: [be9d, b9e5]
+relates: [be9d, b9e5, 7157]
 blocks: [600a, 6b43]
 needs: [383e]
 docket: true

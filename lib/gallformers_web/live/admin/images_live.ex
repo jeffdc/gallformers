@@ -17,6 +17,7 @@ defmodule GallformersWeb.Admin.ImagesLive do
   alias Gallformers.Images
   alias Gallformers.Images.Image
   alias Gallformers.Licenses
+  alias Gallformers.Search.TextMatch
   alias Gallformers.Sources
   alias Gallformers.Storage
 
@@ -1209,15 +1210,12 @@ defmodule GallformersWeb.Admin.ImagesLive do
   def handle_event("search_source", %{"value" => query}, socket) do
     results =
       if String.length(query) >= 1 do
-        search_term = String.downcase(query)
-
         socket.assigns.source_options
         |> Enum.filter(fn source ->
           title = source.title || ""
           author = source.author || ""
 
-          String.contains?(String.downcase(title), search_term) ||
-            String.contains?(String.downcase(author), search_term)
+          TextMatch.matches_all_terms?(query, "#{title} #{author}")
         end)
         |> Enum.take(10)
       else

@@ -13,6 +13,7 @@ defmodule Gallformers.Images do
   alias Gallformers.Images.Image, as: ImageSchema
   alias Gallformers.Licenses
   alias Gallformers.Repo
+  alias Gallformers.Search.TextMatch
   alias Gallformers.Species.Species
   alias Gallformers.Storage
 
@@ -366,12 +367,12 @@ defmodule Gallformers.Images do
   """
   @spec search_species(String.t()) :: [map()]
   def search_species(query) when is_binary(query) do
-    search_term = "%#{String.downcase(query)}%"
+    filter = TextMatch.build_filter(query, [:name])
 
     from(s in Species,
       left_join: i in ImageSchema,
       on: i.species_id == s.id,
-      where: fragment("lower(?) LIKE ?", s.name, ^search_term),
+      where: ^filter,
       group_by: [s.id, s.name, s.taxoncode],
       select: %{
         id: s.id,

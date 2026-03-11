@@ -10,6 +10,9 @@ defmodule GallformersWeb.Admin.GallRangeLiveTest do
   alias Gallformers.Accounts.Auth0User
   alias Gallformers.Galls
 
+  # Route is commented out in router — use plain strings to avoid compile-time ~p warnings.
+  @gall_range_path "/admin/gall-range"
+
   setup %{conn: conn} do
     user = %Auth0User{
       id: "test-user-id",
@@ -31,14 +34,14 @@ defmodule GallformersWeb.Admin.GallRangeLiveTest do
 
   describe "Gall Range Review page" do
     test "renders the page with unconfirmed galls", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin/gall-range")
+      {:ok, _view, html} = live(conn, @gall_range_path)
 
       assert html =~ "Gall Range Review"
       assert html =~ "Needs Review"
     end
 
     test "shows gall names from seed data", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin/gall-range")
+      {:ok, _view, html} = live(conn, @gall_range_path)
 
       # Seed data has gall species at IDs 100, 101, 102
       assert html =~ "Andricus quercuscalifornicus"
@@ -49,7 +52,7 @@ defmodule GallformersWeb.Admin.GallRangeLiveTest do
       # Confirm a gall first
       Galls.confirm_gall_range(100)
 
-      {:ok, view, _html} = live(conn, ~p"/admin/gall-range")
+      {:ok, view, _html} = live(conn, @gall_range_path)
 
       # Initially, gall 100 should not appear (it's confirmed)
       refute render(view) =~ "Confirmed"
@@ -62,7 +65,7 @@ defmodule GallformersWeb.Admin.GallRangeLiveTest do
     end
 
     test "select and confirm a gall", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin/gall-range")
+      {:ok, view, _html} = live(conn, @gall_range_path)
 
       # Select gall 100
       view |> element("input[phx-click=toggle_select][phx-value-id='100']") |> render_click()
@@ -79,7 +82,7 @@ defmodule GallformersWeb.Admin.GallRangeLiveTest do
     end
 
     test "select all and deselect all", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin/gall-range")
+      {:ok, view, _html} = live(conn, @gall_range_path)
 
       # Click the header checkbox to select all
       view |> element("th input[type=checkbox]") |> render_click()
@@ -95,7 +98,7 @@ defmodule GallformersWeb.Admin.GallRangeLiveTest do
     end
 
     test "shows error when confirming with nothing selected", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin/gall-range")
+      {:ok, view, _html} = live(conn, @gall_range_path)
 
       # The confirm button is only shown when something is selected,
       # so send the event directly
@@ -112,18 +115,18 @@ defmodule GallformersWeb.Admin.GallRangeLiveTest do
         Galls.confirm_gall_range(gall.id)
       end
 
-      {:ok, _view, html} = live(conn, ~p"/admin/gall-range")
+      {:ok, _view, html} = live(conn, @gall_range_path)
       assert html =~ "All gall ranges confirmed!"
     end
 
     test "gall name links to gallhost page", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin/gall-range")
+      {:ok, view, _html} = live(conn, @gall_range_path)
 
       assert has_element?(view, "a[href*='/admin/gallhost?id=100']")
     end
 
     test "back link navigates to admin dashboard", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin/gall-range")
+      {:ok, view, _html} = live(conn, @gall_range_path)
 
       assert has_element?(view, "a[href='/admin']")
     end
@@ -132,7 +135,7 @@ defmodule GallformersWeb.Admin.GallRangeLiveTest do
   describe "authentication" do
     test "redirects unauthenticated users", %{conn: _conn} do
       conn = Phoenix.ConnTest.build_conn()
-      conn = get(conn, ~p"/admin/gall-range")
+      conn = get(conn, @gall_range_path)
 
       assert redirected_to(conn) =~ "/"
     end

@@ -20,7 +20,9 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
        country: nil,
        subdivisions: [],
        country_level_on: false,
-       introduced_places: []
+       country_dist_type: "native",
+       exact_places: MapSet.new(),
+       introduced_places: MapSet.new()
      )}
   end
 
@@ -34,12 +36,23 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
     country_entry = Map.get(range_entries, country.code)
     country_level_on = country_entry != nil and country_entry.precision == "country"
 
+    country_dist_type =
+      if country_entry, do: Map.get(country_entry, :distribution_type, "native"), else: "native"
+
+    exact_codes = for({code, %{precision: "exact"}} <- range_entries, do: code) |> MapSet.new()
+
+    introduced_codes =
+      for({code, %{distribution_type: "introduced"}} <- range_entries, do: code) |> MapSet.new()
+
     {:ok,
      assign(socket,
        open: true,
        country: country,
        subdivisions: subdivisions,
-       country_level_on: country_level_on
+       country_level_on: country_level_on,
+       country_dist_type: country_dist_type,
+       exact_places: exact_codes,
+       introduced_places: introduced_codes
      )}
   end
 
@@ -65,11 +78,24 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
 
   @impl true
   def handle_event("toggle_country_level", _params, socket) do
-    new_val = !socket.assigns.country_level_on
     code = socket.assigns.country.code
 
-    notify_parent({:set_country_level, code, new_val})
-    {:noreply, assign(socket, country_level_on: new_val)}
+    if socket.assigns.country_level_on do
+      notify_parent({:set_country_level, code, false})
+      {:noreply, assign(socket, country_level_on: false)}
+    else
+      type = socket.assigns.country_dist_type
+      notify_parent({:set_country_level, code, type})
+      {:noreply, assign(socket, country_level_on: true)}
+    end
+  end
+
+  @impl true
+  def handle_event("set_country_type", %{"type" => type}, socket)
+      when type in ["native", "introduced"] do
+    code = socket.assigns.country.code
+    notify_parent({:set_country_level, code, type})
+    {:noreply, assign(socket, country_dist_type: type)}
   end
 
   @impl true
@@ -120,6 +146,39 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
                 phx-target={@myself}
               />
             </label>
+            <div :if={@country_level_on} class="mt-2 flex items-center gap-2">
+              <span class="text-xs text-gray-500">Type:</span>
+              <button
+                type="button"
+                phx-click="set_country_type"
+                phx-value-type="native"
+                phx-target={@myself}
+                class={[
+                  "text-xs px-2 py-0.5 rounded-full border",
+                  if(@country_dist_type == "native",
+                    do: "bg-green-100 border-green-400 text-green-800 font-medium",
+                    else: "border-gray-300 text-gray-500 hover:bg-gray-50"
+                  )
+                ]}
+              >
+                Native
+              </button>
+              <button
+                type="button"
+                phx-click="set_country_type"
+                phx-value-type="introduced"
+                phx-target={@myself}
+                class={[
+                  "text-xs px-2 py-0.5 rounded-full border",
+                  if(@country_dist_type == "introduced",
+                    do: "bg-amber-100 border-amber-400 text-amber-800 font-medium",
+                    else: "border-gray-300 text-gray-500 hover:bg-gray-50"
+                  )
+                ]}
+              >
+                Introduced
+              </button>
+            </div>
             <p :if={@country_level_on} class="mt-2 text-xs text-gray-500">
               All states shown as probable — check individual states to mark as documented.
             </p>
@@ -149,37 +208,43 @@ defmodule GallformersWeb.Admin.CountryDrillDown do
         <%!-- Subdivision list --%>
         <ul class="space-y-1">
           <li :for={subdiv <- @subdivisions} class="flex items-center">
-            <label
+            <button
+              type="button"
+              phx-click="toggle_subdivision"
+              phx-target={@myself}
+              phx-value-code={subdiv.code}
               class={[
-                "flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm cursor-pointer hover:bg-gray-50",
-                subdiv.code in @exact_places && subdiv.code not in @introduced_places && "bg-green-50",
-                subdiv.code not in @exact_places && @country_level_on && "bg-emerald-50/50"
+                "flex items-center gap-2 w-full px-2 py-1.5 rounded text-sm cursor-pointer text-left",
+                subdiv.code in @introduced_places && "bg-amber-50 hover:bg-amber-100",
+                subdiv.code not in @introduced_places && subdiv.code in @exact_places &&
+                  "bg-green-50 hover:bg-green-100",
+                subdiv.code not in @exact_places && @country_level_on &&
+                  "bg-emerald-50/50 hover:bg-emerald-100/50",
+                subdiv.code not in @exact_places && !@country_level_on && "hover:bg-gray-50"
               ]}
-              style={
-                if(subdiv.code in @introduced_places,
-                  do:
-                    "background: repeating-linear-gradient(-45deg, #dcfce7, #dcfce7 3px, #bbf7d0 3px, #bbf7d0 6px)",
-                  else: nil
-                )
-              }
             >
-              <input
-                type="checkbox"
-                checked={subdiv.code in @exact_places}
-                phx-click="toggle_subdivision"
-                phx-target={@myself}
-                phx-value-code={subdiv.code}
-                class="rounded border-gray-300 text-green-600 focus:ring-green-500"
-              />
+              <span class={[
+                "w-4 h-4 rounded-sm shrink-0 inline-flex items-center justify-center",
+                subdiv.code in @introduced_places && "bg-amber-500",
+                subdiv.code not in @introduced_places && subdiv.code in @exact_places &&
+                  "bg-green-500",
+                subdiv.code not in @exact_places && "border-2 border-gray-300"
+              ]}>
+                <.icon
+                  :if={subdiv.code in @exact_places}
+                  name="ph-check"
+                  class="size-3 text-white"
+                />
+              </span>
               <span>{subdiv.name}</span>
               <span
                 :if={subdiv.code in @introduced_places}
-                class="ml-1 text-xs text-green-700 font-medium"
+                class="ml-1 text-xs text-amber-700 font-medium"
               >
                 (introduced)
               </span>
               <span class="ml-auto text-xs text-gray-400">{subdiv.code}</span>
-            </label>
+            </button>
           </li>
         </ul>
       </.drill_down_panel>

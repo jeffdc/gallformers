@@ -54,7 +54,7 @@ defmodule GallformersWeb.Admin.HostRangeLiveTest do
       refute render(view) =~ "Quercus alba"
 
       # Switch filter to confirmed
-      view |> element("select[phx-change=filter]") |> render_change(%{value: "confirmed"})
+      view |> element("form#filter") |> render_change(%{value: "confirmed"})
 
       html = render(view)
       assert html =~ "Quercus alba"
@@ -77,8 +77,9 @@ defmodule GallformersWeb.Admin.HostRangeLiveTest do
       # Select host 1
       view |> element("input[phx-click=toggle_select][phx-value-id='1']") |> render_click()
 
-      # Confirm selected
+      # Open confirm modal and confirm
       view |> element("button", "Confirm Selected") |> render_click()
+      view |> element("#confirm-modal button[phx-click=do_confirm_selected]") |> render_click()
 
       # Verify flash message
       assert render(view) =~ "Confirmed range for 1 host(s)"
@@ -115,13 +116,15 @@ defmodule GallformersWeb.Admin.HostRangeLiveTest do
       refute html =~ "Confirm Selected"
     end
 
-    test "shows error when confirming with nothing selected", %{conn: conn} do
+    test "shows confirmation modal when confirming with nothing selected", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/host-range")
 
       # Send the event directly since button is hidden when nothing selected
       view |> render_hook("confirm_selected", %{})
 
-      assert render(view) =~ "No hosts selected"
+      # Modal shows with 0 count
+      assert has_element?(view, "#confirm-modal")
+      assert render(view) =~ "0"
     end
 
     test "shows empty state when all confirmed", %{conn: conn} do
@@ -156,31 +159,126 @@ defmodule GallformersWeb.Admin.HostRangeLiveTest do
       refute html =~ "WCVP data:"
     end
 
-    test "sync selected attempts name matching for hosts without WCVP IDs", %{conn: conn} do
+    test "sync selected shows results modal after completion", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/host-range")
 
       # Select a host (none have WCVP IDs in seed data)
       view |> element("input[phx-click=toggle_select][phx-value-id='1']") |> render_click()
 
-      # Try to sync — should attempt name matching (WCVP repo not available in test,
-      # so it will fail with "not matched" rather than the old "No selected hosts have WCVP matches")
+      # Show confirm modal, then execute sync
       view |> element("button", "Sync Selected from WCVP") |> render_click()
+      view |> element("#sync-confirm-modal button[phx-click=do_sync_selected]") |> render_click()
 
       # Wait for async sync to complete
       assert_receive _, 500
       html = render(view)
 
-      # Should show completion message with not-matched count (no WCVP DB in this test env)
-      assert html =~ "WCVP sync complete"
+      # Should show results modal (no WCVP DB in test env, so hosts fail/not matched)
+      assert html =~ "WCVP Sync Complete"
+      assert has_element?(view, "#sync-results-modal")
     end
 
-    test "sync selected shows error when nothing is selected", %{conn: conn} do
+    test "sync selected shows modal when nothing is selected", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/host-range")
 
       # Send the event directly since button is hidden when nothing selected
       view |> render_hook("sync_selected", %{})
 
-      assert render(view) =~ "No hosts selected"
+      # Modal shows with 0 count
+      assert has_element?(view, "#sync-confirm-modal")
+    end
+  end
+
+  describe "URL param persistence" do
+    test "reads filter from URL params", %{conn: conn} do
+      # No hosts are confirmed by default, so confirmed filter shows empty state
+      {:ok, _view, html} = live(conn, ~p"/admin/host-range?filter=confirmed")
+
+      assert html =~ "No hosts found"
+    end
+
+    test "reads search from URL params", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/admin/host-range?search=Quercus")
+
+      assert html =~ "Quercus alba"
+      refute html =~ "Acer rubrum"
+    end
+
+    test "reads multiple params together", %{conn: conn} do
+      Plants.bulk_confirm_host_ranges([1])
+
+      {:ok, view, _html} = live(conn, ~p"/admin/host-range?filter=confirmed&search=Quercus")
+
+      html = render(view)
+      assert html =~ "Quercus alba"
+    end
+
+    test "filter change updates URL via patch", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/host-range")
+
+      view |> element("form#filter") |> render_change(%{value: "confirmed"})
+
+      # After patch, the view should reflect the confirmed filter
+      assert render(view) =~ "No hosts found"
+    end
+  end
+
+  describe "sync status filter" do
+    test "renders sync status dropdown", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/host-range")
+
+      assert has_element?(view, "form#sync_status_filter")
+    end
+
+    test "sync status filter reads from URL params", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/host-range?sync_status=never")
+
+      assert has_element?(view, "form#sync_status_filter option[value=never][selected]")
+    end
+  end
+
+  describe "confirmation modals" do
+    test "confirm button shows confirmation modal", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/host-range")
+
+      view |> element("input[phx-click=toggle_select][phx-value-id='1']") |> render_click()
+      view |> element("button[phx-click=confirm_selected]") |> render_click()
+
+      assert has_element?(view, "#confirm-modal")
+      assert render(view) =~ "Confirm Host Ranges"
+    end
+
+    test "sync button shows confirmation modal", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/host-range")
+
+      view |> element("input[phx-click=toggle_select][phx-value-id='1']") |> render_click()
+      view |> element("button[phx-click=sync_selected]") |> render_click()
+
+      assert has_element?(view, "#sync-confirm-modal")
+      assert render(view) =~ "Sync from WCVP"
+    end
+
+    test "cancel on confirmation modal preserves selection", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/host-range")
+
+      view |> element("input[phx-click=toggle_select][phx-value-id='1']") |> render_click()
+      view |> element("button[phx-click=confirm_selected]") |> render_click()
+
+      # Cancel the modal
+      view |> element("#confirm-modal button[phx-click=cancel_confirm]") |> render_click()
+
+      # Selection should still be there
+      assert has_element?(view, "button[phx-click=confirm_selected]")
+    end
+
+    test "confirming executes the action", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/host-range")
+
+      view |> element("input[phx-click=toggle_select][phx-value-id='1']") |> render_click()
+      view |> element("button[phx-click=confirm_selected]") |> render_click()
+      view |> element("#confirm-modal button[phx-click=do_confirm_selected]") |> render_click()
+
+      assert render(view) =~ "Confirmed range for 1 host(s)"
     end
   end
 

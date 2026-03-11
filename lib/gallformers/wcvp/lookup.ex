@@ -152,19 +152,51 @@ defmodule Gallformers.Wcvp.Lookup do
   Returns the matching record as a map (same shape as search results)
   or nil if no match found. Only matches accepted names.
   """
-  @spec match_by_name(String.t()) :: map() | nil
-  def match_by_name(name) do
-    Repo.WCVP.one(
-      from(n in name_query(),
-        where: n.taxon_name == ^name and n.taxon_status == "Accepted",
-        limit: 1,
-        select_merge: %{taxon_status: n.taxon_status}
-      )
-    )
+  @spec match_by_name(String.t(), keyword()) :: map() | nil
+  def match_by_name(name, opts \\ []) do
+    case Repo.WCVP.one(
+           from(n in name_query(),
+             where: n.taxon_name == ^name and n.taxon_status == "Accepted",
+             limit: 1,
+             select_merge: %{taxon_status: n.taxon_status}
+           )
+         ) do
+      %{} = accepted ->
+        accepted
+
+      nil ->
+        if Keyword.get(opts, :resolve_synonyms, false) do
+          resolve_synonym_by_name(name)
+        end
+    end
   rescue
     _ -> nil
   catch
     :exit, _ -> nil
+  end
+
+  defp resolve_synonym_by_name(name) do
+    case Repo.WCVP.one(
+           from(n in "wcvp_names",
+             where: n.taxon_name == ^name and n.taxon_status == "Synonym",
+             select: %{
+               plant_name_id: n.plant_name_id,
+               accepted_plant_name_id: n.accepted_plant_name_id
+             },
+             limit: 1
+           )
+         ) do
+      %{accepted_plant_name_id: accepted_id} when accepted_id not in [nil, ""] ->
+        Repo.WCVP.one(
+          from(n in name_query(),
+            where: n.plant_name_id == ^accepted_id,
+            select_merge: %{taxon_status: n.taxon_status}
+          )
+        )
+
+      _ ->
+        nil
+    end
   end
 
   @doc """

@@ -980,6 +980,30 @@ a.gf-btn-primary:hover {
   color: #6b7280;
 }
 
+/* Compact search input for toolbars — matches .gf-select sizing */
+.gf-search-input-sm {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.75rem 0.5rem 2rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #1f2937;
+  background-color: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.gf-search-input-sm:focus {
+  outline: none;
+  border-color: #661419;
+  box-shadow: 0 0 0 3px rgba(102, 20, 25, 0.1);
+}
+
+.gf-search-input-sm::placeholder {
+  color: #6b7280;
+}
+
 /* ============================================
    Toggle Switch Styles
    ============================================ */

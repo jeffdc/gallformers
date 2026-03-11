@@ -1,9 +1,9 @@
 ---
-status: refined
+status: done
 created: 2026-03-10
 updated: 2026-03-10
 epic: geo-expansion
-relates: [b9e5, be9d, 600a, 6b43]
+relates: [b9e5, be9d, 600a, 6b43, 7157]
 blocks: [0df8]
 ---
 
@@ -90,4 +90,3 @@ Layers 1+2 execute together on branch be9d. Layer 3 is a separate branch after b
 ### Known limitation: range review family column
 
 The `base_range_review_query` in `Plants` joins genus→family via direct `parent_id`, which skips intermediate taxonomy ranks (subfamily, tribe). Hosts with intermediate ranks will show "---" for Family in the host range review table. The recursive CTE approach from `get_hosts_tree` would fix this but adds query complexity. Tracking here for awareness — affects UX only, not data correctness.
-

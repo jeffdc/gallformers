@@ -16,6 +16,7 @@ defmodule Gallformers.Plants do
   alias Gallformers.Plants.HostTraits
   alias Gallformers.Ranges
   alias Gallformers.Repo
+  alias Gallformers.Search.TextMatch
   alias Gallformers.Species.{Abundance, Species}
   alias Gallformers.Taxonomy
   alias Gallformers.Taxonomy.TreeBuilder
@@ -200,16 +201,12 @@ defmodule Gallformers.Plants do
   """
   @spec search_hosts(String.t(), integer()) :: [map()]
   def search_hosts(query, limit \\ 20) when is_binary(query) do
-    normalized = query |> String.downcase() |> String.trim()
-
-    terms =
-      normalized
-      |> String.split(~r/\s+/, trim: true)
-      |> Enum.map(&"%#{&1}%")
+    terms = TextMatch.parse_terms(query)
 
     if terms == [] do
       []
     else
+      normalized = query |> String.downcase() |> String.trim()
       search_hosts_with_terms(terms, normalized, limit)
     end
   end
@@ -297,11 +294,11 @@ defmodule Gallformers.Plants do
   """
   @spec search_hosts_for_section(String.t(), integer()) :: [map()]
   def search_hosts_for_section(query, limit \\ 20) do
-    search_pattern = "%#{String.downcase(query)}%"
+    filter = TextMatch.build_filter(query, [:name])
 
     from(s in Species,
       where: s.taxoncode == "plant",
-      where: fragment("lower(?) LIKE ?", s.name, ^search_pattern),
+      where: ^filter,
       order_by: s.name,
       limit: ^limit,
       select: %{
@@ -589,7 +586,6 @@ defmodule Gallformers.Plants do
   defp update_species_section_link(nil, _new, _old), do: :ok
 
   defp update_species_section_link(species_id, new_section_id, old_section_id) do
-
     # Remove old section link if any
     if old_section_id do
       from(st in "species_taxonomy",
@@ -810,14 +806,20 @@ defmodule Gallformers.Plants do
   defp apply_search_filter(query, nil), do: query
 
   defp apply_search_filter(query, search) do
-    pattern = "%#{String.downcase(search)}%"
+    case TextMatch.parse_terms(search) do
+      [] ->
+        query
 
-    from([s, ht, hr, st, g, f] in query,
-      having:
-        fragment("lower(?) LIKE ?", s.name, ^pattern) or
-          fragment("lower(coalesce(max(?), '')) LIKE ?", g.name, ^pattern) or
-          fragment("lower(coalesce(max(?), '')) LIKE ?", f.name, ^pattern)
-    )
+      terms ->
+        Enum.reduce(terms, query, fn term, q ->
+          from([s, ht, hr, st, g, f] in q,
+            having:
+              fragment("lower(?) LIKE ?", s.name, ^term) or
+                fragment("lower(coalesce(max(?), '')) LIKE ?", g.name, ^term) or
+                fragment("lower(coalesce(max(?), '')) LIKE ?", f.name, ^term)
+          )
+        end)
+    end
   end
 
   @doc """
@@ -894,7 +896,7 @@ defmodule Gallformers.Plants do
 
       # No wcvp_id — try name matching
       true ->
-        case Wcvp.Lookup.match_by_name(species.name) do
+        case Wcvp.Lookup.match_by_name(species.name, resolve_synonyms: true) do
           nil ->
             {:error, "No WCVP match found for #{species.name}"}
 

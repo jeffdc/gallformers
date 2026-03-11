@@ -160,8 +160,8 @@ defmodule Gallformers.Analytics.Rollup do
   defp ms_until_next_run do
     now = NaiveDateTime.utc_now()
     today = NaiveDateTime.to_date(now)
-    # Target: next midnight + 5 minutes
-    target = NaiveDateTime.new!(Date.add(today, 1), ~T[00:05:00])
+    # Target: 07:00 UTC (3:00 AM ET) — low-traffic window
+    target = NaiveDateTime.new!(Date.add(today, 1), ~T[07:00:00])
     max(NaiveDateTime.diff(target, now, :millisecond), 1_000)
   end
 
