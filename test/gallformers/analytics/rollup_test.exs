@@ -278,6 +278,39 @@ defmodule Gallformers.Analytics.RollupTest do
       end
     end
 
+    test "fills gaps from previously failed days" do
+      today = Date.utc_today()
+      three_days_ago = Date.add(today, -3)
+      two_days_ago = Date.add(today, -2)
+      yesterday = Date.add(today, -1)
+
+      # Insert data for all three days
+      for {date, path} <- [{three_days_ago, "/a"}, {two_days_ago, "/b"}, {yesterday, "/c"}] do
+        insert_page_views(date, [
+          %{
+            path: path,
+            visitor_hash: "v",
+            referrer_host: nil,
+            browser: "Chrome",
+            device_type: "desktop"
+          }
+        ])
+      end
+
+      # Roll up day 1 and day 3, leaving day 2 as a gap (simulates day 2 failing)
+      Rollup.rollup_day(three_days_ago)
+      Rollup.rollup_day(yesterday)
+
+      # rollup_pending_days should find and fill the gap
+      assert {:ok, 1} = Rollup.rollup_pending_days()
+
+      # Day 2 should now have summary data
+      assert %{num_rows: 1} =
+               Repo.query!("SELECT * FROM daily_stats WHERE date = ?", [
+                 Date.to_iso8601(two_days_ago)
+               ])
+    end
+
     test "a single-day rollup failure does not prevent other days from being processed" do
       today = Date.utc_today()
       three_days_ago = Date.add(today, -3)
