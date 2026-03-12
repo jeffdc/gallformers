@@ -102,6 +102,6 @@ defmodule Gallformers.Galls.GallTraits do
       message: "must be one of: unknown, integral, detachable, both"
     )
     |> foreign_key_constraint(:species_id)
-    |> unique_constraint(:gallformers_code, name: :gall_traits_gallformers_code_index)
+    |> unique_constraint(:gallformers_code, name: :gall_traits_gallformers_code_unique)
   end
 end

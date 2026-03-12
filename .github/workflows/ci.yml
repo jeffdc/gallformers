@@ -34,6 +34,26 @@ jobs:
     name: Phoenix
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      MIX_ENV: test
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGHOST: localhost
+
     steps:
       - uses: actions/checkout@v4
 
@@ -57,11 +77,9 @@ jobs:
 
       - name: Setup test database
         run: |
-          rm -f priv/gallformers_test.sqlite*
-          MIX_ENV=test mix ecto.create --quiet
-          MIX_ENV=test mix ecto.load --quiet
-          MIX_ENV=test mix ecto.migrate --quiet
-          sqlite3 priv/gallformers_test.sqlite < priv/repo/test_seeds.sql
+          mix ecto.create --quiet
+          mix ecto.migrate --quiet
+          PGUSER=postgres PGPASSWORD=postgres psql -h localhost -d gallformers_test -f priv/repo/test_seeds.sql
 
       - name: Setup ChromeDriver for E2E tests
         run: |

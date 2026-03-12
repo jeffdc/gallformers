@@ -1,6 +1,6 @@
 defmodule Gallformers.Articles.TagsType do
   @moduledoc """
-  Custom Ecto type for storing tags as a JSON array in SQLite.
+  Custom Ecto type for storing tags as a JSON array in a text column.
 
   Handles serialization between Elixir lists and JSON strings.
   """

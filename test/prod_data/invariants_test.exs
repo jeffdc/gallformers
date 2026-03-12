@@ -417,43 +417,4 @@ defmodule Gallformers.ProdData.InvariantsTest do
              "Found #{length(orphans)} orphaned aliases (no species or taxonomy link): #{inspect(Enum.take(orphans, 10))}"
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # FTS consistency
-  # ---------------------------------------------------------------------------
-
-  describe "FTS consistency" do
-    test "every species has a row in species_fts" do
-      # species_fts is a virtual table — use raw SQL for the join
-      %{rows: rows} =
-        Repo.query!("""
-        SELECT s.id, s.name
-        FROM species s
-        LEFT JOIN species_fts fts ON s.id = fts.species_id
-        WHERE fts.species_id IS NULL
-        LIMIT 20
-        """)
-
-      bad = Enum.map(rows, fn [id, name] -> %{id: id, name: name} end)
-
-      assert bad == [],
-             "Found species without FTS entry: #{inspect(Enum.take(bad, 10))}"
-    end
-
-    test "no species_fts row references a nonexistent species" do
-      %{rows: rows} =
-        Repo.query!("""
-        SELECT fts.species_id, fts.name
-        FROM species_fts fts
-        LEFT JOIN species s ON fts.species_id = s.id
-        WHERE s.id IS NULL
-        LIMIT 20
-        """)
-
-      bad = Enum.map(rows, fn [id, name] -> %{id: id, name: name} end)
-
-      assert bad == [],
-             "Found #{length(bad)} FTS rows for nonexistent species: #{inspect(Enum.take(bad, 10))}"
-    end
-  end
 end

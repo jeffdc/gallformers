@@ -125,7 +125,7 @@ These rules are **non-negotiable** and exist because of a production incident:
 - **Always check machine state first** — `fly machine list` before SSH/SFTP operations.
 - **Always get user approval** before machine stop/start/update operations.
 - **Execute ONE step at a time** — verify success before proceeding to the next step.
-- **NEVER query the production database directly** — no `fly ssh console` with `rpc` or `eval` for database queries. A local copy of the prod DB is available at `priv/gallformers.sqlite` and can be refreshed anytime with `make download-db`.
+- **NEVER query the production database directly** — no `fly ssh console` with `rpc` or `eval` for database queries. Use a local dev database and refresh with `make download-db`.
 
 # Gallformers Project Overview
 
@@ -142,10 +142,12 @@ Gallformers (gallformers.org) is a comprehensive online database and reference g
 ## Tech Stack
 
 - **Phoenix 1.8** with LiveView - Full-stack web framework
-- **Ecto** with ecto_sqlite3 - Database ORM (see "Ecto & Query Patterns" for usage guidelines)
-- **SQLite** - Database
+- **Ecto** with Postgrex - Database ORM (see "Ecto & Query Patterns" for usage guidelines)
+- **PostgreSQL** - Database
 - **Tailwind CSS v4** - Styling
 - **Fly.io** - Production hosting
+
+> **Note**: The WCVP secondary repo still uses SQLite (ecto_sqlite3). See `runbooks/wcvp.md`.
 
 ## Project Structure
 
@@ -200,7 +202,7 @@ Do not commit until precommit passes.
 
 ## Testing
 
-All tests run serially (`async: false`) due to SQLite's single-writer constraint.
+Tests use Ecto's SQL Sandbox with PostgreSQL. Tests can run with `async: true` where appropriate.
 
 ### Test Types
 
@@ -220,18 +222,14 @@ All tests run serially (`async: false`) due to SQLite's single-writer constraint
 
 ### Test Database
 
-Tests use a **separate test database** (`priv/gallformers_test.sqlite`) that is:
-- **Schema-only**: Created from `priv/repo/structure.sql` (no production data)
+Tests use a **separate PostgreSQL test database** (`gallformers_test`) that is:
+- **Schema-only**: Created via Ecto migrations (no production data)
 - **Minimal seed data**: Loaded from `priv/repo/test_seeds.sql` with just enough data for tests
 - **Rebuilt fresh**: `make test` rebuilds the test DB before each run
 
 ```bash
 make test-db               # Rebuild test database manually (rarely needed)
 ```
-
-**Important**: The test database uses `journal_mode: :wal` (write-ahead logging) for better
-concurrency. WAL mode allows reads during write transactions, preventing "Database busy" errors
-that occurred with DELETE mode.
 
 ### Unit & Integration Tests
 
@@ -265,28 +263,26 @@ See CODING_STANDARDS.md for E2E writing guide, test organization, and setup inst
 
 ## Database
 
-- **Local dev**: `priv/gallformers.sqlite` (not committed)
-- **Production**: Fly.io volume at `/data/gallformers.sqlite`
+- **Local dev**: PostgreSQL running locally (see README.md for setup)
+- **Production**: Fly Postgres (managed by Fly.io)
 - **Query patterns**: See "Ecto & Query Patterns" section below
 
 ### Getting the Database
 
 ```bash
-# Download from S3 (recommended - daily snapshot from production)
+# Download a pg_dump from S3 and restore locally (recommended)
 make download-db
 ```
 
 ### Schema Changes: Use Ecto Migrations
 
 All schema and data changes go through **Ecto migrations** (`mix ecto.gen.migration`).
-The `priv/repo/structure.sql` file was a one-time bootstrap from V1 — it is not the
-source of truth for ongoing changes. Never edit it directly.
 
 ### Table Naming: Use snake_case
 
 Table names use **snake_case** (e.g., `species_source`, `gall_traits`, `host_range`).
-**When writing raw SQL in migrations, always check `priv/repo/structure.sql`
-or the Ecto schema's `schema "table_name"` declaration for the correct table name.**
+**When writing raw SQL in migrations, always check the Ecto schema's
+`schema "table_name"` declaration for the correct table name.**
 
 ## Key Domain Concepts
 
@@ -392,7 +388,6 @@ All component files are in `lib/gallformers_web/components/`.
 
 See **[CODING_STANDARDS.md](./CODING_STANDARDS.md)** for detailed reference on:
 - Ecto query patterns, schema associations, and red flags
-- SQLite compatibility (no `ilike`, no `distinct`, WAL footguns)
 - PubSub real-time update patterns
 - Custom colors and Phosphor icon setup
 - Schema field definitions pattern (in progress)
@@ -400,7 +395,7 @@ See **[CODING_STANDARDS.md](./CODING_STANDARDS.md)** for detailed reference on:
 - E2E test writing guide
 
 **Quick reminders** (details in CODING_STANDARDS.md):
-- **SQLite, not PostgreSQL** — no `ilike`, no `DISTINCT ON`, use `fragment("lower(?) LIKE ?", ...)`
+- **PostgreSQL** — `ilike` and `DISTINCT ON` are available; no SQLite limitations
 - **Phosphor icons** — check `assets/vendor/phosphor/` before downloading new ones
 - **Preloads over manual joins** — use schema associations, return structs not maps
 - **Count your queries** — know the count before and after any change

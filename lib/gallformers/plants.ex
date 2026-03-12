@@ -230,7 +230,7 @@ defmodule Gallformers.Plants do
               """
               MIN(CASE
                 WHEN lower(?) = ? OR lower(?) = ? THEN 0
-                WHEN lower(?) LIKE ? OR lower(?) LIKE ? THEN 1
+                WHEN ? ILIKE ? OR ? ILIKE ? THEN 1
                 ELSE 2
               END)
               """,
@@ -258,8 +258,8 @@ defmodule Gallformers.Plants do
       Enum.reduce(terms, base_query, fn term, q ->
         from([s, als, a] in q,
           where:
-            fragment("lower(?) LIKE ?", s.name, ^term) or
-              fragment("lower(?) LIKE ?", a.name, ^term)
+            ilike(s.name, ^term) or
+              ilike(a.name, ^term)
         )
       end)
 
@@ -417,8 +417,7 @@ defmodule Gallformers.Plants do
       |> Repo.insert()
 
     case result do
-      {:ok, species} ->
-        Gallformers.Species.update_species_fts(species.id)
+      {:ok, _species} ->
         broadcast(result, :host_created)
 
       {:error, _} ->
@@ -437,8 +436,7 @@ defmodule Gallformers.Plants do
       |> Repo.update()
 
     case result do
-      {:ok, updated_host} ->
-        Gallformers.Species.update_species_fts(updated_host.id)
+      {:ok, _updated_host} ->
         broadcast(result, :host_updated)
 
       {:error, _} ->
@@ -814,9 +812,9 @@ defmodule Gallformers.Plants do
         Enum.reduce(terms, query, fn term, q ->
           from([s, ht, hr, st, g, f] in q,
             having:
-              fragment("lower(?) LIKE ?", s.name, ^term) or
-                fragment("lower(coalesce(max(?), '')) LIKE ?", g.name, ^term) or
-                fragment("lower(coalesce(max(?), '')) LIKE ?", f.name, ^term)
+              ilike(s.name, ^term) or
+                fragment("coalesce(max(?), '') ILIKE ?", g.name, ^term) or
+                fragment("coalesce(max(?), '') ILIKE ?", f.name, ^term)
           )
         end)
     end

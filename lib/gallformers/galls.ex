@@ -100,10 +100,10 @@ defmodule Gallformers.Galls do
         JOIN species s ON s.id = st.species_id AND s.taxoncode = 'gall'
         JOIN gall_traits gt ON gt.species_id = s.id
         WHERE f.description != 'Plant'
-          AND (?1 = 0 OR gt.undescribed = 1)
+          AND ($1::boolean = false OR gt.undescribed = true)
         ORDER BY f.name, gf.genus_name, s.name
         """,
-        [if(undescribed_only, do: 1, else: 0)]
+        [if(undescribed_only, do: true, else: false)]
       )
 
     Enum.map(rows, fn [fid, fname, fdesc, gid, gname, gdesc, sid, sname, undescribed] ->
@@ -116,7 +116,7 @@ defmodule Gallformers.Galls do
         genus_description: gdesc,
         species_id: sid,
         species_name: sname,
-        undescribed: undescribed == 1
+        undescribed: undescribed == true
       }
     end)
   end

@@ -21,7 +21,7 @@ Visit [localhost:4000](http://localhost:4000) in your browser.
 
 - **Elixir 1.19+** and **OTP 28+**
 - **Node.js 20+** (for asset compilation)
-- **SQLite** (bundled via ecto_sqlite3)
+- **PostgreSQL 16+**
 - **libvips** (for image processing - resizing uploaded images)
 - **ChromeDriver** (for E2E tests only)
 
@@ -40,6 +40,17 @@ asdf plugin add elixir
 asdf plugin add erlang
 asdf install erlang 28.0
 asdf install elixir 1.19.0-otp-28
+```
+
+### Installing PostgreSQL
+
+```bash
+# macOS
+brew install postgresql@16
+brew services start postgresql@16
+
+# Ubuntu/Debian
+sudo apt-get install postgresql postgresql-contrib
 ```
 
 ### Installing libvips (for image processing)
@@ -67,10 +78,13 @@ Verify with `make e2e-setup`.
 
 ## Database Setup
 
-The database file is not committed. To get started:
+Ensure PostgreSQL is running locally, then:
 
 ```bash
-# Download from S3 (recommended - daily snapshot from production)
+# Create the database and run migrations
+mix ecto.setup
+
+# Or download a snapshot from production and restore locally
 make download-db
 ```
 
@@ -88,8 +102,8 @@ make ci                 # Full CI check (same as GitHub Actions)
 
 ### Test Database
 
-Tests use a separate database (`priv/gallformers_test.sqlite`) built from:
-- `priv/repo/structure.sql` - Schema only (no production data)
+Tests use a separate PostgreSQL database (`gallformers_test`) built from:
+- Ecto migrations - Schema only (no production data)
 - `priv/repo/test_seeds.sql` - Minimal seed data for tests
 
 `make test` rebuilds this automatically. Use `make test-db` to rebuild manually.
@@ -199,12 +213,8 @@ The `/release` skill handles tag naming, commit collection, and release note gen
 
 ## Backup Strategy
 
-The database is backed up using two complementary approaches:
+The PostgreSQL database backup strategy is TBD as part of the Postgres migration. Daily snapshots continue to be stored in S3:
 
-1. **Litestream** - Continuous replication to S3 (near real-time)
-2. **Daily snapshots** - GitHub Actions workflow creating point-in-time snapshots
-
-Daily snapshots are stored in two locations:
 - **Public** (`s3://gallformers-backups/public/`) - Sanitized, PII removed
 - **Private** (`s3://gallformers-full-backups/`) - Full backup with PII
 

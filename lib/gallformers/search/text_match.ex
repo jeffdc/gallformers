@@ -48,7 +48,7 @@ defmodule Gallformers.Search.TextMatch do
 
   defp match_any_field(term, fields) do
     Enum.reduce(fields, dynamic(false), fn field_name, acc ->
-      dynamic([q], ^acc or fragment("lower(?) LIKE ?", field(q, ^field_name), ^term))
+      dynamic([q], ^acc or ilike(field(q, ^field_name), ^term))
     end)
   end
 

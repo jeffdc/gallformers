@@ -492,7 +492,7 @@ defmodule Gallformers.Taxonomy.Tree do
       SELECT id, name, description, type, rank, parent_id, is_placeholder,
              inserted_at, updated_at, 0 as depth
       FROM taxonomy
-      WHERE id = ?1
+      WHERE id = $1::bigint
 
       UNION ALL
 
@@ -879,7 +879,7 @@ defmodule Gallformers.Taxonomy.Tree do
     SELECT gf.genus_id as id, gf.genus_name as name, f.id as family_id
     FROM genus_to_family gf
     JOIN taxonomy f ON f.id = gf.current_parent_id AND f.type = 'family'
-    WHERE (?1 = 0 OR f.description = 'Plant')
+    WHERE ($1::integer = 0 OR f.description = 'Plant')
     ORDER BY gf.genus_name
     """
 
@@ -1037,7 +1037,7 @@ defmodule Gallformers.Taxonomy.Tree do
       JOIN taxonomy t ON st.taxonomy_id = t.id AND t.type = 'genus'
       JOIN species s ON st.species_id = s.id AND s.taxoncode = 'gall'
       JOIN gallhost h ON h.gall_species_id = s.id
-      WHERE h.host_species_id = ?1
+      WHERE h.host_species_id = $1::bigint
 
       UNION ALL
 
@@ -1077,7 +1077,7 @@ defmodule Gallformers.Taxonomy.Tree do
       JOIN species s ON h.gall_species_id = s.id AND s.taxoncode = 'gall'
       JOIN species_taxonomy galler_st ON galler_st.species_id = s.id
       JOIN taxonomy gt ON galler_st.taxonomy_id = gt.id AND gt.type = 'genus'
-      WHERE host_st.taxonomy_id = ?1
+      WHERE host_st.taxonomy_id = $1::bigint
 
       UNION ALL
 
@@ -1141,7 +1141,7 @@ defmodule Gallformers.Taxonomy.Tree do
       -- Base: direct children of each child
       SELECT child.id AS child_id, child.id AS descendant_id, child.type AS descendant_type
       FROM taxonomy child
-      WHERE child.parent_id = ?1
+      WHERE child.parent_id = $1::bigint
 
       UNION ALL
 
@@ -1155,7 +1155,7 @@ defmodule Gallformers.Taxonomy.Tree do
     FROM taxonomy t
     LEFT JOIN descendants d ON d.child_id = t.id AND d.descendant_type = 'genus'
     LEFT JOIN species_taxonomy st ON st.taxonomy_id = d.descendant_id
-    WHERE t.parent_id = ?1
+    WHERE t.parent_id = $1::bigint
     GROUP BY t.id, t.name, t.type, t.rank, t.description
     ORDER BY t.type, t.name
     """

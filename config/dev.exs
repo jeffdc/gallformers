@@ -3,12 +3,11 @@ import Config
 config :gallformers, env: :dev
 
 # Configure your database
-# DATABASE_PATH env var overrides the default for migration testing
-# Falls back to local database in priv/ for normal development
 config :gallformers, Gallformers.Repo,
   database: "gallformers_dev",
-  username: System.get_env("USER"),
-  hostname: "localhost",
+  username: System.get_env("PGUSER", System.get_env("USER")),
+  password: System.get_env("PGPASSWORD"),
+  hostname: System.get_env("PGHOST", "localhost"),
   pool_size: 5,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true

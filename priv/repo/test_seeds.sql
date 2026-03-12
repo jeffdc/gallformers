@@ -214,6 +214,20 @@ INSERT INTO glossary (id, word, definition, urls) VALUES
   (4, 'detachable', 'A gall that can be separated from the host plant without tearing plant tissue.', '');
 
 -- =============================================================================
+-- Keys (for key_live_test and keys_live_test)
+-- =============================================================================
+
+INSERT INTO keys (id, slug, title, subtitle, authors, description, version, couplets, inserted_at, updated_at) VALUES
+  (1, 'oak-parasite-key',
+   'Key to parasitic wasps associated with oak gall wasps',
+   'Hymenoptera: Cynipini',
+   '[]',
+   'Detailed taxon treatments including diagnoses and notes on ecology.',
+   '2026-02-05',
+   '{"1":{"leads":[{"text":"Wings fully developed.","images":[],"destination":{"type":"couplet","number":"2"}},{"text":"Wings reduced or absent.","images":[],"destination":{"type":"couplet","number":"4"}}]},"2":{"leads":[{"text":"Fore wing with complex venation, with two or more cells defined by veins.","images":[],"destination":{"type":"couplet","number":"3"}},{"text":"Fore wing with simple venation.","images":[],"destination":{"type":"couplet","number":"4"}}]},"3":{"leads":[{"text":"Fore wing with conspicuous stigma. Metasoma generally elongate and cylindrical.","images":[],"destination":{"type":"couplet","number":"4","label":"Ichneumonoidea"}},{"text":"Fore wing without stigma. Metasoma ovate.","images":[],"destination":{"type":"taxon","name":"Cynipoidea"}}]},"4":{"leads":[{"text":"Fore wing vein 2m-cu present. Second and third metasomal tergites clearly separated.","images":[],"destination":{"type":"taxon","name":"Ichneumonidae"}},{"text":"Fore wing vein 2m-cu absent. Second and third metasomal tergites fused.","images":[],"destination":{"type":"taxon","name":"Braconidae"}}]}}',
+   '2026-01-01T00:00:00', '2026-01-01T00:00:00');
+
+-- =============================================================================
 -- Articles
 -- =============================================================================
 -- Note: Article tests use Ecto sandbox and create their own test data.

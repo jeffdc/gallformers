@@ -1,6 +1,6 @@
 defmodule Gallformers.Keys.CoupletsType do
   @moduledoc """
-  Custom Ecto type for storing dichotomous key couplets as a JSON object in SQLite.
+  Custom Ecto type for storing dichotomous key couplets as a JSON object.
 
   Handles serialization between atom-keyed Elixir maps (used at runtime) and
   JSON strings (stored in the database).

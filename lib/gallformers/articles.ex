@@ -41,11 +41,14 @@ defmodule Gallformers.Articles do
   defp maybe_filter_by_tag(query, ""), do: query
 
   defp maybe_filter_by_tag(query, tag) do
-    # Use SQLite JSON functions for exact tag matching
     where(
       query,
       [a],
-      fragment("EXISTS (SELECT 1 FROM json_each(?) WHERE value = ?)", a.tags, ^tag)
+      fragment(
+        "EXISTS (SELECT 1 FROM jsonb_array_elements_text(?::jsonb) AS t(value) WHERE t.value = ?)",
+        a.tags,
+        ^tag
+      )
     )
   end
 
@@ -252,15 +255,15 @@ defmodule Gallformers.Articles do
     if article.tags == [] do
       []
     else
-      tags_json = Jason.encode!(article.tags)
+      tags = article.tags
 
       from(a in Article,
         where: a.id != ^article.id and a.is_published == true,
         where:
           fragment(
-            "EXISTS (SELECT 1 FROM json_each(?) WHERE value IN (SELECT value FROM json_each(?)))",
+            "EXISTS (SELECT 1 FROM jsonb_array_elements_text(?::jsonb) AS t(value) WHERE t.value = ANY(?))",
             a.tags,
-            ^tags_json
+            type(^tags, {:array, :string})
           ),
         order_by: [desc: a.inserted_at],
         limit: ^limit

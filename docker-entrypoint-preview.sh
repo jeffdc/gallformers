@@ -1,10 +1,8 @@
 #!/bin/sh
 # Docker entrypoint for Gallformers preview deploys
-# Runs migrations then starts the server (no Litestream replication)
+# Starts the server (database is remote Postgres)
 
 set -e
-
-DATABASE_PATH="${DATABASE_PATH:-/app/data/gallformers.sqlite}"
 
 # Symlink boundaries PMTiles into static assets
 if [ -f /app/data/boundaries.pmtiles ]; then

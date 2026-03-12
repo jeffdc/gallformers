@@ -82,8 +82,8 @@ defmodule Gallformers.Sources do
 
     from(s in Source,
       where:
-        fragment("lower(?) LIKE ?", s.title, ^search_term) or
-          fragment("lower(?) LIKE ?", s.author, ^search_term),
+        ilike(s.title, ^search_term) or
+          ilike(s.author, ^search_term),
       order_by: s.title
     )
     |> Repo.all()
@@ -414,10 +414,10 @@ defmodule Gallformers.Sources do
       join: src in Source,
       on: ss.source_id == src.id,
       where:
-        fragment("lower(?) LIKE ?", sp.name, ^search_term) or
-          fragment("lower(?) LIKE ?", src.title, ^search_term) or
-          fragment("lower(?) LIKE ?", src.author, ^search_term) or
-          fragment("lower(?) LIKE ?", ss.description, ^search_term),
+        ilike(sp.name, ^search_term) or
+          ilike(src.title, ^search_term) or
+          ilike(src.author, ^search_term) or
+          ilike(ss.description, ^search_term),
       order_by: [asc: sp.name, asc: src.title],
       limit: ^limit,
       select: %{

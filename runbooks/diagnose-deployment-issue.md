@@ -48,7 +48,7 @@ Look for:
 - `** (EXIT)` or `** (RuntimeError)` - Elixir process crashes
 - `GenServer terminating` - GenServer failures
 - `FATAL` or `ERROR` - Application errors
-- `database` or `sqlite` - Database connection issues
+- `database` or `postgres` - Database connection issues
 - `migration` - Migration failures
 - `bind` or `listen` - Port binding issues
 

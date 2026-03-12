@@ -2,7 +2,9 @@ defmodule GallformersWeb.Admin.OpsLiveTest do
   @moduledoc """
   LiveView tests for the operator ops admin page.
   """
-  use GallformersWeb.ConnCase, async: true
+  # async: false because tests modify SiteSettings via persistent_term (global state).
+  # Running async would poison concurrent admin tests with read_only mode.
+  use GallformersWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
 
   alias Gallformers.Accounts.Auth0User
@@ -104,6 +106,9 @@ defmodule GallformersWeb.Admin.OpsLiveTest do
       |> render_click()
 
       assert Gallformers.SiteSettings.read_only?() == true
+
+      # Reset immediately to avoid poisoning concurrent async tests via persistent_term
+      :persistent_term.put({Gallformers.SiteSettings, :cache}, %{})
     end
   end
 

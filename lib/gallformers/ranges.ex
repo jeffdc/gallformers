@@ -41,7 +41,7 @@ defmodule Gallformers.Ranges do
       select: %{
         id: s.id,
         name: s.name,
-        aliases: fragment("GROUP_CONCAT(?, ', ')", a.name)
+        aliases: fragment("string_agg(?, ', ')", a.name)
       }
     )
     |> Repo.all()

@@ -13,7 +13,7 @@ gallformers/              ← Business logic layer (Contexts)
     ↓
 Ecto (Repo, Schemas)      ← Data access
     ↓
-SQLite
+PostgreSQL
 ```
 
 **Critical rule**: The web layer cannot directly access the database. It must go through Contexts.

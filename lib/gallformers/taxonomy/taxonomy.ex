@@ -65,7 +65,7 @@ defmodule Gallformers.Taxonomy.Taxonomy do
     |> maybe_require_rank()
     |> validate_no_self_reference()
     |> unique_constraint([:name, :parent_id],
-      name: :taxonomy_name_parent_id_index,
+      name: :idx_taxonomy_name_parent,
       message: "already exists for this parent"
     )
     |> foreign_key_constraint(:parent_id)

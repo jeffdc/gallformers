@@ -42,15 +42,18 @@ defmodule Gallformers.Analytics.RollupTest do
 
       # daily_stats: 3 page views, 2 unique visitors
       assert %{rows: [[3, 2]]} =
-               Repo.query!("SELECT page_views, unique_visitors FROM daily_stats WHERE date = ?", [
-                 Date.to_iso8601(@today)
-               ])
+               Repo.query!(
+                 "SELECT page_views, unique_visitors FROM daily_stats WHERE date = $1",
+                 [
+                   @today
+                 ]
+               )
 
       # daily_page_stats: "/" = 2 views/2 unique, "/gall/1" = 1 view/1 unique
       %{rows: page_rows} =
         Repo.query!(
-          "SELECT path, page_views, unique_visitors FROM daily_page_stats WHERE date = ? ORDER BY page_views DESC",
-          [Date.to_iso8601(@today)]
+          "SELECT path, page_views, unique_visitors FROM daily_page_stats WHERE date = $1 ORDER BY page_views DESC",
+          [@today]
         )
 
       assert ["/", 2, 2] in page_rows
@@ -59,8 +62,8 @@ defmodule Gallformers.Analytics.RollupTest do
       # daily_referrer_stats: nil = 1, "google.com" = 2
       %{rows: ref_rows} =
         Repo.query!(
-          "SELECT referrer_host, page_views FROM daily_referrer_stats WHERE date = ? ORDER BY page_views DESC",
-          [Date.to_iso8601(@today)]
+          "SELECT referrer_host, page_views FROM daily_referrer_stats WHERE date = $1 ORDER BY page_views DESC",
+          [@today]
         )
 
       assert [nil, 1] in ref_rows or ["", 1] in ref_rows
@@ -69,8 +72,8 @@ defmodule Gallformers.Analytics.RollupTest do
       # daily_device_stats: desktop = 2, mobile = 1
       %{rows: device_rows} =
         Repo.query!(
-          "SELECT device_type, count FROM daily_device_stats WHERE date = ? ORDER BY count DESC",
-          [Date.to_iso8601(@today)]
+          "SELECT device_type, count FROM daily_device_stats WHERE date = $1 ORDER BY count DESC",
+          [@today]
         )
 
       assert ["desktop", 2] in device_rows
@@ -79,8 +82,8 @@ defmodule Gallformers.Analytics.RollupTest do
       # daily_browser_stats: Chrome = 2, Firefox = 1
       %{rows: browser_rows} =
         Repo.query!(
-          "SELECT browser, count FROM daily_browser_stats WHERE date = ? ORDER BY count DESC",
-          [Date.to_iso8601(@today)]
+          "SELECT browser, count FROM daily_browser_stats WHERE date = $1 ORDER BY count DESC",
+          [@today]
         )
 
       assert ["Chrome", 2] in browser_rows
@@ -102,28 +105,31 @@ defmodule Gallformers.Analytics.RollupTest do
       assert :ok = Rollup.rollup_day(@today)
 
       assert %{rows: [[1, 1]]} =
-               Repo.query!("SELECT page_views, unique_visitors FROM daily_stats WHERE date = ?", [
-                 Date.to_iso8601(@today)
+               Repo.query!(
+                 "SELECT page_views, unique_visitors FROM daily_stats WHERE date = $1",
+                 [
+                   @today
+                 ]
+               )
+
+      assert %{num_rows: 1} =
+               Repo.query!("SELECT * FROM daily_page_stats WHERE date = $1", [
+                 @today
                ])
 
       assert %{num_rows: 1} =
-               Repo.query!("SELECT * FROM daily_page_stats WHERE date = ?", [
-                 Date.to_iso8601(@today)
+               Repo.query!("SELECT * FROM daily_referrer_stats WHERE date = $1", [
+                 @today
                ])
 
       assert %{num_rows: 1} =
-               Repo.query!("SELECT * FROM daily_referrer_stats WHERE date = ?", [
-                 Date.to_iso8601(@today)
+               Repo.query!("SELECT * FROM daily_device_stats WHERE date = $1", [
+                 @today
                ])
 
       assert %{num_rows: 1} =
-               Repo.query!("SELECT * FROM daily_device_stats WHERE date = ?", [
-                 Date.to_iso8601(@today)
-               ])
-
-      assert %{num_rows: 1} =
-               Repo.query!("SELECT * FROM daily_browser_stats WHERE date = ?", [
-                 Date.to_iso8601(@today)
+               Repo.query!("SELECT * FROM daily_browser_stats WHERE date = $1", [
+                 @today
                ])
     end
 
@@ -131,7 +137,7 @@ defmodule Gallformers.Analytics.RollupTest do
       assert :noop = Rollup.rollup_day(@today)
 
       assert %{num_rows: 0} =
-               Repo.query!("SELECT * FROM daily_stats WHERE date = ?", [Date.to_iso8601(@today)])
+               Repo.query!("SELECT * FROM daily_stats WHERE date = $1", [@today])
     end
   end
 
@@ -183,7 +189,7 @@ defmodule Gallformers.Analytics.RollupTest do
       # Verify all three days now have summary data
       for date <- [three_days_ago, two_days_ago, yesterday] do
         assert %{num_rows: 1} =
-                 Repo.query!("SELECT * FROM daily_stats WHERE date = ?", [Date.to_iso8601(date)])
+                 Repo.query!("SELECT * FROM daily_stats WHERE date = $1", [date])
       end
     end
 
@@ -240,8 +246,8 @@ defmodule Gallformers.Analytics.RollupTest do
 
       # Yesterday should have summary data
       assert %{num_rows: 1} =
-               Repo.query!("SELECT * FROM daily_stats WHERE date = ?", [
-                 Date.to_iso8601(yesterday)
+               Repo.query!("SELECT * FROM daily_stats WHERE date = $1", [
+                 yesterday
                ])
     end
 
@@ -274,7 +280,7 @@ defmodule Gallformers.Analytics.RollupTest do
 
       for date <- [two_days_ago, yesterday] do
         assert %{num_rows: 1} =
-                 Repo.query!("SELECT * FROM daily_stats WHERE date = ?", [Date.to_iso8601(date)])
+                 Repo.query!("SELECT * FROM daily_stats WHERE date = $1", [date])
       end
     end
 
@@ -306,8 +312,8 @@ defmodule Gallformers.Analytics.RollupTest do
 
       # Day 2 should now have summary data
       assert %{num_rows: 1} =
-               Repo.query!("SELECT * FROM daily_stats WHERE date = ?", [
-                 Date.to_iso8601(two_days_ago)
+               Repo.query!("SELECT * FROM daily_stats WHERE date = $1", [
+                 two_days_ago
                ])
     end
 
@@ -360,8 +366,8 @@ defmodule Gallformers.Analytics.RollupTest do
 
       # Yesterday must have data regardless of what happened to other days
       assert %{num_rows: 1} =
-               Repo.query!("SELECT * FROM daily_stats WHERE date = ?", [
-                 Date.to_iso8601(yesterday)
+               Repo.query!("SELECT * FROM daily_stats WHERE date = $1", [
+                 yesterday
                ])
     end
   end

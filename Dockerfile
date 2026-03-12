@@ -1,5 +1,5 @@
 # Gallformers V2 - Phoenix Dockerfile
-# Multi-stage build for Phoenix release with Litestream
+# Multi-stage build for Phoenix release
 
 # Stage 1: Build Elixir release
 FROM hexpm/elixir:1.17.3-erlang-27.1.2-alpine-3.20.3 AS builder
@@ -53,14 +53,10 @@ RUN mix release
 # Stage 2: Runtime
 FROM alpine:3.20 AS runtime
 
-# Runtime dependencies + aws-cli for database reset workflow
+# Runtime dependencies
 # vips is needed for image processing (resizing variants)
 # curl is needed for downloading data files from S3 on first boot
-RUN apk add --no-cache libstdc++ openssl ncurses-libs sqlite su-exec aws-cli vips curl
-
-# Install Litestream for continuous SQLite replication
-ADD https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-amd64.tar.gz /tmp/litestream.tar.gz
-RUN tar -C /usr/local/bin -xzf /tmp/litestream.tar.gz && rm /tmp/litestream.tar.gz
+RUN apk add --no-cache libstdc++ openssl ncurses-libs su-exec vips curl
 
 # Install Typst for PDF generation of identification keys
 ADD https://github.com/typst/typst/releases/download/v0.14.2/typst-x86_64-unknown-linux-musl.tar.xz /tmp/typst.tar.xz
@@ -74,7 +70,6 @@ RUN addgroup -g 1000 gallformers && \
 
 # Copy release from builder
 COPY --from=builder --chown=gallformers:gallformers /app/_build/prod/rel/gallformers ./
-COPY --chown=gallformers:gallformers litestream.yml /etc/litestream.yml
 
 # Create data directory
 RUN mkdir -p /data && chown gallformers:gallformers /data
@@ -83,7 +78,6 @@ RUN mkdir -p /data && chown gallformers:gallformers /data
 COPY --chmod=755 docker-entrypoint.sh /app/docker-entrypoint.sh
 
 ENV HOME=/app
-ENV DATABASE_PATH=/data/gallformers.sqlite
 
 EXPOSE 4000
 

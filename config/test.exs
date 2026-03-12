@@ -9,8 +9,9 @@ config :gallformers, async_tasks: false
 # Use a schema-only test database (no production data)
 config :gallformers, Gallformers.Repo,
   database: "gallformers_test",
-  username: System.get_env("USER"),
-  hostname: "localhost",
+  username: System.get_env("PGUSER", System.get_env("USER")),
+  password: System.get_env("PGPASSWORD"),
+  hostname: System.get_env("PGHOST", "localhost"),
   pool_size: 5,
   pool: Ecto.Adapters.SQL.Sandbox
 

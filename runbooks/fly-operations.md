@@ -26,7 +26,7 @@ Key settings in `fly.toml`:
 |---------|-------|---------|
 | `app` | `gallformers` | App name |
 | `primary_region` | `iad` | US East (matches S3 region) |
-| `DATABASE_PATH` | `/data/gallformers.sqlite` | SQLite on persistent volume |
+| `DATABASE_URL` | Fly Postgres connection string | Managed Postgres database |
 | `min_machines_running` | `1` | Always keep one machine running |
 
 ## Secrets
@@ -54,46 +54,25 @@ This is the correct way to perform file operations on a running machine, but it 
 
 1. Stop machine (if running)
 2. Update machine command: `fly machine update --command "sleep infinity"`
-3. Start machine (now runs `sleep infinity` instead of app — releases DB lock)
+3. Start machine (now runs `sleep infinity` instead of app)
 4. Perform file operations (backup, upload, verify)
 5. Clear command override: `fly machine update --command ""`
 6. Restart machine (reverts to Dockerfile CMD with fly.toml config)
 
 **Why this works:**
 - Machine starts successfully (sleep infinity never fails)
-- App is not running, so DB lock is released
+- App is not running, so volume files can be safely modified
 - Machine keeps all its configuration (memory, health checks, etc.)
 - Clearing command override reverts to original Dockerfile CMD
 - No machine destruction/recreation needed
 
-## SQLite on Fly.io
-
-**WAL mode requires 3 files:**
-- `.sqlite` - main database
-- `.sqlite-shm` - shared memory file
-- `.sqlite-wal` - write-ahead log
-
-Uploading or downloading only the `.sqlite` file will result in database corruption.
-
-**Creating a clean single-file copy:**
-```bash
-sqlite3 db.sqlite "PRAGMA wal_checkpoint(TRUNCATE); VACUUM;"
-# Now you can upload just the .sqlite file
-```
-
-**Backup strategy:**
-- Use `mv` not `cp` for backups (SFTP cannot overwrite existing files)
-- `mv /data/gallformers.sqlite /data/gallformers-TIMESTAMP.sqlite.bak`
-- Now you can upload to `/data/gallformers.sqlite`
-
 ## Volume Data Files
 
-The `/data` volume holds files that must persist across deploys:
+The `/data` volume holds files that must persist across deploys. The main database is now in Fly Postgres (not on the volume).
 
 | File | Purpose | How to populate |
 |------|---------|-----------------|
-| `gallformers.sqlite` | Main database | Restored from Litestream on first boot |
-| `wcvp.sqlite` | WCVP plant name lookup database | SFTP upload: `echo "put priv/data/wcvp.sqlite /data/wcvp.sqlite" \| fly ssh sftp shell` |
+| `wcvp.sqlite` | WCVP plant name lookup database (SQLite) | SFTP upload: `echo "put priv/data/wcvp.sqlite /data/wcvp.sqlite" \| fly ssh sftp shell` |
 | `boundaries.pmtiles` | Geographic boundary tiles for range maps (~370MB) | SFTP upload: `echo "put priv/static/data/boundaries.pmtiles /data/boundaries.pmtiles" \| fly ssh sftp shell` |
 
 **WCVP** is configured via the `WCVP_DATABASE_PATH` secret (set to `/data/wcvp.sqlite`).
@@ -116,16 +95,14 @@ The `/data` volume holds files that must persist across deploys:
 ```
 User: "Update the production database"
 
-Agent: "I need to update the production database. Here's my plan:
-1. Validate local DB (integrity + species count)
+Agent: "I need to update the volume files. Here's my plan:
+1. Check current machine state
 2. Stop production machine
 3. Update to sleep infinity mode
-4. Start machine (releases DB lock)
-5. Backup existing DB (mv to timestamped file)
-6. Upload new DB
-7. Verify remote DB
-8. Clear Litestream backups
-9. Restart normally
+4. Start machine
+5. Perform file operations
+6. Verify
+7. Restart normally
 
 Should I proceed?"
 
@@ -144,8 +121,7 @@ User: "Update the production database"
 Agent: [Immediately starts running commands]
 Agent: [Tries SFTP to stopped machine - fails]
 Agent: [Creates temp machine with fly machine run - wrong config]
-Agent: [Uploads only .sqlite file - missing WAL/SHM]
-Agent: [Database corrupted]
+Agent: [Makes changes without verification]
 User: "STOP!!!"
 Agent: [Keeps running commands anyway]
 ```

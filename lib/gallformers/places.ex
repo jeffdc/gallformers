@@ -223,7 +223,7 @@ defmodule Gallformers.Places do
         left_join: parent in Place,
         on: parent.id == ph.parent_id,
         where: p.type in ["country", "state", "province"],
-        where: fragment("lower(?) LIKE ?", p.name, ^like_query),
+        where: ilike(p.name, ^like_query),
         order_by: [
           fragment("CASE WHEN ? = 'country' THEN 0 ELSE 1 END", p.type),
           p.name
@@ -279,7 +279,7 @@ defmodule Gallformers.Places do
       Repo.query(
         """
         WITH RECURSIVE descendants(id) AS (
-          SELECT ?1
+          SELECT $1::bigint
           UNION ALL
           SELECT ph.place_id
           FROM place_hierarchy ph
@@ -302,7 +302,7 @@ defmodule Gallformers.Places do
       Repo.query(
         """
         WITH RECURSIVE ancestors(id) AS (
-          SELECT ?1
+          SELECT $1::bigint
           UNION ALL
           SELECT ph.parent_id
           FROM place_hierarchy ph
@@ -347,7 +347,7 @@ defmodule Gallformers.Places do
   def batch_leaf_descendant_ids([]), do: []
 
   def batch_leaf_descendant_ids(place_ids) do
-    placeholders = Enum.map_join(1..length(place_ids), ", ", &"?#{&1}")
+    placeholders = Enum.map_join(1..length(place_ids), ", ", &"$#{&1}::bigint")
 
     {:ok, %{rows: rows}} =
       Repo.query(
@@ -389,7 +389,7 @@ defmodule Gallformers.Places do
         WITH RECURSIVE ancestors(id, depth) AS (
           SELECT ph.parent_id, 1
           FROM place_hierarchy ph
-          WHERE ph.place_id = ?1
+          WHERE ph.place_id = $1::bigint
           UNION ALL
           SELECT ph.parent_id, a.depth + 1
           FROM place_hierarchy ph

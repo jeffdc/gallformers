@@ -123,7 +123,6 @@ defmodule Gallformers.MixProject do
         "format_check",
         "compile --warnings-as-errors",
         "credo --strict",
-        "migrations.lint",
         "deps.unlock --unused",
         "test",
         "test.check_exclusions"

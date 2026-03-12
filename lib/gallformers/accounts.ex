@@ -298,7 +298,7 @@ defmodule Gallformers.Accounts do
   def list_users_for_about_page do
     User
     |> where([u], u.show_on_about == true)
-    |> order_by([u], fragment("COALESCE(?, ?) COLLATE NOCASE", u.display_name, u.nickname))
+    |> order_by([u], fragment("lower(COALESCE(?, ?))", u.display_name, u.nickname))
     |> Repo.all()
   end
 
@@ -315,7 +315,7 @@ defmodule Gallformers.Accounts do
   @spec list_all_users() :: [User.t()]
   def list_all_users do
     User
-    |> order_by([u], fragment("COALESCE(?, ?) COLLATE NOCASE", u.display_name, u.nickname))
+    |> order_by([u], fragment("lower(COALESCE(?, ?))", u.display_name, u.nickname))
     |> Repo.all()
   end
 end

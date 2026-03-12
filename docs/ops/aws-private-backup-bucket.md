@@ -23,18 +23,18 @@ Use cases:
 
 ## Access Control
 
-**IAM Policy**: `LitestreamGallformersBackup` (shared with `gallformers-backups` bucket)
+**IAM Policy**: `LitestreamGallformersBackup` (shared with `gallformers-backups` bucket; name is historical from the SQLite/Litestream era)
 
-**IAM User**: `litestream-gallformers`
+**IAM User**: `litestream-gallformers` (name is historical)
 
-The same credentials used for Litestream backups have access to this bucket. No additional secrets are needed.
+The same credentials used for database backups have access to this bucket. No additional secrets are needed.
 
 ## Comparison with Other Buckets
 
 | Bucket | Access | Contains PII | Use |
 |--------|--------|--------------|-----|
 | `gallformers-images-us-east-1` | Public | No | Production images |
-| `gallformers-backups` | Mixed | No | Litestream (private) + sanitized snapshots (public) |
+| `gallformers-backups` | Mixed | No | Database backups (private) + sanitized snapshots (public) |
 | `gallformers-full-backups` | Private | **Yes** | Full unsanitized backups |
 
 ## GitHub Actions Usage
@@ -48,7 +48,7 @@ The daily backup workflow can optionally upload a full backup here before saniti
     AWS_SECRET_ACCESS_KEY: ${{ secrets.LITESTREAM_SECRET_ACCESS_KEY }}
     AWS_DEFAULT_REGION: us-east-1
   run: |
-    aws s3 cp gallformers.sqlite s3://gallformers-full-backups/$(date +%Y-%m-%d)/gallformers.sqlite
+    aws s3 cp gallformers.dump s3://gallformers-full-backups/$(date +%Y-%m-%d)/gallformers.dump
 ```
 
 ## Lifecycle Policy (Optional)

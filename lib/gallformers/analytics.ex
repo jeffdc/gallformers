@@ -228,12 +228,9 @@ defmodule Gallformers.Analytics do
   end
 
   defp summary_stats(from_date, to_date) do
-    from_str = Date.to_iso8601(from_date)
-    to_str = Date.to_iso8601(to_date)
-
     result =
       from(ds in "daily_stats",
-        where: ds.date >= ^from_str and ds.date <= ^to_str,
+        where: ds.date >= ^from_date and ds.date <= ^to_date,
         select: %{
           page_views: sum(ds.page_views),
           unique_visitors: sum(ds.unique_visitors)
@@ -275,27 +272,23 @@ defmodule Gallformers.Analytics do
 
     from(pv in PageView,
       where: pv.inserted_at >= ^from_dt and pv.inserted_at < ^to_dt,
-      group_by: fragment("date(?)", pv.inserted_at),
+      group_by: fragment("?::date", pv.inserted_at),
       select: %{
-        date: fragment("date(?)", pv.inserted_at),
+        date: fragment("?::date", pv.inserted_at),
         page_views: count(pv.id),
         unique_visitors: count(pv.visitor_hash, :distinct)
       },
-      order_by: fragment("date(?)", pv.inserted_at)
+      order_by: fragment("?::date", pv.inserted_at)
     )
     |> Repo.all()
     |> Enum.map(fn stat ->
-      {:ok, date} = Date.from_iso8601(stat.date)
-      %{stat | date: date}
+      %{stat | date: to_date_struct(stat.date)}
     end)
   end
 
   defp summary_daily_stats(from_date, to_date) do
-    from_str = Date.to_iso8601(from_date)
-    to_str = Date.to_iso8601(to_date)
-
     from(ds in "daily_stats",
-      where: ds.date >= ^from_str and ds.date <= ^to_str,
+      where: ds.date >= ^from_date and ds.date <= ^to_date,
       select: %{
         date: ds.date,
         page_views: ds.page_views,
@@ -305,10 +298,13 @@ defmodule Gallformers.Analytics do
     )
     |> Repo.all()
     |> Enum.map(fn stat ->
-      {:ok, date} = Date.from_iso8601(stat.date)
-      %{stat | date: date}
+      %{stat | date: to_date_struct(stat.date)}
     end)
   end
+
+  # Postgres returns Date structs directly from date columns/casts,
+  # so this is an identity function. Kept for clarity at call sites.
+  defp to_date_struct(%Date{} = date), do: date
 
   defp fill_missing_days(from_date, to_date, stats_with_data) do
     # Create a map for quick lookup
@@ -378,12 +374,9 @@ defmodule Gallformers.Analytics do
   end
 
   defp summary_top_pages(from_date, to_date, limit) do
-    from_str = Date.to_iso8601(from_date)
-    to_str = Date.to_iso8601(to_date)
-
     query =
       from(dp in "daily_page_stats",
-        where: dp.date >= ^from_str and dp.date <= ^to_str,
+        where: dp.date >= ^from_date and dp.date <= ^to_date,
         group_by: dp.path,
         select: %{
           path: dp.path,
@@ -448,11 +441,8 @@ defmodule Gallformers.Analytics do
   end
 
   defp summary_top_referrers(from_date, to_date) do
-    from_str = Date.to_iso8601(from_date)
-    to_str = Date.to_iso8601(to_date)
-
     from(dr in "daily_referrer_stats",
-      where: dr.date >= ^from_str and dr.date <= ^to_str,
+      where: dr.date >= ^from_date and dr.date <= ^to_date,
       group_by: dr.referrer_host,
       select: %{
         referrer: dr.referrer_host,
@@ -507,11 +497,8 @@ defmodule Gallformers.Analytics do
   end
 
   defp summary_device_breakdown(from_date, to_date) do
-    from_str = Date.to_iso8601(from_date)
-    to_str = Date.to_iso8601(to_date)
-
     from(dd in "daily_device_stats",
-      where: dd.date >= ^from_str and dd.date <= ^to_str,
+      where: dd.date >= ^from_date and dd.date <= ^to_date,
       group_by: dd.device_type,
       select: %{
         device_type: dd.device_type,
@@ -566,11 +553,8 @@ defmodule Gallformers.Analytics do
   end
 
   defp summary_browser_breakdown(from_date, to_date) do
-    from_str = Date.to_iso8601(from_date)
-    to_str = Date.to_iso8601(to_date)
-
     from(db in "daily_browser_stats",
-      where: db.date >= ^from_str and db.date <= ^to_str,
+      where: db.date >= ^from_date and db.date <= ^to_date,
       group_by: db.browser,
       select: %{
         browser: db.browser,

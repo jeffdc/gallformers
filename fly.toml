@@ -4,19 +4,13 @@
 app = "gallformers"
 primary_region = "iad"
 
-# Graceful shutdown: send SIGTERM and wait for Litestream to flush WAL to S3
 kill_signal = "SIGTERM"
-kill_timeout = "30s"
+kill_timeout = "5s"
 
 [build]
   dockerfile = "Dockerfile"
 
-# Note: release_command doesn't work with SQLite volumes on Fly.io because
-# the release machine gets a forked volume snapshot that doesn't persist.
-# Migrations are run in docker-entrypoint.sh instead.
-
 [env]
-  DATABASE_PATH = "/data/gallformers.sqlite"
   WCVP_DATABASE_PATH = "/data/wcvp.sqlite"
   PHX_HOST = "www.gallformers.org"
   PORT = "4000"

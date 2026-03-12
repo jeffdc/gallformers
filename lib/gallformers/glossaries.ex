@@ -64,8 +64,8 @@ defmodule Gallformers.Glossaries do
 
     from(g in Glossary,
       where:
-        fragment("lower(?) LIKE ?", g.word, ^search_term) or
-          fragment("lower(?) LIKE ?", g.definition, ^search_term),
+        ilike(g.word, ^search_term) or
+          ilike(g.definition, ^search_term),
       order_by: g.word
     )
     |> Repo.all()
@@ -90,7 +90,7 @@ defmodule Gallformers.Glossaries do
     pattern = "#{String.downcase(letter)}%"
 
     from(g in Glossary,
-      where: fragment("lower(?) LIKE ?", g.word, ^pattern),
+      where: ilike(g.word, ^pattern),
       order_by: g.word
     )
     |> Repo.all()

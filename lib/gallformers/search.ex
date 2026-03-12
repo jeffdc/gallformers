@@ -31,7 +31,7 @@ defmodule Gallformers.Search do
       on: gt.species_id == s.id,
       left_join: a in Gallformers.Species.Abundance,
       on: s.abundance_id == a.id,
-      where: s.taxoncode == "gall" and fragment("lower(?) LIKE ?", s.name, ^search_term),
+      where: s.taxoncode == "gall" and ilike(s.name, ^search_term),
       order_by: s.name,
       select: %{
         id: s.id,
@@ -60,7 +60,7 @@ defmodule Gallformers.Search do
       on: gt.species_id == s.id,
       left_join: a in Gallformers.Species.Abundance,
       on: s.abundance_id == a.id,
-      where: s.taxoncode == "gall" and fragment("lower(?) LIKE ?", s.name, ^search_term),
+      where: s.taxoncode == "gall" and ilike(s.name, ^search_term),
       order_by: s.name,
       limit: ^limit,
       offset: ^offset,
@@ -86,7 +86,7 @@ defmodule Gallformers.Search do
     search_term = "%#{String.downcase(query)}%"
 
     from(s in Species,
-      where: s.taxoncode == "gall" and fragment("lower(?) LIKE ?", s.name, ^search_term),
+      where: s.taxoncode == "gall" and ilike(s.name, ^search_term),
       select: count(s.id)
     )
     |> Repo.one()
@@ -101,7 +101,7 @@ defmodule Gallformers.Search do
     search_term = "%#{String.downcase(query)}%"
 
     from(s in Species,
-      where: s.taxoncode == "plant" and fragment("lower(?) LIKE ?", s.name, ^search_term),
+      where: s.taxoncode == "plant" and ilike(s.name, ^search_term),
       order_by: s.name,
       select: %{
         id: s.id,
@@ -122,7 +122,7 @@ defmodule Gallformers.Search do
     search_term = "%#{String.downcase(query)}%"
 
     from(s in Species,
-      where: s.taxoncode == "plant" and fragment("lower(?) LIKE ?", s.name, ^search_term),
+      where: s.taxoncode == "plant" and ilike(s.name, ^search_term),
       order_by: s.name,
       limit: ^limit,
       offset: ^offset,
@@ -144,7 +144,7 @@ defmodule Gallformers.Search do
     search_term = "%#{String.downcase(query)}%"
 
     from(s in Species,
-      where: s.taxoncode == "plant" and fragment("lower(?) LIKE ?", s.name, ^search_term),
+      where: s.taxoncode == "plant" and ilike(s.name, ^search_term),
       select: count(s.id)
     )
     |> Repo.one()
@@ -158,7 +158,7 @@ defmodule Gallformers.Search do
     search_term = "%#{String.downcase(query)}%"
 
     from(s in Species,
-      where: fragment("lower(?) LIKE ?", s.name, ^search_term),
+      where: ilike(s.name, ^search_term),
       order_by: s.name,
       select: %{
         id: s.id,
@@ -249,60 +249,14 @@ defmodule Gallformers.Search do
   end
 
   @doc """
-  Searches galls by name or alias using FTS5 for fast prefix matching.
-  Falls back to LIKE search for mid-word matches.
+  Searches galls by name or alias using ILIKE matching.
   """
   @spec search_galls_with_aliases(String.t()) :: [map()]
   def search_galls_with_aliases(query) do
-    # Try FTS5 first for prefix matching
-    fts_results = search_galls_fts(query)
-
-    if Enum.empty?(fts_results) do
-      # Fall back to LIKE for mid-word matches
-      search_galls_with_aliases_like(query)
-    else
-      fts_results
-    end
+    search_galls_with_aliases_like(query)
   end
 
-  # FTS5-based gall search
-  defp search_galls_fts(query) do
-    sanitized = Gallformers.Species.sanitize_fts_query(query)
-
-    if sanitized == "" do
-      []
-    else
-      fts_query =
-        sanitized
-        |> String.split(~r/\s+/, trim: true)
-        |> Enum.map_join(" ", &"#{&1}*")
-
-      sql = """
-      SELECT s.id, s.name, gt.undescribed
-      FROM species_fts f
-      JOIN species s ON s.id = f.species_id
-      JOIN gall_traits gt ON gt.species_id = s.id
-      WHERE s.taxoncode = 'gall' AND species_fts MATCH ?
-      ORDER BY bm25(species_fts)
-      LIMIT 100
-      """
-
-      case Repo.query(sql, [fts_query]) do
-        {:ok, %{rows: rows}} ->
-          search_terms = Ranking.parse_query(query)
-
-          rows
-          |> Enum.map(&transform_gall_fts_row/1)
-          |> load_all_aliases_for_species()
-          |> Ranking.add_scores_and_sort(search_terms)
-
-        {:error, _} ->
-          []
-      end
-    end
-  end
-
-  # LIKE-based fallback for mid-word matches
+  # ILIKE-based gall search with alias matching
   defp search_galls_with_aliases_like(query) do
     search_term = "%#{String.downcase(query)}%"
     search_terms = Ranking.parse_query(query)
@@ -312,7 +266,7 @@ defmodule Gallformers.Search do
       from(s in Species,
         join: gt in GallTraits,
         on: gt.species_id == s.id,
-        where: s.taxoncode == "gall" and fragment("lower(?) LIKE ?", s.name, ^search_term),
+        where: s.taxoncode == "gall" and ilike(s.name, ^search_term),
         order_by: s.name,
         select: %{
           id: s.id,
@@ -329,7 +283,7 @@ defmodule Gallformers.Search do
         join: s in assoc(a, :species),
         join: gt in GallTraits,
         on: gt.species_id == s.id,
-        where: s.taxoncode == "gall" and fragment("lower(?) LIKE ?", a.name, ^search_term),
+        where: s.taxoncode == "gall" and ilike(a.name, ^search_term),
         order_by: s.name,
         select: %{
           id: s.id,
@@ -348,59 +302,14 @@ defmodule Gallformers.Search do
   end
 
   @doc """
-  Searches hosts by name or alias using FTS5 for fast prefix matching.
-  Falls back to LIKE search for mid-word matches.
+  Searches hosts by name or alias using ILIKE matching.
   """
   @spec search_hosts_with_aliases(String.t()) :: [map()]
   def search_hosts_with_aliases(query) do
-    # Try FTS5 first for prefix matching
-    fts_results = search_hosts_fts(query)
-
-    if Enum.empty?(fts_results) do
-      # Fall back to LIKE for mid-word matches
-      search_hosts_with_aliases_like(query)
-    else
-      fts_results
-    end
+    search_hosts_with_aliases_like(query)
   end
 
-  # FTS5-based host search
-  defp search_hosts_fts(query) do
-    sanitized = Gallformers.Species.sanitize_fts_query(query)
-
-    if sanitized == "" do
-      []
-    else
-      fts_query =
-        sanitized
-        |> String.split(~r/\s+/, trim: true)
-        |> Enum.map_join(" ", &"#{&1}*")
-
-      sql = """
-      SELECT f.species_id, s.name
-      FROM species_fts f
-      JOIN species s ON s.id = f.species_id
-      WHERE s.taxoncode = 'plant' AND species_fts MATCH ?
-      ORDER BY bm25(species_fts)
-      LIMIT 100
-      """
-
-      case Repo.query(sql, [fts_query]) do
-        {:ok, %{rows: rows}} ->
-          search_terms = Ranking.parse_query(query)
-
-          rows
-          |> Enum.map(&transform_host_fts_row/1)
-          |> load_all_aliases_for_species()
-          |> Ranking.add_scores_and_sort(search_terms)
-
-        {:error, _} ->
-          []
-      end
-    end
-  end
-
-  # LIKE-based fallback for mid-word matches
+  # ILIKE-based host search with alias matching
   defp search_hosts_with_aliases_like(query) do
     search_term = "%#{String.downcase(query)}%"
     search_terms = Ranking.parse_query(query)
@@ -408,7 +317,7 @@ defmodule Gallformers.Search do
     # Search by species name
     name_results =
       from(s in Species,
-        where: s.taxoncode == "plant" and fragment("lower(?) LIKE ?", s.name, ^search_term),
+        where: s.taxoncode == "plant" and ilike(s.name, ^search_term),
         order_by: s.name,
         select: %{
           id: s.id,
@@ -422,7 +331,7 @@ defmodule Gallformers.Search do
     alias_results =
       from(a in Alias,
         join: s in assoc(a, :species),
-        where: s.taxoncode == "plant" and fragment("lower(?) LIKE ?", a.name, ^search_term),
+        where: s.taxoncode == "plant" and ilike(a.name, ^search_term),
         order_by: s.name,
         select: %{
           id: s.id,
@@ -437,14 +346,6 @@ defmodule Gallformers.Search do
     |> Enum.uniq_by(& &1.id)
     |> load_all_aliases_for_species()
     |> Ranking.add_scores_and_sort(search_terms)
-  end
-
-  defp transform_gall_fts_row([id, name, undescribed]) do
-    %{id: id, name: name, type: "gall", undescribed: undescribed == 1}
-  end
-
-  defp transform_host_fts_row([id, name]) do
-    %{id: id, name: name, type: "host"}
   end
 
   @doc """
@@ -506,9 +407,9 @@ defmodule Gallformers.Search do
       # Exclude placeholders with no species (handle NULL/0 as false)
       where:
         t.type in ["genus", "family", "intermediate", "section"] and
-          (fragment("lower(?) LIKE ?", t.name, ^search_term) or
-             fragment("lower(coalesce(?, '')) LIKE ?", t.description, ^search_term)) and
-          not (fragment("coalesce(?, 0)", t.is_placeholder) == 1 and is_nil(st.species_id)),
+          (ilike(t.name, ^search_term) or
+             fragment("coalesce(?, '') ILIKE ?", t.description, ^search_term)) and
+          not (fragment("coalesce(?, false)", t.is_placeholder) == true and is_nil(st.species_id)),
       group_by: [t.id, parent.id],
       order_by: [t.type, t.name],
       select: %{

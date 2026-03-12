@@ -44,7 +44,7 @@ structurizr-cli export -workspace workspace.dsl -format svg
 The workspace defines four diagrams:
 
 1. **System Context (C1)** - Gallformers and its external dependencies (Auth0, S3, users)
-2. **Containers (C2)** - Runtime components (Phoenix app, database, GenServers, Litestream)
+2. **Containers (C2)** - Runtime components (Phoenix app, database, GenServers)
 3. **Components (C3)** - Phoenix contexts and their relationships
 4. **Deployment** - Production infrastructure on Fly.io and AWS
 

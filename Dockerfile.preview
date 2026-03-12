@@ -1,6 +1,6 @@
 # Gallformers Preview - Dockerfile
 # Multi-stage build with baked-in database from S3 snapshot
-# No volumes, no Litestream replication at runtime
+# No volumes, no replication at runtime
 
 # Stage 1: Build Elixir release
 FROM hexpm/elixir:1.17.3-erlang-27.1.2-alpine-3.20.3 AS builder
@@ -57,7 +57,7 @@ FROM alpine:3.20 AS runtime
 
 # Runtime dependencies
 # vips is needed for image processing (resizing variants)
-# curl is needed to download the database snapshot
+# curl is needed to download data files from S3
 RUN apk add --no-cache libstdc++ openssl ncurses-libs sqlite vips curl
 
 # Install Typst for PDF generation of identification keys
@@ -75,8 +75,6 @@ COPY --from=builder --chown=gallformers:gallformers /app/_build/prod/rel/gallfor
 
 # Download data files from public S3 (no auth needed)
 RUN mkdir -p /app/data && \
-    curl -fSL -o /app/data/gallformers.sqlite \
-      https://gallformers-backups.s3.amazonaws.com/public/gallformers.sqlite && \
     curl -fSL -o /app/data/wcvp.sqlite \
       https://gallformers-backups.s3.amazonaws.com/public/wcvp.sqlite && \
     curl -fSL -o /app/data/boundaries.pmtiles \
@@ -88,7 +86,6 @@ RUN chown -R gallformers:gallformers /app/data
 COPY --chmod=755 docker-entrypoint-preview.sh /app/docker-entrypoint-preview.sh
 
 ENV HOME=/app
-ENV DATABASE_PATH=/app/data/gallformers.sqlite
 
 EXPOSE 4000
 
