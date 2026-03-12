@@ -1,5 +1,5 @@
 ---
-status: refined
+status: done
 created: 2026-03-11
 updated: 2026-03-12
 epic: postgres
