@@ -1,5 +1,5 @@
 ---
-status: refined
+status: done
 created: 2026-03-11
 updated: 2026-03-12
 epic: postgres
@@ -94,4 +94,3 @@ All application code running against Postgres. No SQLite-specific code remaining
 - No SQLite-specific code in main app
 - FTS working with trigger-based sync
 - All documentation current
-
