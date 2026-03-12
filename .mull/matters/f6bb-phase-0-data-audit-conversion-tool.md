@@ -1,5 +1,5 @@
 ---
-status: refined
+status: done
 created: 2026-03-11
 updated: 2026-03-12
 epic: postgres
@@ -83,4 +83,3 @@ Local Postgres with real gallformers data, bootstrappable from Ecto migrations. 
 - Reads local SQLite, writes local Postgres
 - Handles type coercions from step 3
 - Repeatable, fast enough to run casually
-
