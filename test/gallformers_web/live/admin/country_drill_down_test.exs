@@ -1,5 +1,5 @@
 defmodule GallformersWeb.Admin.CountryDrillDownTest do
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

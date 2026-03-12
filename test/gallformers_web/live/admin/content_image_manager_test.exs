@@ -3,7 +3,7 @@ defmodule GallformersWeb.Admin.ContentImageManagerTest do
   Tests for the ContentImageManager LiveComponent.
   Uses live_isolated with a test wrapper LiveView.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

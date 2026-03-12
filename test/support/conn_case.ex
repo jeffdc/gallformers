@@ -11,9 +11,8 @@ defmodule GallformersWeb.ConnCase do
   we enable the SQL sandbox, so changes done to the database
   are reverted at the end of every test.
 
-  NOTE: This project uses SQLite which does NOT support `async: true`.
-  SQLite is single-writer, so concurrent tests holding write transactions
-  will cause "Database busy" errors. Always use `async: false` (the default).
+  Async tests use isolated sandbox connections while sync tests share
+  a single connection.
   """
 
   use ExUnit.CaseTemplate

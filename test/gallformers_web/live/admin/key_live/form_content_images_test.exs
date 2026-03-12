@@ -2,7 +2,7 @@ defmodule GallformersWeb.Admin.KeyLive.FormContentImagesTest do
   @moduledoc """
   Tests for ContentImageManager integration in the key admin form.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
   alias Gallformers.Accounts.Auth0User

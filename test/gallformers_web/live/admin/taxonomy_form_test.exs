@@ -2,7 +2,7 @@ defmodule GallformersWeb.Admin.TaxonomyFormTest do
   @moduledoc """
   LiveView tests for the taxonomy admin form, focused on the parent field typeahead.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
   alias Gallformers.Accounts.Auth0User

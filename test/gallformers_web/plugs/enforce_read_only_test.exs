@@ -2,7 +2,7 @@ defmodule GallformersWeb.Plugs.EnforceReadOnlyTest do
   @moduledoc """
   Tests for the EnforceReadOnly plug.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
 
   alias Gallformers.Accounts.Auth0User
   alias Gallformers.SiteSettings

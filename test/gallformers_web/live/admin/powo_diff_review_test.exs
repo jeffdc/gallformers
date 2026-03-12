@@ -2,7 +2,7 @@ defmodule GallformersWeb.Admin.PowoDiffReviewTest do
   @moduledoc """
   Tests for the PowoDiffReview LiveComponent.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

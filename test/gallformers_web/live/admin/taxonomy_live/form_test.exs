@@ -9,7 +9,7 @@ defmodule GallformersWeb.Admin.TaxonomyLive.FormTest do
   - Wrong name shows error, nothing deleted
   - Correct name triggers delete and redirect
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
   alias Gallformers.Accounts.Auth0User

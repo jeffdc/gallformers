@@ -6,7 +6,7 @@ defmodule GallformersWeb.TaxonomyRedirectTest do
   Old URLs like /family/30, /genus/33, /section/5 need to 301-redirect
   to /family/Cynipidae, /genus/Andricus, etc.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

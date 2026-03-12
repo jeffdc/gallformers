@@ -2,7 +2,7 @@ defmodule Gallformers.ContentImages.BuildUrlMapTest do
   @moduledoc """
   Tests for ContentImages.build_image_url_map/1.
   """
-  use Gallformers.DataCase, async: false
+  use Gallformers.DataCase, async: true
 
   alias Gallformers.ContentImages
   alias Gallformers.Keys

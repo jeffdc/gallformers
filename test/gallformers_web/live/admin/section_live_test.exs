@@ -5,7 +5,7 @@ defmodule GallformersWeb.Admin.SectionLiveTest do
   Sections are now created/edited via the taxonomy form. The section admin page
   shows a typeahead picker at `/admin/section` and species mapping at `/admin/section/:id`.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
   alias Gallformers.Accounts.Auth0User

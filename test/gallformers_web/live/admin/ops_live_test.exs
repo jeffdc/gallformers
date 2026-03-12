@@ -2,7 +2,7 @@ defmodule GallformersWeb.Admin.OpsLiveTest do
   @moduledoc """
   LiveView tests for the operator ops admin page.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
   alias Gallformers.Accounts.Auth0User

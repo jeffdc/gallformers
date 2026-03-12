@@ -1,5 +1,5 @@
 defmodule Gallformers.GallsIdentificationTest do
-  use Gallformers.DataCase, async: false
+  use Gallformers.DataCase, async: true
 
   alias Gallformers.Galls
 

@@ -1,5 +1,5 @@
 defmodule Gallformers.Wcvp.LookupTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
 
   alias Gallformers.Repo
   alias Gallformers.Wcvp.Lookup

@@ -2,7 +2,7 @@ defmodule Gallformers.ContentImagesTest do
   @moduledoc """
   Unit tests for the ContentImages context.
   """
-  use Gallformers.DataCase, async: false
+  use Gallformers.DataCase, async: true
 
   alias Gallformers.ContentImages
   alias Gallformers.ContentImages.ContentImage

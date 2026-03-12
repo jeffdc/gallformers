@@ -1,0 +1,165 @@
+name: CI (Postgres)
+
+on:
+  push:
+    branches: [postgres-migration]
+    paths:
+      - 'lib/**'
+      - 'config/**'
+      - 'assets/**'
+      - 'priv/**'
+      - 'test/**'
+      - 'mix.exs'
+      - 'mix.lock'
+      - '.github/workflows/ci-postgres.yml'
+  pull_request:
+    branches: [postgres-migration]
+    paths:
+      - 'lib/**'
+      - 'config/**'
+      - 'assets/**'
+      - 'priv/**'
+      - 'test/**'
+      - 'mix.exs'
+      - 'mix.lock'
+      - '.github/workflows/ci-postgres.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ci-postgres-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  phoenix:
+    name: Phoenix
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gallformers_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      MIX_ENV: test
+      USER: postgres
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.19'
+          otp-version: '28'
+
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ hashFiles('mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Setup test database
+        run: |
+          MIX_ENV=test mix ecto.create --quiet
+          MIX_ENV=test mix ecto.migrate --quiet
+          psql -U postgres -h localhost -d gallformers_test -f priv/repo/test_seeds.sql --quiet
+
+      - name: Setup ChromeDriver for E2E tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-chromedriver
+          chromedriver --version
+
+      - name: Run precommit checks (format, compile, credo, migrations, tests, exclusion check)
+        run: mix precommit
+
+  assets:
+    name: Assets
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.19'
+          otp-version: '28'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ hashFiles('mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Install npm dependencies
+        run: npm ci --prefix assets
+
+      - name: Build assets
+        run: mix assets.deploy
+
+  api-version-check:
+    name: API Version Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if API files changed without version bump
+        run: |
+          BASE_SHA=${{ github.event.pull_request.base.sha }}
+          HEAD_SHA=${{ github.event.pull_request.head.sha }}
+
+          # Check if any API controller files changed
+          API_CHANGED=$(git diff --name-only $BASE_SHA $HEAD_SHA -- 'lib/gallformers_web/controllers/api/**' | wc -l)
+
+          # Check if API_VERSION changed
+          VERSION_CHANGED=$(git diff --name-only $BASE_SHA $HEAD_SHA -- 'API_VERSION' | wc -l)
+
+          if [ "$API_CHANGED" -gt 0 ] && [ "$VERSION_CHANGED" -eq 0 ]; then
+            echo "::error::API files changed but API_VERSION was not updated!"
+            echo ""
+            echo "Changed API files:"
+            git diff --name-only $BASE_SHA $HEAD_SHA -- 'lib/gallformers_web/controllers/api/**'
+            echo ""
+            echo "When modifying the REST API, you must bump the version in API_VERSION"
+            echo "Current version: $(cat API_VERSION)"
+            exit 1
+          fi
+
+          if [ "$API_CHANGED" -gt 0 ]; then
+            echo "API files changed and API_VERSION was updated. Good!"
+          else
+            echo "No API files changed. Skipping version check."
+          fi

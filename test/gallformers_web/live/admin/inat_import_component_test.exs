@@ -2,7 +2,7 @@ defmodule GallformersWeb.Admin.InatImportComponentTest do
   @moduledoc """
   Tests for the iNaturalist import component on the Images admin page.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
 
   import Ecto.Query
   import Phoenix.LiveViewTest

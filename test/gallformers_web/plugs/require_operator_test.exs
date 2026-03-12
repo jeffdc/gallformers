@@ -2,7 +2,7 @@ defmodule GallformersWeb.Plugs.RequireOperatorTest do
   @moduledoc """
   Tests for the RequireOperator plug.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
 
   alias Gallformers.Accounts.Auth0User
   alias GallformersWeb.Plugs.RequireOperator

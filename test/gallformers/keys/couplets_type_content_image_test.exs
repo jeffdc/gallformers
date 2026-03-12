@@ -2,7 +2,7 @@ defmodule Gallformers.Keys.CoupletsTypeContentImageTest do
   @moduledoc """
   Tests for content_image_id support in CoupletsType.
   """
-  use Gallformers.DataCase, async: false
+  use Gallformers.DataCase, async: true
 
   alias Gallformers.Keys.CoupletsType
 

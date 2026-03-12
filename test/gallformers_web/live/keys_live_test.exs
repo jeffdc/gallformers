@@ -1,5 +1,5 @@
 defmodule GallformersWeb.KeysLiveTest do
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
   describe "Keys index page" do

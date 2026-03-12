@@ -6,7 +6,7 @@ defmodule GallformersWeb.AuthControllerTest do
   Note: We don't test the actual Ueberauth OAuth flow - we trust the library.
   Instead, we test the callback handling and session management.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
 
   alias Gallformers.Accounts
   alias Gallformers.Accounts.Auth0User

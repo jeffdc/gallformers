@@ -2,7 +2,7 @@ defmodule Gallformers.AccountsTest do
   @moduledoc """
   Unit tests for the Accounts context.
   """
-  use Gallformers.DataCase, async: false
+  use Gallformers.DataCase, async: true
 
   alias Gallformers.Accounts
   alias Gallformers.Accounts.Auth0User

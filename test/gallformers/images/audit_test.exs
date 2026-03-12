@@ -2,7 +2,7 @@ defmodule Gallformers.Images.AuditTest do
   @moduledoc """
   Unit tests for the Images.Audit module (orphan detection and management).
   """
-  use Gallformers.DataCase, async: false
+  use Gallformers.DataCase, async: true
 
   alias Gallformers.Images.Audit
 

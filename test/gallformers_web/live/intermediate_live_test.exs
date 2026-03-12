@@ -2,7 +2,7 @@ defmodule GallformersWeb.IntermediateLiveTest do
   @moduledoc """
   Tests for the public intermediate taxonomy browse page with semantic URLs.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
   describe "IntermediateLive with rank-typed URLs" do

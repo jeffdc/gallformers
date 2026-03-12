@@ -2,7 +2,7 @@ defmodule GallformersWeb.Admin.ProfileLiveTest do
   @moduledoc """
   LiveView tests for the admin profile page.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
   alias Gallformers.Accounts

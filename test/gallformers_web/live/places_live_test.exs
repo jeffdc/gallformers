@@ -5,7 +5,7 @@ defmodule GallformersWeb.PlacesTabTest do
   The old /explore?tab=places route has been replaced by /places.
   See places_browse_live_test.exs for current tests.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
 
   describe "legacy /explore?tab=places redirect" do
     test "redirects /explore?tab=places to /places with 301", %{conn: conn} do

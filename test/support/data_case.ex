@@ -10,9 +10,8 @@ defmodule Gallformers.DataCase do
   we enable the SQL sandbox, so changes done to the database
   are reverted at the end of every test.
 
-  NOTE: This project uses SQLite which does NOT support `async: true`.
-  SQLite is single-writer, so concurrent tests holding write transactions
-  will cause "Database busy" errors. Always use `async: false` (the default).
+  If the test case interacts with the database, async tests use isolated
+  sandbox connections while sync tests share a single connection.
   """
 
   use ExUnit.CaseTemplate
@@ -39,10 +38,6 @@ defmodule Gallformers.DataCase do
   Sets up the sandbox based on the test tags.
   """
   def setup_sandbox(tags) do
-    if tags[:async] do
-      raise "async: true is not supported with SQLite. Use async: false (the default)."
-    end
-
     pid = Sandbox.start_owner!(Gallformers.Repo, shared: not tags[:async])
     on_exit(fn -> Sandbox.stop_owner(pid) end)
   end

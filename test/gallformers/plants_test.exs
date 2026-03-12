@@ -2,7 +2,7 @@ defmodule Gallformers.PlantsTest do
   @moduledoc """
   Unit tests for the Plants context.
   """
-  use Gallformers.DataCase, async: false
+  use Gallformers.DataCase, async: true
 
   alias Gallformers.Plants
   alias Gallformers.Plants.HostTraits

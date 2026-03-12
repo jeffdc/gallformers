@@ -2,9 +2,9 @@ defmodule GallformersWeb.IDLiveTest do
   @moduledoc """
   LiveView tests for the ID tool page.
   """
-  # async: false is required because LiveView processes run separately and
+  # async: true is required because LiveView processes run separately and
   # need to access the database through the same connection as the test
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
   alias Gallformers.GallHosts

@@ -1,5 +1,5 @@
 defmodule Gallformers.Taxonomy.TreeTest do
-  use Gallformers.DataCase, async: false
+  use Gallformers.DataCase, async: true
 
   alias Gallformers.Repo
   alias Gallformers.Species.Species

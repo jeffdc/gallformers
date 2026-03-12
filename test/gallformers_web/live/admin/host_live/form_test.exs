@@ -10,7 +10,7 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
   - Rename modal
   - Dirty state tracking
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
   alias Gallformers.Accounts.Auth0User

@@ -2,7 +2,7 @@ defmodule GallformersWeb.LayoutsTest do
   @moduledoc """
   Tests for layout components.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
   alias GallformersWeb.Layouts

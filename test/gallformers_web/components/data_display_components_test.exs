@@ -2,7 +2,7 @@ defmodule GallformersWeb.DataDisplayComponentsTest do
   @moduledoc """
   Tests for data display components.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
   alias GallformersWeb.DataDisplayComponents

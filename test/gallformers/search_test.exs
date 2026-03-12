@@ -1,5 +1,5 @@
 defmodule Gallformers.SearchTest do
-  use Gallformers.DataCase, async: false
+  use Gallformers.DataCase, async: true
 
   alias Gallformers.Search
 

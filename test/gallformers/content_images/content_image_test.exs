@@ -2,7 +2,7 @@ defmodule Gallformers.ContentImages.ContentImageTest do
   @moduledoc """
   Unit tests for ContentImage schema changeset validation.
   """
-  use Gallformers.DataCase, async: false
+  use Gallformers.DataCase, async: true
 
   alias Gallformers.ContentImages.ContentImage
 

@@ -2,7 +2,7 @@
 #
 # Phoenix/LiveView development commands
 
-.PHONY: dev dev-lan test test-db test-prod-data test-prod-data-e2e test-prod-data-all download-db ci preflight help deps assets setup clean check-db build run-local-release dump-schema upload-reset-db preview preview-stop preview-destroy
+.PHONY: dev dev-lan test test-db test-prod-data test-prod-data-e2e test-prod-data-all download-db ci preflight help deps assets setup clean check-db check-sqlite build run-local-release dump-schema upload-reset-db preview preview-stop preview-destroy
 
 # Download production database for local dev
 # Uses public S3 snapshot (updated daily by GitHub Actions)
@@ -58,30 +58,30 @@ assets: assets/node_modules
 	mix assets.setup
 	mix assets.build
 
-# Ensure database exists and has data (not just Ecto's empty schema_migrations)
+# Ensure dev database exists and has data
 check-db:
+	@psql -d gallformers_dev -tAc "SELECT count(*) FROM species" 2>/dev/null | grep -qE '^[1-9]' || { \
+		echo ""; \
+		echo "ERROR: Dev database not found or has no species data"; \
+		echo "Set it up with:"; \
+		echo "  mix ecto.create && mix ecto.migrate && make download-db && mix convert_sqlite"; \
+		echo ""; \
+		exit 1; \
+	}
+
+# Check that the SQLite production copy exists (needed for convert_sqlite)
+check-sqlite:
 	@if [ ! -f priv/gallformers.sqlite ]; then \
 		echo ""; \
-		echo "ERROR: Database not found at priv/gallformers.sqlite"; \
+		echo "ERROR: SQLite database not found at priv/gallformers.sqlite"; \
 		echo "Run 'make download-db' to download the database"; \
 		echo ""; \
 		exit 1; \
 	fi
-	@DB_SIZE=$$(stat -f%z priv/gallformers.sqlite 2>/dev/null || stat -c%s priv/gallformers.sqlite 2>/dev/null); \
-	if [ "$$DB_SIZE" -lt 100000 ]; then \
-		echo ""; \
-		echo "ERROR: Database appears empty (only $$DB_SIZE bytes)"; \
-		echo "Run 'make download-db' to download the production database"; \
-		echo ""; \
-		exit 1; \
-	fi
 
-# Dump database schema (removes SQLite internal tables that break ecto.load)
+# Dump database schema
 dump-schema:
 	mix ecto.dump
-	@echo "Cleaning SQLite internal tables from structure.sql..."
-	@grep -v -E "species_fts_|sqlite_sequence" priv/repo/structure.sql > priv/repo/structure_clean.sql
-	@mv priv/repo/structure_clean.sql priv/repo/structure.sql
 	@echo "Schema dumped to priv/repo/structure.sql"
 
 # Full setup (deps + assets + database)
@@ -116,13 +116,13 @@ build: deps
 	MIX_ENV=prod mix release --overwrite
 
 # Run the locally built production release
-# Requires SECRET_KEY_BASE and DATABASE_PATH environment variables
+# Requires SECRET_KEY_BASE and DATABASE_URL environment variables
 run-local-release:
 	@if [ -z "$$SECRET_KEY_BASE" ]; then \
 		echo "Generating SECRET_KEY_BASE..."; \
 		export SECRET_KEY_BASE=$$(mix phx.gen.secret); \
 	fi; \
-	DATABASE_PATH=$${DATABASE_PATH:-$(PWD)/priv/gallformers.sqlite} \
+	DATABASE_URL=$${DATABASE_URL:-postgres://localhost/gallformers_dev} \
 	PHX_HOST=localhost \
 	PORT=4000 \
 	_build/prod/rel/gallformers/bin/gallformers start
@@ -131,28 +131,28 @@ run-local-release:
 # Testing
 # =============================================================================
 
-# Set up fresh test database from structure.sql + test_seeds.sql
+# Set up fresh test database with migrations + seed data
 test-db:
 	@echo "Setting up test database..."
-	@rm -f priv/gallformers_test.sqlite*
+	@MIX_ENV=test mix ecto.drop --quiet 2>/dev/null || true
 	@MIX_ENV=test mix ecto.create --quiet
-	@MIX_ENV=test mix ecto.load --quiet
 	@MIX_ENV=test mix ecto.migrate --quiet
-	@sqlite3 priv/gallformers_test.sqlite < priv/repo/test_seeds.sql
+	@psql -d gallformers_test -f priv/repo/test_seeds.sql --quiet
 	@echo "Test database ready"
 
 # Run tests (rebuilds test DB first, excludes E2E tests)
 test: test-db
 	mix test
 
-# Run context-level tests against a copy of the production database (no browser)
+# Run context-level tests against production data loaded into Postgres (no browser)
 # Validates data integrity and exercises write paths against real data
 # All writes use Ecto sandbox (rolled back automatically)
-test-prod-data: check-db
-	@echo "Copying production database for testing..."
-	@cp priv/gallformers.sqlite priv/gallformers_test.sqlite
-	@echo "Applying pending migrations to test copy..."
+test-prod-data: check-sqlite
+	@echo "Loading production data into test database..."
+	@MIX_ENV=test mix ecto.drop --quiet 2>/dev/null || true
+	@MIX_ENV=test mix ecto.create --quiet
 	@MIX_ENV=test mix ecto.migrate --quiet
+	@MIX_ENV=test mix convert_sqlite
 	@echo "Running prod data context tests..."
 	@mix test test/prod_data/invariants_test.exs test/prod_data/write_operations_test.exs --include prod_data; \
 		status=$$?; \
@@ -160,14 +160,15 @@ test-prod-data: check-db
 		$(MAKE) test-db; \
 		exit $$status
 
-# Run E2E browser tests against a copy of the production database
+# Run E2E browser tests against production data loaded into Postgres
 # Requires chromedriver: brew install chromedriver
-test-prod-data-e2e: check-db
+test-prod-data-e2e: check-sqlite
 	$(call check_chromedriver)
-	@echo "Copying production database for testing..."
-	@cp priv/gallformers.sqlite priv/gallformers_test.sqlite
-	@echo "Applying pending migrations to test copy..."
+	@echo "Loading production data into test database..."
+	@MIX_ENV=test mix ecto.drop --quiet 2>/dev/null || true
+	@MIX_ENV=test mix ecto.create --quiet
 	@MIX_ENV=test mix ecto.migrate --quiet
+	@MIX_ENV=test mix convert_sqlite
 	@echo "Running prod data E2E tests..."
 	@GALLFORMERS_E2E=1 mix test test/prod_data/e2e --include prod_data; \
 		status=$$?; \
@@ -175,14 +176,15 @@ test-prod-data-e2e: check-db
 		$(MAKE) test-db; \
 		exit $$status
 
-# Run all prod data tests (context + E2E in separate passes to avoid SQLite contention)
+# Run all prod data tests (context + E2E in separate passes)
 # Non-browser tests run first without the endpoint, then E2E tests with browser
-test-prod-data-all: check-db
+test-prod-data-all: check-sqlite
 	$(call check_chromedriver)
-	@echo "Copying production database for testing..."
-	@cp priv/gallformers.sqlite priv/gallformers_test.sqlite
-	@echo "Applying pending migrations to test copy..."
+	@echo "Loading production data into test database..."
+	@MIX_ENV=test mix ecto.drop --quiet 2>/dev/null || true
+	@MIX_ENV=test mix ecto.create --quiet
 	@MIX_ENV=test mix ecto.migrate --quiet
+	@MIX_ENV=test mix convert_sqlite
 	@echo "Running prod data context tests..."
 	@mix test test/prod_data/invariants_test.exs test/prod_data/write_operations_test.exs --include prod_data
 	@echo "Running prod data E2E tests..."
@@ -314,9 +316,9 @@ ci: assets/node_modules test-db
 	mix dialyzer
 	@echo "==> All CI checks passed!"
 
-# Run everything before pushing to main (local only, not for CI)
-# Requires: chromedriver (make e2e-setup) and prod DB copy (make download-db)
-preflight: ci download-db
+# Run everything before pushing (local only, not for CI)
+# Requires: chromedriver (make e2e-setup) and SQLite prod copy (make download-db)
+preflight: ci
 	$(call check_chromedriver)
 	@echo ""
 	@echo "==> CI checks passed. Running E2E browser tests..."
@@ -326,16 +328,7 @@ preflight: ci download-db
 	@sleep 1
 	@echo ""
 	@echo "==> E2E tests passed. Running prod data tests..."
-	@cp priv/gallformers.sqlite priv/gallformers_test.sqlite
-	@MIX_ENV=test mix ecto.migrate --quiet
-	@echo "Running prod data context tests..."
-	@mix test test/prod_data/invariants_test.exs test/prod_data/write_operations_test.exs --include prod_data
-	@echo "Running prod data E2E tests..."
-	@GALLFORMERS_E2E=1 mix test test/prod_data/e2e --include prod_data; \
-		status=$$?; \
-		echo "Restoring test database..."; \
-		$(MAKE) test-db; \
-		exit $$status
+	$(MAKE) test-prod-data-all
 	@echo ""
 	@echo "==> All preflight checks passed! Safe to push."
 
@@ -455,7 +448,8 @@ help:
 	@echo "  make clean             Clean build artifacts (node_modules, _build, deps)"
 	@echo ""
 	@echo "Database:"
-	@echo "  make download-db       Download database snapshot from S3"
+	@echo "  make download-db       Download SQLite snapshot from S3 (for convert_sqlite)"
+	@echo "  make test-db           Rebuild test database (drop, create, migrate, seed)"
 	@echo ""
 	@echo "Preview Deploys:"
 	@echo "  make preview           Deploy current branch to preview (gallformers-preview.fly.dev)"

@@ -2,7 +2,7 @@ defmodule GallformersWeb.AboutControllerTest do
   @moduledoc """
   Controller tests for the public About page.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
 
   alias Gallformers.Accounts
 

@@ -9,7 +9,7 @@ defmodule GallformersWeb.Admin.GallHostLiveTest do
   - Range exclusions (toggle, select all, deselect all)
   - Edge cases and error handling
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
   alias Gallformers.Accounts.Auth0User

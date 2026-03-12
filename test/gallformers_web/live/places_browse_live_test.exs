@@ -2,7 +2,7 @@ defmodule GallformersWeb.PlacesBrowseLiveTest do
   @moduledoc """
   LiveView tests for the public Places browse page at /places.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 

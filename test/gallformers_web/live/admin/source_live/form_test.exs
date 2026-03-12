@@ -7,7 +7,7 @@ defmodule GallformersWeb.Admin.SourceLive.FormTest do
   - Form validation and submission
   - Navigation after create (should go to edit page, not list)
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
   alias Gallformers.Accounts.Auth0User

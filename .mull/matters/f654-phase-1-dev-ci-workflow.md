@@ -55,7 +55,6 @@ Development loop functional against Postgres: local Makefile targets work, CI pi
 
 - **test_seeds.sql** has `INSERT INTO species_fts` lines (lines 61-72, 159-160, 178-179, 225-227) that will fail against Postgres. Must be removed.
 - **`Gallformers.Migration` module is SQLite-specific** — sets `@disable_ddl_transaction true` and provides `safe_recreate_table/2`. The baseline migration uses plain `Ecto.Migration`. Any code doing `use Gallformers.Migration` needs updating (more Phase 2 than Phase 1).
-- **Postgres.app psql** is at `/Applications/Postgres.app/Contents/Versions/latest/bin/psql` — not on PATH by default on this machine.
 - **`source.licenselink`** is `:text` in the migration but `:string` in the Ecto schema (Ecto uses `:string` for both). Correct — just worth knowing.
 - **9 gallhost + 65 species_source duplicates** in prod SQLite — conversion tool deduplicates them. Postgres schema has unique constraints SQLite didn't enforce.
 - **`species.taxonomy_id`** is a dead column in SQLite (all NULL), doesn't exist in Postgres. Any code referencing it will break.
@@ -94,4 +93,3 @@ Development loop functional against Postgres: local Makefile targets work, CI pi
 - Async test infrastructure in place
 - CI pipeline exists and runs on the integration branch
 - Phase 2 will get tests fully green
-

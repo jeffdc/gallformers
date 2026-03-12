@@ -2,7 +2,7 @@ defmodule GallformersWeb.GenusLiveTest do
   @moduledoc """
   Tests for the public genus browse page with semantic URLs.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
   describe "GenusLive with name-based URLs" do

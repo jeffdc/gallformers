@@ -2,7 +2,7 @@ defmodule GallformersWeb.FamilyLiveTest do
   @moduledoc """
   Tests for the public family browse page with table layout.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
   describe "FamilyLive with name-based URLs" do

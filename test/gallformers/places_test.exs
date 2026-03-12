@@ -1,5 +1,5 @@
 defmodule Gallformers.PlacesTest do
-  use Gallformers.DataCase, async: false
+  use Gallformers.DataCase, async: true
 
   alias Gallformers.Places
 

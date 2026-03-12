@@ -18,58 +18,41 @@ INSERT INTO abundance (id, abundance) VALUES
 -- =============================================================================
 
 -- Host plants (taxoncode = 'plant')
-INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id) VALUES
-  (1, 'Quercus alba', 'plant', 0, 1),
-  (2, 'Quercus rubra', 'plant', 0, 1),
-  (3, 'Quercus velutina', 'plant', 0, 2),
-  (4, 'Acer rubrum', 'plant', 0, 1),
-  (5, 'Acer saccharum', 'plant', 0, 2);
+INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id, inserted_at, updated_at) VALUES
+  (1, 'Quercus alba', 'plant', false, 1, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (2, 'Quercus rubra', 'plant', false, 1, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (3, 'Quercus velutina', 'plant', false, 2, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (4, 'Acer rubrum', 'plant', false, 1, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (5, 'Acer saccharum', 'plant', false, 2, '2026-01-01T00:00:00', '2026-01-01T00:00:00');
 
 -- Gall-forming species (taxoncode = 'gall')
-INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id) VALUES
-  (100, 'Andricus quercuscalifornicus', 'gall', 0, 1),
-  (101, 'Amphibolips confluenta', 'gall', 0, 2),
-  (102, 'Callirhytis quercuspunctata', 'gall', 0, 3);
+INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id, inserted_at, updated_at) VALUES
+  (100, 'Andricus quercuscalifornicus', 'gall', false, 1, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (101, 'Amphibolips confluenta', 'gall', false, 2, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (102, 'Callirhytis quercuspunctata', 'gall', false, 3, '2026-01-01T00:00:00', '2026-01-01T00:00:00');
 
 -- Gall traits (1:1 with gall species, species_id is PK+FK)
 -- Note: detachable is now a string enum: 'unknown', 'integral', 'detachable', 'both'
 INSERT INTO gall_traits (species_id, detachable, undescribed) VALUES
-  (100, 'integral', 0),
-  (101, 'unknown', 0),
-  (102, 'integral', 1);
+  (100, 'integral', false),
+  (101, 'unknown', false),
+  (102, 'integral', true);
 
 -- =============================================================================
 -- Aliases (for search tests)
 -- =============================================================================
 
 -- Note: type must be 'common' or 'scientific' per CHECK constraint
-INSERT INTO alias (id, name, type, description) VALUES
-  (1, 'White Oak', 'common', ''),
-  (2, 'Red Oak', 'common', ''),
-  (3, 'Oak Apple Gall Wasp', 'common', '');
+INSERT INTO alias (id, name, type, description, inserted_at, updated_at) VALUES
+  (1, 'White Oak', 'common', '', '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (2, 'Red Oak', 'common', '', '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (3, 'Oak Apple Gall Wasp', 'common', '', '2026-01-01T00:00:00', '2026-01-01T00:00:00');
 
 -- V2: Snake-case junction table name
 INSERT INTO alias_species (alias_id, species_id) VALUES
   (1, 1),
   (2, 2),
   (3, 100);
-
--- =============================================================================
--- FTS Index (for full-text search tests)
--- =============================================================================
-
-INSERT INTO species_fts (species_id, name, aliases) VALUES
-  (1, 'Quercus alba', 'White Oak'),
-  (2, 'Quercus rubra', 'Red Oak'),
-  (3, 'Quercus velutina', ''),
-  (4, 'Acer rubrum', ''),
-  (5, 'Acer saccharum', ''),
-  (6, 'Thymus alpinus', ''),
-  (7, 'Thymus serpyllum', ''),
-  (8, 'Mentha arvensis', ''),
-  (100, 'Andricus quercuscalifornicus', 'Oak Apple Gall Wasp'),
-  (101, 'Amphibolips confluenta', ''),
-  (102, 'Callirhytis quercuspunctata', '');
 
 -- =============================================================================
 -- ID filter test data (genus+place interaction)
@@ -79,17 +62,17 @@ INSERT INTO species_fts (species_id, name, aliases) VALUES
 -- for species 1-5.
 
 -- Dedicated host plants for ID filter tests
-INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id) VALUES
-  (6, 'Thymus alpinus', 'plant', 0, 1),
-  (7, 'Thymus serpyllum', 'plant', 0, 1),
-  (8, 'Mentha arvensis', 'plant', 0, 1);
+INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id, inserted_at, updated_at) VALUES
+  (6, 'Thymus alpinus', 'plant', false, 1, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (7, 'Thymus serpyllum', 'plant', false, 1, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (8, 'Mentha arvensis', 'plant', false, 1, '2026-01-01T00:00:00', '2026-01-01T00:00:00');
 
 -- Synthetic families and genera (unique names to avoid collisions)
 INSERT INTO taxonomy (id, name, description, type, parent_id, is_placeholder, inserted_at, updated_at) VALUES
-  (20, 'FamilyAlpha', 'Plant', 'family', NULL, 0, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
-  (21, 'FamilyBeta', 'Plant', 'family', NULL, 0, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
-  (10, 'GenusAlpha', 'test genus alpha', 'genus', 20, 0, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
-  (11, 'GenusBeta', 'test genus beta', 'genus', 21, 0, '2026-01-01T00:00:00', '2026-01-01T00:00:00');
+  (20, 'FamilyAlpha', 'Plant', 'family', NULL, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (21, 'FamilyBeta', 'Plant', 'family', NULL, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (10, 'GenusAlpha', 'test genus alpha', 'genus', 20, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (11, 'GenusBeta', 'test genus beta', 'genus', 21, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00');
 
 -- Link dedicated hosts to their genera
 INSERT INTO species_taxonomy (species_id, taxonomy_id) VALUES
@@ -153,11 +136,8 @@ INSERT INTO host_range (species_id, place_id, precision) VALUES
   (8, 902, 'country');   -- M. arvensis in United States (country-level)
 
 -- European host + gall data for continent-scoping tests
-INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id) VALUES
-  (9, 'Quercus robur', 'plant', 0, 1);
-
-INSERT INTO species_fts (species_id, name, aliases) VALUES
-  (9, 'Quercus robur', '');
+INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id, inserted_at, updated_at) VALUES
+  (9, 'Quercus robur', 'plant', false, 1, '2026-01-01T00:00:00', '2026-01-01T00:00:00');
 
 INSERT INTO host_range (species_id, place_id, precision) VALUES
   (9, 4, 'exact');     -- Q. robur in Bucharest (RO-B) — European host
@@ -169,14 +149,11 @@ INSERT INTO host_range (species_id, place_id, precision, distribution_type) VALU
   (7, 906, 'exact', 'introduced');    -- T. serpyllum introduced in Bahamas
 
 -- European gall linked to European host
-INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id) VALUES
-  (103, 'Cynips quercusfolii', 'gall', 0, 1);
+INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id, inserted_at, updated_at) VALUES
+  (103, 'Cynips quercusfolii', 'gall', false, 1, '2026-01-01T00:00:00', '2026-01-01T00:00:00');
 
 INSERT INTO gall_traits (species_id, detachable, undescribed) VALUES
-  (103, 'detachable', 0);
-
-INSERT INTO species_fts (species_id, name, aliases) VALUES
-  (103, 'Cynips quercusfolii', '');
+  (103, 'detachable', false);
 
 INSERT INTO gallhost (id, host_species_id, gall_species_id, inserted_at, updated_at) VALUES
   (4, 9, 103, '2026-01-01T00:00:00', '2026-01-01T00:00:00');  -- gall 103 → Q. robur (Europe)
@@ -206,25 +183,21 @@ INSERT INTO gall_range (species_id, place_id, precision) VALUES
 
 -- Gall family with intermediate ranks for testing
 INSERT INTO taxonomy (id, name, description, type, rank, parent_id, is_placeholder, inserted_at, updated_at) VALUES
-  (30, 'Cynipidae', 'Wasp', 'family', NULL, NULL, 0, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
-  (31, 'Cynipinae', NULL, 'intermediate', 'Subfamily', 30, 0, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
-  (32, 'Cynipini', NULL, 'intermediate', 'Tribe', 31, 0, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
-  (33, 'Andricus', 'test genus under tribe', 'genus', NULL, 32, 0, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
-  (34, 'Cynips', 'test genus under tribe', 'genus', NULL, 32, 0, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
-  (35, 'Unknown', NULL, 'genus', NULL, 30, 1, '2026-01-01T00:00:00', '2026-01-01T00:00:00');
+  (30, 'Cynipidae', 'Wasp', 'family', NULL, NULL, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (31, 'Cynipinae', NULL, 'intermediate', 'Subfamily', 30, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (32, 'Cynipini', NULL, 'intermediate', 'Tribe', 31, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (33, 'Andricus', 'test genus under tribe', 'genus', NULL, 32, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (34, 'Cynips', 'test genus under tribe', 'genus', NULL, 32, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (35, 'Unknown', NULL, 'genus', NULL, 30, true, '2026-01-01T00:00:00', '2026-01-01T00:00:00');
 
 -- Species under intermediate-parented genera
-INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id) VALUES
-  (200, 'Andricus crystallinus', 'gall', 0, 1),
-  (201, 'Cynips quercus', 'gall', 0, 2);
+INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id, inserted_at, updated_at) VALUES
+  (200, 'Andricus crystallinus', 'gall', false, 1, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (201, 'Cynips quercus', 'gall', false, 2, '2026-01-01T00:00:00', '2026-01-01T00:00:00');
 
 INSERT INTO gall_traits (species_id, detachable, undescribed) VALUES
-  (200, 'integral', 0),
-  (201, 'unknown', 0);
-
-INSERT INTO species_fts (species_id, name, aliases) VALUES
-  (200, 'Andricus crystallinus', ''),
-  (201, 'Cynips quercus', '');
+  (200, 'integral', false),
+  (201, 'unknown', false);
 
 INSERT INTO species_taxonomy (species_id, taxonomy_id) VALUES
   (200, 33),  -- A. crystallinus → Andricus (under Cynipini tribe)

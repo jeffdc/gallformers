@@ -2,7 +2,7 @@ defmodule GallformersWeb.ExploreRedirectTest do
   @moduledoc """
   Tests for legacy /explore URL redirects.
   """
-  use GallformersWeb.ConnCase, async: false
+  use GallformersWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 
