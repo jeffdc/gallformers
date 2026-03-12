@@ -45,6 +45,8 @@ defmodule Gallformers.MixProject do
       {:phoenix, "~> 1.8.3"},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.13"},
+      {:postgrex, ">= 0.0.0"},
+      # WCVP lookup repo remains SQLite
       {:ecto_sqlite3, ">= 0.0.0"},
       {:ecto_sqlite3_extras, "~> 1.2"},
       {:phoenix_html, "~> 4.1"},

@@ -8,15 +8,11 @@ config :gallformers, async_tasks: false
 # Configure your database
 # Use a schema-only test database (no production data)
 config :gallformers, Gallformers.Repo,
-  database: Path.expand("../priv/gallformers_test.sqlite", __DIR__),
+  database: "gallformers_test",
+  username: System.get_env("USER"),
+  hostname: "localhost",
   pool_size: 5,
-  pool: Ecto.Adapters.SQL.Sandbox,
-  # Use :wal (the adapter's default) for better concurrency
-  # WAL allows reads during write transactions, preventing "Database busy" errors
-  journal_mode: :wal,
-  busy_timeout: 5000,
-  # Override ecto_sqlite3's default of -64000 (62.5 MB per connection)
-  cache_size: -2000
+  pool: Ecto.Adapters.SQL.Sandbox
 
 config :gallformers, Gallformers.Repo.WCVP,
   database: Path.expand("../priv/data/wcvp_test.sqlite", __DIR__)

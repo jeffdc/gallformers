@@ -6,14 +6,12 @@ config :gallformers, env: :dev
 # DATABASE_PATH env var overrides the default for migration testing
 # Falls back to local database in priv/ for normal development
 config :gallformers, Gallformers.Repo,
-  database: System.get_env("DATABASE_PATH", Path.expand("../priv/gallformers.sqlite", __DIR__)),
+  database: "gallformers_dev",
+  username: System.get_env("USER"),
+  hostname: "localhost",
   pool_size: 5,
   stacktrace: true,
-  show_sensitive_data_on_connection_error: true,
-  # Match test.exs settings for SQLite consistency
-  busy_timeout: 5000,
-  # Override ecto_sqlite3's default of -64000 (62.5 MB per connection)
-  cache_size: -2000
+  show_sensitive_data_on_connection_error: true
 
 config :gallformers, Gallformers.Repo.WCVP,
   database: Path.expand("../priv/data/wcvp.sqlite", __DIR__)
