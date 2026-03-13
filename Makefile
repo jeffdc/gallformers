@@ -340,7 +340,7 @@ preflight: ci
 
 # Build and deploy preview from current local branch
 preview:
-	fly deploy --config fly.preview.toml --dockerfile Dockerfile.preview
+	fly deploy --config fly.preview.toml
 
 # Stop the preview machine (preserves app config and secrets)
 preview-stop:
