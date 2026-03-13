@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-03-11
-updated: 2026-03-11
+updated: 2026-03-12
 epic: postgres
 needs: [1858]
 parent: 4474
@@ -12,6 +12,19 @@ parent: 4474
 ## Goal
 
 Production running on Postgres. Clean, rehearsed, monitored.
+
+## Production Postgres provisioning checklist
+
+These steps were done for preview during Phase 3a. Repeat for production:
+
+1. `fly postgres create --name gallformers-prod-db --region iad --vm-size shared-cpu-1x --volume-size 2` (save credentials!)
+2. `fly machine update <id> --memory 1024 -a gallformers-prod-db --yes` (bump RAM to 1GB — create wizard defaults to 256MB)
+3. **Do NOT set auto-stop** — production must stay running. Verify min_machines_running = 1.
+4. `fly postgres attach gallformers-prod-db --app gallformers` (creates DB, user, sets DATABASE_URL secret)
+5. Clean up orphaned Litestream secrets: `fly secrets unset LITESTREAM_ACCESS_KEY_ID LITESTREAM_SECRET_ACCESS_KEY -a gallformers`
+6. Rename IAM user/policy from "litestream-gallformers" to something generic (cosmetic, not blocking)
+
+**Preview instance reference:** `gallformers-db` in iad, shared-cpu-1x/1GB, 2GB vol, auto-stop enabled, attached to `gallformers-preview`.
 
 ## Pre-cutover preparation
 

@@ -1,6 +1,6 @@
 # P1: 90-Minute Unresponsive Outage - March 9, 2026
 
-## Status: Closed — Root cause undetermined, mitigations deployed
+## Status: Closed — Root cause confirmed: Fly emergency host maintenance
 
 ## Summary
 
@@ -9,13 +9,28 @@ for 90 minutes until the BEAM process was killed at 4:23 PM ET. Fly auto-restart
 machine at 4:25 PM ET and service resumed immediately. This was the longest outage in the
 site's history.
 
-All observable metrics (memory, CPU, traffic, request latency) were normal right up until
-the instant the app died. The root cause could not be determined from available data. The
-most likely explanation is a Fly.io host-level or hypervisor-level issue, but this could
-not be confirmed.
+**Root cause:** Fly.io performed emergency host maintenance at 2026-03-09 18:52:10 UTC —
+matching the outage start to the second. Found on 3/12 via `fly incidents hosts list`:
 
-The investigation yielded two mitigations: a health watchdog that prevents future 90-minute
-zombie states, and a batched query fix for an N+1 pattern.
+> Affected Apps: gallformers
+>
+> 2026-03-09 18:52:10 UTC We are performing emergency maintenance on a host some of your
+> apps instances are running on in IAD. Machines on this host may be unavailable until the
+> maintenance is completed.
+
+This did not appear on status.flyio.net. The status page only surfaces platform-wide
+incidents, not per-host maintenance. `fly incidents hosts list` is the only way to see
+host-level events affecting your specific machines.
+
+All application-level metrics were clean because nothing was wrong with the application.
+The investigation yielded two useful mitigations (health watchdog, batched query) even
+though neither addressed the root cause.
+
+## Lesson learned
+
+**Check `fly incidents hosts list` first** when investigating any unexplained outage.
+Host-level maintenance is invisible to app metrics, dashboards, and the public status page.
+This single command would have ended the investigation immediately.
 
 ## Impact
 
@@ -97,21 +112,20 @@ mapping precision. Investigation of its SQLite interaction patterns found:
 
 ### Fly.io Platform
 
-No incidents reported on status.flyio.net for March 9, 2026.
+No incidents reported on status.flyio.net for March 9, 2026. However, `fly incidents hosts
+list` (checked 3/12) revealed emergency host maintenance at 18:52:10 UTC — the exact moment
+of the outage. **The status page does not surface per-host maintenance events.**
 
-## What We Could Not Determine
+## Root Cause — Confirmed
 
-The crash characteristics — instant death from a healthy state, 90-minute zombie where the
-process is alive but completely unresponsive, terminated by SIGKILL (`exit_code=-1`) with no
-application-level metric anomaly — are consistent with a host-level or hypervisor-level
-issue that is invisible to application monitoring:
+Fly.io emergency host maintenance at 2026-03-09 18:52:10 UTC. The maintenance made the
+machine unavailable, explaining all observed symptoms:
 
-- Firecracker microVM freeze
-- Host hardware issue
-- Host-level resource contention
-- Network partition between the VM and Fly's proxy
-
-These would require Fly support to investigate using host-level telemetry.
+- Instant transition from healthy to unresponsive (host froze the VM)
+- 90-minute zombie (maintenance duration)
+- `exit_code=-1, oom_killed=false, requested_stop=false` (host-level kill, not app-level)
+- All app metrics clean right up to the moment of death (nothing was wrong with the app)
+- Immediate recovery after restart (host maintenance had completed)
 
 ## Mitigations Deployed
 
@@ -142,8 +156,10 @@ baseline. Can be reverted to save cost.
 
 ## Recommendations
 
-1. **File Fly.io support ticket** referencing machine `7847515a205e68` at
-   `2026-03-09T20:23:35Z` to get host-level event data
+1. ~~**File Fly.io support ticket**~~ — No longer needed, root cause confirmed via
+   `fly incidents hosts list`
 2. **Revert CPU to 1x** when convenient — the bump provides no benefit
 3. **Monitor** the health watchdog in logs — if it triggers, we'll know the app became
    unresponsive and recovered automatically
+4. **Check `fly incidents hosts list` first** in any future investigation — added to
+   the fly-operations runbook and production-investigation skill

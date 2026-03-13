@@ -2,10 +2,10 @@
 status: planned
 effort: 5-7 days
 created: 2026-02-13
-updated: 2026-03-11
+updated: 2026-03-13
 epic: postgres
 docs: [docs/plans/2026-02-12-sqlite-to-postgres-research.md]
-relates: [1501, 9ca2, cd9d]
+relates: [1501, 9ca2, cd9d, eff3]
 blocks: [f6bb]
 docket: true
 ---
@@ -64,4 +64,3 @@ Goal: concrete plan and date by 2026-03-12 midday. Main work in 3-5 days. Cutove
 ## Current Inventory (2026-03-11)
 
 DB size ~140MB. 39 fragment/lower/LIKE calls in 8 app files. 2 GROUP_CONCAT calls. 3 fragment("date(?)") calls in analytics.ex. 2 migrations using safe_recreate_table. 55 async:false test files out of 99 total. 30 files referencing Litestream. 16 files with fragment() calls. 19 total migrations (all `use Gallformers.Migration`). App machine: shared-cpu 2 cores, 1GB RAM. Test seeds INSERT INTO species_fts (must be rewritten for Postgres). CI needs both Postgres and SQLite (WCVP tests).
-

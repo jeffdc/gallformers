@@ -17,13 +17,14 @@ kill_timeout = "5s"
   S3_IMAGE_PREFIX = "preview"
   PREVIEW_DEPLOY = "true"
   WCVP_DATABASE_PATH = "/app/data/wcvp.sqlite"
+  ECTO_IPV6 = "true"
 
 [http_service]
   internal_port = 4000
   force_https = true
   auto_stop_machines = "stop"
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
 
   [http_service.concurrency]
     type = "requests"

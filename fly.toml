@@ -14,6 +14,7 @@ kill_timeout = "5s"
   WCVP_DATABASE_PATH = "/data/wcvp.sqlite"
   PHX_HOST = "www.gallformers.org"
   PORT = "4000"
+  ECTO_IPV6 = "true"
 
 [http_service]
   internal_port = 4000

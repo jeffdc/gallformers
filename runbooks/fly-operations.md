@@ -13,6 +13,19 @@ fly logs                # View application logs (STREAMS - see note below)
 fly ssh console         # SSH into running machine
 ```
 
+## Troubleshooting an Outage
+
+**Check this first** before diving into app metrics or dashboards:
+
+```bash
+fly incidents hosts list    # Host-level maintenance/incidents affecting YOUR machines
+```
+
+Host-level events (emergency maintenance, hardware issues) are invisible to app metrics,
+Grafana dashboards, and status.flyio.net. This command is the only way to see them.
+See `docs/investigations/20260309-unresponsive-crash-cpu-investigation.md` for a case
+where this would have saved hours of investigation.
+
 **Note on `fly logs`**: This command streams logs continuously and never terminates. Do NOT run it in the background or pipe to `tail`. To check recent errors, either:
 - Run interactively and Ctrl+C after seeing what you need
 - Use `fly logs 2>&1 | timeout 5 cat` to get a 5-second snapshot
