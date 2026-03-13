@@ -232,3 +232,17 @@ INSERT INTO keys (id, slug, title, subtitle, authors, description, version, coup
 -- =============================================================================
 -- Note: Article tests use Ecto sandbox and create their own test data.
 -- Do NOT seed articles here - it will break tests that expect an empty state.
+
+-- =============================================================================
+-- Reset sequences (Postgres doesn't auto-advance sequences for explicit IDs)
+-- =============================================================================
+-- When INSERT specifies an explicit id, the sequence is NOT advanced.
+-- Without this, the next auto-generated id collides with seeded rows.
+SELECT setval('abundance_id_seq', (SELECT MAX(id) FROM abundance));
+SELECT setval('species_id_seq', (SELECT MAX(id) FROM species));
+SELECT setval('alias_id_seq', (SELECT MAX(id) FROM alias));
+SELECT setval('taxonomy_id_seq', (SELECT MAX(id) FROM taxonomy));
+SELECT setval('gallhost_id_seq', (SELECT MAX(id) FROM gallhost));
+SELECT setval('place_id_seq', (SELECT MAX(id) FROM place));
+SELECT setval('glossary_id_seq', (SELECT MAX(id) FROM glossary));
+SELECT setval('keys_id_seq', (SELECT MAX(id) FROM keys));

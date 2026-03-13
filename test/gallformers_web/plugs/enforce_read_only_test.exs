@@ -2,7 +2,9 @@ defmodule GallformersWeb.Plugs.EnforceReadOnlyTest do
   @moduledoc """
   Tests for the EnforceReadOnly plug.
   """
-  use GallformersWeb.ConnCase, async: true
+  # async: false — SiteSettings.set writes to persistent_term (global, not sandbox-isolated).
+  # Running async would leak read_only: true to concurrent admin tests.
+  use GallformersWeb.ConnCase, async: false
 
   alias Gallformers.Accounts.Auth0User
   alias Gallformers.SiteSettings
