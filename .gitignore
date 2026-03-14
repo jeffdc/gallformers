@@ -100,6 +100,7 @@ api/bin/
 .env
 .env.local
 .env*.local
+.env.pg-load
 
 # E2E test artifacts (Wallaby)
 /test/screenshots/*.png

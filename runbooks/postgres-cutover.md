@@ -26,6 +26,9 @@ Use this procedure to load or refresh production data in the preview Postgres.
 - Local Postgres running with `gallformers_dev` database
 - Fly CLI authenticated (`fly auth login`)
 - `psql` and `pg_dump`/`pg_restore` installed locally
+- `fly.preview.toml` must have a `[mounts]` section (volume for WCVP, boundaries, etc.)
+- Preview secrets set: `DATABASE_URL` (for postgres-migration branch deploys)
+- If deploying from main (SQLite mirror): `LITESTREAM_ACCESS_KEY_ID`, `LITESTREAM_SECRET_ACCESS_KEY` secrets set
 
 ### Step 1: Download production SQLite
 
@@ -75,33 +78,38 @@ fly machine start <machine-id> -a gallformers-db   # Start if stopped
 
 ### Step 5: Restore into Fly Postgres
 
-Get the connection credentials from the app's DATABASE_URL secret:
+**Get credentials.** If you don't have the password, reset it:
 
 ```bash
-# fly secrets list only shows names, not values. To retrieve the URL:
-fly ssh console -a gallformers-preview -C 'printenv DATABASE_URL'
-# Format: postgres://gallformers_preview:PASSWORD@gallformers-db.flycast:5432/gallformers_preview?sslmode=disable
-# Extract the username, password, and database name
+fly postgres users update gallformers_preview --password -a gallformers-db
 ```
 
-Restore:
+Save the password — you'll need it for `DATABASE_URL` later.
+
+**Drop and recreate the database** (the `--clean` flag on pg_restore doesn't work reliably with Fly Postgres due to extension and schema ownership conflicts):
 
 ```bash
-pg_restore \
+PGPASSWORD=<password> psql \
+  --host=localhost --port=15432 \
+  --username=gallformers_preview --dbname=postgres <<'SQL'
+SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'gallformers_preview' AND pid <> pg_backend_pid();
+DROP DATABASE gallformers_preview;
+CREATE DATABASE gallformers_preview OWNER gallformers_preview;
+SQL
+```
+
+**Restore into the fresh database:**
+
+```bash
+PGPASSWORD=<password> pg_restore \
   --host=localhost \
   --port=15432 \
   --username=gallformers_preview \
   --dbname=gallformers_preview \
   --no-owner \
   --no-acl \
-  --clean \
-  --if-exists \
   /tmp/gallformers.dump
 ```
-
-Enter the password from DATABASE_URL when prompted. The `--clean --if-exists` flags drop existing objects before recreating them, making this safe to re-run.
-
-**Note:** You will see errors about the `public` schema and extensions (pg_stat_statements, etc.) owned by `flypgadmin`. These are safe to ignore — Fly manages those objects.
 
 ### Step 6: Verify
 
@@ -120,7 +128,15 @@ Compare the count against local dev:
 psql -d gallformers_dev -c "SELECT count(*) FROM species;"
 ```
 
-### Step 7: Deploy preview and test
+### Step 7: Set DATABASE_URL secret
+
+Build the connection string from the credentials and set it:
+
+```bash
+fly secrets set DATABASE_URL=postgres://gallformers_preview:<password>@gallformers-db.flycast:5432/gallformers_preview -a gallformers-preview
+```
+
+### Step 8: Deploy preview and test
 
 ```bash
 make preview
@@ -152,16 +168,33 @@ This section is a high-level plan. The exact commands will be refined during reh
 | 1 | Put site in read-only mode (auth plug flag) | Admin pages reject writes |
 | 2 | Wait for in-flight requests to drain (~1 min) | Check fly logs |
 | 3 | Checkpoint WAL on production SQLite | `PRAGMA wal_checkpoint(TRUNCATE)` via fly ssh |
-| 4 | Download final production SQLite | `make download-db` (or direct from Litestream S3) |
-| 5 | Convert locally | `mix ecto.reset && mix convert_sqlite` |
-| 6 | pg_dump | `pg_dump --format=custom --no-owner --no-acl gallformers_dev > /tmp/gallformers-cutover.dump` |
-| 7 | Open proxy to prod Postgres | `fly proxy 15432:5432 -a gallformers-prod-db` |
-| 8 | pg_restore | Same as preview procedure, using prod credentials |
-| 9 | Verify row counts | Compare species, gall_traits, sources, images counts |
-| 10 | Deploy Postgres-backed release | `fly deploy` (site comes up in read-only mode, talking to Fly Postgres) |
-| 11 | Soak test under real traffic | Browse pages, search, maps, keys. Check Fly dashboard. Tail logs. |
-| 12 | Turn off read-only mode | Writes now go to Postgres |
-| 13 | Turn off maintenance banner | |
+| 4 | Wait for Litestream to replicate checkpoint (~10s) | Litestream sync-interval is 5s |
+| 5 | Restore latest SQLite from Litestream locally | See command below |
+| 6 | Convert locally | `mix ecto.reset && mix convert_sqlite` |
+| 7 | pg_dump | `pg_dump --format=custom --no-owner --no-acl gallformers_dev > /tmp/gallformers-cutover.dump` |
+| 8 | Open proxy to prod Postgres | `fly proxy 15432:5432 -a gallformers-prod-db` |
+| 9 | pg_restore | Same as preview procedure, using prod credentials |
+| 10 | Verify row counts | Compare species, gall_traits, sources, images counts |
+| 11 | Deploy Postgres-backed release | `fly deploy` (site comes up in read-only mode, talking to Fly Postgres) |
+| 12 | Soak test under real traffic | Browse pages, search, maps, keys. Check Fly dashboard. Tail logs. |
+| 13 | Turn off read-only mode | Writes now go to Postgres |
+| 14 | Turn off maintenance banner | |
+
+**Step 5 — Litestream restore command:**
+
+```bash
+LITESTREAM_ACCESS_KEY_ID=<key> \
+LITESTREAM_SECRET_ACCESS_KEY=<secret> \
+litestream restore -o priv/gallformers.sqlite s3://gallformers-backups/litestream
+```
+
+This gets the absolute latest data (not the daily S3 public snapshot). Use this instead of `make download-db` for production cutover to minimize data staleness.
+
+**Then run the data pipeline script:**
+
+```bash
+scripts/pg-load.sh -u <username> -a gallformers-prod-db -A gallformers
+```
 
 ### Rollback plan
 
