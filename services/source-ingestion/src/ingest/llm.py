@@ -9,7 +9,11 @@ from dataclasses import dataclass, field
 
 from openai import APIError, OpenAI
 
-from ingest.prompts import CLEANUP_SYSTEM_PROMPT, DATA_EXTRACT_SYSTEM_PROMPT, METADATA_SYSTEM_PROMPT
+from ingest.prompts import (
+    CLEANUP_SYSTEM_PROMPT,
+    DATA_EXTRACT_SYSTEM_PROMPT,
+    METADATA_SYSTEM_PROMPT,
+)
 from ingest.providers import ProviderConfig
 
 
@@ -73,7 +77,7 @@ def _call_llm(
     client = OpenAI(base_url=provider.base_url, api_key=provider.api_key)
 
     if provider.no_system_role or merge_prompt:
-        messages = [
+        messages: list[dict[str, str]] = [
             {"role": "user", "content": f"{system_prompt}\n\n---\n\n{user_text}"},
         ]
     else:
@@ -85,16 +89,18 @@ def _call_llm(
     try:
         response = client.chat.completions.create(
             model=provider.model,
-            messages=messages,
+            messages=messages,  # type: ignore[arg-type]
             max_tokens=max_tokens,
         )
     except APIError as exc:
         raise RuntimeError(f"LLM API call failed: {exc}") from exc
 
     content = response.choices[0].message.content
+    if content is None:
+        raise RuntimeError("LLM returned empty response")
     usage = TokenUsage(
-        prompt_tokens=response.usage.prompt_tokens,
-        completion_tokens=response.usage.completion_tokens,
+        prompt_tokens=response.usage.prompt_tokens,  # type: ignore[union-attr]
+        completion_tokens=response.usage.completion_tokens,  # type: ignore[union-attr]
     )
     return content, usage
 
@@ -197,7 +203,9 @@ def clean_text(
 
         def _process_chunk(idx_chunk: tuple[int, str]) -> tuple[int, str, TokenUsage]:
             idx, chunk = idx_chunk
-            content, usage = _call_llm(CLEANUP_SYSTEM_PROMPT, chunk, provider, max_tokens=chunk_max_tokens)
+            content, usage = _call_llm(
+                CLEANUP_SYSTEM_PROMPT, chunk, provider, max_tokens=chunk_max_tokens
+            )
             return idx, content, usage
 
         with ThreadPoolExecutor(max_workers=4) as executor:
@@ -209,13 +217,17 @@ def clean_text(
                 total_completion += usage.completion_tokens
                 if len(chunks) > 1:
                     click.echo(f"  Chunk {idx + 1}/{len(chunks)} done.")
-                chunk_cache = Path(cache_dir) / f"chunk_{idx + 1}.md" if cache_dir else None
+                chunk_cache = (
+                    Path(cache_dir) / f"chunk_{idx + 1}.md" if cache_dir else None
+                )
                 if chunk_cache:
                     chunk_cache.write_text(content)
 
     return CleanupResult(
-        text="\n\n".join(results),
-        usage=TokenUsage(prompt_tokens=total_prompt, completion_tokens=total_completion),
+        text="\n\n".join(results),  # type: ignore[arg-type]
+        usage=TokenUsage(
+            prompt_tokens=total_prompt, completion_tokens=total_completion
+        ),
     )
 
 
@@ -237,7 +249,9 @@ def extract_metadata(text: str, provider: ProviderConfig) -> MetadataResult:
     # Metadata is in the first few pages — truncate to save tokens.
     max_chars = DEFAULT_CHUNK_MAX_TOKENS * 4
     truncated = text[:max_chars] if len(text) > max_chars else text
-    content, usage = _call_llm(METADATA_SYSTEM_PROMPT, truncated, provider, max_tokens=1024)
+    content, usage = _call_llm(
+        METADATA_SYSTEM_PROMPT, truncated, provider, max_tokens=1024
+    )
 
     data = _extract_json(content)
 
@@ -301,9 +315,17 @@ def extract_data(
         if len(chunks) > 1:
             click.echo(f"  Extracting {len(uncached)} chunks in parallel...")
 
-        def _process_chunk(idx_chunk: tuple[int, str]) -> tuple[int, list[dict], TokenUsage]:
+        def _process_chunk(
+            idx_chunk: tuple[int, str],
+        ) -> tuple[int, list[dict], TokenUsage]:
             idx, chunk = idx_chunk
-            content, usage = _call_llm(DATA_EXTRACT_SYSTEM_PROMPT, chunk, provider, max_tokens=chunk_max_tokens * 2, merge_prompt=True)
+            content, usage = _call_llm(
+                DATA_EXTRACT_SYSTEM_PROMPT,
+                chunk,
+                provider,
+                max_tokens=chunk_max_tokens * 2,
+                merge_prompt=True,
+            )
             records = _extract_json_array(content)
             return idx, records, usage
 
@@ -322,8 +344,12 @@ def extract_data(
                 total_prompt += usage.prompt_tokens
                 total_completion += usage.completion_tokens
                 if len(chunks) > 1:
-                    click.echo(f"  Chunk {idx + 1}/{len(chunks)} done ({len(records)} records).")
-                chunk_cache = Path(cache_dir) / f"chunk_{idx + 1}.json" if cache_dir else None
+                    click.echo(
+                        f"  Chunk {idx + 1}/{len(chunks)} done ({len(records)} records)."
+                    )
+                chunk_cache = (
+                    Path(cache_dir) / f"chunk_{idx + 1}.json" if cache_dir else None
+                )
                 if chunk_cache:
                     chunk_cache.write_text(json.dumps(records, indent=2))
 
@@ -335,7 +361,9 @@ def extract_data(
 
     return DataExtractResult(
         records=all_records,
-        usage=TokenUsage(prompt_tokens=total_prompt, completion_tokens=total_completion),
+        usage=TokenUsage(
+            prompt_tokens=total_prompt, completion_tokens=total_completion
+        ),
     )
 
 
@@ -397,7 +425,7 @@ def _find_last_complete_object(candidate: str) -> str | None:
         if escape:
             escape = False
             continue
-        if ch == '\\' and in_string:
+        if ch == "\\" and in_string:
             escape = True
             continue
         if ch == '"' and not escape:
@@ -406,16 +434,16 @@ def _find_last_complete_object(candidate: str) -> str | None:
         if in_string:
             continue
 
-        if ch == '[' or ch == '{':
+        if ch == "[" or ch == "{":
             depth += 1
-        elif ch == ']' or ch == '}':
+        elif ch == "]" or ch == "}":
             depth -= 1
             # depth==1 means we just closed a top-level object inside the array
-            if depth == 1 and ch == '}':
+            if depth == 1 and ch == "}":
                 last_obj_end = i
 
     if last_obj_end > 0:
-        return candidate[:last_obj_end + 1] + "\n]"
+        return candidate[: last_obj_end + 1] + "\n]"
     return None
 
 
@@ -450,6 +478,5 @@ def _extract_json(content: str) -> dict:
             continue
 
     raise RuntimeError(
-        f"Could not extract JSON from LLM response.\n"
-        f"Response was: {content[:500]}"
+        f"Could not extract JSON from LLM response.\nResponse was: {content[:500]}"
     )

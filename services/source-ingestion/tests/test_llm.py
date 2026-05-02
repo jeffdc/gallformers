@@ -7,8 +7,21 @@ from unittest.mock import Mock
 import pytest
 from openai import APIError
 
-from ingest.llm import CleanupResult, DataExtractResult, MetadataResult, TokenUsage, clean_text, extract_data, extract_metadata, _chunk_text
-from ingest.prompts import CLEANUP_SYSTEM_PROMPT, DATA_EXTRACT_SYSTEM_PROMPT, METADATA_SYSTEM_PROMPT
+from ingest.llm import (
+    CleanupResult,
+    DataExtractResult,
+    MetadataResult,
+    TokenUsage,
+    _chunk_text,
+    clean_text,
+    extract_data,
+    extract_metadata,
+)
+from ingest.prompts import (
+    CLEANUP_SYSTEM_PROMPT,
+    DATA_EXTRACT_SYSTEM_PROMPT,
+    METADATA_SYSTEM_PROMPT,
+)
 from ingest.providers import ProviderConfig
 
 
@@ -62,7 +75,18 @@ class TestPrompts:
         # Must mention JSON output
         assert "json" in prompt
         # Must contain all trait vocabulary categories
-        for category in ["shape", "color", "texture", "walls", "cells", "alignment", "plant_part", "form", "season", "detachable"]:
+        for category in [
+            "shape",
+            "color",
+            "texture",
+            "walls",
+            "cells",
+            "alignment",
+            "plant_part",
+            "form",
+            "season",
+            "detachable",
+        ]:
             assert category in prompt, f"Missing vocabulary category: {category}"
         # Must contain specific vocabulary values
         assert "globular" in prompt  # shape
@@ -206,34 +230,50 @@ class TestExtractData:
 
     def test_parses_json_array(self, provider, mock_openai):
         """extract_data returns records from a JSON array response."""
-        json_response = json.dumps([
-            {
-                "gall_species": {"name": "Andricus quercuscalifornicus", "authority": "Bassett", "family": "Cynipidae", "order": "Hymenoptera"},
-                "host_species": {"name": "Quercus lobata", "authority": "Née", "family": "Fagaceae"},
-                "traits": {
-                    "shape": {"original": "globular", "suggested": ["globular"]},
-                    "color": {"original": "tan", "suggested": ["tan"]},
-                    "texture": {"original": None, "suggested": []},
-                    "walls": {"original": None, "suggested": []},
-                    "cells": {"original": "monothalamous", "suggested": ["monothalamous"]},
-                    "alignment": {"original": None, "suggested": []},
-                    "plant_part": {"original": "twig", "suggested": ["stem"]},
-                    "form": {"original": None, "suggested": []},
-                    "season": {"original": None, "suggested": []},
-                    "detachable": "unknown",
-                },
-                "description": "A large globular gall on twigs.",
-                "location": "California",
-                "confidence": 0.9,
-            }
-        ])
+        json_response = json.dumps(
+            [
+                {
+                    "gall_species": {
+                        "name": "Andricus quercuscalifornicus",
+                        "authority": "Bassett",
+                        "family": "Cynipidae",
+                        "order": "Hymenoptera",
+                    },
+                    "host_species": {
+                        "name": "Quercus lobata",
+                        "authority": "Née",
+                        "family": "Fagaceae",
+                    },
+                    "traits": {
+                        "shape": {"original": "globular", "suggested": ["globular"]},
+                        "color": {"original": "tan", "suggested": ["tan"]},
+                        "texture": {"original": None, "suggested": []},
+                        "walls": {"original": None, "suggested": []},
+                        "cells": {
+                            "original": "monothalamous",
+                            "suggested": ["monothalamous"],
+                        },
+                        "alignment": {"original": None, "suggested": []},
+                        "plant_part": {"original": "twig", "suggested": ["stem"]},
+                        "form": {"original": None, "suggested": []},
+                        "season": {"original": None, "suggested": []},
+                        "detachable": "unknown",
+                    },
+                    "description": "A large globular gall on twigs.",
+                    "location": "California",
+                    "confidence": 0.9,
+                }
+            ]
+        )
         mock_openai(content=json_response)
 
         result = extract_data("scholarly text about galls", provider)
 
         assert isinstance(result, DataExtractResult)
         assert len(result.records) == 1
-        assert result.records[0]["gall_species"]["name"] == "Andricus quercuscalifornicus"
+        assert (
+            result.records[0]["gall_species"]["name"] == "Andricus quercuscalifornicus"
+        )
         assert result.records[0]["confidence"] == 0.9
 
     def test_returns_usage(self, provider, mock_openai):
@@ -248,7 +288,9 @@ class TestExtractData:
 
     def test_handles_fenced_json_array(self, provider, mock_openai):
         """extract_data handles JSON arrays wrapped in markdown fences."""
-        fenced = '```json\n[{"gall_species": {"name": "Test gall"}, "confidence": 0.5}]\n```'
+        fenced = (
+            '```json\n[{"gall_species": {"name": "Test gall"}, "confidence": 0.5}]\n```'
+        )
         mock_openai(content=fenced)
 
         result = extract_data("some text", provider)
@@ -258,10 +300,15 @@ class TestExtractData:
 
     def test_chunking_merges_arrays(self, provider, mock_openai):
         """Large text is chunked and JSON arrays from each chunk are merged."""
-        client = mock_openai(content='[{"gall_species": {"name": "Gall A"}, "confidence": 0.8}]')
+        client = mock_openai(
+            content='[{"gall_species": {"name": "Gall A"}, "confidence": 0.8}]'
+        )
 
         # Create text large enough to require chunking
-        paragraphs = [f"Paragraph {i} with enough content to exceed the chunk limit easily." for i in range(30)]
+        paragraphs = [
+            f"Paragraph {i} with enough content to exceed the chunk limit easily."
+            for i in range(30)
+        ]
         big_text = "\n\n".join(paragraphs)
 
         result = extract_data(big_text, provider, chunk_max_tokens=100)
@@ -313,11 +360,13 @@ class TestParallelProcessing:
         mock_client.chat.completions.create.side_effect = slow_create
 
         # Create text that splits into 3+ chunks
-        paragraphs = [f"Paragraph {i} with enough content to exceed limit." for i in range(20)]
+        paragraphs = [
+            f"Paragraph {i} with enough content to exceed limit." for i in range(20)
+        ]
         big_text = "\n\n".join(paragraphs)
 
         start = time.monotonic()
-        result = clean_text(big_text, provider, chunk_max_tokens=100)
+        clean_text(big_text, provider, chunk_max_tokens=100)
         elapsed = time.monotonic() - start
 
         call_count = mock_client.chat.completions.create.call_count
@@ -343,7 +392,9 @@ class TestParallelProcessing:
 
         mock_client.chat.completions.create.side_effect = slow_create
 
-        paragraphs = [f"Paragraph {i} with enough content to exceed limit." for i in range(20)]
+        paragraphs = [
+            f"Paragraph {i} with enough content to exceed limit." for i in range(20)
+        ]
         big_text = "\n\n".join(paragraphs)
 
         start = time.monotonic()
@@ -375,7 +426,9 @@ class TestParallelProcessing:
 
         mock_client.chat.completions.create.side_effect = ordered_create
 
-        paragraphs = [f"Paragraph {i} with enough content to exceed limit." for i in range(20)]
+        paragraphs = [
+            f"Paragraph {i} with enough content to exceed limit." for i in range(20)
+        ]
         big_text = "\n\n".join(paragraphs)
 
         result = clean_text(big_text, provider, chunk_max_tokens=100)

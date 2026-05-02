@@ -6,6 +6,7 @@
 
 # Logs
 log.log
+dev.log
 
 # Spell check
 cspell.json
@@ -113,3 +114,9 @@ api/bin/
 *.tfstate.*
 *.tfplan
 .terraform.lock.hcl
+
+# Python
+# uv package manager lock file
+/priv/python/uv.lock
+# egg-info directories (build artifacts from setuptools/pip)
+*.egg-info/
