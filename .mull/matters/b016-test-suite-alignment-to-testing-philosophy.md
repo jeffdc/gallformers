@@ -1,7 +1,7 @@
 ---
-status: active
+status: refined
 created: 2026-03-18
-updated: 2026-04-25
+updated: 2026-05-01
 epic: platform
 docs: [docs/testing-philosophy.md]
 relates: [2648]

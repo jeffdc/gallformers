@@ -25,7 +25,7 @@ defmodule Gallformers.IngestionPipeline.Stages.UploadTest do
           next_result
 
         [] ->
-          {:ok, %{keys: [], next_continuation_token: nil}}
+          {:ok, %{keys: [], next_continuation_token: nil, is_truncated: false}}
       end
     end
 
@@ -72,7 +72,8 @@ defmodule Gallformers.IngestionPipeline.Stages.UploadTest do
            "source-ingestions/#{ingestion.id}/extract/text.txt",
            "source-ingestions/#{ingestion.id}/preprocess/text.txt"
          ],
-         next_continuation_token: "page-2"
+         next_continuation_token: "page-2",
+         is_truncated: true
        }},
       {:ok,
        %{
@@ -80,7 +81,8 @@ defmodule Gallformers.IngestionPipeline.Stages.UploadTest do
            "source-ingestions/#{ingestion.id}/metadata/output.json",
            "source-ingestions/#{ingestion.id}/assemble/output.md"
          ],
-         next_continuation_token: nil
+         next_continuation_token: nil,
+         is_truncated: false
        }}
     ])
 
@@ -107,7 +109,8 @@ defmodule Gallformers.IngestionPipeline.Stages.UploadTest do
            "source-ingestions/#{ingestion.id}/llm_clean/text.txt",
            "source-ingestions/#{ingestion.id}/extract/text.txt"
          ],
-         next_continuation_token: "page-2"
+         next_continuation_token: "page-2",
+         is_truncated: true
        }},
       {:ok,
        %{
@@ -115,7 +118,8 @@ defmodule Gallformers.IngestionPipeline.Stages.UploadTest do
            "source-ingestions/#{ingestion.id}/data_extract/output.json",
            "source-ingestions/#{ingestion.id}/assemble/output.md"
          ],
-         next_continuation_token: nil
+         next_continuation_token: nil,
+         is_truncated: false
        }}
     ])
 

@@ -1,6 +1,6 @@
 defmodule Gallformers.IngestionPipeline.Stages.Extract do
   @moduledoc """
-  Extracts raw text from a submitted PDF input.
+  Extracts raw text from submitted source-ingestion inputs.
   """
 
   @behaviour Gallformers.IngestionPipeline.StageWorker
@@ -44,6 +44,23 @@ defmodule Gallformers.IngestionPipeline.Stages.Extract do
     end
   end
 
+  def perform_stage(%SourceIngestion{input_type: "text"} = ingestion) do
+    with {:ok, text} <- Storage.download_artifact(ingestion.id, :input, "source.txt"),
+         {:ok, _artifact_path} <-
+           Storage.upload_artifact(ingestion.id, :extract, "text.txt", text, "text/plain") do
+      Ingestions.transition_source_ingestion_workflow(ingestion, :extract_succeeded)
+    end
+  end
+
+  def perform_stage(%SourceIngestion{input_type: "url"} = ingestion) do
+    with {:ok, url} <- Storage.download_artifact(ingestion.id, :input, "source.url"),
+         {:ok, %{text: text}} <- url_extractor().extract_text(url),
+         {:ok, _artifact_path} <-
+           Storage.upload_artifact(ingestion.id, :extract, "text.txt", text, "text/plain") do
+      Ingestions.transition_source_ingestion_workflow(ingestion, :extract_succeeded)
+    end
+  end
+
   def perform_stage(%SourceIngestion{}), do: {:error, :unsupported_input_type}
 
   defp download_input_pdf(%SourceIngestion{id: ingestion_id}) do
@@ -66,5 +83,14 @@ defmodule Gallformers.IngestionPipeline.Stages.Extract do
     :gallformers
     |> Application.get_env(__MODULE__, [])
     |> Keyword.get(:extractor, PythonExtractor)
+  end
+
+  defp url_extractor do
+    :gallformers
+    |> Application.get_env(__MODULE__, [])
+    |> Keyword.get(
+      :url_extractor,
+      Gallformers.IngestionPipeline.Stages.Extract.ReqURLExtractor
+    )
   end
 end

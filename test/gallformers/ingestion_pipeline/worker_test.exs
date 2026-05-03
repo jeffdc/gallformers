@@ -71,8 +71,27 @@ defmodule Gallformers.IngestionPipeline.WorkerTest do
     def perform_stage(_ingestion), do: {:error, :extract_failed}
   end
 
+  defmodule SlowPausedStageStub do
+    @behaviour Gallformers.IngestionPipeline.StageWorker
+
+    @impl true
+    def stage_name, do: :extract
+
+    @impl true
+    def perform_stage(ingestion) do
+      {:ok, updated_ingestion} =
+        Ingestions.transition_source_ingestion_status(ingestion, :needs_duplicate_review, %{
+          processing_stage: "duplicate_review"
+        })
+
+      Process.sleep(30)
+      {:ok, updated_ingestion}
+    end
+  end
+
   setup do
     previous_config = Application.get_env(:gallformers, Worker)
+    previous_ingestions_config = Application.get_env(:gallformers, Ingestions)
 
     Process.put(:worker_test_pid, self())
 
@@ -83,6 +102,12 @@ defmodule Gallformers.IngestionPipeline.WorkerTest do
         Application.delete_env(:gallformers, Worker)
       else
         Application.put_env(:gallformers, Worker, previous_config)
+      end
+
+      if previous_ingestions_config == nil do
+        Application.delete_env(:gallformers, Ingestions)
+      else
+        Application.put_env(:gallformers, Ingestions, previous_ingestions_config)
       end
     end)
 
@@ -194,6 +219,23 @@ defmodule Gallformers.IngestionPipeline.WorkerTest do
       refute_receive {:performed_stage, _, _, _}
     end
 
+    test "supports a configurable orchestration lock timeout for slow stages" do
+      ingestion = source_ingestion_fixture()
+
+      put_stage_modules(%{extract: SlowPausedStageStub})
+      put_ingestions_config(orchestration_lock_timeout: 500)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert :ok = perform_job(Worker, %{ingestion_id: ingestion.id})
+
+        reloaded_ingestion = Ingestions.get_source_ingestion!(ingestion.id)
+
+        assert reloaded_ingestion.status == "needs_duplicate_review"
+        assert reloaded_ingestion.processing_stage == "duplicate_review"
+        refute_enqueued(worker: Worker, queue: "extraction", args: %{ingestion_id: ingestion.id})
+      end)
+    end
+
     test "keeps the ingestion resumable on non-final attempts when a stage fails" do
       ingestion = source_ingestion_fixture()
 
@@ -283,6 +325,15 @@ defmodule Gallformers.IngestionPipeline.WorkerTest do
 
   defp put_stage_modules(stage_modules) do
     put_worker_config(stage_modules: stage_modules)
+  end
+
+  defp put_ingestions_config(overrides) do
+    config =
+      :gallformers
+      |> Application.get_env(Ingestions, [])
+      |> Keyword.merge(overrides)
+
+    Application.put_env(:gallformers, Ingestions, config)
   end
 
   defp put_worker_config(overrides) do

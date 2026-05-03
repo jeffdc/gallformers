@@ -98,6 +98,12 @@ defmodule Gallformers.IngestionPipeline.Stages.MetadataTest do
     raw_response =
       ~s({"title":"A Study of Gall Insects.","authors":["Smith, J.A."," Jones "],"year":1919,"doi":"DOI:10.1234/Example."})
 
+    # Expected parsed JSON (upload is always pretty-printed)
+    {:ok, expected_data} =
+      Jason.decode(
+        ~S({"title":"A Study of Gall Insects.","authors":["Smith, J.A."," Jones "],"year":1919,"doi":"DOI:10.1234/Example."})
+      )
+
     Process.put(:metadata_text_fixture, cleaned_text)
     set_responses([{:ok, raw_response, %{prompt_tokens: 10, completion_tokens: 5}}])
 
@@ -111,7 +117,10 @@ defmodule Gallformers.IngestionPipeline.Stages.MetadataTest do
     assert prompt ==
              File.read!(Path.join([:code.priv_dir(:gallformers), "prompts", "metadata.txt"]))
 
-    assert_received {:upload, _, ^output_path, ^raw_response, "application/json"}
+    # Compare decoded content (upload is pretty-printed)
+    assert_received {:upload, _, ^output_path, actual_upload, "application/json"}
+    assert {:ok, actual_data} = Jason.decode(actual_upload)
+    assert actual_data == expected_data
     assert_receive {:stage_complete, :metadata}
 
     reloaded_ingestion = Ingestions.get_source_ingestion!(ingestion.id)

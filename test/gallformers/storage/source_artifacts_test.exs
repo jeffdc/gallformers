@@ -23,13 +23,15 @@ defmodule Gallformers.Storage.SourceArtifactsTest do
     def list_objects(bucket, prefix, continuation_token) do
       send(self(), {:list_objects, bucket, prefix, continuation_token})
 
-      case Process.get(:list_objects_results, [{:ok, %{keys: [], next_continuation_token: nil}}]) do
+      case Process.get(:list_objects_results, [
+             {:ok, %{keys: [], next_continuation_token: nil, is_truncated: false}}
+           ]) do
         [next_result | rest] ->
           Process.put(:list_objects_results, rest)
           next_result
 
         [] ->
-          {:ok, %{keys: [], next_continuation_token: nil}}
+          {:ok, %{keys: [], next_continuation_token: nil, is_truncated: false}}
       end
     end
 
@@ -174,7 +176,8 @@ defmodule Gallformers.Storage.SourceArtifactsTest do
         {:ok,
          %{
            keys: ["source-ingestions/42/extract/text.txt"],
-           next_continuation_token: "page-2"
+           next_continuation_token: "page-2",
+           is_truncated: true
          }},
         {:ok,
          %{
@@ -182,7 +185,8 @@ defmodule Gallformers.Storage.SourceArtifactsTest do
              "source-ingestions/42/preprocess/text.txt",
              "source-ingestions/42/metadata/output.json"
            ],
-           next_continuation_token: nil
+           next_continuation_token: nil,
+           is_truncated: false
          }}
       ])
 
@@ -197,6 +201,25 @@ defmodule Gallformers.Storage.SourceArtifactsTest do
                "source-ingestions/42/preprocess/text.txt"
              ]
     end
+
+    test "does not request another page when the listing is not truncated" do
+      bucket = SourceArtifacts.private_bucket()
+
+      Process.put(:list_objects_results, [
+        {:ok,
+         %{
+           keys: ["source-ingestions/42/extract/text.txt"],
+           next_continuation_token: "bogus-token",
+           is_truncated: false
+         }}
+      ])
+
+      assert {:ok, keys} = SourceArtifacts.list_private_artifacts_for_ingestion(42)
+
+      assert_received {:list_objects, ^bucket, "source-ingestions/42/", nil}
+      refute_received {:list_objects, ^bucket, "source-ingestions/42/", "bogus-token"}
+      assert keys == ["source-ingestions/42/extract/text.txt"]
+    end
   end
 
   describe "delete_private_artifacts_for_ingestion/1" do
@@ -207,7 +230,8 @@ defmodule Gallformers.Storage.SourceArtifactsTest do
         {:ok,
          %{
            keys: ["source-ingestions/42/extract/text.txt"],
-           next_continuation_token: "page-2"
+           next_continuation_token: "page-2",
+           is_truncated: true
          }},
         {:ok,
          %{
@@ -215,7 +239,8 @@ defmodule Gallformers.Storage.SourceArtifactsTest do
              "source-ingestions/42/preprocess/text.txt",
              "source-ingestions/42/metadata/output.json"
            ],
-           next_continuation_token: nil
+           next_continuation_token: nil,
+           is_truncated: false
          }}
       ])
 

@@ -39,8 +39,15 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMCleanTest do
       send(test_pid(), {:completion, prompt, chunk, opts})
 
       case responses()[chunk] do
-        nil -> {:ok, "cleaned:" <> chunk, %{prompt_tokens: 10, completion_tokens: 20}}
-        response -> response
+        nil ->
+          {:ok, "cleaned:" <> chunk, %{prompt_tokens: 10, completion_tokens: 20}}
+
+        {:sleep, duration_ms, response} ->
+          Process.sleep(duration_ms)
+          response
+
+        response ->
+          response
       end
     end
 
@@ -144,6 +151,27 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMCleanTest do
     assert reloaded_ingestion.status == "processing"
   end
 
+  test "normalizes chunk timeout exits without uploading partial output" do
+    ingestion = source_ingestion_fixture()
+    chunk = "chunk one " <> String.duplicate("a", 3_500)
+
+    Process.put(:llm_clean_text_fixture, chunk)
+
+    set_llm_config(%{
+      task_timeout: 10,
+      responses: %{
+        chunk => {:sleep, 25, {:ok, "cleaned timeout", %{prompt_tokens: 1, completion_tokens: 1}}}
+      }
+    })
+
+    assert {:error, :timeout} = LLMClean.perform_stage(ingestion)
+    refute_received {:upload, _, _, _, _}
+
+    reloaded_ingestion = Ingestions.get_source_ingestion!(ingestion.id)
+    assert reloaded_ingestion.processing_stage == "hash_and_dedup"
+    assert reloaded_ingestion.status == "processing"
+  end
+
   defp source_ingestion_fixture(attrs \\ %{}) do
     attrs =
       Map.merge(
@@ -160,10 +188,14 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMCleanTest do
   end
 
   defp set_llm_responses(responses) do
+    set_llm_config(%{responses: responses})
+  end
+
+  defp set_llm_config(new_values) do
     Application.put_env(
       :gallformers,
       LLMClean,
-      Keyword.merge(Application.get_env(:gallformers, LLMClean, []), responses: responses)
+      Keyword.merge(Application.get_env(:gallformers, LLMClean, []), Map.to_list(new_values))
     )
   end
 end

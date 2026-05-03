@@ -1,7 +1,7 @@
 ---
-status: planned
+status: done
 created: 2026-04-25
-updated: 2026-04-25
+updated: 2026-05-01
 epic: ingestion
 parent: 7fda
 ---

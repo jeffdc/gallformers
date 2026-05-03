@@ -9,13 +9,29 @@ import click
 import yaml
 
 from ingest.extract import extract_text
-from ingest.llm import CleanupResult, DataExtractResult, MetadataResult, TokenUsage, clean_text, extract_data, extract_metadata
-from ingest.ocr import OcrResult, ocr_pdf
+from ingest.llm import (
+    MetadataResult,
+    TokenUsage,
+    clean_text,
+    extract_data,
+    extract_metadata,
+)
+from ingest.ocr import ocr_pdf
 from ingest.output import assemble_document, build_frontmatter
 from ingest.preprocess import preprocess
-from ingest.providers import resolve_model
+from ingest.providers import ProviderConfig, resolve_model
 
-VALID_STEPS = frozenset({"extract", "ocr", "preprocess", "llm-clean", "metadata", "data-extract", "assemble"})
+VALID_STEPS = frozenset(
+    {
+        "extract",
+        "ocr",
+        "preprocess",
+        "llm-clean",
+        "metadata",
+        "data-extract",
+        "assemble",
+    }
+)
 
 
 def load_pipeline(config_path: str) -> dict:
@@ -45,7 +61,9 @@ def load_pipeline(config_path: str) -> dict:
         raise ValueError(f"Pipeline config must contain a 'name' field: {config_path}")
 
     if "stages" not in pipeline or not pipeline["stages"]:
-        raise ValueError(f"Pipeline config must contain a non-empty 'stages' list: {config_path}")
+        raise ValueError(
+            f"Pipeline config must contain a non-empty 'stages' list: {config_path}"
+        )
 
     _validate_stages(pipeline["stages"])
 
@@ -97,6 +115,11 @@ def run_pipeline(
 
     for stage in stages:
         if "fork" in stage:
+            if current_input is None:
+                raise ValueError(
+                    "Fork stage needs to run but no input file is available. "
+                    "Provide -i/--input to supply the initial input file."
+                )
             _run_fork(
                 fork_config=stage["fork"],
                 name=name,
@@ -244,9 +267,13 @@ def _run_step(
         _run_metadata(input_path, output_path, provider=provider)
     elif step_type == "data-extract":
         provider = resolve_model(stage["model"], provider_config)
-        _run_data_extract(input_path, output_path, provider=provider, step_outputs=step_outputs)
+        _run_data_extract(
+            input_path, output_path, provider=provider, step_outputs=step_outputs
+        )
     elif step_type == "assemble":
-        _run_assemble(input_path, output_path, source_id=source_id, step_outputs=step_outputs)
+        _run_assemble(
+            input_path, output_path, source_id=source_id, step_outputs=step_outputs
+        )
 
 
 def _run_extract(input_path: str, output_path: Path, **kwargs: object) -> None:
@@ -254,7 +281,9 @@ def _run_extract(input_path: str, output_path: Path, **kwargs: object) -> None:
     output_path.write_text(text)
 
 
-def _run_ocr(input_path: str, output_path: Path, *, provider: object, **kwargs: object) -> None:
+def _run_ocr(
+    input_path: str, output_path: Path, *, provider: ProviderConfig, **kwargs: object
+) -> None:
     result = ocr_pdf(input_path, provider)
     output_path.write_text(result.text)
 
@@ -265,14 +294,21 @@ def _run_preprocess(input_path: str, output_path: Path, **kwargs: object) -> Non
     output_path.write_text(result)
 
 
-def _run_llm_clean(input_path: str, output_path: Path, *, provider: object, **kwargs: object) -> None:
+def _run_llm_clean(
+    input_path: str, output_path: Path, *, provider: ProviderConfig, **kwargs: object
+) -> None:
     text = Path(input_path).read_text()
     result = clean_text(text, provider)
     output_path.write_text(result.text)
 
 
 def _run_data_extract(
-    input_path: str, output_path: Path, *, provider: object, step_outputs: dict[str, str], **kwargs: object
+    input_path: str,
+    output_path: Path,
+    *,
+    provider: ProviderConfig,
+    step_outputs: dict[str, str],
+    **kwargs: object,
 ) -> None:
     # Read from llm-clean output (the cleaned text), not the previous step
     # which may be metadata JSON or other non-text output.
@@ -282,10 +318,17 @@ def _run_data_extract(
     output_path.write_text(json.dumps(result.records, indent=2))
 
 
-def _run_metadata(input_path: str, output_path: Path, *, provider: object, **kwargs: object) -> None:
+def _run_metadata(
+    input_path: str, output_path: Path, *, provider: ProviderConfig, **kwargs: object
+) -> None:
     text = Path(input_path).read_text()
     result = extract_metadata(text, provider)
-    data = {"title": result.title, "authors": result.authors, "year": result.year, "doi": result.doi}
+    data = {
+        "title": result.title,
+        "authors": result.authors,
+        "year": result.year,
+        "doi": result.doi,
+    }
     output_path.write_text(json.dumps(data, indent=2))
 
 

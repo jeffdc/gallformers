@@ -27,7 +27,7 @@ defmodule Gallformers.IngestionPipeline.DuplicateResolution do
 
     with {:ok, %{source_ingestion: source_ingestion}} <-
            Ingestions.confirm_duplicate_candidate(candidate, %{reviewed_by_id: reviewed_by_id}),
-         {:ok, _job} <- Worker.enqueue(source_ingestion.id) do
+         {:ok, _job} <- worker_module().enqueue(source_ingestion.id) do
       {:ok, source_ingestion}
     end
   end
@@ -81,12 +81,18 @@ defmodule Gallformers.IngestionPipeline.DuplicateResolution do
 
   defp maybe_reenqueue(source_ingestion) do
     if Workflow.resumable?(source_ingestion) do
-      case Worker.enqueue(source_ingestion.id) do
+      case worker_module().enqueue(source_ingestion.id) do
         {:ok, _job} -> :ok
         {:error, changeset} -> {:error, changeset}
       end
     else
       :ok
     end
+  end
+
+  defp worker_module do
+    :gallformers
+    |> Application.get_env(__MODULE__, [])
+    |> Keyword.get(:worker_module, Worker)
   end
 end

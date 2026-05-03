@@ -29,7 +29,11 @@ def extract_text(input_path: str) -> str:
 
 
 def _extract_pdf(path: str) -> str:
-    return pymupdf4llm.to_markdown(path)
+    result = pymupdf4llm.to_markdown(path)
+    if isinstance(result, list):
+        # pymupdf4llm can return a list of page dicts; join the text content
+        return "\n\n".join(str(page.get("text", "")) for page in result)
+    return result
 
 
 def _extract_url(url: str) -> str:

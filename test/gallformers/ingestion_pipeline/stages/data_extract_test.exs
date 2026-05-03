@@ -45,6 +45,10 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtractTest do
       configured = Map.fetch!(responses, chunk)
 
       case configured do
+        {:sleep, duration_ms, response} ->
+          Process.sleep(duration_ms)
+          response
+
         response when is_tuple(response) ->
           response
 
@@ -251,6 +255,33 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtractTest do
 
     assert {:error, {:transport_error, :econnrefused}} = DataExtract.perform_stage(ingestion)
 
+    refute_received {:upload, _, _, _, _}
+
+    reloaded_ingestion = Ingestions.get_source_ingestion!(ingestion.id)
+    assert reloaded_ingestion.processing_stage == "metadata"
+    assert reloaded_ingestion.status == "processing"
+  end
+
+  test "normalizes chunk timeout exits without uploading partial output" do
+    ingestion = source_ingestion_fixture()
+    chunk = "chunk one " <> String.duplicate("a", 3_500)
+
+    Process.put(:data_extract_text_fixture, chunk)
+
+    set_data_extract_config(%{
+      task_timeout: 10,
+      responses: %{
+        chunk =>
+          {:sleep, 25,
+           {:ok, Jason.encode!([valid_record("Gall Timeout", "Host Timeout", 0.8)]),
+            %{
+              prompt_tokens: 1,
+              completion_tokens: 1
+            }}}
+      }
+    })
+
+    assert {:error, :timeout} = DataExtract.perform_stage(ingestion)
     refute_received {:upload, _, _, _, _}
 
     reloaded_ingestion = Ingestions.get_source_ingestion!(ingestion.id)

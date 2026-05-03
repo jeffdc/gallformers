@@ -27,7 +27,12 @@ defmodule Gallformers.Storage.SourceArtifacts do
     @callback get_object(String.t(), String.t()) :: {:ok, map()} | {:error, term()}
 
     @callback list_objects(String.t(), String.t(), String.t() | nil) ::
-                {:ok, %{keys: [String.t()], next_continuation_token: String.t() | nil}}
+                {:ok,
+                 %{
+                   keys: [String.t()],
+                   next_continuation_token: String.t() | nil,
+                   is_truncated: boolean()
+                 }}
                 | {:error, term()}
 
     @callback delete_objects(String.t(), [String.t()]) :: {:ok, term()} | {:error, term()}
@@ -68,7 +73,8 @@ defmodule Gallformers.Storage.SourceArtifacts do
           {:ok,
            %{
              keys: extract_keys(body),
-             next_continuation_token: next_continuation_token(body)
+             next_continuation_token: next_continuation_token(body),
+             is_truncated: truncated?(body)
            }}
 
         {:error, reason} ->
@@ -98,6 +104,14 @@ defmodule Gallformers.Storage.SourceArtifacts do
 
     defp next_continuation_token(body) do
       Map.get(body, :next_continuation_token, Map.get(body, "next_continuation_token"))
+    end
+
+    defp truncated?(body) do
+      case Map.get(body, :is_truncated, Map.get(body, "is_truncated")) do
+        true -> true
+        "true" -> true
+        _ -> false
+      end
     end
   end
 
@@ -290,14 +304,52 @@ defmodule Gallformers.Storage.SourceArtifacts do
 
   defp list_private_artifact_keys(prefix, continuation_token \\ nil, acc \\ []) do
     case backend().list_objects(private_bucket(), prefix, continuation_token) do
-      {:ok, %{keys: keys, next_continuation_token: nil}} ->
-        {:ok, Enum.reverse(acc, keys)}
-
-      {:ok, %{keys: keys, next_continuation_token: next_token}} ->
-        list_private_artifact_keys(prefix, next_token, Enum.reverse(keys, acc))
+      {:ok, result} ->
+        continue_or_finish_listing(prefix, result, acc)
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  defp continue_or_finish_listing(prefix, result, acc) do
+    keys = Map.get(result, :keys, Map.get(result, "keys", []))
+
+    if truncated_listing?(result) do
+      case Map.get(result, :next_continuation_token, Map.get(result, "next_continuation_token")) do
+        next_token when is_binary(next_token) and next_token != "" ->
+          list_private_artifact_keys(prefix, next_token, Enum.reverse(keys, acc))
+
+        _ ->
+          {:error, :invalid_continuation_token}
+      end
+    else
+      {:ok, Enum.reverse(acc, keys)}
+    end
+  end
+
+  defp truncated_listing?(result) do
+    case Map.get(result, :is_truncated, Map.get(result, "is_truncated")) do
+      true ->
+        true
+
+      "true" ->
+        true
+
+      false ->
+        false
+
+      "false" ->
+        false
+
+      nil ->
+        next_token =
+          Map.get(result, :next_continuation_token, Map.get(result, "next_continuation_token"))
+
+        is_binary(next_token) and next_token != ""
+
+      _ ->
+        false
     end
   end
 

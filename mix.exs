@@ -67,6 +67,8 @@ defmodule Gallformers.MixProject do
       {:earmark, "~> 1.4"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
+      # For HTML parsing of URLs in the ingestion pipeline
+      {:floki, "~> 0.38"},
       # API Documentation
       {:open_api_spex, "~> 3.18"},
       # Rate Limiting

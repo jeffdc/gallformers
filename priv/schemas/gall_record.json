@@ -90,7 +90,7 @@
       }
     },
     "description": {
-      "type": "string",
+      "type": ["string", "null"],
       "description": "Morphological description of the gall"
     },
     "location": {
@@ -144,20 +144,7 @@
     },
     "color_vocab": {
       "type": "string",
-      "enum": [
-        "UV",
-        "black",
-        "brown",
-        "gray",
-        "green",
-        "orange",
-        "pink",
-        "purple",
-        "red",
-        "tan",
-        "white",
-        "yellow"
-      ]
+      "enum": ["UV", "black", "brown", "gray", "green", "orange", "pink", "purple", "red", "tan", "white", "yellow"]
     },
     "texture_vocab": {
       "type": "string",
@@ -187,35 +174,15 @@
     },
     "walls_vocab": {
       "type": "string",
-      "enum": [
-        "false chamber",
-        "mycelium lining",
-        "ostiole",
-        "radiating-fibers",
-        "slit",
-        "spongy",
-        "thick",
-        "thin"
-      ]
+      "enum": ["false chamber", "mycelium lining", "ostiole", "radiating-fibers", "slit", "spongy", "thick", "thin"]
     },
     "cells_vocab": {
       "type": "string",
-      "enum": [
-        "free-rolling",
-        "monothalamous",
-        "not applicable",
-        "polythalamous"
-      ]
+      "enum": ["free-rolling", "monothalamous", "not applicable", "polythalamous"]
     },
     "alignment_vocab": {
       "type": "string",
-      "enum": [
-        "drooping",
-        "erect",
-        "integral",
-        "leaning",
-        "supine"
-      ]
+      "enum": ["drooping", "erect", "integral", "leaning", "supine"]
     },
     "plant_part_vocab": {
       "type": "string",
@@ -262,12 +229,7 @@
     },
     "season_vocab": {
       "type": "string",
-      "enum": [
-        "Fall",
-        "Spring",
-        "Summer",
-        "Winter"
-      ]
+      "enum": ["Fall", "Spring", "Summer", "Winter"]
     }
   }
 }

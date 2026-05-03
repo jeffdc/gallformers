@@ -13,22 +13,28 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
   alias Gallformers.Ingestions
   alias Gallformers.Ingestions.SourceIngestion
 
-  @chunk_size 3000
-  @max_tokens 6000
-  @max_concurrency 4
-  @task_timeout 300_000
-  @json_attempts 3
+  require Logger
+
+  @default_chunk_size 3000
+  @default_max_tokens 6000
+  @default_max_concurrency 2
+  @default_task_timeout :timer.minutes(10)
+  @default_json_attempts 3
 
   @impl true
   def stage_name, do: :data_extract
 
   @impl true
   def perform_stage(%SourceIngestion{} = ingestion) do
+    Logger.info("Starting data_extract stage", ingestion_id: ingestion.id)
+
     with {:ok, cleaned_text} <- Storage.download_artifact(ingestion.id, :llm_clean, "text.txt"),
          prompt <- load_prompt(schema_module()),
-         chunks <- LLMClient.chunk_text(cleaned_text, @chunk_size),
+         chunks <- LLMClient.chunk_text(cleaned_text, chunk_size()),
+         chunk_count = length(chunks),
          {:ok, records} <- extract_chunks(prompt, chunks),
-         {:ok, validated_records} <- schema_module().validate(records),
+         record_count = length(records),
+         {:ok, validated_records} <- normalize_validate(schema_module().validate(records)),
          {:ok, _artifact_path} <-
            Storage.upload_artifact(
              ingestion.id,
@@ -40,7 +46,25 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
          {:ok, updated_ingestion} <-
            Ingestions.transition_source_ingestion_workflow(ingestion, :data_extract_succeeded),
          :ok <- Broadcaster.broadcast_stage_complete(ingestion.id, :data_extract) do
+      Logger.info("Completed data_extract stage",
+        ingestion_id: ingestion.id,
+        chunks: chunk_count,
+        records_extracted: record_count,
+        records_validated: length(validated_records)
+      )
+
       {:ok, updated_ingestion}
+    else
+      {:error, :invalid_contract, _} = error ->
+        error
+
+      {:error, reason} ->
+        Logger.warning("data_extract stage failed",
+          ingestion_id: ingestion.id,
+          reason: inspect(reason)
+        )
+
+        {:error, reason}
     end
   end
 
@@ -50,9 +74,10 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
     chunks
     |> Task.async_stream(
       &extract_chunk(prompt, &1),
-      max_concurrency: @max_concurrency,
+      max_concurrency: max_concurrency(),
       ordered: true,
-      timeout: @task_timeout
+      timeout: task_timeout(),
+      on_timeout: :kill_task
     )
     |> Enum.reduce_while({:ok, []}, &LLMSupport.reduce_async_result/2)
     |> case do
@@ -64,13 +89,13 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
     end
   end
 
-  defp extract_chunk(prompt, chunk, attempts_remaining \\ @json_attempts)
+  defp extract_chunk(prompt, chunk, attempts_remaining \\ json_attempts())
 
   defp extract_chunk(_prompt, _chunk, 0), do: {:error, :invalid_json}
 
   defp extract_chunk(prompt, chunk, attempts_remaining) do
     case llm_client().completion(:data_extract, prompt, chunk,
-           max_tokens: @max_tokens,
+           max_tokens: max_tokens(),
            merge_prompt: true
          ) do
       {:ok, response, _usage} ->
@@ -91,24 +116,7 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
   end
 
   defp parse_json_response(response) do
-    response
-    |> LLMSupport.strip_fenced_json()
-    |> trim_to_json_array()
-    |> Jason.decode()
-    |> case do
-      {:ok, records} when is_list(records) -> {:ok, records}
-      _ -> {:error, :invalid_json}
-    end
-  end
-
-  defp trim_to_json_array(response) do
-    case :binary.match(response, "[") do
-      :nomatch ->
-        response
-
-      {bracket_index, _length} ->
-        String.slice(response, bracket_index, String.length(response) - bracket_index)
-    end
+    LLMSupport.extract_json_array(response)
   end
 
   defp load_prompt(schema_module) do
@@ -119,9 +127,20 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
     LLMSupport.llm_client(__MODULE__)
   end
 
+  defp normalize_validate({:ok, data}), do: {:ok, data}
+  defp normalize_validate(error), do: error
+
   defp schema_module do
-    :gallformers
-    |> Application.get_env(__MODULE__, [])
-    |> Keyword.get(:schema_module, Schema)
+    config()[:schema_module] || Schema
+  end
+
+  defp chunk_size, do: config()[:chunk_size] || @default_chunk_size
+  defp max_tokens, do: config()[:max_tokens] || @default_max_tokens
+  defp max_concurrency, do: config()[:max_concurrency] || @default_max_concurrency
+  defp task_timeout, do: config()[:task_timeout] || @default_task_timeout
+  defp json_attempts, do: config()[:json_attempts] || @default_json_attempts
+
+  defp config do
+    Application.get_env(:gallformers, __MODULE__, [])
   end
 end

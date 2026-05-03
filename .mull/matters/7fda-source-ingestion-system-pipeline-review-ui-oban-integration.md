@@ -1,8 +1,8 @@
 ---
-status: planned
+status: active
 tags: [design]
 created: 2026-03-04
-updated: 2026-04-25
+updated: 2026-05-01
 epic: ingestion
 relates: [fa48]
 needs: [7c67]

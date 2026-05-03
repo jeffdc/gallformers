@@ -6,6 +6,8 @@ defmodule Gallformers.IngestionPipeline.Stages.Upload do
 
   @behaviour Gallformers.IngestionPipeline.StageWorker
 
+  require Logger
+
   alias Gallformers.IngestionPipeline.Broadcaster
   alias Gallformers.IngestionPipeline.Storage
   alias Gallformers.Ingestions
@@ -21,11 +23,28 @@ defmodule Gallformers.IngestionPipeline.Stages.Upload do
 
   @impl true
   def perform_stage(%SourceIngestion{} = ingestion) do
-    with {:ok, _manifest} <- artifact_manifest(ingestion.id),
+    Logger.info("Starting upload stage", ingestion_id: ingestion.id)
+
+    with {:ok, manifest} <- artifact_manifest(ingestion.id),
          {:ok, updated_ingestion} <-
            Ingestions.transition_source_ingestion_workflow(ingestion, :upload_succeeded),
          :ok <- Broadcaster.broadcast_review_ready(ingestion.id) do
+      Logger.info(
+        "Upload stage completed",
+        ingestion_id: ingestion.id,
+        artifact_count: length(manifest)
+      )
+
       {:ok, updated_ingestion}
+    else
+      {:error, reason} ->
+        Logger.warning(
+          "Upload stage failed",
+          ingestion_id: ingestion.id,
+          reason: inspect(reason)
+        )
+
+        {:error, reason}
     end
   end
 end

@@ -84,7 +84,8 @@ setup: deps assets check-db wcvp-check
 # Start development server (ensures deps and assets are ready)
 # Loads .env if present for Auth0 and other local config
 dev: setup
-	set -a && [ -f .env ] && . .env; set +a && PREVIEW_DEPLOY=true mix phx.server
+	@echo "Logs will be written to dev.log"
+	@set -a && [ -f .env ] && . .env; set +a && PREVIEW_DEPLOY=true mix phx.server 2>&1 | tee dev.log 2>&1 | tee dev.log
 
 # Start dev server using production CloudFront tiles (no local build needed)
 dev-cloudfront: setup

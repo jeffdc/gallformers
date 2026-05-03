@@ -5,6 +5,8 @@ defmodule Gallformers.IngestionPipeline.Stages.Preprocess do
 
   @behaviour Gallformers.IngestionPipeline.StageWorker
 
+  require Logger
+
   alias Gallformers.IngestionPipeline.DuplicateSignals
   alias Gallformers.IngestionPipeline.Storage
   alias Gallformers.Ingestions
@@ -24,6 +26,8 @@ defmodule Gallformers.IngestionPipeline.Stages.Preprocess do
 
   @impl true
   def perform_stage(%SourceIngestion{} = ingestion) do
+    Logger.info("Starting preprocess stage", ingestion_id: ingestion.id)
+
     with {:ok, extracted_text} <- Storage.download_artifact(ingestion.id, :extract, "text.txt"),
          cleaned_text <- run_heuristics(extracted_text),
          sniffed <- cheap_sniff(cleaned_text),
@@ -37,9 +41,36 @@ defmodule Gallformers.IngestionPipeline.Stages.Preprocess do
              "text.txt",
              cleaned_text,
              "text/plain"
-           ) do
-      Ingestions.transition_source_ingestion_workflow(ingestion, :preprocess_succeeded)
+           ),
+         {:ok, updated_ingestion} <-
+           Ingestions.transition_source_ingestion_workflow(ingestion, :preprocess_succeeded) do
+      Logger.info(
+        "Preprocess stage completed",
+        ingestion_id: ingestion.id,
+        text_length: String.length(extracted_text)
+      )
+
+      {:ok, updated_ingestion}
+    else
+      {:error, reason} ->
+        Logger.warning(
+          "Preprocess stage failed",
+          ingestion_id: ingestion.id,
+          reason: inspect(reason)
+        )
+
+        {:error, reason}
     end
+  rescue
+    exception ->
+      Logger.error(
+        "Preprocess stage failed",
+        ingestion_id: ingestion.id,
+        error: Exception.message(exception),
+        stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+      )
+
+      reraise exception, __STACKTRACE__
   end
 
   defp run_heuristics(text) do

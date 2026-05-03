@@ -150,8 +150,9 @@ defmodule GallformersWeb.Router do
     # User management (superadmin only)
     live "/users", Admin.UsersLive, :index
 
-    # Source ingestion review (PoC — superadmin only)
-    live "/ingestion-review", Admin.IngestionReviewLive
+    # Source ingestion review (superadmin only)
+    live "/ingestion-review", Admin.IngestionReviewLive.Index, :index
+    live "/ingestion-review/:id", Admin.IngestionReviewLive.Show, :show
   end
 
   # Operator routes (require operator role)

@@ -1,11 +1,116 @@
 defmodule Gallformers.IngestionsTest do
-  use Gallformers.DataCase, async: true
+  use Gallformers.DataCase, async: false
+  use Oban.Testing, repo: Gallformers.Repo
+  import Ecto.Query
 
   alias Gallformers.Accounts
+  alias Gallformers.IngestionPipeline.Worker
   alias Gallformers.Ingestions
   alias Gallformers.Sources
   alias Gallformers.Species.Species
   alias Gallformers.Storage.SourceArtifacts
+
+  defmodule SubmissionStorageBackendStub do
+    @behaviour Gallformers.Storage.SourceArtifacts.Backend
+
+    @impl true
+    def upload(bucket, path, content, content_type) do
+      send(test_pid(), {:upload, bucket, path, content, content_type})
+
+      case Process.get(:submission_storage_upload_result, {:ok, %{}}) do
+        {:ok, _response} = ok ->
+          objects = Process.get(:submission_storage_objects, %{})
+          Process.put(:submission_storage_objects, Map.put(objects, path, %{body: content}))
+          ok
+
+        {:error, _reason} = error ->
+          error
+      end
+    end
+
+    @impl true
+    def get_object(bucket, path) do
+      send(test_pid(), {:get_object, bucket, path})
+
+      case Process.get(:submission_storage_objects, %{}) do
+        %{^path => %{body: body}} -> {:ok, %{body: body}}
+        _ -> {:error, :not_found}
+      end
+    end
+
+    @impl true
+    def list_objects(bucket, prefix, continuation_token) do
+      send(test_pid(), {:list_objects, bucket, prefix, continuation_token})
+
+      keys =
+        Process.get(:submission_storage_objects, %{})
+        |> Map.keys()
+        |> Enum.filter(&String.starts_with?(&1, prefix))
+        |> Enum.sort()
+
+      {:ok, %{keys: keys, next_continuation_token: nil}}
+    end
+
+    @impl true
+    def delete_objects(bucket, keys) do
+      send(test_pid(), {:delete_objects, bucket, keys})
+
+      objects =
+        Process.get(:submission_storage_objects, %{})
+        |> Map.drop(keys)
+
+      Process.put(:submission_storage_objects, objects)
+
+      Process.get(:submission_storage_delete_result, {:ok, %{}})
+    end
+
+    @impl true
+    def copy_object(_dest_bucket, _dest_path, _src_bucket, _src_path), do: {:ok, %{}}
+
+    defp test_pid, do: Process.get(:ingestions_test_pid, self())
+  end
+
+  defmodule WorkerStub do
+    def enqueue(ingestion_id) do
+      send(test_pid(), {:worker_enqueue, ingestion_id})
+      Process.get(:worker_enqueue_result, {:ok, %{id: ingestion_id}})
+    end
+
+    defp test_pid, do: Process.get(:ingestions_test_pid, self())
+  end
+
+  setup do
+    previous_storage_config = Application.get_env(:gallformers, SourceArtifacts)
+    previous_ingestions_config = Application.get_env(:gallformers, Ingestions)
+
+    Process.put(:ingestions_test_pid, self())
+    Process.put(:submission_storage_objects, %{})
+
+    Application.put_env(:gallformers, SourceArtifacts, backend: SubmissionStorageBackendStub)
+    Application.put_env(:gallformers, Ingestions, worker_module: WorkerStub)
+
+    on_exit(fn ->
+      Process.delete(:ingestions_test_pid)
+      Process.delete(:submission_storage_objects)
+      Process.delete(:submission_storage_upload_result)
+      Process.delete(:submission_storage_delete_result)
+      Process.delete(:worker_enqueue_result)
+
+      if previous_storage_config == nil do
+        Application.delete_env(:gallformers, SourceArtifacts)
+      else
+        Application.put_env(:gallformers, SourceArtifacts, previous_storage_config)
+      end
+
+      if previous_ingestions_config == nil do
+        Application.delete_env(:gallformers, Ingestions)
+      else
+        Application.put_env(:gallformers, Ingestions, previous_ingestions_config)
+      end
+    end)
+
+    :ok
+  end
 
   describe "create_source_ingestion/1" do
     test "creates a submission with a canonical per-ingestion artifacts path" do
@@ -40,6 +145,220 @@ defmodule Gallformers.IngestionsTest do
                })
 
       assert %{processing_stage: ["is invalid for status needs_review"]} = errors_on(changeset)
+    end
+  end
+
+  describe "submit_source_ingestion/1" do
+    test "creates pdf ingestions, uploads the canonical input artifact, and enqueues the worker" do
+      user = user_fixture()
+      pdf_bytes = "%PDF-1.4\nfixture\n"
+
+      assert {:ok, ingestion} =
+               Ingestions.submit_source_ingestion(%{
+                 input_type: "pdf",
+                 uploaded_by_id: user.id,
+                 filename: "paper.pdf",
+                 content: pdf_bytes
+               })
+
+      input_path = "source-ingestions/#{ingestion.id}/input/source.pdf"
+      ingestion_id = ingestion.id
+
+      assert ingestion.input_type == "pdf"
+      assert ingestion.uploaded_by_id == user.id
+      assert ingestion.artifacts_path == SourceArtifacts.private_artifact_prefix(ingestion.id)
+
+      assert_received {:upload, _, ^input_path, ^pdf_bytes, "application/pdf"}
+
+      assert_received {:worker_enqueue, ^ingestion_id}
+    end
+
+    test "creates url ingestions with the canonical url artifact path" do
+      user = user_fixture()
+      url = "https://example.com/galls"
+
+      assert {:ok, ingestion} =
+               Ingestions.submit_source_ingestion(%{
+                 input_type: "url",
+                 uploaded_by_id: user.id,
+                 url: url
+               })
+
+      input_path = "source-ingestions/#{ingestion.id}/input/source.url"
+      ingestion_id = ingestion.id
+
+      assert_received {:upload, _, ^input_path, ^url, "text/plain"}
+
+      assert_received {:worker_enqueue, ^ingestion_id}
+    end
+
+    test "creates text ingestions with the canonical text artifact path" do
+      user = user_fixture()
+      text = "A new gall description."
+
+      assert {:ok, ingestion} =
+               Ingestions.submit_source_ingestion(%{
+                 input_type: "text",
+                 uploaded_by_id: user.id,
+                 text: text
+               })
+
+      input_path = "source-ingestions/#{ingestion.id}/input/source.txt"
+      ingestion_id = ingestion.id
+
+      assert_received {:upload, _, ^input_path, ^text, "text/plain"}
+
+      assert_received {:worker_enqueue, ^ingestion_id}
+    end
+
+    test "validates required attrs by input type" do
+      user = user_fixture()
+
+      assert {:error, changeset} =
+               Ingestions.submit_source_ingestion(%{
+                 input_type: "pdf",
+                 uploaded_by_id: user.id
+               })
+
+      assert %{filename: ["can't be blank"], content: ["can't be blank"]} = errors_on(changeset)
+
+      assert {:error, changeset} =
+               Ingestions.submit_source_ingestion(%{
+                 input_type: "url",
+                 uploaded_by_id: user.id
+               })
+
+      assert %{url: ["can't be blank"]} = errors_on(changeset)
+
+      assert {:error, changeset} =
+               Ingestions.submit_source_ingestion(%{
+                 input_type: "text",
+                 uploaded_by_id: user.id
+               })
+
+      assert %{text: ["can't be blank"]} = errors_on(changeset)
+    end
+
+    test "cleans up uploaded artifacts when enqueue fails" do
+      user = user_fixture()
+      Process.put(:worker_enqueue_result, {:error, worker_error_changeset()})
+
+      assert {:error, changeset} =
+               Ingestions.submit_source_ingestion(%{
+                 input_type: "text",
+                 uploaded_by_id: user.id,
+                 text: "Needs cleanup"
+               })
+
+      assert changeset.errors[:ingestion_id] != nil
+      assert_received {:delete_objects, _, ["source-ingestions/" <> _ = deleted_key]}
+      assert deleted_key =~ "/input/source.txt"
+      assert Process.get(:submission_storage_objects) == %{}
+    end
+
+    test "returns upload errors without enqueuing the worker" do
+      user = user_fixture()
+      Process.put(:submission_storage_upload_result, {:error, :s3_down})
+
+      assert {:error, :s3_down} =
+               Ingestions.submit_source_ingestion(%{
+                 input_type: "text",
+                 uploaded_by_id: user.id,
+                 text: "Upload fails"
+               })
+
+      refute_received {:worker_enqueue, _}
+    end
+  end
+
+  describe "delete_failed_source_ingestion/1" do
+    test "deletes failed ingestions and their persisted artifacts" do
+      user = user_fixture()
+
+      ingestion =
+        source_ingestion_fixture(%{
+          input_type: "pdf",
+          uploaded_by_id: user.id,
+          status: "failed",
+          processing_stage: "failed",
+          error_stage: "upload"
+        })
+
+      artifact_path = "source-ingestions/#{ingestion.id}/input/source.pdf"
+
+      Process.put(:submission_storage_objects, %{
+        artifact_path => %{body: "%PDF-1.4 failed\n"}
+      })
+
+      assert {:ok, deleted_ingestion} = Ingestions.delete_failed_source_ingestion(ingestion.id)
+
+      assert deleted_ingestion.id == ingestion.id
+      assert_received {:delete_objects, _, [^artifact_path]}
+      assert Ingestions.get_source_ingestion(ingestion.id) == nil
+      assert Process.get(:submission_storage_objects) == %{}
+    end
+
+    test "rejects clearing an ingestion that is not failed" do
+      ingestion =
+        source_ingestion_fixture(%{
+          input_type: "url",
+          status: "processing",
+          processing_stage: "metadata"
+        })
+
+      assert {:error, changeset} = Ingestions.delete_failed_source_ingestion(ingestion)
+
+      assert %{status: ["only failed or abandoned ingestions can be cleared"]} =
+               errors_on(changeset)
+
+      assert Ingestions.get_source_ingestion(ingestion.id).id == ingestion.id
+    end
+
+    test "returns artifact cleanup errors without deleting the ingestion" do
+      ingestion =
+        source_ingestion_fixture(%{
+          input_type: "text",
+          status: "failed",
+          processing_stage: "failed",
+          error_stage: "upload"
+        })
+
+      artifact_path = "source-ingestions/#{ingestion.id}/input/source.txt"
+
+      Process.put(:submission_storage_objects, %{
+        artifact_path => %{body: "failed text"}
+      })
+
+      Process.put(:submission_storage_delete_result, {:error, :s3_down})
+
+      assert {:error, :s3_down} = Ingestions.delete_failed_source_ingestion(ingestion.id)
+      assert Ingestions.get_source_ingestion(ingestion.id).id == ingestion.id
+    end
+
+    test "clears abandoned processing ingestions whose worker was discarded" do
+      ingestion =
+        source_ingestion_fixture(%{
+          input_type: "text",
+          status: "processing",
+          processing_stage: "metadata"
+        })
+
+      artifact_path = "source-ingestions/#{ingestion.id}/input/source.txt"
+
+      Process.put(:submission_storage_objects, %{
+        artifact_path => %{body: "abandoned text"}
+      })
+
+      job = Repo.insert!(Worker.new(%{ingestion_id: ingestion.id}))
+      mark_job_discarded(job.id)
+
+      assert Ingestions.source_ingestion_clearability(ingestion.id) == :abandoned
+      assert {:ok, deleted_ingestion} = Ingestions.clear_source_ingestion(ingestion.id)
+
+      assert deleted_ingestion.id == ingestion.id
+      assert_received {:delete_objects, _, [^artifact_path]}
+      assert Ingestions.get_source_ingestion(ingestion.id) == nil
+      assert Process.get(:submission_storage_objects) == %{}
     end
   end
 
@@ -219,6 +538,115 @@ defmodule Gallformers.IngestionsTest do
     end
   end
 
+  describe "update_source_ingestion_species_review/3" do
+    test "persists a complete review payload and updates the entry status" do
+      reviewer = user_fixture()
+      source = source_fixture()
+      mapped_gall = species_fixture("Andricus reviewed", "gall")
+      mapped_host = species_fixture("Quercus workspace", "plant")
+
+      ingestion =
+        source_ingestion_fixture(%{
+          input_type: "pdf",
+          status: "needs_review",
+          processing_stage: "review",
+          source_id: source.id
+        })
+
+      species_entry =
+        create_species_entry(ingestion, 0, %{
+          extraction_payload: %{
+            "hosts" => [%{"name" => "Quercus alba"}],
+            "traits" => %{
+              "shape" => %{"original" => "globular", "suggested" => ["globular"]}
+            },
+            "description_evidence" => [%{"text" => "Rounded woody gall on oak twigs."}]
+          }
+        })
+
+      assert {:ok, updated_entry} =
+               Ingestions.update_source_ingestion_species_review(
+                 species_entry,
+                 %{
+                   action: "complete",
+                   description_prose: "Edited woody gall description.",
+                   species_review: %{
+                     decision: "mapped",
+                     species_id: mapped_gall.id,
+                     notes: "Reviewed against the persisted gall species."
+                   },
+                   host_reviews: %{
+                     "0" => %{
+                       extracted_name: "Quercus alba",
+                       decision: "mapped",
+                       species_id: mapped_host.id
+                     }
+                   },
+                   trait_reviews: %{
+                     "shape" => %{selected_values: ["globular", "oval"]}
+                   }
+                 },
+                 reviewer.id
+               )
+
+      assert updated_entry.status == "complete"
+      assert updated_entry.species_id == mapped_gall.id
+      assert updated_entry.reviewed_by_id == reviewer.id
+      assert updated_entry.description_prose == "Edited woody gall description."
+      assert get_in(updated_entry.review_payload, ["species_review", "decision"]) == "mapped"
+
+      assert get_in(updated_entry.review_payload, ["species_review", "species_id"]) ==
+               mapped_gall.id
+
+      assert get_in(updated_entry.review_payload, ["host_reviews", Access.at(0), "decision"]) ==
+               "mapped"
+
+      assert get_in(updated_entry.review_payload, ["host_reviews", Access.at(0), "species_id"]) ==
+               mapped_host.id
+
+      assert get_in(updated_entry.review_payload, ["trait_reviews", "shape", "selected_values"]) ==
+               [
+                 "globular",
+                 "oval"
+               ]
+
+      assert get_in(updated_entry.review_payload, ["trait_reviews", "shape", "raw_evidence"]) == [
+               "globular"
+             ]
+
+      assert get_in(updated_entry.review_payload, ["description_review", "edited"]) == true
+    end
+
+    test "rejects review updates when the ingestion is not associated with a source" do
+      reviewer = user_fixture()
+      mapped_gall = species_fixture("Andricus blocked", "gall")
+
+      species_entry =
+        create_species_entry(
+          source_ingestion_fixture(%{
+            input_type: "pdf",
+            status: "needs_review",
+            processing_stage: "review"
+          }),
+          0,
+          %{}
+        )
+
+      assert {:error, changeset} =
+               Ingestions.update_source_ingestion_species_review(
+                 species_entry,
+                 %{
+                   description_prose: "Blocked review",
+                   species_review: %{decision: "mapped", species_id: mapped_gall.id}
+                 },
+                 reviewer.id
+               )
+
+      assert %{source_ingestion_id: ["must be associated with a source before gall review"]} =
+               errors_on(changeset)
+    end
+  end
+
   describe "get_source_ingestion_with_details!/1" do
     test "preloads duplicate candidates and species entries in review order" do
       ingestion =
@@ -264,6 +692,212 @@ defmodule Gallformers.IngestionsTest do
              ]
 
       assert Enum.map(detailed_ingestion.species_entries, & &1.position) == [1, 2]
+    end
+  end
+
+  describe "list_source_ingestion_queue_rows/1" do
+    test "returns newest-first rows with aggregated counts and uploader names" do
+      uploader = user_fixture()
+      source = source_fixture()
+
+      processing =
+        source_ingestion_fixture(%{
+          input_type: "text",
+          uploaded_by_id: uploader.id,
+          title: "Processing submission",
+          status: "processing",
+          processing_stage: "metadata"
+        })
+
+      review_ready =
+        source_ingestion_fixture(%{
+          input_type: "url",
+          uploaded_by_id: uploader.id,
+          status: "needs_review",
+          processing_stage: "review",
+          source_id: source.id
+        })
+
+      complete =
+        source_ingestion_fixture(%{
+          input_type: "pdf",
+          uploaded_by_id: uploader.id,
+          title: "Completed submission",
+          status: "complete",
+          processing_stage: "complete",
+          source_id: source.id
+        })
+
+      duplicate_candidate_fixture(
+        review_ready,
+        source_ingestion_fixture(%{
+          input_type: "pdf",
+          status: "complete",
+          processing_stage: "complete"
+        })
+      )
+
+      duplicate_candidate_fixture(
+        review_ready,
+        source_ingestion_fixture(%{
+          input_type: "text",
+          status: "complete",
+          processing_stage: "complete"
+        }),
+        %{status: "rejected"}
+      )
+
+      create_species_entry(review_ready, 0, %{status: "pending", extracted_name: "Pending gall"})
+
+      create_species_entry(review_ready, 1, %{status: "mapped", extracted_name: "Mapped gall"})
+
+      rows =
+        Ingestions.list_source_ingestion_queue_rows(
+          uploaded_by_id: uploader.id,
+          include_complete: true
+        )
+
+      assert Enum.map(rows, & &1.id) == [complete.id, review_ready.id, processing.id]
+
+      assert Enum.find(rows, &(&1.id == review_ready.id)) == %{
+               id: review_ready.id,
+               title: nil,
+               display_title: "Untitled URL submission",
+               input_type: "url",
+               status: "needs_review",
+               processing_stage: "review",
+               error_stage: nil,
+               inserted_at: review_ready.inserted_at,
+               uploaded_by_id: uploader.id,
+               uploaded_by_name: "Ingestion Reviewer",
+               source_id: source.id,
+               duplicate_of_source_ingestion_id: nil,
+               pending_duplicate_candidates_count: 1,
+               total_duplicate_candidates_count: 2,
+               total_species_entries_count: 2,
+               pending_species_entries_count: 1,
+               resolved_species_entries_count: 1
+             }
+    end
+
+    test "supports status, uploader, and include_complete filters" do
+      uploader = user_fixture()
+      other_uploader = other_user_fixture()
+
+      hidden_complete =
+        source_ingestion_fixture(%{
+          input_type: "pdf",
+          uploaded_by_id: uploader.id,
+          status: "complete",
+          processing_stage: "complete"
+        })
+
+      included_review =
+        source_ingestion_fixture(%{
+          input_type: "text",
+          uploaded_by_id: uploader.id,
+          status: "needs_review",
+          processing_stage: "review"
+        })
+
+      other_processing =
+        source_ingestion_fixture(%{
+          input_type: "url",
+          uploaded_by_id: other_uploader.id,
+          status: "processing",
+          processing_stage: "extract"
+        })
+
+      assert Enum.map(Ingestions.list_source_ingestion_queue_rows(), & &1.id) == [
+               other_processing.id,
+               included_review.id
+             ]
+
+      assert Enum.map(
+               Ingestions.list_source_ingestion_queue_rows(include_complete: true),
+               & &1.id
+             ) ==
+               [other_processing.id, included_review.id, hidden_complete.id]
+
+      assert Enum.map(
+               Ingestions.list_source_ingestion_queue_rows(
+                 uploaded_by_id: uploader.id,
+                 include_complete: true
+               ),
+               & &1.id
+             ) == [included_review.id, hidden_complete.id]
+
+      assert Enum.map(
+               Ingestions.list_source_ingestion_queue_rows(
+                 status: [:processing, :complete],
+                 include_complete: true
+               ),
+               & &1.id
+             ) == [other_processing.id, hidden_complete.id]
+    end
+  end
+
+  describe "queue_status_label/1" do
+    test "returns the expected labels across queue states" do
+      assert Ingestions.queue_status_label(%{
+               status: "needs_duplicate_review",
+               processing_stage: "duplicate_review"
+             }) == "Needs duplicate review"
+
+      assert Ingestions.queue_status_label(%{
+               status: "needs_review",
+               processing_stage: "review",
+               source_id: nil,
+               total_species_entries_count: 0,
+               pending_species_entries_count: 0
+             }) == "Needs source review"
+
+      assert Ingestions.queue_status_label(%{
+               status: "needs_review",
+               processing_stage: "review",
+               source_id: 12,
+               total_species_entries_count: 4,
+               pending_species_entries_count: 3
+             }) == "3 of 4 galls remaining"
+
+      assert Ingestions.queue_status_label(%{
+               status: "needs_review",
+               processing_stage: "review",
+               source_id: 12,
+               total_species_entries_count: 4,
+               pending_species_entries_count: 0
+             }) == "0 of 4 galls remaining"
+
+      assert Ingestions.queue_status_label(%{
+               status: "complete",
+               processing_stage: "complete"
+             }) == "Complete"
+
+      assert Ingestions.queue_status_label(%{
+               status: "duplicate_confirmed",
+               processing_stage: "duplicate_review"
+             }) == "Duplicate confirmed"
+
+      assert Ingestions.queue_status_label(%{
+               status: "failed",
+               processing_stage: "failed",
+               error_stage: "metadata"
+             }) == "Failed at metadata"
+
+      assert Ingestions.queue_status_label(%{
+               status: "processing",
+               processing_stage: "extract"
+             }) == "Processing: preprocess"
+
+      assert Ingestions.queue_status_label(%{
+               status: "processing",
+               processing_stage: "metadata"
+             }) == "Processing: data_extract"
+
+      assert Ingestions.processing_stage_label(%{
+               status: "processing",
+               processing_stage: "metadata"
+             }) == "data_extract"
     end
   end
 
@@ -471,6 +1105,62 @@ defmodule Gallformers.IngestionsTest do
     end
   end
 
+  describe "maybe_complete_source_ingestion_review/1" do
+    test "transitions needs_review ingestions to complete when all species entries are resolved" do
+      ingestion =
+        source_ingestion_fixture(%{
+          input_type: "pdf",
+          status: "needs_review",
+          processing_stage: "review"
+        })
+
+      assert {:ok, _} =
+               Ingestions.create_source_ingestion_species(%{
+                 source_ingestion_id: ingestion.id,
+                 position: 0,
+                 extracted_name: "Mapped Gall",
+                 status: "mapped"
+               })
+
+      assert {:ok, _} =
+               Ingestions.create_source_ingestion_species(%{
+                 source_ingestion_id: ingestion.id,
+                 position: 1,
+                 extracted_name: "Created Gall",
+                 status: "created"
+               })
+
+      assert {:ok, completed_ingestion} =
+               Ingestions.maybe_complete_source_ingestion_review(ingestion.id)
+
+      assert completed_ingestion.status == "complete"
+      assert completed_ingestion.processing_stage == "complete"
+    end
+
+    test "leaves ingestions unchanged when pending species entries remain" do
+      ingestion =
+        source_ingestion_fixture(%{
+          input_type: "pdf",
+          status: "needs_review",
+          processing_stage: "review"
+        })
+
+      assert {:ok, _} =
+               Ingestions.create_source_ingestion_species(%{
+                 source_ingestion_id: ingestion.id,
+                 position: 0,
+                 extracted_name: "Pending Gall",
+                 status: "pending"
+               })
+
+      assert {:ok, unchanged_ingestion} =
+               Ingestions.maybe_complete_source_ingestion_review(ingestion.id)
+
+      assert unchanged_ingestion.status == "needs_review"
+      assert unchanged_ingestion.processing_stage == "review"
+    end
+  end
+
   defp source_ingestion_fixture(attrs) do
     merged_attrs =
       attrs
@@ -498,11 +1188,11 @@ defmodule Gallformers.IngestionsTest do
     source
   end
 
-  defp species_fixture(name) do
+  defp species_fixture(name, taxoncode \\ "gall") do
     assert {:ok, species} =
              Repo.insert(%Species{
                name: name,
-               taxoncode: "gall",
+               taxoncode: taxoncode,
                datacomplete: false
              })
 
@@ -517,5 +1207,63 @@ defmodule Gallformers.IngestionsTest do
              })
 
     user
+  end
+
+  defp other_user_fixture do
+    assert {:ok, user} =
+             Accounts.create_user(%{
+               auth0_id: "auth0|ingestion-test-#{System.unique_integer([:positive])}",
+               display_name: "Another Reviewer"
+             })
+
+    user
+  end
+
+  defp duplicate_candidate_fixture(ingestion, candidate, attrs \\ %{}) do
+    assert {:ok, duplicate_candidate} =
+             Ingestions.create_duplicate_candidate(ingestion, candidate, attrs)
+
+    duplicate_candidate
+  end
+
+  defp create_species_entry(ingestion, position, attrs) do
+    default_payload = %{
+      "hosts" => [%{"name" => "Quercus alba"}],
+      "traits" => %{
+        "shape" => %{"original" => "globular", "suggested" => ["globular"]}
+      },
+      "description_evidence" => [%{"text" => "Rounded woody gall on oak twigs."}]
+    }
+
+    entry_attrs =
+      attrs
+      |> Map.new()
+      |> Map.put_new(:source_ingestion_id, ingestion.id)
+      |> Map.put_new(:position, position)
+      |> Map.put_new(:description_prose, "Rounded woody gall on oak twigs.")
+      |> Map.put_new(:extraction_payload, default_payload)
+
+    assert {:ok, source_ingestion_species} =
+             Ingestions.create_source_ingestion_species(entry_attrs)
+
+    source_ingestion_species
+  end
+
+  defp worker_error_changeset do
+    {%{}, %{ingestion_id: :integer}}
+    |> Ecto.Changeset.cast(%{ingestion_id: nil}, [:ingestion_id])
+    |> Ecto.Changeset.validate_required([:ingestion_id])
+  end
+
+  defp mark_job_discarded(job_id) do
+    from(job in "oban_jobs", where: field(job, :id) == ^job_id)
+    |> Repo.update_all(
+      set: [
+        state: "discarded",
+        attempt: 3,
+        max_attempts: 3,
+        discarded_at: DateTime.utc_now()
+      ]
+    )
   end
 end

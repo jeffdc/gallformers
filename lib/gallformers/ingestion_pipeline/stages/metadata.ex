@@ -5,6 +5,8 @@ defmodule Gallformers.IngestionPipeline.Stages.Metadata do
 
   @behaviour Gallformers.IngestionPipeline.StageWorker
 
+  require Logger
+
   alias Gallformers.IngestionPipeline.Broadcaster
   alias Gallformers.IngestionPipeline.DuplicateSignals
   alias Gallformers.IngestionPipeline.Stages.LLMSupport
@@ -21,24 +23,45 @@ defmodule Gallformers.IngestionPipeline.Stages.Metadata do
 
   @impl true
   def perform_stage(%SourceIngestion{} = ingestion) do
+    Logger.info("Starting metadata stage", ingestion_id: ingestion.id)
+
     with {:ok, cleaned_text} <- Storage.download_artifact(ingestion.id, :llm_clean, "text.txt"),
          prompt <- LLMSupport.load_prompt!("metadata.txt"),
          truncated_text <- String.slice(cleaned_text, 0, @max_input_chars),
          {:ok, raw_response, metadata_attrs} <-
            extract_metadata(prompt, truncated_text),
+         {:ok, parsed_json} <- parse_json_for_upload(raw_response),
+         title <- Map.get(metadata_attrs, :title),
+         author_count <- length(Map.get(metadata_attrs, :authors, [])),
          {:ok, _updated_signals} <- Ingestions.record_duplicate_signals(ingestion, metadata_attrs),
          {:ok, _artifact_path} <-
            Storage.upload_artifact(
              ingestion.id,
              :metadata,
              "output.json",
-             raw_response,
+             parsed_json,
              "application/json"
            ),
          {:ok, updated_ingestion} <-
            Ingestions.transition_source_ingestion_workflow(ingestion, :metadata_succeeded),
          :ok <- Broadcaster.broadcast_stage_complete(ingestion.id, :metadata) do
+      Logger.info("Completed metadata stage",
+        ingestion_id: ingestion.id,
+        title: title,
+        author_count: author_count,
+        input_chars: String.length(cleaned_text)
+      )
+
       {:ok, updated_ingestion}
+    else
+      {:error, reason} ->
+        Logger.warning(
+          "Metadata stage failed",
+          ingestion_id: ingestion.id,
+          reason: inspect(reason)
+        )
+
+        {:error, reason}
     end
   end
 
@@ -66,12 +89,20 @@ defmodule Gallformers.IngestionPipeline.Stages.Metadata do
   end
 
   defp parse_metadata(raw_response) do
+    case LLMSupport.extract_json_object(raw_response) do
+      {:ok, decoded} -> cast_metadata(decoded)
+      {:error, _} -> {:error, :invalid_json}
+    end
+  end
+
+  # Strips fences, parses JSON, and re-encodes for clean upload
+  defp parse_json_for_upload(raw_response) do
     raw_response
     |> LLMSupport.strip_fenced_json()
     |> Jason.decode()
     |> case do
-      {:ok, decoded} -> cast_metadata(decoded)
-      {:error, _reason} -> {:error, :invalid_json}
+      {:ok, decoded} -> {:ok, Jason.encode!(decoded, pretty: true)}
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -83,8 +114,6 @@ defmodule Gallformers.IngestionPipeline.Stages.Metadata do
       {:ok, %{title: title, authors: authors, year: year, doi: doi}}
     end
   end
-
-  defp cast_metadata(_decoded), do: {:error, :invalid_json}
 
   defp cast_optional_string(nil), do: {:ok, nil}
   defp cast_optional_string(value) when is_binary(value), do: {:ok, value}
