@@ -45,12 +45,22 @@ defmodule Gallformers.IngestionPipeline.Worker do
     case ingestions_module().with_source_ingestion_orchestration_lock(ingestion_id, fn ->
            ingestion_id
            |> ingestions_module().get_source_ingestion!()
+           |> resume_failed_ingestion()
            |> dispatch_stage(job)
          end) do
       {:ok, result} -> result
       {:error, :already_processing} -> :ok
     end
   end
+
+  defp resume_failed_ingestion(%SourceIngestion{status: "failed"} = ingestion) do
+    case ingestions_module().retry_failed_source_ingestion(ingestion) do
+      {:ok, resumed_ingestion} -> resumed_ingestion
+      {:error, changeset} -> raise_retry_reset_error(ingestion, changeset)
+    end
+  end
+
+  defp resume_failed_ingestion(%SourceIngestion{} = ingestion), do: ingestion
 
   defp dispatch_stage(%SourceIngestion{} = ingestion, %Oban.Job{} = job) do
     case Workflow.next_stage(ingestion) do
@@ -162,6 +172,17 @@ defmodule Gallformers.IngestionPipeline.Worker do
   end
 
   defp final_attempt?(%Oban.Job{}), do: false
+
+  defp raise_retry_reset_error(%SourceIngestion{} = ingestion, changeset) do
+    Logger.error(
+      "Source ingestion retry reset failed",
+      ingestion_id: ingestion.id,
+      changeset_errors: inspect(changeset.errors)
+    )
+
+    raise ArgumentError,
+          "failed ingestion #{ingestion.id} could not be reset for retry: #{inspect(changeset.errors)}"
+  end
 
   defp stage_module(stage) do
     case Map.fetch(stage_modules(), stage) do

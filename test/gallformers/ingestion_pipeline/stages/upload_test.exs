@@ -13,7 +13,14 @@ defmodule Gallformers.IngestionPipeline.Stages.UploadTest do
     def upload(_bucket, _path, _content, _content_type), do: {:ok, %{}}
 
     @impl true
-    def get_object(_bucket, _path), do: {:ok, %{body: ""}}
+    def get_object(bucket, path) do
+      send(test_pid(), {:get_object, bucket, path})
+
+      case Process.get(:upload_get_object_fixtures, %{}) do
+        %{^path => body} -> {:ok, %{body: body}}
+        _ -> {:error, :not_found}
+      end
+    end
 
     @impl true
     def list_objects(bucket, prefix, continuation_token) do
@@ -45,6 +52,7 @@ defmodule Gallformers.IngestionPipeline.Stages.UploadTest do
     Application.put_env(:gallformers, SourceArtifacts, backend: StorageBackendStub)
 
     on_exit(fn ->
+      Process.delete(:upload_get_object_fixtures)
       Process.delete(:upload_list_objects_results)
       Process.delete(:upload_test_pid)
 
@@ -63,6 +71,7 @@ defmodule Gallformers.IngestionPipeline.Stages.UploadTest do
     ingestion_id = ingestion.id
     bucket = SourceArtifacts.private_bucket()
     prefix = "source-ingestions/#{ingestion.id}/"
+    data_extract_path = "source-ingestions/#{ingestion.id}/data_extract/output.json"
     Broadcaster.subscribe(ingestion.id)
 
     set_list_results([
@@ -86,17 +95,27 @@ defmodule Gallformers.IngestionPipeline.Stages.UploadTest do
        }}
     ])
 
+    put_get_object_fixtures(%{
+      data_extract_path => Jason.encode!([valid_record("Andricus uploadii", "Quercus alba", 0.91)])
+    })
+
     assert {:ok, updated_ingestion} = Upload.perform_stage(ingestion)
 
+    assert_receive {:get_object, ^bucket, ^data_extract_path}
     assert_receive {:list_objects, ^bucket, ^prefix, nil}
     assert_receive {:list_objects, ^bucket, ^prefix, "page-2"}
     assert_receive {:review_ready, ^ingestion_id}
 
     reloaded_ingestion = Ingestions.get_source_ingestion!(ingestion.id)
+    species_entries = Ingestions.list_source_ingestion_species(ingestion.id)
+
     assert updated_ingestion.status == "needs_review"
     assert updated_ingestion.processing_stage == "review"
     assert reloaded_ingestion.status == "needs_review"
     assert reloaded_ingestion.processing_stage == "review"
+    assert Enum.map(species_entries, &{&1.position, &1.extracted_name, &1.status}) == [
+             {0, "Andricus uploadii", "pending"}
+           ]
   end
 
   test "artifact_manifest/1 returns all stage artifact keys across paginated results" do
@@ -150,5 +169,29 @@ defmodule Gallformers.IngestionPipeline.Stages.UploadTest do
 
   defp set_list_results(results) do
     Process.put(:upload_list_objects_results, results)
+  end
+
+  defp put_get_object_fixtures(fixtures) do
+    Process.put(:upload_get_object_fixtures, fixtures)
+  end
+
+  defp valid_record(gall_name, host_name, confidence) do
+    %{
+      "gall_species" => %{
+        "name" => gall_name,
+        "authority" => nil,
+        "family" => "Cynipidae",
+        "order" => "Hymenoptera"
+      },
+      "host_species" => %{
+        "name" => host_name,
+        "authority" => nil,
+        "family" => "Fagaceae"
+      },
+      "traits" => %{},
+      "description" => "Gall description",
+      "location" => nil,
+      "confidence" => confidence
+    }
   end
 end

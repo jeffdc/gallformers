@@ -9,6 +9,7 @@ defmodule Gallformers.IngestionPipeline.Stages.Upload do
   require Logger
 
   alias Gallformers.IngestionPipeline.Broadcaster
+  alias Gallformers.IngestionPipeline.Stages.LLMSupport
   alias Gallformers.IngestionPipeline.Storage
   alias Gallformers.Ingestions
   alias Gallformers.Ingestions.SourceIngestion
@@ -25,7 +26,11 @@ defmodule Gallformers.IngestionPipeline.Stages.Upload do
   def perform_stage(%SourceIngestion{} = ingestion) do
     Logger.info("Starting upload stage", ingestion_id: ingestion.id)
 
-    with {:ok, manifest} <- artifact_manifest(ingestion.id),
+    with {:ok, records_json} <- Storage.download_artifact(ingestion.id, :data_extract, "output.json"),
+         {:ok, records} <- decode_records(records_json),
+         {:ok, _species_entries} <-
+           Ingestions.ensure_source_ingestion_species_entries(ingestion, records),
+         {:ok, manifest} <- artifact_manifest(ingestion.id),
          {:ok, updated_ingestion} <-
            Ingestions.transition_source_ingestion_workflow(ingestion, :upload_succeeded),
          :ok <- Broadcaster.broadcast_review_ready(ingestion.id) do
@@ -45,6 +50,14 @@ defmodule Gallformers.IngestionPipeline.Stages.Upload do
         )
 
         {:error, reason}
+    end
+  end
+
+  defp decode_records(json) when is_binary(json) do
+    case json |> LLMSupport.strip_fenced_json() |> Jason.decode() do
+      {:ok, records} when is_list(records) -> {:ok, records}
+      {:ok, _other} -> {:error, :invalid_data_extract_payload}
+      {:error, reason} -> {:error, reason}
     end
   end
 end

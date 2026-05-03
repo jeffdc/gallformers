@@ -276,12 +276,64 @@ defmodule Gallformers.IngestionPipeline.WorkerTest do
       assert_receive {:error, :extract, :extract_failed}
     end
 
+    test "retries failed ingestions from their stored failed stage" do
+      ingestion =
+        source_ingestion_fixture(%{
+          status: "failed",
+          processing_stage: "failed",
+          error_stage: "extract",
+          error_message: "boom"
+        })
+
+      ingestion_id = ingestion.id
+      put_stage_modules(%{extract: ExtractStageStub})
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert :ok = perform_job(Worker, %{ingestion_id: ingestion.id})
+
+        assert_received {:performed_stage, :extract, ^ingestion_id, "submitted"}
+
+        reloaded_ingestion = Ingestions.get_source_ingestion!(ingestion_id)
+        assert reloaded_ingestion.status == "processing"
+        assert reloaded_ingestion.processing_stage == "submitted"
+        assert is_nil(reloaded_ingestion.error_stage)
+        assert is_nil(reloaded_ingestion.error_message)
+        assert is_nil(reloaded_ingestion.failed_at)
+
+        assert_enqueued(worker: Worker, queue: "extraction", args: %{ingestion_id: ingestion.id})
+      end)
+    end
+
+    test "retries llm_clean failures from duplicate_review when duplicate candidates exist" do
+      ingestion =
+        source_ingestion_fixture(%{
+          status: "failed",
+          processing_stage: "failed",
+          error_stage: "llm_clean",
+          error_message: "boom"
+        })
+
+      candidate_source = source_ingestion_fixture(%{input_type: "url"})
+      {:ok, _candidate} = Ingestions.create_duplicate_candidate(ingestion, candidate_source)
+
+      ingestion_id = ingestion.id
+      put_stage_modules(%{llm_clean: DuplicateReviewStageStub})
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert :ok = perform_job(Worker, %{ingestion_id: ingestion.id})
+
+        assert_received {:performed_stage, :llm_clean, ^ingestion_id, "duplicate_review"}
+
+        reloaded_ingestion = Ingestions.get_source_ingestion!(ingestion_id)
+        assert reloaded_ingestion.status == "processing"
+        assert reloaded_ingestion.processing_stage == "duplicate_review"
+      end)
+    end
+
     test "no-ops for terminal stages" do
       for {status, attrs} <- [
             {"needs_review", %{processing_stage: "review"}},
-            {"complete", %{}},
-            {"failed",
-             %{processing_stage: "failed", error_stage: "extract", error_message: "boom"}}
+            {"complete", %{}}
           ] do
         ingestion =
           source_ingestion_fixture()

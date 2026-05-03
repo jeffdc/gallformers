@@ -219,6 +219,10 @@ defmodule Gallformers.IngestionPipeline.FullPipelineTest do
     reloaded_ingestion = Ingestions.get_source_ingestion!(ingestion_id)
     assert Workflow.state(reloaded_ingestion) == {"needs_review", "review"}
 
+    assert Enum.map(Ingestions.list_source_ingestion_species(ingestion_id), fn species_entry ->
+             {species_entry.position, species_entry.extracted_name, species_entry.status}
+           end) == [{0, "Andricus normalis", "pending"}]
+
     assert_artifact_keys_include(ingestion_id, [
       "source-ingestions/#{ingestion_id}/extract/text.txt",
       "source-ingestions/#{ingestion_id}/preprocess/text.txt",

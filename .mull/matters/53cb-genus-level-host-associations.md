@@ -1,7 +1,7 @@
 ---
-status: raw
+status: refined
 created: 2026-03-03
-updated: 2026-04-25
+updated: 2026-05-03
 epic: cynipid
 relates: [67c9]
 ---

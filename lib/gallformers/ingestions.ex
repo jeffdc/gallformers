@@ -359,7 +359,7 @@ defmodule Gallformers.Ingestions do
         "Duplicate confirmed"
 
       "failed" ->
-        "Failed at #{attr_value(queue_row, :error_stage) || processing_stage}"
+        failed_queue_status_label(queue_row)
 
       _ ->
         "Processing: #{processing_stage}"
@@ -595,6 +595,48 @@ defmodule Gallformers.Ingestions do
   end
 
   @doc """
+  Resets a failed ingestion to its last resumable checkpoint.
+
+  This is used when retrying a discarded worker job for an ingestion that has
+  already been marked failed.
+  """
+  @spec retry_failed_source_ingestion(SourceIngestion.t() | integer()) ::
+          {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t()}
+  def retry_failed_source_ingestion(%SourceIngestion{} = source_ingestion) do
+    with {:ok, retry_stage} <- retry_stage_for_failed_ingestion(source_ingestion) do
+      transition_source_ingestion_status(source_ingestion, :processing, %{
+        processing_stage: retry_stage,
+        error_stage: nil,
+        error_message: nil,
+        failed_at: nil
+      })
+    else
+      {:error, :not_failed} ->
+        {:error, retry_failed_source_ingestion_changeset(source_ingestion, "must be failed")}
+
+      {:error, :missing_error_stage} ->
+        {:error,
+         retry_failed_source_ingestion_changeset(
+           source_ingestion,
+           "must record the failed stage before retrying"
+         )}
+
+      {:error, :unknown_error_stage} ->
+        {:error,
+         retry_failed_source_ingestion_changeset(
+           source_ingestion,
+           "has an unknown failed stage and cannot be retried"
+         )}
+    end
+  end
+
+  def retry_failed_source_ingestion(source_ingestion_id) when is_integer(source_ingestion_id) do
+    source_ingestion_id
+    |> get_source_ingestion!()
+    |> retry_failed_source_ingestion()
+  end
+
+  @doc """
   Returns a changeset for a duplicate candidate.
   """
   @spec change_duplicate_candidate(DuplicateCandidate.t(), map()) :: Ecto.Changeset.t()
@@ -773,6 +815,46 @@ defmodule Gallformers.Ingestions do
     %SourceIngestionSpecies{}
     |> SourceIngestionSpecies.changeset(attrs)
     |> Repo.insert()
+  end
+
+  @doc """
+  Ensures gall-level review rows exist for extracted records.
+  """
+  @spec ensure_source_ingestion_species_entries(SourceIngestion.t() | integer(), [map()]) ::
+          {:ok, [SourceIngestionSpecies.t()]} | {:error, Ecto.Changeset.t()}
+  def ensure_source_ingestion_species_entries(%SourceIngestion{id: source_ingestion_id}, records)
+      when is_list(records) do
+    ensure_source_ingestion_species_entries(source_ingestion_id, records)
+  end
+
+  def ensure_source_ingestion_species_entries(source_ingestion_id, records)
+      when is_integer(source_ingestion_id) and is_list(records) do
+    existing_entries_by_position =
+      source_ingestion_id
+      |> list_source_ingestion_species()
+      |> Map.new(&{&1.position, &1})
+
+    records
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, []}, fn {record, position}, {:ok, acc} ->
+      case Map.fetch(existing_entries_by_position, position) do
+        {:ok, existing_entry} ->
+          {:cont, {:ok, [existing_entry | acc]}}
+
+        :error ->
+          source_ingestion_id
+          |> source_ingestion_species_attrs_from_record(record, position)
+          |> create_source_ingestion_species()
+          |> case do
+            {:ok, species_entry} -> {:cont, {:ok, [species_entry | acc]}}
+            {:error, changeset} -> {:halt, {:error, changeset}}
+          end
+      end
+    end)
+    |> case do
+      {:ok, species_entries} -> {:ok, Enum.reverse(species_entries)}
+      error -> error
+    end
   end
 
   @doc """
@@ -1236,6 +1318,57 @@ defmodule Gallformers.Ingestions do
   end
 
   defp maybe_species_summary(_species_id, species), do: species_summary(species)
+
+  defp source_ingestion_species_attrs_from_record(source_ingestion_id, record, position) do
+    gall_species = attr_value(record, :gall_species)
+    host_species = attr_value(record, :host_species)
+    description = string_or_nil(attr_value(record, :description))
+
+    %{
+      source_ingestion_id: source_ingestion_id,
+      position: position,
+      status: "pending",
+      extracted_name: nested_value(gall_species, :name, nil),
+      extracted_authority: nested_value(gall_species, :authority, nil),
+      description_prose: description || "",
+      extraction_payload: %{
+        "gall_species" => normalize_extracted_record_map(gall_species),
+        "host_species" => normalize_extracted_record_map(host_species),
+        "hosts" => normalize_extracted_hosts(host_species),
+        "traits" => normalize_extracted_traits(attr_value(record, :traits)),
+        "description_evidence" => description_evidence_from_record(description),
+        "location" => attr_value(record, :location),
+        "confidence" => attr_value(record, :confidence)
+      }
+    }
+  end
+
+  defp normalize_extracted_record_map(value) when is_map(value), do: value
+  defp normalize_extracted_record_map(_value), do: %{}
+
+  defp normalize_extracted_hosts(host_species) when is_map(host_species) do
+    case nested_value(host_species, :name, nil) do
+      name when is_binary(name) and name != "" -> [host_species]
+      _ -> []
+    end
+  end
+
+  defp normalize_extracted_hosts(_host_species), do: []
+
+  defp normalize_extracted_traits(traits) when is_map(traits), do: traits
+  defp normalize_extracted_traits(_traits), do: %{}
+
+  defp description_evidence_from_record(nil), do: []
+  defp description_evidence_from_record(description), do: [%{"text" => description}]
+
+  defp string_or_nil(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp string_or_nil(_value), do: nil
 
   defp load_species_summaries([]), do: %{}
 
@@ -1813,6 +1946,15 @@ defmodule Gallformers.Ingestions do
     |> add_error(:status, "only failed or abandoned ingestions can be cleared")
   end
 
+  defp retry_failed_source_ingestion_changeset(
+         %SourceIngestion{} = source_ingestion,
+         message
+       ) do
+    source_ingestion
+    |> change_source_ingestion(%{})
+    |> add_error(:status, message)
+  end
+
   defp abandoned_source_ingestion?(%SourceIngestion{
          id: source_ingestion_id,
          status: "processing"
@@ -1822,6 +1964,57 @@ defmodule Gallformers.Ingestions do
   end
 
   defp abandoned_source_ingestion?(%SourceIngestion{}), do: false
+
+  defp retry_stage_for_failed_ingestion(%SourceIngestion{status: "failed"} = source_ingestion) do
+    case attr_value(source_ingestion, :error_stage) do
+      nil ->
+        {:error, :missing_error_stage}
+
+      "extract" ->
+        {:ok, "submitted"}
+
+      "preprocess" ->
+        {:ok, "extract"}
+
+      "hash_and_dedup" ->
+        {:ok, "preprocess"}
+
+      "llm_clean" ->
+        {:ok, llm_clean_retry_stage(source_ingestion)}
+
+      "metadata" ->
+        {:ok, "llm_clean"}
+
+      "data_extract" ->
+        {:ok, "metadata"}
+
+      "assemble" ->
+        {:ok, "data_extract"}
+
+      "upload" ->
+        {:ok, "assemble"}
+
+      _other ->
+        {:error, :unknown_error_stage}
+    end
+  end
+
+  defp retry_stage_for_failed_ingestion(%SourceIngestion{}), do: {:error, :not_failed}
+
+  defp llm_clean_retry_stage(%SourceIngestion{id: source_ingestion_id}) do
+    if duplicate_candidates_exist?(source_ingestion_id) do
+      "duplicate_review"
+    else
+      "hash_and_dedup"
+    end
+  end
+
+  defp duplicate_candidates_exist?(source_ingestion_id) when is_integer(source_ingestion_id) do
+    from(duplicate_candidate in DuplicateCandidate,
+      where: duplicate_candidate.source_ingestion_id == ^source_ingestion_id
+    )
+    |> Repo.exists?()
+  end
 
   defp active_worker_job_exists?(source_ingestion_id) do
     from(job in "oban_jobs",
@@ -1934,6 +2127,25 @@ defmodule Gallformers.Ingestions do
       "#{pending_species_entries_count} of #{total_species_entries_count} galls remaining"
     end
   end
+
+  defp failed_queue_status_label(queue_row) do
+    failed_stage =
+      [attr_value(queue_row, :error_stage), processing_stage_label(queue_row)]
+      |> Enum.find(&meaningful_failed_stage?/1)
+
+    if failed_stage do
+      "Failed at #{failed_stage}"
+    else
+      "Failed"
+    end
+  end
+
+  defp meaningful_failed_stage?(stage) when is_binary(stage) do
+    trimmed_stage = String.trim(stage)
+    trimmed_stage != "" and trimmed_stage != "failed"
+  end
+
+  defp meaningful_failed_stage?(_stage), do: false
 
   defp worker_module do
     :gallformers

@@ -7,6 +7,7 @@ defmodule Gallformers.IngestionPipeline.Stages.Assemble do
   @behaviour Gallformers.IngestionPipeline.StageWorker
 
   alias Gallformers.IngestionPipeline.Broadcaster
+  alias Gallformers.IngestionPipeline.Stages.LLMSupport
   alias Gallformers.IngestionPipeline.Storage
   alias Gallformers.Ingestions
   alias Gallformers.Ingestions.SourceIngestion
@@ -39,7 +40,7 @@ defmodule Gallformers.IngestionPipeline.Stages.Assemble do
   end
 
   defp decode_records(json) do
-    case Jason.decode(json) do
+    case json |> LLMSupport.strip_fenced_json() |> Jason.decode() do
       {:ok, records} when is_list(records) -> {:ok, records}
       {:ok, _other} -> {:error, :invalid_data_extract_payload}
       {:error, reason} -> {:error, reason}
@@ -47,7 +48,7 @@ defmodule Gallformers.IngestionPipeline.Stages.Assemble do
   end
 
   defp decode_metadata(json) do
-    case Jason.decode(json) do
+    case json |> LLMSupport.strip_fenced_json() |> Jason.decode() do
       {:ok, metadata} when is_map(metadata) -> {:ok, metadata}
       {:ok, _other} -> {:error, :invalid_metadata_payload}
       {:error, reason} -> {:error, reason}

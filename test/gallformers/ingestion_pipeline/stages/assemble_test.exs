@@ -197,6 +197,44 @@ defmodule Gallformers.IngestionPipeline.Stages.AssembleTest do
     assert markdown =~ "<!-- UNRESOLVED: Missing Host"
   end
 
+  test "accepts fenced json artifacts from earlier pipeline stages" do
+    ingestion = source_ingestion_fixture()
+
+    data_path = "source-ingestions/#{ingestion.id}/data_extract/output.json"
+    metadata_path = "source-ingestions/#{ingestion.id}/metadata/output.json"
+
+    put_storage_fixtures(%{
+      data_path =>
+        """
+        ```json
+        [
+          {
+            "gall_species": {"name": "Fenced Gall"},
+            "host_species": {"name": "Fenced Host"},
+            "traits": {},
+            "description": "Fenced payload.",
+            "confidence": 0.5
+          }
+        ]
+        ```
+        """,
+      metadata_path =>
+        """
+        ```json
+        {
+          "title": "Fenced Metadata"
+        }
+        ```
+        """
+    })
+
+    assert {:ok, _updated_ingestion} = Assemble.perform_stage(ingestion)
+
+    assert_received {:upload, _, _, markdown, "text/markdown"}
+    assert markdown =~ "title: \"Fenced Metadata\""
+    assert markdown =~ "## Fenced Gall"
+  end
+
   test "flags unresolved names when multiple matches are found" do
     ingestion = source_ingestion_fixture()
     query = "Ambiguous Species #{System.unique_integer([:positive])}"

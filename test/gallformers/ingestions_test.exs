@@ -885,6 +885,18 @@ defmodule Gallformers.IngestionsTest do
              }) == "Failed at metadata"
 
       assert Ingestions.queue_status_label(%{
+               status: "failed",
+               processing_stage: "failed",
+               error_stage: nil
+             }) == "Failed"
+
+      assert Ingestions.queue_status_label(%{
+               status: "failed",
+               processing_stage: "metadata",
+               error_stage: nil
+             }) == "Failed at metadata"
+
+      assert Ingestions.queue_status_label(%{
                status: "processing",
                processing_stage: "extract"
              }) == "Processing: preprocess"
@@ -1082,6 +1094,56 @@ defmodule Gallformers.IngestionsTest do
 
       assert updated_ingestion.status == "needs_review"
       assert updated_ingestion.processing_stage == "review"
+    end
+  end
+
+  describe "retry_failed_source_ingestion/1" do
+    test "resets a failed ingestion to the checkpoint before the failed stage" do
+      ingestion = source_ingestion_fixture(%{input_type: "pdf"})
+
+      assert {:ok, failed} =
+               Ingestions.transition_source_ingestion_status(ingestion, :failed, %{
+                 error_stage: "metadata",
+                 error_message: "boom"
+               })
+
+      assert {:ok, retried} = Ingestions.retry_failed_source_ingestion(failed)
+
+      assert retried.status == "processing"
+      assert retried.processing_stage == "llm_clean"
+      assert retried.error_stage == nil
+      assert retried.error_message == nil
+      assert retried.failed_at == nil
+    end
+
+    test "resumes llm_clean failures from duplicate_review when duplicate candidates exist" do
+      subject =
+        source_ingestion_fixture(%{
+          input_type: "pdf",
+          status: "failed",
+          processing_stage: "failed",
+          error_stage: "llm_clean",
+          error_message: "boom"
+        })
+
+      candidate_source = source_ingestion_fixture(%{input_type: "url"})
+      duplicate_candidate_fixture(subject, candidate_source)
+
+      assert {:ok, retried} = Ingestions.retry_failed_source_ingestion(subject)
+
+      assert retried.status == "processing"
+      assert retried.processing_stage == "duplicate_review"
+      assert retried.error_stage == nil
+      assert retried.error_message == nil
+      assert retried.failed_at == nil
+    end
+
+    test "rejects retrying ingestions that are not failed" do
+      ingestion = source_ingestion_fixture(%{input_type: "pdf"})
+
+      assert {:error, changeset} = Ingestions.retry_failed_source_ingestion(ingestion)
+
+      assert %{status: ["must be failed"]} = errors_on(changeset)
     end
   end
 
