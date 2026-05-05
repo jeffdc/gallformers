@@ -1,4 +1,6 @@
 defmodule Gallformers.IngestionPipeline.Heuristics.RejoinLines do
+  alias Gallformers.Utils
+
   @behaviour Gallformers.IngestionPipeline.Heuristics.TextHeuristic
 
   @impl true
@@ -44,7 +46,7 @@ defmodule Gallformers.IngestionPipeline.Heuristics.RejoinLines do
     stripped = String.trim(line)
 
     String.starts_with?(stripped, "#") or
-      (Gallformers.Utilities.all_caps?(stripped) and String.length(stripped) < 100) or
+      (Utils.all_caps?(stripped) and String.length(stripped) < 100) or
       Regex.match?(~r/^\d+$/, stripped)
   end
 

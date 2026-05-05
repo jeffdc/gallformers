@@ -9,6 +9,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   alias Gallformers.Ingestions
   alias Gallformers.Sources
   alias Gallformers.Species
+  alias GallformersWeb.Admin.IngestionReviewLive.Presenter
 
   @detachable_options [
     {"Unknown", "unknown"},
@@ -387,7 +388,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
 
             <.list>
               <:item title="Input Type">{String.upcase(@review_view.input_type)}</:item>
-              <:item title="Stage">{Ingestions.processing_stage_label(@review_view)}</:item>
+              <:item title="Stage">{Presenter.processing_stage_label(@review_view)}</:item>
               <:item title="Uploaded">{format_date(@review_view.inserted_at, :short)}</:item>
             </.list>
           </div>
@@ -991,7 +992,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   end
 
   defp load_review_view(socket, source_ingestion_id) do
-    review_view = Ingestions.source_ingestion_review_view!(source_ingestion_id)
+    review_view = Presenter.source_ingestion_review_view!(source_ingestion_id)
 
     socket
     |> assign(:review_view, review_view)
@@ -1299,7 +1300,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
     end
   end
 
-  defp status_label(review_view), do: Ingestions.queue_status_label(review_view)
+  defp status_label(review_view), do: Presenter.queue_status_label(review_view)
   defp clear_source_ingestion_label(%{clearability: :abandoned}), do: "Clear Abandoned Ingestion"
   defp clear_source_ingestion_label(_review_view), do: "Clear Failed Ingestion"
 

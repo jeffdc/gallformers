@@ -8,6 +8,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.IndexTest do
   alias Gallformers.Ingestions
   alias Gallformers.Sources
   alias Gallformers.Storage.SourceArtifacts
+  alias GallformersWeb.Admin.IngestionReviewLive.Presenter
 
   defmodule StorageBackendStub do
     @behaviour Gallformers.Storage.SourceArtifacts.Backend
@@ -510,7 +511,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.IndexTest do
         status: "mapped"
       })
 
-    Ingestions.list_source_ingestion_queue_rows(
+    Presenter.list_source_ingestion_queue_rows(
       uploaded_by_id: current_db_user.id,
       include_complete: true
     )
@@ -518,7 +519,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.IndexTest do
   end
 
   defp latest_ingestion_for(uploaded_by_id) do
-    Ingestions.list_source_ingestion_queue_rows(
+    Presenter.list_source_ingestion_queue_rows(
       uploaded_by_id: uploaded_by_id,
       include_complete: true
     )

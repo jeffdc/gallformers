@@ -141,38 +141,112 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMSupport do
     do_find_last_complete_object(chars, candidate, 0, false, false, 0, -1)
   end
 
-  defp do_find_last_complete_object([], candidate, _depth, _in_string, _escape, _index, last_obj_end),
-    do: finalize_truncated_array(candidate, last_obj_end)
+  defp do_find_last_complete_object(
+         [],
+         candidate,
+         _depth,
+         _in_string,
+         _escape,
+         _index,
+         last_obj_end
+       ),
+       do: finalize_truncated_array(candidate, last_obj_end)
 
-  defp do_find_last_complete_object([char | rest], candidate, depth, in_string, escape, index, last_obj_end) do
+  defp do_find_last_complete_object(
+         [char | rest],
+         candidate,
+         depth,
+         in_string,
+         escape,
+         index,
+         last_obj_end
+       ) do
     cond do
       escape ->
-        do_find_last_complete_object(rest, candidate, depth, in_string, false, index + 1, last_obj_end)
+        do_find_last_complete_object(
+          rest,
+          candidate,
+          depth,
+          in_string,
+          false,
+          index + 1,
+          last_obj_end
+        )
 
       char == "\\" and in_string ->
-        do_find_last_complete_object(rest, candidate, depth, in_string, true, index + 1, last_obj_end)
+        do_find_last_complete_object(
+          rest,
+          candidate,
+          depth,
+          in_string,
+          true,
+          index + 1,
+          last_obj_end
+        )
 
       char == "\"" and not escape ->
-        do_find_last_complete_object(rest, candidate, depth, not in_string, false, index + 1, last_obj_end)
+        do_find_last_complete_object(
+          rest,
+          candidate,
+          depth,
+          not in_string,
+          false,
+          index + 1,
+          last_obj_end
+        )
 
       in_string ->
-        do_find_last_complete_object(rest, candidate, depth, in_string, false, index + 1, last_obj_end)
+        do_find_last_complete_object(
+          rest,
+          candidate,
+          depth,
+          in_string,
+          false,
+          index + 1,
+          last_obj_end
+        )
 
       char == "[" or char == "{" ->
-        do_find_last_complete_object(rest, candidate, depth + 1, in_string, false, index + 1, last_obj_end)
+        do_find_last_complete_object(
+          rest,
+          candidate,
+          depth + 1,
+          in_string,
+          false,
+          index + 1,
+          last_obj_end
+        )
 
       char == "]" or char == "}" ->
         new_depth = depth - 1
         # depth == 1 means we just closed a top-level object inside the array
         new_last = if new_depth == 1 and char == "}", do: index, else: last_obj_end
-        do_find_last_complete_object(rest, candidate, new_depth, in_string, false, index + 1, new_last)
+
+        do_find_last_complete_object(
+          rest,
+          candidate,
+          new_depth,
+          in_string,
+          false,
+          index + 1,
+          new_last
+        )
 
       true ->
-        do_find_last_complete_object(rest, candidate, depth, in_string, false, index + 1, last_obj_end)
+        do_find_last_complete_object(
+          rest,
+          candidate,
+          depth,
+          in_string,
+          false,
+          index + 1,
+          last_obj_end
+        )
     end
   end
 
   defp finalize_truncated_array(_candidate, -1), do: nil
+
   defp finalize_truncated_array(candidate, last_obj_end) do
     String.slice(candidate, 0, last_obj_end + 1) <> "\n]"
   end

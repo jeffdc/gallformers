@@ -96,7 +96,8 @@ defmodule Gallformers.IngestionPipeline.Stages.UploadTest do
     ])
 
     put_get_object_fixtures(%{
-      data_extract_path => Jason.encode!([valid_record("Andricus uploadii", "Quercus alba", 0.91)])
+      data_extract_path =>
+        Jason.encode!([valid_record("Andricus uploadii", "Quercus alba", 0.91)])
     })
 
     assert {:ok, updated_ingestion} = Upload.perform_stage(ingestion)
@@ -113,6 +114,7 @@ defmodule Gallformers.IngestionPipeline.Stages.UploadTest do
     assert updated_ingestion.processing_stage == "review"
     assert reloaded_ingestion.status == "needs_review"
     assert reloaded_ingestion.processing_stage == "review"
+
     assert Enum.map(species_entries, &{&1.position, &1.extracted_name, &1.status}) == [
              {0, "Andricus uploadii", "pending"}
            ]

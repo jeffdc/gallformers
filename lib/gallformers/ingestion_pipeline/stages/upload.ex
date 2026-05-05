@@ -26,7 +26,8 @@ defmodule Gallformers.IngestionPipeline.Stages.Upload do
   def perform_stage(%SourceIngestion{} = ingestion) do
     Logger.info("Starting upload stage", ingestion_id: ingestion.id)
 
-    with {:ok, records_json} <- Storage.download_artifact(ingestion.id, :data_extract, "output.json"),
+    with {:ok, records_json} <-
+           Storage.download_artifact(ingestion.id, :data_extract, "output.json"),
          {:ok, records} <- decode_records(records_json),
          {:ok, _species_entries} <-
            Ingestions.ensure_source_ingestion_species_entries(ingestion, records),

@@ -17,6 +17,7 @@ defmodule Gallformers.Ingestions do
       Gallformers.Sources,
       Gallformers.Storage,
       Gallformers.Species,
+      Gallformers.Utils,
       Gallformers.IngestionPipeline.Storage,
       Gallformers.IngestionPipeline.Workflow
     ],
@@ -31,6 +32,7 @@ defmodule Gallformers.Ingestions do
   alias Gallformers.Sources.Source
   alias Gallformers.Species, as: SpeciesContext
   alias Gallformers.Storage.SourceArtifacts
+  alias Gallformers.Utils
 
   @ordered_duplicate_candidates_query from(duplicate_candidate in DuplicateCandidate,
                                         order_by: [
@@ -80,172 +82,6 @@ defmodule Gallformers.Ingestions do
   ]
 
   @source_ingestion_species_workspace_preloads [:species, source_ingestion: [:source]]
-
-  @doc """
-  Returns ingestions ordered newest-first.
-  """
-  @spec list_source_ingestions(keyword()) :: [SourceIngestion.t()]
-  def list_source_ingestions(opts \\ []) do
-    SourceIngestion
-    |> order_by([source_ingestion], desc: source_ingestion.inserted_at)
-    |> maybe_filter_status(Keyword.get(opts, :status))
-    |> maybe_preload(Keyword.get(opts, :preload, false))
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets a source ingestion by ID.
-  """
-  @spec get_source_ingestion(integer()) :: SourceIngestion.t() | nil
-  def get_source_ingestion(id), do: Repo.get(SourceIngestion, id)
-
-  @doc """
-  Gets a source ingestion by ID, raising if it does not exist.
-  """
-  @spec get_source_ingestion!(integer()) :: SourceIngestion.t()
-  def get_source_ingestion!(id), do: Repo.get!(SourceIngestion, id)
-
-  @doc """
-  Runs a function while holding a per-ingestion orchestration lock.
-  """
-  @spec with_source_ingestion_orchestration_lock(integer(), (-> result)) ::
-          {:ok, result} | {:error, :already_processing}
-        when result: var
-  def with_source_ingestion_orchestration_lock(source_ingestion_id, fun)
-      when is_integer(source_ingestion_id) and is_function(fun, 0) do
-    Repo.checkout(
-      fn ->
-        if acquire_source_ingestion_orchestration_lock(source_ingestion_id) do
-          try do
-            {:ok, fun.()}
-          after
-            maybe_release_source_ingestion_orchestration_lock(source_ingestion_id)
-          end
-        else
-          {:error, :already_processing}
-        end
-      end,
-      timeout: orchestration_lock_timeout()
-    )
-  end
-
-  @doc """
-  Gets a source ingestion with the detail preloads needed by review workflows.
-  """
-  @spec get_source_ingestion_with_details!(integer()) :: SourceIngestion.t()
-  def get_source_ingestion_with_details!(id) do
-    id
-    |> get_source_ingestion!()
-    |> Repo.preload(@source_ingestion_detail_preloads)
-  end
-
-  @doc """
-  Returns the persisted detail-page view model for an ingestion review.
-  """
-  @spec source_ingestion_review_view!(integer()) :: map()
-  def source_ingestion_review_view!(id) do
-    source_ingestion = get_source_ingestion_with_details!(id)
-
-    duplicate_review_required? = duplicate_review_required?(source_ingestion)
-    source_review_unlocked? = source_review_unlocked?(source_ingestion)
-    species_review_unlocked? = species_review_unlocked?(source_ingestion)
-    clearability = source_ingestion_clearability(source_ingestion)
-
-    duplicate_candidates =
-      Enum.map(source_ingestion.duplicate_candidates, &duplicate_candidate_review_view/1)
-
-    species_entries =
-      Enum.map(source_ingestion.species_entries, &species_entry_review_view/1)
-
-    %{
-      id: source_ingestion.id,
-      title: source_ingestion.title,
-      display_title: display_title(source_ingestion),
-      authors: source_ingestion.authors,
-      publication_year: source_ingestion.publication_year,
-      doi: source_ingestion.doi,
-      input_type: source_ingestion.input_type,
-      status: source_ingestion.status,
-      processing_stage: source_ingestion.processing_stage,
-      inserted_at: source_ingestion.inserted_at,
-      uploaded_by_id: source_ingestion.uploaded_by_id,
-      source_id: source_ingestion.source_id,
-      associated_source: associated_source_review_view(source_ingestion.source),
-      duplicate_of_source_ingestion_id: source_ingestion.duplicate_of_source_ingestion_id,
-      clearability: clearability,
-      clearable?: not is_nil(clearability),
-      duplicate_review_required?: duplicate_review_required?,
-      source_review_unlocked?: source_review_unlocked?,
-      species_review_unlocked?: species_review_unlocked?,
-      duplicate_candidates: duplicate_candidates,
-      species_entries: species_entries,
-      counts: %{
-        duplicate_candidates_total: length(duplicate_candidates),
-        duplicate_candidates_pending: Enum.count(duplicate_candidates, &(&1.status == "pending")),
-        species_entries_total: length(species_entries),
-        species_entries_pending: Enum.count(species_entries, &(&1.status == "pending")),
-        species_entries_resolved: Enum.count(species_entries, &(&1.status != "pending"))
-      }
-    }
-  end
-
-  @doc """
-  Returns a changeset for a source ingestion.
-  """
-  @spec change_source_ingestion(SourceIngestion.t(), map()) :: Ecto.Changeset.t()
-  def change_source_ingestion(%SourceIngestion{} = source_ingestion, attrs \\ %{}) do
-    SourceIngestion.changeset(source_ingestion, attrs)
-  end
-
-  @doc """
-  Creates a source ingestion and assigns its canonical per-ingestion artifacts path.
-  """
-  @spec create_source_ingestion(map()) ::
-          {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t()}
-  def create_source_ingestion(attrs \\ %{}) do
-    Repo.transaction(fn ->
-      attrs = Map.new(attrs)
-
-      source_ingestion =
-        %SourceIngestion{}
-        |> SourceIngestion.changeset(attrs)
-        |> insert_or_rollback()
-
-      if blank_artifacts_path?(source_ingestion.artifacts_path) do
-        source_ingestion
-        |> SourceIngestion.changeset(%{
-          artifacts_path: SourceArtifacts.private_artifact_prefix(source_ingestion.id)
-        })
-        |> update_or_rollback()
-      else
-        source_ingestion
-      end
-    end)
-  end
-
-  @doc """
-  Creates a persisted ingestion, uploads its initial input artifact, and
-  enqueues the pipeline worker.
-  """
-  @spec submit_source_ingestion(map()) ::
-          {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t() | term()}
-  def submit_source_ingestion(attrs) do
-    attrs = Map.new(attrs)
-
-    with :ok <- validate_submission_attrs(attrs),
-         {:ok, source_ingestion} <- create_submission_record(attrs),
-         {:ok, _artifact_path} <- upload_submission_artifact(source_ingestion, attrs),
-         {:ok, _job} <- enqueue_submission_worker(source_ingestion) do
-      {:ok, source_ingestion}
-    else
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:error, changeset}
-
-      {:submission_error, source_ingestion, reason} ->
-        cleanup_submission_artifacts(source_ingestion.id)
-        {:error, reason}
-    end
-  end
 
   @doc """
   Returns queue rows for the persisted ingestion review workflow.
@@ -334,48 +170,121 @@ defmodule Gallformers.Ingestions do
       resolved_species_entries_count: species_counts.resolved_species_entries_count
     })
     |> Repo.all()
-    |> Enum.map(&normalize_queue_row/1)
   end
 
   @doc """
-  Returns the UI-facing queue status label for an ingestion row.
+  Returns ingestions ordered newest-first.
   """
-  @spec queue_status_label(map() | SourceIngestion.t()) :: String.t()
-  def queue_status_label(queue_row) do
-    status = attr_value(queue_row, :status)
-    processing_stage = processing_stage_label(queue_row)
-
-    case status do
-      "needs_duplicate_review" ->
-        "Needs duplicate review"
-
-      "needs_review" ->
-        review_queue_status_label(queue_row)
-
-      "complete" ->
-        "Complete"
-
-      "duplicate_confirmed" ->
-        "Duplicate confirmed"
-
-      "failed" ->
-        failed_queue_status_label(queue_row)
-
-      _ ->
-        "Processing: #{processing_stage}"
-    end
+  @spec list_source_ingestions(keyword()) :: [SourceIngestion.t()]
+  def list_source_ingestions(opts \\ []) do
+    SourceIngestion
+    |> order_by([source_ingestion], desc: source_ingestion.inserted_at)
+    |> maybe_filter_status(Keyword.get(opts, :status))
+    |> maybe_preload(Keyword.get(opts, :preload, false))
+    |> Repo.all()
   end
 
   @doc """
-  Returns the workflow stage label that best represents the current work.
+  Gets a source ingestion by ID.
   """
-  @spec processing_stage_label(map() | SourceIngestion.t()) :: String.t()
-  def processing_stage_label(source_ingestion) do
-    persisted_stage = attr_value(source_ingestion, :processing_stage) || "unknown"
+  @spec get_source_ingestion(integer()) :: SourceIngestion.t() | nil
+  def get_source_ingestion(id), do: Repo.get(SourceIngestion, id)
 
-    case Workflow.next_stage(source_ingestion) do
-      {:run, stage} -> Atom.to_string(stage)
-      _ -> persisted_stage
+  @doc """
+  Gets a source ingestion by ID, raising if it does not exist.
+  """
+  @spec get_source_ingestion!(integer()) :: SourceIngestion.t()
+  def get_source_ingestion!(id), do: Repo.get!(SourceIngestion, id)
+
+  @doc """
+  Runs a function while holding a per-ingestion orchestration lock.
+  """
+  @spec with_source_ingestion_orchestration_lock(integer(), (-> result)) ::
+          {:ok, result} | {:error, :already_processing}
+        when result: var
+  def with_source_ingestion_orchestration_lock(source_ingestion_id, fun)
+      when is_integer(source_ingestion_id) and is_function(fun, 0) do
+    Repo.checkout(
+      fn ->
+        if acquire_source_ingestion_orchestration_lock(source_ingestion_id) do
+          try do
+            {:ok, fun.()}
+          after
+            maybe_release_source_ingestion_orchestration_lock(source_ingestion_id)
+          end
+        else
+          {:error, :already_processing}
+        end
+      end,
+      timeout: orchestration_lock_timeout()
+    )
+  end
+
+  @doc """
+  Gets a source ingestion with the detail preloads needed by review workflows.
+  """
+  @spec get_source_ingestion_with_details!(integer()) :: SourceIngestion.t()
+  def get_source_ingestion_with_details!(id) do
+    id
+    |> get_source_ingestion!()
+    |> Repo.preload(@source_ingestion_detail_preloads)
+  end
+
+  @doc """
+  Returns a changeset for a source ingestion.
+  """
+  @spec change_source_ingestion(SourceIngestion.t(), map()) :: Ecto.Changeset.t()
+  def change_source_ingestion(%SourceIngestion{} = source_ingestion, attrs \\ %{}) do
+    SourceIngestion.changeset(source_ingestion, attrs)
+  end
+
+  @doc """
+  Creates a source ingestion and assigns its canonical per-ingestion artifacts path.
+  """
+  @spec create_source_ingestion(map()) ::
+          {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t()}
+  def create_source_ingestion(attrs \\ %{}) do
+    Repo.transaction(fn ->
+      attrs = Map.new(attrs)
+
+      source_ingestion =
+        %SourceIngestion{}
+        |> SourceIngestion.changeset(attrs)
+        |> insert_or_rollback()
+
+      if blank_artifacts_path?(source_ingestion.artifacts_path) do
+        source_ingestion
+        |> SourceIngestion.changeset(%{
+          artifacts_path: SourceArtifacts.private_artifact_prefix(source_ingestion.id)
+        })
+        |> update_or_rollback()
+      else
+        source_ingestion
+      end
+    end)
+  end
+
+  @doc """
+  Creates a persisted ingestion, uploads its initial input artifact, and
+  enqueues the pipeline worker.
+  """
+  @spec submit_source_ingestion(map()) ::
+          {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t() | term()}
+  def submit_source_ingestion(attrs) do
+    attrs = Map.new(attrs)
+
+    with :ok <- validate_submission_attrs(attrs),
+         {:ok, source_ingestion} <- create_submission_record(attrs),
+         {:ok, _artifact_path} <- upload_submission_artifact(source_ingestion, attrs),
+         {:ok, _job} <- enqueue_submission_worker(source_ingestion) do
+      {:ok, source_ingestion}
+    else
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:error, changeset}
+
+      {:submission_error, source_ingestion, reason} ->
+        cleanup_submission_artifacts(source_ingestion.id)
+        {:error, reason}
     end
   end
 
@@ -389,7 +298,7 @@ defmodule Gallformers.Ingestions do
         status,
         attrs \\ %{}
       ) do
-    status = normalize_status(status)
+    status = Utils.normalize_atom(status)
 
     attrs =
       attrs
@@ -436,7 +345,7 @@ defmodule Gallformers.Ingestions do
     allowed_attrs =
       SourceIngestion.signal_fields()
       |> Enum.reduce(%{}, fn field, acc ->
-        case attr_value(attrs, field) do
+        case Utils.attr_value(attrs, field) do
           nil -> acc
           value -> Map.put(acc, field, value)
         end
@@ -707,7 +616,7 @@ defmodule Gallformers.Ingestions do
     attrs = Map.new(attrs)
 
     candidate_status =
-      normalize_status(attr_value(attrs, :status) || "confirmed")
+      Utils.normalize_atom(Utils.attr_value(attrs, :status) || "confirmed")
 
     case candidate_status do
       status when status in ["confirmed", "auto_confirmed"] ->
@@ -746,8 +655,8 @@ defmodule Gallformers.Ingestions do
         duplicate_candidate
         |> DuplicateCandidate.changeset(%{
           status: "rejected",
-          reviewed_by_id: attr_value(attrs, :reviewed_by_id),
-          reviewed_at: attr_value(attrs, :reviewed_at) || now()
+          reviewed_by_id: Utils.attr_value(attrs, :reviewed_by_id),
+          reviewed_at: Utils.attr_value(attrs, :reviewed_at) || now()
         })
         |> update_or_rollback()
 
@@ -930,12 +839,12 @@ defmodule Gallformers.Ingestions do
         attrs \\ %{}
       ) do
     attrs = Map.new(attrs)
-    status = normalize_status(status)
+    status = Utils.normalize_atom(status)
 
     attrs =
       attrs
       |> Map.put(:status, status)
-      |> maybe_put_reviewed_at(attr_value(attrs, :reviewed_by_id))
+      |> maybe_put_reviewed_at(Utils.attr_value(attrs, :reviewed_by_id))
 
     source_ingestion_species
     |> SourceIngestionSpecies.changeset(attrs)
@@ -965,8 +874,8 @@ defmodule Gallformers.Ingestions do
          {:ok, action} <- normalize_workspace_action(attrs) do
       description_prose =
         attrs
-        |> attr_value(:description_prose)
-        |> normalize_optional_string(source_ingestion_species.description_prose)
+        |> Utils.attr_value(:description_prose)
+        |> Utils.normalize_optional_string(source_ingestion_species.description_prose)
 
       review_payload = %{
         "species_review" => species_review.payload,
@@ -988,10 +897,10 @@ defmodule Gallformers.Ingestions do
   end
 
   defp normalize_workspace_species_review(attrs) do
-    species_review_attrs = nested_value(attrs, :species_review, %{})
-    decision = nested_value(species_review_attrs, :decision, nil)
-    species_id = nested_integer(species_review_attrs, :species_id)
-    notes = normalize_optional_string(nested_value(species_review_attrs, :notes, nil))
+    species_review_attrs = Utils.nested_value(attrs, :species_review, %{})
+    decision = Utils.nested_value(species_review_attrs, :decision, nil)
+    species_id = Utils.nested_integer(species_review_attrs, :species_id)
+    notes = Utils.normalize_optional_string(Utils.nested_value(species_review_attrs, :notes, nil))
 
     cond do
       decision == "mapped" and is_nil(species_id) ->
@@ -1032,15 +941,15 @@ defmodule Gallformers.Ingestions do
 
   defp normalize_workspace_host_reviews(attrs) do
     attrs
-    |> nested_value(:host_reviews, %{})
-    |> normalize_indexed_values()
+    |> Utils.nested_value(:host_reviews, %{})
+    |> Utils.normalize_indexed_values()
     |> Enum.reduce_while({:ok, []}, fn host_review_attrs, {:ok, acc} ->
-      decision = nested_value(host_review_attrs, :decision, "unresolved")
-      species_id = nested_integer(host_review_attrs, :species_id)
+      decision = Utils.nested_value(host_review_attrs, :decision, "unresolved")
+      species_id = Utils.nested_integer(host_review_attrs, :species_id)
 
       payload = %{
-        "extracted_name" => nested_value(host_review_attrs, :extracted_name, nil),
-        "extracted_authority" => nested_value(host_review_attrs, :extracted_authority, nil)
+        "extracted_name" => Utils.nested_value(host_review_attrs, :extracted_name, nil),
+        "extracted_authority" => Utils.nested_value(host_review_attrs, :extracted_authority, nil)
       }
 
       case decision do
@@ -1112,13 +1021,13 @@ defmodule Gallformers.Ingestions do
 
     payload =
       attrs
-      |> nested_value(:trait_reviews, %{})
+      |> Utils.nested_value(:trait_reviews, %{})
       |> normalize_trait_review_values()
       |> Enum.reduce(%{}, fn {name, trait_review_attrs}, acc ->
         selected_values =
           trait_review_attrs
-          |> nested_value(:selected_values, [])
-          |> normalize_string_list()
+          |> Utils.nested_value(:selected_values, [])
+          |> Utils.normalize_string_list()
 
         Map.put(acc, name, %{
           "selected_values" => selected_values,
@@ -1130,7 +1039,7 @@ defmodule Gallformers.Ingestions do
   end
 
   defp normalize_workspace_action(attrs) do
-    case attr_value(attrs, :action) do
+    case Utils.attr_value(attrs, :action) do
       "save" ->
         {:ok, "save"}
 
@@ -1203,22 +1112,23 @@ defmodule Gallformers.Ingestions do
   end
 
   defp workspace_species_review(source_ingestion_species) do
-    persisted_review = nested_value(source_ingestion_species.review_payload, :species_review, %{})
+    persisted_review =
+      Utils.nested_value(source_ingestion_species.review_payload, :species_review, %{})
 
     decision =
-      nested_value(
+      Utils.nested_value(
         persisted_review,
         :decision,
         if(source_ingestion_species.species_id, do: "mapped")
       )
 
     species_id =
-      nested_integer(persisted_review, :species_id) || source_ingestion_species.species_id
+      Utils.nested_integer(persisted_review, :species_id) || source_ingestion_species.species_id
 
     %{
       decision: decision,
       species_id: species_id,
-      notes: nested_value(persisted_review, :notes, nil),
+      notes: Utils.nested_value(persisted_review, :notes, nil),
       selected_species: maybe_species_summary(species_id, source_ingestion_species.species)
     }
   end
@@ -1226,12 +1136,12 @@ defmodule Gallformers.Ingestions do
   defp workspace_host_reviews(source_ingestion_species) do
     persisted_reviews =
       source_ingestion_species.review_payload
-      |> nested_value(:host_reviews, [])
-      |> normalize_indexed_values()
+      |> Utils.nested_value(:host_reviews, [])
+      |> Utils.normalize_indexed_values()
 
     selected_species =
       persisted_reviews
-      |> Enum.map(&nested_integer(&1, :species_id))
+      |> Enum.map(&Utils.nested_integer(&1, :species_id))
       |> Enum.reject(&is_nil/1)
       |> load_species_summaries()
 
@@ -1240,13 +1150,13 @@ defmodule Gallformers.Ingestions do
     |> Enum.with_index()
     |> Enum.map(fn {host, index} ->
       persisted_review = matching_host_review(host, persisted_reviews)
-      species_id = nested_integer(persisted_review, :species_id)
+      species_id = Utils.nested_integer(persisted_review, :species_id)
 
       %{
         index: index,
-        extracted_name: nested_value(host, :name, nil),
-        extracted_authority: nested_value(host, :authority, nil),
-        decision: nested_value(persisted_review, :decision, "unresolved"),
+        extracted_name: Utils.nested_value(host, :name, nil),
+        extracted_authority: Utils.nested_value(host, :authority, nil),
+        decision: Utils.nested_value(persisted_review, :decision, "unresolved"),
         species_id: species_id,
         selected_species: Map.get(selected_species, species_id),
         search_query: "",
@@ -1257,44 +1167,46 @@ defmodule Gallformers.Ingestions do
 
   defp workspace_trait_reviews(source_ingestion_species) do
     persisted_trait_reviews =
-      nested_value(source_ingestion_species.review_payload, :trait_reviews, %{})
+      Utils.nested_value(source_ingestion_species.review_payload, :trait_reviews, %{})
 
     source_ingestion_species.extraction_payload
     |> extraction_traits()
     |> Map.keys()
     |> Enum.sort()
     |> Enum.map(fn name ->
-      persisted_trait_review = nested_value(persisted_trait_reviews, name, %{})
+      persisted_trait_review = Utils.nested_value(persisted_trait_reviews, name, %{})
       extracted_trait = extraction_traits(source_ingestion_species.extraction_payload)[name]
 
       %{
         name: name,
         selected_values:
           persisted_trait_review
-          |> nested_value(:selected_values, extracted_trait_suggested_values(extracted_trait))
-          |> normalize_string_list(),
+          |> Utils.nested_value(
+            :selected_values,
+            extracted_trait_suggested_values(extracted_trait)
+          )
+          |> Utils.normalize_string_list(),
         suggested_values: extracted_trait_suggested_values(extracted_trait),
         raw_evidence:
           persisted_trait_review
-          |> nested_value(:raw_evidence, extract_trait_raw_evidence(extracted_trait))
-          |> normalize_string_list()
+          |> Utils.nested_value(:raw_evidence, extract_trait_raw_evidence(extracted_trait))
       }
     end)
   end
 
   defp workspace_description_review(source_ingestion_species) do
     persisted_review =
-      nested_value(source_ingestion_species.review_payload, :description_review, %{})
+      Utils.nested_value(source_ingestion_species.review_payload, :description_review, %{})
 
-    %{edited: nested_value(persisted_review, :edited, false)}
+    %{edited: Utils.nested_value(persisted_review, :edited, false)}
   end
 
   defp workspace_description_evidence(source_ingestion_species) do
     source_ingestion_species.extraction_payload
-    |> nested_value(:description_evidence, [])
-    |> normalize_indexed_values()
+    |> Utils.nested_value(:description_evidence, [])
+    |> Utils.normalize_indexed_values()
     |> Enum.flat_map(fn evidence ->
-      case nested_value(evidence, :text, nil) do
+      case Utils.nested_value(evidence, :text, nil) do
         text when is_binary(text) and text != "" -> [text]
         _ -> []
       end
@@ -1303,9 +1215,10 @@ defmodule Gallformers.Ingestions do
 
   defp matching_host_review(host, persisted_reviews) do
     Enum.find(persisted_reviews, %{}, fn persisted_review ->
-      nested_value(persisted_review, :extracted_name, nil) == nested_value(host, :name, nil) and
-        nested_value(persisted_review, :extracted_authority, nil) ==
-          nested_value(host, :authority, nil)
+      Utils.nested_value(persisted_review, :extracted_name, nil) ==
+        Utils.nested_value(host, :name, nil) and
+        Utils.nested_value(persisted_review, :extracted_authority, nil) ==
+          Utils.nested_value(host, :authority, nil)
     end)
   end
 
@@ -1320,25 +1233,25 @@ defmodule Gallformers.Ingestions do
   defp maybe_species_summary(_species_id, species), do: species_summary(species)
 
   defp source_ingestion_species_attrs_from_record(source_ingestion_id, record, position) do
-    gall_species = attr_value(record, :gall_species)
-    host_species = attr_value(record, :host_species)
-    description = string_or_nil(attr_value(record, :description))
+    gall_species = Utils.attr_value(record, :gall_species)
+    host_species = Utils.attr_value(record, :host_species)
+    description = string_or_nil(Utils.attr_value(record, :description))
 
     %{
       source_ingestion_id: source_ingestion_id,
       position: position,
       status: "pending",
-      extracted_name: nested_value(gall_species, :name, nil),
-      extracted_authority: nested_value(gall_species, :authority, nil),
+      extracted_name: Utils.nested_value(gall_species, :name, nil),
+      extracted_authority: Utils.nested_value(gall_species, :authority, nil),
       description_prose: description || "",
       extraction_payload: %{
         "gall_species" => normalize_extracted_record_map(gall_species),
         "host_species" => normalize_extracted_record_map(host_species),
         "hosts" => normalize_extracted_hosts(host_species),
-        "traits" => normalize_extracted_traits(attr_value(record, :traits)),
+        "traits" => normalize_extracted_traits(Utils.attr_value(record, :traits)),
         "description_evidence" => description_evidence_from_record(description),
-        "location" => attr_value(record, :location),
-        "confidence" => attr_value(record, :confidence)
+        "location" => Utils.attr_value(record, :location),
+        "confidence" => Utils.attr_value(record, :confidence)
       }
     }
   end
@@ -1347,7 +1260,7 @@ defmodule Gallformers.Ingestions do
   defp normalize_extracted_record_map(_value), do: %{}
 
   defp normalize_extracted_hosts(host_species) when is_map(host_species) do
-    case nested_value(host_species, :name, nil) do
+    case Utils.nested_value(host_species, :name, nil) do
       name when is_binary(name) and name != "" -> [host_species]
       _ -> []
     end
@@ -1394,14 +1307,14 @@ defmodule Gallformers.Ingestions do
   end
 
   defp extraction_hosts(extraction_payload) do
-    case nested_value(extraction_payload, :hosts, []) do
+    case Utils.nested_value(extraction_payload, :hosts, []) do
       hosts when is_list(hosts) -> hosts
       _ -> []
     end
   end
 
   defp extraction_traits(extraction_payload) do
-    case nested_value(extraction_payload, :traits, %{}) do
+    case Utils.nested_value(extraction_payload, :traits, %{}) do
       traits when is_map(traits) -> traits
       _ -> %{}
     end
@@ -1411,8 +1324,8 @@ defmodule Gallformers.Ingestions do
 
   defp extracted_trait_suggested_values(extracted_trait) do
     extracted_trait
-    |> nested_value(:suggested, [])
-    |> normalize_string_list()
+    |> Utils.nested_value(:suggested, [])
+    |> Utils.normalize_string_list()
   end
 
   defp extract_trait_raw_evidence(nil), do: []
@@ -1421,12 +1334,17 @@ defmodule Gallformers.Ingestions do
     extracted_trait
     |> case do
       trait when is_map(trait) ->
-        originals = nested_value(trait, :originals, nil)
+        originals = Utils.nested_value(trait, :originals, nil)
 
         cond do
-          is_list(originals) -> normalize_string_list(originals)
-          is_binary(nested_value(trait, :original, nil)) -> [nested_value(trait, :original, nil)]
-          true -> []
+          is_list(originals) ->
+            Utils.normalize_string_list(originals)
+
+          is_binary(Utils.nested_value(trait, :original, nil)) ->
+            [Utils.nested_value(trait, :original, nil)]
+
+          true ->
+            []
         end
 
       _ ->
@@ -1442,70 +1360,6 @@ defmodule Gallformers.Ingestions do
   end
 
   defp normalize_trait_review_values(_), do: %{}
-
-  defp normalize_indexed_values(values) when is_list(values), do: values
-
-  defp normalize_indexed_values(values) when is_map(values) do
-    values
-    |> Enum.map(fn {key, value} -> {parse_index_key(key), value} end)
-    |> Enum.sort_by(fn {index, _value} -> index end)
-    |> Enum.map(fn {_index, value} -> value end)
-  end
-
-  defp normalize_indexed_values(_), do: []
-
-  defp parse_index_key(key) when is_integer(key), do: key
-  defp parse_index_key(key) when is_binary(key), do: String.to_integer(key)
-
-  defp normalize_string_list(values) when is_list(values) do
-    values
-    |> Enum.flat_map(fn
-      value when is_binary(value) and value != "" -> [value]
-      _ -> []
-    end)
-    |> Enum.uniq()
-  end
-
-  defp normalize_string_list(value) when is_binary(value) and value != "", do: [value]
-  defp normalize_string_list(_), do: []
-
-  defp normalize_optional_string(nil), do: nil
-
-  defp normalize_optional_string(value) when is_binary(value),
-    do: normalize_optional_string(value, nil)
-
-  defp normalize_optional_string(value, fallback) when is_binary(value) do
-    if String.trim(value) == "" do
-      fallback
-    else
-      String.trim(value)
-    end
-  end
-
-  defp normalize_optional_string(_value, fallback), do: fallback
-
-  defp nested_value(map, key, default) when is_map(map) do
-    string_key =
-      case key do
-        value when is_atom(value) -> Atom.to_string(value)
-        value when is_binary(value) -> value
-      end
-
-    case Map.get(map, key) do
-      nil -> Map.get(map, string_key, default)
-      value -> value
-    end
-  end
-
-  defp nested_value(_map, _key, default), do: default
-
-  defp nested_integer(map, key) do
-    case nested_value(map, key, nil) do
-      value when is_integer(value) -> value
-      value when is_binary(value) and value != "" -> String.to_integer(value)
-      _ -> nil
-    end
-  end
 
   defp validate_submission_attrs(attrs) do
     changeset =
@@ -1556,8 +1410,8 @@ defmodule Gallformers.Ingestions do
 
   defp create_submission_record(attrs) do
     create_source_ingestion(%{
-      input_type: attr_value(attrs, :input_type),
-      uploaded_by_id: attr_value(attrs, :uploaded_by_id)
+      input_type: Utils.attr_value(attrs, :input_type),
+      uploaded_by_id: Utils.attr_value(attrs, :uploaded_by_id)
     })
   end
 
@@ -1584,7 +1438,7 @@ defmodule Gallformers.Ingestions do
   end
 
   defp maybe_filter_status(query, statuses) when is_list(statuses) do
-    normalized_statuses = Enum.map(statuses, &normalize_status/1)
+    normalized_statuses = Enum.map(statuses, &Utils.normalize_atom/1)
     from(source_ingestion in query, where: source_ingestion.status in ^normalized_statuses)
   end
 
@@ -1610,9 +1464,9 @@ defmodule Gallformers.Ingestions do
   defp maybe_preload(query, false), do: query
 
   defp put_default_stage_for_status(attrs, %SourceIngestion{processing_stage: processing_stage}) do
-    case attr_value(attrs, :processing_stage) do
+    case Utils.attr_value(attrs, :processing_stage) do
       nil ->
-        case attr_value(attrs, :status) do
+        case Utils.attr_value(attrs, :status) do
           "needs_duplicate_review" -> Map.put(attrs, :processing_stage, "duplicate_review")
           "needs_review" -> Map.put(attrs, :processing_stage, "review")
           "duplicate_confirmed" -> Map.put(attrs, :processing_stage, "duplicate_review")
@@ -1627,7 +1481,7 @@ defmodule Gallformers.Ingestions do
   end
 
   defp maybe_put_failed_at(attrs, "failed") do
-    case attr_value(attrs, :failed_at) do
+    case Utils.attr_value(attrs, :failed_at) do
       nil -> Map.put(attrs, :failed_at, now())
       _ -> attrs
     end
@@ -1638,7 +1492,7 @@ defmodule Gallformers.Ingestions do
   defp maybe_put_reviewed_at(attrs, nil), do: attrs
 
   defp maybe_put_reviewed_at(attrs, _reviewed_by_id) do
-    case attr_value(attrs, :reviewed_at) do
+    case Utils.attr_value(attrs, :reviewed_at) do
       nil -> Map.put(attrs, :reviewed_at, now())
       _ -> attrs
     end
@@ -1722,7 +1576,7 @@ defmodule Gallformers.Ingestions do
 
       canonical_source_ingestion_id =
         attrs
-        |> attr_value(:canonical_source_ingestion_id)
+        |> Utils.attr_value(:canonical_source_ingestion_id)
         |> case do
           nil -> duplicate_candidate.candidate_source_ingestion_id
           source_ingestion_id -> source_ingestion_id
@@ -1739,8 +1593,8 @@ defmodule Gallformers.Ingestions do
         duplicate_candidate
         |> DuplicateCandidate.changeset(%{
           status: candidate_status,
-          reviewed_by_id: attr_value(attrs, :reviewed_by_id),
-          reviewed_at: attr_value(attrs, :reviewed_at) || now()
+          reviewed_by_id: Utils.attr_value(attrs, :reviewed_by_id),
+          reviewed_at: Utils.attr_value(attrs, :reviewed_at) || now()
         })
         |> update_or_rollback()
 
@@ -1850,45 +1704,6 @@ defmodule Gallformers.Ingestions do
     end
   end
 
-  defp attr_value(attrs, key) do
-    # Look up by atom key first, then fall back to string key.
-    # Explicitly checks for nil to preserve false/0/"" values.
-    case Map.get(attrs, key) do
-      nil -> Map.get(attrs, Atom.to_string(key))
-      value -> value
-    end
-  end
-
-  defp normalize_status(status) when is_atom(status), do: Atom.to_string(status)
-  defp normalize_status(status) when is_binary(status), do: status
-
-  defp normalize_queue_row(queue_row) do
-    queue_row
-    |> Map.update(:pending_duplicate_candidates_count, 0, &(&1 || 0))
-    |> Map.update(:total_duplicate_candidates_count, 0, &(&1 || 0))
-    |> Map.update(:total_species_entries_count, 0, &(&1 || 0))
-    |> Map.update(:pending_species_entries_count, 0, &(&1 || 0))
-    |> Map.update(:resolved_species_entries_count, 0, &(&1 || 0))
-    |> Map.put(:display_title, display_title(queue_row))
-  end
-
-  defp display_title(%{title: title, input_type: input_type}) when title in [nil, ""] do
-    case input_type do
-      "url" -> "Untitled URL submission"
-      "text" -> "Untitled text submission"
-      "pdf" -> "Untitled PDF submission"
-      _ -> "Untitled submission"
-    end
-  end
-
-  defp display_title(%{title: title, input_type: input_type}) when is_binary(title) do
-    if String.trim(title) == "" do
-      display_title(%{title: nil, input_type: input_type})
-    else
-      title
-    end
-  end
-
   defp submission_types do
     %{
       input_type: :string,
@@ -1901,10 +1716,10 @@ defmodule Gallformers.Ingestions do
   end
 
   defp submission_artifact_spec(attrs) do
-    case attr_value(attrs, :input_type) do
-      "pdf" -> {"source.pdf", attr_value(attrs, :content), "application/pdf"}
-      "url" -> {"source.url", attr_value(attrs, :url), "text/plain"}
-      "text" -> {"source.txt", attr_value(attrs, :text), "text/plain"}
+    case Utils.attr_value(attrs, :input_type) do
+      "pdf" -> {"source.pdf", Utils.attr_value(attrs, :content), "application/pdf"}
+      "url" -> {"source.url", Utils.attr_value(attrs, :url), "text/plain"}
+      "text" -> {"source.txt", Utils.attr_value(attrs, :text), "text/plain"}
     end
   end
 
@@ -1966,7 +1781,7 @@ defmodule Gallformers.Ingestions do
   defp abandoned_source_ingestion?(%SourceIngestion{}), do: false
 
   defp retry_stage_for_failed_ingestion(%SourceIngestion{status: "failed"} = source_ingestion) do
-    case attr_value(source_ingestion, :error_stage) do
+    case Utils.attr_value(source_ingestion, :error_stage) do
       nil ->
         {:error, :missing_error_stage}
 
@@ -2045,107 +1860,6 @@ defmodule Gallformers.Ingestions do
     )
     |> Repo.one()
   end
-
-  defp queue_row_count(queue_row, field) do
-    queue_row
-    |> attr_value(field)
-    |> Kernel.||(0)
-  end
-
-  defp duplicate_candidate_review_view(duplicate_candidate) do
-    candidate_source_ingestion = duplicate_candidate.candidate_source_ingestion
-
-    %{
-      id: duplicate_candidate.id,
-      status: duplicate_candidate.status,
-      evidence_rows: duplicate_candidate_evidence_rows(duplicate_candidate.evidence),
-      candidate_source_ingestion_id: duplicate_candidate.candidate_source_ingestion_id,
-      candidate_title: candidate_source_ingestion.title,
-      candidate_display_title: display_title(candidate_source_ingestion),
-      candidate_authors: candidate_source_ingestion.authors,
-      candidate_year: candidate_source_ingestion.publication_year
-    }
-  end
-
-  defp duplicate_candidate_evidence_rows(evidence) when is_map(evidence) do
-    [
-      {"normalized_doi", "DOI match"},
-      {"preprocessed_text_sha256", "Exact normalized text match"},
-      {"normalized_title", "Title match"},
-      {"title_fingerprint", "Title fingerprint match"},
-      {"author_fingerprint", "Author overlap"},
-      {"publication_year", "Year match"},
-      {"similarity", "Text similarity"}
-    ]
-    |> Enum.flat_map(fn {key, label} ->
-      case Map.fetch(evidence, key) do
-        {:ok, value} -> [%{key: key, label: label, value: value}]
-        :error -> []
-      end
-    end)
-  end
-
-  defp duplicate_candidate_evidence_rows(_), do: []
-
-  defp species_entry_review_view(species_entry) do
-    %{
-      id: species_entry.id,
-      position: species_entry.position,
-      extracted_name: species_entry.extracted_name,
-      extracted_authority: species_entry.extracted_authority,
-      mapped_species_name: mapped_species_name(species_entry.species),
-      host_count: host_count(species_entry.extraction_payload),
-      status: species_entry.status
-    }
-  end
-
-  defp associated_source_review_view(nil), do: nil
-
-  defp associated_source_review_view(source) do
-    %{
-      id: source.id,
-      title: source.title,
-      author: source.author,
-      pubyear: source.pubyear
-    }
-  end
-
-  defp mapped_species_name(nil), do: nil
-  defp mapped_species_name(species), do: species.name
-
-  defp host_count(%{"hosts" => hosts}) when is_list(hosts), do: length(hosts)
-  defp host_count(%{hosts: hosts}) when is_list(hosts), do: length(hosts)
-  defp host_count(_), do: 0
-
-  defp review_queue_status_label(queue_row) do
-    total_species_entries_count = queue_row_count(queue_row, :total_species_entries_count)
-    pending_species_entries_count = queue_row_count(queue_row, :pending_species_entries_count)
-
-    if total_species_entries_count == 0 or is_nil(attr_value(queue_row, :source_id)) do
-      "Needs source review"
-    else
-      "#{pending_species_entries_count} of #{total_species_entries_count} galls remaining"
-    end
-  end
-
-  defp failed_queue_status_label(queue_row) do
-    failed_stage =
-      [attr_value(queue_row, :error_stage), processing_stage_label(queue_row)]
-      |> Enum.find(&meaningful_failed_stage?/1)
-
-    if failed_stage do
-      "Failed at #{failed_stage}"
-    else
-      "Failed"
-    end
-  end
-
-  defp meaningful_failed_stage?(stage) when is_binary(stage) do
-    trimmed_stage = String.trim(stage)
-    trimmed_stage != "" and trimmed_stage != "failed"
-  end
-
-  defp meaningful_failed_stage?(_stage), do: false
 
   defp worker_module do
     :gallformers

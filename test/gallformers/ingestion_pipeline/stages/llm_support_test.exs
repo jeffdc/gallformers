@@ -72,12 +72,16 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMSupportTest do
   describe "extract_json_array/1" do
     test "parses raw JSON array" do
       json = ~s([{"name": "Test"}, {"name": "Test2"}])
-      assert {:ok, [%{"name" => "Test"}, %{"name" => "Test2"}]} = LLMSupport.extract_json_array(json)
+
+      assert {:ok, [%{"name" => "Test"}, %{"name" => "Test2"}]} =
+               LLMSupport.extract_json_array(json)
     end
 
     test "parses fenced JSON array" do
       fenced = ~s(```json\n[{"name": "Test"}, {"name": "Test2"}]\n```)
-      assert {:ok, [%{"name" => "Test"}, %{"name" => "Test2"}]} = LLMSupport.extract_json_array(fenced)
+
+      assert {:ok, [%{"name" => "Test"}, %{"name" => "Test2"}]} =
+               LLMSupport.extract_json_array(fenced)
     end
 
     test "handles preamble before JSON array" do

@@ -9,6 +9,7 @@ defmodule Gallformers.IngestionsTest do
   alias Gallformers.Sources
   alias Gallformers.Species.Species
   alias Gallformers.Storage.SourceArtifacts
+  alias GallformersWeb.Admin.IngestionReviewLive.Presenter
 
   defmodule SubmissionStorageBackendStub do
     @behaviour Gallformers.Storage.SourceArtifacts.Backend
@@ -762,7 +763,6 @@ defmodule Gallformers.IngestionsTest do
       assert Enum.find(rows, &(&1.id == review_ready.id)) == %{
                id: review_ready.id,
                title: nil,
-               display_title: "Untitled URL submission",
                input_type: "url",
                status: "needs_review",
                processing_stage: "review",
@@ -839,12 +839,12 @@ defmodule Gallformers.IngestionsTest do
 
   describe "queue_status_label/1" do
     test "returns the expected labels across queue states" do
-      assert Ingestions.queue_status_label(%{
+      assert Presenter.queue_status_label(%{
                status: "needs_duplicate_review",
                processing_stage: "duplicate_review"
              }) == "Needs duplicate review"
 
-      assert Ingestions.queue_status_label(%{
+      assert Presenter.queue_status_label(%{
                status: "needs_review",
                processing_stage: "review",
                source_id: nil,
@@ -852,7 +852,7 @@ defmodule Gallformers.IngestionsTest do
                pending_species_entries_count: 0
              }) == "Needs source review"
 
-      assert Ingestions.queue_status_label(%{
+      assert Presenter.queue_status_label(%{
                status: "needs_review",
                processing_stage: "review",
                source_id: 12,
@@ -860,7 +860,7 @@ defmodule Gallformers.IngestionsTest do
                pending_species_entries_count: 3
              }) == "3 of 4 galls remaining"
 
-      assert Ingestions.queue_status_label(%{
+      assert Presenter.queue_status_label(%{
                status: "needs_review",
                processing_stage: "review",
                source_id: 12,
@@ -868,45 +868,45 @@ defmodule Gallformers.IngestionsTest do
                pending_species_entries_count: 0
              }) == "0 of 4 galls remaining"
 
-      assert Ingestions.queue_status_label(%{
+      assert Presenter.queue_status_label(%{
                status: "complete",
                processing_stage: "complete"
              }) == "Complete"
 
-      assert Ingestions.queue_status_label(%{
+      assert Presenter.queue_status_label(%{
                status: "duplicate_confirmed",
                processing_stage: "duplicate_review"
              }) == "Duplicate confirmed"
 
-      assert Ingestions.queue_status_label(%{
+      assert Presenter.queue_status_label(%{
                status: "failed",
                processing_stage: "failed",
                error_stage: "metadata"
              }) == "Failed at metadata"
 
-      assert Ingestions.queue_status_label(%{
+      assert Presenter.queue_status_label(%{
                status: "failed",
                processing_stage: "failed",
                error_stage: nil
              }) == "Failed"
 
-      assert Ingestions.queue_status_label(%{
+      assert Presenter.queue_status_label(%{
                status: "failed",
                processing_stage: "metadata",
                error_stage: nil
              }) == "Failed at metadata"
 
-      assert Ingestions.queue_status_label(%{
+      assert Presenter.queue_status_label(%{
                status: "processing",
                processing_stage: "extract"
              }) == "Processing: preprocess"
 
-      assert Ingestions.queue_status_label(%{
+      assert Presenter.queue_status_label(%{
                status: "processing",
                processing_stage: "metadata"
              }) == "Processing: data_extract"
 
-      assert Ingestions.processing_stage_label(%{
+      assert Presenter.processing_stage_label(%{
                status: "processing",
                processing_stage: "metadata"
              }) == "data_extract"

@@ -107,7 +107,7 @@ defmodule Gallformers.IngestionPipeline.Stages.Preprocess do
       |> Enum.map(&String.trim/1)
       |> Enum.find(fn line ->
         String.length(line) >= 20 and
-          not Gallformers.Utilities.all_caps?(line) and
+          not Gallformers.Utils.all_caps?(line) and
           not Regex.match?(~r/^\d+$/, line) and
           not Regex.match?(doi_regex, line)
       end)

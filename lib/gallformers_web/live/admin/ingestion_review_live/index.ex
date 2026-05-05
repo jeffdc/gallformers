@@ -3,6 +3,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
 
   alias Gallformers.Accounts
   alias Gallformers.Ingestions
+  alias GallformersWeb.Admin.IngestionReviewLive.Presenter
 
   @pdf_upload_name :pdf
 
@@ -290,7 +291,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
               </:col>
 
               <:col :let={row} label="Status">
-                {Ingestions.queue_status_label(row)}
+                {Presenter.queue_status_label(row)}
               </:col>
 
               <:col :let={row} label="Uploaded">
@@ -328,7 +329,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
     assign(
       socket,
       :queue_rows,
-      Ingestions.list_source_ingestion_queue_rows(queue_row_opts(socket))
+      Presenter.list_source_ingestion_queue_rows(queue_row_opts(socket))
     )
   end
 
