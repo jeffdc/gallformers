@@ -26,10 +26,12 @@ defmodule Gallformers.Ingestions do
   import Ecto.Changeset, only: [add_error: 3]
   import Ecto.Query
 
-  alias Gallformers.IngestionPipeline.{Storage, Workflow}
+  alias Gallformers.IngestionPipeline.Workflow
 
   alias Gallformers.Ingestions.{
     DuplicateCandidate,
+    DuplicateReview,
+    Lifecycle,
     SourceIngestion,
     SourceIngestionCreation,
     SourceIngestionSpecies,
@@ -40,25 +42,6 @@ defmodule Gallformers.Ingestions do
   alias Gallformers.Sources.Source
   alias Gallformers.Species, as: SpeciesContext
   alias Gallformers.Utils
-
-  @ordered_duplicate_candidates_query from(duplicate_candidate in DuplicateCandidate,
-                                        order_by: [
-                                          asc:
-                                            fragment(
-                                              """
-                                              CASE ?
-                                                WHEN 'pending' THEN 0
-                                                WHEN 'auto_confirmed' THEN 1
-                                                WHEN 'confirmed' THEN 2
-                                                WHEN 'rejected' THEN 3
-                                                ELSE 4
-                                              END
-                                              """,
-                                              duplicate_candidate.status
-                                            ),
-                                          asc: duplicate_candidate.inserted_at
-                                        ]
-                                      )
 
   @ordered_species_entries_query from(source_ingestion_species in SourceIngestionSpecies,
                                    order_by: source_ingestion_species.position
@@ -84,7 +67,7 @@ defmodule Gallformers.Ingestions do
     :uploaded_by,
     :duplicate_of_source_ingestion,
     duplicate_candidates:
-      {@ordered_duplicate_candidates_query, [:candidate_source_ingestion, :reviewed_by]},
+      {DuplicateReview.ordered_candidates_query(), [:candidate_source_ingestion, :reviewed_by]},
     species_entries: {@ordered_species_entries_query, [:species, :reviewed_by]}
   ]
 
@@ -434,13 +417,11 @@ defmodule Gallformers.Ingestions do
   @spec clear_source_ingestion(SourceIngestion.t() | integer()) ::
           {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t() | term()}
   def clear_source_ingestion(%SourceIngestion{} = source_ingestion) do
-    do_clear_source_ingestion(source_ingestion)
+    Lifecycle.clear_source_ingestion(source_ingestion)
   end
 
   def clear_source_ingestion(source_ingestion_id) when is_integer(source_ingestion_id) do
-    source_ingestion_id
-    |> get_source_ingestion!()
-    |> do_clear_source_ingestion()
+    Lifecycle.clear_source_ingestion(source_ingestion_id)
   end
 
   @doc """
@@ -449,22 +430,11 @@ defmodule Gallformers.Ingestions do
   @spec source_ingestion_clearability(SourceIngestion.t() | integer()) ::
           :failed | :abandoned | nil
   def source_ingestion_clearability(%SourceIngestion{} = source_ingestion) do
-    cond do
-      source_ingestion.status == "failed" ->
-        :failed
-
-      abandoned_source_ingestion?(source_ingestion) ->
-        :abandoned
-
-      true ->
-        nil
-    end
+    Lifecycle.source_ingestion_clearability(source_ingestion)
   end
 
   def source_ingestion_clearability(source_ingestion_id) when is_integer(source_ingestion_id) do
-    source_ingestion_id
-    |> get_source_ingestion!()
-    |> source_ingestion_clearability()
+    Lifecycle.source_ingestion_clearability(source_ingestion_id)
   end
 
   @doc """
@@ -473,10 +443,7 @@ defmodule Gallformers.Ingestions do
   @spec delete_failed_source_ingestion(SourceIngestion.t() | integer()) ::
           {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t() | term()}
   def delete_failed_source_ingestion(source_ingestion) do
-    case source_ingestion_clearability(source_ingestion) do
-      :failed -> clear_source_ingestion(source_ingestion)
-      _ -> {:error, clear_source_ingestion_changeset(source_ingestion)}
-    end
+    Lifecycle.delete_failed_source_ingestion(source_ingestion)
   end
 
   @doc """
@@ -488,38 +455,11 @@ defmodule Gallformers.Ingestions do
   @spec retry_failed_source_ingestion(SourceIngestion.t() | integer()) ::
           {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t()}
   def retry_failed_source_ingestion(%SourceIngestion{} = source_ingestion) do
-    case retry_stage_for_failed_ingestion(source_ingestion) do
-      {:ok, retry_stage} ->
-        transition_source_ingestion_status(source_ingestion, :processing, %{
-          processing_stage: retry_stage,
-          error_stage: nil,
-          error_message: nil,
-          failed_at: nil
-        })
-
-      {:error, :not_failed} ->
-        {:error, retry_failed_source_ingestion_changeset(source_ingestion, "must be failed")}
-
-      {:error, :missing_error_stage} ->
-        {:error,
-         retry_failed_source_ingestion_changeset(
-           source_ingestion,
-           "must record the failed stage before retrying"
-         )}
-
-      {:error, :unknown_error_stage} ->
-        {:error,
-         retry_failed_source_ingestion_changeset(
-           source_ingestion,
-           "has an unknown failed stage and cannot be retried"
-         )}
-    end
+    Lifecycle.retry_failed_source_ingestion(source_ingestion)
   end
 
   def retry_failed_source_ingestion(source_ingestion_id) when is_integer(source_ingestion_id) do
-    source_ingestion_id
-    |> get_source_ingestion!()
-    |> retry_failed_source_ingestion()
+    Lifecycle.retry_failed_source_ingestion(source_ingestion_id)
   end
 
   @doc """
@@ -527,7 +467,7 @@ defmodule Gallformers.Ingestions do
   """
   @spec change_duplicate_candidate(DuplicateCandidate.t(), map()) :: Ecto.Changeset.t()
   def change_duplicate_candidate(%DuplicateCandidate{} = duplicate_candidate, attrs \\ %{}) do
-    DuplicateCandidate.changeset(duplicate_candidate, attrs)
+    DuplicateReview.change_duplicate_candidate(duplicate_candidate, attrs)
   end
 
   @doc """
@@ -535,17 +475,11 @@ defmodule Gallformers.Ingestions do
   """
   @spec list_duplicate_candidates(SourceIngestion.t() | integer()) :: [DuplicateCandidate.t()]
   def list_duplicate_candidates(%SourceIngestion{id: source_ingestion_id}) do
-    list_duplicate_candidates(source_ingestion_id)
+    DuplicateReview.list_duplicate_candidates(source_ingestion_id)
   end
 
   def list_duplicate_candidates(source_ingestion_id) when is_integer(source_ingestion_id) do
-    @ordered_duplicate_candidates_query
-    |> where(
-      [duplicate_candidate],
-      duplicate_candidate.source_ingestion_id == ^source_ingestion_id
-    )
-    |> Repo.all()
-    |> Repo.preload([:reviewed_by, :candidate_source_ingestion])
+    DuplicateReview.list_duplicate_candidates(source_ingestion_id)
   end
 
   @doc """
@@ -553,9 +487,7 @@ defmodule Gallformers.Ingestions do
   """
   @spec get_duplicate_candidate!(integer()) :: DuplicateCandidate.t()
   def get_duplicate_candidate!(duplicate_candidate_id) when is_integer(duplicate_candidate_id) do
-    DuplicateCandidate
-    |> Repo.get!(duplicate_candidate_id)
-    |> Repo.preload([:reviewed_by, :candidate_source_ingestion])
+    DuplicateReview.get_duplicate_candidate!(duplicate_candidate_id)
   end
 
   @doc """
@@ -564,23 +496,19 @@ defmodule Gallformers.Ingestions do
   @spec create_duplicate_candidate(SourceIngestion.t(), SourceIngestion.t(), map()) ::
           {:ok, DuplicateCandidate.t()} | {:error, Ecto.Changeset.t()}
   def create_duplicate_candidate(
-        %SourceIngestion{id: source_ingestion_id},
-        %SourceIngestion{id: candidate_source_ingestion_id},
+        %SourceIngestion{} = source_ingestion,
+        %SourceIngestion{} = candidate_source_ingestion,
         attrs \\ %{}
       ) do
-    attrs =
+    DuplicateReview.create_duplicate_candidate(
+      source_ingestion,
+      candidate_source_ingestion,
       attrs
-      |> Map.new()
-      |> Map.put(:source_ingestion_id, source_ingestion_id)
-      |> Map.put(:candidate_source_ingestion_id, candidate_source_ingestion_id)
-
-    create_duplicate_candidate(attrs)
+    )
   end
 
   def create_duplicate_candidate(attrs) do
-    %DuplicateCandidate{}
-    |> DuplicateCandidate.changeset(attrs)
-    |> Repo.insert()
+    DuplicateReview.create_duplicate_candidate(attrs)
   end
 
   @doc """
@@ -590,21 +518,7 @@ defmodule Gallformers.Ingestions do
           {:ok, %{candidate: DuplicateCandidate.t(), source_ingestion: SourceIngestion.t()}}
           | {:error, Ecto.Changeset.t()}
   def confirm_duplicate_candidate(%DuplicateCandidate{} = duplicate_candidate, attrs \\ %{}) do
-    attrs = Map.new(attrs)
-
-    candidate_status =
-      Utils.normalize_atom(Utils.attr_value(attrs, :status) || "confirmed")
-
-    case candidate_status do
-      status when status in ["confirmed", "auto_confirmed"] ->
-        do_confirm_duplicate_candidate(duplicate_candidate, attrs, candidate_status)
-
-      _ ->
-        {:error,
-         duplicate_candidate
-         |> DuplicateCandidate.changeset(%{})
-         |> add_error(:status, "must be confirmed or auto_confirmed")}
-    end
+    DuplicateReview.confirm_duplicate_candidate(duplicate_candidate, attrs)
   end
 
   @doc """
@@ -615,42 +529,7 @@ defmodule Gallformers.Ingestions do
           {:ok, %{candidate: DuplicateCandidate.t(), source_ingestion: SourceIngestion.t()}}
           | {:error, Ecto.Changeset.t()}
   def reject_duplicate_candidate(%DuplicateCandidate{} = duplicate_candidate, attrs \\ %{}) do
-    attrs = Map.new(attrs)
-
-    Repo.transaction(fn ->
-      source_ingestion =
-        duplicate_candidate.source_ingestion_id
-        |> lock_source_ingestion_for_duplicate_review!()
-        |> ensure_duplicate_review_open!()
-
-      duplicate_candidate =
-        duplicate_candidate.id
-        |> lock_duplicate_candidate!()
-        |> ensure_pending_duplicate_candidate!()
-
-      updated_candidate =
-        duplicate_candidate
-        |> DuplicateCandidate.changeset(%{
-          status: "rejected",
-          reviewed_by_id: Utils.attr_value(attrs, :reviewed_by_id),
-          reviewed_at: Utils.attr_value(attrs, :reviewed_at) || now()
-        })
-        |> update_or_rollback()
-
-      updated_source_ingestion =
-        if no_pending_duplicate_candidates?(source_ingestion.id) do
-          source_ingestion
-          |> transition_source_ingestion_workflow(:duplicate_rejected_resume)
-          |> update_result_or_rollback()
-        else
-          source_ingestion
-        end
-
-      %{
-        candidate: Repo.preload(updated_candidate, [:reviewed_by, :candidate_source_ingestion]),
-        source_ingestion: updated_source_ingestion
-      }
-    end)
+    DuplicateReview.reject_duplicate_candidate(duplicate_candidate, attrs)
   end
 
   @doc """
@@ -1466,285 +1345,7 @@ defmodule Gallformers.Ingestions do
     |> Keyword.get(:orchestration_lock_timeout, :timer.minutes(5))
   end
 
-  defp update_result_or_rollback({:ok, result}), do: result
-  defp update_result_or_rollback({:error, reason}), do: Repo.rollback(reason)
-
-  defp no_pending_duplicate_candidates?(source_ingestion_id) do
-    # Lock pending candidates to prevent race conditions with concurrent insertions.
-    # We select IDs with FOR UPDATE rather than using aggregate count (which doesn't support locking).
-    pending_ids =
-      from(duplicate_candidate in DuplicateCandidate,
-        where:
-          duplicate_candidate.source_ingestion_id == ^source_ingestion_id and
-            duplicate_candidate.status == "pending",
-        select: duplicate_candidate.id,
-        lock: "FOR UPDATE"
-      )
-      |> Repo.all()
-
-    Enum.empty?(pending_ids)
-  end
-
-  defp do_confirm_duplicate_candidate(duplicate_candidate, attrs, candidate_status) do
-    Repo.transaction(fn ->
-      source_ingestion =
-        duplicate_candidate.source_ingestion_id
-        |> lock_source_ingestion_for_duplicate_review!()
-        |> ensure_duplicate_review_open!()
-
-      duplicate_candidate =
-        duplicate_candidate.id
-        |> lock_duplicate_candidate!()
-        |> ensure_pending_duplicate_candidate!()
-
-      canonical_source_ingestion_id =
-        attrs
-        |> Utils.attr_value(:canonical_source_ingestion_id)
-        |> case do
-          nil -> duplicate_candidate.candidate_source_ingestion_id
-          source_ingestion_id -> source_ingestion_id
-        end
-        |> resolve_canonical_source_ingestion_id()
-
-      ensure_not_self_duplicate!(
-        duplicate_candidate,
-        source_ingestion,
-        canonical_source_ingestion_id
-      )
-
-      updated_candidate =
-        duplicate_candidate
-        |> DuplicateCandidate.changeset(%{
-          status: candidate_status,
-          reviewed_by_id: Utils.attr_value(attrs, :reviewed_by_id),
-          reviewed_at: Utils.attr_value(attrs, :reviewed_at) || now()
-        })
-        |> update_or_rollback()
-
-      updated_source_ingestion =
-        source_ingestion
-        |> transition_source_ingestion_workflow(:duplicate_confirmed, %{
-          duplicate_of_source_ingestion_id: canonical_source_ingestion_id
-        })
-        |> update_result_or_rollback()
-
-      %{
-        candidate: Repo.preload(updated_candidate, [:reviewed_by, :candidate_source_ingestion]),
-        source_ingestion: updated_source_ingestion
-      }
-    end)
-  end
-
-  defp lock_source_ingestion_for_duplicate_review!(source_ingestion_id) do
-    from(source_ingestion in SourceIngestion,
-      where: source_ingestion.id == ^source_ingestion_id,
-      lock: "FOR UPDATE"
-    )
-    |> Repo.one!()
-  end
-
-  defp lock_duplicate_candidate!(duplicate_candidate_id) do
-    from(duplicate_candidate in DuplicateCandidate,
-      where: duplicate_candidate.id == ^duplicate_candidate_id,
-      lock: "FOR UPDATE"
-    )
-    |> Repo.one!()
-  end
-
-  defp ensure_duplicate_review_open!(
-         %SourceIngestion{status: "needs_duplicate_review"} =
-           source_ingestion
-       ) do
-    source_ingestion
-  end
-
-  defp ensure_duplicate_review_open!(%SourceIngestion{} = source_ingestion) do
-    Repo.rollback(
-      source_ingestion
-      |> SourceIngestion.changeset(%{})
-      |> add_error(:status, "duplicate review is no longer pending")
-    )
-  end
-
-  defp ensure_pending_duplicate_candidate!(
-         %DuplicateCandidate{status: "pending"} =
-           duplicate_candidate
-       ) do
-    duplicate_candidate
-  end
-
-  defp ensure_pending_duplicate_candidate!(%DuplicateCandidate{} = duplicate_candidate) do
-    Repo.rollback(
-      duplicate_candidate
-      |> DuplicateCandidate.changeset(%{})
-      |> add_error(:status, "duplicate candidate is no longer pending")
-    )
-  end
-
-  defp ensure_not_self_duplicate!(
-         duplicate_candidate,
-         source_ingestion,
-         canonical_source_ingestion_id
-       ) do
-    if canonical_source_ingestion_id == source_ingestion.id do
-      Repo.rollback(
-        duplicate_candidate
-        |> DuplicateCandidate.changeset(%{})
-        |> add_error(
-          :candidate_source_ingestion_id,
-          "cannot confirm a source ingestion as a duplicate of itself"
-        )
-      )
-    end
-  end
-
-  defp resolve_canonical_source_ingestion_id(source_ingestion_id) do
-    do_resolve_canonical_source_ingestion_id(source_ingestion_id, [])
-  end
-
-  @spec do_resolve_canonical_source_ingestion_id(integer() | nil, [integer()]) :: integer() | nil
-  defp do_resolve_canonical_source_ingestion_id(source_ingestion_id, visited_ids) do
-    cond do
-      is_nil(source_ingestion_id) ->
-        nil
-
-      source_ingestion_id in visited_ids ->
-        source_ingestion_id
-
-      true ->
-        visited_ids = [source_ingestion_id | visited_ids]
-
-        case Repo.get(SourceIngestion, source_ingestion_id) do
-          %SourceIngestion{duplicate_of_source_ingestion_id: nil} ->
-            source_ingestion_id
-
-          %SourceIngestion{duplicate_of_source_ingestion_id: canonical_source_ingestion_id} ->
-            do_resolve_canonical_source_ingestion_id(canonical_source_ingestion_id, visited_ids)
-
-          nil ->
-            source_ingestion_id
-        end
-    end
-  end
-
-  defp do_clear_source_ingestion(%SourceIngestion{} = source_ingestion) do
-    case source_ingestion_clearability(source_ingestion) do
-      clearability when clearability in [:failed, :abandoned] ->
-        do_delete_source_ingestion(source_ingestion)
-
-      nil ->
-        {:error, clear_source_ingestion_changeset(source_ingestion)}
-    end
-  end
-
-  defp do_delete_source_ingestion(%SourceIngestion{} = source_ingestion) do
-    with :ok <- Storage.delete_artifacts_for_ingestion(source_ingestion.id) do
-      Repo.delete(source_ingestion)
-    end
-  end
-
-  defp clear_source_ingestion_changeset(%SourceIngestion{} = source_ingestion) do
-    source_ingestion
-    |> change_source_ingestion(%{})
-    |> add_error(:status, "only failed or abandoned ingestions can be cleared")
-  end
-
-  defp retry_failed_source_ingestion_changeset(
-         %SourceIngestion{} = source_ingestion,
-         message
-       ) do
-    source_ingestion
-    |> change_source_ingestion(%{})
-    |> add_error(:status, message)
-  end
-
-  defp abandoned_source_ingestion?(%SourceIngestion{
-         id: source_ingestion_id,
-         status: "processing"
-       }) do
-    not active_worker_job_exists?(source_ingestion_id) and
-      latest_worker_state_for_ingestion(source_ingestion_id) in ["discarded", "cancelled"]
-  end
-
-  defp abandoned_source_ingestion?(%SourceIngestion{}), do: false
-
-  defp retry_stage_for_failed_ingestion(%SourceIngestion{status: "failed"} = source_ingestion) do
-    source_ingestion
-    |> Utils.attr_value(:error_stage)
-    |> retry_stage_for_error_stage(source_ingestion)
-  end
-
-  defp retry_stage_for_failed_ingestion(%SourceIngestion{}), do: {:error, :not_failed}
-
-  defp retry_stage_for_error_stage(nil, _source_ingestion), do: {:error, :missing_error_stage}
-  defp retry_stage_for_error_stage("extract", _source_ingestion), do: {:ok, "submitted"}
-  defp retry_stage_for_error_stage("preprocess", _source_ingestion), do: {:ok, "extract"}
-  defp retry_stage_for_error_stage("hash_and_dedup", _source_ingestion), do: {:ok, "preprocess"}
-
-  defp retry_stage_for_error_stage("llm_clean", source_ingestion),
-    do: {:ok, llm_clean_retry_stage(source_ingestion)}
-
-  defp retry_stage_for_error_stage("metadata", _source_ingestion), do: {:ok, "llm_clean"}
-  defp retry_stage_for_error_stage("data_extract", _source_ingestion), do: {:ok, "metadata"}
-  defp retry_stage_for_error_stage("assemble", _source_ingestion), do: {:ok, "data_extract"}
-  defp retry_stage_for_error_stage("upload", _source_ingestion), do: {:ok, "assemble"}
-
-  defp retry_stage_for_error_stage(_error_stage, _source_ingestion),
-    do: {:error, :unknown_error_stage}
-
-  defp llm_clean_retry_stage(%SourceIngestion{id: source_ingestion_id}) do
-    if duplicate_candidates_exist?(source_ingestion_id) do
-      "duplicate_review"
-    else
-      "hash_and_dedup"
-    end
-  end
-
-  defp duplicate_candidates_exist?(source_ingestion_id) when is_integer(source_ingestion_id) do
-    from(duplicate_candidate in DuplicateCandidate,
-      where: duplicate_candidate.source_ingestion_id == ^source_ingestion_id
-    )
-    |> Repo.exists?()
-  end
-
-  defp active_worker_job_exists?(source_ingestion_id) do
-    from(job in "oban_jobs",
-      where:
-        field(job, :worker) == ^"Gallformers.IngestionPipeline.Worker" and
-          field(job, :state) in ^["available", "scheduled", "executing", "retryable"] and
-          fragment(
-            "?->>'ingestion_id' = ?",
-            field(job, :args),
-            ^Integer.to_string(source_ingestion_id)
-          )
-    )
-    |> Repo.exists?()
-  end
-
-  defp latest_worker_state_for_ingestion(source_ingestion_id) do
-    from(job in "oban_jobs",
-      where:
-        field(job, :worker) == ^"Gallformers.IngestionPipeline.Worker" and
-          fragment(
-            "?->>'ingestion_id' = ?",
-            field(job, :args),
-            ^Integer.to_string(source_ingestion_id)
-          ),
-      order_by: [desc: field(job, :inserted_at), desc: field(job, :id)],
-      limit: 1,
-      select: field(job, :state)
-    )
-    |> Repo.one()
-  end
-
   defp now do
     DateTime.utc_now() |> DateTime.truncate(:second)
-  end
-
-  defp update_or_rollback(changeset) do
-    case Repo.update(changeset) do
-      {:ok, record} -> record
-      {:error, changeset} -> Repo.rollback(changeset)
-    end
   end
 end
