@@ -54,39 +54,10 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMSupport do
   """
   @spec extract_json_array(String.t()) :: {:ok, list(map())} | {:error, :invalid_json}
   def extract_json_array(raw_response) when is_binary(raw_response) do
-    # Strip fences first
-    candidate = strip_fenced_json(raw_response)
-
-    # If no fence, find the first '['
-    candidate =
-      if String.starts_with?(candidate, "[") do
-        candidate
-      else
-        trim_to_json_start(candidate, "[")
-      end
-
-    # Try parsing as-is
-    case Jason.decode(candidate) do
-      {:ok, result} when is_list(result) ->
-        {:ok, result}
-
-      {:ok, result} when is_map(result) ->
-        {:ok, [result]}
-
-      {:error, _} ->
-        # Truncated JSON — find the last complete object and close the array
-        case find_last_complete_object(candidate) do
-          nil ->
-            {:error, :invalid_json}
-
-          repaired ->
-            case Jason.decode(repaired) do
-              {:ok, result} when is_list(result) -> {:ok, result}
-              {:ok, result} when is_map(result) -> {:ok, [result]}
-              {:error, _} -> {:error, :invalid_json}
-            end
-        end
-    end
+    raw_response
+    |> strip_fenced_json()
+    |> trim_to_json_start("[")
+    |> decode_json_array_candidate()
   end
 
   @doc """
@@ -97,157 +68,117 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMSupport do
   """
   @spec extract_json_object(String.t()) :: {:ok, map()} | {:error, :invalid_json}
   def extract_json_object(raw_response) when is_binary(raw_response) do
-    # Strip fences first
-    candidate = strip_fenced_json(raw_response)
+    raw_response
+    |> strip_fenced_json()
+    |> trim_to_json_start("{")
+    |> decode_json_object_candidate()
+  end
 
-    # If no fence, find the first '{'
-    candidate =
-      if String.starts_with?(candidate, "{") do
-        candidate
-      else
-        trim_to_json_start(candidate, "{")
+  # Finds the first occurrence of a character and returns substring from there
+  defp trim_to_json_start(candidate, char) do
+    if String.starts_with?(candidate, char) do
+      candidate
+    else
+      case :binary.match(candidate, char) do
+        :nomatch -> candidate
+        {pos, _len} -> String.slice(candidate, pos, String.length(candidate) - pos)
       end
+    end
+  end
 
-    # Try parsing as-is
+  defp decode_json_array_candidate(candidate) do
+    case decode_array_or_wrapped_object(candidate) do
+      {:ok, result} -> {:ok, result}
+      {:error, :invalid_json} -> decode_repaired_json_array(candidate)
+    end
+  end
+
+  defp decode_array_or_wrapped_object(candidate) do
+    case Jason.decode(candidate) do
+      {:ok, result} when is_list(result) -> {:ok, result}
+      {:ok, result} when is_map(result) -> {:ok, [result]}
+      {:error, _} -> {:error, :invalid_json}
+    end
+  end
+
+  defp decode_repaired_json_array(candidate) do
+    candidate
+    |> find_last_complete_object()
+    |> case do
+      nil -> {:error, :invalid_json}
+      repaired -> decode_array_or_wrapped_object(repaired)
+    end
+  end
+
+  defp decode_json_object_candidate(candidate) do
     case Jason.decode(candidate) do
       {:ok, result} when is_map(result) ->
         {:ok, result}
 
       {:error, _} ->
-        # Truncated JSON — try progressively closing open structures
-        closers = [~s'"}', ~s'"}]', ~s'"]}', ~s'"]}}', "}", " ]}"]
-
-        Enum.reduce_while(closers, {:error, :invalid_json}, fn suffix, _acc ->
-          case Jason.decode(candidate <> suffix) do
-            {:ok, result} when is_map(result) -> {:halt, {:ok, result}}
-            _ -> {:cont, {:error, :invalid_json}}
-          end
-        end)
+        decode_truncated_json_object(candidate)
     end
   end
 
-  # Finds the first occurrence of a character and returns substring from there
-  defp trim_to_json_start(candidate, char) do
-    case :binary.match(candidate, char) do
-      :nomatch -> candidate
-      {pos, _len} -> String.slice(candidate, pos, String.length(candidate) - pos)
-    end
+  defp decode_truncated_json_object(candidate) do
+    closers = [~s'"}', ~s'"}]', ~s'"]}', ~s'"]}}', "}", " ]}"]
+
+    Enum.reduce_while(closers, {:error, :invalid_json}, fn suffix, _acc ->
+      case Jason.decode(candidate <> suffix) do
+        {:ok, result} when is_map(result) -> {:halt, {:ok, result}}
+        _ -> {:cont, {:error, :invalid_json}}
+      end
+    end)
   end
 
   # Find the last complete top-level object in a truncated JSON array.
   # Uses brace depth tracking to find where top-level objects end.
   defp find_last_complete_object(candidate) do
-    chars = String.graphemes(candidate)
-    do_find_last_complete_object(chars, candidate, 0, false, false, 0, -1)
+    initial_state = %{depth: 0, in_string: false, escape: false, index: 0, last_obj_end: -1}
+
+    candidate
+    |> String.graphemes()
+    |> Enum.reduce(initial_state, &scan_array_char/2)
+    |> Map.fetch!(:last_obj_end)
+    |> finalize_truncated_array(candidate)
   end
 
-  defp do_find_last_complete_object(
-         [],
-         candidate,
-         _depth,
-         _in_string,
-         _escape,
-         _index,
-         last_obj_end
-       ),
-       do: finalize_truncated_array(candidate, last_obj_end)
+  defp scan_array_char(_char, %{escape: true} = state),
+    do: advance_scan_state(%{state | escape: false})
 
-  defp do_find_last_complete_object(
-         [char | rest],
-         candidate,
-         depth,
-         in_string,
-         escape,
-         index,
-         last_obj_end
-       ) do
-    cond do
-      escape ->
-        do_find_last_complete_object(
-          rest,
-          candidate,
-          depth,
-          in_string,
-          false,
-          index + 1,
-          last_obj_end
-        )
+  defp scan_array_char("\\", %{in_string: true} = state),
+    do: advance_scan_state(%{state | escape: true})
 
-      char == "\\" and in_string ->
-        do_find_last_complete_object(
-          rest,
-          candidate,
-          depth,
-          in_string,
-          true,
-          index + 1,
-          last_obj_end
-        )
+  defp scan_array_char("\"", state),
+    do: advance_scan_state(%{state | in_string: not state.in_string, escape: false})
 
-      char == "\"" and not escape ->
-        do_find_last_complete_object(
-          rest,
-          candidate,
-          depth,
-          not in_string,
-          false,
-          index + 1,
-          last_obj_end
-        )
+  defp scan_array_char(_char, %{in_string: true} = state), do: advance_scan_state(state)
 
-      in_string ->
-        do_find_last_complete_object(
-          rest,
-          candidate,
-          depth,
-          in_string,
-          false,
-          index + 1,
-          last_obj_end
-        )
+  defp scan_array_char(char, state) when char in ["[", "{"],
+    do: advance_scan_state(%{state | depth: state.depth + 1})
 
-      char == "[" or char == "{" ->
-        do_find_last_complete_object(
-          rest,
-          candidate,
-          depth + 1,
-          in_string,
-          false,
-          index + 1,
-          last_obj_end
-        )
+  defp scan_array_char("}", state) do
+    new_depth = state.depth - 1
 
-      char == "]" or char == "}" ->
-        new_depth = depth - 1
-        # depth == 1 means we just closed a top-level object inside the array
-        new_last = if new_depth == 1 and char == "}", do: index, else: last_obj_end
-
-        do_find_last_complete_object(
-          rest,
-          candidate,
-          new_depth,
-          in_string,
-          false,
-          index + 1,
-          new_last
-        )
-
-      true ->
-        do_find_last_complete_object(
-          rest,
-          candidate,
-          depth,
-          in_string,
-          false,
-          index + 1,
-          last_obj_end
-        )
-    end
+    state
+    |> Map.put(:depth, new_depth)
+    |> maybe_mark_last_object_end("}", new_depth)
+    |> advance_scan_state()
   end
 
-  defp finalize_truncated_array(_candidate, -1), do: nil
+  defp scan_array_char("]", state),
+    do: advance_scan_state(%{state | depth: state.depth - 1})
 
-  defp finalize_truncated_array(candidate, last_obj_end) do
+  defp scan_array_char(_char, state), do: advance_scan_state(state)
+
+  defp advance_scan_state(state), do: %{state | index: state.index + 1}
+
+  defp maybe_mark_last_object_end(state, "}", 1), do: %{state | last_obj_end: state.index}
+  defp maybe_mark_last_object_end(state, _char, _depth), do: state
+
+  defp finalize_truncated_array(-1, _candidate), do: nil
+
+  defp finalize_truncated_array(last_obj_end, candidate) do
     String.slice(candidate, 0, last_obj_end + 1) <> "\n]"
   end
 

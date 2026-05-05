@@ -25,6 +25,7 @@ defmodule GallformersWeb.Admin.ContentImageManager do
 
   use GallformersWeb, :live_component
 
+  alias Gallformers.Accounts
   alias Gallformers.ContentImages
   alias Gallformers.Images.Attribution
   alias Gallformers.Licenses
@@ -323,7 +324,7 @@ defmodule GallformersWeb.Admin.ContentImageManager do
   def handle_event("uploads_completed", %{"paths" => paths}, socket) do
     owner_type = socket.assigns.owner_type
     owner_id = socket.assigns.owner_id
-    uploader = get_display_name(socket.assigns.current_user)
+    uploader = Accounts.current_user_display_name(socket.assigns.current_user)
 
     images =
       Enum.map(paths, fn path ->
@@ -371,7 +372,7 @@ defmodule GallformersWeb.Admin.ContentImageManager do
 
   def handle_event("save_image", params, socket) do
     image = socket.assigns.editing_image
-    uploader = get_display_name(socket.assigns.current_user)
+    uploader = Accounts.current_user_display_name(socket.assigns.current_user)
 
     attrs = %{
       creator: params["creator"],
@@ -464,9 +465,6 @@ defmodule GallformersWeb.Admin.ContentImageManager do
 
   defp prefix_for(:article), do: "articles"
   defp prefix_for(:key), do: "keys"
-
-  defp get_display_name(%{display_name: name}), do: name
-  defp get_display_name(_), do: "unknown"
 
   @metadata_fields ~w(creator license licenselink sourcelink attribution caption)
 

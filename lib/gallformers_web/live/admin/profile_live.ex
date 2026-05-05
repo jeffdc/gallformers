@@ -36,13 +36,18 @@ defmodule GallformersWeb.Admin.ProfileLive do
   end
 
   defp load_user_profile(socket) do
-    auth0_user = socket.assigns.current_user
+    case Accounts.db_user(socket.assigns.current_user) do
+      %User{} = user ->
+        changeset = User.update_changeset(user, %{})
 
-    case Accounts.get_user_by_auth0_id(auth0_user.id) do
+        socket
+        |> assign(:user, user)
+        |> assign(:form, to_form(changeset))
+        |> assign(:inat_username, extract_inat_username(user.inaturalist_url))
+
       nil ->
-        # Profile doesn't exist - create it now using Auth0 data from session
-        case Accounts.sync_user_from_auth0(auth0_user) do
-          {:ok, user} ->
+        case Accounts.ensure_db_user(socket.assigns.current_user) do
+          %User{} = user ->
             changeset = User.update_changeset(user, %{})
 
             socket
@@ -51,20 +56,12 @@ defmodule GallformersWeb.Admin.ProfileLive do
             |> assign(:form, to_form(changeset))
             |> assign(:inat_username, extract_inat_username(user.inaturalist_url))
 
-          {:error, _changeset} ->
+          nil ->
             socket
             |> put_flash(:error, "Unable to create your profile. Please contact support.")
             |> assign(:user, nil)
             |> assign(:form, nil)
         end
-
-      %User{} = user ->
-        changeset = User.update_changeset(user, %{})
-
-        socket
-        |> assign(:user, user)
-        |> assign(:form, to_form(changeset))
-        |> assign(:inat_username, extract_inat_username(user.inaturalist_url))
     end
   end
 

@@ -173,6 +173,7 @@ defmodule Gallformers.IngestionPipeline.Worker do
 
   defp final_attempt?(%Oban.Job{}), do: false
 
+  @spec raise_retry_reset_error(SourceIngestion.t(), Ecto.Changeset.t()) :: no_return()
   defp raise_retry_reset_error(%SourceIngestion{} = ingestion, changeset) do
     Logger.error(
       "Source ingestion retry reset failed",

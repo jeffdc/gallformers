@@ -27,11 +27,18 @@ defmodule Gallformers.Ingestions do
   import Ecto.Query
 
   alias Gallformers.IngestionPipeline.{Storage, Workflow}
-  alias Gallformers.Ingestions.{DuplicateCandidate, SourceIngestion, SourceIngestionSpecies}
+
+  alias Gallformers.Ingestions.{
+    DuplicateCandidate,
+    SourceIngestion,
+    SourceIngestionCreation,
+    SourceIngestionSpecies,
+    Submission
+  }
+
   alias Gallformers.Repo
   alias Gallformers.Sources.Source
   alias Gallformers.Species, as: SpeciesContext
-  alias Gallformers.Storage.SourceArtifacts
   alias Gallformers.Utils
 
   @ordered_duplicate_candidates_query from(duplicate_candidate in DuplicateCandidate,
@@ -231,61 +238,30 @@ defmodule Gallformers.Ingestions do
   end
 
   @doc """
+  Creates a persisted source ingestion record with canonical workflow defaults.
+  """
+  @spec create_source_ingestion(map()) ::
+          {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t()}
+  def create_source_ingestion(attrs \\ %{}) do
+    SourceIngestionCreation.create_source_ingestion(attrs)
+  end
+
+  @doc """
+  Creates a source ingestion submission, uploads its initial artifact, and
+  enqueues the ingestion pipeline worker.
+  """
+  @spec submit_source_ingestion(map()) ::
+          {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t() | term()}
+  def submit_source_ingestion(attrs) do
+    Submission.submit_source_ingestion(attrs)
+  end
+
+  @doc """
   Returns a changeset for a source ingestion.
   """
   @spec change_source_ingestion(SourceIngestion.t(), map()) :: Ecto.Changeset.t()
   def change_source_ingestion(%SourceIngestion{} = source_ingestion, attrs \\ %{}) do
     SourceIngestion.changeset(source_ingestion, attrs)
-  end
-
-  @doc """
-  Creates a source ingestion and assigns its canonical per-ingestion artifacts path.
-  """
-  @spec create_source_ingestion(map()) ::
-          {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t()}
-  def create_source_ingestion(attrs \\ %{}) do
-    Repo.transaction(fn ->
-      attrs = Map.new(attrs)
-
-      source_ingestion =
-        %SourceIngestion{}
-        |> SourceIngestion.changeset(attrs)
-        |> insert_or_rollback()
-
-      if blank_artifacts_path?(source_ingestion.artifacts_path) do
-        source_ingestion
-        |> SourceIngestion.changeset(%{
-          artifacts_path: SourceArtifacts.private_artifact_prefix(source_ingestion.id)
-        })
-        |> update_or_rollback()
-      else
-        source_ingestion
-      end
-    end)
-  end
-
-  @doc """
-  Creates a persisted ingestion, uploads its initial input artifact, and
-  enqueues the pipeline worker.
-  """
-  @spec submit_source_ingestion(map()) ::
-          {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t() | term()}
-  def submit_source_ingestion(attrs) do
-    attrs = Map.new(attrs)
-
-    with :ok <- validate_submission_attrs(attrs),
-         {:ok, source_ingestion} <- create_submission_record(attrs),
-         {:ok, _artifact_path} <- upload_submission_artifact(source_ingestion, attrs),
-         {:ok, _job} <- enqueue_submission_worker(source_ingestion) do
-      {:ok, source_ingestion}
-    else
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:error, changeset}
-
-      {:submission_error, source_ingestion, reason} ->
-        cleanup_submission_artifacts(source_ingestion.id)
-        {:error, reason}
-    end
   end
 
   @doc """
@@ -512,14 +488,15 @@ defmodule Gallformers.Ingestions do
   @spec retry_failed_source_ingestion(SourceIngestion.t() | integer()) ::
           {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t()}
   def retry_failed_source_ingestion(%SourceIngestion{} = source_ingestion) do
-    with {:ok, retry_stage} <- retry_stage_for_failed_ingestion(source_ingestion) do
-      transition_source_ingestion_status(source_ingestion, :processing, %{
-        processing_stage: retry_stage,
-        error_stage: nil,
-        error_message: nil,
-        failed_at: nil
-      })
-    else
+    case retry_stage_for_failed_ingestion(source_ingestion) do
+      {:ok, retry_stage} ->
+        transition_source_ingestion_status(source_ingestion, :processing, %{
+          processing_stage: retry_stage,
+          error_stage: nil,
+          error_message: nil,
+          failed_at: nil
+        })
+
       {:error, :not_failed} ->
         {:error, retry_failed_source_ingestion_changeset(source_ingestion, "must be failed")}
 
@@ -745,24 +722,40 @@ defmodule Gallformers.Ingestions do
 
     records
     |> Enum.with_index()
-    |> Enum.reduce_while({:ok, []}, fn {record, position}, {:ok, acc} ->
-      case Map.fetch(existing_entries_by_position, position) do
-        {:ok, existing_entry} ->
-          {:cont, {:ok, [existing_entry | acc]}}
-
-        :error ->
-          source_ingestion_id
-          |> source_ingestion_species_attrs_from_record(record, position)
-          |> create_source_ingestion_species()
-          |> case do
-            {:ok, species_entry} -> {:cont, {:ok, [species_entry | acc]}}
-            {:error, changeset} -> {:halt, {:error, changeset}}
-          end
-      end
-    end)
+    |> Enum.reduce_while(
+      {:ok, []},
+      &ensure_source_ingestion_species_entry(
+        &1,
+        &2,
+        source_ingestion_id,
+        existing_entries_by_position
+      )
+    )
     |> case do
       {:ok, species_entries} -> {:ok, Enum.reverse(species_entries)}
       error -> error
+    end
+  end
+
+  defp ensure_source_ingestion_species_entry(
+         {record, position},
+         {:ok, acc},
+         source_ingestion_id,
+         existing_entries_by_position
+       ) do
+    case Map.fetch(existing_entries_by_position, position) do
+      {:ok, existing_entry} -> {:cont, {:ok, [existing_entry | acc]}}
+      :error -> create_source_ingestion_species_entry(source_ingestion_id, record, position, acc)
+    end
+  end
+
+  defp create_source_ingestion_species_entry(source_ingestion_id, record, position, acc) do
+    source_ingestion_id
+    |> source_ingestion_species_attrs_from_record(record, position)
+    |> create_source_ingestion_species()
+    |> case do
+      {:ok, species_entry} -> {:cont, {:ok, [species_entry | acc]}}
+      {:error, changeset} -> {:halt, {:error, changeset}}
     end
   end
 
@@ -1361,76 +1354,6 @@ defmodule Gallformers.Ingestions do
 
   defp normalize_trait_review_values(_), do: %{}
 
-  defp validate_submission_attrs(attrs) do
-    changeset =
-      {%{}, submission_types()}
-      |> Ecto.Changeset.cast(attrs, Map.keys(submission_types()))
-      |> Ecto.Changeset.validate_required([:input_type, :uploaded_by_id])
-      |> Ecto.Changeset.validate_inclusion(:input_type, ~w(pdf url text))
-      |> validate_submission_fields()
-
-    if changeset.valid? do
-      :ok
-    else
-      {:error, changeset}
-    end
-  end
-
-  defp validate_submission_fields(changeset) do
-    case Ecto.Changeset.get_field(changeset, :input_type) do
-      "pdf" ->
-        changeset
-        |> Ecto.Changeset.validate_required([:filename, :content])
-        |> validate_non_blank(:filename)
-
-      "url" ->
-        changeset
-        |> Ecto.Changeset.validate_required([:url])
-        |> validate_non_blank(:url)
-
-      "text" ->
-        changeset
-        |> Ecto.Changeset.validate_required([:text])
-        |> validate_non_blank(:text)
-
-      _ ->
-        changeset
-    end
-  end
-
-  defp validate_non_blank(changeset, field) do
-    Ecto.Changeset.validate_change(changeset, field, fn ^field, value ->
-      if is_binary(value) and String.trim(value) == "" do
-        [{field, "can't be blank"}]
-      else
-        []
-      end
-    end)
-  end
-
-  defp create_submission_record(attrs) do
-    create_source_ingestion(%{
-      input_type: Utils.attr_value(attrs, :input_type),
-      uploaded_by_id: Utils.attr_value(attrs, :uploaded_by_id)
-    })
-  end
-
-  defp upload_submission_artifact(source_ingestion, attrs) do
-    {filename, content, content_type} = submission_artifact_spec(attrs)
-
-    case Storage.upload_artifact(source_ingestion.id, :input, filename, content, content_type) do
-      {:ok, artifact_path} -> {:ok, artifact_path}
-      {:error, reason} -> {:submission_error, source_ingestion, reason}
-    end
-  end
-
-  defp enqueue_submission_worker(source_ingestion) do
-    case worker_module().enqueue(source_ingestion.id) do
-      {:ok, job} -> {:ok, job}
-      {:error, reason} -> {:submission_error, source_ingestion, reason}
-    end
-  end
-
   defp maybe_filter_status(query, nil), do: query
 
   defp maybe_filter_status(query, status) when is_atom(status) do
@@ -1704,41 +1627,6 @@ defmodule Gallformers.Ingestions do
     end
   end
 
-  defp submission_types do
-    %{
-      input_type: :string,
-      uploaded_by_id: :integer,
-      filename: :string,
-      content: :binary,
-      url: :string,
-      text: :string
-    }
-  end
-
-  defp submission_artifact_spec(attrs) do
-    case Utils.attr_value(attrs, :input_type) do
-      "pdf" -> {"source.pdf", Utils.attr_value(attrs, :content), "application/pdf"}
-      "url" -> {"source.url", Utils.attr_value(attrs, :url), "text/plain"}
-      "text" -> {"source.txt", Utils.attr_value(attrs, :text), "text/plain"}
-    end
-  end
-
-  defp cleanup_submission_artifacts(ingestion_id) do
-    case Storage.delete_artifacts_for_ingestion(ingestion_id) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        Logger.warning(
-          "Failed to clean up source ingestion artifacts after submission error",
-          ingestion_id: ingestion_id,
-          reason: inspect(reason)
-        )
-
-        :ok
-    end
-  end
-
   defp do_clear_source_ingestion(%SourceIngestion{} = source_ingestion) do
     case source_ingestion_clearability(source_ingestion) do
       clearability when clearability in [:failed, :abandoned] ->
@@ -1781,40 +1669,28 @@ defmodule Gallformers.Ingestions do
   defp abandoned_source_ingestion?(%SourceIngestion{}), do: false
 
   defp retry_stage_for_failed_ingestion(%SourceIngestion{status: "failed"} = source_ingestion) do
-    case Utils.attr_value(source_ingestion, :error_stage) do
-      nil ->
-        {:error, :missing_error_stage}
-
-      "extract" ->
-        {:ok, "submitted"}
-
-      "preprocess" ->
-        {:ok, "extract"}
-
-      "hash_and_dedup" ->
-        {:ok, "preprocess"}
-
-      "llm_clean" ->
-        {:ok, llm_clean_retry_stage(source_ingestion)}
-
-      "metadata" ->
-        {:ok, "llm_clean"}
-
-      "data_extract" ->
-        {:ok, "metadata"}
-
-      "assemble" ->
-        {:ok, "data_extract"}
-
-      "upload" ->
-        {:ok, "assemble"}
-
-      _other ->
-        {:error, :unknown_error_stage}
-    end
+    source_ingestion
+    |> Utils.attr_value(:error_stage)
+    |> retry_stage_for_error_stage(source_ingestion)
   end
 
   defp retry_stage_for_failed_ingestion(%SourceIngestion{}), do: {:error, :not_failed}
+
+  defp retry_stage_for_error_stage(nil, _source_ingestion), do: {:error, :missing_error_stage}
+  defp retry_stage_for_error_stage("extract", _source_ingestion), do: {:ok, "submitted"}
+  defp retry_stage_for_error_stage("preprocess", _source_ingestion), do: {:ok, "extract"}
+  defp retry_stage_for_error_stage("hash_and_dedup", _source_ingestion), do: {:ok, "preprocess"}
+
+  defp retry_stage_for_error_stage("llm_clean", source_ingestion),
+    do: {:ok, llm_clean_retry_stage(source_ingestion)}
+
+  defp retry_stage_for_error_stage("metadata", _source_ingestion), do: {:ok, "llm_clean"}
+  defp retry_stage_for_error_stage("data_extract", _source_ingestion), do: {:ok, "metadata"}
+  defp retry_stage_for_error_stage("assemble", _source_ingestion), do: {:ok, "data_extract"}
+  defp retry_stage_for_error_stage("upload", _source_ingestion), do: {:ok, "assemble"}
+
+  defp retry_stage_for_error_stage(_error_stage, _source_ingestion),
+    do: {:error, :unknown_error_stage}
 
   defp llm_clean_retry_stage(%SourceIngestion{id: source_ingestion_id}) do
     if duplicate_candidates_exist?(source_ingestion_id) do
@@ -1861,27 +1737,8 @@ defmodule Gallformers.Ingestions do
     |> Repo.one()
   end
 
-  defp worker_module do
-    :gallformers
-    |> Application.get_env(__MODULE__, [])
-    |> Keyword.get(:worker_module, default_worker_module())
-  end
-
-  defp default_worker_module do
-    Module.concat([Gallformers.IngestionPipeline, Worker])
-  end
-
-  defp blank_artifacts_path?(artifacts_path), do: artifacts_path in [nil, ""]
-
   defp now do
     DateTime.utc_now() |> DateTime.truncate(:second)
-  end
-
-  defp insert_or_rollback(changeset) do
-    case Repo.insert(changeset) do
-      {:ok, record} -> record
-      {:error, changeset} -> Repo.rollback(changeset)
-    end
   end
 
   defp update_or_rollback(changeset) do

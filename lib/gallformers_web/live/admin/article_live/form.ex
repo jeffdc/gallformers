@@ -13,7 +13,7 @@ defmodule GallformersWeb.Admin.ArticleLive.Form do
 
   require Logger
 
-  alias Gallformers.Accounts.Auth0User
+  alias Gallformers.Accounts
   alias Gallformers.Articles
   alias Gallformers.Articles.Article
   alias Gallformers.Markdown
@@ -63,7 +63,7 @@ defmodule GallformersWeb.Admin.ArticleLive.Form do
 
   defp apply_action(socket, :new, _params) do
     # Pre-populate author from logged in user
-    author = Auth0User.display_name(socket.assigns.current_user)
+    author = Accounts.current_user_display_name(socket.assigns.current_user)
     article = %Article{author: author}
     changeset = Articles.change_article(article, %{author: author})
 

@@ -12,7 +12,7 @@ defmodule GallformersWeb.Admin.ImageAuditLive do
 
   use GallformersWeb, :live_view
 
-  alias Gallformers.Accounts.Auth0User
+  alias Gallformers.Accounts
   alias Gallformers.Images
   alias Gallformers.Images.Audit
   alias Gallformers.Images.AuditCache
@@ -861,7 +861,7 @@ defmodule GallformersWeb.Admin.ImageAuditLive do
     path = params["path"]
     species_id = String.to_integer(params["species_id"])
 
-    uploader = Auth0User.display_name(socket.assigns.current_user)
+    uploader = Accounts.current_user_display_name(socket.assigns.current_user)
 
     attrs = %{
       creator: params["creator"],
@@ -1032,7 +1032,7 @@ defmodule GallformersWeb.Admin.ImageAuditLive do
     editing_image = socket.assigns.editing_image
     image = Images.get_image!(editing_image.id)
 
-    lastchangedby = Auth0User.display_name(socket.assigns.current_user)
+    lastchangedby = Accounts.current_user_display_name(socket.assigns.current_user)
 
     license = editing_image.license
 

@@ -108,16 +108,74 @@ defmodule Gallformers.Accounts do
   end
 
   @doc """
-  Returns the DB display name from the session.
+  Returns the preferred display name for the current session.
 
-  Falls back to "Unknown" if not set.
+  Prefers the persisted DB display name when it is already in the session.
+  Falls back to the Auth0-backed session user name, nickname, or email.
   """
   @spec db_display_name(map()) :: String.t()
   def db_display_name(%{} = session) do
     case Map.get(session, "db_display_name") do
-      nil -> "Unknown"
-      "" -> "Unknown"
-      name -> name
+      name when is_binary(name) and name != "" -> name
+      _ -> session |> get_user_from_session() |> fallback_display_name()
+    end
+  end
+
+  @doc """
+  Returns the preferred display name for the current user.
+
+  Prefers the database profile display_name when it exists, then falls back to
+  the Auth0 session user fields.
+  """
+  @spec current_user_display_name(Auth0User.t() | map() | nil) :: String.t()
+  def current_user_display_name(current_user) do
+    case db_user(current_user) do
+      %User{display_name: name} when name not in [nil, ""] -> name
+      _ -> current_user |> current_auth0_user() |> Auth0User.display_name()
+    end
+  end
+
+  @doc """
+  Returns the database-backed user for the current Auth0 user, if one exists.
+  """
+  @spec db_user(Auth0User.t() | map() | nil) :: User.t() | nil
+  def db_user(current_user) do
+    case current_auth0_id(current_user) do
+      auth0_id when is_binary(auth0_id) -> get_user_by_auth0_id(auth0_id)
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Returns the database-backed user for the current Auth0 user, creating it from
+  Auth0 when needed.
+  """
+  @spec ensure_db_user(Auth0User.t() | map() | nil) :: User.t() | nil
+  def ensure_db_user(current_user) do
+    case current_auth0_user(current_user) do
+      %Auth0User{} = auth0_user ->
+        get_user_by_auth0_id(auth0_user.id) || sync_auth0_user(auth0_user)
+
+      nil ->
+        nil
+    end
+  end
+
+  @doc """
+  Returns the current session's database user id, syncing from Auth0 when
+  needed for older or incomplete sessions.
+  """
+  @spec db_user_id(map()) :: integer() | nil
+  def db_user_id(%{} = session) do
+    case Map.get(session, "db_user_id") do
+      user_id when is_integer(user_id) ->
+        user_id
+
+      _ ->
+        case ensure_db_user(get_user_from_session(session)) do
+          %User{id: id} -> id
+          _ -> nil
+        end
     end
   end
 
@@ -232,6 +290,43 @@ defmodule Gallformers.Accounts do
   def get_user_by_auth0_id(auth0_id) do
     Repo.get_by(User, auth0_id: auth0_id)
   end
+
+  defp current_auth0_user(%Auth0User{} = current_user), do: current_user
+
+  defp current_auth0_user(current_user) when is_map(current_user) do
+    case current_auth0_id(current_user) do
+      auth0_id when is_binary(auth0_id) ->
+        %Auth0User{
+          id: auth0_id,
+          email: Map.get(current_user, :email) || Map.get(current_user, "email"),
+          name: Map.get(current_user, :name) || Map.get(current_user, "name"),
+          nickname: Map.get(current_user, :nickname) || Map.get(current_user, "nickname"),
+          picture: Map.get(current_user, :picture) || Map.get(current_user, "picture"),
+          roles: Map.get(current_user, :roles) || Map.get(current_user, "roles") || []
+        }
+
+      _ ->
+        nil
+    end
+  end
+
+  defp current_auth0_user(_), do: nil
+
+  defp current_auth0_id(current_user) when is_map(current_user) do
+    Map.get(current_user, :id) || Map.get(current_user, "id")
+  end
+
+  defp current_auth0_id(_), do: nil
+
+  defp sync_auth0_user(auth0_user) do
+    case sync_user_from_auth0(auth0_user) do
+      {:ok, %User{} = user} -> user
+      {:error, _changeset} -> nil
+    end
+  end
+
+  defp fallback_display_name(nil), do: "Unknown"
+  defp fallback_display_name(current_user), do: current_user_display_name(current_user)
 
   @doc """
   Gets a user profile by nickname.

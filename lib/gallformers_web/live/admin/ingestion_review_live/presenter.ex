@@ -1,7 +1,7 @@
 defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
-  alias Gallformers.IngestionPipeline.{Workflow}
+  alias Gallformers.IngestionPipeline.Workflow
   alias Gallformers.Ingestions
-  alias Gallformers.Ingestions.{SourceIngestion}
+  alias Gallformers.Ingestions.SourceIngestion
   alias Gallformers.Utils
 
   @doc """

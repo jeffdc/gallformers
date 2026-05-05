@@ -24,12 +24,12 @@ defmodule GallformersWeb.Admin.ImagesLive do
   @impl true
   def mount(_params, session, socket) do
     current_user = session["current_user"]
-    db_display_name = Gallformers.Accounts.db_display_name(session)
+    current_user_display_name = Gallformers.Accounts.db_display_name(session)
 
     socket =
       socket
       |> assign(:current_user, current_user)
-      |> assign(:db_display_name, db_display_name)
+      |> assign(:current_user_display_name, current_user_display_name)
       |> assign(:page_title, "Image Management")
       |> assign(:search_query, "")
       |> assign(:search_results, [])
@@ -596,7 +596,7 @@ defmodule GallformersWeb.Admin.ImagesLive do
               module={GallformersWeb.Admin.InatImportComponent}
               id="inat-import"
               species_id={@selected_species.id}
-              uploader={@db_display_name}
+              uploader={@current_user_display_name}
             />
           </div>
         </div>
@@ -1068,7 +1068,7 @@ defmodule GallformersWeb.Admin.ImagesLive do
     copy_mode = socket.assigns.copy_mode
     target_ids = MapSet.to_list(copy_mode.selected_ids)
 
-    updated_by = socket.assigns.db_display_name
+    updated_by = socket.assigns.current_user_display_name
 
     case Images.copy_metadata(copy_mode.source_id, target_ids, updated_by) do
       {:ok, count} ->
@@ -1123,7 +1123,7 @@ defmodule GallformersWeb.Admin.ImagesLive do
   def handle_event("uploads_completed", %{"paths" => paths, "species_id" => species_id}, socket) do
     species_id = if is_binary(species_id), do: String.to_integer(species_id), else: species_id
 
-    uploader = socket.assigns.db_display_name
+    uploader = socket.assigns.current_user_display_name
 
     # Create image records and schedule variant generation
     Enum.each(paths, fn path ->
@@ -1340,7 +1340,7 @@ defmodule GallformersWeb.Admin.ImagesLive do
     # modified in-memory by update_license, which would cause Ecto to see no changes)
     image = Images.get_image!(editing_image.id)
 
-    lastchangedby = socket.assigns.db_display_name
+    lastchangedby = socket.assigns.current_user_display_name
 
     # Use license from assigns (kept in sync by update_license handler) rather than
     # form params, as LiveView select elements can have issues with form submission

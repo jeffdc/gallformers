@@ -36,7 +36,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
     {:ok,
      socket
      |> assign(:current_user, session["current_user"])
-     |> assign(:current_user_db_id, resolve_current_user_db_id(session["current_user"]))
+     |> assign(:current_user_db_id, Accounts.db_user_id(session))
      |> assign(:page_title, "Source Ingestion Review")
      |> assign(:review_view, nil)
      |> assign(:selected_source, nil)
@@ -1235,9 +1235,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
     end)
   end
 
-  # TODO: this is straight copy pasta from ingestion_review_live/index.ex
-  # I also think that this code is basically implemented elsewhere as we have
-  # other places that get the user info from Auth0
   defp current_user_db_id(socket) do
     case socket.assigns.current_user_db_id do
       user_id when is_integer(user_id) ->
@@ -1250,53 +1247,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
            :error,
            "You need a database-backed profile to review submissions."
          )}
-    end
-  end
-
-  defp resolve_current_user_db_id(nil), do: nil
-
-  defp resolve_current_user_db_id(current_user) do
-    case current_auth0_user(current_user) do
-      %Accounts.Auth0User{} = auth0_user ->
-        case Accounts.get_user_by_auth0_id(auth0_user.id) || sync_user_from_auth0(auth0_user) do
-          %Accounts.User{id: id} -> id
-          _ -> nil
-        end
-
-      nil ->
-        nil
-    end
-  end
-
-  defp current_auth0_user(%Accounts.Auth0User{} = current_user), do: current_user
-
-  defp current_auth0_user(current_user) when is_map(current_user) do
-    case current_auth0_id(current_user) do
-      auth0_id when is_binary(auth0_id) ->
-        %Accounts.Auth0User{
-          id: auth0_id,
-          email: Map.get(current_user, :email) || Map.get(current_user, "email"),
-          name: Map.get(current_user, :name) || Map.get(current_user, "name"),
-          nickname: Map.get(current_user, :nickname) || Map.get(current_user, "nickname"),
-          picture: Map.get(current_user, :picture) || Map.get(current_user, "picture"),
-          roles: Map.get(current_user, :roles) || Map.get(current_user, "roles") || []
-        }
-
-      _ ->
-        nil
-    end
-  end
-
-  defp current_auth0_user(_), do: nil
-
-  defp current_auth0_id(current_user) when is_map(current_user) do
-    Map.get(current_user, :id) || Map.get(current_user, "id")
-  end
-
-  defp sync_user_from_auth0(auth0_user) do
-    case Accounts.sync_user_from_auth0(auth0_user) do
-      {:ok, %Accounts.User{} = user} -> user
-      {:error, _changeset} -> nil
     end
   end
 

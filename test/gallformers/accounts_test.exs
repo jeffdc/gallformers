@@ -834,14 +834,22 @@ defmodule Gallformers.AccountsTest do
       assert Accounts.db_display_name(session) == "Test User"
     end
 
-    test "returns 'Unknown' for nil session value" do
-      session = %{"db_display_name" => nil}
-      assert Accounts.db_display_name(session) == "Unknown"
+    test "falls back to Auth0 user name when DB display name is nil" do
+      session = %{
+        "db_display_name" => nil,
+        "current_user" => %Auth0User{id: "auth0|1", name: "Auth0 Name"}
+      }
+
+      assert Accounts.db_display_name(session) == "Auth0 Name"
     end
 
-    test "returns 'Unknown' for empty string session value" do
-      session = %{"db_display_name" => ""}
-      assert Accounts.db_display_name(session) == "Unknown"
+    test "falls back to Auth0 user name for a deserialized session user map" do
+      session = %{
+        "db_display_name" => "",
+        "current_user" => %{"id" => "auth0|1", "name" => "Mapped Auth0 Name", "roles" => []}
+      }
+
+      assert Accounts.db_display_name(session) == "Mapped Auth0 Name"
     end
 
     test "returns 'Unknown' for missing key" do
@@ -851,6 +859,69 @@ defmodule Gallformers.AccountsTest do
 
     test "returns 'Unknown' for empty map" do
       assert Accounts.db_display_name(%{}) == "Unknown"
+    end
+  end
+
+  describe "current_user_display_name/1" do
+    test "prefers the DB profile display name when it exists" do
+      auth0_id = unique_auth0_id()
+
+      assert {:ok, _user} =
+               Accounts.create_user(%{
+                 auth0_id: auth0_id,
+                 display_name: "DB Display Name",
+                 nickname: "db-nickname"
+               })
+
+      current_user = %Auth0User{
+        id: auth0_id,
+        email: "db@example.com",
+        name: "Auth0 Name",
+        nickname: "auth0-nickname",
+        picture: nil,
+        roles: []
+      }
+
+      assert Accounts.current_user_display_name(current_user) == "DB Display Name"
+    end
+
+    test "falls back to the Auth0-backed user when no DB profile exists" do
+      current_user = %Auth0User{
+        id: unique_auth0_id(),
+        email: "auth0@example.com",
+        name: "Auth0 Name",
+        nickname: "auth0-nickname",
+        picture: nil,
+        roles: []
+      }
+
+      assert Accounts.current_user_display_name(current_user) == "Auth0 Name"
+    end
+  end
+
+  describe "ensure_db_user/1 and db_user_id/1" do
+    test "creates a DB user from an Auth0-backed session user when needed" do
+      auth0_id = unique_auth0_id()
+
+      current_user = %Auth0User{
+        id: auth0_id,
+        email: "auth0@example.com",
+        name: "New Auth0 User",
+        nickname: "new-auth0-user",
+        picture: nil,
+        roles: []
+      }
+
+      assert Accounts.get_user_by_auth0_id(auth0_id) == nil
+
+      assert %User{id: user_id} = Accounts.ensure_db_user(current_user)
+      assert Accounts.db_user_id(%{"current_user" => current_user}) == user_id
+
+      assert %User{} = Accounts.get_user_by_auth0_id(auth0_id)
+    end
+
+    test "uses db_user_id from the session when present" do
+      assert Accounts.db_user_id(%{"db_user_id" => 123, "current_user" => nil}) == 123
     end
   end
 end
