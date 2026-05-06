@@ -1,5 +1,5 @@
 ---
-status: active
+status: done
 tags: [design]
 created: 2026-05-06
 updated: 2026-05-06
