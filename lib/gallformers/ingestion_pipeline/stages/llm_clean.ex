@@ -9,13 +9,14 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMClean do
 
   alias Gallformers.IngestionPipeline.Broadcaster
   alias Gallformers.IngestionPipeline.LLMClient
+  alias Gallformers.IngestionPipeline.PipelineConfigReader
   alias Gallformers.IngestionPipeline.Stages.LLMSupport
   alias Gallformers.IngestionPipeline.Storage
   alias Gallformers.Ingestions
   alias Gallformers.Ingestions.SourceIngestion
 
   @default_chunk_size 6000
-  @default_max_tokens 8192
+  @default_max_tokens 4096
   @default_max_concurrency 2
   @default_task_timeout :timer.minutes(10)
 
@@ -29,7 +30,7 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMClean do
     with {:ok, preprocessed_text} <-
            Storage.download_artifact(ingestion.id, :preprocess, "text.txt"),
          prompt <- LLMSupport.load_prompt!("llm_clean.txt"),
-         chunks <- LLMClient.chunk_text(preprocessed_text, chunk_size()),
+         chunks <- LLMClient.chunk_text(preprocessed_text, chunk_size(ingestion)),
          _ <-
            Logger.info("llm_clean chunked input",
              ingestion_id: ingestion.id,
@@ -37,7 +38,7 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMClean do
              chunk_count: length(chunks),
              chunk_sizes: Enum.map(chunks, &String.length/1)
            ),
-         {:ok, cleaned_text} <- clean_chunks(prompt, chunks),
+         {:ok, cleaned_text} <- clean_chunks(ingestion, prompt, chunks),
          {:ok, _artifact_path} <-
            Storage.upload_artifact(
              ingestion.id,
@@ -59,15 +60,15 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMClean do
     end
   end
 
-  defp clean_chunks(_prompt, []), do: {:ok, ""}
+  defp clean_chunks(_ingestion, _prompt, []), do: {:ok, ""}
 
-  defp clean_chunks(prompt, chunks) do
+  defp clean_chunks(ingestion, prompt, chunks) do
     chunks
     |> Task.async_stream(
-      &clean_chunk(prompt, &1),
-      max_concurrency: max_concurrency(),
+      &clean_chunk(ingestion, prompt, &1),
+      max_concurrency: max_concurrency(ingestion),
       ordered: true,
-      timeout: task_timeout(),
+      timeout: task_timeout(ingestion),
       on_timeout: :kill_task
     )
     |> Enum.reduce_while({:ok, []}, &LLMSupport.reduce_async_result/2)
@@ -77,24 +78,55 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMClean do
     end
   end
 
-  defp clean_chunk(prompt, chunk) do
-    case llm_client().completion(:llm_clean, prompt, chunk, max_tokens: max_tokens()) do
+  defp clean_chunk(ingestion, prompt, chunk) do
+    case llm_client().completion(:llm_clean, prompt, chunk, llm_opts(ingestion)) do
       {:ok, cleaned_chunk, _usage} -> {:ok, cleaned_chunk}
       {:error, reason} -> {:error, reason}
       {:error, reason, status} -> {:error, {reason, status}}
     end
   end
 
+  defp llm_opts(ingestion) do
+    [max_tokens: max_tokens(ingestion)]
+    |> put_pipeline_opt(ingestion, :llm_clean, :model)
+    |> put_pipeline_client_opts(ingestion)
+  end
+
   defp llm_client do
     LLMSupport.llm_client(__MODULE__)
   end
 
-  defp chunk_size, do: config()[:chunk_size] || @default_chunk_size
-  defp max_tokens, do: config()[:max_tokens] || @default_max_tokens
-  defp max_concurrency, do: config()[:max_concurrency] || @default_max_concurrency
-  defp task_timeout, do: config()[:task_timeout] || @default_task_timeout
+  defp chunk_size(i),
+    do: PipelineConfigReader.get(i, :llm_clean, :chunk_size, @default_chunk_size)
 
-  defp config do
+  defp max_tokens(i),
+    do: PipelineConfigReader.get(i, :llm_clean, :max_tokens, @default_max_tokens)
+
+  defp max_concurrency(i),
+    do: PipelineConfigReader.get(i, :llm_clean, :max_concurrency, @default_max_concurrency)
+
+  defp task_timeout(i) do
+    case PipelineConfigReader.get(i, :llm_clean, :task_timeout_minutes, nil) do
+      nil -> app_config()[:task_timeout] || @default_task_timeout
+      minutes -> :timer.minutes(minutes)
+    end
+  end
+
+  defp put_pipeline_opt(opts, ingestion, section, key) do
+    case PipelineConfigReader.get(ingestion, section, key, nil) do
+      nil -> opts
+      value -> Keyword.put(opts, key, value)
+    end
+  end
+
+  defp put_pipeline_client_opts(opts, ingestion) do
+    opts
+    |> put_pipeline_opt(ingestion, :client, :api_url)
+    |> put_pipeline_opt(ingestion, :client, :receive_timeout)
+    |> put_pipeline_opt(ingestion, :client, :retry_backoffs)
+  end
+
+  defp app_config do
     Application.get_env(:gallformers, __MODULE__, [])
   end
 end

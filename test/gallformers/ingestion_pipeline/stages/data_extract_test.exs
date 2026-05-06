@@ -171,9 +171,9 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtractTest do
 
     assert_received {:get_object, _, ^input_path}
     assert_received :prompt_text
-    assert_received {:completion, prompt, ^chunk_one, [max_tokens: 6000, merge_prompt: true]}
-    assert_received {:completion, ^prompt, ^chunk_two, [max_tokens: 6000, merge_prompt: true]}
-    assert_received {:completion, ^prompt, ^chunk_three, [max_tokens: 6000, merge_prompt: true]}
+    assert_received {:completion, prompt, ^chunk_one, [max_tokens: 4096, merge_prompt: true]}
+    assert_received {:completion, ^prompt, ^chunk_two, [max_tokens: 4096, merge_prompt: true]}
+    assert_received {:completion, ^prompt, ^chunk_three, [max_tokens: 4096, merge_prompt: true]}
     assert String.contains?(prompt, "SCHEMA TEXT") == true
     assert String.contains?(prompt, "{{SCHEMA}}") == false
 
@@ -236,9 +236,28 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtractTest do
 
     assert {:ok, _updated_ingestion} = DataExtract.perform_stage(ingestion)
 
-    assert_received {:completion, _prompt, ^chunk, [max_tokens: 6000, merge_prompt: true]}
-    assert_received {:completion, _prompt, ^chunk, [max_tokens: 6000, merge_prompt: true]}
+    assert_received {:completion, _prompt, ^chunk, [max_tokens: 4096, merge_prompt: true]}
+    assert_received {:completion, _prompt, ^chunk, [max_tokens: 4096, merge_prompt: true]}
     assert_received {:validate, [^record]}
+  end
+
+  test "skips retry when response hits max_tokens (truncated JSON)" do
+    ingestion = source_ingestion_fixture()
+    chunk = "chunk one " <> String.duplicate("a", 3_500)
+
+    Process.put(:data_extract_text_fixture, chunk)
+
+    set_data_extract_config(%{
+      responses: %{
+        chunk => {:ok, "[{\"incomplete\": true", %{prompt_tokens: 100, completion_tokens: 4096}}
+      }
+    })
+
+    assert {:error, :json_truncated} = DataExtract.perform_stage(ingestion)
+
+    assert_received {:completion, _prompt, ^chunk, _opts}
+    refute_received {:completion, _, ^chunk, _}
+    refute_received {:upload, _, _, _, _}
   end
 
   test "surfaces llm client errors without uploading partial output" do

@@ -1,5 +1,5 @@
 ---
-status: raw
+status: active
 tags: [design]
 created: 2026-05-06
 updated: 2026-05-06
@@ -87,4 +87,3 @@ Each stage's `config()` private functions change from `Application.get_env` to `
 - Pipeline stage reordering
 - Config versioning
 - Per-ingestion overrides beyond config selection
-

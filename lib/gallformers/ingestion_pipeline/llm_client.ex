@@ -7,9 +7,9 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
 
   require Logger
 
-  @default_model "deepseek-ai/DeepSeek-V3-0324"
+  @default_model "Qwen/Qwen2.5-72B-Instruct"
   @default_max_tokens 8192
-  @default_receive_timeout 120_000
+  @default_receive_timeout 300_000
   @default_retry_backoffs [1_000, 2_000, 4_000]
   @default_api_url "https://api.deepinfra.com/v1/openai/chat/completions"
 
@@ -26,53 +26,19 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
           | {:error, :timeout}
   def completion(stage, system_prompt, user_text, opts \\ [])
       when is_atom(stage) and is_binary(system_prompt) and is_binary(user_text) do
-    model = model_for(stage)
+    {model, resolved} = resolve_config(stage, opts)
     input_chars = String.length(user_text)
 
-    Logger.info("LLM request starting",
-      stage: stage,
-      model: model,
-      input_chars: input_chars
-    )
+    Logger.info("LLM request starting", stage: stage, model: model, input_chars: input_chars)
 
     start = System.monotonic_time(:millisecond)
-    body = request_body(stage, system_prompt, user_text, opts)
+    body = request_body(model, system_prompt, user_text, opts)
     headers = request_headers()
-    result = do_completion(body, headers, retry_backoffs())
+    req_fn = build_request_fn(resolved.recv_timeout)
+    result = do_completion(body, headers, resolved.retries, resolved.api_url, req_fn)
     elapsed_ms = System.monotonic_time(:millisecond) - start
 
-    case result do
-      {:ok, content, usage} ->
-        Logger.info("LLM request completed",
-          stage: stage,
-          model: model,
-          elapsed_ms: elapsed_ms,
-          input_chars: input_chars,
-          output_chars: String.length(content),
-          prompt_tokens: usage.prompt_tokens,
-          completion_tokens: usage.completion_tokens
-        )
-
-      {:error, reason} ->
-        Logger.warning("LLM request failed",
-          stage: stage,
-          model: model,
-          elapsed_ms: elapsed_ms,
-          input_chars: input_chars,
-          error: inspect(reason)
-        )
-
-      {:error, reason, status} ->
-        Logger.warning("LLM request failed",
-          stage: stage,
-          model: model,
-          elapsed_ms: elapsed_ms,
-          input_chars: input_chars,
-          error: inspect(reason),
-          status: status
-        )
-    end
-
+    log_result(result, stage, model, elapsed_ms, input_chars)
     result
   end
 
@@ -100,8 +66,8 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
     end
   end
 
-  defp do_completion(body, headers, retries_remaining) do
-    case normalize_request_result(request_fun().(api_url(), headers, body)) do
+  defp do_completion(body, headers, retries_remaining, api_url, req_fn) do
+    case normalize_request_result(req_fn.(api_url, headers, body)) do
       {:ok, response_body} ->
         parse_success(response_body)
 
@@ -109,13 +75,13 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
         {:error, :rate_limited}
 
       {:error, :server_error, status} ->
-        retry_server_error(status, body, headers, retries_remaining)
+        retry_server_error(status, body, headers, retries_remaining, api_url, req_fn)
 
       {:error, :http_error, status} ->
         {:error, :http_error, status}
 
       {:error, :timeout} ->
-        retry_timeout(body, headers, retries_remaining)
+        retry_timeout(body, headers, retries_remaining, api_url, req_fn)
 
       {:error, :transport_error, reason} ->
         {:error, :transport_error, reason}
@@ -129,6 +95,8 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
     do: {:ok, response_body}
 
   defp normalize_request_result({:ok, %{status: 429}}), do: {:error, :rate_limited}
+
+  defp normalize_request_result({:ok, %{status: 499}}), do: {:error, :server_error, 499}
 
   defp normalize_request_result({:ok, %{status: status}})
        when is_integer(status) and status >= 500 and status <= 599 do
@@ -161,26 +129,72 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
 
   defp parse_success(_response_body), do: {:error, :invalid_response}
 
-  defp retry_server_error(status, _body, _headers, []), do: {:error, :server_error, status}
+  defp retry_server_error(status, _body, _headers, [], _api_url, _req_fn),
+    do: {:error, :server_error, status}
 
-  defp retry_server_error(status, body, headers, [backoff_ms | rest]) do
+  defp retry_server_error(status, body, headers, [backoff_ms | rest], api_url, req_fn) do
     sleep_fun().(backoff_ms)
-    retry_or_server_error(do_completion(body, headers, rest), status)
+    retry_or_server_error(do_completion(body, headers, rest, api_url, req_fn), status)
   end
 
   defp retry_or_server_error({:error, :timeout}, status), do: {:error, :server_error, status}
   defp retry_or_server_error(result, _status), do: result
 
-  defp retry_timeout(_body, _headers, []), do: {:error, :timeout}
+  defp retry_timeout(_body, _headers, [], _api_url, _req_fn), do: {:error, :timeout}
 
-  defp retry_timeout(body, headers, [backoff_ms | rest]) do
+  defp retry_timeout(body, headers, [backoff_ms | rest], api_url, req_fn) do
     sleep_fun().(backoff_ms)
-    do_completion(body, headers, rest)
+    do_completion(body, headers, rest, api_url, req_fn)
   end
 
-  defp request_body(stage, system_prompt, user_text, opts) do
+  defp resolve_config(stage, opts) do
+    model = Keyword.get(opts, :model) || model_for(stage)
+
+    resolved = %{
+      api_url: Keyword.get(opts, :api_url) || api_url(),
+      retries: Keyword.get(opts, :retry_backoffs) || retry_backoffs(),
+      recv_timeout: Keyword.get(opts, :receive_timeout) || receive_timeout()
+    }
+
+    {model, resolved}
+  end
+
+  defp log_result({:ok, content, usage}, stage, model, elapsed_ms, input_chars) do
+    Logger.info("LLM request completed",
+      stage: stage,
+      model: model,
+      elapsed_ms: elapsed_ms,
+      input_chars: input_chars,
+      output_chars: String.length(content),
+      prompt_tokens: usage.prompt_tokens,
+      completion_tokens: usage.completion_tokens
+    )
+  end
+
+  defp log_result({:error, reason}, stage, model, elapsed_ms, input_chars) do
+    Logger.warning("LLM request failed",
+      stage: stage,
+      model: model,
+      elapsed_ms: elapsed_ms,
+      input_chars: input_chars,
+      error: inspect(reason)
+    )
+  end
+
+  defp log_result({:error, reason, status}, stage, model, elapsed_ms, input_chars) do
+    Logger.warning("LLM request failed",
+      stage: stage,
+      model: model,
+      elapsed_ms: elapsed_ms,
+      input_chars: input_chars,
+      error: inspect(reason),
+      status: status
+    )
+  end
+
+  defp request_body(model, system_prompt, user_text, opts) do
     %{
-      "model" => model_for(stage),
+      "model" => model,
       "messages" => messages(system_prompt, user_text, Keyword.get(opts, :merge_prompt, false)),
       "max_tokens" => Keyword.get(opts, :max_tokens, @default_max_tokens)
     }
@@ -216,20 +230,15 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
     Application.get_env(:gallformers, :ingestion_pipeline, %{})
   end
 
-  defp request_fun do
-    :gallformers
-    |> Application.get_env(__MODULE__, [])
-    |> Keyword.get(:request_fun, &default_request_fun/3)
+  defp build_request_fn(recv_timeout) do
+    case Keyword.get(Application.get_env(:gallformers, __MODULE__, []), :request_fun) do
+      nil -> fn url, headers, body -> default_request(url, headers, body, recv_timeout) end
+      custom_fn -> custom_fn
+    end
   end
 
-  defp sleep_fun do
-    :gallformers
-    |> Application.get_env(__MODULE__, [])
-    |> Keyword.get(:sleep_fun, &:timer.sleep/1)
-  end
-
-  defp default_request_fun(url, headers, body) do
-    case Req.post(url: url, headers: headers, json: body, receive_timeout: receive_timeout()) do
+  defp default_request(url, headers, body, recv_timeout) do
+    case Req.post(url: url, headers: headers, json: body, receive_timeout: recv_timeout) do
       {:ok, %Req.Response{status: status, body: response_body}} ->
         {:ok, %{status: status, body: response_body}}
 
@@ -245,5 +254,11 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
       {:error, reason} ->
         {:error, :transport_error, reason}
     end
+  end
+
+  defp sleep_fun do
+    :gallformers
+    |> Application.get_env(__MODULE__, [])
+    |> Keyword.get(:sleep_fun, &:timer.sleep/1)
   end
 end

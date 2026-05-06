@@ -113,9 +113,9 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMCleanTest do
     assert {:ok, updated_ingestion} = LLMClean.perform_stage(ingestion)
 
     assert_received {:get_object, _, ^input_path}
-    assert_received {:completion, prompt, ^chunk_one, [max_tokens: 8192]}
-    assert_received {:completion, ^prompt, ^chunk_two, [max_tokens: 8192]}
-    assert_received {:completion, ^prompt, ^chunk_three, [max_tokens: 8192]}
+    assert_received {:completion, prompt, ^chunk_one, [max_tokens: 4096]}
+    assert_received {:completion, ^prompt, ^chunk_two, [max_tokens: 4096]}
+    assert_received {:completion, ^prompt, ^chunk_three, [max_tokens: 4096]}
 
     assert prompt ==
              File.read!(Path.join([:code.priv_dir(:gallformers), "prompts", "llm_clean.txt"]))

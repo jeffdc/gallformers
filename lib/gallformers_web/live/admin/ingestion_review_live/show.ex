@@ -2,10 +2,26 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   use GallformersWeb, :live_view
 
   alias Gallformers.Accounts
+  alias Gallformers.IngestionPipeline.Broadcaster
   alias Gallformers.IngestionPipeline.DuplicateResolution
   alias Gallformers.Ingestions
   alias Gallformers.Sources
   alias GallformersWeb.Admin.IngestionReviewLive.Presenter
+
+  @pipeline_stages [
+    {:extract, "Extract"},
+    {:preprocess, "Preprocess"},
+    {:hash_and_dedup, "Hash & Dedup"},
+    {:llm_clean, "LLM Clean"},
+    {:metadata, "Metadata"},
+    {:data_extract, "Data Extract"},
+    {:assemble, "Assemble"},
+    {:upload, "Upload"}
+  ]
+
+  @stage_index @pipeline_stages
+               |> Enum.with_index()
+               |> Enum.into(%{}, fn {{stage, _label}, idx} -> {Atom.to_string(stage), idx} end)
 
   @impl true
   def mount(_params, session, socket) do
@@ -24,7 +40,14 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
 
   @impl true
   def handle_params(%{"id" => id}, _uri, socket) do
-    {:noreply, load_review_view(socket, String.to_integer(id))}
+    ingestion_id = String.to_integer(id)
+    socket = load_review_view(socket, ingestion_id)
+
+    if connected?(socket) && socket.assigns.review_view.status == "processing" do
+      Broadcaster.subscribe(ingestion_id)
+    end
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -176,6 +199,46 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   end
 
   @impl true
+  def handle_info({:stage_complete, _stage}, socket) do
+    socket = reload_review_view(socket)
+
+    if terminal_status?(socket.assigns.review_view.status) do
+      {:noreply, push_event(socket, "stop_timer", %{})}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info({:error, _stage, _reason}, socket) do
+    {:noreply,
+     socket
+     |> reload_review_view()
+     |> push_event("stop_timer", %{})}
+  end
+
+  @impl true
+  def handle_info({:needs_duplicate_review, _candidates}, socket) do
+    {:noreply,
+     socket
+     |> reload_review_view()
+     |> push_event("stop_timer", %{})}
+  end
+
+  @impl true
+  def handle_info({:review_ready, _ingestion_id}, socket) do
+    {:noreply,
+     socket
+     |> reload_review_view()
+     |> push_event("stop_timer", %{})}
+  end
+
+  @impl true
+  def handle_info({:progress, _stage, _percent}, socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <Layouts.admin flash={@flash} current_user={@current_user} page_title={@page_title}>
@@ -218,6 +281,12 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
                 </.button>
               </div>
             </div>
+
+            <.pipeline_progress
+              :if={@review_view.status == "processing"}
+              processing_stage={@review_view.processing_stage}
+              inserted_at={@review_view.inserted_at}
+            />
 
             <.list>
               <:item title="Input Type">{String.upcase(@review_view.input_type)}</:item>
@@ -688,6 +757,81 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   end
 
   defp show_associate_source_action?(_, _), do: false
+
+  attr :processing_stage, :string, required: true
+  attr :inserted_at, :any, required: true
+
+  defp pipeline_progress(assigns) do
+    completed_index = @stage_index[assigns.processing_stage]
+    stages = stage_statuses(completed_index)
+    assigns = assign(assigns, :stages, stages)
+
+    ~H"""
+    <div class="space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-medium text-gray-500">Pipeline Progress</h3>
+        <div
+          id="elapsed-timer"
+          phx-hook="ElapsedTimer"
+          data-started-at={DateTime.to_iso8601(@inserted_at)}
+          class="text-sm font-mono text-gray-500"
+        >
+          <span data-timer-display></span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1">
+        <div
+          :for={{stage_key, label, status} <- @stages}
+          class="flex-1 flex flex-col items-center gap-1"
+        >
+          <div class={[
+            "h-2 w-full rounded-full",
+            stage_bar_class(status)
+          ]} />
+          <span class={[
+            "text-[10px] leading-tight text-center",
+            stage_label_class(status)
+          ]}>
+            {label}
+          </span>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  defp stage_statuses(nil) do
+    Enum.map(@pipeline_stages, fn {key, label} -> {key, label, :running} end)
+    |> List.update_at(0, fn {key, label, _} -> {key, label, :running} end)
+  end
+
+  defp stage_statuses(completed_index) do
+    @pipeline_stages
+    |> Enum.with_index()
+    |> Enum.map(fn {{key, label}, idx} ->
+      cond do
+        idx <= completed_index -> {key, label, :completed}
+        idx == completed_index + 1 -> {key, label, :running}
+        true -> {key, label, :pending}
+      end
+    end)
+  end
+
+  defp stage_bar_class(:completed), do: "bg-green-500"
+  defp stage_bar_class(:running), do: "bg-amber-400 animate-pulse"
+  defp stage_bar_class(:pending), do: "bg-gray-200"
+
+  defp stage_label_class(:completed), do: "text-green-700 font-medium"
+  defp stage_label_class(:running), do: "text-amber-700 font-medium"
+  defp stage_label_class(:pending), do: "text-gray-400"
+
+  defp terminal_status?("needs_review"), do: true
+  defp terminal_status?("complete"), do: true
+  defp terminal_status?("failed"), do: true
+  defp terminal_status?("duplicate_confirmed"), do: true
+  defp terminal_status?("needs_duplicate_review"), do: true
+  defp terminal_status?(_), do: false
 
   defp source_review_locked_for_duplicate?(review_view),
     do: review_view.duplicate_review_required?

@@ -7,6 +7,7 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
 
   alias Gallformers.IngestionPipeline.Broadcaster
   alias Gallformers.IngestionPipeline.LLMClient
+  alias Gallformers.IngestionPipeline.PipelineConfigReader
   alias Gallformers.IngestionPipeline.Schema
   alias Gallformers.IngestionPipeline.Stages.LLMSupport
   alias Gallformers.IngestionPipeline.Storage
@@ -16,7 +17,7 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
   require Logger
 
   @default_chunk_size 3000
-  @default_max_tokens 6000
+  @default_max_tokens 4096
   @default_max_concurrency 2
   @default_task_timeout :timer.minutes(10)
   @default_json_attempts 3
@@ -30,9 +31,9 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
 
     with {:ok, cleaned_text} <- Storage.download_artifact(ingestion.id, :llm_clean, "text.txt"),
          prompt <- load_prompt(schema_module()),
-         chunks <- LLMClient.chunk_text(cleaned_text, chunk_size()),
+         chunks <- LLMClient.chunk_text(cleaned_text, chunk_size(ingestion)),
          chunk_count = length(chunks),
-         {:ok, records} <- extract_chunks(prompt, chunks),
+         {:ok, records} <- extract_chunks(ingestion, prompt, chunks),
          record_count = length(records),
          {:ok, validated_records} <- normalize_validate(schema_module().validate(records)),
          {:ok, _artifact_path} <-
@@ -68,15 +69,15 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
     end
   end
 
-  defp extract_chunks(_prompt, []), do: {:ok, []}
+  defp extract_chunks(_ingestion, _prompt, []), do: {:ok, []}
 
-  defp extract_chunks(prompt, chunks) do
+  defp extract_chunks(ingestion, prompt, chunks) do
     chunks
     |> Task.async_stream(
-      &extract_chunk(prompt, &1),
-      max_concurrency: max_concurrency(),
+      &extract_chunk(ingestion, prompt, &1),
+      max_concurrency: max_concurrency(ingestion),
       ordered: true,
-      timeout: task_timeout(),
+      timeout: task_timeout(ingestion),
       on_timeout: :kill_task
     )
     |> Enum.reduce_while({:ok, []}, &LLMSupport.reduce_async_result/2)
@@ -89,22 +90,53 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
     end
   end
 
-  defp extract_chunk(prompt, chunk, attempts_remaining \\ json_attempts())
+  defp extract_chunk(ingestion, prompt, chunk, attempts_remaining \\ nil)
 
-  defp extract_chunk(_prompt, _chunk, 0), do: {:error, :invalid_json}
+  defp extract_chunk(ingestion, prompt, chunk, nil) do
+    extract_chunk(ingestion, prompt, chunk, json_attempts(ingestion))
+  end
 
-  defp extract_chunk(prompt, chunk, attempts_remaining) do
-    case llm_client().completion(:data_extract, prompt, chunk,
-           max_tokens: max_tokens(),
-           merge_prompt: true
+  defp extract_chunk(ingestion, _prompt, _chunk, 0) do
+    Logger.warning("data_extract chunk exhausted all JSON parse attempts",
+      ingestion_id: ingestion.id
+    )
+
+    {:error, :invalid_json}
+  end
+
+  defp extract_chunk(ingestion, prompt, chunk, attempts_remaining) do
+    max_tok = max_tokens(ingestion)
+
+    case llm_client().completion(
+           :data_extract,
+           prompt,
+           chunk,
+           llm_opts(ingestion) ++ [merge_prompt: true]
          ) do
-      {:ok, response, _usage} ->
+      {:ok, _response, usage} when usage.completion_tokens >= max_tok ->
+        Logger.warning(
+          "data_extract JSON truncated at max_tokens limit, not retrying",
+          ingestion_id: ingestion.id,
+          completion_tokens: usage.completion_tokens,
+          max_tokens: max_tok,
+          input_chars: String.length(chunk)
+        )
+
+        {:error, :json_truncated}
+
+      {:ok, response, usage} ->
         case parse_json_response(response) do
           {:ok, records} ->
             {:ok, records}
 
           {:error, :invalid_json} ->
-            extract_chunk(prompt, chunk, attempts_remaining - 1)
+            Logger.info("data_extract JSON parse failed, retrying",
+              ingestion_id: ingestion.id,
+              attempts_remaining: attempts_remaining - 1,
+              completion_tokens: usage.completion_tokens
+            )
+
+            extract_chunk(ingestion, prompt, chunk, attempts_remaining - 1)
         end
 
       {:error, reason} ->
@@ -123,6 +155,12 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
     LLMSupport.load_prompt!("data_extract.txt", %{"SCHEMA" => schema_module.prompt_text()})
   end
 
+  defp llm_opts(ingestion) do
+    [max_tokens: max_tokens(ingestion)]
+    |> put_pipeline_opt(ingestion, :data_extract, :model)
+    |> put_pipeline_client_opts(ingestion)
+  end
+
   defp llm_client do
     LLMSupport.llm_client(__MODULE__)
   end
@@ -131,16 +169,43 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
   defp normalize_validate(error), do: error
 
   defp schema_module do
-    config()[:schema_module] || Schema
+    app_config()[:schema_module] || Schema
   end
 
-  defp chunk_size, do: config()[:chunk_size] || @default_chunk_size
-  defp max_tokens, do: config()[:max_tokens] || @default_max_tokens
-  defp max_concurrency, do: config()[:max_concurrency] || @default_max_concurrency
-  defp task_timeout, do: config()[:task_timeout] || @default_task_timeout
-  defp json_attempts, do: config()[:json_attempts] || @default_json_attempts
+  defp chunk_size(i),
+    do: PipelineConfigReader.get(i, :data_extract, :chunk_size, @default_chunk_size)
 
-  defp config do
+  defp max_tokens(i),
+    do: PipelineConfigReader.get(i, :data_extract, :max_tokens, @default_max_tokens)
+
+  defp max_concurrency(i),
+    do: PipelineConfigReader.get(i, :data_extract, :max_concurrency, @default_max_concurrency)
+
+  defp task_timeout(i) do
+    case PipelineConfigReader.get(i, :data_extract, :task_timeout_minutes, nil) do
+      nil -> app_config()[:task_timeout] || @default_task_timeout
+      minutes -> :timer.minutes(minutes)
+    end
+  end
+
+  defp json_attempts(i),
+    do: PipelineConfigReader.get(i, :data_extract, :json_attempts, @default_json_attempts)
+
+  defp put_pipeline_opt(opts, ingestion, section, key) do
+    case PipelineConfigReader.get(ingestion, section, key, nil) do
+      nil -> opts
+      value -> Keyword.put(opts, key, value)
+    end
+  end
+
+  defp put_pipeline_client_opts(opts, ingestion) do
+    opts
+    |> put_pipeline_opt(ingestion, :client, :api_url)
+    |> put_pipeline_opt(ingestion, :client, :receive_timeout)
+    |> put_pipeline_opt(ingestion, :client, :retry_backoffs)
+  end
+
+  defp app_config do
     Application.get_env(:gallformers, __MODULE__, [])
   end
 end

@@ -2,6 +2,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
   use GallformersWeb, :live_view
 
   alias Gallformers.Accounts
+  alias Gallformers.IngestionPipeline.PipelineConfigs
   alias Gallformers.Ingestions
   alias GallformersWeb.Admin.IngestionReviewLive.Presenter
 
@@ -24,6 +25,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
       |> assign(:url_form, empty_form(:url_submission))
       |> assign(:text_form, empty_form(:text_submission))
       |> assign(:pdf_error, nil)
+      |> assign(:pipeline_config_options, PipelineConfigs.config_options())
       |> allow_upload(@pdf_upload_name,
         accept: ~w(.pdf),
         max_entries: 1,
@@ -74,7 +76,9 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
   end
 
   @impl true
-  def handle_event("submit_pdf", _params, socket) do
+  def handle_event("submit_pdf", params, socket) do
+    pdf_params = Map.get(params, "pdf_submission", %{})
+
     case current_user_db_id(socket) do
       {:ok, uploaded_by_id} ->
         case consume_pdf_upload(socket) do
@@ -85,7 +89,8 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
                 input_type: "pdf",
                 uploaded_by_id: uploaded_by_id,
                 filename: filename,
-                content: content
+                content: content,
+                pipeline_config_id: parse_config_id(pdf_params)
               },
               :pdf_submission
             )
@@ -108,7 +113,8 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
           %{
             input_type: "url",
             uploaded_by_id: uploaded_by_id,
-            url: Map.get(params, "url", "")
+            url: Map.get(params, "url", ""),
+            pipeline_config_id: parse_config_id(params)
           },
           :url_submission
         )
@@ -127,7 +133,8 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
           %{
             input_type: "text",
             uploaded_by_id: uploaded_by_id,
-            text: Map.get(params, "text", "")
+            text: Map.get(params, "text", ""),
+            pipeline_config_id: parse_config_id(params)
           },
           :text_submission
         )
@@ -218,6 +225,11 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
                   <.alert variant="error">{upload_error_message(error)}</.alert>
                 </div>
 
+                <.pipeline_config_select
+                  name="pdf_submission[pipeline_config_id]"
+                  options={@pipeline_config_options}
+                />
+
                 <.button type="submit" variant="primary">Create From PDF</.button>
               </div>
             </.form>
@@ -236,6 +248,11 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
                   type="url"
                   label="Source URL"
                   placeholder="https://example.com/article"
+                />
+
+                <.pipeline_config_select
+                  name="url_submission[pipeline_config_id]"
+                  options={@pipeline_config_options}
                 />
 
                 <.button type="submit" variant="primary">Create From URL</.button>
@@ -257,6 +274,11 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
                   label="Extracted text"
                   rows="10"
                   placeholder="Paste source text here"
+                />
+
+                <.pipeline_config_select
+                  name="text_submission[pipeline_config_id]"
+                  options={@pipeline_config_options}
                 />
 
                 <.button type="submit" variant="primary">Create From Text</.button>
@@ -441,6 +463,28 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
       "No extracted galls yet"
     end
   end
+
+  defp pipeline_config_select(assigns) do
+    ~H"""
+    <div :if={@options != []} class="mb-3">
+      <label class="block text-xs font-medium text-gray-600 mb-1">Pipeline Config</label>
+      <select
+        name={@name}
+        class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gf-maroon focus:ring-gf-maroon"
+      >
+        <option value="">Default (module defaults)</option>
+        <option :for={{id, name} <- @options} value={id}>{name}</option>
+      </select>
+    </div>
+    """
+  end
+
+  defp parse_config_id(%{"pipeline_config_id" => ""}), do: nil
+
+  defp parse_config_id(%{"pipeline_config_id" => id}) when is_binary(id),
+    do: String.to_integer(id)
+
+  defp parse_config_id(_params), do: nil
 
   defp upload_error_message(:too_large), do: "File is too large."
   defp upload_error_message(:not_accepted), do: "Only PDF files are accepted."

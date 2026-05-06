@@ -42,15 +42,10 @@ defmodule Gallformers.IngestionPipeline.Worker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"ingestion_id" => ingestion_id}} = job) do
-    case ingestions_module().with_source_ingestion_orchestration_lock(ingestion_id, fn ->
-           ingestion_id
-           |> ingestions_module().get_source_ingestion!()
-           |> resume_failed_ingestion()
-           |> dispatch_stage(job)
-         end) do
-      {:ok, result} -> result
-      {:error, :already_processing} -> :ok
-    end
+    ingestion_id
+    |> ingestions_module().get_source_ingestion!()
+    |> resume_failed_ingestion()
+    |> dispatch_stage(job)
   end
 
   defp resume_failed_ingestion(%SourceIngestion{status: "failed"} = ingestion) do

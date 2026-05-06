@@ -45,7 +45,7 @@ defmodule Gallformers.IngestionPipeline.LLMClientTest do
 
     assert_received {:request, headers, body}
     assert {"authorization", "Bearer test-key"} in headers
-    assert body["model"] == "deepseek-ai/DeepSeek-V3-0324"
+    assert body["model"] == "Qwen/Qwen2.5-72B-Instruct"
     assert body["max_tokens"] == 8192
   end
 
@@ -73,6 +73,23 @@ defmodule Gallformers.IngestionPipeline.LLMClientTest do
 
     assert_received :attempt
     refute_receive :attempt
+  end
+
+  test "499 is retried like a server error" do
+    Process.put(:attempt_count, 0)
+
+    set_request_stub(fn _url, _headers, _body ->
+      attempt_count = Process.get(:attempt_count, 0) + 1
+      Process.put(:attempt_count, attempt_count)
+      {:ok, %{status: 499, body: %{}}}
+    end)
+
+    set_sleep_stub(fn _backoff_ms -> :ok end)
+
+    assert {:error, :server_error, 499} =
+             LLMClient.completion(:metadata, "system prompt", "user text")
+
+    assert Process.get(:attempt_count) == 4
   end
 
   test "5xx retries up to 3 times then returns server_error" do
@@ -163,6 +180,66 @@ defmodule Gallformers.IngestionPipeline.LLMClientTest do
 
     assert_received {:body, body}
     assert body["messages"] == [%{"role" => "user", "content" => "system prompt\n\nuser text"}]
+  end
+
+  test "model opt overrides default model" do
+    set_request_stub(fn _url, _headers, body ->
+      send(self(), {:body, body})
+
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "choices" => [%{"message" => %{"content" => "ok"}}],
+           "usage" => %{"prompt_tokens" => 1, "completion_tokens" => 1}
+         }
+       }}
+    end)
+
+    assert {:ok, "ok", _} =
+             LLMClient.completion(:llm_clean, "sys", "user", model: "custom-model")
+
+    assert_received {:body, body}
+    assert body["model"] == "custom-model"
+  end
+
+  test "api_url opt overrides default url" do
+    set_request_stub(fn url, _headers, _body ->
+      send(self(), {:url, url})
+
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "choices" => [%{"message" => %{"content" => "ok"}}],
+           "usage" => %{"prompt_tokens" => 1, "completion_tokens" => 1}
+         }
+       }}
+    end)
+
+    assert {:ok, "ok", _} =
+             LLMClient.completion(:llm_clean, "sys", "user", api_url: "https://custom.api/v1")
+
+    assert_received {:url, "https://custom.api/v1"}
+  end
+
+  test "retry_backoffs opt overrides default retries" do
+    Process.put(:attempt_count, 0)
+
+    set_request_stub(fn _url, _headers, _body ->
+      attempt_count = Process.get(:attempt_count, 0) + 1
+      Process.put(:attempt_count, attempt_count)
+      {:ok, %{status: 503, body: %{}}}
+    end)
+
+    set_sleep_stub(fn backoff_ms -> send(self(), {:sleep, backoff_ms}) end)
+
+    assert {:error, :server_error, 503} =
+             LLMClient.completion(:metadata, "sys", "user", retry_backoffs: [100, 200])
+
+    assert Process.get(:attempt_count) == 3
+    assert_received {:sleep, 100}
+    assert_received {:sleep, 200}
   end
 
   test "chunk_text respects paragraph boundaries and max size" do

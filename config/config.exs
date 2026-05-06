@@ -114,12 +114,12 @@ config :gallformers, Gallformers.Repo.WCVP, pool_size: 2
 
 config :gallformers, :ingestion_pipeline,
   models: %{
-    llm_clean: "deepseek-ai/DeepSeek-V3-0324",
-    metadata: "deepseek-ai/DeepSeek-V3-0324",
-    data_extract: "deepseek-ai/DeepSeek-V3-0324"
+    llm_clean: "Qwen/Qwen2.5-72B-Instruct",
+    metadata: "Qwen/Qwen2.5-72B-Instruct",
+    data_extract: "Qwen/Qwen2.5-72B-Instruct"
   },
   api_url: "https://api.deepinfra.com/v1/openai/chat/completions",
-  receive_timeout: 120_000,
+  receive_timeout: 300_000,
   retry_backoffs: [1_000, 2_000, 4_000]
 
 # Import environment specific config. This must remain at the bottom

@@ -49,7 +49,8 @@ defmodule Gallformers.Ingestions.SourceIngestion do
     :uploaded_by_id,
     :error_stage,
     :error_message,
-    :failed_at
+    :failed_at,
+    :pipeline_config_id
   ]
 
   @signal_fields [
@@ -106,6 +107,7 @@ defmodule Gallformers.Ingestions.SourceIngestion do
           error_stage: String.t() | nil,
           error_message: String.t() | nil,
           failed_at: DateTime.t() | nil,
+          pipeline_config_id: integer() | nil,
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
@@ -133,6 +135,7 @@ defmodule Gallformers.Ingestions.SourceIngestion do
     belongs_to :duplicate_of_source_ingestion, __MODULE__
     belongs_to :source, Gallformers.Sources.Source
     belongs_to :uploaded_by, Gallformers.Accounts.User
+    belongs_to :pipeline_config, Gallformers.IngestionPipeline.PipelineConfig
 
     has_many :canonical_duplicates, __MODULE__, foreign_key: :duplicate_of_source_ingestion_id
 
@@ -186,6 +189,7 @@ defmodule Gallformers.Ingestions.SourceIngestion do
     |> foreign_key_constraint(:duplicate_of_source_ingestion_id)
     |> foreign_key_constraint(:source_id)
     |> foreign_key_constraint(:uploaded_by_id)
+    |> foreign_key_constraint(:pipeline_config_id)
     |> check_constraint(:duplicate_of_source_ingestion_id,
       name: :source_ingestions_no_self_duplicate,
       message: "cannot point to itself as the canonical ingestion"

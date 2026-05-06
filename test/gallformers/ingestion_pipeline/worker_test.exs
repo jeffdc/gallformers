@@ -48,19 +48,6 @@ defmodule Gallformers.IngestionPipeline.WorkerTest do
     end
   end
 
-  defmodule LockedIngestionsStub do
-    def with_source_ingestion_orchestration_lock(_ingestion_id, _fun),
-      do: {:error, :already_processing}
-
-    def get_source_ingestion!(_ingestion_id) do
-      raise "get_source_ingestion!/1 should not be called when the orchestration lock is held"
-    end
-
-    def transition_source_ingestion_workflow(_ingestion, _event, _attrs \\ %{}) do
-      raise "transition_source_ingestion_workflow/3 should not be called when the lock is held"
-    end
-  end
-
   defmodule FailingStageStub do
     @behaviour Gallformers.IngestionPipeline.StageWorker
 
@@ -71,28 +58,8 @@ defmodule Gallformers.IngestionPipeline.WorkerTest do
     def perform_stage(_ingestion), do: {:error, :extract_failed}
   end
 
-  defmodule SlowPausedStageStub do
-    @behaviour Gallformers.IngestionPipeline.StageWorker
-
-    @impl true
-    def stage_name, do: :extract
-
-    @impl true
-    def perform_stage(ingestion) do
-      {:ok, updated_ingestion} =
-        Ingestions.transition_source_ingestion_status(ingestion, :needs_duplicate_review, %{
-          processing_stage: "duplicate_review"
-        })
-
-      Process.sleep(30)
-      {:ok, updated_ingestion}
-    end
-  end
-
   setup do
     previous_config = Application.get_env(:gallformers, Worker)
-    previous_ingestions_config = Application.get_env(:gallformers, Ingestions)
-
     Process.put(:worker_test_pid, self())
 
     on_exit(fn ->
@@ -102,12 +69,6 @@ defmodule Gallformers.IngestionPipeline.WorkerTest do
         Application.delete_env(:gallformers, Worker)
       else
         Application.put_env(:gallformers, Worker, previous_config)
-      end
-
-      if previous_ingestions_config == nil do
-        Application.delete_env(:gallformers, Ingestions)
-      else
-        Application.put_env(:gallformers, Ingestions, previous_ingestions_config)
       end
     end)
 
@@ -208,31 +169,6 @@ defmodule Gallformers.IngestionPipeline.WorkerTest do
         assert_received {:performed_stage, :llm_clean, ^ingestion_id, "duplicate_review"}
 
         assert_enqueued(worker: Worker, queue: "extraction", args: %{ingestion_id: ingestion.id})
-      end)
-    end
-
-    test "no-ops when another job is already orchestrating the same ingestion" do
-      ingestion = source_ingestion_fixture()
-      put_worker_config(ingestions_module: LockedIngestionsStub)
-
-      assert :ok = Worker.perform(worker_job(ingestion.id, attempt: 1, max_attempts: 3))
-      refute_receive {:performed_stage, _, _, _}
-    end
-
-    test "supports a configurable orchestration lock timeout for slow stages" do
-      ingestion = source_ingestion_fixture()
-
-      put_stage_modules(%{extract: SlowPausedStageStub})
-      put_ingestions_config(orchestration_lock_timeout: 500)
-
-      Oban.Testing.with_testing_mode(:manual, fn ->
-        assert :ok = perform_job(Worker, %{ingestion_id: ingestion.id})
-
-        reloaded_ingestion = Ingestions.get_source_ingestion!(ingestion.id)
-
-        assert reloaded_ingestion.status == "needs_duplicate_review"
-        assert reloaded_ingestion.processing_stage == "duplicate_review"
-        refute_enqueued(worker: Worker, queue: "extraction", args: %{ingestion_id: ingestion.id})
       end)
     end
 
@@ -377,15 +313,6 @@ defmodule Gallformers.IngestionPipeline.WorkerTest do
 
   defp put_stage_modules(stage_modules) do
     put_worker_config(stage_modules: stage_modules)
-  end
-
-  defp put_ingestions_config(overrides) do
-    config =
-      :gallformers
-      |> Application.get_env(Ingestions, [])
-      |> Keyword.merge(overrides)
-
-    Application.put_env(:gallformers, Ingestions, config)
   end
 
   defp put_worker_config(overrides) do

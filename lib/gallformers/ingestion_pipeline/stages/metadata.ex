@@ -9,14 +9,15 @@ defmodule Gallformers.IngestionPipeline.Stages.Metadata do
 
   alias Gallformers.IngestionPipeline.Broadcaster
   alias Gallformers.IngestionPipeline.DuplicateSignals
+  alias Gallformers.IngestionPipeline.PipelineConfigReader
   alias Gallformers.IngestionPipeline.Stages.LLMSupport
   alias Gallformers.IngestionPipeline.Storage
   alias Gallformers.Ingestions
   alias Gallformers.Ingestions.SourceIngestion
 
-  @max_input_chars 24_000
-  @max_tokens 1024
-  @json_attempts 3
+  @default_max_input_chars 24_000
+  @default_max_tokens 1024
+  @default_json_attempts 3
 
   @impl true
   def stage_name, do: :metadata
@@ -27,9 +28,9 @@ defmodule Gallformers.IngestionPipeline.Stages.Metadata do
 
     with {:ok, cleaned_text} <- Storage.download_artifact(ingestion.id, :llm_clean, "text.txt"),
          prompt <- LLMSupport.load_prompt!("metadata.txt"),
-         truncated_text <- String.slice(cleaned_text, 0, @max_input_chars),
+         truncated_text <- String.slice(cleaned_text, 0, max_input_chars(ingestion)),
          {:ok, raw_response, metadata_attrs} <-
-           extract_metadata(prompt, truncated_text),
+           extract_metadata(ingestion, prompt, truncated_text),
          {:ok, parsed_json} <- parse_json_for_upload(raw_response),
          title <- Map.get(metadata_attrs, :title),
          author_count <- length(Map.get(metadata_attrs, :authors, [])),
@@ -65,19 +66,47 @@ defmodule Gallformers.IngestionPipeline.Stages.Metadata do
     end
   end
 
-  defp extract_metadata(prompt, text, attempts_remaining \\ @json_attempts)
+  defp extract_metadata(ingestion, prompt, text, attempts_remaining \\ nil)
 
-  defp extract_metadata(_prompt, _text, 0), do: {:error, :invalid_json}
+  defp extract_metadata(ingestion, prompt, text, nil) do
+    extract_metadata(ingestion, prompt, text, json_attempts(ingestion))
+  end
 
-  defp extract_metadata(prompt, text, attempts_remaining) do
-    case llm_client().completion(:metadata, prompt, text, max_tokens: @max_tokens) do
-      {:ok, raw_response, _usage} ->
+  defp extract_metadata(ingestion, _prompt, _text, 0) do
+    Logger.warning("metadata exhausted all JSON parse attempts",
+      ingestion_id: ingestion.id
+    )
+
+    {:error, :invalid_json}
+  end
+
+  defp extract_metadata(ingestion, prompt, text, attempts_remaining) do
+    max_tok = max_tokens(ingestion)
+
+    case llm_client().completion(:metadata, prompt, text, llm_opts(ingestion)) do
+      {:ok, _raw_response, usage} when usage.completion_tokens >= max_tok ->
+        Logger.warning(
+          "metadata JSON truncated at max_tokens limit, not retrying",
+          ingestion_id: ingestion.id,
+          completion_tokens: usage.completion_tokens,
+          max_tokens: max_tok
+        )
+
+        {:error, :json_truncated}
+
+      {:ok, raw_response, usage} ->
         case parse_metadata(raw_response) do
           {:ok, metadata} ->
             {:ok, raw_response, DuplicateSignals.signal_attrs(metadata)}
 
           {:error, :invalid_json} ->
-            extract_metadata(prompt, text, attempts_remaining - 1)
+            Logger.info("metadata JSON parse failed, retrying",
+              ingestion_id: ingestion.id,
+              attempts_remaining: attempts_remaining - 1,
+              completion_tokens: usage.completion_tokens
+            )
+
+            extract_metadata(ingestion, prompt, text, attempts_remaining - 1)
         end
 
       {:error, reason} ->
@@ -133,7 +162,36 @@ defmodule Gallformers.IngestionPipeline.Stages.Metadata do
   defp cast_optional_integer(value) when is_integer(value), do: {:ok, value}
   defp cast_optional_integer(_value), do: {:error, :invalid_json}
 
+  defp llm_opts(ingestion) do
+    [max_tokens: max_tokens(ingestion)]
+    |> put_pipeline_opt(ingestion, :metadata, :model)
+    |> put_pipeline_client_opts(ingestion)
+  end
+
   defp llm_client do
     LLMSupport.llm_client(__MODULE__)
+  end
+
+  defp max_tokens(i),
+    do: PipelineConfigReader.get(i, :metadata, :max_tokens, @default_max_tokens)
+
+  defp max_input_chars(i),
+    do: PipelineConfigReader.get(i, :metadata, :max_input_chars, @default_max_input_chars)
+
+  defp json_attempts(i),
+    do: PipelineConfigReader.get(i, :metadata, :json_attempts, @default_json_attempts)
+
+  defp put_pipeline_opt(opts, ingestion, section, key) do
+    case PipelineConfigReader.get(ingestion, section, key, nil) do
+      nil -> opts
+      value -> Keyword.put(opts, key, value)
+    end
+  end
+
+  defp put_pipeline_client_opts(opts, ingestion) do
+    opts
+    |> put_pipeline_opt(ingestion, :client, :api_url)
+    |> put_pipeline_opt(ingestion, :client, :receive_timeout)
+    |> put_pipeline_opt(ingestion, :client, :retry_backoffs)
   end
 end

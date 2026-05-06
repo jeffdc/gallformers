@@ -49,8 +49,6 @@ defmodule Gallformers.Ingestions do
                                    order_by: source_ingestion_species.position
                                  )
 
-  @source_ingestion_orchestration_lock_namespace 41_204
-
   @source_ingestion_detail_preloads [
     :source,
     :uploaded_by,
@@ -172,30 +170,6 @@ defmodule Gallformers.Ingestions do
   """
   @spec get_source_ingestion!(integer()) :: SourceIngestion.t()
   def get_source_ingestion!(id), do: Repo.get!(SourceIngestion, id)
-
-  @doc """
-  Runs a function while holding a per-ingestion orchestration lock.
-  """
-  @spec with_source_ingestion_orchestration_lock(integer(), (-> result)) ::
-          {:ok, result} | {:error, :already_processing}
-        when result: var
-  def with_source_ingestion_orchestration_lock(source_ingestion_id, fun)
-      when is_integer(source_ingestion_id) and is_function(fun, 0) do
-    Repo.checkout(
-      fn ->
-        if acquire_source_ingestion_orchestration_lock(source_ingestion_id) do
-          try do
-            {:ok, fun.()}
-          after
-            maybe_release_source_ingestion_orchestration_lock(source_ingestion_id)
-          end
-        else
-          {:error, :already_processing}
-        end
-      end,
-      timeout: orchestration_lock_timeout()
-    )
-  end
 
   @doc """
   Gets a source ingestion with the detail preloads needed by review workflows.
@@ -692,50 +666,5 @@ defmodule Gallformers.Ingestions do
       nil -> Map.put(attrs, :reviewed_at, DateTime.utc_now(:second))
       _ -> attrs
     end
-  end
-
-  defp acquire_source_ingestion_orchestration_lock(source_ingestion_id) do
-    %{rows: [[locked?]]} =
-      Repo.query!(
-        "SELECT pg_try_advisory_lock($1, $2)",
-        [@source_ingestion_orchestration_lock_namespace, source_ingestion_id]
-      )
-
-    locked?
-  end
-
-  defp release_source_ingestion_orchestration_lock(source_ingestion_id) do
-    case Repo.query(
-           "SELECT pg_advisory_unlock($1, $2)",
-           [@source_ingestion_orchestration_lock_namespace, source_ingestion_id]
-         ) do
-      {:ok, _result} -> :ok
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  defp maybe_release_source_ingestion_orchestration_lock(source_ingestion_id) do
-    case release_source_ingestion_orchestration_lock(source_ingestion_id) do
-      :ok ->
-        :ok
-
-      {:error, %DBConnection.ConnectionError{} = reason} ->
-        Logger.warning(
-          "Source ingestion orchestration lock release failed after checkout timeout; assuming connection teardown released the advisory lock",
-          ingestion_id: source_ingestion_id,
-          reason: Exception.message(reason)
-        )
-
-        :ok
-
-      {:error, reason} ->
-        raise reason
-    end
-  end
-
-  defp orchestration_lock_timeout do
-    :gallformers
-    |> Application.get_env(__MODULE__, [])
-    |> Keyword.get(:orchestration_lock_timeout, :timer.minutes(5))
   end
 end

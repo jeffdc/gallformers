@@ -79,10 +79,19 @@ defmodule Gallformers.Ingestions.Submission do
   end
 
   defp create_submission_record(attrs) do
-    SourceIngestionCreation.create_source_ingestion(%{
+    creation_attrs = %{
       input_type: Utils.attr_value(attrs, :input_type),
       uploaded_by_id: Utils.attr_value(attrs, :uploaded_by_id)
-    })
+    }
+
+    creation_attrs =
+      case Utils.attr_value(attrs, :pipeline_config_id) do
+        nil -> creation_attrs
+        "" -> creation_attrs
+        id -> Map.put(creation_attrs, :pipeline_config_id, id)
+      end
+
+    SourceIngestionCreation.create_source_ingestion(creation_attrs)
   end
 
   defp upload_submission_artifact(source_ingestion, attrs) do
@@ -115,6 +124,7 @@ defmodule Gallformers.Ingestions.Submission do
     %{
       input_type: :string,
       uploaded_by_id: :integer,
+      pipeline_config_id: :integer,
       filename: :string,
       content: :binary,
       url: :string,

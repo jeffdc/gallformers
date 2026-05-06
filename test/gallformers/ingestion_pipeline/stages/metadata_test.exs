@@ -176,6 +176,20 @@ defmodule Gallformers.IngestionPipeline.Stages.MetadataTest do
     assert reloaded_ingestion.status == "processing"
   end
 
+  test "skips retry when response hits max_tokens (truncated JSON)" do
+    ingestion = source_ingestion_fixture()
+    Process.put(:metadata_text_fixture, "cleaned text")
+
+    set_responses([
+      {:ok, "{\"title\": \"Truncated", %{prompt_tokens: 100, completion_tokens: 1024}}
+    ])
+
+    assert {:error, :json_truncated} = Metadata.perform_stage(ingestion)
+
+    assert Process.get(:metadata_attempt) == 1
+    refute_received {:upload, _, _, _, _}
+  end
+
   test "surfaces llm client errors without uploading or advancing the stage" do
     ingestion = source_ingestion_fixture()
     Process.put(:metadata_text_fixture, "cleaned text")

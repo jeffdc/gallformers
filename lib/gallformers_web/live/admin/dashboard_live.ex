@@ -187,6 +187,13 @@ defmodule GallformersWeb.Admin.DashboardLive do
               accent="slate"
               small
             />
+            <.action_card
+              label="Pipeline Configs"
+              href="/admin/pipeline-configs"
+              icon="ph-sliders-horizontal"
+              accent="slate"
+              small
+            />
           </div>
         </div>
       <% end %>
