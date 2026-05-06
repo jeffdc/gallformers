@@ -87,7 +87,22 @@ config :gallformers, dev_routes: true
 config :os_mon, start_disksup: false
 
 # Do not include metadata nor timestamps in development logs
-config :logger, :default_formatter, format: "[$level] $message\n"
+config :logger, :default_formatter,
+  format: "$time [$level] $message $metadata\n",
+  metadata: [
+    :stage,
+    :model,
+    :input_chars,
+    :output_chars,
+    :elapsed_ms,
+    :prompt_tokens,
+    :completion_tokens,
+    :error,
+    :status,
+    :ingestion_id,
+    :chunk_count,
+    :chunk_sizes
+  ]
 
 # Set a higher stacktrace during development. Avoid configuring such
 # in production as building large stacktraces may be expensive.
@@ -110,3 +125,12 @@ config :swoosh, :api_client, false
 # Dev auth bypass: auto-login as admin without Auth0.
 # Useful for LAN testing where Auth0 callbacks won't work.
 config :gallformers, dev_auth_bypass: true
+
+# Use local filesystem instead of S3 for ingestion artifacts in dev.
+config :gallformers, Gallformers.Storage.SourceArtifacts,
+  backend: Gallformers.Storage.LocalBackend
+
+config :gallformers, :source_storage,
+  private_bucket: Path.expand("priv/storage/dev/private"),
+  public_bucket: Path.expand("priv/storage/dev/public"),
+  public_base_url: "http://localhost:4000/storage"

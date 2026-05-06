@@ -9,6 +9,7 @@ defmodule Gallformers.IngestionsTest do
   alias Gallformers.Sources
   alias Gallformers.Species.Species
   alias Gallformers.Storage.SourceArtifacts
+  alias Gallformers.Taxonomy
   alias GallformersWeb.Admin.IngestionReviewLive.Presenter
 
   defmodule SubmissionStorageBackendStub do
@@ -361,6 +362,30 @@ defmodule Gallformers.IngestionsTest do
       assert Ingestions.get_source_ingestion(ingestion.id) == nil
       assert Process.get(:submission_storage_objects) == %{}
     end
+
+    test "clears abandoned processing ingestions when all jobs completed but stage stuck" do
+      ingestion =
+        source_ingestion_fixture(%{
+          input_type: "pdf",
+          status: "processing",
+          processing_stage: "hash_and_dedup"
+        })
+
+      artifact_path = "source-ingestions/#{ingestion.id}/input/source.pdf"
+
+      Process.put(:submission_storage_objects, %{
+        artifact_path => %{body: "%PDF-1.4 stuck\n"}
+      })
+
+      job = Repo.insert!(Worker.new(%{ingestion_id: ingestion.id}))
+      mark_job_completed(job.id)
+
+      assert Ingestions.source_ingestion_clearability(ingestion.id) == :abandoned
+      assert {:ok, deleted_ingestion} = Ingestions.clear_source_ingestion(ingestion.id)
+
+      assert deleted_ingestion.id == ingestion.id
+      assert Ingestions.get_source_ingestion(ingestion.id) == nil
+    end
   end
 
   describe "confirm_duplicate_candidate/2" do
@@ -538,6 +563,48 @@ defmodule Gallformers.IngestionsTest do
     end
   end
 
+  describe "ensure_source_ingestion_species_entries/2" do
+    test "collates repeated extracted records into a single species-level entry" do
+      ingestion =
+        source_ingestion_fixture(%{
+          input_type: "pdf",
+          status: "needs_review",
+          processing_stage: "review"
+        })
+
+      records = [
+        %{
+          gall_species: %{name: "Andricus collatus", authority: "Author"},
+          host_species: %{name: "Quercus alba", authority: "L."},
+          traits: %{"shape" => %{"original" => "globular", "suggested" => ["globular"]}},
+          description: "Rounded gall on oak twigs."
+        },
+        %{
+          gall_species: %{name: "Andricus collatus", authority: "Author"},
+          host_species: %{name: "Quercus stellata", authority: "Wangenh."},
+          traits: %{"shape" => %{"original" => "ovoid", "suggested" => ["globular", "oval"]}},
+          description: "Later mention with additional host evidence."
+        }
+      ]
+
+      assert {:ok, [entry]} =
+               Ingestions.ensure_source_ingestion_species_entries(ingestion, records)
+
+      assert entry.extracted_name == "Andricus collatus"
+      assert entry.position == 0
+      assert entry.description_prose =~ "Rounded gall on oak twigs."
+      assert entry.description_prose =~ "Later mention with additional host evidence."
+
+      hosts = Enum.map(entry.extraction_payload.hosts, & &1.name)
+      assert hosts == ["Quercus alba", "Quercus stellata"]
+
+      assert entry.extraction_payload.traits.shape.original =~ "globular"
+      assert entry.extraction_payload.traits.shape.original =~ "ovoid"
+      assert entry.extraction_payload.traits.shape.suggested == ["globular", "oval"]
+      assert length(entry.extraction_payload.description_evidence) == 2
+    end
+  end
+
   describe "update_source_ingestion_species_review/3" do
     test "persists a complete review payload and updates the entry status" do
       reviewer = user_fixture()
@@ -635,6 +702,71 @@ defmodule Gallformers.IngestionsTest do
 
       assert %{source_ingestion_id: ["must be associated with a source before gall review"]} =
                errors_on(changeset)
+    end
+
+    test "creates a new gall species when completion chooses the new-species path" do
+      reviewer = user_fixture()
+      source = source_fixture()
+
+      assert {:ok, family} =
+               Taxonomy.create_taxonomy(%{
+                 name: "Reviewfamily#{System.unique_integer([:positive])}",
+                 type: "family",
+                 description: "Gall"
+               })
+
+      ingestion =
+        source_ingestion_fixture(%{
+          input_type: "pdf",
+          status: "needs_review",
+          processing_stage: "review",
+          source_id: source.id
+        })
+
+      species_entry =
+        create_species_entry(ingestion, 0, %{
+          extracted_name: "Brandnewgallus reviewus",
+          extraction_payload: %{
+            "hosts" => [],
+            "traits" => %{
+              "shape" => %{"original" => "globular", "suggested" => ["globular"]}
+            },
+            "description_evidence" => [%{"text" => "Rounded review gall."}]
+          }
+        })
+
+      assert {:ok, updated_entry} =
+               Ingestions.update_source_ingestion_species_review(
+                 species_entry,
+                 %{
+                   action: "complete",
+                   description_prose: "Rounded review gall.",
+                   species_review: %{
+                     decision: "new",
+                     family_id: family.id,
+                     accepted_aliases: ["Brandnew review synonym"]
+                   },
+                   host_reviews: %{},
+                   trait_reviews: %{
+                     "shape" => %{selected_values: ["globular"]}
+                   }
+                 },
+                 reviewer.id
+               )
+
+      assert updated_entry.status == "complete"
+      assert is_integer(updated_entry.species_id)
+
+      created_species = Gallformers.Species.get_species!(updated_entry.species_id)
+      assert created_species.name == "Brandnewgallus reviewus"
+
+      assert Enum.any?(
+               Gallformers.Species.get_aliases_for_species(created_species.id),
+               &(&1.name == "Brandnew review synonym")
+             ) == true
+
+      species_source = Sources.get_species_source_by_ids(created_species.id, source.id)
+      assert species_source.description == "Rounded review gall."
     end
   end
 
@@ -1357,6 +1489,17 @@ defmodule Gallformers.IngestionsTest do
         attempt: 3,
         max_attempts: 3,
         discarded_at: DateTime.utc_now()
+      ]
+    )
+  end
+
+  defp mark_job_completed(job_id) do
+    from(job in "oban_jobs", where: field(job, :id) == ^job_id)
+    |> Repo.update_all(
+      set: [
+        state: "completed",
+        attempt: 1,
+        completed_at: DateTime.utc_now()
       ]
     )
   end

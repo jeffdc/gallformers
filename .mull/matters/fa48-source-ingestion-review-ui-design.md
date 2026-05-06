@@ -1,7 +1,7 @@
 ---
-status: active
+status: done
 created: 2026-03-22
-updated: 2026-05-01
+updated: 2026-05-05
 epic: ingestion
 relates: [7fda, 7c67]
 ---

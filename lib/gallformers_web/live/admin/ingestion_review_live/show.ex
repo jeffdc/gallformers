@@ -1,35 +1,11 @@
 defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   use GallformersWeb, :live_view
 
-  import GallformersWeb.Admin.FormComponents, only: [alias_collision_warning: 1]
-
   alias Gallformers.Accounts
-  alias Gallformers.Galls
   alias Gallformers.IngestionPipeline.DuplicateResolution
   alias Gallformers.Ingestions
   alias Gallformers.Sources
-  alias Gallformers.Species
   alias GallformersWeb.Admin.IngestionReviewLive.Presenter
-
-  @detachable_options [
-    {"Unknown", "unknown"},
-    {"Integral", "integral"},
-    {"Detachable", "detachable"},
-    {"Both", "both"}
-  ]
-
-  @trait_filter_keys %{
-    "color" => :colors,
-    "shape" => :shapes,
-    "texture" => :textures,
-    "walls" => :walls,
-    "cells" => :cells,
-    "alignment" => :alignments,
-    "plant_part" => :plant_parts,
-    "form" => :forms,
-    "season" => :seasons,
-    "detachable" => :detachable
-  }
 
   @impl true
   def mount(_params, session, socket) do
@@ -42,8 +18,8 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
      |> assign(:selected_source, nil)
      |> assign(:source_search_query, "")
      |> assign(:source_search_results, [])
-     |> assign(:filter_options, Galls.get_all_filter_options())
-     |> assign(:workspace, nil)}
+     |> assign(:source_text, nil)
+     |> assign(:source_text_focus, nil)}
   end
 
   @impl true
@@ -182,26 +158,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   end
 
   @impl true
-  def handle_event("open_gall_review_workspace", %{"id" => id}, socket) do
-    if socket.assigns.review_view.species_review_unlocked? do
-      workspace =
-        id
-        |> parse_integer_param()
-        |> Ingestions.source_ingestion_species_review_workspace!()
-        |> build_workspace_state()
-
-      {:noreply, assign(socket, :workspace, workspace)}
-    else
-      {:noreply, put_flash(socket, :error, "Associate a source before opening gall review.")}
-    end
-  end
-
-  @impl true
-  def handle_event("close_gall_review_workspace", _params, socket) do
-    {:noreply, assign(socket, :workspace, nil)}
-  end
-
-  @impl true
   def handle_event("clear_source_ingestion", _params, socket) do
     case Ingestions.clear_source_ingestion(socket.assigns.review_view.id) do
       {:ok, _source_ingestion} ->
@@ -217,129 +173,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
         {:noreply,
          put_flash(socket, :error, "Failed ingestion cleanup failed: #{inspect(reason)}")}
     end
-  end
-
-  @impl true
-  def handle_event("change_gall_review_workspace", %{"workspace" => params}, socket) do
-    {:noreply, update_workspace_assign(socket, params)}
-  end
-
-  @impl true
-  def handle_event("search_workspace_species", %{"value" => query}, socket) do
-    {:noreply, update_workspace_species_search(socket, query)}
-  end
-
-  @impl true
-  def handle_event("select_workspace_species", %{"id" => id}, socket) do
-    species = Species.get_species!(parse_integer_param(id))
-
-    {:noreply,
-     update_workspace(socket, fn workspace ->
-       workspace
-       |> put_in([:species_review, :selected_species], species_summary(species))
-       |> put_in([:species_review, :species_id], species.id)
-       |> put_in([:species_review, :search_query], "")
-       |> put_in([:species_review, :search_results], [])
-       |> maybe_default_species_review_decision("mapped")
-     end)}
-  end
-
-  @impl true
-  def handle_event("clear_workspace_species", _params, socket) do
-    {:noreply,
-     update_workspace(socket, fn workspace ->
-       workspace
-       |> put_in([:species_review, :selected_species], nil)
-       |> put_in([:species_review, :species_id], nil)
-       |> put_in([:species_review, :search_query], "")
-       |> put_in([:species_review, :search_results], [])
-     end)}
-  end
-
-  @impl true
-  def handle_event("toggle_trait_value", %{"value" => encoded_value}, socket) do
-    {:noreply, toggle_workspace_trait_value(socket, encoded_value)}
-  end
-
-  @impl true
-  def handle_event("save_gall_review_workspace", %{"workspace" => params}, socket) do
-    case current_user_db_id(socket) do
-      {:ok, reviewed_by_id} ->
-        socket = update_workspace_assign(socket, params)
-        workspace = socket.assigns.workspace
-        source_ingestion_species = Ingestions.get_source_ingestion_species!(workspace.id)
-
-        case Ingestions.update_source_ingestion_species_review(
-               source_ingestion_species,
-               workspace_update_attrs(workspace, params),
-               reviewed_by_id
-             ) do
-          {:ok, _source_ingestion_species} ->
-            finalize_workspace_save(
-              socket,
-              workspace,
-              source_ingestion_species.source_ingestion_id
-            )
-
-          {:error, %Ecto.Changeset{} = changeset} ->
-            {:noreply, put_flash(socket, :error, changeset_error_message(changeset))}
-        end
-
-      {:error, :missing_db_user, socket} ->
-        {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("search_workspace_host:" <> host_index, %{"value" => query}, socket) do
-    {:noreply, update_workspace_host_search(socket, parse_integer_param(host_index), query)}
-  end
-
-  @impl true
-  def handle_event("select_workspace_host:" <> host_index, %{"id" => id}, socket) do
-    species = Species.get_species!(parse_integer_param(id))
-    host_index = parse_integer_param(host_index)
-
-    {:noreply,
-     update_workspace(socket, fn workspace ->
-       update_in(workspace.host_reviews, fn host_reviews ->
-         Enum.map(host_reviews, fn host_review ->
-           if host_review.index == host_index do
-             host_review
-             |> Map.put(:selected_species, species_summary(species))
-             |> Map.put(:species_id, species.id)
-             |> Map.put(:decision, "mapped")
-             |> Map.put(:search_query, "")
-             |> Map.put(:search_results, [])
-           else
-             host_review
-           end
-         end)
-       end)
-     end)}
-  end
-
-  @impl true
-  def handle_event("clear_workspace_host:" <> host_index, _params, socket) do
-    host_index = parse_integer_param(host_index)
-
-    {:noreply,
-     update_workspace(socket, fn workspace ->
-       update_in(workspace.host_reviews, fn host_reviews ->
-         Enum.map(host_reviews, fn host_review ->
-           if host_review.index == host_index do
-             host_review
-             |> Map.put(:selected_species, nil)
-             |> Map.put(:species_id, nil)
-             |> Map.put(:decision, "unresolved")
-             |> Map.put(:search_query, "")
-             |> Map.put(:search_results, [])
-           else
-             host_review
-           end
-         end)
-       end)
-     end)}
   end
 
   @impl true
@@ -607,6 +440,25 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
                   Associate Source
                 </.button>
               </div>
+
+              <details
+                :if={@source_text}
+                id="full-source-text-panel"
+                class="rounded-lg border border-gray-200"
+              >
+                <summary class="cursor-pointer px-4 py-3 text-sm font-medium text-gray-900">
+                  Full Extracted Text
+                </summary>
+                <div class="border-t border-gray-200 px-4 py-4 space-y-3">
+                  <div
+                    :if={@source_text_focus}
+                    class="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900"
+                  >
+                    Focused fragment: {@source_text_focus}
+                  </div>
+                  <pre class="max-h-96 overflow-auto whitespace-pre-wrap text-sm text-gray-700">{@source_text}</pre>
+                </div>
+              </details>
             </div>
           </div>
         </.card>
@@ -665,327 +517,82 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
               :if={@review_view.species_entries != [] && @review_view.species_review_unlocked?}
               variant="info"
             >
-              Gall rows are now unlocked and can be reviewed one at a time in the workspace.
+              Source attached. Proceed to the species review workspace to curate gall entries.
             </.alert>
 
-            <.table
+            <div
               :if={@review_view.species_entries != []}
-              id="species-review-table"
-              rows={@review_view.species_entries}
-              row_id={&"species-entry-#{&1.id}"}
+              id="species-review-list"
+              class="space-y-2"
             >
-              <:col :let={entry} label="#">
-                {entry.position}
-              </:col>
-              <:col :let={entry} label="Extracted Gall">
-                <div class="space-y-1">
-                  <div class="font-medium">{entry.extracted_name || "Unnamed gall"}</div>
-                  <div :if={entry.extracted_authority} class="text-sm text-gray-500">
-                    {entry.extracted_authority}
+              <details
+                :for={entry <- @review_view.species_entries}
+                id={"species-entry-#{entry.id}"}
+                class="rounded-lg border border-gray-200"
+              >
+                <summary class="cursor-pointer px-4 py-3 flex items-center justify-between gap-3">
+                  <div class="flex items-center gap-3">
+                    <span class="text-sm text-gray-400">{entry.position}</span>
+                    <div>
+                      <div class="font-medium text-gray-900">
+                        {entry.extracted_name || "Unnamed gall"}
+                      </div>
+                      <div :if={entry.extracted_authority} class="text-sm text-gray-500">
+                        {entry.extracted_authority}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span :if={entry.mapped_species_name} class="text-sm text-gray-600">
+                      {entry.mapped_species_name}
+                    </span>
+                    <.badge variant="info">{entry.status}</.badge>
+                  </div>
+                </summary>
+                <div class="border-t border-gray-200 px-4 py-3 space-y-2 text-sm">
+                  <div :if={entry.extracted_hosts != []} class="space-y-1">
+                    <div class="font-medium text-gray-700">Hosts</div>
+                    <div :for={host <- entry.extracted_hosts} class="text-gray-600">
+                      {host.name}<span :if={host.authority} class="text-gray-400">
+                        {" "}{host.authority}
+                      </span>
+                    </div>
+                  </div>
+                  <div :if={entry.extracted_trait_names != []} class="space-y-1">
+                    <div class="font-medium text-gray-700">Traits</div>
+                    <div class="text-gray-600">
+                      {Enum.join(entry.extracted_trait_names, ", ")}
+                    </div>
+                  </div>
+                  <div :if={entry.extracted_aliases != []} class="space-y-1">
+                    <div class="font-medium text-gray-700">Aliases</div>
+                    <div class="text-gray-600">
+                      {Enum.join(entry.extracted_aliases, ", ")}
+                    </div>
+                  </div>
+                  <div
+                    :if={
+                      entry.extracted_hosts == [] && entry.extracted_trait_names == [] &&
+                        entry.extracted_aliases == []
+                    }
+                    class="text-gray-500"
+                  >
+                    No extraction summary available.
                   </div>
                 </div>
-              </:col>
-              <:col :let={entry} label="Mapped Species">
-                {entry.mapped_species_name || "Unmapped"}
-              </:col>
-              <:col :let={entry} label="Hosts">{entry.host_count}</:col>
-              <:col :let={entry} label="Status">{entry.status}</:col>
-              <:action :let={entry}>
-                <.button
-                  :if={@review_view.species_review_unlocked?}
-                  id={"review-species-entry-#{entry.id}"}
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  phx-click="open_gall_review_workspace"
-                  phx-value-id={entry.id}
-                >
-                  Review Gall
-                </.button>
-              </:action>
-            </.table>
+              </details>
+            </div>
+
+            <.link
+              :if={@review_view.species_review_unlocked?}
+              navigate={~p"/admin/ingestion-review/#{@review_view.id}/review"}
+              data-role="proceed-to-review"
+              class="gf-btn gf-btn-primary inline-block"
+            >
+              Proceed to Species Review
+            </.link>
           </div>
         </.card>
-
-        <.modal
-          :if={@workspace}
-          id="gall-review-workspace-modal"
-          show
-          on_cancel={Phoenix.LiveView.JS.push("close_gall_review_workspace")}
-          class="max-w-5xl"
-        >
-          <:header>
-            Review Gall {@workspace.position}: {@workspace.extracted_name || "Unnamed gall"}
-          </:header>
-
-          <:body>
-            <form
-              id="gall-review-workspace-form"
-              phx-change="change_gall_review_workspace"
-              phx-submit="save_gall_review_workspace"
-              class="space-y-6"
-            >
-              <input type="hidden" name="workspace[id]" value={@workspace.id} />
-
-              <div class="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-                <div class="space-y-6">
-                  <section class="space-y-4">
-                    <div>
-                      <h3 class="text-base font-semibold text-gray-900">Species Review</h3>
-                      <p class="text-sm text-gray-500">
-                        Confirm the extracted gall against an existing gall species or defer it for later.
-                      </p>
-                    </div>
-
-                    <.alias_collision_warning collisions={@workspace.species_alias_collisions} />
-
-                    <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
-                      <div class="grid gap-3 md:grid-cols-2">
-                        <div>
-                          <div class="text-xs font-medium uppercase tracking-wide text-gray-500">
-                            Extracted Name
-                          </div>
-                          <div class="text-sm text-gray-900">
-                            {@workspace.extracted_name || "Unnamed gall"}
-                          </div>
-                        </div>
-                        <div>
-                          <div class="text-xs font-medium uppercase tracking-wide text-gray-500">
-                            Authority
-                          </div>
-                          <div class="text-sm text-gray-900">
-                            {metadata_value(@workspace.extracted_authority)}
-                          </div>
-                        </div>
-                      </div>
-
-                      <.radio_group
-                        id="workspace-species-decision"
-                        name="workspace[species_review][decision]"
-                        label="Decision"
-                        value={@workspace.species_review.decision}
-                        options={[
-                          %{value: "mapped", label: "Map to existing species"},
-                          %{value: "skip", label: "Skip for later"}
-                        ]}
-                      />
-
-                      <div :if={@workspace.species_review.decision != "skip"} class="space-y-3">
-                        <.typeahead
-                          id="workspace-species-picker"
-                          label="Species"
-                          placeholder="Search existing gall species..."
-                          query={@workspace.species_review.search_query}
-                          results={@workspace.species_review.search_results}
-                          selected={@workspace.species_review.selected_species}
-                          search_event="search_workspace_species"
-                          select_event="select_workspace_species"
-                          clear_event="clear_workspace_species"
-                          display_fn={& &1.name}
-                        >
-                          <:result :let={species}>
-                            <div class="font-medium text-gray-900">{species.name}</div>
-                            <div class="text-sm text-gray-600">{species.taxoncode}</div>
-                          </:result>
-                        </.typeahead>
-                      </div>
-
-                      <.input
-                        id="workspace-species-notes"
-                        name="workspace[species_review][notes]"
-                        type="textarea"
-                        label="Reviewer Notes"
-                        rows="3"
-                        value={@workspace.species_review.notes}
-                      />
-                    </div>
-                  </section>
-
-                  <section class="space-y-4">
-                    <div>
-                      <h3 class="text-base font-semibold text-gray-900">Host Review</h3>
-                      <p class="text-sm text-gray-500">
-                        Review extracted host mentions without writing host associations into the taxonomy yet.
-                      </p>
-                    </div>
-
-                    <div :if={@workspace.host_reviews == []} class="text-sm text-gray-500">
-                      No host mentions were extracted for this gall.
-                    </div>
-
-                    <div
-                      :for={host_review <- @workspace.host_reviews}
-                      id={"host-review-#{host_review.index}"}
-                      class="rounded-lg border border-gray-200 p-4 space-y-4"
-                    >
-                      <input
-                        type="hidden"
-                        name={"workspace[host_reviews][#{host_review.index}][extracted_name]"}
-                        value={host_review.extracted_name || ""}
-                      />
-                      <input
-                        type="hidden"
-                        name={"workspace[host_reviews][#{host_review.index}][extracted_authority]"}
-                        value={host_review.extracted_authority || ""}
-                      />
-
-                      <div class="grid gap-3 md:grid-cols-2">
-                        <div>
-                          <div class="text-xs font-medium uppercase tracking-wide text-gray-500">
-                            Extracted Host
-                          </div>
-                          <div class="text-sm text-gray-900">{host_review.extracted_name}</div>
-                        </div>
-                        <div>
-                          <div class="text-xs font-medium uppercase tracking-wide text-gray-500">
-                            Authority
-                          </div>
-                          <div class="text-sm text-gray-900">
-                            {metadata_value(host_review.extracted_authority)}
-                          </div>
-                        </div>
-                      </div>
-
-                      <.radio_group
-                        id={"host-review-decision-#{host_review.index}"}
-                        name={"workspace[host_reviews][#{host_review.index}][decision]"}
-                        label="Decision"
-                        value={host_review.decision}
-                        options={[
-                          %{value: "mapped", label: "Map to existing host"},
-                          %{value: "unresolved", label: "Leave unresolved"},
-                          %{value: "skip", label: "Skip"}
-                        ]}
-                      />
-
-                      <div :if={host_review.decision == "mapped"} class="space-y-3">
-                        <.typeahead
-                          id={"host-review-picker-#{host_review.index}"}
-                          label="Host Species"
-                          placeholder="Search existing host species..."
-                          query={host_review.search_query}
-                          results={host_review.search_results}
-                          selected={host_review.selected_species}
-                          search_event={"search_workspace_host:#{host_review.index}"}
-                          select_event={"select_workspace_host:#{host_review.index}"}
-                          clear_event={"clear_workspace_host:#{host_review.index}"}
-                          display_fn={& &1.name}
-                        >
-                          <:result :let={species}>
-                            <div class="font-medium text-gray-900">{species.name}</div>
-                            <div class="text-sm text-gray-600">{species.taxoncode}</div>
-                          </:result>
-                        </.typeahead>
-                      </div>
-                    </div>
-                  </section>
-                </div>
-
-                <div class="space-y-6">
-                  <section class="space-y-4">
-                    <div>
-                      <h3 class="text-base font-semibold text-gray-900">Trait Review</h3>
-                      <p class="text-sm text-gray-500">
-                        Use the extracted evidence and canonical vocab options to capture the reviewed trait values.
-                      </p>
-                    </div>
-
-                    <div :if={@workspace.trait_reviews == []} class="text-sm text-gray-500">
-                      No structured traits were extracted for this gall.
-                    </div>
-
-                    <div
-                      :for={trait_review <- @workspace.trait_reviews}
-                      id={"trait-review-#{trait_review.name}"}
-                      class="rounded-lg border border-gray-200 p-4 space-y-3"
-                    >
-                      <div class="flex flex-col gap-1">
-                        <h4 class="font-medium text-gray-900">{trait_label(trait_review.name)}</h4>
-                        <p class="text-sm text-gray-500">
-                          Suggested: {trait_suggested_text(trait_review)}
-                        </p>
-                        <p class="text-sm text-gray-500">
-                          Evidence: {trait_evidence_text(trait_review)}
-                        </p>
-                      </div>
-
-                      <.multi_select
-                        id={"trait-values-#{trait_review.name}"}
-                        label="Selected Values"
-                        options={workspace_trait_options(@filter_options, trait_review)}
-                        selected={workspace_trait_selected_values(trait_review)}
-                        on_toggle="toggle_trait_value"
-                      />
-                    </div>
-                  </section>
-
-                  <section class="space-y-4">
-                    <div>
-                      <h3 class="text-base font-semibold text-gray-900">Description Review</h3>
-                      <p class="text-sm text-gray-500">
-                        Edit the persisted description prose directly. Saving marks whether the prose changed during review.
-                      </p>
-                    </div>
-
-                    <div
-                      :if={@workspace.description_evidence != []}
-                      class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2"
-                    >
-                      <div class="text-xs font-medium uppercase tracking-wide text-gray-500">
-                        Extracted Evidence
-                      </div>
-                      <p
-                        :for={evidence <- @workspace.description_evidence}
-                        class="text-sm text-gray-700"
-                      >
-                        {evidence}
-                      </p>
-                    </div>
-
-                    <.input
-                      id="workspace-description-prose"
-                      name="workspace[description_prose]"
-                      type="textarea"
-                      label="Reviewed Description"
-                      rows="10"
-                      value={@workspace.description_prose}
-                    />
-                  </section>
-                </div>
-              </div>
-            </form>
-          </:body>
-
-          <:footer>
-            <div class="flex flex-wrap justify-end gap-3">
-              <.button
-                type="button"
-                variant="secondary"
-                phx-click="close_gall_review_workspace"
-              >
-                Close
-              </.button>
-              <.button
-                type="submit"
-                form="gall-review-workspace-form"
-                name="workspace[action]"
-                value="save"
-                variant="secondary"
-              >
-                Save Review
-              </.button>
-              <.button
-                type="submit"
-                form="gall-review-workspace-form"
-                name="workspace[action]"
-                value="complete"
-                variant="primary"
-              >
-                Mark Complete
-              </.button>
-            </div>
-          </:footer>
-        </.modal>
       </div>
     </Layouts.admin>
     """
@@ -994,245 +601,24 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   defp load_review_view(socket, source_ingestion_id) do
     review_view = Presenter.source_ingestion_review_view!(source_ingestion_id)
 
+    source_text =
+      case Ingestions.source_ingestion_full_text(source_ingestion_id) do
+        {:ok, text} -> text
+        _ -> nil
+      end
+
     socket
     |> assign(:review_view, review_view)
     |> assign(:page_title, review_view.display_title)
     |> assign(:selected_source, review_view.associated_source)
     |> assign(:source_search_query, "")
     |> assign(:source_search_results, [])
-    |> assign(:workspace, nil)
+    |> assign(:source_text, source_text)
+    |> assign(:source_text_focus, nil)
   end
 
   defp reload_review_view(socket) do
     load_review_view(socket, socket.assigns.review_view.id)
-  end
-
-  defp finalize_workspace_save(socket, workspace, source_ingestion_id) do
-    case Ingestions.maybe_complete_source_ingestion_review(source_ingestion_id) do
-      {:ok, source_ingestion} ->
-        reloaded_workspace =
-          workspace.id
-          |> Ingestions.source_ingestion_species_review_workspace!()
-          |> build_workspace_state()
-
-        socket = reload_review_view(socket)
-
-        {:noreply,
-         socket
-         |> put_flash(
-           :info,
-           workspace_saved_message(reloaded_workspace.status, source_ingestion.status)
-         )
-         |> assign(:workspace, reloaded_workspace)}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, put_flash(socket, :error, changeset_error_message(changeset))}
-
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to finalize review: #{inspect(reason)}")}
-    end
-  end
-
-  defp update_workspace(socket, fun) do
-    case socket.assigns.workspace do
-      nil -> socket
-      workspace -> assign(socket, :workspace, fun.(workspace))
-    end
-  end
-
-  defp update_workspace_assign(socket, params) do
-    update_workspace(socket, &merge_workspace_params(&1, params))
-  end
-
-  defp update_workspace_species_search(socket, query) do
-    results =
-      if String.length(query) >= 2 do
-        Species.search_species_by_name(query, "gall", 10)
-      else
-        []
-      end
-
-    update_workspace(socket, fn workspace ->
-      workspace
-      |> put_in([:species_review, :search_query], query)
-      |> put_in([:species_review, :search_results], results)
-    end)
-  end
-
-  defp update_workspace_host_search(socket, host_index, query) do
-    results =
-      if String.length(query) >= 2 do
-        Species.search_species_by_name(query, "plant", 10)
-      else
-        []
-      end
-
-    update_workspace(socket, fn workspace ->
-      update_in(
-        workspace.host_reviews,
-        &update_host_review_search(&1, host_index, query, results)
-      )
-    end)
-  end
-
-  defp toggle_workspace_trait_value(socket, encoded_value) do
-    update_workspace(socket, fn workspace ->
-      case decode_trait_value(encoded_value) do
-        {trait_name, value} ->
-          update_in(workspace.trait_reviews, &toggle_trait_review_value(&1, trait_name, value))
-
-        :error ->
-          workspace
-      end
-    end)
-  end
-
-  defp build_workspace_state(workspace_view) do
-    %{
-      id: workspace_view.id,
-      source_ingestion_id: workspace_view.source_ingestion_id,
-      position: workspace_view.position,
-      extracted_name: workspace_view.extracted_name,
-      extracted_authority: workspace_view.extracted_authority,
-      status: workspace_view.status,
-      description_prose: workspace_view.description_prose,
-      description_evidence: workspace_view.description_evidence,
-      species_alias_collisions:
-        Species.find_species_with_alias(workspace_view.extracted_name || ""),
-      species_review:
-        workspace_view.species_review
-        |> Map.put(:search_query, "")
-        |> Map.put(:search_results, []),
-      host_reviews:
-        Enum.map(workspace_view.host_reviews, fn host_review ->
-          host_review
-          |> Map.put(:search_query, "")
-          |> Map.put(:search_results, [])
-        end),
-      trait_reviews: workspace_view.trait_reviews
-    }
-  end
-
-  defp merge_workspace_params(workspace, params) do
-    species_review_params = nested_param(params, "species_review", %{})
-    host_review_params = normalize_indexed_form_values(nested_param(params, "host_reviews", %{}))
-
-    species_review =
-      workspace.species_review
-      |> Map.put(
-        :decision,
-        nested_param(species_review_params, "decision", workspace.species_review.decision)
-      )
-      |> Map.put(
-        :notes,
-        nested_param(species_review_params, "notes", workspace.species_review.notes)
-      )
-      |> normalize_species_review_selection()
-
-    host_reviews =
-      Enum.map(workspace.host_reviews, fn host_review ->
-        params_for_host =
-          Enum.find(host_review_params, %{}, fn host_review_param ->
-            parse_integer_param(
-              nested_param(host_review_param, "index", Integer.to_string(host_review.index))
-            ) ==
-              host_review.index
-          end)
-
-        host_review
-        |> Map.put(
-          :decision,
-          nested_param(params_for_host, "decision", host_review.decision)
-        )
-        |> normalize_host_review_selection()
-      end)
-
-    workspace
-    |> Map.put(:species_review, species_review)
-    |> Map.put(:host_reviews, host_reviews)
-    |> Map.put(
-      :description_prose,
-      nested_param(params, "description_prose", workspace.description_prose)
-    )
-  end
-
-  defp normalize_species_review_selection(species_review) do
-    if species_review.decision == "skip" do
-      species_review
-      |> Map.put(:species_id, nil)
-      |> Map.put(:selected_species, nil)
-    else
-      species_review
-    end
-  end
-
-  defp normalize_host_review_selection(host_review) do
-    if host_review.decision == "mapped" do
-      host_review
-    else
-      host_review
-      |> Map.put(:species_id, nil)
-      |> Map.put(:selected_species, nil)
-    end
-  end
-
-  defp maybe_default_species_review_decision(workspace, decision) do
-    case workspace.species_review.decision do
-      nil -> put_in(workspace, [:species_review, :decision], decision)
-      "" -> put_in(workspace, [:species_review, :decision], decision)
-      _ -> workspace
-    end
-  end
-
-  defp workspace_update_attrs(workspace, params) do
-    %{
-      "action" => nested_param(params, "action", "save"),
-      "description_prose" => workspace.description_prose,
-      "species_review" => %{
-        "decision" => workspace.species_review.decision,
-        "species_id" => workspace.species_review.species_id,
-        "notes" => workspace.species_review.notes
-      },
-      "host_reviews" =>
-        Enum.into(workspace.host_reviews, %{}, fn host_review ->
-          {
-            Integer.to_string(host_review.index),
-            %{
-              "index" => host_review.index,
-              "extracted_name" => host_review.extracted_name,
-              "extracted_authority" => host_review.extracted_authority,
-              "decision" => host_review.decision,
-              "species_id" => host_review.species_id
-            }
-          }
-        end),
-      "trait_reviews" =>
-        Enum.into(workspace.trait_reviews, %{}, fn trait_review ->
-          {trait_review.name, %{"selected_values" => trait_review.selected_values}}
-        end)
-    }
-  end
-
-  defp update_host_review_search(host_reviews, host_index, query, results) do
-    Enum.map(host_reviews, fn host_review ->
-      if host_review.index == host_index do
-        host_review
-        |> Map.put(:search_query, query)
-        |> Map.put(:search_results, results)
-      else
-        host_review
-      end
-    end)
-  end
-
-  defp toggle_trait_review_value(trait_reviews, trait_name, value) do
-    Enum.map(trait_reviews, fn trait_review ->
-      if trait_review.name == trait_name do
-        Map.update!(trait_review, :selected_values, &toggle_string_in_list(&1, value))
-      else
-        trait_review
-      end
-    end)
   end
 
   defp current_user_db_id(socket) do
@@ -1283,14 +669,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   defp authors_text([]), do: "None"
   defp authors_text(authors) when is_list(authors), do: Enum.join(authors, ", ")
 
-  defp species_summary(species) do
-    %{
-      id: species.id,
-      name: species.name,
-      taxoncode: species.taxoncode
-    }
-  end
-
   defp source_display(source), do: source.title
 
   defp source_details(source) do
@@ -1321,107 +699,4 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
     changeset.errors
     |> Enum.map_join(", ", fn {field, error} -> "#{field} #{translate_error(error)}" end)
   end
-
-  defp workspace_saved_message(_workspace_status, "complete"),
-    do: "Source ingestion review complete"
-
-  defp workspace_saved_message("complete", _ingestion_status), do: "Gall review marked complete"
-  defp workspace_saved_message("skipped", _ingestion_status), do: "Gall review skipped for later"
-  defp workspace_saved_message(_workspace_status, _ingestion_status), do: "Gall review saved"
-
-  defp workspace_trait_options(filter_options, trait_review) do
-    trait_review.name
-    |> trait_value_options(filter_options, trait_review)
-    |> Enum.map(fn {label, value} ->
-      %{label: label, value: encode_trait_value(trait_review.name, value)}
-    end)
-  end
-
-  defp workspace_trait_selected_values(trait_review) do
-    Enum.map(trait_review.selected_values, &encode_trait_value(trait_review.name, &1))
-  end
-
-  defp trait_value_options("detachable", _filter_options, trait_review) do
-    known_values = Enum.map(@detachable_options, fn {label, value} -> {label, value} end)
-    merge_trait_option_values(known_values, trait_review)
-  end
-
-  defp trait_value_options(trait_name, filter_options, trait_review) do
-    known_values =
-      trait_name
-      |> then(&Map.get(@trait_filter_keys, &1))
-      |> case do
-        nil ->
-          []
-
-        key ->
-          filter_options
-          |> Map.get(key, [])
-          |> Enum.map(fn option -> {option.field, option.field} end)
-      end
-
-    merge_trait_option_values(known_values, trait_review)
-  end
-
-  defp merge_trait_option_values(known_values, trait_review) do
-    extra_values =
-      (trait_review.selected_values ++ trait_review.suggested_values)
-      |> Enum.uniq()
-      |> Enum.reject(fn value ->
-        Enum.any?(known_values, fn {_label, known_value} -> known_value == value end)
-      end)
-      |> Enum.map(&{&1, &1})
-
-    known_values ++ extra_values
-  end
-
-  defp trait_label(trait_name) do
-    trait_name
-    |> String.replace("_", " ")
-    |> Phoenix.Naming.humanize()
-  end
-
-  defp trait_suggested_text(%{suggested_values: []}), do: "No suggestions recorded"
-
-  defp trait_suggested_text(%{suggested_values: suggested_values}),
-    do: Enum.join(suggested_values, ", ")
-
-  defp trait_evidence_text(%{raw_evidence: []}), do: "No raw evidence recorded"
-  defp trait_evidence_text(%{raw_evidence: raw_evidence}), do: Enum.join(raw_evidence, "; ")
-
-  defp encode_trait_value(trait_name, value), do: "#{trait_name}::#{value}"
-
-  defp decode_trait_value(encoded_value) do
-    case String.split(encoded_value, "::", parts: 2) do
-      [trait_name, value] when trait_name != "" and value != "" -> {trait_name, value}
-      _ -> :error
-    end
-  end
-
-  defp toggle_string_in_list(values, value) do
-    if value in values do
-      Enum.reject(values, &(&1 == value))
-    else
-      values ++ [value]
-    end
-  end
-
-  defp normalize_indexed_form_values(values) when is_list(values), do: values
-
-  defp normalize_indexed_form_values(values) when is_map(values) do
-    values
-    |> Enum.map(fn {key, value} ->
-      {parse_integer_param(key), Map.put_new(value, "index", key)}
-    end)
-    |> Enum.sort_by(fn {index, _value} -> index end)
-    |> Enum.map(fn {_index, value} -> value end)
-  end
-
-  defp normalize_indexed_form_values(_), do: []
-
-  defp nested_param(params, key, default) when is_map(params) do
-    Map.get(params, key, default)
-  end
-
-  defp nested_param(_params, _key, default), do: default
 end

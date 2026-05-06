@@ -17,13 +17,14 @@ defmodule Gallformers.Ingestions do
       Gallformers.Sources,
       Gallformers.Storage,
       Gallformers.Species,
+      Gallformers.Galls,
+      Gallformers.Taxonomy,
       Gallformers.Utils,
       Gallformers.IngestionPipeline.Storage,
       Gallformers.IngestionPipeline.Workflow
     ],
     exports: :all
 
-  import Ecto.Changeset, only: [add_error: 3]
   import Ecto.Query
 
   alias Gallformers.IngestionPipeline.Workflow
@@ -35,12 +36,13 @@ defmodule Gallformers.Ingestions do
     SourceIngestion,
     SourceIngestionCreation,
     SourceIngestionSpecies,
+    SourceIngestionSpeciesEntries,
+    SourceIngestionSpeciesReview,
     Submission
   }
 
   alias Gallformers.Repo
   alias Gallformers.Sources.Source
-  alias Gallformers.Species, as: SpeciesContext
   alias Gallformers.Utils
 
   @ordered_species_entries_query from(source_ingestion_species in SourceIngestionSpecies,
@@ -48,19 +50,6 @@ defmodule Gallformers.Ingestions do
                                  )
 
   @source_ingestion_orchestration_lock_namespace 41_204
-
-  @trait_option_keys %{
-    "color" => :colors,
-    "shape" => :shapes,
-    "texture" => :textures,
-    "walls" => :walls,
-    "cells" => :cells,
-    "alignment" => :alignments,
-    "plant_part" => :plant_parts,
-    "form" => :forms,
-    "season" => :seasons,
-    "detachable" => :detachable
-  }
 
   @source_ingestion_detail_preloads [
     :source,
@@ -70,8 +59,6 @@ defmodule Gallformers.Ingestions do
       {DuplicateReview.ordered_candidates_query(), [:candidate_source_ingestion, :reviewed_by]},
     species_entries: {@ordered_species_entries_query, [:species, :reviewed_by]}
   ]
-
-  @source_ingestion_species_workspace_preloads [:species, source_ingestion: [:source]]
 
   @doc """
   Returns queue rows for the persisted ingestion review workflow.
@@ -462,6 +449,8 @@ defmodule Gallformers.Ingestions do
     Lifecycle.retry_failed_source_ingestion(source_ingestion_id)
   end
 
+  # --- Duplicate candidates ---
+
   @doc """
   Returns a changeset for a duplicate candidate.
   """
@@ -532,6 +521,8 @@ defmodule Gallformers.Ingestions do
     DuplicateReview.reject_duplicate_candidate(duplicate_candidate, attrs)
   end
 
+  # --- Species entries ---
+
   @doc """
   Returns a changeset for a gall-level ingestion review item.
   """
@@ -594,78 +585,30 @@ defmodule Gallformers.Ingestions do
 
   def ensure_source_ingestion_species_entries(source_ingestion_id, records)
       when is_integer(source_ingestion_id) and is_list(records) do
-    existing_entries_by_position =
-      source_ingestion_id
-      |> list_source_ingestion_species()
-      |> Map.new(&{&1.position, &1})
-
-    records
-    |> Enum.with_index()
-    |> Enum.reduce_while(
-      {:ok, []},
-      &ensure_source_ingestion_species_entry(
-        &1,
-        &2,
-        source_ingestion_id,
-        existing_entries_by_position
-      )
-    )
-    |> case do
-      {:ok, species_entries} -> {:ok, Enum.reverse(species_entries)}
-      error -> error
-    end
+    SourceIngestionSpeciesEntries.ensure_entries(source_ingestion_id, records)
   end
 
-  defp ensure_source_ingestion_species_entry(
-         {record, position},
-         {:ok, acc},
-         source_ingestion_id,
-         existing_entries_by_position
-       ) do
-    case Map.fetch(existing_entries_by_position, position) do
-      {:ok, existing_entry} -> {:cont, {:ok, [existing_entry | acc]}}
-      :error -> create_source_ingestion_species_entry(source_ingestion_id, record, position, acc)
-    end
-  end
-
-  defp create_source_ingestion_species_entry(source_ingestion_id, record, position, acc) do
-    source_ingestion_id
-    |> source_ingestion_species_attrs_from_record(record, position)
-    |> create_source_ingestion_species()
-    |> case do
-      {:ok, species_entry} -> {:cont, {:ok, [species_entry | acc]}}
-      {:error, changeset} -> {:halt, {:error, changeset}}
-    end
-  end
+  # --- Species review ---
 
   @doc """
   Returns the persisted workspace view for a gall-level ingestion review item.
   """
   @spec source_ingestion_species_review_workspace!(integer()) :: map()
   def source_ingestion_species_review_workspace!(id) do
-    source_ingestion_species =
-      id
-      |> get_source_ingestion_species!()
-      |> Repo.preload(@source_ingestion_species_workspace_preloads)
+    SourceIngestionSpeciesReview.workspace!(id)
+  end
 
-    species_review = workspace_species_review(source_ingestion_species)
-    host_reviews = workspace_host_reviews(source_ingestion_species)
-    trait_reviews = workspace_trait_reviews(source_ingestion_species)
+  @doc """
+  Returns the best available full extracted text for an ingestion review.
+  """
+  @spec source_ingestion_full_text(SourceIngestion.t() | integer()) ::
+          {:ok, String.t()} | {:error, term()}
+  def source_ingestion_full_text(%SourceIngestion{id: source_ingestion_id}) do
+    source_ingestion_full_text(source_ingestion_id)
+  end
 
-    %{
-      id: source_ingestion_species.id,
-      source_ingestion_id: source_ingestion_species.source_ingestion_id,
-      position: source_ingestion_species.position,
-      extracted_name: source_ingestion_species.extracted_name,
-      extracted_authority: source_ingestion_species.extracted_authority,
-      status: source_ingestion_species.status,
-      description_prose: source_ingestion_species.description_prose,
-      description_evidence: workspace_description_evidence(source_ingestion_species),
-      species_review: species_review,
-      host_reviews: host_reviews,
-      trait_reviews: trait_reviews,
-      description_review: workspace_description_review(source_ingestion_species)
-    }
+  def source_ingestion_full_text(source_ingestion_id) when is_integer(source_ingestion_id) do
+    SourceIngestionSpeciesReview.full_text(source_ingestion_id)
   end
 
   @doc """
@@ -679,22 +622,7 @@ defmodule Gallformers.Ingestions do
         reviewed_by_id
       )
       when is_integer(reviewed_by_id) do
-    source_ingestion_species =
-      source_ingestion_species
-      |> Repo.preload(@source_ingestion_species_workspace_preloads)
-
-    with :ok <- ensure_source_associated_for_review(source_ingestion_species),
-         {:ok, normalized_review} <-
-           normalize_source_ingestion_species_review(source_ingestion_species, attrs),
-         {:ok, status} <-
-           review_status_for_update(source_ingestion_species, normalized_review) do
-      transition_source_ingestion_species_status(source_ingestion_species, status, %{
-        species_id: normalized_review.species_id,
-        description_prose: normalized_review.description_prose,
-        review_payload: normalized_review.review_payload,
-        reviewed_by_id: reviewed_by_id
-      })
-    end
+    SourceIngestionSpeciesReview.update_review(source_ingestion_species, attrs, reviewed_by_id)
   end
 
   @doc """
@@ -723,585 +651,7 @@ defmodule Gallformers.Ingestions do
     |> Repo.update()
   end
 
-  defp ensure_source_associated_for_review(%SourceIngestionSpecies{
-         source_ingestion: %SourceIngestion{source_id: source_id}
-       })
-       when not is_nil(source_id),
-       do: :ok
-
-  defp ensure_source_associated_for_review(%SourceIngestionSpecies{} = source_ingestion_species) do
-    {:error,
-     source_ingestion_species
-     |> SourceIngestionSpecies.changeset(%{})
-     |> add_error(:source_ingestion_id, "must be associated with a source before gall review")}
-  end
-
-  defp normalize_source_ingestion_species_review(source_ingestion_species, attrs) do
-    attrs = Map.new(attrs)
-
-    with {:ok, species_review} <- normalize_workspace_species_review(attrs),
-         {:ok, host_reviews} <- normalize_workspace_host_reviews(attrs),
-         {:ok, trait_reviews} <-
-           normalize_workspace_trait_reviews(source_ingestion_species, attrs),
-         {:ok, action} <- normalize_workspace_action(attrs) do
-      description_prose =
-        attrs
-        |> Utils.attr_value(:description_prose)
-        |> Utils.normalize_optional_string(source_ingestion_species.description_prose)
-
-      review_payload = %{
-        "species_review" => species_review.payload,
-        "host_reviews" => Enum.map(host_reviews, & &1.payload),
-        "trait_reviews" => trait_reviews.payload,
-        "description_review" => %{
-          "edited" => description_prose != source_ingestion_species.description_prose
-        }
-      }
-
-      {:ok,
-       %{
-         action: action,
-         species_id: species_review.species_id,
-         description_prose: description_prose,
-         review_payload: review_payload
-       }}
-    end
-  end
-
-  defp normalize_workspace_species_review(attrs) do
-    species_review_attrs = Utils.nested_value(attrs, :species_review, %{})
-    decision = Utils.nested_value(species_review_attrs, :decision, nil)
-    species_id = Utils.nested_integer(species_review_attrs, :species_id)
-    notes = Utils.normalize_optional_string(Utils.nested_value(species_review_attrs, :notes, nil))
-
-    cond do
-      decision == "mapped" and is_nil(species_id) ->
-        {:error,
-         %SourceIngestionSpecies{}
-         |> SourceIngestionSpecies.changeset(%{})
-         |> add_error(:species_id, "must be selected for a mapped review")}
-
-      decision == "mapped" ->
-        {:ok,
-         %{
-           species_id: species_id,
-           payload: %{
-             "decision" => "mapped",
-             "species_id" => species_id,
-             "notes" => notes
-           }
-         }}
-
-      decision == "skip" ->
-        {:ok,
-         %{
-           species_id: nil,
-           payload: %{
-             "decision" => "skip",
-             "species_id" => nil,
-             "notes" => notes
-           }
-         }}
-
-      true ->
-        {:error,
-         %SourceIngestionSpecies{}
-         |> SourceIngestionSpecies.changeset(%{})
-         |> add_error(:review_payload, "species review decision is required")}
-    end
-  end
-
-  defp normalize_workspace_host_reviews(attrs) do
-    attrs
-    |> Utils.nested_value(:host_reviews, %{})
-    |> Utils.normalize_indexed_values()
-    |> Enum.reduce_while({:ok, []}, fn host_review_attrs, {:ok, acc} ->
-      decision = Utils.nested_value(host_review_attrs, :decision, "unresolved")
-      species_id = Utils.nested_integer(host_review_attrs, :species_id)
-
-      payload = %{
-        "extracted_name" => Utils.nested_value(host_review_attrs, :extracted_name, nil),
-        "extracted_authority" => Utils.nested_value(host_review_attrs, :extracted_authority, nil)
-      }
-
-      case decision do
-        "mapped" when is_nil(species_id) ->
-          {:halt,
-           {:error,
-            %SourceIngestionSpecies{}
-            |> SourceIngestionSpecies.changeset(%{})
-            |> add_error(:review_payload, "mapped host reviews must select a host species")}}
-
-        "mapped" ->
-          {:cont,
-           {:ok,
-            [
-              %{
-                payload:
-                  Map.merge(payload, %{
-                    "decision" => "mapped",
-                    "species_id" => species_id
-                  })
-              }
-              | acc
-            ]}}
-
-        "skip" ->
-          {:cont,
-           {:ok,
-            [
-              %{
-                payload:
-                  Map.merge(payload, %{
-                    "decision" => "skip",
-                    "species_id" => nil
-                  })
-              }
-              | acc
-            ]}}
-
-        "unresolved" ->
-          {:cont,
-           {:ok,
-            [
-              %{
-                payload:
-                  Map.merge(payload, %{
-                    "decision" => "unresolved",
-                    "species_id" => nil
-                  })
-              }
-              | acc
-            ]}}
-
-        _ ->
-          {:halt,
-           {:error,
-            %SourceIngestionSpecies{}
-            |> SourceIngestionSpecies.changeset(%{})
-            |> add_error(:review_payload, "host review decision is invalid")}}
-      end
-    end)
-    |> case do
-      {:ok, host_reviews} -> {:ok, Enum.reverse(host_reviews)}
-      error -> error
-    end
-  end
-
-  defp normalize_workspace_trait_reviews(source_ingestion_species, attrs) do
-    extraction_traits = extraction_traits(source_ingestion_species.extraction_payload)
-
-    payload =
-      attrs
-      |> Utils.nested_value(:trait_reviews, %{})
-      |> normalize_trait_review_values()
-      |> Enum.sort_by(fn {name, _trait_review_attrs} -> name end)
-      |> Enum.map(fn {name, trait_review_attrs} ->
-        selected_values =
-          trait_review_attrs
-          |> Utils.nested_value(:selected_values, [])
-          |> Utils.normalize_string_list()
-
-        %{
-          "name" => name,
-          "selected_values" => selected_values,
-          "raw_evidence" => extract_trait_raw_evidence(Map.get(extraction_traits, name))
-        }
-      end)
-
-    {:ok, %{payload: payload}}
-  end
-
-  defp normalize_workspace_action(attrs) do
-    case Utils.attr_value(attrs, :action) do
-      "save" ->
-        {:ok, "save"}
-
-      "complete" ->
-        {:ok, "complete"}
-
-      nil ->
-        {:ok, "save"}
-
-      _ ->
-        {:error,
-         %SourceIngestionSpecies{}
-         |> SourceIngestionSpecies.changeset(%{})
-         |> add_error(:status, "review action is invalid")}
-    end
-  end
-
-  defp review_status_for_update(
-         %SourceIngestionSpecies{source_ingestion: %SourceIngestion{source_id: source_id}},
-         %{action: "complete", species_id: species_id, review_payload: review_payload}
-       ) do
-    host_reviews = Map.get(review_payload, "host_reviews", [])
-    species_review = Map.get(review_payload, "species_review", %{})
-    description_review = Map.get(review_payload, "description_review", %{})
-
-    cond do
-      is_nil(source_id) ->
-        {:error,
-         %SourceIngestionSpecies{}
-         |> SourceIngestionSpecies.changeset(%{})
-         |> add_error(:status, "cannot mark complete until a source is associated")}
-
-      Map.get(species_review, "decision") != "mapped" or is_nil(species_id) ->
-        {:error,
-         %SourceIngestionSpecies{}
-         |> SourceIngestionSpecies.changeset(%{})
-         |> add_error(:status, "cannot mark complete until the gall is mapped")}
-
-      Enum.any?(host_reviews, &(Map.get(&1, "decision") == "unresolved")) ->
-        {:error,
-         %SourceIngestionSpecies{}
-         |> SourceIngestionSpecies.changeset(%{})
-         |> add_error(:status, "cannot mark complete while host reviews are unresolved")}
-
-      is_nil(Map.get(description_review, "edited")) ->
-        {:error,
-         %SourceIngestionSpecies{}
-         |> SourceIngestionSpecies.changeset(%{})
-         |> add_error(:status, "cannot mark complete until the description is reviewed")}
-
-      true ->
-        {:ok, "complete"}
-    end
-  end
-
-  defp review_status_for_update(_source_ingestion_species, %{review_payload: review_payload}) do
-    case get_in(review_payload, ["species_review", "decision"]) do
-      "mapped" ->
-        {:ok, "mapped"}
-
-      "skip" ->
-        {:ok, "skipped"}
-
-      _ ->
-        {:error,
-         %SourceIngestionSpecies{}
-         |> SourceIngestionSpecies.changeset(%{})
-         |> add_error(:status, "review decision is invalid")}
-    end
-  end
-
-  defp workspace_species_review(source_ingestion_species) do
-    persisted_review =
-      Utils.nested_value(source_ingestion_species.review_payload, :species_review, %{})
-
-    decision =
-      Utils.nested_value(
-        persisted_review,
-        :decision,
-        if(source_ingestion_species.species_id, do: "mapped")
-      )
-
-    species_id =
-      Utils.nested_integer(persisted_review, :species_id) || source_ingestion_species.species_id
-
-    %{
-      decision: decision,
-      species_id: species_id,
-      notes: Utils.nested_value(persisted_review, :notes, nil),
-      selected_species: maybe_species_summary(species_id, source_ingestion_species.species)
-    }
-  end
-
-  defp workspace_host_reviews(source_ingestion_species) do
-    persisted_reviews =
-      source_ingestion_species.review_payload
-      |> Utils.nested_value(:host_reviews, [])
-      |> Utils.normalize_indexed_values()
-
-    selected_species =
-      persisted_reviews
-      |> Enum.map(&Utils.nested_integer(&1, :species_id))
-      |> Enum.reject(&is_nil/1)
-      |> load_species_summaries()
-
-    source_ingestion_species.extraction_payload
-    |> extraction_hosts()
-    |> Enum.with_index()
-    |> Enum.map(fn {host, index} ->
-      persisted_review = matching_host_review(host, persisted_reviews)
-      species_id = Utils.nested_integer(persisted_review, :species_id)
-
-      %{
-        index: index,
-        extracted_name: Utils.nested_value(host, :name, nil),
-        extracted_authority: Utils.nested_value(host, :authority, nil),
-        decision: Utils.nested_value(persisted_review, :decision, "unresolved"),
-        species_id: species_id,
-        selected_species: Map.get(selected_species, species_id),
-        search_query: "",
-        search_results: []
-      }
-    end)
-  end
-
-  defp workspace_trait_reviews(source_ingestion_species) do
-    persisted_trait_reviews = review_trait_reviews(source_ingestion_species.review_payload)
-
-    extraction_traits = extraction_traits(source_ingestion_species.extraction_payload)
-
-    extraction_traits
-    |> Map.keys()
-    |> Enum.sort()
-    |> Enum.map(fn name ->
-      persisted_trait_review = Map.get(persisted_trait_reviews, name, %{})
-      extracted_trait = Map.get(extraction_traits, name)
-
-      %{
-        name: name,
-        selected_values:
-          persisted_trait_review
-          |> Utils.nested_value(
-            :selected_values,
-            extracted_trait_suggested_values(extracted_trait)
-          )
-          |> Utils.normalize_string_list(),
-        suggested_values: extracted_trait_suggested_values(extracted_trait),
-        raw_evidence:
-          persisted_trait_review
-          |> Utils.nested_value(:raw_evidence, extract_trait_raw_evidence(extracted_trait))
-      }
-    end)
-  end
-
-  defp workspace_description_review(source_ingestion_species) do
-    persisted_review =
-      Utils.nested_value(source_ingestion_species.review_payload, :description_review, %{})
-
-    %{edited: Utils.nested_value(persisted_review, :edited, false)}
-  end
-
-  defp workspace_description_evidence(source_ingestion_species) do
-    source_ingestion_species.extraction_payload
-    |> Utils.nested_value(:description_evidence, [])
-    |> Utils.normalize_indexed_values()
-    |> Enum.flat_map(fn evidence ->
-      case Utils.nested_value(evidence, :text, nil) do
-        text when is_binary(text) and text != "" -> [text]
-        _ -> []
-      end
-    end)
-  end
-
-  defp matching_host_review(host, persisted_reviews) do
-    Enum.find(persisted_reviews, %{}, fn persisted_review ->
-      Utils.nested_value(persisted_review, :extracted_name, nil) ==
-        Utils.nested_value(host, :name, nil) and
-        Utils.nested_value(persisted_review, :extracted_authority, nil) ==
-          Utils.nested_value(host, :authority, nil)
-    end)
-  end
-
-  defp maybe_species_summary(nil, _species), do: nil
-
-  defp maybe_species_summary(species_id, nil) do
-    species_id
-    |> SpeciesContext.get_species()
-    |> species_summary()
-  end
-
-  defp maybe_species_summary(_species_id, species), do: species_summary(species)
-
-  defp source_ingestion_species_attrs_from_record(source_ingestion_id, record, position) do
-    gall_species = Utils.attr_value(record, :gall_species)
-    host_species = Utils.attr_value(record, :host_species)
-    description = string_or_nil(Utils.attr_value(record, :description))
-
-    %{
-      source_ingestion_id: source_ingestion_id,
-      position: position,
-      status: "pending",
-      extracted_name: Utils.nested_value(gall_species, :name, nil),
-      extracted_authority: Utils.nested_value(gall_species, :authority, nil),
-      description_prose: description || "",
-      extraction_payload: %{
-        "gall_species" => normalize_extracted_record_map(gall_species),
-        "host_species" => normalize_extracted_record_map(host_species),
-        "hosts" => normalize_extracted_hosts(host_species),
-        "traits" => normalize_extracted_traits(Utils.attr_value(record, :traits)),
-        "description_evidence" => description_evidence_from_record(description),
-        "location" => Utils.attr_value(record, :location),
-        "confidence" => Utils.attr_value(record, :confidence)
-      }
-    }
-  end
-
-  defp normalize_extracted_record_map(value) when is_map(value), do: value
-  defp normalize_extracted_record_map(_value), do: %{}
-
-  defp normalize_extracted_hosts(host_species) when is_map(host_species) do
-    case Utils.nested_value(host_species, :name, nil) do
-      name when is_binary(name) and name != "" -> [host_species]
-      _ -> []
-    end
-  end
-
-  defp normalize_extracted_hosts(_host_species), do: []
-
-  defp normalize_extracted_traits(traits) when is_map(traits), do: traits
-  defp normalize_extracted_traits(_traits), do: %{}
-
-  defp description_evidence_from_record(nil), do: []
-  defp description_evidence_from_record(description), do: [%{"text" => description}]
-
-  defp string_or_nil(value) when is_binary(value) do
-    case String.trim(value) do
-      "" -> nil
-      trimmed -> trimmed
-    end
-  end
-
-  defp string_or_nil(_value), do: nil
-
-  defp load_species_summaries([]), do: %{}
-
-  defp load_species_summaries(species_ids) do
-    species_ids
-    |> Enum.uniq()
-    |> Enum.reduce(%{}, fn species_id, acc ->
-      case SpeciesContext.get_species(species_id) do
-        nil -> acc
-        species -> Map.put(acc, species_id, species_summary(species))
-      end
-    end)
-  end
-
-  defp species_summary(nil), do: nil
-
-  defp species_summary(species) do
-    %{
-      id: species.id,
-      name: species.name,
-      taxoncode: species.taxoncode
-    }
-  end
-
-  defp extraction_hosts(extraction_payload) do
-    case Utils.nested_value(extraction_payload, :hosts, []) do
-      hosts when is_list(hosts) -> hosts
-      _ -> []
-    end
-  end
-
-  defp extraction_traits(extraction_payload) do
-    case Utils.nested_value(extraction_payload, :traits, %{}) do
-      %SourceIngestionSpecies.ExtractedTraits{} = traits ->
-        extracted_traits_to_map(traits)
-
-      traits when is_map(traits) ->
-        traits
-
-      _ ->
-        %{}
-    end
-  end
-
-  defp extracted_traits_to_map(%SourceIngestionSpecies.ExtractedTraits{} = traits) do
-    traits
-    |> Map.from_struct()
-    |> Enum.reject(fn {key, value} -> key in [:__meta__, :__struct__] or is_nil(value) end)
-    |> Map.new(fn
-      {key, %SourceIngestionSpecies.ExtractedTraitValue{} = value} ->
-        {Atom.to_string(key),
-         %{
-           "original" => value.original,
-           "suggested" => List.wrap(value.suggested)
-         }}
-
-      {key, value} ->
-        {Atom.to_string(key), value}
-    end)
-  end
-
-  defp review_trait_reviews(%SourceIngestionSpecies.ReviewPayload{} = review_payload) do
-    review_payload
-    |> Map.get(:trait_reviews, [])
-    |> Enum.reduce(%{}, fn trait_review, acc ->
-      Map.put(acc, trait_review.name, %{
-        "selected_values" => List.wrap(trait_review.selected_values),
-        "raw_evidence" => List.wrap(trait_review.raw_evidence)
-      })
-    end)
-  end
-
-  defp review_trait_reviews(review_payload) when is_map(review_payload) do
-    case Utils.nested_value(review_payload, :trait_reviews, %{}) do
-      reviews when is_list(reviews) ->
-        Enum.reduce(reviews, %{}, &merge_review_trait(&1, &2))
-
-      reviews when is_map(reviews) ->
-        reviews
-
-      _ ->
-        %{}
-    end
-  end
-
-  defp review_trait_reviews(_review_payload), do: %{}
-
-  defp merge_review_trait(review, acc) do
-    case Utils.nested_value(review, :name, nil) do
-      name when is_binary(name) and name != "" ->
-        Map.put(acc, name, %{
-          "selected_values" =>
-            review
-            |> Utils.nested_value(:selected_values, [])
-            |> Utils.normalize_string_list(),
-          "raw_evidence" =>
-            review
-            |> Utils.nested_value(:raw_evidence, [])
-            |> Utils.normalize_string_list()
-        })
-
-      _ ->
-        acc
-    end
-  end
-
-  defp extracted_trait_suggested_values(nil), do: []
-
-  defp extracted_trait_suggested_values(extracted_trait) do
-    extracted_trait
-    |> Utils.nested_value(:suggested, [])
-    |> Utils.normalize_string_list()
-  end
-
-  defp extract_trait_raw_evidence(nil), do: []
-
-  defp extract_trait_raw_evidence(extracted_trait) do
-    extracted_trait
-    |> case do
-      trait when is_map(trait) ->
-        originals = Utils.nested_value(trait, :originals, nil)
-
-        cond do
-          is_list(originals) ->
-            Utils.normalize_string_list(originals)
-
-          is_binary(Utils.nested_value(trait, :original, nil)) ->
-            [Utils.nested_value(trait, :original, nil)]
-
-          true ->
-            []
-        end
-
-      _ ->
-        []
-    end
-  end
-
-  defp normalize_trait_review_values(trait_reviews) when is_map(trait_reviews) do
-    trait_reviews
-    |> Enum.map(fn {name, value} -> {to_string(name), value} end)
-    |> Enum.filter(fn {name, _} -> Map.has_key?(@trait_option_keys, name) end)
-    |> Map.new()
-  end
-
-  defp normalize_trait_review_values(_), do: %{}
+  # --- Private helpers ---
 
   defp maybe_filter_status(query, nil), do: query
 

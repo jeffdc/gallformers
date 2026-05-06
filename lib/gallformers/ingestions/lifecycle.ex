@@ -123,8 +123,7 @@ defmodule Gallformers.Ingestions.Lifecycle do
          id: source_ingestion_id,
          status: "processing"
        }) do
-    not active_worker_job_exists?(source_ingestion_id) and
-      latest_worker_state_for_ingestion(source_ingestion_id) in ["discarded", "cancelled"]
+    not active_worker_job_exists?(source_ingestion_id)
   end
 
   defp abandoned_source_ingestion?(%SourceIngestion{}), do: false
@@ -180,21 +179,5 @@ defmodule Gallformers.Ingestions.Lifecycle do
           )
     )
     |> Repo.exists?()
-  end
-
-  defp latest_worker_state_for_ingestion(source_ingestion_id) do
-    from(job in "oban_jobs",
-      where:
-        field(job, :worker) == ^"Gallformers.IngestionPipeline.Worker" and
-          fragment(
-            "?->>'ingestion_id' = ?",
-            field(job, :args),
-            ^Integer.to_string(source_ingestion_id)
-          ),
-      order_by: [desc: field(job, :inserted_at), desc: field(job, :id)],
-      limit: 1,
-      select: field(job, :state)
-    )
-    |> Repo.one()
   end
 end

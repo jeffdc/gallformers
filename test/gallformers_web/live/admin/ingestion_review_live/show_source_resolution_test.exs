@@ -156,9 +156,8 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowSourceResolutionTest do
       assert row_index(html, middle_entry.id) < row_index(html, later_entry.id)
 
       assert html =~ "Andricus persistus"
-      assert row_hosts_count?(html, first_entry.id, 2)
-      assert row_hosts_count?(html, middle_entry.id, 0)
-      assert row_hosts_count?(html, later_entry.id, 0)
+      assert html =~ "Quercus alba"
+      assert html =~ "Quercus stellata"
     end
 
     test "gall review stays locked until a source is associated, then row actions appear", %{
@@ -175,7 +174,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowSourceResolutionTest do
       {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}")
 
       assert has_element?(view, "#species-review-source-locked")
-      refute has_element?(view, "#review-species-entry-#{species_entry.id}")
 
       view
       |> element("#source-picker")
@@ -186,7 +184,68 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowSourceResolutionTest do
       |> render_click()
 
       refute has_element?(view, "#species-review-source-locked")
-      assert has_element?(view, "#review-species-entry-#{species_entry.id}")
+      html = render(view)
+      assert html =~ species_entry.extracted_name
+    end
+
+    test "proceed to review link appears only when source is attached", %{conn: conn} do
+      reviewer = db_user_fixture("Source Reviewer")
+      ingestion = review_ready_ingestion_fixture(%{uploaded_by_id: reviewer.id})
+      source = source_fixture(%{title: "Gating Source"})
+      source_ingestion_species_fixture(ingestion, 0, %{extracted_name: "Gall One"})
+
+      conn = superadmin_conn(conn, reviewer)
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}")
+
+      refute has_element?(view, "[data-role=proceed-to-review]")
+
+      view
+      |> element("#source-picker")
+      |> render_hook("select_source", %{"id" => source.id})
+
+      view
+      |> element("#associate-source")
+      |> render_click()
+
+      assert has_element?(view, "[data-role=proceed-to-review]")
+
+      html = render(view)
+      assert html =~ ~p"/admin/ingestion-review/#{ingestion.id}/review"
+    end
+
+    test "expandable gall rows show extraction summary", %{conn: conn} do
+      reviewer = db_user_fixture("Source Reviewer")
+      source = source_fixture(%{title: "Summary Source"})
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: reviewer.id,
+          source_id: source.id
+        })
+
+      source_ingestion_species_fixture(ingestion, 0, %{
+        extracted_name: "Andricus quercuscalifornicus",
+        extraction_payload: %{
+          "hosts" => [
+            %{"name" => "Quercus lobata", "authority" => "Née"},
+            %{"name" => "Quercus douglasii", "authority" => "Hook. & Arn."}
+          ],
+          "traits" => %{
+            "shape" => %{"original" => "globular", "suggested" => ["globular"]},
+            "color" => %{"original" => "brown", "suggested" => ["brown"]}
+          },
+          "description_evidence" => [],
+          "aliases" => ["Q. californicus gall"]
+        }
+      })
+
+      conn = superadmin_conn(conn, reviewer)
+      {:ok, _view, html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}")
+
+      assert html =~ "Quercus lobata"
+      assert html =~ "Quercus douglasii"
+      assert html =~ "shape"
+      assert html =~ "color"
     end
   end
 
@@ -251,12 +310,5 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowSourceResolutionTest do
       {index, _length} -> index
       :nomatch -> flunk("missing row for species entry #{entry_id}")
     end
-  end
-
-  defp row_hosts_count?(html, entry_id, expected_count) do
-    Regex.match?(
-      ~r/id="species-entry-#{entry_id}".*?<td[^>]*>\s*#{expected_count}\s*<\/td>/s,
-      html
-    )
   end
 end

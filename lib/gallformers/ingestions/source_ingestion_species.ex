@@ -121,6 +121,7 @@ defmodule Gallformers.Ingestions.SourceIngestionSpecies do
             gall_species: ExtractedSpecies.t() | nil,
             host_species: ExtractedSpecies.t() | nil,
             hosts: [ExtractedSpecies.t()],
+            aliases: [String.t()],
             traits: ExtractedTraits.t() | nil,
             description_evidence: [DescriptionEvidence.t()],
             location: String.t() | nil,
@@ -132,6 +133,7 @@ defmodule Gallformers.Ingestions.SourceIngestionSpecies do
       embeds_one :gall_species, ExtractedSpecies, on_replace: :update
       embeds_one :host_species, ExtractedSpecies, on_replace: :update
       embeds_many :hosts, ExtractedSpecies, on_replace: :delete
+      field :aliases, {:array, :string}, default: []
       embeds_one :traits, ExtractedTraits, on_replace: :update
       embeds_many :description_evidence, DescriptionEvidence, on_replace: :delete
       field :location, :string
@@ -142,7 +144,7 @@ defmodule Gallformers.Ingestions.SourceIngestionSpecies do
       attrs = normalize_embed_attrs(attrs)
 
       extraction_payload
-      |> cast(attrs, [:location, :confidence])
+      |> cast(attrs, [:aliases, :location, :confidence])
       |> cast_embed(:gall_species)
       |> cast_embed(:host_species)
       |> cast_embed(:hosts)
@@ -188,6 +190,8 @@ defmodule Gallformers.Ingestions.SourceIngestionSpecies do
     @type t :: %__MODULE__{
             decision: String.t() | nil,
             species_id: integer() | nil,
+            family_id: integer() | nil,
+            accepted_aliases: [String.t()],
             notes: String.t() | nil
           }
 
@@ -195,11 +199,13 @@ defmodule Gallformers.Ingestions.SourceIngestionSpecies do
     embedded_schema do
       field :decision, :string
       field :species_id, :integer
+      field :family_id, :integer
+      field :accepted_aliases, {:array, :string}, default: []
       field :notes, :string
     end
 
     def changeset(species_review, attrs) do
-      cast(species_review, attrs, [:decision, :species_id, :notes])
+      cast(species_review, attrs, [:decision, :species_id, :family_id, :accepted_aliases, :notes])
     end
   end
 
@@ -211,7 +217,8 @@ defmodule Gallformers.Ingestions.SourceIngestionSpecies do
             extracted_name: String.t() | nil,
             extracted_authority: String.t() | nil,
             decision: String.t() | nil,
-            species_id: integer() | nil
+            species_id: integer() | nil,
+            family_id: integer() | nil
           }
 
     @primary_key false
@@ -220,10 +227,17 @@ defmodule Gallformers.Ingestions.SourceIngestionSpecies do
       field :extracted_authority, :string
       field :decision, :string
       field :species_id, :integer
+      field :family_id, :integer
     end
 
     def changeset(host_review, attrs) do
-      cast(host_review, attrs, [:extracted_name, :extracted_authority, :decision, :species_id])
+      cast(host_review, attrs, [
+        :extracted_name,
+        :extracted_authority,
+        :decision,
+        :species_id,
+        :family_id
+      ])
     end
   end
 

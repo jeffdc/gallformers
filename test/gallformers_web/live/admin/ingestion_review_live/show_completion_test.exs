@@ -10,8 +10,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowCompletionTest do
   alias Gallformers.IngestionPipeline.Worker
   alias Gallformers.Ingestions
   alias Gallformers.Repo
-  alias Gallformers.Sources
-  alias Gallformers.Species.Species
   alias Gallformers.Storage.SourceArtifacts
 
   defmodule StorageBackendStub do
@@ -117,88 +115,8 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowCompletionTest do
   end
 
   describe "completion flow" do
-    test "saving the last unresolved gall review completes the ingestion and removes it from the active queue",
-         %{conn: conn} do
-      reviewer = db_user_fixture("Completion Reviewer")
-      mapped_species = species_fixture("Andricus completionis", "gall")
-      source = source_fixture(%{title: "Completion Source"})
-
-      assert {:ok, ingestion} =
-               Ingestions.submit_source_ingestion(%{
-                 input_type: "url",
-                 uploaded_by_id: reviewer.id,
-                 url: "https://example.com/completion"
-               })
-
-      assert {:ok, ingestion} =
-               Ingestions.transition_source_ingestion_status(ingestion, :needs_review)
-
-      first_entry = source_ingestion_species_fixture(ingestion, 0)
-      second_entry = source_ingestion_species_fixture(ingestion, 1)
-
-      conn = superadmin_conn(conn, reviewer)
-      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}")
-
-      view
-      |> element("#source-picker")
-      |> render_hook("select_source", %{"id" => source.id})
-
-      view
-      |> element("#associate-source")
-      |> render_click()
-
-      view
-      |> element("#review-species-entry-#{first_entry.id}")
-      |> render_click()
-
-      view
-      |> element("#workspace-species-picker")
-      |> render_hook("select_workspace_species", %{"id" => mapped_species.id})
-
-      html =
-        view
-        |> form("#gall-review-workspace-form", %{
-          "workspace" => %{
-            "species_review" => %{"decision" => "mapped"},
-            "description_prose" => "Rounded woolly gall on oak twigs."
-          }
-        })
-        |> render_submit()
-
-      assert html =~ "Gall review saved"
-      assert html =~ "1 of 2 galls remaining"
-      assert Ingestions.get_source_ingestion!(ingestion.id).status == "needs_review"
-
-      view
-      |> element("#review-species-entry-#{second_entry.id}")
-      |> render_click()
-
-      html =
-        view
-        |> form("#gall-review-workspace-form", %{
-          "workspace" => %{
-            "species_review" => %{"decision" => "skip"},
-            "description_prose" => "Rounded woolly gall on oak twigs."
-          }
-        })
-        |> render_submit()
-
-      completed_ingestion = Ingestions.get_source_ingestion!(ingestion.id)
-
-      assert completed_ingestion.status == "complete"
-      assert completed_ingestion.processing_stage == "complete"
-      assert html =~ "Source ingestion review complete"
-      assert html =~ "Complete"
-
-      {:ok, queue_view, queue_html} = live(conn, ~p"/admin/ingestion-review")
-
-      refute queue_html =~ "Untitled URL submission"
-
-      queue_html = render_click(queue_view, "toggle_include_complete")
-
-      assert queue_html =~ "Untitled URL submission"
-      assert queue_html =~ "Complete"
-    end
+    # NOTE: The end-to-end completion test (saving last gall completes ingestion)
+    # moved to workspace_test.exs — workspace interactions now live on a separate route.
 
     test "failed ingestions can be cleared from the detail page", %{conn: conn} do
       reviewer = db_user_fixture("Failed Cleanup Reviewer")
@@ -285,38 +203,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowCompletionTest do
       })
 
     user
-  end
-
-  defp source_fixture(attrs) do
-    merged_attrs =
-      Map.merge(
-        %{
-          title: "Source #{System.unique_integer([:positive])}",
-          author: "Author",
-          pubyear: "2026",
-          link: "https://example.com/source",
-          citation: "Author. 2026. Source.",
-          license: "CC-BY",
-          licenselink: "https://creativecommons.org/licenses/by/4.0/"
-        },
-        attrs
-      )
-
-    {:ok, source} = Sources.create_source(merged_attrs)
-    source
-  end
-
-  defp species_fixture(name, taxoncode) do
-    unique_name = "#{name} #{System.unique_integer([:positive])}"
-
-    {:ok, species} =
-      Repo.insert(%Species{
-        name: unique_name,
-        taxoncode: taxoncode,
-        datacomplete: false
-      })
-
-    species
   end
 
   defp put_storage_object(path, body) do

@@ -153,6 +153,7 @@ defmodule GallformersWeb.Router do
     # Source ingestion review (superadmin only)
     live "/ingestion-review", Admin.IngestionReviewLive.Index, :index
     live "/ingestion-review/:id", Admin.IngestionReviewLive.Show, :show
+    live "/ingestion-review/:id/review", Admin.IngestionReviewLive.Workspace, :review
   end
 
   # Operator routes (require operator role)

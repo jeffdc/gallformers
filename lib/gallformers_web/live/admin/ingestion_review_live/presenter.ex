@@ -210,16 +210,45 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
   end
 
   defp species_entry_review_view(species_entry) do
+    payload = species_entry.extraction_payload || %{}
+
     %{
       id: species_entry.id,
       position: species_entry.position,
       extracted_name: species_entry.extracted_name,
       extracted_authority: species_entry.extracted_authority,
       mapped_species_name: mapped_species_name(species_entry.species),
-      host_count: host_count(species_entry.extraction_payload),
-      status: species_entry.status
+      host_count: host_count(payload),
+      status: species_entry.status,
+      extracted_aliases: extraction_aliases(payload),
+      extracted_hosts: extraction_hosts(payload),
+      extracted_trait_names: extraction_trait_names(payload)
     }
   end
+
+  defp extraction_aliases(%{aliases: aliases}) when is_list(aliases), do: aliases
+  defp extraction_aliases(_), do: []
+
+  defp extraction_hosts(%{hosts: hosts}) when is_list(hosts) do
+    Enum.map(hosts, fn
+      %{name: name} = host -> %{name: name, authority: Map.get(host, :authority)}
+      _ -> nil
+    end)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp extraction_hosts(_), do: []
+
+  @trait_fields ~w(shape color texture walls cells alignment plant_part form season detachable)a
+  defp extraction_trait_names(%{traits: nil}), do: []
+
+  defp extraction_trait_names(%{traits: traits}) do
+    @trait_fields
+    |> Enum.filter(fn field -> Map.get(traits, field) not in [nil, ""] end)
+    |> Enum.map(&Atom.to_string/1)
+  end
+
+  defp extraction_trait_names(_), do: []
 
   defp mapped_species_name(nil), do: nil
   defp mapped_species_name(species), do: species.name

@@ -96,6 +96,9 @@ npm-debug.log
 # Request logs (development only, production uses /data/logs)
 /priv/logs/
 
+# Local dev storage (filesystem backend for S3 in dev)
+/priv/storage/
+
 # API compiled binaries
 api/bin/
 

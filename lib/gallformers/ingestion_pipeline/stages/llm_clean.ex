@@ -17,7 +17,7 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMClean do
   @default_chunk_size 6000
   @default_max_tokens 8192
   @default_max_concurrency 2
-  @default_task_timeout :timer.minutes(5)
+  @default_task_timeout :timer.minutes(10)
 
   @impl true
   def stage_name, do: :llm_clean
@@ -30,6 +30,13 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMClean do
            Storage.download_artifact(ingestion.id, :preprocess, "text.txt"),
          prompt <- LLMSupport.load_prompt!("llm_clean.txt"),
          chunks <- LLMClient.chunk_text(preprocessed_text, chunk_size()),
+         _ <-
+           Logger.info("llm_clean chunked input",
+             ingestion_id: ingestion.id,
+             input_chars: String.length(preprocessed_text),
+             chunk_count: length(chunks),
+             chunk_sizes: Enum.map(chunks, &String.length/1)
+           ),
          {:ok, cleaned_text} <- clean_chunks(prompt, chunks),
          {:ok, _artifact_path} <-
            Storage.upload_artifact(

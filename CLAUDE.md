@@ -5,10 +5,6 @@
 - Do not commit until precommit passes.
 - Always compile with `--warnings-as-errors`**. When verifying code changes, NEVER use plain `mix compile` - always use `mix compile --warnings-as-errors` or run `mix precommit`. CI enforces warnings-as-errors, so skipping this locally will cause CI failures.
 
-## Background Jobs
-
-Use `Oban` for durable, retryable, or scheduled background work. Reserve plain `GenServer` loops and `Process.send_after/3` for in-memory process behavior where persistence, retries, and operator visibility do not matter. The canonical queue dashboard is mounted at `/admin/jobs`.
-
 ### Test Database
 
 Tests use a **separate PostgreSQL test database** (`gallformers_test`) that is:

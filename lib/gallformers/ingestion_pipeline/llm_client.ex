@@ -5,6 +5,8 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
 
   use Boundary, deps: [], exports: :all
 
+  require Logger
+
   @default_model "deepseek-ai/DeepSeek-V3-0324"
   @default_max_tokens 8192
   @default_receive_timeout 120_000
@@ -24,10 +26,54 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
           | {:error, :timeout}
   def completion(stage, system_prompt, user_text, opts \\ [])
       when is_atom(stage) and is_binary(system_prompt) and is_binary(user_text) do
+    model = model_for(stage)
+    input_chars = String.length(user_text)
+
+    Logger.info("LLM request starting",
+      stage: stage,
+      model: model,
+      input_chars: input_chars
+    )
+
+    start = System.monotonic_time(:millisecond)
     body = request_body(stage, system_prompt, user_text, opts)
     headers = request_headers()
+    result = do_completion(body, headers, retry_backoffs())
+    elapsed_ms = System.monotonic_time(:millisecond) - start
 
-    do_completion(body, headers, retry_backoffs())
+    case result do
+      {:ok, content, usage} ->
+        Logger.info("LLM request completed",
+          stage: stage,
+          model: model,
+          elapsed_ms: elapsed_ms,
+          input_chars: input_chars,
+          output_chars: String.length(content),
+          prompt_tokens: usage.prompt_tokens,
+          completion_tokens: usage.completion_tokens
+        )
+
+      {:error, reason} ->
+        Logger.warning("LLM request failed",
+          stage: stage,
+          model: model,
+          elapsed_ms: elapsed_ms,
+          input_chars: input_chars,
+          error: inspect(reason)
+        )
+
+      {:error, reason, status} ->
+        Logger.warning("LLM request failed",
+          stage: stage,
+          model: model,
+          elapsed_ms: elapsed_ms,
+          input_chars: input_chars,
+          error: inspect(reason),
+          status: status
+        )
+    end
+
+    result
   end
 
   @doc """

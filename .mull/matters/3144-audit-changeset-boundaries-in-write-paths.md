@@ -1,5 +1,5 @@
 ---
-status: active
+status: done
 created: 2026-05-05
 updated: 2026-05-05
 epic: platform
