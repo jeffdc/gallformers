@@ -15,6 +15,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
     source_review_unlocked? = Ingestions.source_review_unlocked?(source_ingestion)
     species_review_unlocked? = Ingestions.species_review_unlocked?(source_ingestion)
     clearability = Ingestions.source_ingestion_clearability(source_ingestion)
+    retryable? = source_ingestion.status == "failed" and not is_nil(source_ingestion.error_stage)
 
     duplicate_candidates =
       Enum.map(source_ingestion.duplicate_candidates, &duplicate_candidate_review_view/1)
@@ -39,6 +40,9 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
       duplicate_of_source_ingestion_id: source_ingestion.duplicate_of_source_ingestion_id,
       clearability: clearability,
       clearable?: not is_nil(clearability),
+      retryable?: retryable?,
+      error_stage: source_ingestion.error_stage,
+      error_message: source_ingestion.error_message,
       duplicate_review_required?: duplicate_review_required?,
       source_review_unlocked?: source_review_unlocked?,
       species_review_unlocked?: species_review_unlocked?,

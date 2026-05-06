@@ -4,6 +4,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   alias Gallformers.Accounts
   alias Gallformers.IngestionPipeline.Broadcaster
   alias Gallformers.IngestionPipeline.DuplicateResolution
+  alias Gallformers.IngestionPipeline.Worker, as: PipelineWorker
   alias Gallformers.Ingestions
   alias Gallformers.Sources
   alias GallformersWeb.Admin.IngestionReviewLive.Presenter
@@ -181,6 +182,25 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   end
 
   @impl true
+  def handle_event("resume_pipeline", _params, socket) do
+    ingestion_id = socket.assigns.review_view.id
+
+    case Ingestions.retry_failed_source_ingestion(ingestion_id) do
+      {:ok, _source_ingestion} ->
+        Broadcaster.subscribe(ingestion_id)
+        PipelineWorker.enqueue(ingestion_id)
+
+        {:noreply,
+         socket
+         |> put_flash(:info, "Pipeline resumed")
+         |> reload_review_view()}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply, put_flash(socket, :error, changeset_error_message(changeset))}
+    end
+  end
+
+  @impl true
   def handle_event("clear_source_ingestion", _params, socket) do
     case Ingestions.clear_source_ingestion(socket.assigns.review_view.id) do
       {:ok, _source_ingestion} ->
@@ -266,6 +286,17 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
 
               <div class="flex items-center gap-3">
                 <.button
+                  :if={@review_view.retryable?}
+                  id="resume-pipeline"
+                  type="button"
+                  variant="primary"
+                  phx-click="resume_pipeline"
+                  data-confirm={"Resume pipeline from the #{@review_view.error_stage} stage?"}
+                >
+                  Resume Pipeline
+                </.button>
+
+                <.button
                   :if={@review_view.clearable?}
                   id="clear-source-ingestion"
                   type="button"
@@ -287,6 +318,11 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
               processing_stage={@review_view.processing_stage}
               inserted_at={@review_view.inserted_at}
             />
+
+            <.alert :if={@review_view.status == "failed"} variant="warning">
+              Pipeline failed at <strong>{@review_view.error_stage}</strong>
+              stage: {@review_view.error_message || "unknown error"}
+            </.alert>
 
             <.list>
               <:item title="Input Type">{String.upcase(@review_view.input_type)}</:item>
