@@ -167,7 +167,7 @@ defmodule Gallformers.Ingestions.Lifecycle do
     |> Repo.exists?()
   end
 
-  defp active_worker_job_exists?(source_ingestion_id) do
+  def active_worker_job_exists?(source_ingestion_id) do
     from(job in "oban_jobs",
       where:
         field(job, :worker) == ^"Gallformers.IngestionPipeline.Worker" and

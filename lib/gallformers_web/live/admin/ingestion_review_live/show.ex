@@ -44,7 +44,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
     ingestion_id = String.to_integer(id)
     socket = load_review_view(socket, ingestion_id)
 
-    if connected?(socket) && socket.assigns.review_view.status == "processing" do
+    if connected?(socket) && socket.assigns.review_view.pipeline_active? do
       Broadcaster.subscribe(ingestion_id)
     end
 
@@ -185,8 +185,8 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   def handle_event("resume_pipeline", _params, socket) do
     ingestion_id = socket.assigns.review_view.id
 
-    case Ingestions.retry_failed_source_ingestion(ingestion_id) do
-      {:ok, _source_ingestion} ->
+    case resume_ingestion(ingestion_id, socket.assigns.review_view.status) do
+      :ok ->
         Broadcaster.subscribe(ingestion_id)
         PipelineWorker.enqueue(ingestion_id)
 
@@ -291,7 +291,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
                   type="button"
                   variant="primary"
                   phx-click="resume_pipeline"
-                  data-confirm={"Resume pipeline from the #{@review_view.error_stage} stage?"}
+                  data-confirm={resume_confirm_text(@review_view)}
                 >
                   Resume Pipeline
                 </.button>
@@ -314,7 +314,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
             </div>
 
             <.pipeline_progress
-              :if={@review_view.status == "processing"}
+              :if={@review_view.pipeline_active?}
               processing_stage={@review_view.processing_stage}
               inserted_at={@review_view.inserted_at}
             />
@@ -740,6 +740,21 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
          )}
     end
   end
+
+  defp resume_confirm_text(%{status: "failed", error_stage: stage}),
+    do: "Resume pipeline from the #{stage} stage?"
+
+  defp resume_confirm_text(%{processing_stage: stage}),
+    do: "Resume pipeline from the #{stage} stage?"
+
+  defp resume_ingestion(ingestion_id, "failed") do
+    case Ingestions.retry_failed_source_ingestion(ingestion_id) do
+      {:ok, _source_ingestion} -> :ok
+      error -> error
+    end
+  end
+
+  defp resume_ingestion(_ingestion_id, "processing"), do: :ok
 
   defp status_label(review_view), do: Presenter.queue_status_label(review_view)
   defp clear_source_ingestion_label(%{clearability: :abandoned}), do: "Clear Abandoned Ingestion"

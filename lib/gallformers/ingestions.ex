@@ -398,6 +398,11 @@ defmodule Gallformers.Ingestions do
     Lifecycle.source_ingestion_clearability(source_ingestion_id)
   end
 
+  @spec pipeline_job_active?(integer()) :: boolean()
+  def pipeline_job_active?(source_ingestion_id) do
+    Lifecycle.active_worker_job_exists?(source_ingestion_id)
+  end
+
   @doc """
   Deletes a terminal failed ingestion and its private artifacts.
   """

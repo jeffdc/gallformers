@@ -15,7 +15,12 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
     source_review_unlocked? = Ingestions.source_review_unlocked?(source_ingestion)
     species_review_unlocked? = Ingestions.species_review_unlocked?(source_ingestion)
     clearability = Ingestions.source_ingestion_clearability(source_ingestion)
-    retryable? = source_ingestion.status == "failed" and not is_nil(source_ingestion.error_stage)
+
+    pipeline_active? =
+      source_ingestion.status == "processing" and
+        Ingestions.pipeline_job_active?(source_ingestion.id)
+
+    retryable? = can_resume?(source_ingestion, pipeline_active?)
 
     duplicate_candidates =
       Enum.map(source_ingestion.duplicate_candidates, &duplicate_candidate_review_view/1)
@@ -41,6 +46,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
       clearability: clearability,
       clearable?: not is_nil(clearability),
       retryable?: retryable?,
+      pipeline_active?: pipeline_active?,
       error_stage: source_ingestion.error_stage,
       error_message: source_ingestion.error_message,
       duplicate_review_required?: duplicate_review_required?,
@@ -271,4 +277,11 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
       pubyear: source.pubyear
     }
   end
+
+  defp can_resume?(%{status: "failed", error_stage: error_stage}, _pipeline_active?)
+       when not is_nil(error_stage),
+       do: true
+
+  defp can_resume?(%{status: "processing"}, false = _pipeline_active?), do: true
+  defp can_resume?(_source_ingestion, _pipeline_active?), do: false
 end
