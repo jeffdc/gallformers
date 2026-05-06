@@ -192,6 +192,17 @@ defmodule Gallformers.Ingestions.SourceIngestion do
     )
   end
 
+  def transition_changeset(source_ingestion, status, attrs) do
+    attrs =
+      attrs
+      |> Map.new()
+      |> Map.put(:status, status)
+      |> put_default_stage_for_status(source_ingestion)
+      |> maybe_put_failed_at(status)
+
+    changeset(source_ingestion, attrs)
+  end
+
   defp validate_workflow_state_pair(changeset) do
     status = get_field(changeset, :status)
     processing_stage = get_field(changeset, :processing_stage)
@@ -203,4 +214,30 @@ defmodule Gallformers.Ingestions.SourceIngestion do
       changeset
     end
   end
+
+  defp put_default_stage_for_status(attrs, %__MODULE__{processing_stage: processing_stage}) do
+    case Gallformers.Utils.attr_value(attrs, :processing_stage) do
+      nil ->
+        case Gallformers.Utils.attr_value(attrs, :status) do
+          "needs_duplicate_review" -> Map.put(attrs, :processing_stage, "duplicate_review")
+          "needs_review" -> Map.put(attrs, :processing_stage, "review")
+          "duplicate_confirmed" -> Map.put(attrs, :processing_stage, "duplicate_review")
+          "complete" -> Map.put(attrs, :processing_stage, "complete")
+          "failed" -> Map.put(attrs, :processing_stage, "failed")
+          _ -> Map.put(attrs, :processing_stage, processing_stage)
+        end
+
+      _ ->
+        attrs
+    end
+  end
+
+  defp maybe_put_failed_at(attrs, "failed") do
+    case Gallformers.Utils.attr_value(attrs, :failed_at) do
+      nil -> Map.put(attrs, :failed_at, DateTime.utc_now(:second))
+      _ -> attrs
+    end
+  end
+
+  defp maybe_put_failed_at(attrs, _status), do: attrs
 end

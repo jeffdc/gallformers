@@ -526,8 +526,7 @@ defmodule Gallformers.IngestionsTest do
                  :mapped,
                  %{
                    species_id: species.id,
-                   reviewed_by_id: reviewer.id,
-                   review_payload: %{"decision" => "matched existing species"}
+                   reviewed_by_id: reviewer.id
                  }
                )
 
@@ -594,28 +593,19 @@ defmodule Gallformers.IngestionsTest do
       assert updated_entry.species_id == mapped_gall.id
       assert updated_entry.reviewed_by_id == reviewer.id
       assert updated_entry.description_prose == "Edited woody gall description."
-      assert get_in(updated_entry.review_payload, ["species_review", "decision"]) == "mapped"
+      assert updated_entry.review_payload.species_review.decision == "mapped"
+      assert updated_entry.review_payload.species_review.species_id == mapped_gall.id
 
-      assert get_in(updated_entry.review_payload, ["species_review", "species_id"]) ==
-               mapped_gall.id
+      [host_review] = updated_entry.review_payload.host_reviews
+      assert host_review.decision == "mapped"
+      assert host_review.species_id == mapped_host.id
 
-      assert get_in(updated_entry.review_payload, ["host_reviews", Access.at(0), "decision"]) ==
-               "mapped"
+      trait_review =
+        Enum.find(updated_entry.review_payload.trait_reviews, &(&1.name == "shape"))
 
-      assert get_in(updated_entry.review_payload, ["host_reviews", Access.at(0), "species_id"]) ==
-               mapped_host.id
-
-      assert get_in(updated_entry.review_payload, ["trait_reviews", "shape", "selected_values"]) ==
-               [
-                 "globular",
-                 "oval"
-               ]
-
-      assert get_in(updated_entry.review_payload, ["trait_reviews", "shape", "raw_evidence"]) == [
-               "globular"
-             ]
-
-      assert get_in(updated_entry.review_payload, ["description_review", "edited"]) == true
+      assert trait_review.selected_values == ["globular", "oval"]
+      assert trait_review.raw_evidence == ["globular"]
+      assert updated_entry.review_payload.description_review.edited == true
     end
 
     test "rejects review updates when the ingestion is not associated with a source" do
@@ -984,6 +974,48 @@ defmodule Gallformers.IngestionsTest do
 
       assert updated.title == "Valid Title"
       # unknown_field should not cause an error or be stored
+    end
+
+    test "clears explicitly nil signal fields while leaving omitted fields unchanged" do
+      ingestion =
+        source_ingestion_fixture(%{
+          input_type: "pdf",
+          doi: "10.1234/example",
+          title: "Original Title",
+          normalized_title: "original title",
+          publication_year: 2024
+        })
+
+      assert {:ok, updated} =
+               Ingestions.record_duplicate_signals(ingestion, %{
+                 doi: nil,
+                 title: nil
+               })
+
+      assert updated.doi == nil
+      assert updated.title == nil
+      assert updated.normalized_title == "original title"
+      assert updated.publication_year == 2024
+    end
+
+    test "clears explicitly nil string-keyed signal fields" do
+      ingestion =
+        source_ingestion_fixture(%{
+          input_type: "pdf",
+          normalized_doi: "10.1234/example",
+          title_fingerprint: "original_title",
+          author_fingerprint: "author_one"
+        })
+
+      assert {:ok, updated} =
+               Ingestions.record_duplicate_signals(ingestion, %{
+                 "normalized_doi" => nil,
+                 "title_fingerprint" => nil
+               })
+
+      assert updated.normalized_doi == nil
+      assert updated.title_fingerprint == nil
+      assert updated.author_fingerprint == "author_one"
     end
   end
 

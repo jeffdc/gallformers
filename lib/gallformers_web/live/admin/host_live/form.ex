@@ -978,7 +978,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
         Plants.upsert_host_traits(host.id, %{
           wcvp_id: wcvp.wcvp_id,
           powo_id: wcvp.powo_id,
-          wcvp_synced_at: DateTime.utc_now() |> DateTime.truncate(:second)
+          wcvp_synced_at: DateTime.utc_now(:second)
         })
 
         place_entries = build_place_entries(socket, wcvp)
@@ -1154,7 +1154,7 @@ defmodule GallformersWeb.Admin.HostLive.Form do
      |> assign(:pending_host_traits, %{
        wcvp_id: diff.wcvp_data.plant_name_id,
        powo_id: diff.wcvp_data.powo_id,
-       wcvp_synced_at: DateTime.utc_now() |> DateTime.truncate(:second)
+       wcvp_synced_at: DateTime.utc_now(:second)
      })
      |> assign(:powo_diff, nil)
      |> compute_map_range()

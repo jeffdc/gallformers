@@ -181,7 +181,7 @@ defmodule Gallformers.Articles do
       Ecto.Changeset.put_change(
         changeset,
         :published_at,
-        DateTime.utc_now() |> DateTime.truncate(:second)
+        DateTime.utc_now(:second)
       )
     else
       changeset

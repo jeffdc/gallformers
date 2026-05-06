@@ -259,16 +259,8 @@ defmodule Gallformers.Ingestions do
       ) do
     status = Utils.normalize_atom(status)
 
-    attrs =
-      attrs
-      |> Map.new()
-      |> Map.put(:status, status)
-      |> put_default_stage_for_status(source_ingestion)
-
-    attrs = maybe_put_failed_at(attrs, status)
-
     source_ingestion
-    |> SourceIngestion.changeset(attrs)
+    |> SourceIngestion.transition_changeset(status, attrs)
     |> Repo.update()
   end
 
@@ -304,9 +296,17 @@ defmodule Gallformers.Ingestions do
     allowed_attrs =
       SourceIngestion.signal_fields()
       |> Enum.reduce(%{}, fn field, acc ->
-        case Utils.attr_value(attrs, field) do
-          nil -> acc
-          value -> Map.put(acc, field, value)
+        string_field = Atom.to_string(field)
+
+        cond do
+          Map.has_key?(attrs, field) ->
+            Map.put(acc, field, Map.get(attrs, field))
+
+          Map.has_key?(attrs, string_field) ->
+            Map.put(acc, field, Map.get(attrs, string_field))
+
+          true ->
+            acc
         end
       end)
 
@@ -895,16 +895,18 @@ defmodule Gallformers.Ingestions do
       attrs
       |> Utils.nested_value(:trait_reviews, %{})
       |> normalize_trait_review_values()
-      |> Enum.reduce(%{}, fn {name, trait_review_attrs}, acc ->
+      |> Enum.sort_by(fn {name, _trait_review_attrs} -> name end)
+      |> Enum.map(fn {name, trait_review_attrs} ->
         selected_values =
           trait_review_attrs
           |> Utils.nested_value(:selected_values, [])
           |> Utils.normalize_string_list()
 
-        Map.put(acc, name, %{
+        %{
+          "name" => name,
           "selected_values" => selected_values,
           "raw_evidence" => extract_trait_raw_evidence(Map.get(extraction_traits, name))
-        })
+        }
       end)
 
     {:ok, %{payload: payload}}
@@ -1038,16 +1040,16 @@ defmodule Gallformers.Ingestions do
   end
 
   defp workspace_trait_reviews(source_ingestion_species) do
-    persisted_trait_reviews =
-      Utils.nested_value(source_ingestion_species.review_payload, :trait_reviews, %{})
+    persisted_trait_reviews = review_trait_reviews(source_ingestion_species.review_payload)
 
-    source_ingestion_species.extraction_payload
-    |> extraction_traits()
+    extraction_traits = extraction_traits(source_ingestion_species.extraction_payload)
+
+    extraction_traits
     |> Map.keys()
     |> Enum.sort()
     |> Enum.map(fn name ->
-      persisted_trait_review = Utils.nested_value(persisted_trait_reviews, name, %{})
-      extracted_trait = extraction_traits(source_ingestion_species.extraction_payload)[name]
+      persisted_trait_review = Map.get(persisted_trait_reviews, name, %{})
+      extracted_trait = Map.get(extraction_traits, name)
 
       %{
         name: name,
@@ -1187,8 +1189,76 @@ defmodule Gallformers.Ingestions do
 
   defp extraction_traits(extraction_payload) do
     case Utils.nested_value(extraction_payload, :traits, %{}) do
-      traits when is_map(traits) -> traits
-      _ -> %{}
+      %SourceIngestionSpecies.ExtractedTraits{} = traits ->
+        extracted_traits_to_map(traits)
+
+      traits when is_map(traits) ->
+        traits
+
+      _ ->
+        %{}
+    end
+  end
+
+  defp extracted_traits_to_map(%SourceIngestionSpecies.ExtractedTraits{} = traits) do
+    traits
+    |> Map.from_struct()
+    |> Enum.reject(fn {key, value} -> key in [:__meta__, :__struct__] or is_nil(value) end)
+    |> Map.new(fn
+      {key, %SourceIngestionSpecies.ExtractedTraitValue{} = value} ->
+        {Atom.to_string(key),
+         %{
+           "original" => value.original,
+           "suggested" => List.wrap(value.suggested)
+         }}
+
+      {key, value} ->
+        {Atom.to_string(key), value}
+    end)
+  end
+
+  defp review_trait_reviews(%SourceIngestionSpecies.ReviewPayload{} = review_payload) do
+    review_payload
+    |> Map.get(:trait_reviews, [])
+    |> Enum.reduce(%{}, fn trait_review, acc ->
+      Map.put(acc, trait_review.name, %{
+        "selected_values" => List.wrap(trait_review.selected_values),
+        "raw_evidence" => List.wrap(trait_review.raw_evidence)
+      })
+    end)
+  end
+
+  defp review_trait_reviews(review_payload) when is_map(review_payload) do
+    case Utils.nested_value(review_payload, :trait_reviews, %{}) do
+      reviews when is_list(reviews) ->
+        Enum.reduce(reviews, %{}, &merge_review_trait(&1, &2))
+
+      reviews when is_map(reviews) ->
+        reviews
+
+      _ ->
+        %{}
+    end
+  end
+
+  defp review_trait_reviews(_review_payload), do: %{}
+
+  defp merge_review_trait(review, acc) do
+    case Utils.nested_value(review, :name, nil) do
+      name when is_binary(name) and name != "" ->
+        Map.put(acc, name, %{
+          "selected_values" =>
+            review
+            |> Utils.nested_value(:selected_values, [])
+            |> Utils.normalize_string_list(),
+          "raw_evidence" =>
+            review
+            |> Utils.nested_value(:raw_evidence, [])
+            |> Utils.normalize_string_list()
+        })
+
+      _ ->
+        acc
     end
   end
 
@@ -1265,37 +1335,11 @@ defmodule Gallformers.Ingestions do
   defp maybe_preload(query, true), do: preload(query, ^@source_ingestion_detail_preloads)
   defp maybe_preload(query, false), do: query
 
-  defp put_default_stage_for_status(attrs, %SourceIngestion{processing_stage: processing_stage}) do
-    case Utils.attr_value(attrs, :processing_stage) do
-      nil ->
-        case Utils.attr_value(attrs, :status) do
-          "needs_duplicate_review" -> Map.put(attrs, :processing_stage, "duplicate_review")
-          "needs_review" -> Map.put(attrs, :processing_stage, "review")
-          "duplicate_confirmed" -> Map.put(attrs, :processing_stage, "duplicate_review")
-          "complete" -> Map.put(attrs, :processing_stage, "complete")
-          "failed" -> Map.put(attrs, :processing_stage, "failed")
-          _ -> Map.put(attrs, :processing_stage, processing_stage)
-        end
-
-      _ ->
-        attrs
-    end
-  end
-
-  defp maybe_put_failed_at(attrs, "failed") do
-    case Utils.attr_value(attrs, :failed_at) do
-      nil -> Map.put(attrs, :failed_at, now())
-      _ -> attrs
-    end
-  end
-
-  defp maybe_put_failed_at(attrs, _status), do: attrs
-
   defp maybe_put_reviewed_at(attrs, nil), do: attrs
 
   defp maybe_put_reviewed_at(attrs, _reviewed_by_id) do
     case Utils.attr_value(attrs, :reviewed_at) do
-      nil -> Map.put(attrs, :reviewed_at, now())
+      nil -> Map.put(attrs, :reviewed_at, DateTime.utc_now(:second))
       _ -> attrs
     end
   end
@@ -1343,9 +1387,5 @@ defmodule Gallformers.Ingestions do
     :gallformers
     |> Application.get_env(__MODULE__, [])
     |> Keyword.get(:orchestration_lock_timeout, :timer.minutes(5))
-  end
-
-  defp now do
-    DateTime.utc_now() |> DateTime.truncate(:second)
   end
 end

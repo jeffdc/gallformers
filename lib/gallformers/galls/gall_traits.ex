@@ -106,4 +106,19 @@ defmodule Gallformers.Galls.GallTraits do
     |> foreign_key_constraint(:species_id)
     |> unique_constraint(:gallformers_code, name: :gall_traits_gallformers_code_unique)
   end
+
+  def gall_properties_changeset(gall_traits, attrs, opts \\ []) do
+    gall_traits
+    |> changeset(attrs)
+    |> enforce_unknown_genus_floor(opts)
+  end
+
+  defp enforce_unknown_genus_floor(changeset, opts) do
+    if Keyword.get(opts, :unknown_genus?, false) == true and
+         get_change(changeset, :undescribed) == false do
+      put_change(changeset, :undescribed, true)
+    else
+      changeset
+    end
+  end
 end

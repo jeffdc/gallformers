@@ -171,7 +171,7 @@ defmodule Gallformers.PlantsTest do
 
     test "updates range_confirmed and wcvp_synced_at", %{species: species} do
       {:ok, traits} = Repo.insert(%HostTraits{species_id: species.id})
-      now = DateTime.utc_now() |> DateTime.truncate(:second)
+      now = DateTime.utc_now(:second)
 
       {:ok, updated} =
         traits
@@ -234,6 +234,49 @@ defmodule Gallformers.PlantsTest do
 
       {:ok, traits} =
         Plants.upsert_host_traits(species.id, %{wcvp_id: "12345", powo_id: "powo-12345"})
+
+      assert traits.wcvp_id == "12345"
+      assert traits.wcvp_match_status == "ignored"
+    end
+
+    test "upsert_host_traits/2 preserves ignored status when linking a host with string keys", %{
+      species: species
+    } do
+      {:ok, _} = Plants.upsert_host_traits(species.id, %{wcvp_match_status: "ignored"})
+
+      {:ok, traits} =
+        Plants.upsert_host_traits(species.id, %{
+          "wcvp_id" => "12345",
+          "powo_id" => "powo-12345"
+        })
+
+      assert traits.wcvp_id == "12345"
+      assert traits.wcvp_match_status == "ignored"
+    end
+
+    test "upsert_host_traits/2 clears no_match status when linking a host with string keys", %{
+      species: species
+    } do
+      {:ok, _} = Plants.upsert_host_traits(species.id, %{wcvp_match_status: "no_match"})
+
+      {:ok, traits} =
+        Plants.upsert_host_traits(species.id, %{
+          "wcvp_id" => "700",
+          "powo_id" => "urn:lsid:ipni.org:names:test700"
+        })
+
+      assert traits.wcvp_id == "700"
+      assert traits.wcvp_match_status == nil
+    end
+
+    test "upsert_host_traits/2 respects explicit string-keyed status when linking a host", %{
+      species: species
+    } do
+      {:ok, traits} =
+        Plants.upsert_host_traits(species.id, %{
+          "wcvp_id" => "12345",
+          "wcvp_match_status" => "ignored"
+        })
 
       assert traits.wcvp_id == "12345"
       assert traits.wcvp_match_status == "ignored"

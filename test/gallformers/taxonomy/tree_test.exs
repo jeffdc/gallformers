@@ -71,6 +71,20 @@ defmodule Gallformers.Taxonomy.TreeTest do
       updated_species = Repo.get!(Species, species.id)
       assert updated_species.name =~ "RenamedGenus"
     end
+
+    test "treats trimmed type as unchanged and still renames species", %{
+      genus: genus,
+      species: species
+    } do
+      {:ok, updated} =
+        Tree.update_taxonomy(genus, %{"type" => " genus ", "name" => "TrimmedTypeRename"})
+
+      assert updated.type == "genus"
+      assert updated.name == "TrimmedTypeRename"
+
+      updated_species = Repo.get!(Species, species.id)
+      assert updated_species.name == "TrimmedTypeRename testspecies"
+    end
   end
 
   describe "list_parent_options_with_paths/1" do

@@ -374,34 +374,48 @@ defmodule Gallformers.Plants do
     case Repo.get(HostTraits, species_id) do
       nil ->
         %HostTraits{species_id: species_id}
-        |> HostTraits.changeset(normalize_host_traits_attrs(nil, attrs))
+        |> host_traits_upsert_changeset(attrs)
         |> Repo.insert()
 
       existing ->
         existing
-        |> HostTraits.changeset(normalize_host_traits_attrs(existing, attrs))
+        |> host_traits_upsert_changeset(attrs)
         |> Repo.update()
     end
   end
 
-  defp normalize_host_traits_attrs(existing, attrs) do
-    has_wcvp_link? =
-      Map.has_key?(attrs, :wcvp_id) and Map.get(attrs, :wcvp_id) not in [nil, ""]
+  defp host_traits_upsert_changeset(%HostTraits{} = host_traits, attrs) do
+    host_traits
+    |> HostTraits.changeset(attrs)
+    |> normalize_wcvp_match_status()
+  end
 
-    explicit_status? = Map.has_key?(attrs, :wcvp_match_status)
+  defp normalize_wcvp_match_status(changeset) do
+    wcvp_id = Ecto.Changeset.get_field(changeset, :wcvp_id)
+    explicit_status? = explicit_param?(changeset, :wcvp_match_status)
 
     cond do
       explicit_status? ->
-        attrs
+        changeset
 
-      has_wcvp_link? && existing && existing.wcvp_match_status == "ignored" ->
-        Map.put(attrs, :wcvp_match_status, "ignored")
+      wcvp_id in [nil, ""] ->
+        changeset
 
-      has_wcvp_link? ->
-        Map.put(attrs, :wcvp_match_status, nil)
+      changeset.data.wcvp_match_status == "ignored" ->
+        Ecto.Changeset.put_change(changeset, :wcvp_match_status, "ignored")
 
       true ->
-        attrs
+        Ecto.Changeset.put_change(changeset, :wcvp_match_status, nil)
+    end
+  end
+
+  defp explicit_param?(changeset, field) do
+    case changeset.params do
+      %{} = params ->
+        Map.has_key?(params, field) or Map.has_key?(params, Atom.to_string(field))
+
+      _ ->
+        false
     end
   end
 
@@ -1150,7 +1164,7 @@ defmodule Gallformers.Plants do
 
         Ranges.update_host_places(species_id, place_entries)
 
-        now = DateTime.utc_now() |> DateTime.truncate(:second)
+        now = DateTime.utc_now(:second)
         upsert_host_traits(species_id, %{wcvp_synced_at: now})
 
         {:ok,

@@ -94,10 +94,10 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowWorkspaceTest do
       assert updated.status == "mapped"
       assert updated.species_id == mapped_species.id
       assert updated.reviewed_by_id == reviewer.id
-      assert get_in(updated.review_payload, ["species_review", "decision"]) == "mapped"
-      assert get_in(updated.review_payload, ["species_review", "species_id"]) == mapped_species.id
+      assert updated.review_payload.species_review.decision == "mapped"
+      assert updated.review_payload.species_review.species_id == mapped_species.id
 
-      assert get_in(updated.review_payload, ["species_review", "notes"]) ==
+      assert updated.review_payload.species_review.notes ==
                "Matched against the existing gall species."
     end
 
@@ -162,12 +162,12 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowWorkspaceTest do
       |> render_submit()
 
       updated = Ingestions.get_source_ingestion_species!(species_entry.id)
-      [host_review] = get_in(updated.review_payload, ["host_reviews"])
+      [host_review] = updated.review_payload.host_reviews
 
-      assert host_review["extracted_name"] == "Quercus rubra"
-      assert host_review["extracted_authority"] == "L."
-      assert host_review["decision"] == "mapped"
-      assert host_review["species_id"] == mapped_host.id
+      assert host_review.extracted_name == "Quercus rubra"
+      assert host_review.extracted_authority == "L."
+      assert host_review.decision == "mapped"
+      assert host_review.species_id == mapped_host.id
     end
 
     test "trait evidence renders and saving preserves selected values and raw evidence", %{
@@ -217,15 +217,9 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowWorkspaceTest do
       updated = Ingestions.get_source_ingestion_species!(species_entry.id)
 
       assert updated.status == "skipped"
-
-      assert get_in(updated.review_payload, ["trait_reviews", "shape", "selected_values"]) == [
-               "globular",
-               "oval"
-             ]
-
-      assert get_in(updated.review_payload, ["trait_reviews", "shape", "raw_evidence"]) == [
-               "globular"
-             ]
+      trait_review = Enum.find(updated.review_payload.trait_reviews, &(&1.name == "shape"))
+      assert trait_review.selected_values == ["globular", "oval"]
+      assert trait_review.raw_evidence == ["globular"]
     end
 
     test "editing description prose persists the text and edited review flag", %{conn: conn} do
@@ -259,7 +253,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowWorkspaceTest do
       updated = Ingestions.get_source_ingestion_species!(species_entry.id)
 
       assert updated.description_prose == "Edited description from the review workspace."
-      assert get_in(updated.review_payload, ["description_review", "edited"]) == true
+      assert updated.review_payload.description_review.edited == true
     end
 
     test "status rules only allow complete when all review requirements are satisfied", %{
@@ -334,10 +328,9 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowWorkspaceTest do
       updated = Ingestions.get_source_ingestion_species!(species_entry.id)
 
       assert updated.status == "complete"
-      assert get_in(updated.review_payload, ["species_review", "decision"]) == "mapped"
-
-      assert get_in(updated.review_payload, ["host_reviews", Access.at(0), "decision"]) ==
-               "mapped"
+      assert updated.review_payload.species_review.decision == "mapped"
+      [host_review] = updated.review_payload.host_reviews
+      assert host_review.decision == "mapped"
     end
 
     test "workspace remains inaccessible when the ingestion is not associated with a source", %{

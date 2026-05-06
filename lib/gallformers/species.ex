@@ -345,7 +345,7 @@ defmodule Gallformers.Species do
   def touch(species_id) do
     Species
     |> Repo.get!(species_id)
-    |> Ecto.Changeset.change(%{updated_at: DateTime.utc_now() |> DateTime.truncate(:second)})
+    |> Ecto.Changeset.change(%{updated_at: DateTime.utc_now(:second)})
     |> Repo.update()
   end
 

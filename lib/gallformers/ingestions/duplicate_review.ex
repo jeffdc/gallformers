@@ -122,7 +122,7 @@ defmodule Gallformers.Ingestions.DuplicateReview do
         |> DuplicateCandidate.changeset(%{
           status: "rejected",
           reviewed_by_id: Utils.attr_value(attrs, :reviewed_by_id),
-          reviewed_at: Utils.attr_value(attrs, :reviewed_at) || now()
+          reviewed_at: Utils.attr_value(attrs, :reviewed_at) || DateTime.utc_now(:second)
         })
         |> update_or_rollback()
 
@@ -190,7 +190,7 @@ defmodule Gallformers.Ingestions.DuplicateReview do
         |> DuplicateCandidate.changeset(%{
           status: candidate_status,
           reviewed_by_id: Utils.attr_value(attrs, :reviewed_by_id),
-          reviewed_at: Utils.attr_value(attrs, :reviewed_at) || now()
+          reviewed_at: Utils.attr_value(attrs, :reviewed_at) || DateTime.utc_now(:second)
         })
         |> update_or_rollback()
 
@@ -296,10 +296,6 @@ defmodule Gallformers.Ingestions.DuplicateReview do
             source_ingestion_id
         end
     end
-  end
-
-  defp now do
-    DateTime.utc_now() |> DateTime.truncate(:second)
   end
 
   defp update_result_or_rollback({:ok, result}), do: result

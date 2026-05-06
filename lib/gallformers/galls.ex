@@ -596,15 +596,15 @@ defmodule Gallformers.Galls do
   @spec update_gall_properties(integer(), map()) ::
           {:ok, GallTraits.t()} | {:error, Ecto.Changeset.t() | :not_found}
   def update_gall_properties(species_id, attrs) do
-    attrs = enforce_unknown_genus_floor(species_id, attrs)
-
     case Repo.get(GallTraits, species_id) do
       nil ->
         {:error, :not_found}
 
       gall_traits ->
         gall_traits
-        |> GallTraits.changeset(attrs)
+        |> GallTraits.gall_properties_changeset(attrs,
+          unknown_genus?: has_unknown_genus?(species_id)
+        )
         |> Repo.update()
     end
   end
@@ -645,30 +645,9 @@ defmodule Gallformers.Galls do
     Repo.one(query)
   end
 
-  # If the caller is trying to set undescribed=false but the species has an Unknown genus,
-  # silently correct to undescribed=true.
-  defp enforce_unknown_genus_floor(species_id, attrs) do
-    undescribed = Map.get(attrs, :undescribed, Map.get(attrs, "undescribed"))
-
-    if undescribed == false and has_unknown_genus?(species_id) do
-      force_undescribed(attrs)
-    else
-      attrs
-    end
-  end
-
   defp has_unknown_genus?(species_id) do
     taxonomy = Gallformers.Taxonomy.get_taxonomy_for_species(species_id)
-    taxonomy && Gallformers.Taxonomy.placeholder_genus_name?(taxonomy.genus.name)
-  end
-
-  # Preserve the key type (atom or string) used by the caller
-  defp force_undescribed(attrs) do
-    if Map.has_key?(attrs, :undescribed) do
-      Map.put(attrs, :undescribed, true)
-    else
-      Map.put(attrs, "undescribed", true)
-    end
+    not is_nil(taxonomy) and Gallformers.Taxonomy.placeholder_genus_name?(taxonomy.genus.name)
   end
 
   @doc """
@@ -854,7 +833,7 @@ defmodule Gallformers.Galls do
     |> Repo.update_all(
       set: [
         range_confirmed: true,
-        range_computed_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        range_computed_at: DateTime.utc_now(:second)
       ]
     )
   end
@@ -1053,7 +1032,7 @@ defmodule Gallformers.Galls do
   def bulk_confirm_gall_ranges([]), do: {0, nil}
 
   def bulk_confirm_gall_ranges(species_ids) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    now = DateTime.utc_now(:second)
 
     from(gt in GallTraits,
       where: gt.species_id in ^species_ids

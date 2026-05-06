@@ -146,6 +146,39 @@ defmodule Gallformers.TaxonomyTest do
       assert alias_count == 0
     end
 
+    test "does not sync species when trimmed name is unchanged", %{genus: genus, species: species} do
+      {:ok, updated_genus} = Taxonomy.update_taxonomy(genus, %{"name" => " Testgenus "})
+
+      assert updated_genus.name == "Testgenus"
+
+      unchanged_species = Repo.get!(Species, species.id)
+      assert unchanged_species.name == "Testgenus alba"
+
+      alias_count =
+        from(as in "alias_species", where: as.species_id == ^species.id, select: count())
+        |> Repo.one()
+
+      assert alias_count == 0
+    end
+
+    test "returns changeset errors and does not sync species when name is blank after trimming",
+         %{
+           genus: genus,
+           species: species
+         } do
+      assert {:error, changeset} = Taxonomy.update_taxonomy(genus, %{"name" => "   "})
+      assert changeset.errors[:name] != nil
+
+      unchanged_species = Repo.get!(Species, species.id)
+      assert unchanged_species.name == "Testgenus alba"
+
+      alias_count =
+        from(as in "alias_species", where: as.species_id == ^species.id, select: count())
+        |> Repo.one()
+
+      assert alias_count == 0
+    end
+
     test "does not affect family rename", %{family: family} do
       # Rename family should work normally without species sync
       {:ok, updated_family} = Taxonomy.update_taxonomy(family, %{"name" => "NewFamilyName"})

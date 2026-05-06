@@ -48,12 +48,12 @@ defmodule Gallformers.GallsTest do
       {:ok, result} = Galls.update_gall_properties(species.id, %{undescribed: false})
 
       # Should be silently corrected to true
-      assert result.undescribed != nil
+      assert result.undescribed == true
     end
 
     test "allows undescribed=true for Unknown genus", %{species: species} do
       {:ok, result} = Galls.update_gall_properties(species.id, %{undescribed: true})
-      assert result.undescribed != nil
+      assert result.undescribed == true
     end
 
     test "allows undescribed=false for real genus" do
@@ -95,7 +95,7 @@ defmodule Gallformers.GallsTest do
 
     test "works with string keys in attrs", %{species: species} do
       {:ok, result} = Galls.update_gall_properties(species.id, %{"undescribed" => false})
-      assert result.undescribed != nil
+      assert result.undescribed == true
     end
 
     test "rejects duplicate gallformers_code" do

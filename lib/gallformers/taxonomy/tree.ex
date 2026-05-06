@@ -170,35 +170,36 @@ defmodule Gallformers.Taxonomy.Tree do
           {:ok, Taxonomy.t()}
           | {:error, Ecto.Changeset.t() | {:rename_collision, String.t(), atom()}}
   def update_taxonomy(%Taxonomy{} = taxonomy, attrs) do
-    new_name = attr_value(attrs, "name")
-    new_type = attr_value(attrs, "type") || taxonomy.type
-    type_changing? = new_type != taxonomy.type
+    changeset = Taxonomy.changeset(taxonomy, attrs)
+
+    type_changing? = not is_nil(Ecto.Changeset.get_change(changeset, :type))
+    name_changing? = not is_nil(Ecto.Changeset.get_change(changeset, :name))
 
     genus_rename? =
-      taxonomy.type == "genus" && !type_changing? && new_name && new_name != taxonomy.name
+      changeset.valid? and
+        taxonomy.type == "genus" and
+        not type_changing? and
+        name_changing?
 
     cond do
       type_changing? && has_linked_species?(taxonomy.id) ->
         {:error,
-         taxonomy
-         |> Taxonomy.changeset(attrs)
-         |> Ecto.Changeset.add_error(:type, "cannot change type when species are linked")}
+         Ecto.Changeset.add_error(changeset, :type, "cannot change type when species are linked")}
 
       genus_rename? ->
-        update_genus_with_species_sync(taxonomy, attrs)
+        update_genus_with_species_sync(taxonomy, changeset)
 
       true ->
-        taxonomy
-        |> Taxonomy.changeset(attrs)
+        changeset
         |> Repo.update()
         |> broadcast(:taxonomy_updated)
     end
   end
 
   # Updates a genus and syncs all linked species names via the Species context.
-  defp update_genus_with_species_sync(%Taxonomy{} = taxonomy, attrs) do
+  defp update_genus_with_species_sync(%Taxonomy{} = taxonomy, changeset) do
     old_genus_name = taxonomy.name
-    new_genus_name = attrs["name"] || attrs[:name]
+    new_genus_name = Ecto.Changeset.get_field(changeset, :name)
 
     Repo.transaction(fn ->
       # Delegate species rename to Species context
@@ -223,8 +224,7 @@ defmodule Gallformers.Taxonomy.Tree do
       end
 
       # Update the genus itself
-      taxonomy
-      |> Taxonomy.changeset(attrs)
+      changeset
       |> Repo.update!()
     end)
     |> broadcast(:taxonomy_updated)
@@ -1283,8 +1283,6 @@ defmodule Gallformers.Taxonomy.Tree do
   # =====================================================================
   # Private Helpers
   # =====================================================================
-
-  defp attr_value(attrs, key), do: attrs[key] || attrs[String.to_existing_atom(key)]
 
   defp has_linked_species?(taxonomy_id) do
     Repo.exists?(from(st in "species_taxonomy", where: st.taxonomy_id == ^taxonomy_id))

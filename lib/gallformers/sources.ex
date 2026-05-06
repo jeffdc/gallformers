@@ -283,11 +283,14 @@ defmodule Gallformers.Sources do
   @spec create_species_source(map()) :: {:ok, SpeciesSource.t()} | {:error, Ecto.Changeset.t()}
   def create_species_source(attrs \\ %{}) do
     changeset = SpeciesSource.changeset(%SpeciesSource{}, attrs)
+    setting_as_default? = Ecto.Changeset.get_field(changeset, :useasdefault)
 
     result =
-      if setting_as_default?(attrs) do
-        species_id = get_species_id_from_attrs(attrs)
-        insert_with_default_transaction(changeset, species_id)
+      if setting_as_default? do
+        insert_with_default_transaction(
+          changeset,
+          Ecto.Changeset.get_field(changeset, :species_id)
+        )
       else
         Repo.insert(changeset)
       end
@@ -304,10 +307,15 @@ defmodule Gallformers.Sources do
           {:ok, SpeciesSource.t()} | {:error, Ecto.Changeset.t()}
   def update_species_source(%SpeciesSource{} = species_source, attrs) do
     changeset = SpeciesSource.changeset(species_source, attrs)
+    setting_as_default? = Ecto.Changeset.get_field(changeset, :useasdefault)
 
     result =
-      if setting_as_default?(attrs) do
-        update_with_default_transaction(changeset, species_source.species_id, species_source.id)
+      if setting_as_default? do
+        update_with_default_transaction(
+          changeset,
+          Ecto.Changeset.get_field(changeset, :species_id),
+          species_source.id
+        )
       else
         Repo.update(changeset)
       end
@@ -342,22 +350,6 @@ defmodule Gallformers.Sources do
     case Repo.update(changeset) do
       {:ok, record} -> record
       {:error, changeset} -> Repo.rollback(changeset)
-    end
-  end
-
-  defp setting_as_default?(attrs) do
-    useasdefault = attrs["useasdefault"] || attrs[:useasdefault]
-    useasdefault in [true, "true"]
-  end
-
-  # Gets species_id from attrs (handles both string and atom keys)
-  defp get_species_id_from_attrs(attrs) do
-    species_id = attrs["species_id"] || attrs[:species_id]
-
-    case species_id do
-      id when is_integer(id) -> id
-      id when is_binary(id) -> String.to_integer(id)
-      _ -> nil
     end
   end
 
