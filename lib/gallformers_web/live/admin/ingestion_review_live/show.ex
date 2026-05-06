@@ -314,8 +314,10 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
             </div>
 
             <.pipeline_progress
-              :if={@review_view.pipeline_active?}
+              status={@review_view.status}
               processing_stage={@review_view.processing_stage}
+              error_stage={@review_view.error_stage}
+              pipeline_active?={@review_view.pipeline_active?}
               inserted_at={@review_view.inserted_at}
             />
 
@@ -809,12 +811,21 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
 
   defp show_associate_source_action?(_, _), do: false
 
+  attr :status, :string, required: true
   attr :processing_stage, :string, required: true
+  attr :error_stage, :string, default: nil
+  attr :pipeline_active?, :boolean, required: true
   attr :inserted_at, :any, required: true
 
   defp pipeline_progress(assigns) do
-    completed_index = @stage_index[assigns.processing_stage]
-    stages = stage_statuses(completed_index)
+    stages =
+      stage_statuses(
+        assigns.status,
+        assigns.processing_stage,
+        assigns.error_stage,
+        assigns.pipeline_active?
+      )
+
     assigns = assign(assigns, :stages, stages)
 
     ~H"""
@@ -822,6 +833,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-medium text-gray-500">Pipeline Progress</h3>
         <div
+          :if={@pipeline_active?}
           id="elapsed-timer"
           phx-hook="ElapsedTimer"
           data-started-at={DateTime.to_iso8601(@inserted_at)}
@@ -833,7 +845,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
 
       <div class="flex items-center gap-1">
         <div
-          :for={{stage_key, label, status} <- @stages}
+          :for={{_stage_key, label, status} <- @stages}
           class="flex-1 flex flex-col items-center gap-1"
         >
           <div class={[
@@ -852,18 +864,34 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
     """
   end
 
-  defp stage_statuses(nil) do
-    Enum.map(@pipeline_stages, fn {key, label} -> {key, label, :running} end)
-    |> List.update_at(0, fn {key, label, _} -> {key, label, :running} end)
-  end
+  defp stage_statuses("failed", _processing_stage, error_stage, _active?) do
+    error_index = @stage_index[error_stage]
 
-  defp stage_statuses(completed_index) do
     @pipeline_stages
     |> Enum.with_index()
     |> Enum.map(fn {{key, label}, idx} ->
       cond do
-        idx <= completed_index -> {key, label, :completed}
-        idx == completed_index + 1 -> {key, label, :running}
+        error_index && idx < error_index -> {key, label, :completed}
+        error_index && idx == error_index -> {key, label, :failed}
+        true -> {key, label, :pending}
+      end
+    end)
+  end
+
+  defp stage_statuses(status, _processing_stage, _error_stage, _active?)
+       when status in ~w(complete needs_review) do
+    Enum.map(@pipeline_stages, fn {key, label} -> {key, label, :completed} end)
+  end
+
+  defp stage_statuses(_status, processing_stage, _error_stage, active?) do
+    completed_index = @stage_index[processing_stage]
+
+    @pipeline_stages
+    |> Enum.with_index()
+    |> Enum.map(fn {{key, label}, idx} ->
+      cond do
+        completed_index && idx <= completed_index -> {key, label, :completed}
+        completed_index && idx == completed_index + 1 && active? -> {key, label, :running}
         true -> {key, label, :pending}
       end
     end)
@@ -871,10 +899,12 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
 
   defp stage_bar_class(:completed), do: "bg-green-500"
   defp stage_bar_class(:running), do: "bg-amber-400 animate-pulse"
+  defp stage_bar_class(:failed), do: "bg-red-500"
   defp stage_bar_class(:pending), do: "bg-gray-200"
 
   defp stage_label_class(:completed), do: "text-green-700 font-medium"
   defp stage_label_class(:running), do: "text-amber-700 font-medium"
+  defp stage_label_class(:failed), do: "text-red-700 font-medium"
   defp stage_label_class(:pending), do: "text-gray-400"
 
   defp terminal_status?("needs_review"), do: true
