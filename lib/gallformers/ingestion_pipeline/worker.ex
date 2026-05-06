@@ -84,6 +84,9 @@ defmodule Gallformers.IngestionPipeline.Worker do
           {:error, changeset} -> {:error, changeset}
         end
 
+      {:error, :invalid_contract, messages} ->
+        handle_stage_error(ingestion, module, {:invalid_contract, messages}, job)
+
       {:error, reason} ->
         handle_stage_error(ingestion, module, reason, job)
     end
