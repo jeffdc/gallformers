@@ -44,7 +44,7 @@ defmodule Gallformers.IngestionPipeline.Schema do
     records
     |> Enum.with_index()
     |> Enum.reduce_while({:ok, []}, fn {record, idx}, {:ok, acc} ->
-      errors = schema_errors(schema, record, idx) ++ vocabulary_errors(record, idx, raw_schema)
+      errors = schema_errors(schema, record, idx)
 
       if errors == [] do
         {:cont, {:ok, [record | acc]}}
@@ -143,25 +143,6 @@ defmodule Gallformers.IngestionPipeline.Schema do
     end
   end
 
-  defp vocabulary_errors(record, idx, raw_schema) do
-    raw_schema
-    |> trait_vocabs()
-    |> Map.delete(:detachable)
-    |> Enum.flat_map(fn {trait_name, vocab} ->
-      record
-      |> suggested_values(trait_name)
-      |> invalid_suggested_errors(idx, trait_name, vocab)
-    end)
-  end
-
-  defp trait_vocabs(raw_schema) do
-    raw_schema
-    |> get_in(["properties", "traits", "properties"])
-    |> Enum.into(%{}, fn {trait_name, trait_schema} ->
-      {String.to_atom(trait_name), trait_vocab(trait_name, trait_schema, raw_schema)}
-    end)
-  end
-
   defp trait_vocab(_trait_name, %{"enum" => enum}, _raw_schema) when is_list(enum) do
     Enum.reject(enum, &is_nil/1)
   end
@@ -184,24 +165,5 @@ defmodule Gallformers.IngestionPipeline.Schema do
     path
     |> String.replace("/", ".")
     |> String.trim_leading(".")
-  end
-
-  defp suggested_values(record, trait_name) do
-    case get_in(record, ["traits", Atom.to_string(trait_name), "suggested"]) do
-      values when is_list(values) -> values
-      _ -> []
-    end
-  end
-
-  defp invalid_suggested_errors(values, idx, trait_name, vocab) do
-    Enum.flat_map(values, fn value ->
-      if value in vocab do
-        []
-      else
-        [
-          "Record #{idx}: traits.#{trait_name}.suggested contains invalid value #{inspect(value)}"
-        ]
-      end
-    end)
   end
 end

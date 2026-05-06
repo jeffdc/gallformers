@@ -126,7 +126,7 @@ defmodule Gallformers.IngestionPipeline.SchemaTest do
                true
     end
 
-    test "returns error for invalid suggested vocabulary value" do
+    test "accepts out-of-vocabulary suggested values for human review" do
       record = [
         %{
           "gall_species" => %{"name" => "Andricus", "family" => "Cynipidae"},
@@ -139,12 +139,7 @@ defmodule Gallformers.IngestionPipeline.SchemaTest do
         }
       ]
 
-      assert {:error, :invalid_contract, errors} = Schema.validate(record)
-
-      assert Enum.any?(
-               errors,
-               &String.contains?(&1, ~s(traits.shape.suggested contains invalid value "banana"))
-             ) == true
+      assert {:ok, ^record} = Schema.validate(record)
     end
 
     test "returns error for non-list input" do
