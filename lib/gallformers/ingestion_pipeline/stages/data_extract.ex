@@ -17,10 +17,11 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
   require Logger
 
   @default_chunk_size 3000
-  @default_max_tokens 4096
+  @default_max_tokens 8192
   @default_max_concurrency 2
   @default_task_timeout :timer.minutes(10)
   @default_json_attempts 3
+  @max_split_depth 2
 
   @impl true
   def stage_name, do: :data_extract
@@ -90,13 +91,13 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
     end
   end
 
-  defp extract_chunk(ingestion, prompt, chunk, attempts_remaining \\ nil)
+  defp extract_chunk(ingestion, prompt, chunk, attempts_remaining \\ nil, split_depth \\ 0)
 
-  defp extract_chunk(ingestion, prompt, chunk, nil) do
-    extract_chunk(ingestion, prompt, chunk, json_attempts(ingestion))
+  defp extract_chunk(ingestion, prompt, chunk, nil, split_depth) do
+    extract_chunk(ingestion, prompt, chunk, json_attempts(ingestion), split_depth)
   end
 
-  defp extract_chunk(ingestion, _prompt, _chunk, 0) do
+  defp extract_chunk(ingestion, _prompt, _chunk, 0, _split_depth) do
     Logger.warning("data_extract chunk exhausted all JSON parse attempts",
       ingestion_id: ingestion.id
     )
@@ -104,7 +105,7 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
     {:error, :invalid_json}
   end
 
-  defp extract_chunk(ingestion, prompt, chunk, attempts_remaining) do
+  defp extract_chunk(ingestion, prompt, chunk, attempts_remaining, split_depth) do
     max_tok = max_tokens(ingestion)
 
     case llm_client().completion(
@@ -114,15 +115,7 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
            llm_opts(ingestion) ++ [merge_prompt: true]
          ) do
       {:ok, _response, usage} when usage.completion_tokens >= max_tok ->
-        Logger.warning(
-          "data_extract JSON truncated at max_tokens limit, not retrying",
-          ingestion_id: ingestion.id,
-          completion_tokens: usage.completion_tokens,
-          max_tokens: max_tok,
-          input_chars: String.length(chunk)
-        )
-
-        {:error, :json_truncated}
+        handle_truncated_chunk(ingestion, prompt, chunk, usage, max_tok, split_depth)
 
       {:ok, response, usage} ->
         case parse_json_response(response) do
@@ -136,7 +129,7 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
               completion_tokens: usage.completion_tokens
             )
 
-            extract_chunk(ingestion, prompt, chunk, attempts_remaining - 1)
+            extract_chunk(ingestion, prompt, chunk, attempts_remaining - 1, split_depth)
         end
 
       {:error, reason} ->
@@ -145,6 +138,57 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
       {:error, reason, status} ->
         {:error, {reason, status}}
     end
+  end
+
+  defp handle_truncated_chunk(ingestion, prompt, chunk, usage, max_tok, split_depth)
+       when split_depth < @max_split_depth do
+    sub_chunks = LLMClient.chunk_text(chunk, div(String.length(chunk), 2))
+
+    if length(sub_chunks) > 1 do
+      Logger.info(
+        "data_extract output truncated, splitting chunk and retrying",
+        ingestion_id: ingestion.id,
+        completion_tokens: usage.completion_tokens,
+        max_tokens: max_tok,
+        input_chars: String.length(chunk),
+        sub_chunks: length(sub_chunks),
+        split_depth: split_depth + 1
+      )
+
+      extract_sub_chunks(ingestion, prompt, sub_chunks, split_depth + 1)
+    else
+      Logger.warning(
+        "data_extract output truncated but chunk cannot be split further",
+        ingestion_id: ingestion.id,
+        completion_tokens: usage.completion_tokens,
+        max_tokens: max_tok,
+        input_chars: String.length(chunk)
+      )
+
+      {:error, :json_truncated}
+    end
+  end
+
+  defp handle_truncated_chunk(ingestion, _prompt, chunk, usage, max_tok, split_depth) do
+    Logger.warning(
+      "data_extract output truncated at max split depth, giving up",
+      ingestion_id: ingestion.id,
+      completion_tokens: usage.completion_tokens,
+      max_tokens: max_tok,
+      input_chars: String.length(chunk),
+      split_depth: split_depth
+    )
+
+    {:error, :json_truncated}
+  end
+
+  defp extract_sub_chunks(ingestion, prompt, sub_chunks, split_depth) do
+    Enum.reduce_while(sub_chunks, {:ok, []}, fn sub_chunk, {:ok, acc} ->
+      case extract_chunk(ingestion, prompt, sub_chunk, nil, split_depth) do
+        {:ok, records} -> {:cont, {:ok, acc ++ records}}
+        error -> {:halt, error}
+      end
+    end)
   end
 
   defp parse_json_response(response) do

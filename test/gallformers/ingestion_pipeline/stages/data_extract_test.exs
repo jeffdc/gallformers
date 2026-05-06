@@ -171,9 +171,9 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtractTest do
 
     assert_received {:get_object, _, ^input_path}
     assert_received :prompt_text
-    assert_received {:completion, prompt, ^chunk_one, [max_tokens: 4096, merge_prompt: true]}
-    assert_received {:completion, ^prompt, ^chunk_two, [max_tokens: 4096, merge_prompt: true]}
-    assert_received {:completion, ^prompt, ^chunk_three, [max_tokens: 4096, merge_prompt: true]}
+    assert_received {:completion, prompt, ^chunk_one, [max_tokens: 8192, merge_prompt: true]}
+    assert_received {:completion, ^prompt, ^chunk_two, [max_tokens: 8192, merge_prompt: true]}
+    assert_received {:completion, ^prompt, ^chunk_three, [max_tokens: 8192, merge_prompt: true]}
     assert String.contains?(prompt, "SCHEMA TEXT") == true
     assert String.contains?(prompt, "{{SCHEMA}}") == false
 
@@ -236,8 +236,8 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtractTest do
 
     assert {:ok, _updated_ingestion} = DataExtract.perform_stage(ingestion)
 
-    assert_received {:completion, _prompt, ^chunk, [max_tokens: 4096, merge_prompt: true]}
-    assert_received {:completion, _prompt, ^chunk, [max_tokens: 4096, merge_prompt: true]}
+    assert_received {:completion, _prompt, ^chunk, [max_tokens: 8192, merge_prompt: true]}
+    assert_received {:completion, _prompt, ^chunk, [max_tokens: 8192, merge_prompt: true]}
     assert_received {:validate, [^record]}
   end
 
@@ -249,7 +249,7 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtractTest do
 
     set_data_extract_config(%{
       responses: %{
-        chunk => {:ok, "[{\"incomplete\": true", %{prompt_tokens: 100, completion_tokens: 4096}}
+        chunk => {:ok, "[{\"incomplete\": true", %{prompt_tokens: 100, completion_tokens: 8192}}
       }
     })
 
@@ -258,6 +258,42 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtractTest do
     assert_received {:completion, _prompt, ^chunk, _opts}
     refute_received {:completion, _, ^chunk, _}
     refute_received {:upload, _, _, _, _}
+  end
+
+  test "splits chunk and retries when output is truncated and chunk has paragraph boundaries" do
+    ingestion = source_ingestion_fixture()
+    Broadcaster.subscribe(ingestion.id)
+
+    para_one = "paragraph one " <> String.duplicate("x", 1_400)
+    para_two = "paragraph two " <> String.duplicate("y", 1_400)
+    full_chunk = para_one <> "\n\n" <> para_two
+
+    record_one = valid_record("Gall Split A", "Host Split A", 0.9)
+    record_two = valid_record("Gall Split B", "Host Split B", 0.91)
+
+    Process.put(:data_extract_text_fixture, full_chunk)
+
+    set_data_extract_config(%{
+      responses: %{
+        full_chunk =>
+          {:ok, "[{\"incomplete\": true", %{prompt_tokens: 100, completion_tokens: 8192}},
+        para_one =>
+          {:ok, Jason.encode!([record_one]), %{prompt_tokens: 1, completion_tokens: 100}},
+        para_two =>
+          {:ok, Jason.encode!([record_two]), %{prompt_tokens: 1, completion_tokens: 100}}
+      }
+    })
+
+    assert {:ok, _updated_ingestion} = DataExtract.perform_stage(ingestion)
+
+    assert_received {:completion, _prompt, ^full_chunk, _opts}
+    assert_received {:completion, _prompt, ^para_one, _opts}
+    assert_received {:completion, _prompt, ^para_two, _opts}
+
+    expected_records = [record_one, record_two]
+    assert_received {:validate, ^expected_records}
+    assert_received {:upload, _, _, json_content, "application/json"}
+    assert Jason.decode!(json_content) == expected_records
   end
 
   test "surfaces llm client errors without uploading partial output" do
