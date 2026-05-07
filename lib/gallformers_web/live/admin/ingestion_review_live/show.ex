@@ -44,7 +44,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
     ingestion_id = String.to_integer(id)
     socket = load_review_view(socket, ingestion_id)
 
-    if connected?(socket) && socket.assigns.review_view.pipeline_active? do
+    if connected?(socket) && socket.assigns.review_view.status == "processing" do
       Broadcaster.subscribe(ingestion_id)
     end
 
@@ -263,11 +263,12 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
     ~H"""
     <Layouts.admin flash={@flash} current_user={@current_user} page_title={@page_title}>
       <div :if={@review_view} class="space-y-6">
+        <.ingestion_breadcrumb review_view={@review_view} />
+
         <.card title="Submission Detail" icon="ph-file-text">
-          <div class="space-y-4">
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div class="space-y-2">
-                <p class="text-sm text-gray-500">Submission</p>
+          <div class="space-y-3">
+            <div class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <div class="space-y-1">
                 <h2 class="text-2xl font-semibold text-gf-maroon">
                   {@review_view.display_title}
                 </h2>
@@ -306,10 +307,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
                 >
                   {clear_source_ingestion_label(@review_view)}
                 </.button>
-
-                <.button navigate={~p"/admin/ingestion-review"} variant="secondary">
-                  Back To Queue
-                </.button>
               </div>
             </div>
 
@@ -326,16 +323,27 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
               stage: {@review_view.error_message || "unknown error"}
             </.alert>
 
-            <.list>
-              <:item title="Input Type">{String.upcase(@review_view.input_type)}</:item>
-              <:item title="Stage">{Presenter.processing_stage_label(@review_view)}</:item>
-              <:item title="Uploaded">{format_date(@review_view.inserted_at, :short)}</:item>
-            </.list>
+            <div class="flex gap-6 text-sm">
+              <div>
+                <span class="font-medium text-gray-500">Input Type</span>
+                <span class="ml-1 text-gray-900">{String.upcase(@review_view.input_type)}</span>
+              </div>
+              <div>
+                <span class="font-medium text-gray-500">Uploaded</span>
+                <span class="ml-1 text-gray-900">
+                  {format_date(@review_view.inserted_at, :short)}
+                </span>
+              </div>
+            </div>
           </div>
         </.card>
 
         <.card title="Duplicate Review" icon="ph-copy">
           <div class="space-y-4">
+            <p class="text-sm text-gray-500">
+              The pipeline checks whether this source has already been ingested by comparing titles, DOIs, and text content against existing submissions.
+            </p>
+
             <.alert
               :if={
                 !@review_view.duplicate_review_required? &&
@@ -357,7 +365,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
             </.alert>
 
             <div :if={@review_view.duplicate_candidates == []} class="text-sm text-gray-500">
-              No duplicate candidates were recorded for this submission.
+              No potential duplicates were found — this source appears to be new.
             </div>
 
             <div
@@ -453,15 +461,15 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
             </button>
           </div>
 
-          <div :if={!source_review_locked_for_duplicate?(@review_view)} class="space-y-6">
-            <div class="space-y-3">
+          <div :if={!source_review_locked_for_duplicate?(@review_view)} class="space-y-4">
+            <div class="space-y-2">
               <h3 class="text-sm font-semibold text-gray-700">Submission Metadata</h3>
 
               <.list>
                 <:item title="Title">{@review_view.display_title}</:item>
                 <:item title="Authors">{authors_text(@review_view.authors)}</:item>
                 <:item title="Year">{metadata_value(@review_view.publication_year)}</:item>
-                <:item title="DOI">{metadata_value(@review_view.doi)}</:item>
+                <:item title="DOI/URL">{metadata_value(@review_view.doi)}</:item>
               </.list>
             </div>
 
@@ -599,7 +607,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
           </div>
 
           <div :if={!species_review_locked_for_duplicate?(@review_view)} class="space-y-4">
-            <div class="flex flex-wrap gap-2">
+            <div class="flex flex-wrap items-center gap-3">
               <.badge variant="info">
                 {@review_view.counts.species_entries_pending} of {@review_view.counts.species_entries_total} galls remaining
               </.badge>
@@ -620,84 +628,38 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
               Associate a source to enable gall review.
             </.alert>
 
-            <.alert
-              :if={@review_view.species_entries != [] && @review_view.species_review_unlocked?}
-              variant="info"
-            >
-              Source attached. Proceed to the species review workspace to curate gall entries.
-            </.alert>
-
-            <div
+            <.table
               :if={@review_view.species_entries != []}
               id="species-review-list"
-              class="space-y-2"
+              rows={@review_view.species_entries}
+              row_id={&"species-entry-#{&1.id}"}
+              variant="compact"
+              zebra={false}
             >
-              <details
-                :for={entry <- @review_view.species_entries}
-                id={"species-entry-#{entry.id}"}
-                class="rounded-lg border border-gray-200"
-              >
-                <summary class="cursor-pointer px-4 py-3 flex items-center justify-between gap-3">
-                  <div class="flex items-center gap-3">
-                    <span class="text-sm text-gray-400">{entry.position}</span>
-                    <div>
-                      <div class="font-medium text-gray-900">
-                        {entry.extracted_name || "Unnamed gall"}
-                      </div>
-                      <div :if={entry.extracted_authority} class="text-sm text-gray-500">
-                        {entry.extracted_authority}
-                      </div>
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span :if={entry.mapped_species_name} class="text-sm text-gray-600">
-                      {entry.mapped_species_name}
-                    </span>
-                    <.badge variant="info">{entry.status}</.badge>
-                  </div>
-                </summary>
-                <div class="border-t border-gray-200 px-4 py-3 space-y-2 text-sm">
-                  <div :if={entry.extracted_hosts != []} class="space-y-1">
-                    <div class="font-medium text-gray-700">Hosts</div>
-                    <div :for={host <- entry.extracted_hosts} class="text-gray-600">
-                      {host.name}<span :if={host.authority} class="text-gray-400">
-                        {" "}{host.authority}
-                      </span>
-                    </div>
-                  </div>
-                  <div :if={entry.extracted_trait_names != []} class="space-y-1">
-                    <div class="font-medium text-gray-700">Traits</div>
-                    <div class="text-gray-600">
-                      {Enum.join(entry.extracted_trait_names, ", ")}
-                    </div>
-                  </div>
-                  <div :if={entry.extracted_aliases != []} class="space-y-1">
-                    <div class="font-medium text-gray-700">Aliases</div>
-                    <div class="text-gray-600">
-                      {Enum.join(entry.extracted_aliases, ", ")}
-                    </div>
-                  </div>
-                  <div
-                    :if={
-                      entry.extracted_hosts == [] && entry.extracted_trait_names == [] &&
-                        entry.extracted_aliases == []
-                    }
-                    class="text-gray-500"
-                  >
-                    No extraction summary available.
-                  </div>
+              <:col :let={entry} label="Gall">
+                <div class="font-medium">{entry.extracted_name || "Unnamed gall"}</div>
+                <div :if={entry.extracted_authority} class="text-xs text-gray-500">
+                  {entry.extracted_authority}
                 </div>
-              </details>
-            </div>
-
-            <.link
-              :if={@review_view.species_review_unlocked?}
-              navigate={~p"/admin/ingestion-review/#{@review_view.id}/review"}
-              data-role="proceed-to-review"
-              class="gf-btn gf-btn-primary inline-block"
-            >
-              Proceed to Species Review
-            </.link>
+                <div :if={entry.mapped_species_name} class="text-xs text-gray-500">
+                  &rarr; {entry.mapped_species_name}
+                </div>
+              </:col>
+              <:col :let={entry} label="Hosts">
+                {entry.extracted_hosts |> Enum.map(& &1.name) |> Enum.join(", ")}
+              </:col>
+              <:col :let={entry} label="Aliases">
+                {Enum.join(entry.extracted_aliases, ", ")}
+              </:col>
+              <:col :let={entry} label="Traits">
+                <span :if={entry.extracted_trait_names != []}>
+                  {humanize_list(entry.extracted_trait_names)}
+                </span>
+              </:col>
+              <:col :let={entry} label="Status">
+                <.badge variant="info">{entry.status}</.badge>
+              </:col>
+            </.table>
           </div>
         </.card>
       </div>
@@ -860,6 +822,15 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
           </span>
         </div>
       </div>
+
+      <p
+        :if={
+          @status not in ~w(complete needs_review failed duplicate_confirmed needs_duplicate_review)
+        }
+        class="text-xs text-gray-400"
+      >
+        Processing typically takes 15–30 minutes. Large files may take longer.
+      </p>
     </div>
     """
   end
@@ -919,6 +890,38 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
 
   defp species_review_locked_for_duplicate?(review_view),
     do: review_view.duplicate_review_required?
+
+  defp humanize_list([item]), do: item
+  defp humanize_list([a, b]), do: "#{a} and #{b}"
+
+  defp humanize_list(items),
+    do: "#{Enum.slice(items, 0..-2//1) |> Enum.join(", ")}, and #{List.last(items)}"
+
+  attr :review_view, :map, required: true
+
+  defp ingestion_breadcrumb(assigns) do
+    ~H"""
+    <nav class="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
+      <div class="flex items-center gap-1.5 min-w-0 text-sm">
+        <.link navigate={~p"/admin/ingestion-review"} class="shrink-0 text-gf-maroon hover:underline">
+          Queue
+        </.link>
+        <.icon name="ph-caret-right" class="size-3.5 shrink-0 text-gray-400" />
+        <span class="truncate text-gray-700" title={@review_view.display_title}>
+          {@review_view.display_title}
+        </span>
+      </div>
+      <.link
+        :if={@review_view.species_review_unlocked?}
+        navigate={~p"/admin/ingestion-review/#{@review_view.id}/review"}
+        data-role="proceed-to-review"
+        class="gf-btn gf-btn-primary shrink-0 ml-4"
+      >
+        Species Review
+      </.link>
+    </nav>
+    """
+  end
 
   defp changeset_error_message(changeset) do
     changeset.errors

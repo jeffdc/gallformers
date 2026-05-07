@@ -37,7 +37,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
 
       assert html =~ "Andricus quercuscalifornicus"
       assert html =~ "Disholcaspis eldoradensis"
-      assert has_element?(view, "[data-role=back-to-overview]")
+      assert has_element?(view, "nav a", "Queue")
     end
 
     test "auto-selects first unreviewed species entry", %{conn: conn} do

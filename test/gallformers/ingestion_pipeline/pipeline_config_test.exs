@@ -36,7 +36,7 @@ defmodule Gallformers.IngestionPipeline.PipelineConfigTest do
       changeset =
         PipelineConfig.changeset(%PipelineConfig{}, %{name: "default", config: @valid_config})
 
-      assert changeset.valid?
+      assert changeset.valid? == true
     end
 
     test "name is required" do

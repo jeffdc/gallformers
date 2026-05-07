@@ -174,25 +174,37 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.IndexTest do
       refute html =~ "Complete Submission"
     end
 
-    test "include complete filter reveals completed items", %{conn: conn} do
+    test "table columns are sortable", %{conn: conn} do
       current_db_user = db_user_fixture("Current Reviewer")
       conn = superadmin_conn(conn, current_db_user)
 
       source_ingestion_fixture(%{
         uploaded_by_id: current_db_user.id,
-        title: "Complete Submission",
-        status: "complete",
-        processing_stage: "complete"
+        title: "Alpha Submission",
+        status: "processing",
+        processing_stage: "extract"
       })
 
-      {:ok, view, html} = live(conn, ~p"/admin/ingestion-review")
+      source_ingestion_fixture(%{
+        uploaded_by_id: current_db_user.id,
+        title: "Zeta Submission",
+        status: "needs_review",
+        processing_stage: "review"
+      })
 
-      refute html =~ "Complete Submission"
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review")
 
-      html = render_click(view, "toggle_include_complete")
+      html = render_click(view, "sort", %{"column" => "display_title"})
 
-      assert html =~ "Complete Submission"
-      assert html =~ "Complete"
+      alpha_pos = :binary.match(html, "Alpha Submission") |> elem(0)
+      zeta_pos = :binary.match(html, "Zeta Submission") |> elem(0)
+      assert alpha_pos < zeta_pos
+
+      html = render_click(view, "sort", %{"column" => "display_title"})
+
+      alpha_pos = :binary.match(html, "Alpha Submission") |> elem(0)
+      zeta_pos = :binary.match(html, "Zeta Submission") |> elem(0)
+      assert zeta_pos < alpha_pos
     end
 
     test "default active queue hides duplicate-confirmed rows", %{conn: conn} do
@@ -211,39 +223,29 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.IndexTest do
       refute html =~ "Confirmed Duplicate"
     end
 
-    test "uploader filter switches between me and all", %{conn: conn} do
+    test "queue shows all uploaders", %{conn: conn} do
       current_db_user = db_user_fixture("Current Reviewer")
       other_db_user = db_user_fixture("Other Reviewer")
       conn = superadmin_conn(conn, current_db_user)
 
-      mine =
-        source_ingestion_fixture(%{
-          uploaded_by_id: current_db_user.id,
-          title: "My Submission",
-          status: "needs_review",
-          processing_stage: "review"
-        })
+      source_ingestion_fixture(%{
+        uploaded_by_id: current_db_user.id,
+        title: "My Submission",
+        status: "needs_review",
+        processing_stage: "review"
+      })
 
-      other =
-        source_ingestion_fixture(%{
-          uploaded_by_id: other_db_user.id,
-          title: "Other Submission",
-          status: "processing",
-          processing_stage: "extract"
-        })
+      source_ingestion_fixture(%{
+        uploaded_by_id: other_db_user.id,
+        title: "Other Submission",
+        status: "processing",
+        processing_stage: "extract"
+      })
 
-      {:ok, view, html} = live(conn, ~p"/admin/ingestion-review")
+      {:ok, _view, html} = live(conn, ~p"/admin/ingestion-review")
 
-      assert html =~ mine.title
-      refute html =~ other.title
-
-      html =
-        view
-        |> form("#queue-filter-form", %{"uploaded_by_scope" => "all"})
-        |> render_change()
-
-      assert html =~ mine.title
-      assert html =~ other.title
+      assert html =~ "My Submission"
+      assert html =~ "Other Submission"
     end
 
     test "duplicate-review rows render a distinct badge", %{conn: conn} do

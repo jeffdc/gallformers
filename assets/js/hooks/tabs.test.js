@@ -91,4 +91,16 @@ describe('Tabs', () => {
 
     expect(getTab(hook, 'three').getAttribute('aria-selected')).toBe('true')
   })
+
+  test('updated preserves active tab after DOM patch', () => {
+    getTab(hook, 'two').click()
+
+    // Simulate LiveView DOM patch stripping data-active attributes
+    hook.el.querySelectorAll('[data-active]').forEach(el => el.removeAttribute('data-active'))
+    hook.updated()
+
+    expect(getTab(hook, 'two').hasAttribute('data-active')).toBe(true)
+    expect(getPanel(hook, 'two').hasAttribute('data-active')).toBe(true)
+    expect(getPanel(hook, 'one').hasAttribute('data-active')).toBe(false)
+  })
 })

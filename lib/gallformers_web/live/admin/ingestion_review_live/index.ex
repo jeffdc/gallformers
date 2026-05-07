@@ -12,15 +12,14 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
   def mount(_params, session, socket) do
     current_user = session["current_user"]
     current_user_db_id = Accounts.db_user_id(session)
-    uploaded_by_scope = default_uploaded_by_scope(current_user_db_id)
 
     socket =
       socket
       |> assign(:current_user, current_user)
       |> assign(:current_user_db_id, current_user_db_id)
       |> assign(:page_title, "Source Ingestion Review")
-      |> assign(:include_complete, false)
-      |> assign(:uploaded_by_scope, uploaded_by_scope)
+      |> assign(:sort_by, :inserted_at)
+      |> assign(:sort_dir, :desc)
       |> assign(:pdf_form, empty_form(:pdf_submission))
       |> assign(:url_form, empty_form(:url_submission))
       |> assign(:text_form, empty_form(:text_submission))
@@ -41,23 +40,17 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
   @impl true
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
-  @impl true
-  def handle_event("set_uploader_scope", %{"uploaded_by_scope" => scope}, socket) do
-    {:noreply,
-     socket
-     |> assign(
-       :uploaded_by_scope,
-       parse_uploaded_by_scope(scope, socket.assigns.current_user_db_id)
-     )
-     |> load_queue_rows()}
-  end
+  @sortable_columns ~w(display_title status inserted_at uploaded_by_name)a
 
   @impl true
-  def handle_event("toggle_include_complete", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:include_complete, !socket.assigns.include_complete)
-     |> load_queue_rows()}
+  def handle_event("sort", %{"column" => column}, socket) do
+    column_atom = String.to_existing_atom(column)
+
+    if column_atom in @sortable_columns do
+      {:noreply, assign(socket, toggle_sort(socket.assigns, column_atom))}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true
@@ -167,134 +160,20 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
     ~H"""
     <Layouts.admin flash={@flash} current_user={@current_user} page_title="Source Ingestion Review">
       <div class="space-y-6">
-        <.card title="Queue Filters" icon="ph-funnel">
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <form id="queue-filter-form" phx-change="set_uploader_scope">
-              <.radio_group
-                id="uploaded-by-scope"
-                name="uploaded_by_scope"
-                label="Uploaded by"
-                value={@uploaded_by_scope}
-                options={[
-                  %{value: "me", label: "Me"},
-                  %{value: "all", label: "All reviewers"}
-                ]}
-              />
-            </form>
-
-            <div class="flex items-center gap-3">
-              <.toggle
-                id="include-complete"
-                name="include_complete"
-                checked={@include_complete}
-                label="Include complete items"
-                phx-click="toggle_include_complete"
-              />
-            </div>
-          </div>
-        </.card>
-
-        <div class="grid gap-6 xl:grid-cols-3">
-          <.card title="New Source: PDF" icon="ph-file-pdf">
-            <.form
-              id="pdf-submission-form"
-              for={@pdf_form}
-              phx-change="validate_pdf_submission"
-              phx-submit="submit_pdf"
-            >
-              <div class="space-y-4">
-                <.file_dropzone
-                  id="pdf-dropzone"
-                  upload={@uploads.pdf}
-                  label="Upload PDF (.pdf)"
-                />
-
-                <div :if={@uploads.pdf.entries != []} class="space-y-2">
-                  <div
-                    :for={entry <- @uploads.pdf.entries}
-                    class="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2 text-sm"
-                  >
-                    <span class="font-medium text-gray-700">{entry.client_name}</span>
-                    <span class="text-gray-500">{entry.progress}%</span>
-                  </div>
-                </div>
-
-                <.alert :if={@pdf_error} variant="error">{@pdf_error}</.alert>
-
-                <div :for={error <- upload_errors(@uploads.pdf)}>
-                  <.alert variant="error">{upload_error_message(error)}</.alert>
-                </div>
-
-                <.pipeline_config_select
-                  name="pdf_submission[pipeline_config_id]"
-                  options={@pipeline_config_options}
-                />
-
-                <.button type="submit" variant="primary">Create From PDF</.button>
-              </div>
-            </.form>
-          </.card>
-
-          <.card title="New Source: URL" icon="ph-link">
-            <.form
-              id="url-submission-form"
-              for={@url_form}
-              phx-change="validate_url_submission"
-              phx-submit="submit_url"
-            >
-              <div class="space-y-4">
-                <.input
-                  field={@url_form[:url]}
-                  type="url"
-                  label="Source URL"
-                  placeholder="https://example.com/article"
-                />
-
-                <.pipeline_config_select
-                  name="url_submission[pipeline_config_id]"
-                  options={@pipeline_config_options}
-                />
-
-                <.button type="submit" variant="primary">Create From URL</.button>
-              </div>
-            </.form>
-          </.card>
-
-          <.card title="New Source: Text" icon="ph-text-aa">
-            <.form
-              id="text-submission-form"
-              for={@text_form}
-              phx-change="validate_text_submission"
-              phx-submit="submit_text"
-            >
-              <div class="space-y-4">
-                <.input
-                  field={@text_form[:text]}
-                  type="textarea"
-                  label="Extracted text"
-                  rows="10"
-                  placeholder="Paste source text here"
-                />
-
-                <.pipeline_config_select
-                  name="text_submission[pipeline_config_id]"
-                  options={@pipeline_config_options}
-                />
-
-                <.button type="submit" variant="primary">Create From Text</.button>
-              </div>
-            </.form>
-          </.card>
-        </div>
-
         <.card title="Review Queue" icon="ph-list-checks">
           <div :if={@queue_rows == []} class="py-8 text-center text-gray-500">
-            No source ingestions match the current filters.
+            No source ingestions in the queue.
           </div>
 
           <div :if={@queue_rows != []} class="overflow-x-auto">
-            <.table id="ingestion-review-queue" rows={@queue_rows} row_id={&"ingestion-row-#{&1.id}"}>
-              <:col :let={row} label="Title">
+            <.table
+              id="ingestion-review-queue"
+              rows={sorted_queue_rows(@queue_rows, @sort_by, @sort_dir)}
+              row_id={&"ingestion-row-#{&1.id}"}
+              sort_by={@sort_by}
+              sort_dir={@sort_dir}
+            >
+              <:col :let={row} label="Title" sort_key={:display_title}>
                 <div class="space-y-2">
                   <.link
                     navigate={"/admin/ingestion-review/#{row.id}"}
@@ -312,15 +191,15 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
                 {species_progress_label(row)}
               </:col>
 
-              <:col :let={row} label="Status">
+              <:col :let={row} label="Status" sort_key={:status}>
                 {Presenter.queue_status_label(row)}
               </:col>
 
-              <:col :let={row} label="Uploaded">
+              <:col :let={row} label="Uploaded" sort_key={:inserted_at}>
                 {format_date(row.inserted_at, :short)}
               </:col>
 
-              <:col :let={row} label="By">
+              <:col :let={row} label="By" sort_key={:uploaded_by_name}>
                 {row.uploaded_by_name}
               </:col>
 
@@ -340,6 +219,101 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
             </.table>
           </div>
         </.card>
+
+        <.card title="New Source Ingestion" icon="ph-plus-circle">
+          <.tabs id="new-source-tabs" default_tab="pdf">
+            <:tab id="pdf" label="PDF">
+              <.form
+                id="pdf-submission-form"
+                for={@pdf_form}
+                phx-change="validate_pdf_submission"
+                phx-submit="submit_pdf"
+              >
+                <div class="space-y-4">
+                  <.file_dropzone
+                    id="pdf-dropzone"
+                    upload={@uploads.pdf}
+                    label="Upload PDF (.pdf)"
+                  />
+
+                  <div :if={@uploads.pdf.entries != []} class="space-y-2">
+                    <div
+                      :for={entry <- @uploads.pdf.entries}
+                      class="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2 text-sm"
+                    >
+                      <span class="font-medium text-gray-700">{entry.client_name}</span>
+                      <span class="text-gray-500">{entry.progress}%</span>
+                    </div>
+                  </div>
+
+                  <.alert :if={@pdf_error} variant="error">{@pdf_error}</.alert>
+
+                  <div :for={error <- upload_errors(@uploads.pdf)}>
+                    <.alert variant="error">{upload_error_message(error)}</.alert>
+                  </div>
+
+                  <.pipeline_config_select
+                    name="pdf_submission[pipeline_config_id]"
+                    options={@pipeline_config_options}
+                  />
+
+                  <.button type="submit" variant="primary">Create</.button>
+                </div>
+              </.form>
+            </:tab>
+
+            <:tab id="url" label="URL">
+              <.form
+                id="url-submission-form"
+                for={@url_form}
+                phx-change="validate_url_submission"
+                phx-submit="submit_url"
+              >
+                <div class="space-y-4">
+                  <.input
+                    field={@url_form[:url]}
+                    type="url"
+                    label="Source URL"
+                    placeholder="https://example.com/article"
+                  />
+
+                  <.pipeline_config_select
+                    name="url_submission[pipeline_config_id]"
+                    options={@pipeline_config_options}
+                  />
+
+                  <.button type="submit" variant="primary">Create</.button>
+                </div>
+              </.form>
+            </:tab>
+
+            <:tab id="text" label="Text">
+              <.form
+                id="text-submission-form"
+                for={@text_form}
+                phx-change="validate_text_submission"
+                phx-submit="submit_text"
+              >
+                <div class="space-y-4">
+                  <.input
+                    field={@text_form[:text]}
+                    type="textarea"
+                    label="Extracted text"
+                    rows="6"
+                    placeholder="Paste source text here"
+                  />
+
+                  <.pipeline_config_select
+                    name="text_submission[pipeline_config_id]"
+                    options={@pipeline_config_options}
+                  />
+
+                  <.button type="submit" variant="primary">Create</.button>
+                </div>
+              </.form>
+            </:tab>
+          </.tabs>
+        </.card>
       </div>
     </Layouts.admin>
     """
@@ -348,28 +322,24 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
   defp handle_progress(@pdf_upload_name, _entry, socket), do: {:noreply, socket}
 
   defp load_queue_rows(socket) do
-    assign(
-      socket,
-      :queue_rows,
-      Presenter.list_source_ingestion_queue_rows(queue_row_opts(socket))
-    )
+    assign(socket, :queue_rows, Presenter.list_source_ingestion_queue_rows())
   end
 
-  defp queue_row_opts(socket) do
-    [
-      include_complete: socket.assigns.include_complete
-    ]
-    |> maybe_put_uploaded_by_id(
-      socket.assigns.uploaded_by_scope,
-      socket.assigns.current_user_db_id
-    )
+  defp sorted_queue_rows(rows, sort_by, sort_dir) do
+    sorted = Enum.sort_by(rows, &sort_key(&1, sort_by))
+    if sort_dir == :desc, do: Enum.reverse(sorted), else: sorted
   end
 
-  defp maybe_put_uploaded_by_id(opts, :me, uploaded_by_id) when is_integer(uploaded_by_id) do
-    Keyword.put(opts, :uploaded_by_id, uploaded_by_id)
+  defp toggle_sort(%{sort_by: current, sort_dir: dir}, current) do
+    [sort_by: current, sort_dir: if(dir == :asc, do: :desc, else: :asc)]
   end
 
-  defp maybe_put_uploaded_by_id(opts, _scope, _uploaded_by_id), do: opts
+  defp toggle_sort(_assigns, column), do: [sort_by: column, sort_dir: :asc]
+
+  defp sort_key(row, :display_title), do: String.downcase(row.display_title || "")
+  defp sort_key(row, :status), do: row.status || ""
+  defp sort_key(row, :inserted_at), do: row.inserted_at
+  defp sort_key(row, :uploaded_by_name), do: String.downcase(row.uploaded_by_name || "")
 
   defp submit_ingestion(socket, attrs, form_key) do
     case Ingestions.submit_source_ingestion(attrs) do
@@ -443,13 +413,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
          put_flash(socket, :error, "You need a database-backed profile to submit sources.")}
     end
   end
-
-  defp default_uploaded_by_scope(uploaded_by_id) when is_integer(uploaded_by_id), do: :me
-  defp default_uploaded_by_scope(_), do: :all
-
-  defp parse_uploaded_by_scope("me", uploaded_by_id) when is_integer(uploaded_by_id), do: :me
-  defp parse_uploaded_by_scope("all", _uploaded_by_id), do: :all
-  defp parse_uploaded_by_scope(_, uploaded_by_id), do: default_uploaded_by_scope(uploaded_by_id)
 
   defp empty_form(form_name), do: to_form(%{}, as: form_name)
 

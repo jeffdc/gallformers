@@ -450,12 +450,16 @@ defmodule GallformersWeb.CoreComponents do
 
   attr :zebra, :boolean, default: true, doc: "whether to show zebra striping"
 
+  attr :sort_by, :atom, default: nil, doc: "currently sorted column key"
+  attr :sort_dir, :atom, default: :asc, doc: "sort direction (:asc or :desc)"
+
   attr :row_item, :any,
     default: &Function.identity/1,
     doc: "the function for mapping each row before calling the :col and :action slots"
 
   slot :col, required: true do
     attr :label, :string
+    attr :sort_key, :atom
   end
 
   slot :action, doc: "the slot for showing user actions in the last table column"
@@ -475,7 +479,17 @@ defmodule GallformersWeb.CoreComponents do
     ]}>
       <thead>
         <tr>
-          <th :for={col <- @col}>{col[:label]}</th>
+          <th
+            :for={col <- @col}
+            class={col[:sort_key] && "sortable"}
+            phx-click={col[:sort_key] && "sort"}
+            phx-value-column={col[:sort_key] && Atom.to_string(col[:sort_key])}
+          >
+            {col[:label]}
+            <span :if={col[:sort_key] && col[:sort_key] == @sort_by} class="ml-1">
+              {if @sort_dir == :asc, do: "↑", else: "↓"}
+            </span>
+          </th>
           <th :if={@action != []}>
             <span class="sr-only">{gettext("Actions")}</span>
           </th>

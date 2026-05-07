@@ -201,16 +201,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
     ~H"""
     <Layouts.admin flash={@flash} current_user={@current_user} page_title={@page_title}>
       <div :if={@review_view} class="space-y-4">
-        <div class="flex items-center justify-between">
-          <h1 class="text-xl font-semibold text-gf-maroon">{@review_view.display_title}</h1>
-          <.link
-            navigate={~p"/admin/ingestion-review/#{@review_view.id}"}
-            data-role="back-to-overview"
-            class="gf-btn gf-btn-secondary"
-          >
-            Back to Overview
-          </.link>
-        </div>
+        <.workspace_breadcrumb review_view={@review_view} />
 
         <div class="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
           <aside class="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
@@ -803,4 +794,28 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
 
   defp parse_id(id) when is_integer(id), do: id
   defp parse_id(id) when is_binary(id), do: String.to_integer(id)
+
+  attr :review_view, :map, required: true
+
+  defp workspace_breadcrumb(assigns) do
+    ~H"""
+    <nav class="flex items-center rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
+      <div class="flex items-center gap-1.5 min-w-0 text-sm">
+        <.link navigate={~p"/admin/ingestion-review"} class="shrink-0 text-gf-maroon hover:underline">
+          Queue
+        </.link>
+        <.icon name="ph-caret-right" class="size-3.5 shrink-0 text-gray-400" />
+        <.link
+          navigate={~p"/admin/ingestion-review/#{@review_view.id}"}
+          class="shrink-0 max-w-xs truncate text-gf-maroon hover:underline"
+          title={@review_view.display_title}
+        >
+          {@review_view.display_title}
+        </.link>
+        <.icon name="ph-caret-right" class="size-3.5 shrink-0 text-gray-400" />
+        <span class="shrink-0 text-gray-700">Species Review</span>
+      </div>
+    </nav>
+    """
+  end
 end

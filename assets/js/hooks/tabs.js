@@ -2,6 +2,7 @@
 const Tabs = {
   mounted() {
     const defaultTab = this.el.dataset.defaultTab
+    this._activeTab = defaultTab
     this.activateTab(defaultTab)
 
     // Handle tab clicks
@@ -37,7 +38,13 @@ const Tabs = {
       })
     })
   },
+  updated() {
+    if (this._activeTab) {
+      this.activateTab(this._activeTab)
+    }
+  },
   activateTab(tabId) {
+    this._activeTab = tabId
     // Update tab buttons
     this.el.querySelectorAll("[data-tab-id]").forEach(button => {
       if (button.dataset.tabId === tabId) {

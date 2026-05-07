@@ -254,11 +254,18 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
 
   defp extraction_trait_names(%{traits: traits}) do
     @trait_fields
-    |> Enum.filter(fn field -> Map.get(traits, field) not in [nil, ""] end)
-    |> Enum.map(&Atom.to_string/1)
+    |> Enum.filter(&trait_present?(Map.get(traits, &1)))
+    |> Enum.map(&(&1 |> Atom.to_string() |> String.replace("_", " ")))
   end
 
   defp extraction_trait_names(_), do: []
+
+  defp trait_present?(%{original: original, suggested: suggested}),
+    do: original not in [nil, ""] or suggested != []
+
+  defp trait_present?(%{original: original}), do: original not in [nil, ""]
+  defp trait_present?(value) when is_binary(value), do: value != ""
+  defp trait_present?(_), do: false
 
   defp mapped_species_name(nil), do: nil
   defp mapped_species_name(species), do: species.name
