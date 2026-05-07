@@ -39,6 +39,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
     {:noreply,
      socket
      |> assign(:review_view, review_view)
+     |> assign(:grouped_entries, group_species_entries(review_view.species_entries))
      |> assign(:page_title, "Species Review: #{review_view.display_title}")
      |> assign(:source_text, source_text)
      |> load_workspace_for_entry(first_unreviewed)}
@@ -213,14 +214,14 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
             </div>
             <div class="space-y-2">
               <button
-                :for={entry <- @review_view.species_entries}
-                id={"workspace-nav-#{entry.id}"}
+                :for={group <- @grouped_entries}
+                id={"workspace-nav-group-#{group.nav_entry_id}"}
                 type="button"
                 phx-click="select_gall"
-                phx-value-entry-id={entry.id}
+                phx-value-entry-id={group.nav_entry_id}
                 class={[
                   "w-full rounded-lg border px-3 py-3 text-left transition",
-                  if(@selected_entry && @selected_entry.id == entry.id,
+                  if(group_selected?(group, @selected_entry),
                     do: "border-gf-maroon bg-white shadow-sm",
                     else: "border-gray-200 bg-white hover:border-gray-300"
                   )
@@ -229,13 +230,15 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
                 <div class="flex items-start justify-between gap-3">
                   <div>
                     <div class="font-medium text-gray-900">
-                      {entry.extracted_name || "Unnamed gall"}
+                      {group.name || "Unnamed gall"}
                     </div>
-                    <div :if={entry.extracted_authority} class="text-sm text-gray-500">
-                      {entry.extracted_authority}
+                    <div :if={group.count > 1} class="text-xs text-gray-500">
+                      {group.count} entries
                     </div>
                   </div>
-                  <.badge variant="info">{entry.status}</.badge>
+                  <div class="flex flex-col items-end gap-1">
+                    <.badge variant={group_status_variant(group)}>{group_status_label(group)}</.badge>
+                  </div>
                 </div>
               </button>
             </div>
@@ -250,106 +253,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
               class="space-y-6"
             >
               <input type="hidden" name="workspace[id]" value={@workspace.id} />
-
-              <section class="space-y-4">
-                <div>
-                  <h3 class="text-base font-semibold text-gray-900">Species Review</h3>
-                  <p class="text-sm text-gray-500">
-                    Confirm the extracted gall against an existing gall species or defer it for later.
-                  </p>
-                </div>
-
-                <.alias_collision_warning collisions={@workspace.species_alias_collisions} />
-
-                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
-                  <div class="grid gap-3 md:grid-cols-2">
-                    <div>
-                      <div class="text-xs font-medium uppercase tracking-wide text-gray-500">
-                        Extracted Name
-                      </div>
-                      <div class="text-sm text-gray-900">
-                        {@workspace.extracted_name || "Unnamed gall"}
-                      </div>
-                    </div>
-                    <div>
-                      <div class="text-xs font-medium uppercase tracking-wide text-gray-500">
-                        Authority
-                      </div>
-                      <div class="text-sm text-gray-900">
-                        {metadata_value(@workspace.extracted_authority)}
-                      </div>
-                    </div>
-                  </div>
-
-                  <.radio_group
-                    id="workspace-species-decision"
-                    name="workspace[species_review][decision]"
-                    label="Decision"
-                    value={@workspace.species_review.decision}
-                    options={[
-                      %{value: "mapped", label: "Map to existing species"},
-                      %{value: "skip", label: "Skip for later"}
-                    ]}
-                  />
-
-                  <div :if={@workspace.species_review.decision != "skip"} class="space-y-3">
-                    <.typeahead
-                      id="workspace-species-picker"
-                      label="Species"
-                      placeholder="Search existing gall species..."
-                      query={@workspace.species_review.search_query}
-                      results={@workspace.species_review.search_results}
-                      selected={@workspace.species_review.selected_species}
-                      search_event="search_workspace_species"
-                      select_event="select_workspace_species"
-                      clear_event="clear_workspace_species"
-                      display_fn={& &1.name}
-                    >
-                      <:result :let={species}>
-                        <div class="font-medium text-gray-900">{species.name}</div>
-                        <div class="text-sm text-gray-600">{species.taxoncode}</div>
-                      </:result>
-                    </.typeahead>
-                  </div>
-
-                  <.input
-                    id="workspace-species-notes"
-                    name="workspace[species_review][notes]"
-                    type="textarea"
-                    label="Reviewer Notes"
-                    rows="3"
-                    value={@workspace.species_review.notes}
-                  />
-                </div>
-              </section>
-
-              <section :if={@workspace.extracted_aliases != []} class="space-y-4">
-                <div>
-                  <h3 class="text-base font-semibold text-gray-900">Aliases</h3>
-                  <p class="text-sm text-gray-500">
-                    Select aliases to save as scientific synonyms on completion.
-                  </p>
-                </div>
-
-                <div class="space-y-2">
-                  <label
-                    :for={alias_name <- @workspace.extracted_aliases}
-                    class="flex items-center gap-2 text-sm text-gray-900"
-                  >
-                    <input
-                      type="checkbox"
-                      name="workspace[species_review][accepted_aliases][]"
-                      value={alias_name}
-                      checked={alias_name in (@workspace.species_review.accepted_aliases || [])}
-                      class="rounded border-gray-300"
-                    />
-                    {alias_name}
-                    <span class="text-xs text-gray-500">
-                      Save as scientific synonym on completion
-                    </span>
-                  </label>
-                </div>
-              </section>
 
               <section class="space-y-4">
                 <div>
@@ -404,24 +307,148 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
                   />
 
                   <div :if={host_review.decision == "mapped"} class="space-y-3">
-                    <.typeahead
-                      id={"host-review-picker-#{host_review.index}"}
-                      label="Host Species"
-                      placeholder="Search existing host species..."
-                      query={host_review.search_query}
-                      results={host_review.search_results}
-                      selected={host_review.selected_species}
-                      search_event={"search_workspace_host:#{host_review.index}"}
-                      select_event={"select_workspace_host:#{host_review.index}"}
-                      clear_event={"clear_workspace_host:#{host_review.index}"}
-                      display_fn={& &1.name}
-                    >
-                      <:result :let={species}>
-                        <div class="font-medium text-gray-900">{species.name}</div>
-                        <div class="text-sm text-gray-600">{species.taxoncode}</div>
-                      </:result>
-                    </.typeahead>
+                    <div class="flex items-end gap-3">
+                      <div class="flex-1">
+                        <.typeahead
+                          id={"host-review-picker-#{host_review.index}"}
+                          label="Host Species"
+                          placeholder="Search existing host species..."
+                          query={host_review.search_query}
+                          results={host_review.search_results}
+                          selected={host_review.selected_species}
+                          search_event={"search_workspace_host:#{host_review.index}"}
+                          select_event={"select_workspace_host:#{host_review.index}"}
+                          clear_event={"clear_workspace_host:#{host_review.index}"}
+                          display_fn={& &1.name}
+                        >
+                          <:result :let={species}>
+                            <div class="font-medium text-gray-900">{species.name}</div>
+                            <div class="text-sm text-gray-600">{species.taxoncode}</div>
+                          </:result>
+                        </.typeahead>
+                      </div>
+                      <.link
+                        href={new_host_url(host_review.extracted_name)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="gf-btn gf-btn-secondary shrink-0"
+                      >
+                        Create New Host
+                      </.link>
+                    </div>
                   </div>
+                </div>
+              </section>
+
+              <section class="space-y-4">
+                <div>
+                  <h3 class="text-base font-semibold text-gray-900">Species Review</h3>
+                  <p class="text-sm text-gray-500">
+                    Confirm the extracted gall against an existing gall species or defer it for later.
+                  </p>
+                </div>
+
+                <.alias_collision_warning collisions={@workspace.species_alias_collisions} />
+
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-4">
+                  <div class="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <div class="text-xs font-medium uppercase tracking-wide text-gray-500">
+                        Extracted Name
+                      </div>
+                      <div class="text-sm text-gray-900">
+                        {@workspace.extracted_name || "Unnamed gall"}
+                      </div>
+                    </div>
+                    <div>
+                      <div class="text-xs font-medium uppercase tracking-wide text-gray-500">
+                        Authority
+                      </div>
+                      <div class="text-sm text-gray-900">
+                        {metadata_value(@workspace.extracted_authority)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <.radio_group
+                    id="workspace-species-decision"
+                    name="workspace[species_review][decision]"
+                    label="Decision"
+                    value={@workspace.species_review.decision}
+                    options={[
+                      %{value: "mapped", label: "Map to existing species"},
+                      %{value: "skip", label: "Skip for later"}
+                    ]}
+                  />
+
+                  <div :if={@workspace.species_review.decision != "skip"} class="space-y-3">
+                    <div class="flex items-end gap-3">
+                      <div class="flex-1">
+                        <.typeahead
+                          id="workspace-species-picker"
+                          label="Species"
+                          placeholder="Search existing gall species..."
+                          query={@workspace.species_review.search_query}
+                          results={@workspace.species_review.search_results}
+                          selected={@workspace.species_review.selected_species}
+                          search_event="search_workspace_species"
+                          select_event="select_workspace_species"
+                          clear_event="clear_workspace_species"
+                          display_fn={& &1.name}
+                        >
+                          <:result :let={species}>
+                            <div class="font-medium text-gray-900">{species.name}</div>
+                            <div class="text-sm text-gray-600">{species.taxoncode}</div>
+                          </:result>
+                        </.typeahead>
+                      </div>
+                      <.link
+                        href={new_gall_url(@workspace)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="gf-btn gf-btn-secondary shrink-0"
+                      >
+                        Create New Gall
+                      </.link>
+                    </div>
+                  </div>
+
+                  <.input
+                    id="workspace-species-notes"
+                    name="workspace[species_review][notes]"
+                    type="textarea"
+                    label="Reviewer Notes"
+                    rows="3"
+                    value={@workspace.species_review.notes}
+                  />
+                </div>
+              </section>
+
+              <section :if={@workspace.extracted_aliases != []} class="space-y-4">
+                <div>
+                  <h3 class="text-base font-semibold text-gray-900">Aliases</h3>
+                  <p class="text-sm text-gray-500">
+                    Select aliases to save as scientific synonyms on completion.
+                  </p>
+                </div>
+
+                <div class="space-y-2">
+                  <label
+                    :for={alias_name <- @workspace.extracted_aliases}
+                    class="flex items-center gap-2 text-sm text-gray-900"
+                  >
+                    <input
+                      type="checkbox"
+                      name="workspace[species_review][accepted_aliases][]"
+                      value={alias_name}
+                      checked={alias_name in (@workspace.species_review.accepted_aliases || [])}
+                      class="rounded border-gray-300"
+                    />
+                    {alias_name}
+                    <span class="text-xs text-gray-500">
+                      Save as scientific synonym on completion
+                    </span>
+                  </label>
                 </div>
               </section>
 
@@ -433,21 +460,25 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
                   </p>
                 </div>
 
-                <div :if={@workspace.trait_reviews == []} class="text-sm text-gray-500">
+                <div
+                  :if={Enum.all?(@workspace.trait_reviews, &trait_empty?/1)}
+                  class="text-sm text-gray-500"
+                >
                   No structured traits were extracted for this gall.
                 </div>
 
                 <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   <div
                     :for={trait_review <- @workspace.trait_reviews}
+                    :if={not trait_empty?(trait_review)}
                     id={"trait-review-#{trait_review.name}"}
                     class="rounded-lg border border-gray-200 p-3 space-y-2"
                   >
                     <h4 class="font-medium text-gray-900">{trait_label(trait_review.name)}</h4>
-                    <p class="text-xs text-gray-500">
+                    <p :if={trait_review.suggested_values != []} class="text-xs text-gray-500">
                       Suggested: {trait_suggested_text(trait_review)}
                     </p>
-                    <p class="text-xs text-gray-500">
+                    <p :if={trait_review.raw_evidence != []} class="text-xs text-gray-500">
                       Evidence: {trait_evidence_text(trait_review)}
                     </p>
                   </div>
@@ -526,7 +557,11 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
 
   defp load_workspace_for_entry(socket, entry) do
     workspace_view = Ingestions.source_ingestion_species_review_workspace!(entry.id)
-    workspace = build_workspace_state(workspace_view)
+
+    workspace =
+      workspace_view
+      |> build_workspace_state()
+      |> auto_match_species()
 
     socket
     |> assign(:selected_entry, entry)
@@ -558,6 +593,62 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
         end),
       trait_reviews: workspace_view.trait_reviews
     }
+  end
+
+  defp auto_match_species(workspace) do
+    workspace
+    |> auto_match_hosts()
+    |> auto_match_gall()
+  end
+
+  defp auto_match_gall(workspace) do
+    review = workspace.species_review
+
+    if review.species_id || review.decision == "skip",
+      do: workspace,
+      else: do_auto_match_gall(workspace)
+  end
+
+  defp do_auto_match_gall(workspace) do
+    case find_exact_species(workspace.extracted_name, "gall") do
+      nil ->
+        workspace
+
+      match ->
+        species_review =
+          workspace.species_review
+          |> Map.put(:selected_species, match)
+          |> Map.put(:species_id, match.id)
+          |> Map.put(:decision, "mapped")
+
+        Map.put(workspace, :species_review, species_review)
+    end
+  end
+
+  defp auto_match_hosts(workspace) do
+    Map.update!(workspace, :host_reviews, fn reviews ->
+      Enum.map(reviews, &maybe_auto_match_host/1)
+    end)
+  end
+
+  defp maybe_auto_match_host(%{species_id: id} = review) when not is_nil(id), do: review
+  defp maybe_auto_match_host(%{decision: "skip"} = review), do: review
+
+  defp maybe_auto_match_host(review) do
+    case find_exact_species(review.extracted_name, "plant") do
+      nil -> review
+      match -> %{review | selected_species: match, species_id: match.id, decision: "mapped"}
+    end
+  end
+
+  defp find_exact_species(nil, _taxoncode), do: nil
+  defp find_exact_species("", _taxoncode), do: nil
+
+  defp find_exact_species(name, taxoncode) do
+    name_downcased = String.downcase(name)
+
+    Species.search_species_by_name(name, taxoncode, 5)
+    |> Enum.find(&(String.downcase(&1.name) == name_downcased))
   end
 
   defp update_workspace(socket, fun) do
@@ -660,6 +751,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
            workspace_saved_message(reloaded_workspace.status, source_ingestion.status)
          )
          |> assign(:review_view, review_view)
+         |> assign(:grouped_entries, group_species_entries(review_view.species_entries))
          |> assign(:selected_entry, entry)
          |> assign(:workspace, reloaded_workspace)}
 
@@ -744,6 +836,9 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
     |> Phoenix.Naming.humanize()
   end
 
+  defp trait_empty?(%{suggested_values: [], raw_evidence: []}), do: true
+  defp trait_empty?(_), do: false
+
   defp trait_suggested_text(%{suggested_values: []}), do: "No suggestions recorded"
 
   defp trait_suggested_text(%{suggested_values: suggested_values}),
@@ -818,4 +913,58 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
     </nav>
     """
   end
+
+  # --- Species entry grouping ---
+
+  defp group_species_entries(entries) do
+    entries
+    |> Enum.group_by(& &1.extracted_name)
+    |> Enum.map(fn {name, group_entries} ->
+      pending = Enum.count(group_entries, &(&1.status == "pending"))
+      nav_entry = Enum.find(group_entries, &(&1.status == "pending")) || List.first(group_entries)
+
+      %{
+        name: name,
+        entry_ids: MapSet.new(group_entries, & &1.id),
+        nav_entry_id: nav_entry.id,
+        count: length(group_entries),
+        pending_count: pending,
+        resolved_count: length(group_entries) - pending
+      }
+    end)
+    |> Enum.sort_by(fn group ->
+      first = Enum.find(entries, &(&1.extracted_name == group.name))
+      first.position
+    end)
+  end
+
+  defp group_selected?(_group, nil), do: false
+  defp group_selected?(group, selected_entry), do: selected_entry.id in group.entry_ids
+
+  defp group_status_label(%{pending_count: 0}), do: "done"
+  defp group_status_label(%{resolved_count: 0}), do: "pending"
+  defp group_status_label(group), do: "#{group.resolved_count}/#{group.count}"
+
+  defp group_status_variant(%{pending_count: 0}), do: "success"
+  defp group_status_variant(_), do: "info"
+
+  defp new_gall_url(workspace) do
+    host_ids =
+      workspace.host_reviews
+      |> Enum.filter(&(&1.decision == "mapped" && &1.species_id))
+      |> Enum.map(& &1.species_id)
+
+    params =
+      %{name: workspace.extracted_name}
+      |> then(fn p ->
+        if host_ids == [], do: p, else: Map.put(p, :host_ids, Enum.join(host_ids, ","))
+      end)
+      |> Enum.reject(fn {_k, v} -> v in [nil, ""] end)
+      |> Map.new()
+
+    ~p"/admin/galls/new?#{params}"
+  end
+
+  defp new_host_url(nil), do: ~p"/admin/hosts/new"
+  defp new_host_url(name), do: ~p"/admin/hosts/new?#{%{name: name}}"
 end

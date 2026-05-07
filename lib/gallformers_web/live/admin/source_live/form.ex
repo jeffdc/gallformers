@@ -54,7 +54,26 @@ defmodule GallformersWeb.Admin.SourceLive.Form do
     {:noreply, apply_action(socket, socket.assigns.live_action, params)}
   end
 
-  defp apply_action(socket, :new, _params), do: apply_new_action(socket)
+  @prefill_keys ~w(title author pubyear link)
+
+  defp apply_action(socket, :new, params) do
+    prefill = Map.take(params, @prefill_keys)
+
+    if map_size(prefill) > 0 do
+      entity = struct(Source, for({k, v} <- prefill, do: {String.to_existing_atom(k), v}))
+      changeset = change_entity(entity, prefill)
+
+      socket
+      |> assign(:page_title, "New #{entity_label()}")
+      |> assign(entity_key(), entity)
+      |> assign(:form, Phoenix.Component.to_form(changeset, as: form_key()))
+      |> assign(:mode, :new)
+      |> mark_dirty()
+    else
+      apply_new_action(socket)
+    end
+  end
+
   defp apply_action(socket, :edit, %{"id" => id}), do: apply_edit_action(socket, id)
 
   @impl true

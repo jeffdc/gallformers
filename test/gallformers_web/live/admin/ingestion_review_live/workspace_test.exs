@@ -101,7 +101,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
 
       html =
         view
-        |> element("#workspace-nav-#{entry_b.id}")
+        |> element("#workspace-nav-group-#{entry_b.id}")
         |> render_click()
 
       assert html =~ "Disholcaspis eldoradensis"

@@ -63,10 +63,11 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     {:noreply, apply_action(socket, socket.assigns.live_action, params)}
   end
 
-  defp apply_action(socket, :new, _params) do
+  defp apply_action(socket, :new, params) do
     socket
     |> build_default_assigns()
     |> assign(:page_title, "Add Host")
+    |> maybe_prefill_wcvp_search(params["name"])
   end
 
   defp apply_action(socket, :edit, %{"id" => id}) do
@@ -86,6 +87,24 @@ defmodule GallformersWeb.Admin.HostLive.Form do
         else
           load_host_for_edit(socket, host)
         end
+    end
+  end
+
+  defp maybe_prefill_wcvp_search(socket, nil), do: socket
+  defp maybe_prefill_wcvp_search(socket, ""), do: socket
+
+  defp maybe_prefill_wcvp_search(socket, name) do
+    socket = assign(socket, :wcvp_search_query, name)
+
+    if connected?(socket) and String.length(name) >= 3 do
+      socket
+      |> assign(:wcvp_searching, true)
+      |> start_async(:wcvp_search, fn ->
+        wcvp_lookup().search(name, limit: 10)
+        |> Enum.map(fn r -> Map.put(r, :id, r.plant_name_id) end)
+      end)
+    else
+      socket
     end
   end
 

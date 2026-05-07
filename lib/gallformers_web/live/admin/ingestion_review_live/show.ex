@@ -566,7 +566,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
                 </div>
 
                 <.link
-                  href={~p"/admin/sources/new"}
+                  href={new_source_url(@review_view)}
                   target="_blank"
                   rel="noopener noreferrer"
                   class="gf-btn gf-btn-secondary"
@@ -794,6 +794,23 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
     do: :erlang.float_to_binary(value, decimals: 2)
 
   defp format_evidence_value(value), do: inspect(value)
+
+  defp new_source_url(review_view) do
+    params =
+      %{
+        title: review_view.title,
+        author: authors_for_url(review_view.authors),
+        pubyear: review_view.publication_year,
+        link: review_view.doi
+      }
+      |> Enum.reject(fn {_k, v} -> v in [nil, "", []] end)
+      |> Map.new()
+
+    ~p"/admin/sources/new?#{params}"
+  end
+
+  defp authors_for_url([]), do: nil
+  defp authors_for_url(authors) when is_list(authors), do: Enum.join(authors, " and ")
 
   defp metadata_value(nil), do: "None"
   defp metadata_value(""), do: "None"

@@ -1,7 +1,7 @@
 ---
 status: planned
 created: 2026-05-03
-updated: 2026-05-06
+updated: 2026-05-07
 epic: ingestion
 ---
 
@@ -557,336 +557,90 @@ This keeps the review model consistent across aliases, hosts, and traits:
 
 
 
-## Implementation Design
 
-### Route structure
+## Refined Design: Workspace as Gall Editor (2026-05-07)
 
-- `/admin/ingestion-review/:id` — Ingestion Overview (existing `Show`, trimmed)
-- `/admin/ingestion-review/:id/review` — Species Review Workspace (new `Workspace` LiveView)
+This section supersedes the earlier implementation plan (Tasks 1–7). The workspace has been built as a basic review form. The next iteration turns it into the actual gall editor — the place where gall records are created or updated.
 
-The overview is the triage and source-decision gate. The workspace is the species-by-species curation screen. They are separate LiveViews with separate routes.
+### Key Design Decisions
 
-### File changes
+1. **The workspace IS the gall editor.** The workspace is not a review form that feeds into a separate gall admin screen. When the user saves, they are writing directly to the gall record. This eliminates the current confusion about what "save" means.
 
-**Modified:**
-- `show.ex` — remove all workspace code (events, helpers, render section 5). Keep sections 1–4. Add expandable gall rows and "Proceed to Review" navigation link.
-- `router.ex` — add workspace route
+2. **Entry aggregation.** When a source mentions the same species multiple times, the workspace merges all extracted data into a single consolidated view. The merge is a deduplicated union: hosts, aliases, traits, and description evidence from all entries are combined. The sidebar shows one row per species regardless of how many extraction records exist.
 
-**New:**
-- `workspace.ex` — `IngestionReviewLive.Workspace`, the species review master-detail page
+3. **Existing gall data loads into the workspace.** When a species is mapped to an existing gall, the workspace loads that gall's current hosts, aliases, traits, and description. These are visually differentiated from the incoming extraction data (e.g., "existing" vs "from source" labels, different background colors). The user sees both streams side by side and decides what the final state should be.
 
-**Unchanged:**
-- `presenter.ex`, `index.ex`, all context modules (`SourceIngestionSpeciesReview`, `SourceIngestionSpeciesEntries`, `Ingestions`)
+4. **Two save actions with clear labels.** "Save Draft" persists the review state without touching the gall record (so the user can come back later). The second button is context-dependent: "Create Gall" for new species, "Update Gall" for existing species. This makes the write-to-database action unambiguous.
 
-### Overview (show.ex) trimming
+5. **Inline WCVP host creation.** Hosts that auto-match an existing plant species show as confirmed list items. Hosts that don't match offer an inline "Create from WCVP" action — a button that calls `Plants.quick_create_host_from_wcvp/1` directly in the workspace, no tab-switching. This requires a new context function that creates a plant species from WCVP data in one step.
 
-Remove from mount: `:workspace`, `:filter_options`, `:gall_families`
+6. **Identity-first gating.** The species identity decision (map to existing, create new, or skip) gates the rest of the workspace. Hosts, aliases, traits, and description sections unlock only after identity is resolved. This is unchanged from the original design.
 
-Remove all workspace event handlers: `open_gall_review_workspace`, `close_gall_review_workspace`, `change_gall_review_workspace`, `save_gall_review_workspace`, `search_workspace_species`, `select_workspace_species`, `clear_workspace_species`, `toggle_trait_value`, `search_workspace_host:*`, `select_workspace_host:*`, `clear_workspace_host:*`, `focus_source_text`
+### Entry Aggregation
 
-Remove all workspace helper functions: `build_workspace_state`, `merge_workspace_params`, `update_workspace*`, `toggle_workspace*`, `workspace_*`, `identity_resolved?`, trait encoding/decoding, host review helpers
+When loading a workspace for a species name that has multiple extraction entries:
 
-Remove the workspace card (section 5) from render.
+- **Hosts**: deduplicated union of all host mentions across entries, by extracted_name
+- **Aliases**: deduplicated union of all alias mentions across entries
+- **Traits**: for each trait key, merge suggested_values and raw_evidence across entries (deduplicated)
+- **Description**: concatenate description_prose from all entries (paragraph-separated), union of description_evidence fragments
+- **Position**: use the lowest position value from any entry in the group (for sidebar ordering)
 
-Modify the gall table:
-- Remove per-row "Review Gall" buttons
-- Add expandable rows showing extracted hosts/traits/aliases as a quick quality summary
-- Add "Proceed to Species Review" link navigating to `~p"/admin/ingestion-review/#{id}/review"`, gated on `species_review_unlocked?`
+The aggregated workspace tracks which entry IDs contributed to it (`entry_ids` set). When saving, all contributing entries are updated together.
 
-### Workspace (workspace.ex)
+### Existing Gall Data Display
 
-Full-page master-detail layout.
+When the species is mapped to an existing gall:
 
-**Master sidebar:** Gall names + review status badges. Clicking a gall loads it into the detail pane. No URL change — selection is an assign.
+- **Hosts section** shows two groups:
+  - "Current hosts" — the gall's existing host associations, read-only display
+  - "From source" — newly extracted hosts, with match/create/skip actions
+- **Aliases section** shows two groups:
+  - "Current aliases" — existing aliases on the gall, read-only
+  - "From source" — newly extracted aliases, with accept/reject checkboxes
+- **Traits section** shows:
+  - Current trait values (read-only, dimmed if extraction proposes different values)
+  - Extracted trait suggestions with evidence, user picks which to apply
+- **Description section** shows:
+  - Current description (read-only reference)
+  - Extracted description (editable, will be appended or replace current)
 
-**Detail pane sections (top to bottom):**
-1. Name — extracted name, authority, decision radio (mapped/new/skip), exact match suggestion, typeahead for species search, family select for new
-2. Aliases — checkbox accept/decline list
-3. Hosts — compact rows with typeahead per host
-4. Traits — grid layout using `multi_select_dropdown` (same component as Gall Admin), not the current `multi_select` pill pattern
-5. Description — textarea with extracted evidence
-6. Source Text — collapsible panel with fragment linking
+Visual differentiation: existing data uses a neutral/dimmed background (e.g., gray-50 border), incoming data uses a highlighted treatment (e.g., blue-50 border or "NEW" badge).
 
-Sections 2–5 gated on identity resolution (decision in mapped/new).
+No need to track source provenance for existing gall data — it's just "what's already on the gall."
 
-**Actions:** Save Review, Mark Complete, Skip. "Back to Overview" link.
+### Save Semantics
 
-**Data flow:** Same as current — delegates to `Ingestions.update_source_ingestion_species_review` and `SourceIngestionSpeciesReview.workspace!/1`. All existing workspace logic moves from show.ex into workspace.ex.
+**Save Draft:**
+- Persists the review_payload on the source_ingestion_species records
+- Updates status to "in_progress" (or keeps current)
+- Does NOT write to Species, GallHost, Alias, or Trait tables
+- User can return and continue later
 
-### Interaction pattern changes
+**Create Gall / Update Gall:**
+- Persists the review_payload (same as Save Draft)
+- Writes the resolved data to the gall record:
+  - Creates or updates Species
+  - Creates GallHost associations for accepted hosts
+  - Creates Aliases for accepted aliases
+  - Updates trait values
+  - Updates description
+  - Creates Species-Source linkage
+- Marks all contributing entries as "mapped" or "completed"
+- Marks the entry group as reviewed
 
-**Traits:** Replace `multi_select` pills with `multi_select_dropdown` in a compact 2–3 column grid matching Gall Admin density. Suggested values and evidence shown as small inline text under each dropdown, not as separate bordered cards.
+### New Context Functions Needed
 
-**Hosts:** Compact rows with typeaheads instead of bordered cards with heavy padding.
+- `Plants.quick_create_host_from_wcvp/1` — takes a WCVP result map, creates a plant Species with name, authority, and WCVP reference in one call
+- `Ingestions.aggregated_workspace!/2` — takes a source_ingestion_id and extracted_name, loads all entries for that name, returns a single merged workspace view
+- `Ingestions.apply_review_to_gall/2` — takes the workspace state and reviewer_id, writes all resolved data to the gall record in a transaction (species, hosts, aliases, traits, description, source linkage)
 
-**Aliases:** Checkbox pattern stays — appropriate for accept/decline of extracted names.
+### Section Order in Workspace
 
-**Name:** Current radio + typeahead + exact-match suggestion pattern stays — it works well.
-
-
-
-## Implementation Plan
-
-**Goal:** Split the ingestion review show page into two separate LiveViews — an Overview for triage/source-decision and a Workspace for species-by-species curation.
-
-**Architecture:** Create a new `Workspace` LiveView at a new route. Trim the existing `Show` LiveView down to the overview. Move all workspace logic (events, helpers, state) from Show into Workspace. Replace trait `multi_select` pills with `multi_select_dropdown` grids matching Gall Admin density. No context-layer changes — `SourceIngestionSpeciesReview`, `SourceIngestionSpeciesEntries`, `Ingestions`, and `Presenter` stay unchanged.
-
-**Tech Stack:** Phoenix LiveView, existing form components (`multi_select_dropdown`, `typeahead`, `radio_group`), Tailwind CSS grid utilities.
-
-### Task 1: Add workspace route and create skeleton LiveView
-
-**Files:**
-- Modify: `lib/gallformers_web/router.ex` (add workspace route inside superadmin scope)
-- Create: `lib/gallformers_web/live/admin/ingestion_review_live/workspace.ex`
-
-**Behavior:**
-Add route `live "/ingestion-review/:id/review", Admin.IngestionReviewLive.Workspace, :review` inside the existing superadmin scope, after the Show route.
-
-Create a minimal `Workspace` LiveView that:
-- Mounts with the source ingestion ID from params
-- Loads the review view (via `Presenter.source_ingestion_review_view!/1`) for the master list data
-- Loads source text (via `Ingestions.source_ingestion_full_text/1`)
-- Loads filter options and gall families (needed for trait/species work later)
-- Assigns the current user and db user ID from session
-- Auto-selects the first unreviewed species entry (or first entry if all reviewed)
-- Renders a placeholder page with the master sidebar listing gall names and a "Back to Overview" link
-
-**Testing:**
-- Route resolves to Workspace LiveView with correct action
-- Mount loads review view and species entries
-- Redirects or errors gracefully if ingestion ID is invalid
-
-**Notes:**
-The workspace route must be inside the same superadmin scope as the existing ingestion-review routes (router.ex line 153-155). The initial skeleton only needs mount + handle_params + a basic render — detail pane content comes in later tasks.
-
-### Task 2: Trim show.ex — remove all workspace code
-
-**Files:**
-- Modify: `lib/gallformers_web/live/admin/ingestion_review_live/show.ex`
-
-**Behavior:**
-Remove everything workspace-related from Show:
-
-Mount — remove assigns: `:workspace`, `:filter_options`, `:gall_families`, `:source_text_focus`
-
-Event handlers — remove all of: `open_gall_review_workspace`, `close_gall_review_workspace`, `change_gall_review_workspace`, `save_gall_review_workspace`, `search_workspace_species`, `select_workspace_species`, `clear_workspace_species`, `toggle_trait_value`, `focus_source_text`, and all `search_workspace_host:*`, `select_workspace_host:*`, `clear_workspace_host:*` handlers.
-
-Helper functions — remove all of: `build_workspace_state`, `merge_workspace_params`, `update_workspace`, `update_workspace_assign`, `update_workspace_species_search`, `update_workspace_host_search`, `toggle_workspace_trait_value`, `finalize_workspace_save`, `workspace_update_attrs`, `workspace_alias_candidates`, `workspace_saved_message`, `workspace_trait_options`, `workspace_trait_selected_values`, `trait_value_options`, `merge_trait_option_values`, `trait_label`, `trait_suggested_text`, `trait_evidence_text`, `encode_trait_value`, `decode_trait_value`, `toggle_string_in_list`, `normalize_indexed_form_values`, `update_host_review_search`, `toggle_trait_review_value`, `identity_resolved?`, `default_species_review_aliases`, `exact_species_match_candidate`, `species_summary`, `maybe_default_species_review_decision`, `normalize_species_review_selection`, `normalize_host_review_selection`, `nested_param`, `parse_optional_integer`.
-
-Render — remove the entire workspace `.card` block (the `:if={@workspace}` card, roughly lines 738-1181).
-
-Imports/aliases — remove `FormComponents.alias_collision_warning` import, and aliases only used by workspace code: `Galls`, `Species`, `Taxonomy`.
-
-The module attribute `@detachable_options` and `@trait_filter_keys` are workspace-only — remove them.
-
-**Testing:**
-- Show page compiles with `--warnings-as-errors`
-- Overview still renders all 4 sections (submission detail, duplicate review, source review, gall table)
-- No references to removed workspace assigns or events remain
-
-**Notes:**
-This is mostly deletion. Keep `source_text` in Show since the overview has a "Full Extracted Text" panel inside the Source Review card. Keep `parse_integer_param` since it is used by non-workspace event handlers. Verify compilation after removal to catch any missed references.
-
-### Task 3: Add expandable gall summary and review navigation to overview
-
-**Files:**
-- Modify: `lib/gallformers_web/live/admin/ingestion_review_live/show.ex` (render changes)
-- Modify: `lib/gallformers_web/live/admin/ingestion_review_live/presenter.ex` (expand species entry view model)
-
-**Behavior:**
-Enhance the Gall Review card on the overview:
-
-**Presenter changes:** Expand `species_entry_review_view/1` to include summary data from the extraction payload for the expandable view:
-- `extracted_aliases` — list of alias strings
-- `extracted_hosts` — list of `%{name, authority}` maps
-- `extracted_trait_names` — list of trait name strings that have data
-
-These are read-only summaries for the overview; they don't need the full workspace-level detail.
-
-**Render changes:**
-- Remove per-row "Review Gall" buttons from the table
-- Replace the flat table with expandable rows: collapsed shows gall name + status, expanded shows aliases/hosts/traits summary as compact lists
-- Add a "Proceed to Species Review" link/button below the table that navigates to `~p"/admin/ingestion-review/#{@review_view.id}/review"`, visible only when `@review_view.species_review_unlocked?` is true
-- When `species_review_unlocked?` is false, show the existing alert ("Associate a source to enable gall review")
-
-**Testing:**
-- Presenter includes extraction summary fields in species entry view
-- Overview renders expandable gall rows with correct summary data
-- "Proceed to Species Review" link appears only when source is attached
-- Link navigates to the workspace route
-
-### Task 4: Workspace master-detail layout with gall selection
-
-**Files:**
-- Modify: `lib/gallformers_web/live/admin/ingestion_review_live/workspace.ex`
-
-**Behavior:**
-Build the full master-detail layout structure:
-
-**Master sidebar:**
-- List of gall species from `review_view.species_entries`
-- Each row shows: gall name (or "Unnamed gall"), authority, status badge
-- Active gall highlighted with border/shadow
-- Click fires `select_gall` event that loads the workspace data for that gall
-- Progress summary at top: "N remaining, M reviewed"
-
-**Detail pane:**
-- Header: gall name, position, "Back to Overview" link
-- Form wrapper with `phx-change` and `phx-submit` bindings
-- Action buttons at bottom: Save Review, Mark Complete, Clear Selection
-- Placeholder sections for Name/Aliases/Hosts/Traits/Description/Source Text (filled in subsequent tasks)
-
-**Gall selection:**
-- `handle_event("select_gall", ...)` loads workspace state via `Ingestions.source_ingestion_species_review_workspace!/1` and `build_workspace_state/1`
-- Move `build_workspace_state/1` from show.ex into workspace.ex
-- Auto-select first unreviewed gall on mount (enhance from Task 1)
-
-**Testing:**
-- Master list renders all species entries with correct names and statuses
-- Clicking a gall loads its workspace data into the detail pane
-- Active gall is visually highlighted in sidebar
-- Progress counts are correct
-
-### Task 5: Workspace detail pane — identity resolution and aliases
-
-**Files:**
-- Modify: `lib/gallformers_web/live/admin/ingestion_review_live/workspace.ex`
-
-**Behavior:**
-Move identity resolution and alias review from show.ex into the workspace detail pane.
-
-**Name section:**
-- Show extracted name and authority
-- Alias collision warning (import `alias_collision_warning` from FormComponents)
-- Radio group: mapped / new / skip
-- Exact-match suggestion with accept button (when candidate exists and decision is not skip)
-- Typeahead for species search (when decision is "mapped")
-- Family select dropdown (when decision is "new")
-- Reviewer notes textarea
-
-**Aliases section (gated on identity_resolved?):**
-- Checkbox list of alias candidates
-- Each checkbox shows alias name + "Save as scientific synonym on completion"
-
-**Event handlers to move/recreate:**
-- `search_workspace_species` → species typeahead search
-- `select_workspace_species` → accept a species mapping
-- `clear_workspace_species` → clear species mapping
-- `change_gall_review_workspace` → form change handler (species_review params portion)
-
-**Helper functions to move:**
-- `exact_species_match_candidate/1`
-- `species_summary/1`
-- `workspace_alias_candidates/1`
-- `default_species_review_aliases/2`
-- `identity_resolved?/1`
-- `maybe_default_species_review_decision/2`
-- `normalize_species_review_selection/1`
-
-**Testing:**
-- Name section renders extracted name and authority
-- Radio group changes decision state
-- Exact match suggestion appears for matching names
-- Typeahead searches gall species and selects correctly
-- Family select appears only for "new" decision
-- Aliases section hidden when decision is "skip"
-- Alias checkboxes toggle accepted_aliases list
-
-### Task 6: Workspace detail pane — hosts and traits
-
-**Files:**
-- Modify: `lib/gallformers_web/live/admin/ingestion_review_live/workspace.ex`
-
-**Behavior:**
-Move host and trait review from show.ex into the workspace, with interaction pattern changes.
-
-**Hosts section (gated on identity_resolved?):**
-- Compact rows — each host shows extracted name, authority, decision radio (mapped/unresolved/skip), and typeahead when mapped
-- Use the same `typeahead` component but with less padding/chrome than the current bordered-card pattern
-- Layout: each host is a row in a list, not a standalone bordered card
-
-**Event handlers to move:**
-- `search_workspace_host:N` → host typeahead search
-- `select_workspace_host:N` → accept a host mapping
-- `clear_workspace_host:N` → clear host mapping
-
-**Helper functions to move:**
-- `update_host_review_search/4`
-- `normalize_host_review_selection/1`
-
-**Traits section (gated on identity_resolved?):**
-- Replace `multi_select` component with `multi_select_dropdown` from FormComponents (same component Gall Admin uses)
-- Layout: 2-3 column grid using Tailwind `grid grid-cols-2 xl:grid-cols-3 gap-3`
-- Each trait shows: label, `multi_select_dropdown` for value selection, small text below showing suggested values and evidence
-- Remove the current bordered-card-per-trait pattern
-
-**Event handlers to move:**
-- `toggle_trait_value` → value toggle (keep for multi_select_dropdown compatibility or adapt to multi_select_dropdown events)
-
-**Helper functions to move:**
-- `workspace_trait_options/2`
-- `workspace_trait_selected_values/1`
-- `trait_value_options/3`
-- `merge_trait_option_values/2`
-- `trait_label/1`, `trait_suggested_text/1`, `trait_evidence_text/1`
-- `encode_trait_value/2`, `decode_trait_value/1`, `toggle_string_in_list/2`
-- `toggle_trait_review_value/3`
-
-**Notes:**
-Check `multi_select_dropdown` component attrs in `form_components.ex` to ensure compatibility with the workspace's trait data shape. The Gall Admin uses it with `options`, `selected`, `search_query`, `dropdown_open`, `item_label`, `on_search`, `on_add`, `on_remove`, `on_open`, `on_close` — the workspace trait data may need adapter functions to match this interface.
-
-**Testing:**
-- Host rows render with correct extracted data
-- Host typeahead search and selection works
-- Trait grid renders with correct number of columns
-- Trait dropdowns show canonical vocab options
-- Suggested values and evidence text display below each trait
-- Adding/removing trait values updates workspace state
-
-### Task 7: Workspace detail pane — description, source text, and save actions
-
-**Files:**
-- Modify: `lib/gallformers_web/live/admin/ingestion_review_live/workspace.ex`
-
-**Behavior:**
-Complete the workspace with description review, source text access, and save/complete/skip actions.
-
-**Description section (gated on identity_resolved?):**
-- Extracted evidence shown as small text blocks above the textarea
-- Editable textarea for reviewed description prose
-- Evidence blocks are clickable links that focus the source text panel
-
-**Source text panel:**
-- Collapsible `<details>` element at the bottom of the detail pane
-- Shows full extracted source text
-- Focused fragment highlight (when user clicks "Jump to Source Text" from evidence)
-
-**Event handlers to move:**
-- `focus_source_text` → highlight a fragment in the source text panel
-- `save_gall_review_workspace` → form submit handler
-
-**Helper functions to move:**
-- `merge_workspace_params/2` — form param → workspace state merge
-- `workspace_update_attrs/2` — workspace state → context attrs
-- `finalize_workspace_save/3` — post-save reload and flash
-- `workspace_saved_message/2`
-- `normalize_indexed_form_values/1`
-- `nested_param/3`
-- `parse_optional_integer/1`
-
-**Save flow:**
-- Save Review: persists current state, reloads workspace, stays on current gall
-- Mark Complete: validates all required fields, persists, marks complete, reloads master list
-- Skip action uses the save handler with decision="skip"
-- After save, reload the review_view to update master list counts/statuses
-- When all galls are complete/skipped, flash message indicates source review complete
-
-**Testing:**
-- Description textarea renders with current prose
-- Evidence blocks display above textarea
-- Source text panel is collapsible and shows full text
-- Save persists workspace state and reloads
-- Mark Complete validates required fields and transitions status
-- Master list updates after save/complete
-- Flash messages appropriate to each outcome
+1. Species Identity (name, authority, decision, typeahead/family select)
+2. Hosts (gated on identity)
+3. Aliases (gated on identity)
+4. Traits (gated on identity)
+5. Description (gated on identity)
+6. Save actions
 

@@ -79,13 +79,28 @@ defmodule GallformersWeb.Admin.GallLive.Form do
   end
 
   defp apply_action(socket, :new, params) do
-    # Check if this is from the undescribed flow (has species_name param)
-    if params["species_name"] do
-      init_undescribed_gall_state(socket, params)
-    else
-      # New gall - start in search mode so user can enter a name
-      socket
+    socket = assign(socket, :prefill_host_ids, parse_host_ids_param(params["host_ids"]))
+
+    cond do
+      params["species_name"] ->
+        init_undescribed_gall_state(socket, params)
+
+      params["name"] ->
+        socket |> assign(:gall_search_query, params["name"])
+
+      true ->
+        socket
     end
+  end
+
+  defp parse_host_ids_param(nil), do: []
+  defp parse_host_ids_param(""), do: []
+
+  defp parse_host_ids_param(ids_string) do
+    ids_string
+    |> String.split(",")
+    |> Enum.map(&parse_int_param/1)
+    |> Enum.reject(&is_nil/1)
   end
 
   # Initialize empty gall state (no gall selected)
@@ -196,6 +211,7 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(:alias_collisions, Species.find_species_with_alias(name))
     |> apply_undescribed_lock(taxonomy)
     |> apply_datacomplete_lock()
+    |> maybe_add_prefill_hosts()
     |> mark_dirty()
   end
 
@@ -258,6 +274,17 @@ defmodule GallformersWeb.Admin.GallLive.Form do
       %{host_species_id: host.id, host_name: host.name},
       id_field: :host_relation_id
     )
+  end
+
+  defp maybe_add_prefill_hosts(socket) do
+    host_ids = Map.get(socket.assigns, :prefill_host_ids, [])
+
+    Enum.reduce(host_ids, socket, fn host_id, acc ->
+      case Species.get_species(host_id) do
+        nil -> acc
+        host -> maybe_add_initial_host(acc, host)
+      end
+    end)
   end
 
   # Load an existing gall for editing
