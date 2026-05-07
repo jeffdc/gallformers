@@ -36,7 +36,9 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
      |> assign(:source_search_query, "")
      |> assign(:source_search_results, [])
      |> assign(:source_text, nil)
-     |> assign(:source_text_focus, nil)}
+     |> assign(:source_text_focus, nil)
+     |> assign(:activity_text, nil)
+     |> assign(:activity_style, :normal)}
   end
 
   @impl true
@@ -219,8 +221,35 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   end
 
   @impl true
+  def handle_info({:chunk_progress, _stage, %{chunk: 0} = progress}, socket) do
+    text =
+      if progress.total_chunks == 1,
+        do: "Processing...",
+        else: "Processing #{progress.total_chunks} chunks..."
+
+    {:noreply, assign(socket, activity_text: text, activity_style: :normal)}
+  end
+
+  @impl true
+  def handle_info({:chunk_progress, _stage, progress}, socket) do
+    text = "Chunk #{progress.chunk}/#{progress.total_chunks} — #{progress.tokens} tokens"
+
+    text =
+      if progress.tokens_per_sec,
+        do: text <> ", #{round(progress.tokens_per_sec)} tok/sec",
+        else: text
+
+    {:noreply, assign(socket, activity_text: text, activity_style: :normal)}
+  end
+
+  @impl true
+  def handle_info({:chunk_warning, _stage, warning}, socket) do
+    {:noreply, assign(socket, activity_text: warning.message, activity_style: :warning)}
+  end
+
+  @impl true
   def handle_info({:stage_complete, _stage}, socket) do
-    socket = reload_review_view(socket)
+    socket = socket |> assign(activity_text: nil, activity_style: :normal) |> reload_review_view()
 
     if terminal_status?(socket.assigns.review_view.status) do
       {:noreply, push_event(socket, "stop_timer", %{})}
@@ -230,9 +259,22 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   end
 
   @impl true
-  def handle_info({:error, _stage, _reason}, socket) do
+  def handle_info({:error, _stage, reason}, socket) do
+    activity_text =
+      case reason do
+        :timeout ->
+          "Processing stalled — source may be too information-dense for current chunk size"
+
+        {:invalid_contract, messages} when is_list(messages) ->
+          "Validation error: #{Enum.join(messages, "; ")}"
+
+        other ->
+          "Error: #{inspect(other)}"
+      end
+
     {:noreply,
      socket
+     |> assign(activity_text: activity_text, activity_style: :warning)
      |> reload_review_view()
      |> push_event("stop_timer", %{})}
   end
@@ -317,6 +359,16 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
               pipeline_active?={@review_view.pipeline_active?}
               inserted_at={@review_view.inserted_at}
             />
+
+            <p
+              :if={@activity_text}
+              class={[
+                "text-xs mt-2 font-mono",
+                activity_text_class(@activity_style)
+              ]}
+            >
+              {@activity_text}
+            </p>
 
             <.alert :if={@review_view.status == "failed"} variant="warning">
               Pipeline failed at <strong>{@review_view.error_stage}</strong>
@@ -877,6 +929,10 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   defp stage_label_class(:running), do: "text-amber-700 font-medium"
   defp stage_label_class(:failed), do: "text-red-700 font-medium"
   defp stage_label_class(:pending), do: "text-gray-400"
+
+  defp activity_text_class(:normal), do: "text-gray-500"
+  defp activity_text_class(:warning), do: "text-amber-600"
+  defp activity_text_class(:success), do: "text-green-600"
 
   defp terminal_status?("needs_review"), do: true
   defp terminal_status?("complete"), do: true

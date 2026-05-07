@@ -190,6 +190,41 @@ defmodule Gallformers.IngestionPipeline.Stages.MetadataTest do
     refute_received {:upload, _, _, _, _}
   end
 
+  test "broadcasts chunk_progress after metadata extraction succeeds" do
+    ingestion = source_ingestion_fixture()
+    Broadcaster.subscribe(ingestion.id)
+
+    Process.put(:metadata_text_fixture, "cleaned text")
+
+    set_responses([
+      {:ok, ~s({"title":"Progress Test","authors":["A"],"year":2020,"doi":null}),
+       %{prompt_tokens: 10, completion_tokens: 5}}
+    ])
+
+    assert {:ok, _updated} = Metadata.perform_stage(ingestion)
+
+    assert_receive {:chunk_progress, :metadata,
+                    %{chunk: 0, total_chunks: 1, tokens: 0, tokens_per_sec: nil}}
+
+    assert_receive {:chunk_progress, :metadata,
+                    %{chunk: 1, total_chunks: 1, tokens: 0, tokens_per_sec: nil}}
+  end
+
+  test "passes stall_timeout instead of receive_timeout from pipeline config" do
+    ingestion = source_ingestion_fixture()
+    Process.put(:metadata_text_fixture, "cleaned text")
+
+    set_responses([
+      {:ok, ~s({"title":"Timeout Test","authors":["A"],"year":2020,"doi":null}),
+       %{prompt_tokens: 10, completion_tokens: 5}}
+    ])
+
+    assert {:ok, _updated} = Metadata.perform_stage(ingestion)
+
+    assert_received {:completion, _prompt, _text, opts}
+    refute Keyword.has_key?(opts, :receive_timeout)
+  end
+
   test "surfaces llm client errors without uploading or advancing the stage" do
     ingestion = source_ingestion_fixture()
     Process.put(:metadata_text_fixture, "cleaned text")

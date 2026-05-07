@@ -45,6 +45,22 @@ defmodule Gallformers.IngestionPipeline.BroadcasterTest do
       assert_receive {:subscriber_message, ^other_subscriber, {:progress, :assemble, 80}}
     end
 
+    test "broadcast_chunk_progress delivers chunk progress to subscribers" do
+      assert :ok = Broadcaster.subscribe(42)
+
+      progress = %{chunk: 3, total_chunks: 12, tokens: 847, tokens_per_sec: 142.0}
+      assert :ok = Broadcaster.broadcast_chunk_progress(42, :data_extract, progress)
+      assert_receive {:chunk_progress, :data_extract, ^progress}
+    end
+
+    test "broadcast_chunk_warning delivers chunk warning to subscribers" do
+      assert :ok = Broadcaster.subscribe(42)
+
+      warning = %{message: "Output truncated at 8192 tokens", chunk: 3}
+      assert :ok = Broadcaster.broadcast_chunk_warning(42, :data_extract, warning)
+      assert_receive {:chunk_warning, :data_extract, ^warning}
+    end
+
     test "does not deliver broadcasts to non-subscribers" do
       parent = self()
       listener = spawn_link(fn -> non_subscriber_loop(parent) end)

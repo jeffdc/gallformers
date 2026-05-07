@@ -3,13 +3,15 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
   Thin OpenAI-compatible client for ingestion pipeline stages.
   """
 
-  use Boundary, deps: [], exports: :all
+  use Boundary, deps: [Gallformers.IngestionPipeline.SSEParser], exports: :all
 
   require Logger
 
+  alias Gallformers.IngestionPipeline.SSEParser
+
   @default_model "Qwen/Qwen2.5-72B-Instruct"
   @default_max_tokens 8192
-  @default_receive_timeout 300_000
+  @default_stall_timeout 60_000
   @default_retry_backoffs [1_000, 2_000, 4_000]
   @default_api_url "https://api.deepinfra.com/v1/openai/chat/completions"
 
@@ -17,13 +19,23 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
   Executes a completion request for a pipeline stage.
   """
   @spec completion(atom(), String.t(), String.t(), keyword()) ::
-          {:ok, String.t(), %{prompt_tokens: integer(), completion_tokens: integer()}}
+          {:ok, String.t(), usage()}
           | {:error, :rate_limited}
           | {:error, :http_error, integer()}
           | {:error, :server_error, integer()}
           | {:error, :transport_error, term()}
           | {:error, :invalid_response}
           | {:error, :timeout}
+
+  @type usage :: %{
+          prompt_tokens: integer(),
+          completion_tokens: integer(),
+          tokens_per_sec: float() | nil,
+          estimated_cost: float() | nil,
+          finish_reason: String.t() | nil,
+          truncated: boolean()
+        }
+
   def completion(stage, system_prompt, user_text, opts \\ [])
       when is_atom(stage) and is_binary(system_prompt) and is_binary(user_text) do
     {model, resolved} = resolve_config(stage, opts)
@@ -34,10 +46,11 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
     start = System.monotonic_time(:millisecond)
     body = request_body(model, system_prompt, user_text, opts)
     headers = request_headers()
-    req_fn = build_request_fn(resolved.recv_timeout)
+    req_fn = build_request_fn(resolved.stall_timeout)
     result = do_completion(body, headers, resolved.retries, resolved.api_url, req_fn)
     elapsed_ms = System.monotonic_time(:millisecond) - start
 
+    result = enrich_result(result, elapsed_ms)
     log_result(result, stage, model, elapsed_ms, input_chars)
     result
   end
@@ -68,6 +81,9 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
 
   defp do_completion(body, headers, retries_remaining, api_url, req_fn) do
     case normalize_request_result(req_fn.(api_url, headers, body)) do
+      {:ok, content, usage} when is_binary(content) ->
+        {:ok, content, usage}
+
       {:ok, response_body} ->
         parse_success(response_body)
 
@@ -90,6 +106,9 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
         {:error, :invalid_response}
     end
   end
+
+  defp normalize_request_result({:ok, content, usage}) when is_binary(content),
+    do: {:ok, content, usage}
 
   defp normalize_request_result({:ok, %{status: 200, body: response_body}}),
     do: {:ok, response_body}
@@ -153,7 +172,10 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
     resolved = %{
       api_url: Keyword.get(opts, :api_url) || api_url(),
       retries: Keyword.get(opts, :retry_backoffs) || retry_backoffs(),
-      recv_timeout: Keyword.get(opts, :receive_timeout) || receive_timeout()
+      stall_timeout:
+        Keyword.get(opts, :stall_timeout) ||
+          Keyword.get(opts, :receive_timeout) ||
+          stall_timeout()
     }
 
     {model, resolved}
@@ -167,7 +189,11 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
       input_chars: input_chars,
       output_chars: String.length(content),
       prompt_tokens: usage.prompt_tokens,
-      completion_tokens: usage.completion_tokens
+      completion_tokens: usage.completion_tokens,
+      tokens_per_sec: usage[:tokens_per_sec],
+      estimated_cost: usage[:estimated_cost],
+      truncated: usage[:truncated],
+      finish_reason: usage[:finish_reason]
     )
   end
 
@@ -196,7 +222,9 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
     %{
       "model" => model,
       "messages" => messages(system_prompt, user_text, Keyword.get(opts, :merge_prompt, false)),
-      "max_tokens" => Keyword.get(opts, :max_tokens, @default_max_tokens)
+      "max_tokens" => Keyword.get(opts, :max_tokens, @default_max_tokens),
+      "stream" => true,
+      "stream_options" => %{"include_usage" => true, "continuous_usage_stats" => true}
     }
   end
 
@@ -223,24 +251,60 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
   end
 
   defp api_url, do: config()[:api_url] || @default_api_url
-  defp receive_timeout, do: config()[:receive_timeout] || @default_receive_timeout
+
+  defp stall_timeout,
+    do: config()[:stall_timeout] || config()[:receive_timeout] || @default_stall_timeout
+
   defp retry_backoffs, do: config()[:retry_backoffs] || @default_retry_backoffs
 
   defp config do
     Application.get_env(:gallformers, :ingestion_pipeline, %{})
   end
 
-  defp build_request_fn(recv_timeout) do
+  defp enrich_result({:ok, content, usage}, elapsed_ms) do
+    tokens_per_sec =
+      if elapsed_ms > 0 and is_integer(usage[:completion_tokens]) do
+        usage.completion_tokens / (elapsed_ms / 1000)
+      end
+
+    enriched =
+      usage
+      |> Map.put_new(:tokens_per_sec, tokens_per_sec)
+      |> Map.put_new(:estimated_cost, nil)
+      |> Map.put_new(:finish_reason, nil)
+      |> Map.put_new(:truncated, false)
+
+    {:ok, content, enriched}
+  end
+
+  defp enrich_result(error, _elapsed_ms), do: error
+
+  defp build_request_fn(stall_timeout) do
     case Keyword.get(Application.get_env(:gallformers, __MODULE__, []), :request_fun) do
-      nil -> fn url, headers, body -> default_request(url, headers, body, recv_timeout) end
+      nil -> fn url, headers, body -> default_request(url, headers, body, stall_timeout) end
       custom_fn -> custom_fn
     end
   end
 
-  defp default_request(url, headers, body, recv_timeout) do
-    case Req.post(url: url, headers: headers, json: body, receive_timeout: recv_timeout) do
-      {:ok, %Req.Response{status: status, body: response_body}} ->
-        {:ok, %{status: status, body: response_body}}
+  defp default_request(url, headers, body, stall_timeout) do
+    callback = fn {:data, chunk}, {req, resp} ->
+      {:cont, {req, accumulate_sse(resp, chunk)}}
+    end
+
+    case Req.post(
+           url: url,
+           headers: headers,
+           json: body,
+           into: callback,
+           receive_timeout: stall_timeout
+         ) do
+      {:ok, %Req.Response{status: 200} = resp} ->
+        resp.private
+        |> Map.get(:sse_state, SSEParser.new())
+        |> SSEParser.finish()
+
+      {:ok, %Req.Response{status: status}} ->
+        {:ok, %{status: status, body: %{}}}
 
       {:error, %Req.TransportError{reason: :timeout}} ->
         {:error, :timeout}
@@ -255,6 +319,15 @@ defmodule Gallformers.IngestionPipeline.LLMClient do
         {:error, :transport_error, reason}
     end
   end
+
+  defp accumulate_sse(%Req.Response{status: 200} = resp, chunk) do
+    Req.Response.update_private(resp, :sse_state, SSEParser.new(), fn state ->
+      {_events, state} = SSEParser.feed(state, chunk)
+      state
+    end)
+  end
+
+  defp accumulate_sse(resp, _chunk), do: resp
 
   defp sleep_fun do
     :gallformers

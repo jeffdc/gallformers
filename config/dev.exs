@@ -101,7 +101,16 @@ config :logger, :default_formatter,
     :status,
     :ingestion_id,
     :chunk_count,
-    :chunk_sizes
+    :chunk_sizes,
+    :reason,
+    :attempt,
+    :max_attempts,
+    :tokens_per_sec,
+    :estimated_cost,
+    :truncated,
+    :finish_reason,
+    :chunk,
+    :total_chunks
   ]
 
 # Set a higher stacktrace during development. Avoid configuring such

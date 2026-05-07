@@ -50,6 +50,22 @@ defmodule Gallformers.IngestionPipeline.Broadcaster do
   end
 
   @doc """
+  Broadcasts chunk-level progress for a stage (e.g., LLM streaming).
+  """
+  @spec broadcast_chunk_progress(integer(), stage(), map()) :: :ok
+  def broadcast_chunk_progress(ingestion_id, stage, progress) when is_map(progress) do
+    broadcast(ingestion_id, {:chunk_progress, stage, progress})
+  end
+
+  @doc """
+  Broadcasts a warning for a specific chunk within a stage.
+  """
+  @spec broadcast_chunk_warning(integer(), stage(), map()) :: :ok
+  def broadcast_chunk_warning(ingestion_id, stage, warning) when is_map(warning) do
+    broadcast(ingestion_id, {:chunk_warning, stage, warning})
+  end
+
+  @doc """
   Broadcasts that an ingestion is ready for review.
   """
   @spec broadcast_review_ready(integer()) :: :ok

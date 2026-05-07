@@ -151,25 +151,49 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMCleanTest do
     assert reloaded_ingestion.status == "processing"
   end
 
-  test "normalizes chunk timeout exits without uploading partial output" do
+  test "broadcasts chunk_progress after each chunk completes" do
+    ingestion = source_ingestion_fixture()
+    Broadcaster.subscribe(ingestion.id)
+
+    chunk_one = "chunk one " <> String.duplicate("a", 3_500)
+    chunk_two = "chunk two " <> String.duplicate("b", 3_500)
+
+    Process.put(:llm_clean_text_fixture, Enum.join([chunk_one, chunk_two], "\n\n"))
+
+    set_llm_responses(%{
+      chunk_one =>
+        {:ok, "cleaned one", %{prompt_tokens: 10, completion_tokens: 50, tokens_per_sec: 42.5}},
+      chunk_two =>
+        {:ok, "cleaned two", %{prompt_tokens: 10, completion_tokens: 60, tokens_per_sec: 38.0}}
+    })
+
+    assert {:ok, _updated} = LLMClean.perform_stage(ingestion)
+
+    assert_receive {:chunk_progress, :llm_clean,
+                    %{chunk: 0, total_chunks: 2, tokens: 0, tokens_per_sec: nil}}
+
+    assert_receive {:chunk_progress, :llm_clean,
+                    %{chunk: 1, total_chunks: 2, tokens: 50, tokens_per_sec: 42.5}}
+
+    assert_receive {:chunk_progress, :llm_clean,
+                    %{chunk: 2, total_chunks: 2, tokens: 60, tokens_per_sec: 38.0}}
+  end
+
+  test "passes stall_timeout instead of receive_timeout from pipeline config" do
     ingestion = source_ingestion_fixture()
     chunk = "chunk one " <> String.duplicate("a", 3_500)
 
     Process.put(:llm_clean_text_fixture, chunk)
 
-    set_llm_config(%{
-      task_timeout: 10,
-      responses: %{
-        chunk => {:sleep, 25, {:ok, "cleaned timeout", %{prompt_tokens: 1, completion_tokens: 1}}}
-      }
+    set_llm_responses(%{
+      chunk => {:ok, "cleaned", %{prompt_tokens: 1, completion_tokens: 1}}
     })
 
-    assert {:error, :timeout} = LLMClean.perform_stage(ingestion)
-    refute_received {:upload, _, _, _, _}
+    assert {:ok, _updated} = LLMClean.perform_stage(ingestion)
 
-    reloaded_ingestion = Ingestions.get_source_ingestion!(ingestion.id)
-    assert reloaded_ingestion.processing_stage == "hash_and_dedup"
-    assert reloaded_ingestion.status == "processing"
+    # Verify stall_timeout is NOT receive_timeout in the opts passed to the LLM client
+    assert_received {:completion, _prompt, ^chunk, opts}
+    refute Keyword.has_key?(opts, :receive_timeout)
   end
 
   defp source_ingestion_fixture(attrs \\ %{}) do

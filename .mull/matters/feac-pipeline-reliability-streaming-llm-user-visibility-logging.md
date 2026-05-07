@@ -1,5 +1,5 @@
 ---
-status: planned
+status: done
 tags: [design]
 created: 2026-05-07
 updated: 2026-05-07
@@ -319,4 +319,3 @@ This is UI behavior — verify by running the dev server and submitting an inges
 
 **Notes:**
 The existing `handle_info({:progress, _stage, _percent}, socket)` that currently does nothing (`{:noreply, socket}`) stays as-is for now. The new chunk_progress messages are a different shape and carry richer data.
-

@@ -29,8 +29,22 @@ defmodule Gallformers.IngestionPipeline.Stages.Metadata do
     with {:ok, cleaned_text} <- Storage.download_artifact(ingestion.id, :llm_clean, "text.txt"),
          prompt <- LLMSupport.load_prompt!("metadata.txt"),
          truncated_text <- String.slice(cleaned_text, 0, max_input_chars(ingestion)),
+         _ <-
+           Broadcaster.broadcast_chunk_progress(ingestion.id, :metadata, %{
+             chunk: 0,
+             total_chunks: 1,
+             tokens: 0,
+             tokens_per_sec: nil
+           }),
          {:ok, raw_response, metadata_attrs} <-
            extract_metadata(ingestion, prompt, truncated_text),
+         _ <-
+           Broadcaster.broadcast_chunk_progress(ingestion.id, :metadata, %{
+             chunk: 1,
+             total_chunks: 1,
+             tokens: 0,
+             tokens_per_sec: nil
+           }),
          {:ok, parsed_json} <- parse_json_for_upload(raw_response),
          title <- Map.get(metadata_attrs, :title),
          author_count <- length(Map.get(metadata_attrs, :authors, [])),
@@ -191,7 +205,7 @@ defmodule Gallformers.IngestionPipeline.Stages.Metadata do
   defp put_pipeline_client_opts(opts, ingestion) do
     opts
     |> put_pipeline_opt(ingestion, :client, :api_url)
-    |> put_pipeline_opt(ingestion, :client, :receive_timeout)
+    |> put_pipeline_opt(ingestion, :client, :stall_timeout)
     |> put_pipeline_opt(ingestion, :client, :retry_backoffs)
   end
 end

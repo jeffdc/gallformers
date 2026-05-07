@@ -18,7 +18,7 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMClean do
   @default_chunk_size 6000
   @default_max_tokens 4096
   @default_max_concurrency 2
-  @default_task_timeout :timer.minutes(10)
+  @default_task_timeout 900_000
 
   @impl true
   def stage_name, do: :llm_clean
@@ -63,9 +63,19 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMClean do
   defp clean_chunks(_ingestion, _prompt, []), do: {:ok, ""}
 
   defp clean_chunks(ingestion, prompt, chunks) do
+    total_chunks = length(chunks)
+
+    Broadcaster.broadcast_chunk_progress(ingestion.id, :llm_clean, %{
+      chunk: 0,
+      total_chunks: total_chunks,
+      tokens: 0,
+      tokens_per_sec: nil
+    })
+
     chunks
+    |> Enum.with_index(1)
     |> Task.async_stream(
-      &clean_chunk(ingestion, prompt, &1),
+      fn {chunk, index} -> clean_chunk(ingestion, prompt, chunk, index, total_chunks) end,
       max_concurrency: max_concurrency(ingestion),
       ordered: true,
       timeout: task_timeout(ingestion),
@@ -78,11 +88,23 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMClean do
     end
   end
 
-  defp clean_chunk(ingestion, prompt, chunk) do
+  defp clean_chunk(ingestion, prompt, chunk, chunk_index, total_chunks) do
     case llm_client().completion(:llm_clean, prompt, chunk, llm_opts(ingestion)) do
-      {:ok, cleaned_chunk, _usage} -> {:ok, cleaned_chunk}
-      {:error, reason} -> {:error, reason}
-      {:error, reason, status} -> {:error, {reason, status}}
+      {:ok, cleaned_chunk, usage} ->
+        Broadcaster.broadcast_chunk_progress(ingestion.id, :llm_clean, %{
+          chunk: chunk_index,
+          total_chunks: total_chunks,
+          tokens: usage.completion_tokens,
+          tokens_per_sec: usage[:tokens_per_sec]
+        })
+
+        {:ok, cleaned_chunk}
+
+      {:error, reason} ->
+        {:error, reason}
+
+      {:error, reason, status} ->
+        {:error, {reason, status}}
     end
   end
 
@@ -105,12 +127,8 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMClean do
   defp max_concurrency(i),
     do: PipelineConfigReader.get(i, :llm_clean, :max_concurrency, @default_max_concurrency)
 
-  defp task_timeout(i) do
-    case PipelineConfigReader.get(i, :llm_clean, :task_timeout_minutes, nil) do
-      nil -> app_config()[:task_timeout] || @default_task_timeout
-      minutes -> :timer.minutes(minutes)
-    end
-  end
+  defp task_timeout(i),
+    do: PipelineConfigReader.get(i, :llm_clean, :task_timeout, @default_task_timeout)
 
   defp put_pipeline_opt(opts, ingestion, section, key) do
     case PipelineConfigReader.get(ingestion, section, key, nil) do
@@ -122,11 +140,7 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMClean do
   defp put_pipeline_client_opts(opts, ingestion) do
     opts
     |> put_pipeline_opt(ingestion, :client, :api_url)
-    |> put_pipeline_opt(ingestion, :client, :receive_timeout)
+    |> put_pipeline_opt(ingestion, :client, :stall_timeout)
     |> put_pipeline_opt(ingestion, :client, :retry_backoffs)
-  end
-
-  defp app_config do
-    Application.get_env(:gallformers, __MODULE__, [])
   end
 end

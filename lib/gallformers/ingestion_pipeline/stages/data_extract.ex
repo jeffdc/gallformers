@@ -19,8 +19,8 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
   @default_chunk_size 3000
   @default_max_tokens 8192
   @default_max_concurrency 2
-  @default_task_timeout :timer.minutes(10)
   @default_json_attempts 3
+  @default_task_timeout 900_000
   @max_split_depth 2
 
   @impl true
@@ -73,9 +73,21 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
   defp extract_chunks(_ingestion, _prompt, []), do: {:ok, []}
 
   defp extract_chunks(ingestion, prompt, chunks) do
+    total_chunks = length(chunks)
+
+    Broadcaster.broadcast_chunk_progress(ingestion.id, :data_extract, %{
+      chunk: 0,
+      total_chunks: total_chunks,
+      tokens: 0,
+      tokens_per_sec: nil
+    })
+
     chunks
+    |> Enum.with_index(1)
     |> Task.async_stream(
-      &extract_chunk(ingestion, prompt, &1),
+      fn {chunk, index} ->
+        extract_chunk_with_progress(ingestion, prompt, chunk, index, total_chunks)
+      end,
       max_concurrency: max_concurrency(ingestion),
       ordered: true,
       timeout: task_timeout(ingestion),
@@ -85,6 +97,23 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
     |> case do
       {:ok, chunk_records} ->
         {:ok, chunk_records |> Enum.reverse() |> List.flatten()}
+
+      error ->
+        error
+    end
+  end
+
+  defp extract_chunk_with_progress(ingestion, prompt, chunk, chunk_index, total_chunks) do
+    case extract_chunk(ingestion, prompt, chunk) do
+      {:ok, records, usage} ->
+        Broadcaster.broadcast_chunk_progress(ingestion.id, :data_extract, %{
+          chunk: chunk_index,
+          total_chunks: total_chunks,
+          tokens: usage.completion_tokens,
+          tokens_per_sec: usage[:tokens_per_sec]
+        })
+
+        {:ok, records}
 
       error ->
         error
@@ -120,7 +149,7 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
       {:ok, response, usage} ->
         case parse_json_response(response) do
           {:ok, records} ->
-            {:ok, records}
+            {:ok, records, usage}
 
           {:error, :invalid_json} ->
             Logger.info("data_extract JSON parse failed, retrying",
@@ -183,10 +212,20 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
   end
 
   defp extract_sub_chunks(ingestion, prompt, sub_chunks, split_depth) do
-    Enum.reduce_while(sub_chunks, {:ok, []}, fn sub_chunk, {:ok, acc} ->
+    init = {:ok, [], %{completion_tokens: 0, tokens_per_sec: nil}}
+
+    Enum.reduce_while(sub_chunks, init, fn sub_chunk, {:ok, acc, acc_usage} ->
       case extract_chunk(ingestion, prompt, sub_chunk, nil, split_depth) do
-        {:ok, records} -> {:cont, {:ok, acc ++ records}}
-        error -> {:halt, error}
+        {:ok, records, usage} ->
+          merged = %{
+            completion_tokens: acc_usage.completion_tokens + usage.completion_tokens,
+            tokens_per_sec: usage[:tokens_per_sec]
+          }
+
+          {:cont, {:ok, acc ++ records, merged}}
+
+        error ->
+          {:halt, error}
       end
     end)
   end
@@ -225,15 +264,11 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
   defp max_concurrency(i),
     do: PipelineConfigReader.get(i, :data_extract, :max_concurrency, @default_max_concurrency)
 
-  defp task_timeout(i) do
-    case PipelineConfigReader.get(i, :data_extract, :task_timeout_minutes, nil) do
-      nil -> app_config()[:task_timeout] || @default_task_timeout
-      minutes -> :timer.minutes(minutes)
-    end
-  end
-
   defp json_attempts(i),
     do: PipelineConfigReader.get(i, :data_extract, :json_attempts, @default_json_attempts)
+
+  defp task_timeout(i),
+    do: PipelineConfigReader.get(i, :data_extract, :task_timeout, @default_task_timeout)
 
   defp put_pipeline_opt(opts, ingestion, section, key) do
     case PipelineConfigReader.get(ingestion, section, key, nil) do
@@ -245,7 +280,7 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtract do
   defp put_pipeline_client_opts(opts, ingestion) do
     opts
     |> put_pipeline_opt(ingestion, :client, :api_url)
-    |> put_pipeline_opt(ingestion, :client, :receive_timeout)
+    |> put_pipeline_opt(ingestion, :client, :stall_timeout)
     |> put_pipeline_opt(ingestion, :client, :retry_backoffs)
   end
 

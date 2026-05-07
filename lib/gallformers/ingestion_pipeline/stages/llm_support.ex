@@ -28,6 +28,7 @@ defmodule Gallformers.IngestionPipeline.Stages.LLMSupport do
   def reduce_async_result({:exit, reason}, _acc),
     do: {:halt, {:error, normalize_async_exit(reason)}}
 
+  defp normalize_async_exit(:timeout), do: :timeout
   defp normalize_async_exit({:timeout, _reason}), do: :timeout
   defp normalize_async_exit({:exit, {:timeout, _reason}}), do: :timeout
   defp normalize_async_exit(reason), do: reason

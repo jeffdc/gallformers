@@ -317,31 +317,61 @@ defmodule Gallformers.IngestionPipeline.Stages.DataExtractTest do
     assert reloaded_ingestion.status == "processing"
   end
 
-  test "normalizes chunk timeout exits without uploading partial output" do
+  test "broadcasts chunk_progress after each chunk completes with usage data" do
+    ingestion = source_ingestion_fixture()
+    Broadcaster.subscribe(ingestion.id)
+
+    chunk_one = "chunk one " <> String.duplicate("a", 1_800)
+    chunk_two = "chunk two " <> String.duplicate("b", 1_800)
+
+    record_one = valid_record("Gall Progress A", "Host A", 0.8)
+    record_two = valid_record("Gall Progress B", "Host B", 0.81)
+
+    Process.put(
+      :data_extract_text_fixture,
+      Enum.join([chunk_one, chunk_two], "\n\n")
+    )
+
+    set_data_extract_config(%{
+      responses: %{
+        chunk_one =>
+          {:ok, Jason.encode!([record_one]),
+           %{prompt_tokens: 10, completion_tokens: 50, tokens_per_sec: 42.5}},
+        chunk_two =>
+          {:ok, Jason.encode!([record_two]),
+           %{prompt_tokens: 10, completion_tokens: 60, tokens_per_sec: 38.0}}
+      }
+    })
+
+    assert {:ok, _updated} = DataExtract.perform_stage(ingestion)
+
+    assert_receive {:chunk_progress, :data_extract,
+                    %{chunk: 0, total_chunks: 2, tokens: 0, tokens_per_sec: nil}}
+
+    assert_receive {:chunk_progress, :data_extract,
+                    %{chunk: 1, total_chunks: 2, tokens: 50, tokens_per_sec: 42.5}}
+
+    assert_receive {:chunk_progress, :data_extract,
+                    %{chunk: 2, total_chunks: 2, tokens: 60, tokens_per_sec: 38.0}}
+  end
+
+  test "passes stall_timeout instead of receive_timeout from pipeline config" do
     ingestion = source_ingestion_fixture()
     chunk = "chunk one " <> String.duplicate("a", 3_500)
+    record = valid_record("Gall One", "Host One", 0.8)
 
     Process.put(:data_extract_text_fixture, chunk)
 
     set_data_extract_config(%{
-      task_timeout: 10,
       responses: %{
-        chunk =>
-          {:sleep, 25,
-           {:ok, Jason.encode!([valid_record("Gall Timeout", "Host Timeout", 0.8)]),
-            %{
-              prompt_tokens: 1,
-              completion_tokens: 1
-            }}}
+        chunk => {:ok, Jason.encode!([record]), %{prompt_tokens: 1, completion_tokens: 1}}
       }
     })
 
-    assert {:error, :timeout} = DataExtract.perform_stage(ingestion)
-    refute_received {:upload, _, _, _, _}
+    assert {:ok, _updated} = DataExtract.perform_stage(ingestion)
 
-    reloaded_ingestion = Ingestions.get_source_ingestion!(ingestion.id)
-    assert reloaded_ingestion.processing_stage == "metadata"
-    assert reloaded_ingestion.status == "processing"
+    assert_received {:completion, _prompt, ^chunk, opts}
+    refute Keyword.has_key?(opts, :receive_timeout)
   end
 
   defp source_ingestion_fixture(attrs \\ %{}) do

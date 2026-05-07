@@ -242,6 +242,64 @@ defmodule Gallformers.IngestionPipeline.LLMClientTest do
     assert_received {:sleep, 200}
   end
 
+  test "request body includes streaming options" do
+    set_request_stub(fn _url, _headers, body ->
+      send(self(), {:body, body})
+
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "choices" => [%{"message" => %{"content" => "ok"}}],
+           "usage" => %{"prompt_tokens" => 1, "completion_tokens" => 1}
+         }
+       }}
+    end)
+
+    assert {:ok, _, _} = LLMClient.completion(:llm_clean, "sys", "user")
+    assert_received {:body, body}
+    assert body["stream"] == true
+    assert body["stream_options"]["include_usage"] == true
+    assert body["stream_options"]["continuous_usage_stats"] == true
+  end
+
+  test "usage map includes enriched fields on sync path" do
+    set_request_stub(fn _url, _headers, _body ->
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "choices" => [%{"message" => %{"content" => "ok"}}],
+           "usage" => %{"prompt_tokens" => 10, "completion_tokens" => 20}
+         }
+       }}
+    end)
+
+    assert {:ok, "ok", usage} = LLMClient.completion(:llm_clean, "sys", "user")
+    assert usage.prompt_tokens == 10
+    assert usage.completion_tokens == 20
+    assert is_number(usage.tokens_per_sec) or is_nil(usage.tokens_per_sec)
+    assert is_nil(usage.estimated_cost)
+    assert is_nil(usage.finish_reason)
+    assert usage.truncated == false
+  end
+
+  test "stall_timeout opt is accepted" do
+    set_request_stub(fn _url, _headers, _body ->
+      {:ok,
+       %{
+         status: 200,
+         body: %{
+           "choices" => [%{"message" => %{"content" => "ok"}}],
+           "usage" => %{"prompt_tokens" => 1, "completion_tokens" => 1}
+         }
+       }}
+    end)
+
+    assert {:ok, "ok", _} =
+             LLMClient.completion(:llm_clean, "sys", "user", stall_timeout: 30_000)
+  end
+
   test "chunk_text respects paragraph boundaries and max size" do
     text = "para one\n\npara two\n\n#{String.duplicate("x", 25)}\n\npara four"
 
