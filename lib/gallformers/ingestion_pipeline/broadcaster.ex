@@ -5,6 +5,8 @@ defmodule Gallformers.IngestionPipeline.Broadcaster do
 
   use Boundary, deps: [], exports: :all
 
+  require Logger
+
   @topic_prefix "ingestion:"
 
   @type stage :: atom() | String.t()
@@ -14,7 +16,13 @@ defmodule Gallformers.IngestionPipeline.Broadcaster do
   """
   @spec subscribe(integer()) :: :ok | {:error, term()}
   def subscribe(ingestion_id) when is_integer(ingestion_id) do
-    Phoenix.PubSub.subscribe(Gallformers.PubSub, topic(ingestion_id))
+    result = Phoenix.PubSub.subscribe(Gallformers.PubSub, topic(ingestion_id))
+
+    Logger.debug(
+      "Broadcaster.subscribe topic=#{topic(ingestion_id)} pid=#{inspect(self())} result=#{inspect(result)}"
+    )
+
+    result
   end
 
   @doc """
@@ -74,6 +82,18 @@ defmodule Gallformers.IngestionPipeline.Broadcaster do
   end
 
   defp broadcast(ingestion_id, message) do
+    tag =
+      case message do
+        {atom, _stage, %{chunk: chunk}} -> "#{atom}/chunk=#{chunk}"
+        {atom, stage} when is_atom(stage) -> "#{atom}/#{stage}"
+        {atom, stage, _} -> "#{atom}/#{inspect(stage)}"
+        other -> inspect(other)
+      end
+
+    Logger.debug(
+      "Broadcaster.broadcast topic=#{topic(ingestion_id)} tag=#{tag} from_pid=#{inspect(self())}"
+    )
+
     Phoenix.PubSub.broadcast(Gallformers.PubSub, topic(ingestion_id), message)
   end
 

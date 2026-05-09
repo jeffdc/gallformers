@@ -99,13 +99,16 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     if connected?(socket) and String.length(name) >= 3 do
       socket
       |> assign(:wcvp_searching, true)
-      |> start_async(:wcvp_search, fn ->
-        wcvp_lookup().search(name, limit: 10)
-        |> Enum.map(fn r -> Map.put(r, :id, r.plant_name_id) end)
-      end)
+      |> start_async(:wcvp_search, fn -> wcvp_search_with_ids(name) end)
     else
       socket
     end
+  end
+
+  defp wcvp_search_with_ids(name) do
+    name
+    |> wcvp_lookup().search(limit: 10)
+    |> Enum.map(fn r -> Map.put(r, :id, r.plant_name_id) end)
   end
 
   defp load_host_for_edit(socket, host) do

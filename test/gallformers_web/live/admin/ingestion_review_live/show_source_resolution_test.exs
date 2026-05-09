@@ -152,8 +152,8 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowSourceResolutionTest do
 
       {:ok, _view, html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}")
 
-      assert row_index(html, first_entry.id) < row_index(html, middle_entry.id)
-      assert row_index(html, middle_entry.id) < row_index(html, later_entry.id)
+      assert row_index(html, first_entry.id) < row_index(html, later_entry.id)
+      assert row_index(html, later_entry.id) < row_index(html, middle_entry.id)
 
       assert html =~ "Andricus persistus"
       assert html =~ "Quercus alba"

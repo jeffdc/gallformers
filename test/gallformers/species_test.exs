@@ -230,6 +230,22 @@ defmodule Gallformers.SpeciesTest do
       assert is_list(results)
       assert length(results) > 0
     end
+
+    test "expands abbreviated genus names like 'Q. robur'" do
+      # Seeded host (id 9) is "Quercus robur"
+      results = Species.search_species_by_name("Q. robur", "plant", 10)
+
+      assert Enum.any?(results, &(&1.name == "Quercus robur")),
+             "expected 'Q. robur' to match 'Quercus robur', got #{inspect(Enum.map(results, & &1.name))}"
+    end
+
+    test "abbreviated genus does not match species in unrelated genera" do
+      # 'Q. alpinus' should not match Thymus alpinus (genus does not start with Q)
+      results = Species.search_species_by_name("Q. alpinus", "plant", 10)
+
+      refute Enum.any?(results, &(&1.name == "Thymus alpinus")),
+             "expected 'Q. alpinus' not to match Thymus alpinus"
+    end
   end
 
   describe "delete_species/1" do

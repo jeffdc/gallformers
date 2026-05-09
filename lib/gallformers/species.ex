@@ -249,7 +249,50 @@ defmodule Gallformers.Species do
   """
   @spec search_species_by_name(String.t(), String.t() | nil, integer()) :: [map()]
   def search_species_by_name(query, taxoncode \\ nil, limit \\ 20) do
-    search_species_by_name_like(query, taxoncode, limit)
+    case parse_abbreviated_genus(query) do
+      {letter, rest} ->
+        search_with_genus_letter(letter, rest, taxoncode, limit)
+
+      nil ->
+        search_species_by_name_like(query, taxoncode, limit)
+    end
+  end
+
+  # Detects "Q. robur" form (single capital letter + dot + species).
+  defp parse_abbreviated_genus(query) when is_binary(query) do
+    case Regex.run(~r/^\s*([A-Z])\.\s+(\S.*)$/, query) do
+      [_, letter, rest] -> {letter, rest}
+      _ -> nil
+    end
+  end
+
+  defp parse_abbreviated_genus(_), do: nil
+
+  defp search_with_genus_letter(letter, rest, taxoncode, limit) do
+    rest_filter = Gallformers.TextMatch.build_filter(rest, [:name])
+    genus_pattern = "^#{letter}"
+
+    base_query =
+      from(s in Species,
+        where: ^rest_filter,
+        where: fragment("? ~* ?", s.name, ^genus_pattern),
+        order_by: s.name,
+        limit: ^limit,
+        select: %{
+          id: s.id,
+          name: s.name,
+          taxoncode: s.taxoncode
+        }
+      )
+
+    query =
+      if taxoncode do
+        from(s in base_query, where: s.taxoncode == ^taxoncode)
+      else
+        base_query
+      end
+
+    Repo.all(query)
   end
 
   # ILIKE-based name search

@@ -1,6 +1,8 @@
 defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   use GallformersWeb, :live_view
 
+  require Logger
+
   alias Gallformers.Accounts
   alias Gallformers.IngestionPipeline.Broadcaster
   alias Gallformers.IngestionPipeline.DuplicateResolution
@@ -41,6 +43,8 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
      |> assign(:activity_style, :normal)}
   end
 
+  @poll_interval_ms 3_000
+
   @impl true
   def handle_params(%{"id" => id}, _uri, socket) do
     ingestion_id = String.to_integer(id)
@@ -48,6 +52,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
 
     if connected?(socket) && socket.assigns.review_view.status == "processing" do
       Broadcaster.subscribe(ingestion_id)
+      schedule_poll()
     end
 
     {:noreply, socket}
@@ -191,6 +196,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
       :ok ->
         Broadcaster.subscribe(ingestion_id)
         PipelineWorker.enqueue(ingestion_id)
+        schedule_poll()
 
         {:noreply,
          socket
@@ -221,7 +227,23 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   end
 
   @impl true
-  def handle_info({:chunk_progress, _stage, %{chunk: 0} = progress}, socket) do
+  def handle_info(:poll_status, socket) do
+    socket = reload_review_view(socket)
+
+    if socket.assigns.review_view.status == "processing" do
+      schedule_poll()
+      {:noreply, socket}
+    else
+      {:noreply, push_event(socket, "stop_timer", %{})}
+    end
+  end
+
+  @impl true
+  def handle_info({:chunk_progress, stage, %{chunk: 0} = progress}, socket) do
+    Logger.debug(
+      "Show.handle_info chunk_progress chunk=0 stage=#{stage} total=#{progress.total_chunks}"
+    )
+
     text =
       if progress.total_chunks == 1,
         do: "Processing...",
@@ -231,7 +253,11 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   end
 
   @impl true
-  def handle_info({:chunk_progress, _stage, progress}, socket) do
+  def handle_info({:chunk_progress, stage, progress}, socket) do
+    Logger.debug(
+      "Show.handle_info chunk_progress chunk=#{progress.chunk}/#{progress.total_chunks} stage=#{stage} tokens=#{progress.tokens}"
+    )
+
     text = "Chunk #{progress.chunk}/#{progress.total_chunks} — #{progress.tokens} tokens"
 
     text =
@@ -243,12 +269,16 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   end
 
   @impl true
-  def handle_info({:chunk_warning, _stage, warning}, socket) do
+  def handle_info({:chunk_warning, stage, warning}, socket) do
+    Logger.debug("Show.handle_info chunk_warning stage=#{stage} message=#{warning.message}")
+
     {:noreply, assign(socket, activity_text: warning.message, activity_style: :warning)}
   end
 
   @impl true
-  def handle_info({:stage_complete, _stage}, socket) do
+  def handle_info({:stage_complete, stage}, socket) do
+    Logger.debug("Show.handle_info stage_complete stage=#{stage}")
+
     socket = socket |> assign(activity_text: nil, activity_style: :normal) |> reload_review_view()
 
     if terminal_status?(socket.assigns.review_view.status) do
@@ -740,6 +770,10 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
 
   defp reload_review_view(socket) do
     load_review_view(socket, socket.assigns.review_view.id)
+  end
+
+  defp schedule_poll do
+    Process.send_after(self(), :poll_status, @poll_interval_ms)
   end
 
   defp current_user_db_id(socket) do

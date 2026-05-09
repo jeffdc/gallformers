@@ -187,10 +187,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
                 </div>
               </:col>
 
-              <:col :let={row} label="Species">
-                {species_progress_label(row)}
-              </:col>
-
               <:col :let={row} label="Status" sort_key={:status}>
                 {Presenter.queue_status_label(row)}
               </:col>
@@ -204,6 +200,14 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
               </:col>
 
               <:action :let={row}>
+                <.link
+                  :if={species_review_link_visible?(row)}
+                  navigate={"/admin/ingestion-review/#{row.id}/review"}
+                  class="text-sm text-gf-maroon hover:underline"
+                >
+                  Review
+                </.link>
+
                 <.table_actions :if={failed_queue_row?(row)}>
                   <.action_button
                     id={"clear-failed-ingestion-#{row.id}"}
@@ -419,12 +423,8 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
   defp duplicate_review_row?(row), do: row.status == "needs_duplicate_review"
   defp failed_queue_row?(row), do: row.status == "failed"
 
-  defp species_progress_label(row) do
-    if row.total_species_entries_count > 0 do
-      "#{row.resolved_species_entries_count} of #{row.total_species_entries_count} reviewed"
-    else
-      "No extracted galls yet"
-    end
+  defp species_review_link_visible?(row) do
+    row.status in ["needs_review", "complete"] and not is_nil(row.source_id)
   end
 
   defp pipeline_config_select(assigns) do

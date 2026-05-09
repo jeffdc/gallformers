@@ -953,6 +953,25 @@ a.gf-btn-primary:hover {
   border-color: #661419;
 }
 
+.gf-pill-compact {
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 0.25rem;
+}
+
+.gf-pill-compact.gf-pill-selected {
+  background-color: transparent;
+  color: #661419;
+  border-color: #661419;
+  font-weight: 500;
+}
+
+.gf-pill-compact.gf-pill-unselected {
+  background-color: transparent;
+  color: #9ca3af;
+  border-color: #e5e7eb;
+}
+
 /* ============================================
    Search Input Styles
    ============================================ */

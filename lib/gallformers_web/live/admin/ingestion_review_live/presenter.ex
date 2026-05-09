@@ -1,7 +1,11 @@
 defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
+  alias Gallformers.Galls
   alias Gallformers.IngestionPipeline.Workflow
   alias Gallformers.Ingestions
   alias Gallformers.Ingestions.SourceIngestion
+  alias Gallformers.Sources
+  alias Gallformers.Species, as: SpeciesContext
+  alias Gallformers.Taxonomy
   alias Gallformers.Utils
 
   @doc """
@@ -26,7 +30,10 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
       Enum.map(source_ingestion.duplicate_candidates, &duplicate_candidate_review_view/1)
 
     species_entries =
-      Enum.map(source_ingestion.species_entries, &species_entry_review_view/1)
+      source_ingestion.species_entries
+      |> Enum.map(&species_entry_review_view/1)
+      |> collate_species_entries()
+      |> Enum.sort_by(& &1.extracted_name)
 
     %{
       id: source_ingestion.id,
@@ -114,6 +121,74 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
     opts
     |> Ingestions.list_source_ingestion_queue_rows()
     |> Enum.map(&queue_row/1)
+  end
+
+  @doc """
+  Assembles existing gall data for merge views in the review workspace.
+
+  Returns hosts, aliases, trait filter values, and primary description for a
+  catalog gall. Used when identity resolves to "existing" so section components
+  can show current data alongside extracted data.
+  """
+  @spec load_existing_gall_data(integer() | nil) :: map() | nil
+  def load_existing_gall_data(nil), do: nil
+
+  def load_existing_gall_data(species_id) when is_integer(species_id) do
+    %{
+      hosts: Galls.get_hosts_for_gall(species_id),
+      aliases: SpeciesContext.get_aliases_for_species(species_id),
+      traits: Galls.get_gall_filter_values(species_id),
+      description: load_existing_description(species_id)
+    }
+  end
+
+  @doc """
+  Searches for an exact name match in the gall catalog.
+
+  Used by the identity section to show a suggested match card. Does NOT
+  auto-select — the reviewer must explicitly accept the match.
+  """
+  @spec load_suggested_match(String.t() | nil) :: map() | nil
+  def load_suggested_match(nil), do: nil
+  def load_suggested_match(""), do: nil
+
+  def load_suggested_match(extracted_name) when is_binary(extracted_name) do
+    name_downcased = String.downcase(extracted_name)
+
+    extracted_name
+    |> SpeciesContext.search_species_by_name("gall", 5)
+    |> Enum.find(&(String.downcase(&1.name) == name_downcased))
+    |> case do
+      nil -> nil
+      match -> enrich_suggested_match(match)
+    end
+  end
+
+  defp load_existing_description(species_id) do
+    case Sources.get_sources_for_species(species_id) do
+      [] -> nil
+      [source | _] -> source.description
+    end
+  end
+
+  defp enrich_suggested_match(match) do
+    hosts = Galls.get_hosts_for_gall(match.id)
+    aliases = SpeciesContext.get_aliases_for_species(match.id)
+
+    %{
+      id: match.id,
+      name: match.name,
+      family: resolve_family_name(match.name),
+      host_count: length(hosts),
+      alias_count: length(aliases)
+    }
+  end
+
+  defp resolve_family_name(name) do
+    case Taxonomy.resolve_taxonomy_from_name(name) do
+      {:ok, %{family: %{name: family_name}}} -> family_name
+      _ -> nil
+    end
   end
 
   defp queue_row(raw_row) do
@@ -230,10 +305,35 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
       mapped_species_name: mapped_species_name(species_entry.species),
       host_count: host_count(payload),
       status: species_entry.status,
+      sibling_ids: [],
       extracted_aliases: extraction_aliases(payload),
       extracted_hosts: extraction_hosts(payload),
       extracted_trait_names: extraction_trait_names(payload)
     }
+  end
+
+  defp collate_species_entries(entries) do
+    entries
+    |> Enum.reject(&(&1.extracted_name in [nil, ""]))
+    |> Enum.group_by(fn entry ->
+      (entry.extracted_name || "") |> String.downcase()
+    end)
+    |> Enum.map(fn {_key, group} ->
+      primary = hd(group)
+      sibling_ids = group |> tl() |> Enum.map(& &1.id)
+
+      authority =
+        Enum.find_value(group, fn e -> e.extracted_authority end) || primary.extracted_authority
+
+      status =
+        cond do
+          Enum.all?(group, &(&1.status in ~w(complete mapped created))) -> primary.status
+          Enum.any?(group, &(&1.status == "pending")) -> "pending"
+          true -> primary.status
+        end
+
+      %{primary | extracted_authority: authority, status: status, sibling_ids: sibling_ids}
+    end)
   end
 
   defp extraction_aliases(%{aliases: aliases}) when is_list(aliases), do: aliases

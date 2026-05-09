@@ -379,7 +379,7 @@ defmodule Gallformers.Ingestions.SourceIngestionSpeciesReview do
          |> SourceIngestionSpecies.changeset(%{})
          |> add_error(:status, "cannot mark complete until the gall identity is resolved")}
 
-      Enum.any?(host_reviews, &(Map.get(&1, "decision") == "unresolved")) ->
+      Enum.any?(host_reviews, &(Map.get(&1, "decision") not in ["mapped", "skip"])) ->
         {:error,
          %SourceIngestionSpecies{}
          |> SourceIngestionSpecies.changeset(%{})

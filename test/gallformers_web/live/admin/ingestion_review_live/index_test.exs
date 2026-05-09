@@ -138,14 +138,51 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.IndexTest do
 
       assert html =~ "Source Ingestion Review"
       assert html =~ row.display_title
-      assert html =~ "1 of 2 reviewed"
       assert html =~ "1 of 2 galls remaining"
       assert html =~ current_db_user.display_name
+
+      # Status conveys the gall-progress count for needs_review rows; the redundant
+      # "Species" column has been removed.
+      refute html =~ "1 of 2 reviewed"
+      refute has_element?(view, "th", "Species")
 
       assert has_element?(
                view,
                "a[href='/admin/ingestion-review/#{row.id}']",
                row.display_title
+             )
+    end
+
+    test "rows ready for species review link straight to the workspace", %{conn: conn} do
+      current_db_user = db_user_fixture("Workspace Link Reviewer")
+      row = review_queue_row_fixture(current_db_user)
+      conn = superadmin_conn(conn, current_db_user)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review")
+
+      assert has_element?(
+               view,
+               "a[href='/admin/ingestion-review/#{row.id}/review']"
+             )
+    end
+
+    test "rows that are not yet reviewable do not show the workspace link", %{conn: conn} do
+      current_db_user = db_user_fixture("No Workspace Link Reviewer")
+      conn = superadmin_conn(conn, current_db_user)
+
+      processing =
+        source_ingestion_fixture(%{
+          uploaded_by_id: current_db_user.id,
+          title: "Processing Submission",
+          status: "processing",
+          processing_stage: "extract"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review")
+
+      refute has_element?(
+               view,
+               "a[href='/admin/ingestion-review/#{processing.id}/review']"
              )
     end
 

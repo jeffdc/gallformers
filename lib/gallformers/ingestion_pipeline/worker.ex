@@ -80,8 +80,22 @@ defmodule Gallformers.IngestionPipeline.Worker do
 
       {:ok, %SourceIngestion{id: ingestion_id}} ->
         case enqueue(ingestion_id) do
-          {:ok, _job} -> :ok
-          {:error, changeset} -> {:error, changeset}
+          {:ok, %Oban.Job{conflict?: true} = job} ->
+            Logger.warning(
+              "Worker.enqueue conflict — next stage NOT scheduled. ingestion=#{ingestion_id} stage_module=#{inspect(module)} existing_job_id=#{job.id} state=#{job.state}"
+            )
+
+            :ok
+
+          {:ok, %Oban.Job{} = job} ->
+            Logger.debug(
+              "Worker.enqueue ingestion=#{ingestion_id} stage_module=#{inspect(module)} job_id=#{job.id} state=#{job.state}"
+            )
+
+            :ok
+
+          {:error, changeset} ->
+            {:error, changeset}
         end
 
       {:error, :invalid_contract, messages} ->
