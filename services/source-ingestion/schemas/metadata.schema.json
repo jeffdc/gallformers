@@ -1,0 +1,219 @@
+{
+  "$defs": {
+    "Evidence": {
+      "additionalProperties": false,
+      "description": "A single citation pointing at the canonical normalized text.\n\nBoth block-relative addressing (`block_id`) and absolute offsets are\ncarried (per amendment 1 of the artifact contract). UI uses\n`char_start`/`char_end` to render highlights; audit tools use `block_id`\nto trace back to `normalized_text.jsonl`.",
+      "properties": {
+        "block_id": {
+          "description": "ID of the source block in normalized_text.jsonl",
+          "title": "Block Id",
+          "type": "string"
+        },
+        "char_end": {
+          "description": "Absolute char offset (exclusive)",
+          "minimum": 0,
+          "title": "Char End",
+          "type": "integer"
+        },
+        "char_start": {
+          "description": "Absolute char offset in the flat normalized text",
+          "minimum": 0,
+          "title": "Char Start",
+          "type": "integer"
+        },
+        "page": {
+          "description": "1-indexed page number",
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "quote": {
+          "description": "Exact substring at [char_start:char_end] of the flat normalized text",
+          "title": "Quote",
+          "type": "string"
+        }
+      },
+      "required": [
+        "block_id",
+        "page",
+        "char_start",
+        "char_end",
+        "quote"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "EvidenceCell": {
+      "additionalProperties": false,
+      "description": "Every fact field has this shape: value + evidence + verifier verdict.",
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "raw_value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Source phrase before normalization, when different from value",
+          "title": "Raw Value"
+        },
+        "support_status": {
+          "$ref": "#/$defs/SupportStatus"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Extracted value; null when abstained or substring-gate-rejected",
+          "title": "Value"
+        }
+      },
+      "required": [
+        "value",
+        "support_status",
+        "confidence"
+      ],
+      "title": "EvidenceCell",
+      "type": "object"
+    },
+    "SupportStatus": {
+      "description": "Verifier/gate verdict on a single field's evidence.\n\n`supported` and `contradicted` are verifier verdicts.\n`evidence_substring_mismatch` is the substring gate's verdict (value nulled).\n`abstained` is the extractor declining to fill the field.",
+      "enum": [
+        "supported",
+        "contradicted",
+        "not_enough_evidence",
+        "needs_human_review",
+        "evidence_substring_mismatch",
+        "abstained"
+      ],
+      "title": "SupportStatus",
+      "type": "string"
+    }
+  },
+  "$id": "https://gallformers.org/schemas/metadata.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "`metadata.json` — bibliographic metadata, evidence-bound.",
+  "properties": {
+    "authors": {
+      "items": {
+        "$ref": "#/$defs/EvidenceCell"
+      },
+      "title": "Authors",
+      "type": "array"
+    },
+    "doi": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EvidenceCell"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "issue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EvidenceCell"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "journal": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EvidenceCell"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "language": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EvidenceCell"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "pages": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EvidenceCell"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "title": {
+      "$ref": "#/$defs/EvidenceCell"
+    },
+    "volume": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EvidenceCell"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "year": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EvidenceCell"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "title"
+  ],
+  "title": "DocumentMetadata",
+  "type": "object",
+  "x-schema-version": "1.0.0"
+}

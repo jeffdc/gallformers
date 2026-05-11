@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "Candidate": {
+      "additionalProperties": false,
+      "description": "One gall-maker mention. Per-candidate scratch only; not in the bundle by default.",
+      "properties": {
+        "candidate_id": {
+          "description": "e.g. 'C_001'",
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "gall_maker_mention": {
+          "description": "Name as it appears in the source",
+          "title": "Gall Maker Mention",
+          "type": "string"
+        },
+        "mention_span_ids": {
+          "description": "Spans where this candidate is mentioned",
+          "items": {
+            "type": "string"
+          },
+          "title": "Mention Span Ids",
+          "type": "array"
+        },
+        "sample_agreement": {
+          "description": "How many of N self-consistency samples produced this candidate",
+          "minimum": 1,
+          "title": "Sample Agreement",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "gall_maker_mention",
+        "mention_span_ids",
+        "sample_agreement"
+      ],
+      "title": "Candidate",
+      "type": "object"
+    }
+  },
+  "$id": "https://gallformers.org/schemas/candidates.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "`candidates.json` — find-candidates output (scratch, not in bundle).",
+  "properties": {
+    "candidates": {
+      "items": {
+        "$ref": "#/$defs/Candidate"
+      },
+      "title": "Candidates",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "candidates"
+  ],
+  "title": "CandidatesFile",
+  "type": "object",
+  "x-schema-version": "1.0.0"
+}

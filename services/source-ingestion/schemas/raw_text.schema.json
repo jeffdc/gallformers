@@ -1,0 +1,85 @@
+{
+  "$defs": {
+    "Bbox": {
+      "additionalProperties": false,
+      "description": "Bounding box in PDF page coordinates (top-left origin).",
+      "properties": {
+        "x0": {
+          "title": "X0",
+          "type": "number"
+        },
+        "x1": {
+          "title": "X1",
+          "type": "number"
+        },
+        "y0": {
+          "title": "Y0",
+          "type": "number"
+        },
+        "y1": {
+          "title": "Y1",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x0",
+        "y0",
+        "x1",
+        "y1"
+      ],
+      "title": "Bbox",
+      "type": "object"
+    }
+  },
+  "$id": "https://gallformers.org/schemas/raw_text.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One row of `raw_text.jsonl` — a block extracted from a PDF page.\n\nAudit-only artifact. Not addressable by evidence offsets; the normalized\nblocks are the canonical substrate.",
+  "properties": {
+    "bbox": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Bbox"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "block_id": {
+      "description": "Unique block ID, e.g. 'p12-b04'",
+      "title": "Block Id",
+      "type": "string"
+    },
+    "extractor": {
+      "description": "e.g. 'pymupdf-1.24.0' or 'olmocr-2-7B-1025'",
+      "title": "Extractor",
+      "type": "string"
+    },
+    "page": {
+      "minimum": 1,
+      "title": "Page",
+      "type": "integer"
+    },
+    "quality_signals": {
+      "additionalProperties": true,
+      "description": "Extractor-specific signals: confidence, char count, weird-char ratio, etc.",
+      "title": "Quality Signals",
+      "type": "object"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "block_id",
+    "page",
+    "text",
+    "extractor"
+  ],
+  "title": "RawTextBlock",
+  "type": "object",
+  "x-schema-version": "1.0.0"
+}
