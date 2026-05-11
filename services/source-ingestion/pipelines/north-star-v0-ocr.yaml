@@ -53,14 +53,14 @@ pipeline:
     # ── Metadata ──────────────────────────────────────────────────────────────
 
     - step: metadata
-      model: deepinfra/meta-llama/Llama-3.1-8B-Instruct
+      model: deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct
       prompt: prompts/metadata.md
       input_section_types: [title, abstract, introduction]
 
     # ── Candidate detection ──────────────────────────────────────────────────
 
     - step: find-candidates
-      model: deepinfra/meta-llama/Llama-3.1-8B-Instruct
+      model: deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct
       prompt: prompts/find-candidates.md
       n_samples: 3
       agreement_threshold: 2

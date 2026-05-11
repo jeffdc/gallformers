@@ -20,7 +20,7 @@ providers:
       - moonshotai/Kimi-K2.5
       - deepseek-ai/DeepSeek-V3
       - Qwen/Qwen2.5-72B-Instruct
-      - meta-llama/Llama-3.1-8B-Instruct       # north-star: metadata, find-candidates
+      - meta-llama/Meta-Llama-3.1-8B-Instruct   # north-star: metadata, find-candidates
   # OpenRouter — optional. Enable if you want a fully cross-provider verifier
   # setup (e.g., extractor on DeepInfra, verifier on Anthropic via OpenRouter).
   # Today's north-star pipelines achieve different-family verification within

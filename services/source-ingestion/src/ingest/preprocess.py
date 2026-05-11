@@ -1,16 +1,19 @@
-"""Deterministic text pre-processing for BHL and OCR-extracted documents.
+"""Deterministic block-level text pre-processing.
 
-Cleans up raw extracted text before sending to the LLM. Handles:
-- BHL boilerplate removal
-- Line rejoining (OCR single-line breaks)
-- Hyphenated word rejoining
-- Page header/footer stripping
-- Plate image page removal
+Operates on ``RawTextBlock`` instances from extraction and produces
+``NormalizedBlock`` instances suitable for ``normalized_text.jsonl``. The
+five-step cleanup (BHL boilerplate strip, plate-page strip, page-header
+strip, hyphen rejoin, line rejoin) runs per-block. Blocks that become
+empty after cleanup are dropped; remaining blocks get sequential span IDs
+and absolute character offsets into the flat normalized text — the
+canonical substrate evidence offsets address.
 """
 
 from __future__ import annotations
 
 import re
+
+from ingest.schemas import NormalizedBlock, RawTextBlock
 
 
 def strip_bhl_boilerplate(text: str) -> str:
@@ -111,9 +114,7 @@ def _is_heading_or_special(line: str) -> bool:
     if stripped.isupper() and len(stripped) < 100:
         return True
     # Lines that are just numbers (page numbers that weren't caught)
-    if stripped.isdigit():
-        return True
-    return False
+    return stripped.isdigit()
 
 
 def _is_continuation(prev: str, current: str) -> bool:
@@ -130,18 +131,21 @@ def _is_continuation(prev: str, current: str) -> bool:
         return False
 
     # Previous line ends mid-sentence
-    prev_ends_mid = prev_stripped[-1] not in ".!?:;\""
+    prev_ends_mid = prev_stripped[-1] not in '.!?:;"'
 
     # Current line starts lowercase or with common continuation chars
+    # Continuation punctuation includes em-dash and en-dash, which
+    # commonly appear at the start of OCR'd continuation lines.
     current_continues = (
-        current_stripped[0].islower()
-        or current_stripped[0] in ",(;—–-"
+        current_stripped[0].islower() or current_stripped[0] in ",(;—–-"  # noqa: RUF001
     )
 
     # Previous ends with comma, semicolon, or conjunction words
-    prev_ends_soft = prev_stripped[-1] in ",;:" or prev_stripped.endswith((" or", " and", " the", " of", " a", " an", " in", " to", " by"))
+    prev_ends_soft = prev_stripped[-1] in ",;:" or prev_stripped.endswith(
+        (" or", " and", " the", " of", " a", " an", " in", " to", " by")
+    )
 
-    return prev_ends_mid and current_continues or prev_ends_soft
+    return (prev_ends_mid and current_continues) or prev_ends_soft
 
 
 def rejoin_hyphenated(text: str) -> str:
@@ -222,10 +226,7 @@ def strip_plate_pages(text: str) -> str:
             continue
 
         # OCR junk lines: very short, single characters, pipes, etc.
-        if in_plate_image and (
-            len(stripped) <= 3
-            or re.match(r"^[|OoIl\s\W]+$", stripped)
-        ):
+        if in_plate_image and (len(stripped) <= 3 or re.match(r"^[|OoIl\s\W]+$", stripped)):
             continue
 
         # If we're in a plate image section and hit a real content line,
@@ -251,19 +252,78 @@ def strip_plate_pages(text: str) -> str:
     return "\n".join(result)
 
 
-def preprocess(text: str) -> str:
-    """Run the full pre-processing pipeline.
+# Separator placed between normalized blocks in the flat text substrate.
+# Evidence absolute char offsets address into the flat text composed with this.
+BLOCK_SEPARATOR = "\n\n"
 
-    Order matters:
-    1. Strip BHL boilerplate (before line manipulation)
-    2. Strip plate image pages (before line rejoining, since they're noise)
-    3. Strip page headers/footers
-    4. Rejoin hyphenated words (before line rejoining, to catch cross-line hyphens)
-    5. Rejoin broken lines (last, on clean text)
+
+def preprocess_blocks(raw_blocks: list[RawTextBlock]) -> list[NormalizedBlock]:
+    """Apply deterministic cleanup to raw blocks, producing normalized blocks.
+
+    For each raw block, runs the same five-step text cleanup that
+    ``preprocess`` runs on a single joined string — applied per-block.
+    Blocks that become empty after cleanup are dropped. Each kept raw
+    block maps 1:1 to a normalized block in Phase A; the schema's
+    ``raw_block_ids`` list shape leaves room for future many-to-one
+    merging without changing the contract.
+
+    Output blocks carry sequential ``S_NNNN`` span IDs and absolute
+    ``char_start``/``char_end`` offsets into the flat normalized text
+    (the concatenation of all kept blocks separated by ``BLOCK_SEPARATOR``).
+    Evidence offsets in claims address into that flat text.
     """
-    text = strip_bhl_boilerplate(text)
-    text = strip_plate_pages(text)
-    text = strip_page_headers(text)
-    text = rejoin_hyphenated(text)
-    text = rejoin_lines(text)
-    return text.strip()
+    cleaned: list[tuple[RawTextBlock, str]] = []
+    for raw in raw_blocks:
+        text = raw.text
+        text = strip_bhl_boilerplate(text)
+        text = strip_plate_pages(text)
+        text = strip_page_headers(text)
+        text = rejoin_hyphenated(text)
+        text = rejoin_lines(text)
+        text = text.strip()
+        if text:
+            cleaned.append((raw, text))
+
+    normalized: list[NormalizedBlock] = []
+    cursor = 0
+    sep_len = len(BLOCK_SEPARATOR)
+    last_idx = len(cleaned) - 1
+    for idx, (raw, text) in enumerate(cleaned):
+        char_start = cursor
+        char_end = cursor + len(text)
+        normalized.append(
+            NormalizedBlock(
+                span_id=f"S_{idx + 1:04d}",
+                block_id=raw.block_id,
+                page=raw.page,
+                section_id=None,
+                char_start=char_start,
+                char_end=char_end,
+                text=text,
+                raw_block_ids=[raw.block_id],
+            )
+        )
+        # Advance cursor past this block; add separator length except after
+        # the last block (no trailing separator in flat normalized text).
+        cursor = char_end + (sep_len if idx < last_idx else 0)
+    return normalized
+
+
+def flat_normalized_text(blocks: list[NormalizedBlock]) -> str:
+    """The canonical text substrate. Evidence absolute char offsets address into this."""
+    return BLOCK_SEPARATOR.join(b.text for b in blocks)
+
+
+def verify_block_offsets(blocks: list[NormalizedBlock]) -> None:
+    """Sanity check: each block's [char_start:char_end] equals its text in the flat text.
+
+    Raises ValueError on mismatch. Cheap to run; useful in tests and as a
+    pre-bundle invariant in the assemble stage.
+    """
+    flat = flat_normalized_text(blocks)
+    for b in blocks:
+        if flat[b.char_start : b.char_end] != b.text:
+            raise ValueError(
+                f"Block {b.block_id} (span {b.span_id}) text does not match its "
+                f"char_start/char_end offsets in the flat normalized text"
+            )

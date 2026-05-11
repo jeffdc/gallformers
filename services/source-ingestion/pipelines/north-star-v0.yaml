@@ -46,14 +46,14 @@ pipeline:
     # ── Metadata ──────────────────────────────────────────────────────────────
 
     - step: metadata               # → metadata.json (evidence-bound)
-      model: deepinfra/meta-llama/Llama-3.1-8B-Instruct
+      model: deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct
       prompt: prompts/metadata.md
       input_section_types: [title, abstract, introduction]   # scope reduction
 
     # ── Candidate detection (N=3 self-consistency) ───────────────────────────
 
     - step: find-candidates        # → candidates.json (scratch)
-      model: deepinfra/meta-llama/Llama-3.1-8B-Instruct
+      model: deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct
       prompt: prompts/find-candidates.md
       n_samples: 3
       agreement_threshold: 2       # keep candidates appearing in >= N samples

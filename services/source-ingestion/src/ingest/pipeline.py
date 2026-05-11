@@ -1,32 +1,74 @@
-"""Pipeline runner: load YAML configs and execute multi-stage ingestion pipelines."""
+"""Async pipeline runner for the north-star ingestion pipeline.
+
+Loads a YAML config, dispatches each stage in order, and writes artifacts
+to a per-source working directory. Per-candidate stages (``extract-facts``,
+``verify-claims`` per cell) fan out via ``asyncio.gather`` with a per-stage
+``asyncio.Semaphore`` from the stage's ``max_workers``. The final stages
+assemble all four contract artifacts and tarball the bundle.
+
+Resumability is intentionally minimal in Phase A — if an intermediate
+artifact exists on disk the stage skips and reuses it. Richer cache
+invalidation (prompt-SHA aware) is Phase B work.
+"""
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import json
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
-import click
 import yaml
 
-from ingest.extract import extract_text
-from ingest.llm import CleanupResult, DataExtractResult, MetadataResult, TokenUsage, clean_text, extract_data, extract_metadata
-from ingest.ocr import OcrResult, ocr_pdf
-from ingest.output import assemble_document, build_frontmatter
-from ingest.preprocess import preprocess
-from ingest.providers import resolve_model
+from ingest.assemble import assemble
+from ingest.bundle import write_bundle
+from ingest.evidence_pack import build_evidence_pack
+from ingest.extract import extract_blocks
+from ingest.extract_facts import extract_facts
+from ingest.find_candidates import find_candidates
+from ingest.jsonl import write_jsonl
+from ingest.metadata import extract_document_metadata
+from ingest.preprocess import flat_normalized_text, preprocess_blocks
+from ingest.schemas import (
+    Candidate,
+    DocumentMetadata,
+    GallRecord,
+    NormalizedBlock,
+    ProviderCallRecord,
+    SectionType,
+    StageRunRecord,
+    WarningEntry,
+)
+from ingest.sectionize import sectionize
+from ingest.taxonomy_lookup import enrich_cells_concurrently
+from ingest.verify import _index_blocks, gate_cell
+from ingest.verify_claims import verify_cell
 
-VALID_STEPS = frozenset({"extract", "ocr", "preprocess", "llm-clean", "metadata", "data-extract", "assemble"})
+VALID_STEPS = frozenset(
+    {
+        "extract",
+        "preprocess",
+        "sectionize",
+        "metadata",
+        "find-candidates",
+        "evidence-pack",
+        "extract-facts",
+        "verify",
+        "verify-claims",
+        "taxonomy-lookup",
+        "assemble-review",
+        "bundle",
+    }
+)
+
+
+# ─── YAML loading + validation ────────────────────────────────────────────
 
 
 def load_pipeline(config_path: str) -> dict:
-    """Load and validate a pipeline YAML config.
-
-    Returns the parsed pipeline dict with 'name' and 'stages' keys.
-
-    Raises:
-        FileNotFoundError: If the config file does not exist.
-        ValueError: On invalid config structure or unknown step types.
-    """
+    """Load and validate a pipeline YAML config."""
     path = Path(config_path)
     if not path.exists():
         raise FileNotFoundError(f"Pipeline config not found: {config_path}")
@@ -35,295 +77,612 @@ def load_pipeline(config_path: str) -> dict:
         raw = yaml.safe_load(f)
 
     if not isinstance(raw, dict) or "pipeline" not in raw:
-        raise ValueError(
-            f"Pipeline config must contain a top-level 'pipeline' key: {config_path}"
-        )
-
+        raise ValueError(f"Pipeline config must contain a top-level 'pipeline' key: {config_path}")
     pipeline = raw["pipeline"]
+    for required in ("name", "stages"):
+        if required not in pipeline:
+            raise ValueError(f"Pipeline config missing '{required}': {config_path}")
+    if not pipeline["stages"]:
+        raise ValueError(f"Pipeline config has empty 'stages' list: {config_path}")
 
-    if "name" not in pipeline:
-        raise ValueError(f"Pipeline config must contain a 'name' field: {config_path}")
-
-    if "stages" not in pipeline or not pipeline["stages"]:
-        raise ValueError(f"Pipeline config must contain a non-empty 'stages' list: {config_path}")
-
-    _validate_stages(pipeline["stages"])
+    for stage in pipeline["stages"]:
+        step = stage.get("step")
+        if step is None:
+            raise ValueError(f"Stage missing 'step' key: {stage}")
+        if step not in VALID_STEPS:
+            raise ValueError(f"Unknown step type {step!r}. Valid steps: {sorted(VALID_STEPS)}")
 
     return pipeline
 
 
-def _validate_stages(stages: list[dict]) -> None:
-    """Validate that all step types in a stage list are known."""
-    for stage in stages:
-        if "step" in stage:
-            if stage["step"] not in VALID_STEPS:
-                raise ValueError(
-                    f"Unknown step type: {stage['step']!r}. "
-                    f"Valid steps: {', '.join(sorted(VALID_STEPS))}"
-                )
-        elif "fork" in stage:
-            for _branch_name, branch_stages in stage["fork"].items():
-                _validate_stages(branch_stages)
-        else:
-            raise ValueError(f"Stage must contain either 'step' or 'fork': {stage}")
+# ─── Helpers ──────────────────────────────────────────────────────────────
 
 
-def run_pipeline(
+def _stages_by_step(pipeline: dict) -> dict[str, dict]:
+    """Map step name to its config dict. Last definition wins on duplicates."""
+    return {s["step"]: s for s in pipeline["stages"]}
+
+
+def _project_root() -> Path:
+    """Repo path that hosts ``prompts/`` and ``schemas/`` relative to this module."""
+    return Path(__file__).resolve().parents[2]
+
+
+def _load_prompt(rel_path: str) -> tuple[str, str]:
+    """Load a prompt file and compute its SHA-256."""
+    path = _project_root() / rel_path
+    if not path.exists():
+        raise FileNotFoundError(f"Prompt file not found: {path}")
+    content = path.read_text()
+    return content, hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
+
+
+def _pdf_sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _text_sha(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _eligible_blocks(
+    blocks: list[NormalizedBlock], sections_with_eligibility: dict[str, bool]
+) -> list[NormalizedBlock]:
+    """Filter blocks to those whose section is extraction-eligible."""
+    return [b for b in blocks if sections_with_eligibility.get(b.section_id or "", True)]
+
+
+def _blocks_in_section_types(
+    blocks: list[NormalizedBlock],
+    sections_by_id: dict[str, Any],
+    section_types: list[str],
+) -> list[NormalizedBlock]:
+    """Filter blocks whose section type matches one of the given names."""
+    wanted = set(section_types)
+    return [
+        b
+        for b in blocks
+        if b.section_id
+        and sections_by_id.get(b.section_id)
+        and sections_by_id[b.section_id].type.value in wanted
+    ]
+
+
+# ─── Main runner ──────────────────────────────────────────────────────────
+
+
+async def run_pipeline(
     pipeline: dict,
     source_id: str | int,
     input_path: str | None,
     provider_config: dict,
     output_dir: str = "./output",
-) -> None:
-    """Execute a pipeline, running stages in sequence.
+) -> Path:
+    """Execute a pipeline end-to-end. Returns the path to the produced bundle.
 
     Args:
-        pipeline: Parsed pipeline config from load_pipeline().
-        source_id: Source ID for output naming.
-        input_path: Path to initial input file. Can be None when resuming
-            a pipeline where early steps already have cached output.
-        provider_config: Provider config dict for resolving models.
-        output_dir: Base output directory.
+        pipeline: parsed YAML config from ``load_pipeline``.
+        source_id: per-paper identifier; defines the working subdirectory.
+        input_path: PDF/URL/text file to ingest. Required for the ``extract`` stage.
+        provider_config: parsed providers config (unused directly at this layer —
+            LiteLLM resolves models from the model strings in the pipeline YAML).
+        output_dir: base directory for per-source working dirs.
+
+    Returns:
+        Path to the produced ``bundle.tar.gz``.
+
+    Raises:
+        NotImplementedError: if the pipeline uses a stage type that exists in
+            ``VALID_STEPS`` but isn't wired into this runner yet (e.g., ``ocr``).
+        FileNotFoundError: missing input file, missing prompt file, or missing
+            artifact at the bundle stage with ``verify_complete=True``.
     """
-    name = pipeline["name"]
-    stages = pipeline["stages"]
-    source_dir = Path(output_dir) / str(source_id)
-    source_dir.mkdir(parents=True, exist_ok=True)
+    started_at = _now()
+    src_dir = Path(output_dir) / str(source_id)
+    src_dir.mkdir(parents=True, exist_ok=True)
+    candidates_dir = src_dir / "candidates"
+    candidates_dir.mkdir(exist_ok=True)
 
-    # Track state as we move through stages
-    current_input = input_path
-    step_outputs: dict[str, str] = {}  # step type -> most recent output path
-    step_number = 0
+    stages_cfg = _stages_by_step(pipeline)
+    defaults = pipeline.get("defaults", {})
+    default_total_timeout = float(defaults.get("total_timeout_s", 300.0))
+    stage_records: list[StageRunRecord] = []
+    warnings: list[WarningEntry] = []
 
-    for stage in stages:
-        if "fork" in stage:
-            _run_fork(
-                fork_config=stage["fork"],
-                name=name,
-                source_id=source_id,
-                current_input=current_input,
-                step_number=step_number,
-                step_outputs=step_outputs,
-                provider_config=provider_config,
-                source_dir=source_dir,
-            )
-            # After a fork, there's no single "current_input" — forks are terminal
-            # or each branch continues independently. We don't rejoin.
-            continue
-
-        step_number += 1
-        step_type = stage["step"]
-
-        output_path = _output_path_for_step(
-            source_dir, name, step_number, step_type, source_id
+    # ── extract ──────────────────────────────────────────────────────────
+    if "extract" not in stages_cfg:
+        raise ValueError("Pipeline must include an 'extract' stage")
+    if input_path is None:
+        raise ValueError("input_path is required for the 'extract' stage")
+    t = _now()
+    raw_blocks = extract_blocks(input_path)
+    write_jsonl(raw_blocks, src_dir / "raw_text.jsonl")
+    pdf_sha = (
+        _pdf_sha(Path(input_path))
+        if Path(input_path).suffix.lower() == ".pdf"
+        else _text_sha(input_path)
+    )
+    stage_records.append(
+        StageRunRecord(
+            name="extract",
+            started_at=t,
+            completed_at=_now(),
+            artifacts_written=["raw_text.jsonl"],
         )
-
-        if output_path.exists():
-            click.echo(f"Skipping {step_type} (output exists: {output_path})")
-            current_input = str(output_path)
-            step_outputs[step_type] = str(output_path)
-            continue
-
-        if current_input is None:
-            raise ValueError(
-                f"Step '{step_type}' needs to run but no input file is available. "
-                f"Provide -i/--input to supply the initial input file."
-            )
-
-        click.echo(f"Running {step_type} (step {step_number})...")
-
-        _run_step(
-            step_type=step_type,
-            stage=stage,
-            input_path=current_input,
-            output_path=output_path,
-            source_id=source_id,
-            step_outputs=step_outputs,
-            provider_config=provider_config,
-        )
-
-        current_input = str(output_path)
-        step_outputs[step_type] = str(output_path)
-
-
-def _run_fork(
-    fork_config: dict,
-    name: str,
-    source_id: str | int,
-    current_input: str,
-    step_number: int,
-    step_outputs: dict[str, str],
-    provider_config: dict,
-    source_dir: Path,
-) -> None:
-    """Run forked branches of the pipeline."""
-    for branch_name, branch_stages in fork_config.items():
-        branch_input = current_input
-        branch_outputs = dict(step_outputs)  # copy shared state
-
-        for i, stage in enumerate(branch_stages, start=step_number + 1):
-            step_type = stage["step"]
-
-            output_path = _output_path_for_fork_step(
-                source_dir, name, branch_name, i, step_type, source_id
-            )
-
-            if output_path.exists():
-                click.echo(
-                    f"Skipping {step_type} [{branch_name}] (output exists: {output_path})"
-                )
-                branch_input = str(output_path)
-                branch_outputs[step_type] = str(output_path)
-                continue
-
-            click.echo(f"Running {step_type} [{branch_name}] (step {i})...")
-
-            _run_step(
-                step_type=step_type,
-                stage=stage,
-                input_path=branch_input,
-                output_path=output_path,
-                source_id=source_id,
-                step_outputs=branch_outputs,
-                provider_config=provider_config,
-            )
-
-            branch_input = str(output_path)
-            branch_outputs[step_type] = str(output_path)
-
-
-def _output_path_for_step(
-    source_dir: Path, name: str, step_number: int, step_type: str, source_id: str | int
-) -> Path:
-    """Build output path for a regular (non-fork) step."""
-    if step_type == "assemble":
-        return source_dir / f"{name}-{source_id}.md"
-    ext = ".json" if step_type in ("metadata", "data-extract") else ".md"
-    return source_dir / f"{name}-{step_number}-{step_type}{ext}"
-
-
-def _output_path_for_fork_step(
-    source_dir: Path,
-    name: str,
-    branch_name: str,
-    step_number: int,
-    step_type: str,
-    source_id: str | int,
-) -> Path:
-    """Build output path for a forked step."""
-    if step_type == "assemble":
-        return source_dir / f"{name}-{branch_name}-{source_id}.md"
-    ext = ".json" if step_type in ("metadata", "data-extract") else ".md"
-    return source_dir / f"{name}-{branch_name}-{step_number}-{step_type}{ext}"
-
-
-def _run_step(
-    step_type: str,
-    stage: dict,
-    input_path: str,
-    output_path: Path,
-    source_id: str | int,
-    step_outputs: dict[str, str],
-    provider_config: dict,
-) -> None:
-    """Dispatch and run a single pipeline step."""
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    if step_type == "extract":
-        _run_extract(input_path, output_path)
-    elif step_type == "ocr":
-        provider = resolve_model(stage["model"], provider_config)
-        _run_ocr(input_path, output_path, provider=provider)
-    elif step_type == "preprocess":
-        _run_preprocess(input_path, output_path)
-    elif step_type == "llm-clean":
-        provider = resolve_model(stage["model"], provider_config)
-        _run_llm_clean(input_path, output_path, provider=provider)
-    elif step_type == "metadata":
-        provider = resolve_model(stage["model"], provider_config)
-        _run_metadata(input_path, output_path, provider=provider)
-    elif step_type == "data-extract":
-        provider = resolve_model(stage["model"], provider_config)
-        _run_data_extract(input_path, output_path, provider=provider, step_outputs=step_outputs)
-    elif step_type == "assemble":
-        _run_assemble(input_path, output_path, source_id=source_id, step_outputs=step_outputs)
-
-
-def _run_extract(input_path: str, output_path: Path, **kwargs: object) -> None:
-    text = extract_text(input_path)
-    output_path.write_text(text)
-
-
-def _run_ocr(input_path: str, output_path: Path, *, provider: object, **kwargs: object) -> None:
-    result = ocr_pdf(input_path, provider)
-    output_path.write_text(result.text)
-
-
-def _run_preprocess(input_path: str, output_path: Path, **kwargs: object) -> None:
-    text = Path(input_path).read_text()
-    result = preprocess(text)
-    output_path.write_text(result)
-
-
-def _run_llm_clean(input_path: str, output_path: Path, *, provider: object, **kwargs: object) -> None:
-    text = Path(input_path).read_text()
-    result = clean_text(text, provider)
-    output_path.write_text(result.text)
-
-
-def _run_data_extract(
-    input_path: str, output_path: Path, *, provider: object, step_outputs: dict[str, str], **kwargs: object
-) -> None:
-    # Read from llm-clean output (the cleaned text), not the previous step
-    # which may be metadata JSON or other non-text output.
-    text_path = step_outputs.get("llm-clean", input_path)
-    text = Path(text_path).read_text()
-    result = extract_data(text, provider)
-    output_path.write_text(json.dumps(result.records, indent=2))
-
-
-def _run_metadata(input_path: str, output_path: Path, *, provider: object, **kwargs: object) -> None:
-    text = Path(input_path).read_text()
-    result = extract_metadata(text, provider)
-    data = {"title": result.title, "authors": result.authors, "year": result.year, "doi": result.doi}
-    output_path.write_text(json.dumps(data, indent=2))
-
-
-def _run_assemble(
-    input_path: str,
-    output_path: Path,
-    *,
-    source_id: str | int,
-    step_outputs: dict[str, str],
-    **kwargs: object,
-) -> None:
-    """Assemble final document from cleaned text and metadata.
-
-    Uses the llm-clean output as the document body (falling back to
-    input_path if llm-clean hasn't run). This ensures the body is always
-    the cleaned text, not output from later steps like data-extract.
-    """
-    metadata_path = step_outputs.get("metadata")
-    if not metadata_path:
-        raise ValueError(
-            "assemble step requires a preceding metadata step, but none was found"
-        )
-
-    # Prefer llm-clean output as body; fall back to input_path for pipelines
-    # that don't have steps after llm-clean (e.g., no data-extract).
-    body_path = step_outputs.get("llm-clean", input_path)
-    body = Path(body_path).read_text()
-    meta_raw = Path(metadata_path).read_text()
-    meta_data = json.loads(meta_raw)
-
-    meta = MetadataResult(
-        title=meta_data.get("title"),
-        authors=meta_data.get("authors", []),
-        year=meta_data.get("year"),
-        doi=meta_data.get("doi"),
-        usage=TokenUsage(0, 0),
     )
 
-    frontmatter = build_frontmatter(source_id, meta)
-    document = assemble_document(frontmatter, body)
-    output_path.write_text(document)
+    # ── preprocess ───────────────────────────────────────────────────────
+    t = _now()
+    normalized_blocks = preprocess_blocks(raw_blocks)
+    write_jsonl(normalized_blocks, src_dir / "normalized_text.jsonl")
+    stage_records.append(
+        StageRunRecord(
+            name="preprocess",
+            started_at=t,
+            completed_at=_now(),
+            artifacts_written=["normalized_text.jsonl"],
+        )
+    )
+
+    # ── sectionize ───────────────────────────────────────────────────────
+    t = _now()
+    sections_file, normalized_blocks = sectionize(normalized_blocks)
+    (src_dir / "sections.json").write_text(sections_file.model_dump_json(indent=2))
+    sections_by_id = {s.section_id: s for s in sections_file.sections}
+    eligibility = {s.section_id: s.extraction_eligible for s in sections_file.sections}
+    stage_records.append(
+        StageRunRecord(
+            name="sectionize",
+            started_at=t,
+            completed_at=_now(),
+            artifacts_written=["sections.json"],
+        )
+    )
+
+    # ── metadata ─────────────────────────────────────────────────────────
+    document_metadata: DocumentMetadata
+    if "metadata" in stages_cfg:
+        cfg = stages_cfg["metadata"]
+        prompt_content, prompt_sha = _load_prompt(cfg["prompt"])
+        section_types = cfg.get("input_section_types") or [
+            SectionType.TITLE.value,
+            SectionType.ABSTRACT.value,
+            SectionType.INTRODUCTION.value,
+        ]
+        meta_input_blocks = _blocks_in_section_types(
+            normalized_blocks, sections_by_id, section_types
+        )
+        # Phase A: when sectionizer hasn't typed sections (everything UNKNOWN),
+        # fall back to the first few blocks so the stage still gets input.
+        if not meta_input_blocks:
+            meta_input_blocks = normalized_blocks[:5]
+
+        t = _now()
+        document_metadata, call = await extract_document_metadata(
+            meta_input_blocks,
+            model=cfg["model"],
+            prompt=prompt_content,
+            prompt_sha256=prompt_sha,
+            total_timeout=float(cfg.get("total_timeout_s", default_total_timeout)),
+        )
+        (src_dir / "metadata.json").write_text(document_metadata.model_dump_json(indent=2))
+        stage_records.append(
+            StageRunRecord(
+                name="metadata",
+                started_at=t,
+                completed_at=_now(),
+                calls=[call],
+                artifacts_written=["metadata.json"],
+            )
+        )
+    else:
+        document_metadata = DocumentMetadata(
+            title=__import__("ingest.metadata", fromlist=["_abstaining_title"])._abstaining_title()
+        )
+        (src_dir / "metadata.json").write_text(document_metadata.model_dump_json(indent=2))
+
+    # ── find-candidates ──────────────────────────────────────────────────
+    cfg = stages_cfg["find-candidates"]
+    prompt_content, prompt_sha = _load_prompt(cfg["prompt"])
+    eligible = _eligible_blocks(normalized_blocks, eligibility)
+
+    t = _now()
+    candidates_file, sample_records = await find_candidates(
+        blocks=eligible,
+        model=cfg["model"],
+        prompt=prompt_content,
+        prompt_sha256=prompt_sha,
+        n_samples=cfg.get("n_samples", 3),
+        agreement_threshold=cfg.get("agreement_threshold", 2),
+    )
+    (src_dir / "candidates.json").write_text(candidates_file.model_dump_json(indent=2))
+    stage_records.append(
+        StageRunRecord(
+            name="find-candidates",
+            started_at=t,
+            completed_at=_now(),
+            calls=sample_records,
+        )
+    )
+
+    # ── evidence-pack + extract-facts (per candidate) ────────────────────
+    pack_cfg = stages_cfg.get("evidence-pack", {})
+    context_window = pack_cfg.get("context_window", 2)
+    facts_cfg = stages_cfg["extract-facts"]
+    facts_prompt, facts_prompt_sha = _load_prompt(facts_cfg["prompt"])
+    facts_workers = facts_cfg.get("max_workers", 4)
+    facts_semaphore = asyncio.Semaphore(facts_workers)
+
+    async def _process_candidate(c: Candidate) -> tuple[GallRecord, ProviderCallRecord]:
+        candidate_dir = candidates_dir / c.candidate_id
+        candidate_dir.mkdir(exist_ok=True)
+        pack_text, meta = build_evidence_pack(c, normalized_blocks, context_window=context_window)
+        (candidate_dir / "evidence_pack.txt").write_text(pack_text)
+        (candidate_dir / "evidence_pack.meta.json").write_text(json.dumps(meta, indent=2))
+        async with facts_semaphore:
+            record, call = await extract_facts(
+                candidate=c,
+                evidence_pack_text=pack_text,
+                allowed_span_ids=meta["allowed_span_ids"],
+                model=facts_cfg["model"],
+                prompt=facts_prompt,
+                prompt_sha256=facts_prompt_sha,
+                total_timeout=float(facts_cfg.get("total_timeout_s", default_total_timeout)),
+            )
+        (candidate_dir / "facts.json").write_text(record.model_dump_json(indent=2))
+        return record, call
+
+    t = _now()
+    facts_results = await asyncio.gather(
+        *[_process_candidate(c) for c in candidates_file.candidates]
+    )
+    claims_records = [r for r, _ in facts_results]
+    facts_calls = [c for _, c in facts_results]
+    stage_records.append(
+        StageRunRecord(
+            name="evidence-pack",
+            started_at=t,
+            completed_at=_now(),
+            artifacts_written=[
+                f"candidates/{c.candidate_id}/evidence_pack.txt" for c in candidates_file.candidates
+            ],
+        )
+    )
+    stage_records.append(
+        StageRunRecord(
+            name="extract-facts",
+            started_at=t,
+            completed_at=_now(),
+            calls=facts_calls,
+            artifacts_written=[
+                f"candidates/{c.candidate_id}/facts.json" for c in candidates_file.candidates
+            ],
+        )
+    )
+
+    # ── verify (substring gate) ──────────────────────────────────────────
+    t = _now()
+    blocks_by_id = _index_blocks(normalized_blocks)
+    gated_records: list[GallRecord] = []
+    for record in claims_records:
+        gated, record_warnings = _gate_record(record, blocks_by_id)
+        gated_records.append(gated)
+        warnings.extend(record_warnings)
+        (candidates_dir / record.candidate_id / "gated_facts.json").write_text(
+            gated.model_dump_json(indent=2)
+        )
+    stage_records.append(StageRunRecord(name="verify", started_at=t, completed_at=_now()))
+
+    # ── verify-claims (per cell, LLM verifier) ───────────────────────────
+    vc_cfg = stages_cfg["verify-claims"]
+    vc_prompt, vc_sha = _load_prompt(vc_cfg["prompt"])
+    vc_workers = vc_cfg.get("max_workers", 8)
+    vc_total_timeout = float(vc_cfg.get("total_timeout_s", default_total_timeout))
+    vc_semaphore = asyncio.Semaphore(vc_workers)
+    t = _now()
+    verified_records, vc_calls = await _verify_records_claims(
+        gated_records,
+        blocks_by_id,
+        vc_cfg["model"],
+        vc_prompt,
+        vc_sha,
+        vc_semaphore,
+        total_timeout=vc_total_timeout,
+    )
+    for r in verified_records:
+        (candidates_dir / r.candidate_id / "verified_facts.json").write_text(
+            r.model_dump_json(indent=2)
+        )
+    stage_records.append(
+        StageRunRecord(
+            name="verify-claims",
+            started_at=t,
+            completed_at=_now(),
+            calls=vc_calls,
+        )
+    )
+
+    # ── taxonomy-lookup ──────────────────────────────────────────────────
+    tax_cfg = stages_cfg.get("taxonomy-lookup", {})
+    cache_dir = Path(tax_cfg.get("cache_dir", str(src_dir / "cache" / "gbif")))
+    t = _now()
+    verified_records = await _enrich_records_with_taxonomy(
+        verified_records,
+        cache_dir=cache_dir,
+        max_workers=tax_cfg.get("max_workers", 8),
+    )
+    stage_records.append(StageRunRecord(name="taxonomy-lookup", started_at=t, completed_at=_now()))
+
+    # ── assemble-review ──────────────────────────────────────────────────
+    completed_at = _now()
+    flat_text = flat_normalized_text(normalized_blocks)
+    pdf_filename = Path(input_path).name if Path(input_path).is_file() else str(source_id)
+    pdf_page_count = max((b.page for b in raw_blocks), default=1)
+
+    manifest, claims, verified, review = assemble(
+        pipeline_name=pipeline["name"],
+        pipeline_version=str(pipeline.get("version", "0.1.0")),
+        pipeline_config_name=pipeline["name"],
+        seed=int(pipeline.get("seed", 42)),
+        started_at=started_at,
+        completed_at=completed_at,
+        pdf_sha256=pdf_sha,
+        pdf_filename=pdf_filename,
+        pdf_page_count=pdf_page_count,
+        source_text_sha256=_text_sha(flat_text),
+        normalized_blocks=normalized_blocks,
+        document_metadata=document_metadata,
+        claims_records=claims_records,
+        verified_records=verified_records,
+        stages=stage_records,
+        warnings=warnings,
+    )
+    (src_dir / "claims.json").write_text(claims.model_dump_json(indent=2))
+    (src_dir / "verified_claims.json").write_text(verified.model_dump_json(indent=2))
+    (src_dir / "review_artifact.json").write_text(review.model_dump_json(indent=2))
+    (src_dir / "manifest.json").write_text(manifest.model_dump_json(indent=2))
+
+    # Ensure source.pdf is bundleable (the bundle stage requires it).
+    bundle_pdf = src_dir / "source.pdf"
+    if not bundle_pdf.exists():
+        if Path(input_path).is_file() and Path(input_path).suffix.lower() == ".pdf":
+            bundle_pdf.write_bytes(Path(input_path).read_bytes())
+        else:
+            bundle_pdf.write_bytes(b"%PDF-1.4\n%not-a-pdf-stub\n")
+
+    # ── bundle ───────────────────────────────────────────────────────────
+    bundle_cfg = stages_cfg.get("bundle", {})
+    bundle_path = src_dir / bundle_cfg.get("output", "bundle.tar.gz")
+    write_bundle(
+        src_dir,
+        bundle_path,
+        include_candidates=bool(bundle_cfg.get("include_candidates", False)),
+        verify_complete=bool(bundle_cfg.get("verify_complete", True)),
+    )
+    return bundle_path
+
+
+# ─── Helpers: record-level verify + taxonomy walking ──────────────────────
+
+
+def _gate_record(record: GallRecord, blocks_by_id: dict) -> tuple[GallRecord, list[WarningEntry]]:
+    """Walk every cell in a record, run the substring gate, accumulate warnings."""
+    warnings: list[WarningEntry] = []
+    field_path_base = f"records[{record.record_id}]"
+
+    def _gate(cell, path: str):
+        if cell is None or not cell.evidence:
+            return cell, []
+        return gate_cell(cell, blocks_by_id, field_path=path, record_id=record.record_id)
+
+    gm = record.gall_maker
+    new_scientific_name, w1 = _gate(
+        gm.scientific_name, f"{field_path_base}.gall_maker.scientific_name"
+    )
+    warnings.extend(w1)
+    new_authority, w2 = _gate(gm.authority, f"{field_path_base}.gall_maker.authority")
+    warnings.extend(w2)
+    new_rank, w3 = _gate(gm.rank, f"{field_path_base}.gall_maker.rank")
+    warnings.extend(w3)
+    new_gm = gm.model_copy(
+        update={
+            "scientific_name": new_scientific_name,
+            "authority": new_authority,
+            "rank": new_rank,
+        }
+    )
+
+    new_hosts = []
+    for i, h in enumerate(record.hosts):
+        h_name, w = _gate(h.scientific_name, f"{field_path_base}.hosts[{i}].scientific_name")
+        warnings.extend(w)
+        new_hosts.append(h.model_copy(update={"scientific_name": h_name}))
+
+    new_traits_update = {}
+    for field_name in (
+        "color",
+        "shape",
+        "texture",
+        "walls",
+        "cells",
+        "alignment",
+        "plant_part",
+        "form",
+        "season",
+    ):
+        cell = getattr(record.gall_traits, field_name)
+        new_cell, w = _gate(cell, f"{field_path_base}.gall_traits.{field_name}")
+        if cell is not None:
+            new_traits_update[field_name] = new_cell
+        warnings.extend(w)
+    if record.gall_traits.detachable is not None:
+        new_det, w = _gate(
+            record.gall_traits.detachable, f"{field_path_base}.gall_traits.detachable"
+        )
+        new_traits_update["detachable"] = new_det
+        warnings.extend(w)
+    new_traits = record.gall_traits.model_copy(update=new_traits_update)
+
+    new_desc, w = _gate(record.description, f"{field_path_base}.description")
+    warnings.extend(w)
+    new_loc, w = _gate(record.location, f"{field_path_base}.location")
+    warnings.extend(w)
+
+    return (
+        record.model_copy(
+            update={
+                "gall_maker": new_gm,
+                "hosts": new_hosts,
+                "gall_traits": new_traits,
+                "description": new_desc,
+                "location": new_loc,
+                "warnings": record.warnings + warnings,
+            }
+        ),
+        warnings,
+    )
+
+
+async def _verify_records_claims(
+    records: list[GallRecord],
+    blocks_by_id: dict,
+    model: str,
+    prompt: str,
+    prompt_sha: str,
+    semaphore: asyncio.Semaphore,
+    *,
+    total_timeout: float = 300.0,
+) -> tuple[list[GallRecord], list[ProviderCallRecord]]:
+    """Run verify_cell on every cell across all records, in parallel."""
+    all_calls: list[ProviderCallRecord] = []
+    out_records: list[GallRecord] = []
+
+    async def _verify(cell, path):
+        if cell is None or not cell.evidence:
+            return cell, None
+        async with semaphore:
+            updated, call = await verify_cell(
+                cell,
+                path,
+                blocks_by_id,
+                model=model,
+                prompt=prompt,
+                prompt_sha256=prompt_sha,
+                total_timeout=total_timeout,
+            )
+        return updated, call
+
+    for record in records:
+        path_base = f"records[{record.record_id}]"
+
+        gm = record.gall_maker
+        sn, c = await _verify(gm.scientific_name, f"{path_base}.gall_maker.scientific_name")
+        if c:
+            all_calls.append(c)
+        auth, c = await _verify(gm.authority, f"{path_base}.gall_maker.authority")
+        if c:
+            all_calls.append(c)
+        rank, c = await _verify(gm.rank, f"{path_base}.gall_maker.rank")
+        if c:
+            all_calls.append(c)
+        new_gm = gm.model_copy(update={"scientific_name": sn, "authority": auth, "rank": rank})
+
+        new_hosts = []
+        for i, h in enumerate(record.hosts):
+            hs, c = await _verify(h.scientific_name, f"{path_base}.hosts[{i}].scientific_name")
+            if c:
+                all_calls.append(c)
+            new_hosts.append(h.model_copy(update={"scientific_name": hs}))
+
+        traits_update = {}
+        for fname in (
+            "color",
+            "shape",
+            "texture",
+            "walls",
+            "cells",
+            "alignment",
+            "plant_part",
+            "form",
+            "season",
+        ):
+            cell = getattr(record.gall_traits, fname)
+            updated, call = await _verify(cell, f"{path_base}.gall_traits.{fname}")
+            if cell is not None:
+                traits_update[fname] = updated
+            if call:
+                all_calls.append(call)
+        if record.gall_traits.detachable is not None:
+            updated, call = await _verify(
+                record.gall_traits.detachable, f"{path_base}.gall_traits.detachable"
+            )
+            traits_update["detachable"] = updated
+            if call:
+                all_calls.append(call)
+        new_traits = record.gall_traits.model_copy(update=traits_update)
+
+        desc, c = await _verify(record.description, f"{path_base}.description")
+        if c:
+            all_calls.append(c)
+        loc, c = await _verify(record.location, f"{path_base}.location")
+        if c:
+            all_calls.append(c)
+
+        out_records.append(
+            record.model_copy(
+                update={
+                    "gall_maker": new_gm,
+                    "hosts": new_hosts,
+                    "gall_traits": new_traits,
+                    "description": desc,
+                    "location": loc,
+                }
+            )
+        )
+
+    return out_records, all_calls
+
+
+async def _enrich_records_with_taxonomy(
+    records: list[GallRecord],
+    cache_dir: Path,
+    max_workers: int = 8,
+) -> list[GallRecord]:
+    """Append GBIF TaxonomyLookup to every scientific-name cell in every record."""
+    cells_with_kingdoms: list[tuple] = []
+    locations: list[tuple] = []  # (record_idx, "gall_maker" | (("host", host_idx)))
+
+    for r_idx, record in enumerate(records):
+        cells_with_kingdoms.append((record.gall_maker.scientific_name, "Animalia"))
+        locations.append((r_idx, "gall_maker"))
+        for h_idx, host in enumerate(record.hosts):
+            cells_with_kingdoms.append((host.scientific_name, "Plantae"))
+            locations.append((r_idx, ("host", h_idx)))
+
+    if not cells_with_kingdoms:
+        return records
+
+    enriched_cells = await enrich_cells_concurrently(
+        cells_with_kingdoms,
+        cache_dir=cache_dir,
+        max_workers=max_workers,
+    )
+
+    out_records = [r.model_copy() for r in records]
+    for cell, loc in zip(enriched_cells, locations, strict=True):
+        r_idx, where = loc
+        record = out_records[r_idx]
+        if where == "gall_maker":
+            new_gm = record.gall_maker.model_copy(update={"scientific_name": cell})
+            out_records[r_idx] = record.model_copy(update={"gall_maker": new_gm})
+        else:
+            _, h_idx = where
+            new_hosts = list(record.hosts)
+            new_hosts[h_idx] = new_hosts[h_idx].model_copy(update={"scientific_name": cell})
+            out_records[r_idx] = record.model_copy(update={"hosts": new_hosts})
+
+    return out_records

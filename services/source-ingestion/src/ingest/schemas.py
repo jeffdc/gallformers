@@ -22,7 +22,7 @@ content without changing the shape.
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -33,7 +33,7 @@ SCHEMA_VERSION: Literal["1.0.0"] = "1.0.0"
 # ─── Enums ─────────────────────────────────────────────────────────────────
 
 
-class SupportStatus(str, Enum):
+class SupportStatus(StrEnum):
     """Verifier/gate verdict on a single field's evidence.
 
     `supported` and `contradicted` are verifier verdicts.
@@ -49,7 +49,7 @@ class SupportStatus(str, Enum):
     ABSTAINED = "abstained"
 
 
-class WarningType(str, Enum):
+class WarningType(StrEnum):
     """Closed enum of warning types. UI rendering depends on this set."""
 
     EVIDENCE_SUBSTRING_MISMATCH = "evidence_substring_mismatch"
@@ -65,13 +65,13 @@ class WarningType(str, Enum):
     TAXONOMY_SOURCE_DISAGREEMENT = "taxonomy_source_disagreement"
 
 
-class WarningSeverity(str, Enum):
+class WarningSeverity(StrEnum):
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
 
 
-class TaxonomyLookupSource(str, Enum):
+class TaxonomyLookupSource(StrEnum):
     """The pipeline produces GBIF entries only. The server appends WCVP for plants."""
 
     GBIF = "GBIF"
@@ -81,7 +81,7 @@ class TaxonomyLookupSource(str, Enum):
     ITIS = "ITIS"
 
 
-class TaxonomyLookupStatus(str, Enum):
+class TaxonomyLookupStatus(StrEnum):
     EXACT = "exact"
     FUZZY = "fuzzy"
     SYNONYM = "synonym"
@@ -89,7 +89,7 @@ class TaxonomyLookupStatus(str, Enum):
     API_ERROR = "api_error"
 
 
-class SectionType(str, Enum):
+class SectionType(StrEnum):
     """Logical sections detected by the rule-based sectionizer."""
 
     TITLE = "title"
@@ -109,13 +109,13 @@ class SectionType(str, Enum):
     UNKNOWN = "unknown"
 
 
-class ConfidenceBucket(str, Enum):
+class ConfidenceBucket(StrEnum):
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
 
 
-class Detachable(str, Enum):
+class Detachable(StrEnum):
     """How a gall relates to host tissue. Distinct from trait vocab."""
 
     UNKNOWN = "unknown"
@@ -149,7 +149,9 @@ class Evidence(StrictModel):
     page: int = Field(ge=1, description="1-indexed page number")
     char_start: int = Field(ge=0, description="Absolute char offset in the flat normalized text")
     char_end: int = Field(ge=0, description="Absolute char offset (exclusive)")
-    quote: str = Field(description="Exact substring at [char_start:char_end] of the flat normalized text")
+    quote: str = Field(
+        description="Exact substring at [char_start:char_end] of the flat normalized text"
+    )
 
     @model_validator(mode="after")
     def _check_range(self) -> Evidence:
@@ -168,13 +170,17 @@ class TaxonomyMatch(StrictModel):
     rank: str | None = None
     kingdom: str | None = None
     phylum: str | None = None
-    class_name: str | None = Field(default=None, description="Taxonomic class (avoiding Python `class` keyword)")
+    class_name: str | None = Field(
+        default=None, description="Taxonomic class (avoiding Python `class` keyword)"
+    )
     order: str | None = None
     family: str | None = None
     genus: str | None = None
     canonical_name: str | None = None
     accepted_name: str | None = Field(default=None, description="Populated when status == synonym")
-    source_key: str | None = Field(default=None, description="Provider-native ID, e.g. GBIF usageKey")
+    source_key: str | None = Field(
+        default=None, description="Provider-native ID, e.g. GBIF usageKey"
+    )
     url: str | None = None
 
 
@@ -186,7 +192,9 @@ class TaxonomyLookup(StrictModel):
     match: TaxonomyMatch | None = Field(
         default=None, description="Populated when status is exact/fuzzy/synonym; null otherwise"
     )
-    confidence: float | None = Field(default=None, ge=0, le=1, description="Provider-reported match confidence")
+    confidence: float | None = Field(
+        default=None, ge=0, le=1, description="Provider-reported match confidence"
+    )
     queried_at: datetime
 
 
@@ -196,7 +204,9 @@ class TaxonomyLookup(StrictModel):
 class EvidenceCell(StrictModel):
     """Every fact field has this shape: value + evidence + verifier verdict."""
 
-    value: str | None = Field(description="Extracted value; null when abstained or substring-gate-rejected")
+    value: str | None = Field(
+        description="Extracted value; null when abstained or substring-gate-rejected"
+    )
     raw_value: str | None = Field(
         default=None, description="Source phrase before normalization, when different from value"
     )
@@ -227,8 +237,12 @@ class TraitCell(StrictModel):
     constraining `suggested` to allowed values during extraction.
     """
 
-    original: str | None = Field(description="Exact source phrase, e.g. 'bright red'. Null if trait unmentioned.")
-    suggested: list[str] = Field(default_factory=list, description="Controlled-vocab mappings; may be empty")
+    original: str | None = Field(
+        description="Exact source phrase, e.g. 'bright red'. Null if trait unmentioned."
+    )
+    suggested: list[str] = Field(
+        default_factory=list, description="Controlled-vocab mappings; may be empty"
+    )
     evidence: list[Evidence] = Field(default_factory=list)
     support_status: SupportStatus
     confidence: float = Field(ge=0, le=1)
@@ -242,12 +256,16 @@ class WarningEntry(StrictModel):
 
     type: WarningType
     severity: WarningSeverity = WarningSeverity.WARNING
-    record_id: str | None = Field(default=None, description="Gall-record ID when warning is record-scoped")
+    record_id: str | None = Field(
+        default=None, description="Gall-record ID when warning is record-scoped"
+    )
     field_path: str | None = Field(
         default=None,
         description="Dotted path to the offending field, e.g. 'gall_traits.color'",
     )
-    detail: dict[str, Any] = Field(default_factory=dict, description="Type-specific structured info")
+    detail: dict[str, Any] = Field(
+        default_factory=dict, description="Type-specific structured info"
+    )
 
 
 # ─── Raw text and normalized text (JSONL rows) ────────────────────────────
@@ -294,9 +312,13 @@ class NormalizedBlock(StrictModel):
     page: int = Field(ge=1)
     section_id: str | None = Field(default=None, description="ID into sections.json")
     char_start: int = Field(ge=0, description="Block start offset in the flat normalized text")
-    char_end: int = Field(ge=0, description="Block end offset (exclusive) in the flat normalized text")
+    char_end: int = Field(
+        ge=0, description="Block end offset (exclusive) in the flat normalized text"
+    )
     text: str
-    raw_block_ids: list[str] = Field(description="Source blocks in raw_text.jsonl that contributed to this block")
+    raw_block_ids: list[str] = Field(
+        description="Source blocks in raw_text.jsonl that contributed to this block"
+    )
 
     @model_validator(mode="after")
     def _check_range(self) -> NormalizedBlock:
@@ -318,7 +340,9 @@ class Section(StrictModel):
     )
     page_start: int = Field(ge=1)
     page_end: int = Field(ge=1)
-    span_ids: list[str] = Field(description="Span IDs in normalized_text.jsonl belonging to this section")
+    span_ids: list[str] = Field(
+        description="Span IDs in normalized_text.jsonl belonging to this section"
+    )
     extraction_eligible: bool = Field(
         description="False for references/bibliography/literature_cited; suppresses extraction"
     )
@@ -326,7 +350,9 @@ class Section(StrictModel):
     @model_validator(mode="after")
     def _check_pages(self) -> Section:
         if self.page_end < self.page_start:
-            raise ValueError(f"page_end ({self.page_end}) must be >= page_start ({self.page_start})")
+            raise ValueError(
+                f"page_end ({self.page_end}) must be >= page_start ({self.page_start})"
+            )
         return self
 
 
@@ -343,7 +369,9 @@ class SectionsFile(StrictModel):
 class ProviderCallRecord(StrictModel):
     """One LLM call's bookkeeping. Many of these aggregate into a stage record."""
 
-    model: str = Field(description="LiteLLM model string, e.g. 'deepinfra/Qwen/Qwen2.5-72B-Instruct'")
+    model: str = Field(
+        description="LiteLLM model string, e.g. 'deepinfra/Qwen/Qwen2.5-72B-Instruct'"
+    )
     provider: str = Field(description="Provider name extracted from model string, e.g. 'deepinfra'")
     prompt_sha256: str = Field(min_length=64, max_length=64)
     input_tokens: int = Field(ge=0)
@@ -365,8 +393,12 @@ class StageRunRecord(StrictModel):
     started_at: datetime
     completed_at: datetime
     status: Literal["ok", "error", "skipped"] = "ok"
-    calls: list[ProviderCallRecord] = Field(default_factory=list, description="LLM calls made by this stage")
-    artifacts_written: list[str] = Field(default_factory=list, description="Artifact filenames produced")
+    calls: list[ProviderCallRecord] = Field(
+        default_factory=list, description="LLM calls made by this stage"
+    )
+    artifacts_written: list[str] = Field(
+        default_factory=list, description="Artifact filenames produced"
+    )
     notes: str | None = None
 
     @model_validator(mode="after")
@@ -379,10 +411,14 @@ class StageRunRecord(StrictModel):
 class Source(StrictModel):
     """Source-document identity. Appears in `Manifest`. The PDF bytes ship in the bundle."""
 
-    pdf_sha256: str = Field(min_length=64, max_length=64, description="SHA-256 of source.pdf, lowercase hex")
+    pdf_sha256: str = Field(
+        min_length=64, max_length=64, description="SHA-256 of source.pdf, lowercase hex"
+    )
     pdf_filename: str
     pdf_page_count: int = Field(ge=1)
-    source_text_sha256: str = Field(min_length=64, max_length=64, description="SHA-256 of the flat normalized text")
+    source_text_sha256: str = Field(
+        min_length=64, max_length=64, description="SHA-256 of the flat normalized text"
+    )
 
 
 class Manifest(StrictModel):
@@ -459,7 +495,9 @@ class GallMaker(StrictModel):
 
     scientific_name: ScientificNameCell
     authority: EvidenceCell | None = None
-    rank: EvidenceCell | None = Field(default=None, description="Taxonomic rank of scientific_name, e.g. 'species'")
+    rank: EvidenceCell | None = Field(
+        default=None, description="Taxonomic rank of scientific_name, e.g. 'species'"
+    )
     taxonomy: Taxonomy = Field(default_factory=Taxonomy)
     aliases: list[ScientificNameCell] = Field(default_factory=list)
     common_names: list[EvidenceCell] = Field(default_factory=list)
@@ -491,7 +529,8 @@ class GallTraits(StrictModel):
     form: TraitCell | None = None
     season: TraitCell | None = None
     detachable: EvidenceCell | None = Field(
-        default=None, description="One of: unknown, integral, detachable, both (see Detachable enum)"
+        default=None,
+        description="One of: unknown, integral, detachable, both (see Detachable enum)",
     )
 
 
@@ -503,8 +542,12 @@ class GallRecord(StrictModel):
     gall_maker: GallMaker
     hosts: list[Host] = Field(default_factory=list)
     gall_traits: GallTraits = Field(default_factory=GallTraits)
-    description: EvidenceCell | None = Field(default=None, description="Morphological description text from the source")
-    location: EvidenceCell | None = Field(default=None, description="Collection locality if mentioned")
+    description: EvidenceCell | None = Field(
+        default=None, description="Morphological description text from the source"
+    )
+    location: EvidenceCell | None = Field(
+        default=None, description="Collection locality if mentioned"
+    )
     confidence_bucket: ConfidenceBucket = ConfidenceBucket.MEDIUM
     warnings: list[WarningEntry] = Field(default_factory=list)
 

@@ -36,9 +36,7 @@ def load_config(config_path: str) -> dict:
         raw = yaml.safe_load(f)
 
     if not isinstance(raw, dict) or "providers" not in raw:
-        raise ValueError(
-            f"Config file must contain a top-level 'providers' key: {config_path}"
-        )
+        raise ValueError(f"Config file must contain a top-level 'providers' key: {config_path}")
 
     return raw["providers"]
 
@@ -66,9 +64,7 @@ def resolve_model(model_spec: str, config: dict) -> ProviderConfig:
 
     if provider_name not in config:
         available = ", ".join(sorted(config.keys()))
-        raise ValueError(
-            f"Unknown provider {provider_name!r}. Available providers: {available}"
-        )
+        raise ValueError(f"Unknown provider {provider_name!r}. Available providers: {available}")
 
     provider = config[provider_name]
 
@@ -83,8 +79,7 @@ def resolve_model(model_spec: str, config: dict) -> ProviderConfig:
     api_key = os.environ.get(env_key)
     if not api_key:
         raise ValueError(
-            f"Environment variable {env_key} is not set. "
-            f"Set it to your {provider_name} API key."
+            f"Environment variable {env_key} is not set. Set it to your {provider_name} API key."
         )
 
     return ProviderConfig(

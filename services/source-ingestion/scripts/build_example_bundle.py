@@ -29,19 +29,17 @@ Outputs:
 from __future__ import annotations
 
 import hashlib
-import json
-import sys
 import tarfile
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import TypeVar
 
 import click
 from pydantic import BaseModel
 
 from ingest.schemas import (
-    SCHEMA_VERSION,
     ARTIFACT_MODELS,
+    SCHEMA_VERSION,
     Bbox,
     Candidate,
     CandidatesFile,
@@ -80,7 +78,6 @@ from ingest.schemas import (
     WarningType,
 )
 
-
 # ─── Example data ──────────────────────────────────────────────────────────
 
 # A minimal PDF stub. Real bundles ship the actual source PDF.
@@ -97,8 +94,8 @@ BLOCK_SEPARATOR = "\n\n"
 FLAT_NORMALIZED_TEXT = BLOCK_SEPARATOR.join(NORMALIZED_BLOCKS_TEXT)
 
 # Provenance for the run.
-RUN_STARTED = datetime(2026, 5, 11, 14, 0, 0, tzinfo=timezone.utc)
-RUN_COMPLETED = datetime(2026, 5, 11, 14, 3, 27, tzinfo=timezone.utc)
+RUN_STARTED = datetime(2026, 5, 11, 14, 0, 0, tzinfo=UTC)
+RUN_COMPLETED = datetime(2026, 5, 11, 14, 3, 27, tzinfo=UTC)
 PIPELINE_NAME = "north-star-v0"
 PIPELINE_VERSION = "0.1.0"
 PIPELINE_CONFIG = "north-star-v0"
@@ -216,7 +213,9 @@ def build_normalized_text() -> list[NormalizedBlock]:
             text=text,
             raw_block_ids=[f"p1-b{i + 1}"],
         )
-        for i, (text, (char_start, char_end)) in enumerate(zip(NORMALIZED_BLOCKS_TEXT, offsets))
+        for i, (text, (char_start, char_end)) in enumerate(
+            zip(NORMALIZED_BLOCKS_TEXT, offsets, strict=True)
+        )
     ]
 
 
@@ -425,7 +424,10 @@ def build_claims() -> ClaimsFile:
             value="A large, woody, oak-apple gall, globular, 2-4 cm in diameter, with a bright red exterior fading to brown.",
             evidence=[
                 quote_evidence(0, "large, woody, oak-apple gall"),
-                quote_evidence(1, "globular, 2-4 cm in diameter, with a bright red exterior that fades to brown"),
+                quote_evidence(
+                    1,
+                    "globular, 2-4 cm in diameter, with a bright red exterior that fades to brown",
+                ),
             ],
             support_status=SupportStatus.SUPPORTED,
             confidence=0.85,
@@ -447,7 +449,10 @@ def build_verified_claims() -> VerifiedClaimsFile:
             value="A large, woody, oak-apple gall, globular, 2-4 cm in diameter, with a bright red exterior fading to brown.",
             evidence=[
                 quote_evidence(0, "large, woody, oak-apple gall"),
-                quote_evidence(1, "globular, 2-4 cm in diameter, with a bright red exterior that fades to brown"),
+                quote_evidence(
+                    1,
+                    "globular, 2-4 cm in diameter, with a bright red exterior that fades to brown",
+                ),
             ],
             support_status=SupportStatus.SUPPORTED,
             confidence=0.85,
@@ -622,7 +627,10 @@ def build_manifest() -> Manifest:
             WarningEntry(
                 type=WarningType.SECTION_EXCLUDED,
                 severity=WarningSeverity.INFO,
-                detail={"section_type": "references", "reason": "No references section detected in example."},
+                detail={
+                    "section_type": "references",
+                    "reason": "No references section detected in example.",
+                },
             )
         ],
     )
@@ -665,10 +673,8 @@ def build_candidates() -> CandidatesFile:
 
 # ─── Round-trip validation ────────────────────────────────────────────────
 
-T = TypeVar("T", bound=BaseModel)
 
-
-def round_trip(model: T) -> T:
+def round_trip[T: BaseModel](model: T) -> T:
     """Serialize to JSON, parse back into the same model class, return the parsed instance.
 
     Catches silent shape drift (e.g., aliases not symmetric, defaults that
@@ -690,10 +696,10 @@ def write_json(path: Path, model: BaseModel) -> None:
     path.write_text(model.model_dump_json(indent=2) + "\n")
 
 
-def write_jsonl(path: Path, rows: list[BaseModel]) -> None:
+def write_jsonl(path: Path, rows: Iterable[BaseModel]) -> None:
     with path.open("w") as f:
         for row in rows:
-            f.write(row.model_dump_json() + "\n")
+            _ = f.write(row.model_dump_json() + "\n")
 
 
 def write_bundle_tarball(source_dir: Path, output: Path) -> None:
@@ -781,7 +787,7 @@ def main(output: Path) -> None:
             size = path.stat().st_size
             click.echo(f"  {path.name:30s} {size:>8d} bytes")
 
-    click.echo(f"\nSanity checks:")
+    click.echo("\nSanity checks:")
     click.echo(f"  flat normalized text length: {len(FLAT_NORMALIZED_TEXT)} chars")
     click.echo(f"  PDF SHA-256:                 {PDF_SHA}")
     click.echo(f"  normalized-text SHA-256:     {TEXT_SHA}")
