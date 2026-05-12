@@ -591,6 +591,19 @@ def _gate_record(record: GallRecord, blocks_by_id: dict) -> tuple[GallRecord, li
     )
 
 
+_TRAIT_FIELDS: tuple[str, ...] = (
+    "color",
+    "shape",
+    "texture",
+    "walls",
+    "cells",
+    "alignment",
+    "plant_part",
+    "form",
+    "season",
+)
+
+
 async def _verify_records_claims(
     records: list[GallRecord],
     blocks_by_id: dict,
@@ -603,23 +616,16 @@ async def _verify_records_claims(
 ) -> tuple[list[GallRecord], list[ProviderCallRecord], list[WarningEntry]]:
     """Run verify_cell on every cell across all records, in parallel.
 
+    Concurrency model: every verifiable cell across every record is
+    submitted to a single ``asyncio.gather``. The shared semaphore caps
+    in-flight LLM calls at ``max_workers`` (configured per-stage in the
+    pipeline YAML); the rest queue. Per-record assembly happens after
+    all calls complete.
+
     Returns ``(verified_records, calls, warnings)``. Warnings are
     synthesized for any cell whose verifier call failed (status='error');
     the cell falls back to its pre-verifier support_status.
     """
-    all_calls: list[ProviderCallRecord] = []
-    all_warnings: list[WarningEntry] = []
-    out_records: list[GallRecord] = []
-
-    def _track(call, record_id: str, field_path: str):
-        if call is None:
-            return
-        all_calls.append(call)
-        w = _warning_for_error_call(
-            call, stage="verify-claims", record_id=record_id, field_path=field_path
-        )
-        if w:
-            all_warnings.append(w)
 
     async def _verify(cell, path):
         if cell is None or not cell.evidence:
@@ -636,53 +642,98 @@ async def _verify_records_claims(
             )
         return updated, call
 
-    for record in records:
+    # Build a flat list of verification jobs across all records. Each job
+    # carries the (record_idx, location_key, field_path, cell) tuple so
+    # results can be re-assembled into per-record GallRecord copies after
+    # the global gather completes. location_key is a stable token used
+    # by the assembly phase below.
+    jobs: list[tuple[int, str, str, Any]] = []
+    for r_idx, record in enumerate(records):
         path_base = f"records[{record.record_id}]"
-
         gm = record.gall_maker
-        sn, c = await _verify(gm.scientific_name, f"{path_base}.gall_maker.scientific_name")
-        _track(c, record.record_id, f"{path_base}.gall_maker.scientific_name")
-        auth, c = await _verify(gm.authority, f"{path_base}.gall_maker.authority")
-        _track(c, record.record_id, f"{path_base}.gall_maker.authority")
-        rank, c = await _verify(gm.rank, f"{path_base}.gall_maker.rank")
-        _track(c, record.record_id, f"{path_base}.gall_maker.rank")
-        new_gm = gm.model_copy(update={"scientific_name": sn, "authority": auth, "rank": rank})
-
-        new_hosts = []
-        for i, h in enumerate(record.hosts):
-            hs, c = await _verify(h.scientific_name, f"{path_base}.hosts[{i}].scientific_name")
-            _track(c, record.record_id, f"{path_base}.hosts[{i}].scientific_name")
-            new_hosts.append(h.model_copy(update={"scientific_name": hs}))
-
-        traits_update = {}
-        for fname in (
-            "color",
-            "shape",
-            "texture",
-            "walls",
-            "cells",
-            "alignment",
-            "plant_part",
-            "form",
-            "season",
-        ):
-            cell = getattr(record.gall_traits, fname)
-            updated, call = await _verify(cell, f"{path_base}.gall_traits.{fname}")
-            if cell is not None:
-                traits_update[fname] = updated
-            _track(call, record.record_id, f"{path_base}.gall_traits.{fname}")
-        if record.gall_traits.detachable is not None:
-            updated, call = await _verify(
-                record.gall_traits.detachable, f"{path_base}.gall_traits.detachable"
+        jobs.append(
+            (r_idx, "gm_sci", f"{path_base}.gall_maker.scientific_name", gm.scientific_name)
+        )
+        jobs.append((r_idx, "gm_auth", f"{path_base}.gall_maker.authority", gm.authority))
+        jobs.append((r_idx, "gm_rank", f"{path_base}.gall_maker.rank", gm.rank))
+        for h_idx, h in enumerate(record.hosts):
+            jobs.append(
+                (
+                    r_idx,
+                    f"host_{h_idx}",
+                    f"{path_base}.hosts[{h_idx}].scientific_name",
+                    h.scientific_name,
+                )
             )
-            traits_update["detachable"] = updated
-            _track(call, record.record_id, f"{path_base}.gall_traits.detachable")
-        new_traits = record.gall_traits.model_copy(update=traits_update)
+        for fname in _TRAIT_FIELDS:
+            jobs.append(
+                (
+                    r_idx,
+                    f"trait_{fname}",
+                    f"{path_base}.gall_traits.{fname}",
+                    getattr(record.gall_traits, fname),
+                )
+            )
+        if record.gall_traits.detachable is not None:
+            jobs.append(
+                (
+                    r_idx,
+                    "trait_detachable",
+                    f"{path_base}.gall_traits.detachable",
+                    record.gall_traits.detachable,
+                )
+            )
+        jobs.append((r_idx, "description", f"{path_base}.description", record.description))
+        jobs.append((r_idx, "location", f"{path_base}.location", record.location))
 
-        desc, c = await _verify(record.description, f"{path_base}.description")
-        _track(c, record.record_id, f"{path_base}.description")
-        loc, c = await _verify(record.location, f"{path_base}.location")
-        _track(c, record.record_id, f"{path_base}.location")
+    # Run the whole batch concurrently. Semaphore enforces the in-flight
+    # cap; everything else queues.
+    results = await asyncio.gather(*[_verify(cell, path) for _, _, path, cell in jobs])
+
+    # Track calls + warnings in job order (preserves the per-record
+    # ordering callers/manifest readers expect).
+    all_calls: list[ProviderCallRecord] = []
+    all_warnings: list[WarningEntry] = []
+    for (r_idx, _, path, _), (_, call) in zip(jobs, results, strict=True):
+        if call is None:
+            continue
+        all_calls.append(call)
+        w = _warning_for_error_call(
+            call,
+            stage="verify-claims",
+            record_id=records[r_idx].record_id,
+            field_path=path,
+        )
+        if w:
+            all_warnings.append(w)
+
+    # Build (record_idx, location_key) -> updated_cell map.
+    by_loc: dict[tuple[int, str], Any] = {
+        (r_idx, key): updated
+        for (r_idx, key, _, _), (updated, _) in zip(jobs, results, strict=True)
+    }
+
+    # Re-assemble each record from the verified cells.
+    out_records: list[GallRecord] = []
+    for r_idx, record in enumerate(records):
+        new_gm = record.gall_maker.model_copy(
+            update={
+                "scientific_name": by_loc[(r_idx, "gm_sci")],
+                "authority": by_loc[(r_idx, "gm_auth")],
+                "rank": by_loc[(r_idx, "gm_rank")],
+            }
+        )
+        new_hosts = [
+            h.model_copy(update={"scientific_name": by_loc[(r_idx, f"host_{h_idx}")]})
+            for h_idx, h in enumerate(record.hosts)
+        ]
+        traits_update: dict[str, Any] = {}
+        for fname in _TRAIT_FIELDS:
+            if getattr(record.gall_traits, fname) is not None:
+                traits_update[fname] = by_loc[(r_idx, f"trait_{fname}")]
+        if record.gall_traits.detachable is not None:
+            traits_update["detachable"] = by_loc[(r_idx, "trait_detachable")]
+        new_traits = record.gall_traits.model_copy(update=traits_update)
 
         out_records.append(
             record.model_copy(
@@ -690,8 +741,8 @@ async def _verify_records_claims(
                     "gall_maker": new_gm,
                     "hosts": new_hosts,
                     "gall_traits": new_traits,
-                    "description": desc,
-                    "location": loc,
+                    "description": by_loc[(r_idx, "description")],
+                    "location": by_loc[(r_idx, "location")],
                 }
             )
         )

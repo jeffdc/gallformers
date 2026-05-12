@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-05-11
-updated: 2026-05-11
+updated: 2026-05-12
 epic: source-ingestion
 ---
 
@@ -373,4 +373,103 @@ Each Phase B activity: write the prompt; run the stage on the iteration corpus; 
 - `services/source-ingestion/pipelines/north-star-v0.yaml` — born-digital pipeline config (mock-up)
 - `services/source-ingestion/pipelines/north-star-v0-ocr.yaml` — scanned-paper variant (mock-up)
 - `services/source-ingestion/providers.example.yaml` — updated with Llama-3.1-8B-Instruct on DeepInfra plus optional OpenRouter section
+
+## Implementation status (2026-05-12)
+
+### Phase A — done
+
+End-to-end bundle produces valid `bundle.tar.gz` on all four
+iteration-corpus PDFs. All ten stages wire together, graceful failure
+catches any LLM misbehavior without crashing the pipeline, manifest
+warnings capture what went wrong.
+
+Iteration corpus locked to four born-digital PDFs (test-corpus/, symlinks
+to local Desktop sources, gitignored):
+
+- Cook 2026 (easy, 8p) — single-species paper, fastest feedback
+- Philippines BHL (45p, scanned-with-OCR'd-text-layer) — kept as a
+  baseline for the future OCR pipeline; pymupdf currently reads its
+  OCR overlay as if born-digital
+- Nicholls 2022 (79p) — Nearctic oak gallwasps, many species
+- Cuesta-Porta 2022 (92p) — Druon genus revision, dense taxonomic
+  renames, the largest paper
+
+### Key implementation departures from the original design
+
+- **Instructor enforcement in find-candidates.** Original code used
+  `json.loads` + manual Pydantic validation and silently returned `[]`
+  on parse or validation failure. Switched to
+  `make_instructor_client().create_with_completion(response_model=...)`
+  mirroring the pattern already used in metadata/extract_facts. Per-sample
+  exceptions are caught and yield empty results + error-status record so
+  "one bad sample doesn't kill the batch."
+
+- **Graceful Instructor-failure handling across all LLM stages.**
+  metadata, extract_facts, verify_claims each catch exceptions, return
+  an abstaining default + error-status ProviderCallRecord. Pipeline
+  runner synthesizes manifest warnings from any error-status call
+  (`_warning_for_error_call` in pipeline.py). ProviderCallRecord gained
+  an optional `error_detail` field; WarningType gained
+  `llm_output_invalid`. Schemas regenerated.
+
+- **Stub-config model picks.** Discovered through corpus runs:
+  - Llama-3.1-8B works for find-candidates only on small/medium papers
+    (Cook 3K, Philippines 25K, Nicholls 58K all OK; Cuesta 76K it
+    confuses the schema and emits `_LLMCandidate` as a JSON key)
+  - Qwen-2.5-72B on DeepInfra is capped at **32K input tokens**, not
+    its native 128K — so it can't host find-candidates for any
+    long-paper inputs. Useful for metadata, extract-facts, verify-claims
+    where per-call input is small.
+  - Stub config now: metadata + extract-facts + verify-claims on
+    Qwen-2.5-72B; find-candidates on Llama-3.1-8B.
+
+- **Production find-candidates model: DeepSeek-V4-Flash.** Llama can't
+  follow nuanced inclusion rules (consistently dropped comparison/
+  reference species even with explicit prompt anti-patterns and N=3
+  self-consistency — all samples agreed on the wrong answer). Switched
+  to `deepseek-ai/DeepSeek-V4-Flash` on DeepInfra: 1M-token context,
+  reasoning-capable, ~$0.03 per Cuesta-call at n=3. Full-corpus
+  find-candidates pass costs ~$0.07.
+
+### Phase B — in progress
+
+- `prompts/find-candidates.md` **done** (v0.1.3). Iterated against Cook
+  through 4 versions; final corpus run produces 68 distinct candidates
+  across the four papers with zero manifest warnings.
+- `pipelines/phase-b-find-candidates.yaml` is the iteration config: real
+  find-candidates wired through DeepSeek-V4-Flash, stubs preserved for
+  the other LLM stages so one prompt's quality changes don't confound
+  another's signal.
+- `pipelines/north-star-v0.yaml` (production) **not yet updated**;
+  still references Llama-3.1-8B for find-candidates. Update once the
+  remaining Phase B prompts are ready and we settle the full production
+  model set.
+
+Remaining Phase B prompts, in order of leverage:
+1. `extract-facts.md` — the matter's "central problem"; produces real
+   per-candidate facts. **Next.**
+2. `verify-claims.md` — per-cell verifier with four-value vocabulary.
+3. `metadata.md` — evidence-bound bibliographic extraction.
+
+### Open Phase A polish (deferred, all non-blocking)
+
+- **Sectionizer → NormalizedBlock.section_id linkage broken.** Sections
+  ARE detected correctly (Cook gets sec-1 unknown + sec-2 references
+  with eligible=False), but `section_id` is `None` on every block in
+  `normalized_text.jsonl`. The eligibility filter at
+  `pipeline.py:_eligible_blocks` uses `b.section_id` and defaults to
+  True when None — so references blocks pass through to find-candidates.
+  DeepSeek-V4-Flash compensates by recognizing reference-list formatting,
+  but the filter itself is effectively a no-op.
+- **BHL boilerplate strip rule misses real BHL output.** Philippines
+  paper's first three normalized blocks are biodiversitylibrary.org URLs
+  and journal portal text that should have been dropped by
+  `strip_bhl_boilerplate` in preprocess.
+- **Sectionizer is too conservative.** Even on born-digital papers
+  (Nicholls, Cuesta) it only finds `unknown + references`. Headings
+  like "Introduction", "Methods", "Discussion" aren't being detected.
+  Affects evidence-pack quality once real extract-facts prompts run.
+- **Production north-star-v0.yaml model set.** Update once Phase B is
+  complete; record model rationale per stage in this matter at that
+  time.
 

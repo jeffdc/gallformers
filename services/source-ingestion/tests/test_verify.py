@@ -78,7 +78,7 @@ class TestGateEvidenceCell:
         blocks = _blocks()
         cell = EvidenceCell(
             value="globular",
-            evidence=[_evidence("p1-b1", "globular")],
+            evidence=[_evidence("S_0002", "globular")],
             support_status=SupportStatus.SUPPORTED,
             confidence=0.9,
         )
@@ -102,7 +102,7 @@ class TestGateEvidenceCell:
         blocks = _blocks()
         cell = EvidenceCell(
             value="Quercus agrifolia",
-            evidence=[_evidence("p1-b2", "Quercus agrifolia", page=2)],
+            evidence=[_evidence("S_0003", "Quercus agrifolia", page=2)],
             support_status=SupportStatus.SUPPORTED,
             confidence=0.95,
         )
@@ -130,7 +130,7 @@ class TestGateFailures:
         # Quote that doesn't appear anywhere in any block.
         cell = EvidenceCell(
             value="Hocus pocus",
-            evidence=[_evidence("p1-b0", "Hocus pocus abracadabra completely off")],
+            evidence=[_evidence("S_0001", "Hocus pocus abracadabra completely off")],
             support_status=SupportStatus.SUPPORTED,
             confidence=0.5,
         )
@@ -146,7 +146,7 @@ class TestGateFailures:
         assert warnings[0].type == WarningType.EVIDENCE_SUBSTRING_MISMATCH
         assert warnings[0].record_id == "R_001"
         assert warnings[0].field_path == "gall_maker.scientific_name"
-        assert warnings[0].detail["block_id"] == "p1-b0"
+        assert warnings[0].detail["block_id"] == "S_0001"
         assert warnings[0].detail["claimed_quote"].startswith("Hocus pocus")
         assert warnings[0].detail["score"] < 90
 
@@ -174,8 +174,8 @@ class TestGateFailures:
         cell = EvidenceCell(
             value="something",
             evidence=[
-                _evidence("p1-b0", "Andricus"),  # passes
-                _evidence("p1-b1", "TOTALLY ABSENT TEXT"),  # fails
+                _evidence("S_0001", "Andricus"),  # passes
+                _evidence("S_0002", "TOTALLY ABSENT TEXT"),  # fails
             ],
             support_status=SupportStatus.SUPPORTED,
             confidence=0.9,
@@ -198,7 +198,7 @@ class TestGateScientificNameCell:
         cell = ScientificNameCell(
             value="Andricus quercuscalifornicus",
             name_as_written="Andricus quercus-cαlifornicus",  # OCR damage preserved
-            evidence=[_evidence("p1-b0", "BAD_QUOTE_NOT_PRESENT_ANYWHERE")],
+            evidence=[_evidence("S_0001", "BAD_QUOTE_NOT_PRESENT_ANYWHERE")],
             support_status=SupportStatus.SUPPORTED,
             confidence=0.9,
         )
@@ -221,7 +221,7 @@ class TestGateTraitCell:
         cell = TraitCell(
             original="bright red",
             suggested=["red"],
-            evidence=[_evidence("p1-b1", "BAD_QUOTE_NOT_PRESENT")],
+            evidence=[_evidence("S_0002", "BAD_QUOTE_NOT_PRESENT")],
             support_status=SupportStatus.SUPPORTED,
             confidence=0.9,
         )
@@ -242,7 +242,7 @@ class TestGateTraitCell:
         cell = TraitCell(
             original="bright red",
             suggested=["red"],
-            evidence=[_evidence("p1-b1", "bright red")],
+            evidence=[_evidence("S_0002", "bright red")],
             support_status=SupportStatus.SUPPORTED,
             confidence=0.9,
         )

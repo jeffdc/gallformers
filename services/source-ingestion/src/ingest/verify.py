@@ -38,8 +38,15 @@ DEFAULT_MIN_SCORE: int = 90
 
 
 def _index_blocks(blocks: list[NormalizedBlock]) -> dict[str, NormalizedBlock]:
-    """O(1) lookup of normalized blocks by their block_id (== span_id key)."""
-    return {b.block_id: b for b in blocks}
+    """O(1) lookup of normalized blocks by ``span_id``.
+
+    The Evidence schema's ``block_id`` field carries the LLM's citation,
+    which is the user-facing span_id (e.g. ``"S_0042"``) — that's what
+    the prompt presents to the model. The NormalizedBlock has both a
+    ``span_id`` and an unrelated ``block_id`` (PyMuPDF page+block, e.g.
+    ``"p1-b3"``) which the LLM never sees, so we key by span_id here.
+    """
+    return {b.span_id: b for b in blocks}
 
 
 def _gate_evidence(
