@@ -40,11 +40,22 @@ pipeline:
       excluded_section_types: [references, bibliography, literature_cited]
 
     - step: metadata
-      model: deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct
+      # DocumentMetadata has ~9 EvidenceCell fields; small models hit
+      # multi-error validation failures on real papers (Llama-3.1-8B
+      # produced 6 schema violations on Nicholls 2022).
+      model: deepinfra/Qwen/Qwen2.5-72B-Instruct
       prompt: prompts/stubs/metadata.md
       input_section_types: [title, abstract, introduction]
 
     - step: find-candidates
+      # find-candidates currently sends the entire eligible document in a
+      # single call; long papers (>32K tokens) can't use Qwen-2.5-72B on
+      # DeepInfra (32K cap on this deployment). Llama-3.1-8B has a 128K
+      # context window. The trade: small model + long input occasionally
+      # confuses Instructor's schema hint (e.g. Cuesta 2022 at 71K tokens
+      # produced JSON wrapped under a `_LLMCandidate` key). Graceful
+      # failure catches that. Phase B work: either chunked find-candidates
+      # input or a larger-context provider for this stage.
       model: deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct
       prompt: prompts/stubs/find-candidates.md
       n_samples: 1                 # stub: skip self-consistency
