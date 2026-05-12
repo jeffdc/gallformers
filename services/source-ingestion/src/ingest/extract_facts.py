@@ -67,6 +67,37 @@ def _record_id_from_candidate(candidate_id: str) -> str:
     return f"R_{num}"
 
 
+def _abstaining_scientific_name() -> ScientificNameCell:
+    """A ScientificNameCell with no value, no evidence, abstained — used when extraction fails."""
+    return ScientificNameCell(
+        value=None,
+        evidence=[],
+        support_status=SupportStatus.ABSTAINED,
+        confidence=0.0,
+    )
+
+
+def _abstaining_record(candidate: Candidate) -> GallRecord:
+    """Build an abstaining GallRecord for a candidate when extract-facts could not produce facts.
+
+    Used when Instructor exhausts its retry budget on the schema. The record
+    contract is satisfied (every required field present), but every value is
+    null and every cell is marked ``ABSTAINED`` so the reviewer sees that
+    the pipeline tried and gave up rather than that the source was empty.
+    """
+    return GallRecord(
+        record_id=_record_id_from_candidate(candidate.candidate_id),
+        candidate_id=candidate.candidate_id,
+        gall_maker=GallMaker(scientific_name=_abstaining_scientific_name()),
+        hosts=[],
+        gall_traits=GallTraits(),
+        description=None,
+        location=None,
+        confidence_bucket=ConfidenceBucket.LOW,
+        warnings=[],
+    )
+
+
 def _filter_evidence(
     evidence: list[Evidence],
     allowed: set[str],
@@ -194,15 +225,30 @@ async def extract_facts(
     client = make_instructor_client()
 
     started = time.monotonic()
-    facts, completion = await asyncio.wait_for(
-        client.create_with_completion(
+    try:
+        facts, completion = await asyncio.wait_for(
+            client.create_with_completion(
+                model=model,
+                messages=messages,
+                response_model=_LLMFacts,
+                max_retries=max_retries,
+            ),
+            timeout=total_timeout,
+        )
+    except Exception as exc:
+        duration_ms = int((time.monotonic() - started) * 1000)
+        return _abstaining_record(candidate), ProviderCallRecord(
             model=model,
-            messages=messages,
-            response_model=_LLMFacts,
-            max_retries=max_retries,
-        ),
-        timeout=total_timeout,
-    )
+            provider=_provider_from_model(model),
+            prompt_sha256=prompt_sha256,
+            input_tokens=0,
+            output_tokens=0,
+            cost_usd=0.0,
+            duration_ms=duration_ms,
+            status="error",
+            error_detail=f"{type(exc).__name__}: {exc}",
+        )
+
     duration_ms = int((time.monotonic() - started) * 1000)
 
     # Build the ProviderCallRecord from the underlying LiteLLM completion.

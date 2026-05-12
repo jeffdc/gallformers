@@ -55,6 +55,7 @@ class WarningType(StrEnum):
     EVIDENCE_SUBSTRING_MISMATCH = "evidence_substring_mismatch"
     VERIFIER_CONTRADICTED = "verifier_contradicted"
     SCHEMA_REPAIR_APPLIED = "schema_repair_applied"
+    LLM_OUTPUT_INVALID = "llm_output_invalid"
     IDLE_TIMEOUT_RETRY = "idle_timeout_retry"
     USAGE_ESTIMATED = "usage_estimated"
     SECTION_EXCLUDED = "section_excluded"
@@ -384,6 +385,13 @@ class ProviderCallRecord(StrictModel):
         default=False, description="True if LiteLLM didn't return usage and we estimated"
     )
     status: Literal["ok", "error"] = "ok"
+    error_detail: str | None = Field(
+        default=None,
+        description=(
+            "Exception class and message when the call failed (e.g. Instructor "
+            "exhausted retries on schema validation). Only set when status='error'."
+        ),
+    )
 
 
 class StageRunRecord(StrictModel):

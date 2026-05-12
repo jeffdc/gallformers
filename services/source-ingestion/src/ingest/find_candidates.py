@@ -1,9 +1,10 @@
 """Find-candidates stage: high-recall gall-maker mention detection.
 
-Calls the LLM ``n_samples`` times concurrently (via ``call_with_samples``);
-parses each sample's output as JSON; dedupes by normalized mention string;
-keeps mentions that appear in ``>= agreement_threshold`` samples. Records
-the per-sample call data in a flat list for the manifest accumulator.
+Calls Instructor ``n_samples`` times concurrently with a Pydantic
+``response_model``; Instructor handles JSON extraction, schema validation,
+and self-repair retries. Dedupes by normalized mention string; keeps
+mentions that appear in ``>= agreement_threshold`` samples. Records the
+per-sample call data in a flat list for the manifest accumulator.
 
 Output: a ``CandidatesFile`` plus a list of ``ProviderCallRecord``. The
 candidates carry stable ``C_NNN`` IDs and ``sample_agreement`` counts.
@@ -14,12 +15,14 @@ output.
 
 from __future__ import annotations
 
-import json
+import asyncio
 import re
+import sys
+import time
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
-from ingest.llm import call_with_samples
+from ingest.llm import _provider_from_model, _safe_completion_cost, make_instructor_client
 from ingest.schemas import (
     Candidate,
     CandidatesFile,
@@ -56,23 +59,71 @@ def _normalize_mention(mention: str) -> str:
     return re.sub(r"\s+", " ", mention.strip().lower())
 
 
-def _parse_sample(content: str) -> list[_LLMCandidate]:
-    """Parse one LLM sample's content. Tolerant of empty content.
+async def _run_one_sample(
+    client,
+    *,
+    messages: list[dict[str, str]],
+    model: str,
+    prompt_sha256: str,
+    total_timeout: float,
+    max_retries: int,
+) -> tuple[list[_LLMCandidate], ProviderCallRecord]:
+    """Run one Instructor-validated sample. On any failure, return ([], error_record).
 
-    Returns an empty list on parse failure rather than raising — one bad
-    sample shouldn't kill the whole self-consistency batch.
+    Preserves the prior "one bad sample doesn't kill the batch" semantics.
     """
-    if not content.strip():
-        return []
+    provider = _provider_from_model(model)
+    started = time.monotonic()
     try:
-        payload = json.loads(content)
-    except json.JSONDecodeError:
-        return []
-    try:
-        parsed = _LLMResponse.model_validate(payload)
-    except ValidationError:
-        return []
-    return parsed.candidates
+        parsed, completion = await asyncio.wait_for(
+            client.create_with_completion(
+                model=model,
+                messages=messages,
+                response_model=_LLMResponse,
+                max_retries=max_retries,
+            ),
+            timeout=total_timeout,
+        )
+    except Exception as exc:
+        duration_ms = int((time.monotonic() - started) * 1000)
+        print(
+            f"[find-candidates] sample failed: {type(exc).__name__}: {exc}",
+            file=sys.stderr,
+        )
+        return [], ProviderCallRecord(
+            model=model,
+            provider=provider,
+            prompt_sha256=prompt_sha256,
+            input_tokens=0,
+            output_tokens=0,
+            cost_usd=0.0,
+            duration_ms=duration_ms,
+            status="error",
+            error_detail=f"{type(exc).__name__}: {exc}",
+        )
+
+    duration_ms = int((time.monotonic() - started) * 1000)
+    usage = getattr(completion, "usage", None)
+    if usage is not None:
+        input_tokens = int(getattr(usage, "prompt_tokens", 0))
+        output_tokens = int(getattr(usage, "completion_tokens", 0))
+        usage_estimated = False
+    else:
+        input_tokens = output_tokens = 0
+        usage_estimated = True
+
+    record = ProviderCallRecord(
+        model=model,
+        provider=provider,
+        prompt_sha256=prompt_sha256,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost_usd=_safe_completion_cost(model, input_tokens, output_tokens),
+        duration_ms=duration_ms,
+        usage_estimated=usage_estimated,
+        status="ok",
+    )
+    return parsed.candidates, record
 
 
 async def find_candidates(
@@ -83,8 +134,8 @@ async def find_candidates(
     prompt_sha256: str,
     n_samples: int = 3,
     agreement_threshold: int = 2,
-    idle_timeout: float = 60.0,
     total_timeout: float = 600.0,
+    max_retries: int = 2,
 ) -> tuple[CandidatesFile, list[ProviderCallRecord]]:
     """Detect candidate gall-maker mentions with N-way self-consistency.
 
@@ -96,7 +147,8 @@ async def find_candidates(
         prompt_sha256: SHA-256 of the prompt file, recorded per call.
         n_samples: number of concurrent samples for self-consistency.
         agreement_threshold: keep mentions appearing in at least this many samples.
-        idle_timeout / total_timeout: per-call stream timeouts.
+        total_timeout: per-call total timeout in seconds.
+        max_retries: Instructor self-repair retry budget per sample.
 
     Returns:
         ``(CandidatesFile, list[ProviderCallRecord])`` — the CandidatesFile
@@ -111,18 +163,23 @@ async def find_candidates(
         {"role": "user", "content": chunked_input},
     ]
 
-    samples = await call_with_samples(
-        messages,
-        model,
-        prompt_sha256=prompt_sha256,
-        n=n_samples,
-        idle_timeout=idle_timeout,
-        total_timeout=total_timeout,
-        response_format={"type": "json_object"},
+    client = make_instructor_client()
+    samples = await asyncio.gather(
+        *[
+            _run_one_sample(
+                client,
+                messages=messages,
+                model=model,
+                prompt_sha256=prompt_sha256,
+                total_timeout=total_timeout,
+                max_retries=max_retries,
+            )
+            for _ in range(n_samples)
+        ]
     )
 
     records = [r for _, r in samples]
-    parsed_samples: list[list[_LLMCandidate]] = [_parse_sample(c) for c, _ in samples]
+    parsed_samples = [c for c, _ in samples]
 
     # Dedup across samples: group by normalized mention string. For each
     # group, count how many distinct samples contributed it and union the
@@ -140,19 +197,14 @@ async def find_candidates(
                 {"mention": c.gall_maker_mention, "spans": set(), "samples": set()},
             )
             entry["spans"].update(s for s in c.mention_span_ids if s in valid_span_ids)
-        # Record which sample each group appeared in (for agreement count).
         for k in seen_in_sample:
             groups[k]["samples"].add(sample_idx)
 
-    # Filter by agreement threshold and assemble final candidates.
     kept = [entry for entry in groups.values() if len(entry["samples"]) >= agreement_threshold]
-    # Stable ordering: by descending agreement, then alphabetical by mention.
     kept.sort(key=lambda e: (-len(e["samples"]), e["mention"].lower()))
 
     candidates: list[Candidate] = []
     for i, entry in enumerate(kept, start=1):
-        # Skip candidates with no surviving span_ids — extract_facts has nothing
-        # to work with and would abstain. Drop them quietly here.
         if not entry["spans"]:
             continue
         candidates.append(

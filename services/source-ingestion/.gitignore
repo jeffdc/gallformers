@@ -19,5 +19,8 @@ build/
 # Pipeline run artifacts
 output/
 
+# Iteration corpus — local symlinks to PDFs outside the repo
+test-corpus/
+
 # Ephemeral planning documents (see CLAUDE.md)
 docs/plans/

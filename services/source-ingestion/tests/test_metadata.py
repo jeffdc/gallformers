@@ -132,3 +132,28 @@ class TestExtractDocumentMetadata:
         assert "S_0001, S_0002" in user_msg["content"]
         assert "[S_0001] first span text" in user_msg["content"]
         assert "[S_0002] second span text" in user_msg["content"]
+
+    async def test_instructor_failure_returns_abstaining_metadata_and_error_record(self, mocker):
+        """When Instructor exhausts retries, return an abstaining DocumentMetadata
+        with an error-status ProviderCallRecord rather than raising."""
+        blocks = [_block("S_0001", "doc title")]
+        mock_client = MagicMock()
+        mock_client.create_with_completion = AsyncMock(
+            side_effect=RuntimeError("instructor gave up after retries")
+        )
+        mocker.patch("ingest.metadata.make_instructor_client", return_value=mock_client)
+        mocker.patch("ingest.metadata._safe_completion_cost", return_value=0.0)
+
+        result, record = await extract_document_metadata(
+            blocks,
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="e" * 64,
+        )
+
+        assert result.title.value is None
+        assert result.title.support_status == SupportStatus.ABSTAINED
+        assert record.status == "error"
+        assert record.error_detail is not None
+        assert "RuntimeError" in record.error_detail
+        assert "instructor gave up" in record.error_detail

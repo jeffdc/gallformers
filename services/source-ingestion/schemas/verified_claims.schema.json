@@ -929,6 +929,7 @@
         "evidence_substring_mismatch",
         "verifier_contradicted",
         "schema_repair_applied",
+        "llm_output_invalid",
         "idle_timeout_retry",
         "usage_estimated",
         "section_excluded",

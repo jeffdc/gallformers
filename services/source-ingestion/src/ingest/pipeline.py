@@ -40,6 +40,8 @@ from ingest.schemas import (
     SectionType,
     StageRunRecord,
     WarningEntry,
+    WarningSeverity,
+    WarningType,
 )
 from ingest.sectionize import sectionize
 from ingest.taxonomy_lookup import enrich_cells_concurrently
@@ -150,6 +152,36 @@ def _blocks_in_section_types(
         and sections_by_id.get(b.section_id)
         and sections_by_id[b.section_id].type.value in wanted
     ]
+
+
+def _warning_for_error_call(
+    call: ProviderCallRecord,
+    *,
+    stage: str,
+    record_id: str | None = None,
+    field_path: str | None = None,
+    detail: dict | None = None,
+) -> WarningEntry | None:
+    """Synthesize a manifest WarningEntry from an error-status ProviderCallRecord.
+
+    Returns ``None`` for successful calls. Used by the pipeline runner to flow
+    Instructor-failure information from individual LLM calls into the manifest's
+    top-level warnings list. The stage, record_id, and field_path arguments
+    carry scope information the call record itself doesn't track.
+    """
+    if call.status != "error":
+        return None
+    d = dict(detail or {})
+    d["stage"] = stage
+    if call.error_detail:
+        d["error_detail"] = call.error_detail
+    return WarningEntry(
+        type=WarningType.LLM_OUTPUT_INVALID,
+        severity=WarningSeverity.WARNING,
+        record_id=record_id,
+        field_path=field_path,
+        detail=d,
+    )
 
 
 # ─── Main runner ──────────────────────────────────────────────────────────
@@ -270,6 +302,9 @@ async def run_pipeline(
             total_timeout=float(cfg.get("total_timeout_s", default_total_timeout)),
         )
         (src_dir / "metadata.json").write_text(document_metadata.model_dump_json(indent=2))
+        w = _warning_for_error_call(call, stage="metadata")
+        if w:
+            warnings.append(w)
         stage_records.append(
             StageRunRecord(
                 name="metadata",
@@ -300,6 +335,10 @@ async def run_pipeline(
         agreement_threshold=cfg.get("agreement_threshold", 2),
     )
     (src_dir / "candidates.json").write_text(candidates_file.model_dump_json(indent=2))
+    for i, sample_call in enumerate(sample_records):
+        w = _warning_for_error_call(sample_call, stage="find-candidates", detail={"sample_idx": i})
+        if w:
+            warnings.append(w)
     stage_records.append(
         StageRunRecord(
             name="find-candidates",
@@ -342,6 +381,10 @@ async def run_pipeline(
     )
     claims_records = [r for r, _ in facts_results]
     facts_calls = [c for _, c in facts_results]
+    for record, call in facts_results:
+        w = _warning_for_error_call(call, stage="extract-facts", record_id=record.record_id)
+        if w:
+            warnings.append(w)
     stage_records.append(
         StageRunRecord(
             name="evidence-pack",
@@ -384,7 +427,7 @@ async def run_pipeline(
     vc_total_timeout = float(vc_cfg.get("total_timeout_s", default_total_timeout))
     vc_semaphore = asyncio.Semaphore(vc_workers)
     t = _now()
-    verified_records, vc_calls = await _verify_records_claims(
+    verified_records, vc_calls, vc_warnings = await _verify_records_claims(
         gated_records,
         blocks_by_id,
         vc_cfg["model"],
@@ -393,6 +436,7 @@ async def run_pipeline(
         vc_semaphore,
         total_timeout=vc_total_timeout,
     )
+    warnings.extend(vc_warnings)
     for r in verified_records:
         (candidates_dir / r.candidate_id / "verified_facts.json").write_text(
             r.model_dump_json(indent=2)
@@ -556,10 +600,26 @@ async def _verify_records_claims(
     semaphore: asyncio.Semaphore,
     *,
     total_timeout: float = 300.0,
-) -> tuple[list[GallRecord], list[ProviderCallRecord]]:
-    """Run verify_cell on every cell across all records, in parallel."""
+) -> tuple[list[GallRecord], list[ProviderCallRecord], list[WarningEntry]]:
+    """Run verify_cell on every cell across all records, in parallel.
+
+    Returns ``(verified_records, calls, warnings)``. Warnings are
+    synthesized for any cell whose verifier call failed (status='error');
+    the cell falls back to its pre-verifier support_status.
+    """
     all_calls: list[ProviderCallRecord] = []
+    all_warnings: list[WarningEntry] = []
     out_records: list[GallRecord] = []
+
+    def _track(call, record_id: str, field_path: str):
+        if call is None:
+            return
+        all_calls.append(call)
+        w = _warning_for_error_call(
+            call, stage="verify-claims", record_id=record_id, field_path=field_path
+        )
+        if w:
+            all_warnings.append(w)
 
     async def _verify(cell, path):
         if cell is None or not cell.evidence:
@@ -581,21 +641,17 @@ async def _verify_records_claims(
 
         gm = record.gall_maker
         sn, c = await _verify(gm.scientific_name, f"{path_base}.gall_maker.scientific_name")
-        if c:
-            all_calls.append(c)
+        _track(c, record.record_id, f"{path_base}.gall_maker.scientific_name")
         auth, c = await _verify(gm.authority, f"{path_base}.gall_maker.authority")
-        if c:
-            all_calls.append(c)
+        _track(c, record.record_id, f"{path_base}.gall_maker.authority")
         rank, c = await _verify(gm.rank, f"{path_base}.gall_maker.rank")
-        if c:
-            all_calls.append(c)
+        _track(c, record.record_id, f"{path_base}.gall_maker.rank")
         new_gm = gm.model_copy(update={"scientific_name": sn, "authority": auth, "rank": rank})
 
         new_hosts = []
         for i, h in enumerate(record.hosts):
             hs, c = await _verify(h.scientific_name, f"{path_base}.hosts[{i}].scientific_name")
-            if c:
-                all_calls.append(c)
+            _track(c, record.record_id, f"{path_base}.hosts[{i}].scientific_name")
             new_hosts.append(h.model_copy(update={"scientific_name": hs}))
 
         traits_update = {}
@@ -614,23 +670,19 @@ async def _verify_records_claims(
             updated, call = await _verify(cell, f"{path_base}.gall_traits.{fname}")
             if cell is not None:
                 traits_update[fname] = updated
-            if call:
-                all_calls.append(call)
+            _track(call, record.record_id, f"{path_base}.gall_traits.{fname}")
         if record.gall_traits.detachable is not None:
             updated, call = await _verify(
                 record.gall_traits.detachable, f"{path_base}.gall_traits.detachable"
             )
             traits_update["detachable"] = updated
-            if call:
-                all_calls.append(call)
+            _track(call, record.record_id, f"{path_base}.gall_traits.detachable")
         new_traits = record.gall_traits.model_copy(update=traits_update)
 
         desc, c = await _verify(record.description, f"{path_base}.description")
-        if c:
-            all_calls.append(c)
+        _track(c, record.record_id, f"{path_base}.description")
         loc, c = await _verify(record.location, f"{path_base}.location")
-        if c:
-            all_calls.append(c)
+        _track(c, record.record_id, f"{path_base}.location")
 
         out_records.append(
             record.model_copy(
@@ -644,7 +696,7 @@ async def _verify_records_claims(
             )
         )
 
-    return out_records, all_calls
+    return out_records, all_calls, all_warnings
 
 
 async def _enrich_records_with_taxonomy(

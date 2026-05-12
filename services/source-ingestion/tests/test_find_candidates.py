@@ -1,16 +1,19 @@
 """Tests for the find-candidates stage.
 
-LiteLLM is mocked at ``ingest.llm.litellm.acompletion`` so the stage runs
-through real ``call_with_samples`` plumbing without hitting any provider.
+The Instructor client is mocked at ``ingest.find_candidates.make_instructor_client``
+so the stage runs through real dedup/agreement plumbing without hitting any
+provider.
 """
 
 from __future__ import annotations
 
-import json
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
 from ingest.find_candidates import (
+    _LLMCandidate,
+    _LLMResponse,
     _normalize_mention,
-    _parse_sample,
     find_candidates,
     format_chunked_input,
 )
@@ -30,40 +33,41 @@ def _block(span_id: str, text: str, section_id: str = "sec-1") -> NormalizedBloc
     )
 
 
-# ─── Synthetic chunk classes (mirror those in test_llm_streaming) ─────────
+def _completion(prompt_tokens: int = 10, completion_tokens: int = 5) -> SimpleNamespace:
+    """Stand-in completion object with the .usage attributes _run_one_sample reads."""
+    return SimpleNamespace(
+        usage=SimpleNamespace(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )
+    )
 
 
-class _Delta:
-    def __init__(self, content: str | None) -> None:
-        self.content = content
+def _ok_sample(*mentions_with_spans: tuple[str, list[str]]) -> tuple[_LLMResponse, SimpleNamespace]:
+    """Build an (LLMResponse, completion) pair for one successful Instructor call.
+
+    Each arg is ``(mention_text, [span_ids])`` — they become one ``_LLMCandidate``
+    in the response's ``candidates`` list.
+    """
+    return (
+        _LLMResponse(
+            candidates=[
+                _LLMCandidate(gall_maker_mention=m, mention_span_ids=s)
+                for m, s in mentions_with_spans
+            ]
+        ),
+        _completion(),
+    )
 
 
-class _Choice:
-    def __init__(self, content: str | None) -> None:
-        self.delta = _Delta(content)
-
-
-class _Usage:
-    def __init__(self, prompt_tokens: int, completion_tokens: int) -> None:
-        self.prompt_tokens = prompt_tokens
-        self.completion_tokens = completion_tokens
-
-
-class _Chunk:
-    def __init__(self, content: str | None = None, usage: _Usage | None = None) -> None:
-        self.choices = [_Choice(content)] if content is not None else []
-        self.usage = usage
-
-
-async def _fake_stream(chunks):
-    for c in chunks:
-        yield c
-
-
-def _stream_with_payload(payload: dict) -> object:
-    """Build a fake stream that yields one content chunk with JSON, then usage."""
-    content = json.dumps(payload)
-    return _fake_stream([_Chunk(content=content), _Chunk(usage=_Usage(10, 5))])
+def _mock_instructor_client(mocker, side_effects: list):
+    """Patch make_instructor_client to return a client whose create_with_completion
+    yields the supplied side_effects (one per sample).
+    """
+    client = MagicMock()
+    client.create_with_completion = AsyncMock(side_effect=side_effects)
+    mocker.patch("ingest.find_candidates.make_instructor_client", return_value=client)
+    return client
 
 
 # ─── Pure-function tests ──────────────────────────────────────────────────
@@ -81,27 +85,6 @@ class TestNormalizeMention:
         assert _normalize_mention("  Andricus   QUERCUS  ") == "andricus quercus"
 
 
-class TestParseSample:
-    def test_valid_response_parses(self):
-        content = json.dumps(
-            {"candidates": [{"gall_maker_mention": "X", "mention_span_ids": ["S_0001"]}]}
-        )
-        parsed = _parse_sample(content)
-        assert len(parsed) == 1
-        assert parsed[0].gall_maker_mention == "X"
-
-    def test_empty_string_yields_empty(self):
-        assert _parse_sample("") == []
-        assert _parse_sample("   ") == []
-
-    def test_malformed_json_yields_empty(self):
-        assert _parse_sample("not json") == []
-
-    def test_wrong_shape_yields_empty(self):
-        # Right JSON, wrong schema — no "candidates" key.
-        assert _parse_sample('{"foo": "bar"}') == []
-
-
 # ─── Stage integration tests ──────────────────────────────────────────────
 
 
@@ -110,32 +93,14 @@ class TestFindCandidates:
         blocks = [_block("S_0001", "Andricus quercuscalifornicus paragraph.")]
 
         # 3 samples: two agree on the same mention; one is a one-off.
-        sample_payloads = [
-            {
-                "candidates": [
-                    {
-                        "gall_maker_mention": "Andricus quercuscalifornicus",
-                        "mention_span_ids": ["S_0001"],
-                    }
-                ]
-            },
-            {
-                "candidates": [
-                    {
-                        "gall_maker_mention": "Andricus quercuscalifornicus",
-                        "mention_span_ids": ["S_0001"],
-                    }
-                ]
-            },
-            {
-                "candidates": [
-                    {"gall_maker_mention": "Phylloxera quercus", "mention_span_ids": ["S_0001"]}
-                ]
-            },
-        ]
-        streams = iter([_stream_with_payload(p) for p in sample_payloads])
-        mocker.patch("ingest.llm.litellm.acompletion", side_effect=lambda **kw: next(streams))
-        mocker.patch("ingest.llm._safe_completion_cost", return_value=0.0)
+        _mock_instructor_client(
+            mocker,
+            [
+                _ok_sample(("Andricus quercuscalifornicus", ["S_0001"])),
+                _ok_sample(("Andricus quercuscalifornicus", ["S_0001"])),
+                _ok_sample(("Phylloxera quercus", ["S_0001"])),
+            ],
+        )
 
         candidates_file, records = await find_candidates(
             blocks=blocks,
@@ -147,6 +112,7 @@ class TestFindCandidates:
         )
 
         assert len(records) == 3
+        assert all(r.status == "ok" for r in records)
         # Only the agreed-on mention survives.
         assert len(candidates_file.candidates) == 1
         c = candidates_file.candidates[0]
@@ -159,29 +125,14 @@ class TestFindCandidates:
         blocks = [_block("S_0001", "x"), _block("S_0002", "y")]
 
         # Same name spelled differently across samples (whitespace + case).
-        sample_payloads = [
-            {
-                "candidates": [
-                    {"gall_maker_mention": "Andricus californicus", "mention_span_ids": ["S_0001"]}
-                ]
-            },
-            {
-                "candidates": [
-                    {
-                        "gall_maker_mention": "  ANDRICUS  CALIFORNICUS  ",
-                        "mention_span_ids": ["S_0002"],
-                    }
-                ]
-            },
-            {
-                "candidates": [
-                    {"gall_maker_mention": "Andricus californicus", "mention_span_ids": ["S_0002"]}
-                ]
-            },
-        ]
-        streams = iter([_stream_with_payload(p) for p in sample_payloads])
-        mocker.patch("ingest.llm.litellm.acompletion", side_effect=lambda **kw: next(streams))
-        mocker.patch("ingest.llm._safe_completion_cost", return_value=0.0)
+        _mock_instructor_client(
+            mocker,
+            [
+                _ok_sample(("Andricus californicus", ["S_0001"])),
+                _ok_sample(("  ANDRICUS  CALIFORNICUS  ", ["S_0002"])),
+                _ok_sample(("Andricus californicus", ["S_0002"])),
+            ],
+        )
 
         candidates_file, _ = await find_candidates(
             blocks=blocks,
@@ -202,12 +153,14 @@ class TestFindCandidates:
         blocks = [_block("S_0001", "x")]
 
         # All 3 samples cite a span that doesn't exist.
-        sample_payloads = [
-            {"candidates": [{"gall_maker_mention": "Foo bar", "mention_span_ids": ["S_9999"]}]},
-        ] * 3
-        streams = iter([_stream_with_payload(p) for p in sample_payloads])
-        mocker.patch("ingest.llm.litellm.acompletion", side_effect=lambda **kw: next(streams))
-        mocker.patch("ingest.llm._safe_completion_cost", return_value=0.0)
+        _mock_instructor_client(
+            mocker,
+            [
+                _ok_sample(("Foo bar", ["S_9999"])),
+                _ok_sample(("Foo bar", ["S_9999"])),
+                _ok_sample(("Foo bar", ["S_9999"])),
+            ],
+        )
 
         candidates_file, _ = await find_candidates(
             blocks=blocks,
@@ -223,15 +176,16 @@ class TestFindCandidates:
     async def test_one_bad_sample_does_not_break_others(self, mocker):
         blocks = [_block("S_0001", "x")]
 
-        bad_stream = _fake_stream([_Chunk(content="not json"), _Chunk(usage=_Usage(5, 1))])
-        good_payload = {
-            "candidates": [{"gall_maker_mention": "Foo", "mention_span_ids": ["S_0001"]}]
-        }
-        streams = iter(
-            [bad_stream, _stream_with_payload(good_payload), _stream_with_payload(good_payload)]
+        # First sample raises (simulating Instructor giving up after max_retries);
+        # other two succeed with the same mention.
+        _mock_instructor_client(
+            mocker,
+            [
+                Exception("instructor validation failed after retries"),
+                _ok_sample(("Foo", ["S_0001"])),
+                _ok_sample(("Foo", ["S_0001"])),
+            ],
         )
-        mocker.patch("ingest.llm.litellm.acompletion", side_effect=lambda **kw: next(streams))
-        mocker.patch("ingest.llm._safe_completion_cost", return_value=0.0)
 
         candidates_file, records = await find_candidates(
             blocks=blocks,
@@ -241,9 +195,11 @@ class TestFindCandidates:
             n_samples=3,
             agreement_threshold=2,
         )
-        # All three samples produced records (one parse-failed); two valid
-        # samples agreed on "Foo".
+        # All three samples produced records (one with status="error"); two
+        # valid samples agreed on "Foo".
         assert len(records) == 3
+        statuses = sorted(r.status for r in records)
+        assert statuses == ["error", "ok", "ok"]
         assert len(candidates_file.candidates) == 1
         assert candidates_file.candidates[0].gall_maker_mention == "Foo"
         assert candidates_file.candidates[0].sample_agreement == 2

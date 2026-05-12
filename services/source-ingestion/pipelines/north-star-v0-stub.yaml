@@ -55,7 +55,11 @@ pipeline:
       context_window: 1
 
     - step: extract-facts
-      model: deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct
+      # Larger schema (~30 evidence cells) than find-candidates; small
+      # models reliably emit invalid JSON (inline comments, trailing
+      # commas) even on the stub prompt. Use the matter's production
+      # choice — open-weight, fractions of a cent per stub call.
+      model: deepinfra/Qwen/Qwen2.5-72B-Instruct
       prompt: prompts/stubs/extract-facts.md
       # No `vocab:` — stub extract-facts abstains everywhere; vocab is
       # irrelevant. Real pipeline references schemas/gallformers-vocab.json.
@@ -66,7 +70,10 @@ pipeline:
       enrich_offsets: true
 
     - step: verify-claims
-      model: deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct
+      # Per-cell verifier. Small schema (verdict + reason) but production
+      # guidance is to use a different family from the extractor; for the
+      # stub we just need reliable structured output.
+      model: deepinfra/Qwen/Qwen2.5-72B-Instruct
       prompt: prompts/stubs/verify-claims.md
       max_workers: 2
 

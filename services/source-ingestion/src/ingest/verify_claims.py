@@ -135,15 +135,32 @@ async def verify_cell(
 
     client = make_instructor_client()
     started = time.monotonic()
-    verdict, completion = await asyncio.wait_for(
-        client.create_with_completion(
+    try:
+        verdict, completion = await asyncio.wait_for(
+            client.create_with_completion(
+                model=model,
+                messages=messages,
+                response_model=_LLMVerdict,
+                max_retries=max_retries,
+            ),
+            timeout=total_timeout,
+        )
+    except Exception as exc:
+        duration_ms = int((time.monotonic() - started) * 1000)
+        # Verifier failed — cell remains in whatever support_status the extractor
+        # assigned. Caller surfaces a manifest warning from the error record.
+        return cell, ProviderCallRecord(
             model=model,
-            messages=messages,
-            response_model=_LLMVerdict,
-            max_retries=max_retries,
-        ),
-        timeout=total_timeout,
-    )
+            provider=_provider_from_model(model),
+            prompt_sha256=prompt_sha256,
+            input_tokens=0,
+            output_tokens=0,
+            cost_usd=0.0,
+            duration_ms=duration_ms,
+            status="error",
+            error_detail=f"{type(exc).__name__}: {exc}",
+        )
+
     duration_ms = int((time.monotonic() - started) * 1000)
 
     usage = getattr(completion, "usage", None)

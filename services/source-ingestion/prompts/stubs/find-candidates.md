@@ -13,8 +13,8 @@ Return **exactly one** candidate with these fields:
 - `gall_maker_mention`: the literal string `"STUB_CANDIDATE"`
 - `mention_span_ids`: a single-element list containing the **first span_id**
   that appears in the input (e.g. `["S_0001"]`)
-- `sample_agreement`: `1`
 
 Do not return more than one candidate. Do not attempt high recall, real
-extraction, or any kind of reasoning. The pipeline runner only needs a
-schema-valid candidate to proceed downstream.
+extraction, or any kind of reasoning. The structured-output layer
+(Instructor) validates the response shape automatically — agreement
+counts are computed by the pipeline, not by you.

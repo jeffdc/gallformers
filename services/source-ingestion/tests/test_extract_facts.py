@@ -198,3 +198,36 @@ class TestSpanIdScrub:
         assert record.gall_maker.scientific_name.value == "Andricus quercuscalifornicus"
         assert len(record.gall_maker.scientific_name.evidence) == 1
         assert record.gall_maker.scientific_name.evidence[0].block_id == "S_0001"
+
+
+class TestExtractFactsGracefulFailure:
+    async def test_instructor_failure_returns_abstaining_record(self, mocker):
+        """When Instructor exhausts retries on schema validation, extract_facts
+        returns a fully-abstaining GallRecord plus an error-status record —
+        the pipeline must keep running."""
+        mock_client = MagicMock()
+        mock_client.create_with_completion = AsyncMock(
+            side_effect=RuntimeError("instructor gave up after retries")
+        )
+        mocker.patch("ingest.extract_facts.make_instructor_client", return_value=mock_client)
+        mocker.patch("ingest.extract_facts._safe_completion_cost", return_value=0.0)
+
+        record, call = await extract_facts(
+            candidate=_candidate("C_007"),
+            evidence_pack_text="[S_0001] text",
+            allowed_span_ids=["S_0001"],
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="f" * 64,
+        )
+
+        # The record keeps stable IDs but every field abstains.
+        assert record.record_id == "R_007"
+        assert record.candidate_id == "C_007"
+        assert record.gall_maker.scientific_name.value is None
+        assert record.gall_maker.scientific_name.support_status == SupportStatus.ABSTAINED
+        assert record.hosts == []
+        # The call record carries error metadata for the manifest.
+        assert call.status == "error"
+        assert call.error_detail is not None
+        assert "RuntimeError" in call.error_detail

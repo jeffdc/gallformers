@@ -210,3 +210,38 @@ class TestVerifyCell:
         user_msg = next(m for m in messages if m["role"] == "user")
         assert "## Claim\n\nred\n" in user_msg["content"]
         assert "## Quoted span text\n\nthe gall is red and round\n" in user_msg["content"]
+
+    async def test_instructor_failure_returns_cell_unchanged_with_error_record(self, mocker):
+        """If the verifier LLM call fails (Instructor RetryError, timeout, etc.),
+        the cell is returned with its pre-verifier support_status intact and
+        the call record carries status='error' for the manifest."""
+        mock_client = MagicMock()
+        mock_client.create_with_completion = AsyncMock(
+            side_effect=RuntimeError("verifier model returned malformed output")
+        )
+        mocker.patch("ingest.verify_claims.make_instructor_client", return_value=mock_client)
+        mocker.patch("ingest.verify_claims._safe_completion_cost", return_value=0.0)
+        blocks = {"p1-b0": _block("p1-b0", "context")}
+        cell = EvidenceCell(
+            value="Quercus alba",
+            evidence=[_ev("p1-b0")],
+            support_status=SupportStatus.SUPPORTED,
+            confidence=0.9,
+        )
+
+        new_cell, record = await verify_cell(
+            cell,
+            "hosts[0].scientific_name",
+            blocks,
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="e" * 64,
+        )
+
+        # Cell is unchanged — falls back to extractor's status.
+        assert new_cell is cell
+        assert new_cell.support_status == SupportStatus.SUPPORTED
+        # The call record signals the failure to the pipeline runner.
+        assert record.status == "error"
+        assert record.error_detail is not None
+        assert "RuntimeError" in record.error_detail

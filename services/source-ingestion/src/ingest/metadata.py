@@ -117,15 +117,30 @@ async def extract_document_metadata(
 
     client = make_instructor_client()
     started = time.monotonic()
-    metadata, completion = await asyncio.wait_for(
-        client.create_with_completion(
+    try:
+        metadata, completion = await asyncio.wait_for(
+            client.create_with_completion(
+                model=model,
+                messages=messages,
+                response_model=DocumentMetadata,
+                max_retries=max_retries,
+            ),
+            timeout=total_timeout,
+        )
+    except Exception as exc:
+        duration_ms = int((time.monotonic() - started) * 1000)
+        return DocumentMetadata(title=_abstaining_title()), ProviderCallRecord(
             model=model,
-            messages=messages,
-            response_model=DocumentMetadata,
-            max_retries=max_retries,
-        ),
-        timeout=total_timeout,
-    )
+            provider=_provider_from_model(model),
+            prompt_sha256=prompt_sha256,
+            input_tokens=0,
+            output_tokens=0,
+            cost_usd=0.0,
+            duration_ms=duration_ms,
+            status="error",
+            error_detail=f"{type(exc).__name__}: {exc}",
+        )
+
     duration_ms = int((time.monotonic() - started) * 1000)
 
     usage = getattr(completion, "usage", None)
