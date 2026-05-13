@@ -56,6 +56,7 @@ pipeline:
       # Selected via bake-off (docs/extract-facts-model-bakeoff.md).
       model: deepinfra/Qwen/Qwen3-Next-80B-A3B-Instruct
       prompt: prompts/extract-facts.md
+      vocab: schemas/gallformers-vocab.json
       max_workers: 50              # DeepInfra cap is 200/model/user
       idle_timeout_s: 90
 

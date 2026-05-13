@@ -190,19 +190,49 @@ def _scrub_facts(facts: _LLMFacts, allowed: set[str]) -> _LLMFacts:
     )
 
 
+def _format_vocab_block(vocab: dict | None) -> str:
+    """Render the controlled-vocab block for inclusion in the user message.
+
+    `vocab` is the parsed schemas/gallformers-vocab.json. Returns an empty
+    string when no vocab is supplied.
+
+    Output is compact value-lists per trait field — descriptions are not
+    inlined here (would balloon the prompt) but the prompt itself
+    references this block and instructs the model to pick `suggested[]`
+    values from these lists only.
+    """
+    if not vocab or "fields" not in vocab:
+        return ""
+    lines = ["## Controlled trait vocabulary (use only these values for `suggested[]`)\n"]
+    for field, items in vocab["fields"].items():
+        values = [item["value"] for item in items]
+        lines.append(f"- **{field}**: {', '.join(values)}")
+    return "\n".join(lines) + "\n"
+
+
 def _build_messages(
-    prompt: str, candidate: Candidate, evidence_pack_text: str, allowed: list[str]
+    prompt: str,
+    candidate: Candidate,
+    evidence_pack_text: str,
+    allowed: list[str],
+    vocab: dict | None = None,
 ) -> list[ChatCompletionMessageParam]:
     """Build the chat messages for extract-facts."""
-    user_content = (
-        f"## Candidate\n\n"
-        f"- gall_maker_mention: {candidate.gall_maker_mention}\n"
-        f"- candidate_id: {candidate.candidate_id}\n\n"
-        f"## Allowed span IDs (cite only these)\n\n"
-        f"{', '.join(allowed) if allowed else '(none)'}\n\n"
-        f"## Evidence pack\n\n"
-        f"{evidence_pack_text}\n"
-    )
+    sections = [
+        "## Candidate\n",
+        f"- gall_maker_mention: {candidate.gall_maker_mention}",
+        f"- candidate_id: {candidate.candidate_id}",
+        "",
+        "## Allowed span IDs (cite only these)\n",
+        ", ".join(allowed) if allowed else "(none)",
+        "",
+    ]
+    vocab_block = _format_vocab_block(vocab)
+    if vocab_block:
+        sections.append(vocab_block)
+    sections.append("## Evidence pack\n")
+    sections.append(evidence_pack_text)
+    user_content = "\n".join(sections) + "\n"
     return [
         {"role": "system", "content": prompt},
         {"role": "user", "content": user_content},
@@ -219,9 +249,19 @@ async def extract_facts(
     prompt_sha256: str,
     total_timeout: float = 600.0,
     max_retries: int = 2,
+    vocab: dict | None = None,
 ) -> tuple[GallRecord, ProviderCallRecord]:
-    """Run extract-facts for one candidate. Returns ``(record, call_record)``."""
-    messages = _build_messages(prompt, candidate, evidence_pack_text, allowed_span_ids)
+    """Run extract-facts for one candidate. Returns ``(record, call_record)``.
+
+    ``vocab`` is the parsed gallformers-vocab.json (per-field allowed
+    `suggested[]` values for trait cells). When supplied, a controlled-
+    vocabulary block is inlined into the user message so the model can
+    pick from the closed set. When omitted, the model emits free-form
+    `suggested[]` strings (which downstream tooling cannot dedupe).
+    """
+    messages = _build_messages(
+        prompt, candidate, evidence_pack_text, allowed_span_ids, vocab=vocab
+    )
     client = make_instructor_client()
 
     started = time.monotonic()

@@ -360,6 +360,14 @@ async def run_pipeline(
     facts_prompt, facts_prompt_sha = _load_prompt(facts_cfg["prompt"])
     facts_workers = facts_cfg.get("max_workers", 4)
     facts_semaphore = asyncio.Semaphore(facts_workers)
+    # Optional controlled-vocab JSON (per-trait `suggested[]` allowed values).
+    # Path is relative to the project root, same convention as `prompt:`.
+    facts_vocab: dict | None = None
+    if facts_cfg.get("vocab"):
+        vocab_path = _project_root() / facts_cfg["vocab"]
+        if not vocab_path.exists():
+            raise FileNotFoundError(f"Vocab file not found: {vocab_path}")
+        facts_vocab = json.loads(vocab_path.read_text())
 
     async def _process_candidate(c: Candidate) -> tuple[GallRecord, ProviderCallRecord]:
         candidate_dir = candidates_dir / c.candidate_id
@@ -376,6 +384,7 @@ async def run_pipeline(
                 prompt=facts_prompt,
                 prompt_sha256=facts_prompt_sha,
                 total_timeout=float(facts_cfg.get("total_timeout_s", default_total_timeout)),
+                vocab=facts_vocab,
             )
         (candidate_dir / "facts.json").write_text(record.model_dump_json(indent=2))
         return record, call

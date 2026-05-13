@@ -1,4 +1,4 @@
-# version: 0.1.0
+# version: 0.2.0
 
 You are extracting **structured facts about a single gall-maker species**
 from a scientific paper. A previous stage identified the candidate
@@ -131,11 +131,14 @@ For each trait, the cell has:
 
 - `original`: the paper's exact phrase, e.g. `"bright reddish-brown"`.
   Preserve as written. Null when the paper doesn't describe the trait.
-- `suggested`: list of normalized vocabulary mappings, e.g.
-  `["red", "brown"]`. For Phase A iteration, emit simple normalized
-  English words — the controlled vocabulary is generated from the
-  Elixir codebase and not yet plumbed into this prompt. If unsure,
-  prefer one or two of the most general terms.
+- `suggested`: list of values from the **controlled vocabulary block**
+  in your input — see `## Controlled trait vocabulary`. Each trait
+  field has its own allowed value set (color, shape, texture, walls,
+  cells, alignment, plant_part, form, season). Pick ONLY values from
+  the allowed list for that field; if no allowed value applies to what
+  the paper says, emit an empty `suggested: []` and keep `original`.
+  Multiple values are fine when a trait genuinely has more than one
+  facet (e.g. `["red", "brown"]` for a multi-colored gall).
 - `evidence`: span(s) supporting the trait.
 - `support_status`: `supported` if the paper directly describes the
   trait; `abstained` if not addressed.
