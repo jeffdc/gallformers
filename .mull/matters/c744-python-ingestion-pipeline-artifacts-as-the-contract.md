@@ -1,8 +1,9 @@
 ---
-status: raw
+status: done
 created: 2026-05-11
 updated: 2026-05-12
 epic: source-ingestion
+relates: [7a83]
 ---
 
 # Python ingestion pipeline: artifacts as the contract
@@ -473,3 +474,97 @@ Remaining Phase B prompts, in order of leverage:
   complete; record model rationale per stage in this matter at that
   time.
 
+## Final status (2026-05-13) — closing this matter
+
+Phase A and Phase B are complete. Production pipeline runs the four-paper
+iteration corpus end-to-end with prompt-SHA-aware resumability:
+
+| paper | pages | candidates | duration |
+|---|---|---|---|
+| Cook 2026 | 8 | 2 | 78 s |
+| Mutun 2015 | 3 | 13 | 132 s |
+| Nicholls 2022 | 79 | 13 | 317 s |
+| Cuesta 2022 | 92 | 33 | 484 s |
+
+Aggregate quality across the four-paper corpus on the final pipeline:
+647 supported facts, 39 hallucinations caught by the substring gate,
+4 contradictions caught by the verifier, 0 timeouts, 0 pipeline crashes.
+DeepInfra cost ~$0.30–0.60 per full-corpus pass.
+
+### Production model set
+
+- `find-candidates`: `deepseek-ai/DeepSeek-V4-Flash` (1M context,
+  reasoning, 5–19× faster than alternatives). N=3 self-consistency.
+- `extract-facts`: `Qwen/Qwen3-Next-80B-A3B-Instruct` (MoE 80B/3B-active,
+  ~204 output tok/sec, picked via the documented bake-off).
+- `verify-claims`: `deepseek-ai/DeepSeek-V4-Flash` (different family
+  from extractor per the matter's principle).
+- `metadata`: `Qwen/Qwen2.5-72B-Instruct` (small per-call input fits
+  the 32K DeepInfra cap; the schema isn't large enough to need the
+  faster MoE model).
+
+Concurrency at 50-wide (extract-facts and verify-claims), DeepInfra's
+ceiling is 200/model/user.
+
+### Bake-off report
+
+`services/source-ingestion/docs/extract-facts-model-bakeoff.md` records
+the model evaluation and decision rationale (Round 1: speed/reliability/
+hallucination, Round 2: extraction quality with real verify-claims).
+
+### What landed beyond the original design
+
+- Instructor wired into find-candidates (was: silent JSON-loads + manual
+  Pydantic validation, returned [] on any parse failure).
+- Graceful Instructor-failure handling in every LLM stage (metadata,
+  find-candidates, extract-facts, verify-claims) — exhaustion of
+  Instructor retries returns an abstaining default + error-status
+  ProviderCallRecord; pipeline emits a manifest warning and continues.
+- Verify-claims parallelism fix: stage was structurally serial despite a
+  semaphore; switched to single global asyncio.gather. 8.1× wall-clock
+  improvement on Philippines (524 s → 65 s); 50-wide later took it to 22 s.
+- Verify-claims species context (B fix): verifier now sees
+  "candidate species: <name>" alongside field_path / claim / quote.
+  Mutun supported hosts went 7/21 → 20/21 once the verifier could
+  attribute claims to the right species.
+- Substring-gate index keying fix: `_index_blocks` was keying
+  `NormalizedBlock.block_id` (PyMuPDF page+block) but the LLM cites
+  `Evidence.block_id = "S_NNNN"` (span_id). Mismatch silently failed
+  every substring check.
+- Sectionizer multi-section detection: detects Abstract / Introduction /
+  Methods / Acknowledgements (in addition to References / Bibliography /
+  Literature Cited). When publication structure is detected, pre-first-
+  heading content is classified as TITLE; otherwise legacy two-section
+  behavior is preserved.
+- Metadata fallback window bumped 5 → 20 blocks (handles journal-banner-
+  heavy front matter on Zootaxa-style monographs).
+- Controlled trait vocabulary wired (vocab JSON + extract-facts prompt
+  injection + cache key inclusion).
+- Prompt-SHA-aware caching for all four LLM stages with composite cache
+  keys. Cold-cache → warm-cache on Cook: 76 s → 1.7 s (44×).
+
+### Iteration corpus (test-corpus/, gitignored)
+
+- Cook 2026 — single species, 8 pages, fast feedback
+- Mutun 2015 — 12 oak gallwasp species, 3 pages, info-dense
+- Nicholls 2022 — 13 Nearctic gallwasps, 79 pages
+- Cuesta 2022 — Druon genus revision, 92 pages, dense taxonomic renames
+- Philippines (BHL) — kept as OCR-pipeline reference; not in the
+  iteration set
+
+### Follow-ups
+
+Three deferred non-blocking polish items moved to matter `7a83`:
+
+1. Elixir mix task for `gallformers-vocab.json` regeneration + CI
+   guard (vocab JSON currently hand-curated from a one-shot SQL dump).
+2. On-disk `normalized_text.jsonl` `section_id` linkage (in-memory
+   correct; on-disk has `section_id: null` because JSONL is written
+   pre-sectionize).
+3. BHL boilerplate strip rule (current rule expects a specific
+   cover-page pattern not seen in the Philippines test paper).
+
+All other listed-out-of-scope items (OCR pipeline, Marker/Docling
+evaluation, server-side ingestion, beta UX, GBIF↔WCVP resolution)
+remain out of scope for the source-ingestion pipeline matter and
+belong in their respective parent matters.
