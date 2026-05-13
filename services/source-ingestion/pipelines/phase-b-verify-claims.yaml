@@ -39,7 +39,7 @@ pipeline:
 
     - step: metadata
       model: deepinfra/Qwen/Qwen2.5-72B-Instruct
-      prompt: prompts/stubs/metadata.md
+      prompt: prompts/metadata.md
       input_section_types: [title, abstract, introduction]
 
     - step: find-candidates
