@@ -1,4 +1,4 @@
-# version: 0.2.0
+# version: 0.2.1
 
 You are extracting **structured facts about a single gall-maker species**
 from a scientific paper. A previous stage identified the candidate
@@ -94,17 +94,39 @@ structured fields here) — they DO NOT go into `gall_traits`.
 
 **These belong in `gall_traits`:**
 
-- `color`: the gall's color, e.g. "brown", "red", "green"
-- `shape`: the gall's shape, e.g. "spherical", "oblong", "fusiform"
-- `texture`: outer surface texture, e.g. "smooth", "hairy", "warty"
-- `walls`: wall structure, e.g. "thin", "thick", "woody"
-- `cells`: chamber count, e.g. "unilocular", "multilocular"
-- `alignment`: orientation, e.g. "upright", "pendulous"
-- `plant_part`: where on the plant the gall forms, e.g. "leaf", "stem",
-  "bud", "petiole", "root", "catkin"
-- `form`: growth form / lifecycle generation, e.g. "asexual",
-  "sexual", "agamic"
-- `season`: when the gall forms or matures, e.g. "spring", "summer"
+- `color`: the gall's outer color
+- `shape`: the gall's overall geometric shape (sphere, cylinder, cup,
+  spindle, etc.)
+- `texture`: surface texture (hairy, warty, smooth, ribbed, etc.)
+- `walls`: structural wall types (thick, thin, spongy, ostiole, etc.)
+- `cells`: larval chamber count and arrangement (monothalamous,
+  polythalamous, etc.)
+- `alignment`: orientation relative to the host surface (erect,
+  drooping, integral, etc.)
+- `plant_part`: where on the plant the gall forms (leaf, stem, bud,
+  petiole, fruit, etc.)
+- `form`: **gall morphology type** (oak apple, bullet, pip, plum,
+  pocket, leaf curl, witches broom, etc.) — NOT lifecycle generation.
+  The lifecycle generation (asexual / sexual / agamic) does NOT belong
+  here; that information has no field in the current schema. Abstain
+  on `form` if the paper only states the generation, not the
+  morphology.
+- `season`: when the gall forms or matures (Spring, Summer, Fall,
+  Winter — capitalized)
+
+**Use the controlled vocabulary in your input.** The "Controlled trait
+vocabulary" block in your user message lists the exact allowed values
+for each field. Pick `suggested[]` values **only** from that list. If
+the paper describes a trait but no allowed value applies, emit
+`suggested: []` (empty list) and keep `original` populated.
+
+**Do NOT pick `form: non-gall`** for any candidate. The candidate has
+already been identified upstream as a gall-maker mention; the
+`non-gall` vocabulary value is for plant deformations that AREN'T
+galls (scale insects, leaf curl from pathogens, etc.) and should never
+be the trait of an extracted candidate. If you can't pick a real
+morphological form from the vocabulary, emit `suggested: []` and let
+the human curator fill it in.
 
 **These DO NOT belong in `gall_traits`** (they're about the insect
 itself, not the gall):
