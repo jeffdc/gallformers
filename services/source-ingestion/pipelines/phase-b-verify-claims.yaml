@@ -53,9 +53,10 @@ pipeline:
       context_window: 2
 
     - step: extract-facts
-      model: deepinfra/Qwen/Qwen2.5-72B-Instruct
+      # Selected via bake-off (docs/extract-facts-model-bakeoff.md).
+      model: deepinfra/Qwen/Qwen3-Next-80B-A3B-Instruct
       prompt: prompts/extract-facts.md
-      max_workers: 4
+      max_workers: 50              # DeepInfra cap is 200/model/user
       idle_timeout_s: 90
 
     - step: verify
@@ -68,7 +69,7 @@ pipeline:
       # "different family" principle). Per-cell input is tiny.
       model: deepinfra/deepseek-ai/DeepSeek-V4-Flash
       prompt: prompts/verify-claims.md
-      max_workers: 8               # many small per-field calls
+      max_workers: 50              # many small per-field calls; DeepInfra cap is 200/model/user
 
     - step: taxonomy-lookup
       source: gbif

@@ -627,7 +627,7 @@ async def _verify_records_claims(
     the cell falls back to its pre-verifier support_status.
     """
 
-    async def _verify(cell, path):
+    async def _verify(cell, path, record_summary):
         if cell is None or not cell.evidence:
             return cell, None
         async with semaphore:
@@ -639,23 +639,35 @@ async def _verify_records_claims(
                 prompt=prompt,
                 prompt_sha256=prompt_sha,
                 total_timeout=total_timeout,
+                record_summary=record_summary,
             )
         return updated, call
 
     # Build a flat list of verification jobs across all records. Each job
-    # carries the (record_idx, location_key, field_path, cell) tuple so
-    # results can be re-assembled into per-record GallRecord copies after
-    # the global gather completes. location_key is a stable token used
-    # by the assembly phase below.
-    jobs: list[tuple[int, str, str, Any]] = []
+    # carries the (record_idx, location_key, field_path, cell, record_summary)
+    # tuple so results can be re-assembled into per-record GallRecord copies
+    # after the global gather completes. record_summary gives the verifier
+    # the candidate species context — without it, host/trait claims can't
+    # be attributed to a specific species.
+    jobs: list[tuple[int, str, str, Any, str]] = []
     for r_idx, record in enumerate(records):
         path_base = f"records[{record.record_id}]"
         gm = record.gall_maker
+        species_name = gm.scientific_name.value or "(unidentified)"
+        record_summary = f"candidate species: {species_name}"
         jobs.append(
-            (r_idx, "gm_sci", f"{path_base}.gall_maker.scientific_name", gm.scientific_name)
+            (
+                r_idx,
+                "gm_sci",
+                f"{path_base}.gall_maker.scientific_name",
+                gm.scientific_name,
+                record_summary,
+            )
         )
-        jobs.append((r_idx, "gm_auth", f"{path_base}.gall_maker.authority", gm.authority))
-        jobs.append((r_idx, "gm_rank", f"{path_base}.gall_maker.rank", gm.rank))
+        jobs.append(
+            (r_idx, "gm_auth", f"{path_base}.gall_maker.authority", gm.authority, record_summary)
+        )
+        jobs.append((r_idx, "gm_rank", f"{path_base}.gall_maker.rank", gm.rank, record_summary))
         for h_idx, h in enumerate(record.hosts):
             jobs.append(
                 (
@@ -663,6 +675,7 @@ async def _verify_records_claims(
                     f"host_{h_idx}",
                     f"{path_base}.hosts[{h_idx}].scientific_name",
                     h.scientific_name,
+                    record_summary,
                 )
             )
         for fname in _TRAIT_FIELDS:
@@ -672,6 +685,7 @@ async def _verify_records_claims(
                     f"trait_{fname}",
                     f"{path_base}.gall_traits.{fname}",
                     getattr(record.gall_traits, fname),
+                    record_summary,
                 )
             )
         if record.gall_traits.detachable is not None:
@@ -681,20 +695,25 @@ async def _verify_records_claims(
                     "trait_detachable",
                     f"{path_base}.gall_traits.detachable",
                     record.gall_traits.detachable,
+                    record_summary,
                 )
             )
-        jobs.append((r_idx, "description", f"{path_base}.description", record.description))
-        jobs.append((r_idx, "location", f"{path_base}.location", record.location))
+        jobs.append(
+            (r_idx, "description", f"{path_base}.description", record.description, record_summary)
+        )
+        jobs.append((r_idx, "location", f"{path_base}.location", record.location, record_summary))
 
     # Run the whole batch concurrently. Semaphore enforces the in-flight
     # cap; everything else queues.
-    results = await asyncio.gather(*[_verify(cell, path) for _, _, path, cell in jobs])
+    results = await asyncio.gather(
+        *[_verify(cell, path, summary) for _, _, path, cell, summary in jobs]
+    )
 
     # Track calls + warnings in job order (preserves the per-record
     # ordering callers/manifest readers expect).
     all_calls: list[ProviderCallRecord] = []
     all_warnings: list[WarningEntry] = []
-    for (r_idx, _, path, _), (_, call) in zip(jobs, results, strict=True):
+    for (r_idx, _, path, _, _), (_, call) in zip(jobs, results, strict=True):
         if call is None:
             continue
         all_calls.append(call)
@@ -710,7 +729,7 @@ async def _verify_records_claims(
     # Build (record_idx, location_key) -> updated_cell map.
     by_loc: dict[tuple[int, str], Any] = {
         (r_idx, key): updated
-        for (r_idx, key, _, _), (updated, _) in zip(jobs, results, strict=True)
+        for (r_idx, key, _, _, _), (updated, _) in zip(jobs, results, strict=True)
     }
 
     # Re-assemble each record from the verified cells.

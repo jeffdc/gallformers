@@ -54,14 +54,15 @@ pipeline:
 
     # ── The stage under iteration ────────────────────────────────────────
     - step: extract-facts
-      # Per the matter, Qwen-2.5-72B is the production extract-facts
-      # model. Per-candidate input is small (the evidence pack, a few
-      # K tokens), well within DeepInfra's 32K Qwen cap. Larger schema
-      # than find-candidates (~30 evidence cells); Llama-3.1-8B can't
-      # reliably emit it.
-      model: deepinfra/Qwen/Qwen2.5-72B-Instruct
+      # Selected via bake-off (see docs/extract-facts-model-bakeoff.md):
+      # Qwen3-Next is 8-10x faster than Qwen-2.5-72B / DeepSeek-V4-Flash /
+      # MiniMax-M2.5 on this workload (MoE 80B-total / 3B-active), with
+      # competitive supported-cell count and acceptable 5.6% hallucination
+      # rate. Different family from the verifier (DeepSeek), preserving
+      # the matter's different-family principle.
+      model: deepinfra/Qwen/Qwen3-Next-80B-A3B-Instruct
       prompt: prompts/extract-facts.md
-      max_workers: 4               # per-candidate parallelism
+      max_workers: 50              # per-candidate parallelism (DeepInfra cap is 200/model/user)
       idle_timeout_s: 90           # extraction calls are slower than tiny stubs
 
     - step: verify

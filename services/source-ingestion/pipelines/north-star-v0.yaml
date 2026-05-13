@@ -65,10 +65,12 @@ pipeline:
     # ── Per-field extraction ──────────────────────────────────────────────────
 
     - step: extract-facts          # per-candidate, dynamic-schema structured output
-      model: deepinfra/Qwen/Qwen2.5-72B-Instruct
+      # Selected via bake-off (docs/extract-facts-model-bakeoff.md):
+      # 8-10x faster than alternatives on this workload (MoE 80B/3B-active).
+      model: deepinfra/Qwen/Qwen3-Next-80B-A3B-Instruct
       prompt: prompts/extract-facts.md
       vocab: schemas/gallformers-vocab.json
-      max_workers: 6               # per-candidate parallelism
+      max_workers: 50              # per-candidate parallelism (DeepInfra cap is 200/model/user)
       idle_timeout_s: 90           # override: extraction is slower
 
     - step: verify                 # deterministic substring gate
@@ -78,7 +80,7 @@ pipeline:
     - step: verify-claims          # per-field, different model family
       model: deepinfra/deepseek-ai/DeepSeek-V3
       prompt: prompts/verify-claims.md
-      max_workers: 10              # many small per-field calls
+      max_workers: 50              # many small per-field calls (DeepInfra cap is 200/model/user)
 
     # ── Taxonomy lookup ───────────────────────────────────────────────────────
 

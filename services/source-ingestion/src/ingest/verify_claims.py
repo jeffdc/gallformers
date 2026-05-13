@@ -86,11 +86,19 @@ def _quoted_text(
 
 
 def _build_messages(
-    prompt: str, field_path: str, claim: str, quoted_text: str
+    prompt: str,
+    field_path: str,
+    claim: str,
+    quoted_text: str,
+    record_summary: str | None = None,
 ) -> list[ChatCompletionMessageParam]:
-    user_content = (
-        f"## Field\n\n{field_path}\n\n## Claim\n\n{claim}\n\n## Quoted span text\n\n{quoted_text}\n"
-    )
+    sections = []
+    if record_summary:
+        sections.append(f"## Record context\n\n{record_summary}")
+    sections.append(f"## Field\n\n{field_path}")
+    sections.append(f"## Claim\n\n{claim}")
+    sections.append(f"## Quoted span text\n\n{quoted_text}")
+    user_content = "\n\n".join(sections) + "\n"
     return [
         {"role": "system", "content": prompt},
         {"role": "user", "content": user_content},
@@ -107,8 +115,18 @@ async def verify_cell(
     prompt_sha256: str,
     total_timeout: float = 60.0,
     max_retries: int = 2,
+    record_summary: str | None = None,
 ) -> tuple[EvidenceCell | TraitCell | ScientificNameCell, ProviderCallRecord]:
     """Run the verifier for one cell. Returns ``(updated_cell, call_record)``.
+
+    Args:
+        record_summary: optional short context string identifying the gall
+            record this cell belongs to (e.g. ``"candidate species:
+            Andricus assarehi"``). Lets the verifier understand which
+            species the claim is being attributed to. Without it, the
+            verifier sees only field_path / claim / quote and cannot
+            disambiguate "is X a host of THIS species" from "is X
+            mentioned anywhere."
 
     If the cell has no evidence (e.g. extractor abstained), the cell is
     returned unchanged and no LLM call is made — a synthetic
@@ -131,7 +149,7 @@ async def verify_cell(
         )
 
     quoted = _quoted_text(cell, blocks_by_id)
-    messages = _build_messages(prompt, field_path, claim, quoted)
+    messages = _build_messages(prompt, field_path, claim, quoted, record_summary)
 
     client = make_instructor_client()
     started = time.monotonic()
