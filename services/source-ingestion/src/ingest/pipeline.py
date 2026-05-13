@@ -289,9 +289,14 @@ async def run_pipeline(
             normalized_blocks, sections_by_id, section_types
         )
         # Phase A: when sectionizer hasn't typed sections (everything UNKNOWN),
-        # fall back to the first few blocks so the stage still gets input.
+        # fall back to the first ~20 blocks so the stage still gets input.
+        # 20 (vs 5) covers journal-banner-heavy front matter on monograph
+        # publishers like Zootaxa: page 1 typically has DOI/ISSN/copyright
+        # in blocks 0-7 with title and authors only appearing around blocks
+        # 8-12. Cost is negligible — metadata is one call per paper and
+        # 20 blocks of front matter is ~3-5K tokens.
         if not meta_input_blocks:
-            meta_input_blocks = normalized_blocks[:5]
+            meta_input_blocks = normalized_blocks[:20]
 
         t = _now()
         document_metadata, call = await extract_document_metadata(
