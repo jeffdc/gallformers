@@ -259,9 +259,7 @@ async def extract_facts(
     pick from the closed set. When omitted, the model emits free-form
     `suggested[]` strings (which downstream tooling cannot dedupe).
     """
-    messages = _build_messages(
-        prompt, candidate, evidence_pack_text, allowed_span_ids, vocab=vocab
-    )
+    messages = _build_messages(prompt, candidate, evidence_pack_text, allowed_span_ids, vocab=vocab)
     client = make_instructor_client()
 
     started = time.monotonic()

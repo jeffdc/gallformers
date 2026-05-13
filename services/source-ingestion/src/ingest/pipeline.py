@@ -33,6 +33,7 @@ from ingest.metadata import extract_document_metadata
 from ingest.preprocess import flat_normalized_text, preprocess_blocks
 from ingest.schemas import (
     Candidate,
+    CandidatesFile,
     DocumentMetadata,
     GallRecord,
     NormalizedBlock,
@@ -152,6 +153,40 @@ def _blocks_in_section_types(
         and sections_by_id.get(b.section_id)
         and sections_by_id[b.section_id].type.value in wanted
     ]
+
+
+def _cache_sidecar_path(artifact_path: Path) -> Path:
+    """Sidecar path holding the cache key for an artifact (``foo.json.cache.json``)."""
+    return artifact_path.with_suffix(artifact_path.suffix + ".cache.json")
+
+
+def _is_cache_valid(artifact_path: Path, current_key: dict) -> bool:
+    """True iff both the artifact and its cache sidecar exist and the sidecar's
+    stored key matches ``current_key``.
+
+    Used by LLM stages to decide whether the prior run's output can be reused
+    without re-issuing the LLM call. The cache key typically captures the
+    prompt SHA, the model, and any content-hash of the stage's actual input
+    so upstream changes invalidate downstream caches automatically.
+    """
+    sidecar = _cache_sidecar_path(artifact_path)
+    if not artifact_path.exists() or not sidecar.exists():
+        return False
+    try:
+        prior = json.loads(sidecar.read_text())
+    except (OSError, json.JSONDecodeError):
+        return False
+    return all(prior.get(k) == v for k, v in current_key.items())
+
+
+def _write_cache_sidecar(artifact_path: Path, key: dict) -> None:
+    """Persist a cache key next to its artifact for use on the next run."""
+    _cache_sidecar_path(artifact_path).write_text(json.dumps(key, indent=2, sort_keys=True))
+
+
+def _sha_str(s: str) -> str:
+    """Short SHA-256 of a string. Used in cache keys for content-stability."""
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 
 def _warning_for_error_call(
@@ -298,27 +333,50 @@ async def run_pipeline(
         if not meta_input_blocks:
             meta_input_blocks = normalized_blocks[:20]
 
+        meta_path = src_dir / "metadata.json"
+        meta_input_sha = _sha_str("\n".join(f"{b.span_id}:{b.text}" for b in meta_input_blocks))
+        meta_cache_key = {
+            "stage": "metadata",
+            "prompt_sha256": prompt_sha,
+            "model": cfg["model"],
+            "input_sha": meta_input_sha,
+        }
+
         t = _now()
-        document_metadata, call = await extract_document_metadata(
-            meta_input_blocks,
-            model=cfg["model"],
-            prompt=prompt_content,
-            prompt_sha256=prompt_sha,
-            total_timeout=float(cfg.get("total_timeout_s", default_total_timeout)),
-        )
-        (src_dir / "metadata.json").write_text(document_metadata.model_dump_json(indent=2))
-        w = _warning_for_error_call(call, stage="metadata")
-        if w:
-            warnings.append(w)
-        stage_records.append(
-            StageRunRecord(
-                name="metadata",
-                started_at=t,
-                completed_at=_now(),
-                calls=[call],
-                artifacts_written=["metadata.json"],
+        if _is_cache_valid(meta_path, meta_cache_key):
+            document_metadata = DocumentMetadata.model_validate_json(meta_path.read_text())
+            stage_records.append(
+                StageRunRecord(
+                    name="metadata",
+                    started_at=t,
+                    completed_at=_now(),
+                    calls=[],
+                    artifacts_written=["metadata.json"],
+                    notes="cached",
+                )
             )
-        )
+        else:
+            document_metadata, call = await extract_document_metadata(
+                meta_input_blocks,
+                model=cfg["model"],
+                prompt=prompt_content,
+                prompt_sha256=prompt_sha,
+                total_timeout=float(cfg.get("total_timeout_s", default_total_timeout)),
+            )
+            meta_path.write_text(document_metadata.model_dump_json(indent=2))
+            _write_cache_sidecar(meta_path, meta_cache_key)
+            w = _warning_for_error_call(call, stage="metadata")
+            if w:
+                warnings.append(w)
+            stage_records.append(
+                StageRunRecord(
+                    name="metadata",
+                    started_at=t,
+                    completed_at=_now(),
+                    calls=[call],
+                    artifacts_written=["metadata.json"],
+                )
+            )
     else:
         document_metadata = DocumentMetadata(
             title=__import__("ingest.metadata", fromlist=["_abstaining_title"])._abstaining_title()
@@ -330,28 +388,54 @@ async def run_pipeline(
     prompt_content, prompt_sha = _load_prompt(cfg["prompt"])
     eligible = _eligible_blocks(normalized_blocks, eligibility)
 
+    candidates_path = src_dir / "candidates.json"
+    eligible_sha = _sha_str("\n".join(f"{b.span_id}:{b.text}" for b in eligible))
+    fc_cache_key = {
+        "stage": "find-candidates",
+        "prompt_sha256": prompt_sha,
+        "model": cfg["model"],
+        "n_samples": cfg.get("n_samples", 3),
+        "agreement_threshold": cfg.get("agreement_threshold", 2),
+        "eligible_sha": eligible_sha,
+    }
+
     t = _now()
-    candidates_file, sample_records = await find_candidates(
-        blocks=eligible,
-        model=cfg["model"],
-        prompt=prompt_content,
-        prompt_sha256=prompt_sha,
-        n_samples=cfg.get("n_samples", 3),
-        agreement_threshold=cfg.get("agreement_threshold", 2),
-    )
-    (src_dir / "candidates.json").write_text(candidates_file.model_dump_json(indent=2))
-    for i, sample_call in enumerate(sample_records):
-        w = _warning_for_error_call(sample_call, stage="find-candidates", detail={"sample_idx": i})
-        if w:
-            warnings.append(w)
-    stage_records.append(
-        StageRunRecord(
-            name="find-candidates",
-            started_at=t,
-            completed_at=_now(),
-            calls=sample_records,
+    if _is_cache_valid(candidates_path, fc_cache_key):
+        candidates_file = CandidatesFile.model_validate_json(candidates_path.read_text())
+        stage_records.append(
+            StageRunRecord(
+                name="find-candidates",
+                started_at=t,
+                completed_at=_now(),
+                calls=[],
+                notes="cached",
+            )
         )
-    )
+    else:
+        candidates_file, sample_records = await find_candidates(
+            blocks=eligible,
+            model=cfg["model"],
+            prompt=prompt_content,
+            prompt_sha256=prompt_sha,
+            n_samples=cfg.get("n_samples", 3),
+            agreement_threshold=cfg.get("agreement_threshold", 2),
+        )
+        candidates_path.write_text(candidates_file.model_dump_json(indent=2))
+        _write_cache_sidecar(candidates_path, fc_cache_key)
+        for i, sample_call in enumerate(sample_records):
+            w = _warning_for_error_call(
+                sample_call, stage="find-candidates", detail={"sample_idx": i}
+            )
+            if w:
+                warnings.append(w)
+        stage_records.append(
+            StageRunRecord(
+                name="find-candidates",
+                started_at=t,
+                completed_at=_now(),
+                calls=sample_records,
+            )
+        )
 
     # ── evidence-pack + extract-facts (per candidate) ────────────────────
     pack_cfg = stages_cfg.get("evidence-pack", {})
@@ -363,18 +447,33 @@ async def run_pipeline(
     # Optional controlled-vocab JSON (per-trait `suggested[]` allowed values).
     # Path is relative to the project root, same convention as `prompt:`.
     facts_vocab: dict | None = None
+    facts_vocab_sha: str | None = None
     if facts_cfg.get("vocab"):
         vocab_path = _project_root() / facts_cfg["vocab"]
         if not vocab_path.exists():
             raise FileNotFoundError(f"Vocab file not found: {vocab_path}")
-        facts_vocab = json.loads(vocab_path.read_text())
+        vocab_text = vocab_path.read_text()
+        facts_vocab = json.loads(vocab_text)
+        facts_vocab_sha = _sha_str(vocab_text)
 
-    async def _process_candidate(c: Candidate) -> tuple[GallRecord, ProviderCallRecord]:
+    async def _process_candidate(c: Candidate) -> tuple[GallRecord, ProviderCallRecord | None]:
         candidate_dir = candidates_dir / c.candidate_id
         candidate_dir.mkdir(exist_ok=True)
         pack_text, meta = build_evidence_pack(c, normalized_blocks, context_window=context_window)
         (candidate_dir / "evidence_pack.txt").write_text(pack_text)
         (candidate_dir / "evidence_pack.meta.json").write_text(json.dumps(meta, indent=2))
+        facts_path = candidate_dir / "facts.json"
+        cand_cache_key = {
+            "stage": "extract-facts",
+            "prompt_sha256": facts_prompt_sha,
+            "model": facts_cfg["model"],
+            "vocab_sha": facts_vocab_sha,
+            "candidate_id": c.candidate_id,
+            "evidence_pack_sha": _sha_str(pack_text),
+        }
+        if _is_cache_valid(facts_path, cand_cache_key):
+            record = GallRecord.model_validate_json(facts_path.read_text())
+            return record, None
         async with facts_semaphore:
             record, call = await extract_facts(
                 candidate=c,
@@ -386,7 +485,8 @@ async def run_pipeline(
                 total_timeout=float(facts_cfg.get("total_timeout_s", default_total_timeout)),
                 vocab=facts_vocab,
             )
-        (candidate_dir / "facts.json").write_text(record.model_dump_json(indent=2))
+        facts_path.write_text(record.model_dump_json(indent=2))
+        _write_cache_sidecar(facts_path, cand_cache_key)
         return record, call
 
     t = _now()
@@ -394,8 +494,11 @@ async def run_pipeline(
         *[_process_candidate(c) for c in candidates_file.candidates]
     )
     claims_records = [r for r, _ in facts_results]
-    facts_calls = [c for _, c in facts_results]
+    # Cache hits return None for the call; filter them out of the manifest.
+    facts_calls = [c for _, c in facts_results if c is not None]
     for record, call in facts_results:
+        if call is None:
+            continue
         w = _warning_for_error_call(call, stage="extract-facts", record_id=record.record_id)
         if w:
             warnings.append(w)
@@ -440,29 +543,71 @@ async def run_pipeline(
     vc_workers = vc_cfg.get("max_workers", 8)
     vc_total_timeout = float(vc_cfg.get("total_timeout_s", default_total_timeout))
     vc_semaphore = asyncio.Semaphore(vc_workers)
+
+    # Cache key spans the full input set: prompt, model, and a hash of all
+    # gated records (the verifier's input). If any record's pre-verifier
+    # state changes, the SHA changes and the cache invalidates wholesale.
+    # Cache is keyed at the stage level (one sidecar) but checks per-record
+    # artifacts existence — so it's robust to partial output deletion.
+    vc_input_sha = _sha_str("\n".join(r.model_dump_json() for r in gated_records))
+    vc_cache_key = {
+        "stage": "verify-claims",
+        "prompt_sha256": vc_sha,
+        "model": vc_cfg["model"],
+        "input_sha": vc_input_sha,
+    }
+    # No single artifact for verify-claims (output is per-record). Use a
+    # standalone sidecar file at the source-dir level.
+    vc_sidecar = src_dir / "verify-claims.stage-cache.json"
+    vc_per_record_paths = [
+        candidates_dir / r.candidate_id / "verified_facts.json" for r in gated_records
+    ]
+    vc_cache_hit = False
+    if vc_sidecar.exists() and all(p.exists() for p in vc_per_record_paths):
+        try:
+            prior = json.loads(vc_sidecar.read_text())
+            vc_cache_hit = all(prior.get(k) == v for k, v in vc_cache_key.items())
+        except (OSError, json.JSONDecodeError):
+            vc_cache_hit = False
+
     t = _now()
-    verified_records, vc_calls, vc_warnings = await _verify_records_claims(
-        gated_records,
-        blocks_by_id,
-        vc_cfg["model"],
-        vc_prompt,
-        vc_sha,
-        vc_semaphore,
-        total_timeout=vc_total_timeout,
-    )
-    warnings.extend(vc_warnings)
-    for r in verified_records:
-        (candidates_dir / r.candidate_id / "verified_facts.json").write_text(
-            r.model_dump_json(indent=2)
+    if vc_cache_hit:
+        verified_records = [
+            GallRecord.model_validate_json(p.read_text()) for p in vc_per_record_paths
+        ]
+        stage_records.append(
+            StageRunRecord(
+                name="verify-claims",
+                started_at=t,
+                completed_at=_now(),
+                calls=[],
+                notes="cached",
+            )
         )
-    stage_records.append(
-        StageRunRecord(
-            name="verify-claims",
-            started_at=t,
-            completed_at=_now(),
-            calls=vc_calls,
+    else:
+        verified_records, vc_calls, vc_warnings = await _verify_records_claims(
+            gated_records,
+            blocks_by_id,
+            vc_cfg["model"],
+            vc_prompt,
+            vc_sha,
+            vc_semaphore,
+            total_timeout=vc_total_timeout,
         )
-    )
+        warnings.extend(vc_warnings)
+        for r in verified_records:
+            (candidates_dir / r.candidate_id / "verified_facts.json").write_text(
+                r.model_dump_json(indent=2)
+            )
+        vc_sidecar.write_text(json.dumps(vc_cache_key, indent=2, sort_keys=True))
+        stage_records.append(
+            StageRunRecord(
+                name="verify-claims",
+                started_at=t,
+                completed_at=_now(),
+                calls=vc_calls,
+            )
+        )
 
     # ── taxonomy-lookup ──────────────────────────────────────────────────
     tax_cfg = stages_cfg.get("taxonomy-lookup", {})

@@ -187,9 +187,7 @@ class TestStructuredPaper:
                 _block("S_0002", f"{variant}\nThanks.", page=2, char_start=20),
             ]
             sections_file, _ = sectionize(inputs)
-            ack = next(
-                (s for s in sections_file.sections if s.type == SectionType.APPENDIX), None
-            )
+            ack = next((s for s in sections_file.sections if s.type == SectionType.APPENDIX), None)
             assert ack is not None, f"Failed to detect {variant!r} as APPENDIX"
             assert ack.extraction_eligible is False
 
