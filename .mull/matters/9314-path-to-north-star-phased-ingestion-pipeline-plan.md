@@ -1,8 +1,9 @@
 ---
 status: raw
 created: 2026-05-10
-updated: 2026-05-11
+updated: 2026-05-15
 epic: source-ingestion
+relates: [4fef]
 ---
 
 # Path to north star — phased ingestion pipeline plan
@@ -401,4 +402,3 @@ A full pass over the reviewer experience for beta quality. Detailed scope deferr
 The pipeline cannot go to beta until this phase is complete.
 
 **Human test**: a beta user can submit a paper, review the extraction including per-field evidence quotes and verifier status, and approve it into the production tables without confusion or hand-holding.
-

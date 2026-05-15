@@ -285,19 +285,23 @@ async def run_pipeline(
     # ── preprocess ───────────────────────────────────────────────────────
     t = _now()
     normalized_blocks = preprocess_blocks(raw_blocks)
-    write_jsonl(normalized_blocks, src_dir / "normalized_text.jsonl")
     stage_records.append(
         StageRunRecord(
             name="preprocess",
             started_at=t,
             completed_at=_now(),
-            artifacts_written=["normalized_text.jsonl"],
+            artifacts_written=[],
         )
     )
 
     # ── sectionize ───────────────────────────────────────────────────────
+    # normalized_text.jsonl is written here (not after preprocess) so each
+    # row carries the section_id that sectionize assigns; otherwise every
+    # on-disk row would be section_id=null even though in-memory blocks
+    # are correct.
     t = _now()
     sections_file, normalized_blocks = sectionize(normalized_blocks)
+    write_jsonl(normalized_blocks, src_dir / "normalized_text.jsonl")
     (src_dir / "sections.json").write_text(sections_file.model_dump_json(indent=2))
     sections_by_id = {s.section_id: s for s in sections_file.sections}
     eligibility = {s.section_id: s.extraction_eligible for s in sections_file.sections}
@@ -306,7 +310,7 @@ async def run_pipeline(
             name="sectionize",
             started_at=t,
             completed_at=_now(),
-            artifacts_written=["sections.json"],
+            artifacts_written=["normalized_text.jsonl", "sections.json"],
         )
     )
 

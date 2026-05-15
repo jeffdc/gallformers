@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-05-15
 epic: source-ingestion
 relates: [c744]
 ---
@@ -10,7 +10,7 @@ relates: [c744]
 
 ## Context
 
-Three concrete, non-blocking follow-ups from `c744` (Python ingestion
+Two concrete, non-blocking follow-ups from `c744` (Python ingestion
 pipeline: artifacts as the contract). c744 is being closed as `done`
 because Phase A is complete, all four real Phase B prompts have been
 written and iterated, the production model set is settled, and the
@@ -21,6 +21,11 @@ that work and deferred — none block any current functionality.
 Reference: `services/source-ingestion/docs/extract-facts-model-bakeoff.md`
 captures the model decision rationale; the c744 matter body documents
 the broader implementation history.
+
+A third polish item — broadening `preprocess.strip_bhl_boilerplate` — has
+been moved to matter `4fef` (OCR support for scanned PDFs), since nearly
+all BHL papers are OCR scans and the boilerplate work is naturally part
+of bringing OCR support online.
 
 ## 1. Elixir mix task for vocab regeneration + CI guard
 
@@ -65,32 +70,14 @@ after `sectionize` runs. Slight reordering of stage records (preprocess
 no longer claims `artifacts_written=["normalized_text.jsonl"]`;
 sectionize claims it instead).
 
-## 3. BHL boilerplate strip rule
-
-`preprocess.strip_bhl_boilerplate` looks for `biodiversitylibrary.org`
-in the first 500 chars + a `"This page intentionally left blank"`
-marker. The Philippines paper in our test corpus is from BHL but
-doesn't trigger the rule — its blocks contain BHL portal URLs
-interleaved with normal text, not the cover-page pattern the strip
-rule expects.
-
-Low priority because (a) Philippines is a scanned PDF outside our
-born-digital target corpus, (b) we've now confirmed the OCR pipeline
-is out of scope for the current Python pipeline (deferred to matter
-`9314` Phase 4), and (c) any future BHL papers we ingest would
-probably come through different patterns.
-
-If picked up: examine actual BHL outputs (the strip currently expects
-a specific cover-page format; real downloads have multi-block portal
-text) and broaden the rule.
-
 ## What's NOT in this matter
 
 These are explicitly out of scope per c744 and remain so:
 
-- OCR pipeline (matter `9314` Phase 4)
+- OCR pipeline (matter `4fef`; broader phasing in matter `9314`)
 - Marker / Docling evaluation (deferred)
 - Server-side bundle ingestion + WCVP enrichment (matter `415f` /
   Phase 6 work)
 - Beta UX / distribution
 - GBIF↔WCVP disagreement resolution (server-side)
+
