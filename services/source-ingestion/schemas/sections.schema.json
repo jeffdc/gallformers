@@ -1,0 +1,117 @@
+{
+  "$defs": {
+    "Section": {
+      "additionalProperties": false,
+      "properties": {
+        "extraction_eligible": {
+          "description": "False for references/bibliography/literature_cited; suppresses extraction",
+          "title": "Extraction Eligible",
+          "type": "boolean"
+        },
+        "heading": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Detected heading text, if any",
+          "title": "Heading"
+        },
+        "heading_path": {
+          "description": "Ancestral headings, e.g. ['Taxonomic Treatments', 'Andricus quercuscalifornicus']",
+          "items": {
+            "type": "string"
+          },
+          "title": "Heading Path",
+          "type": "array"
+        },
+        "page_end": {
+          "minimum": 1,
+          "title": "Page End",
+          "type": "integer"
+        },
+        "page_start": {
+          "minimum": 1,
+          "title": "Page Start",
+          "type": "integer"
+        },
+        "section_id": {
+          "title": "Section Id",
+          "type": "string"
+        },
+        "span_ids": {
+          "description": "Span IDs in normalized_text.jsonl belonging to this section",
+          "items": {
+            "type": "string"
+          },
+          "title": "Span Ids",
+          "type": "array"
+        },
+        "type": {
+          "$ref": "#/$defs/SectionType"
+        }
+      },
+      "required": [
+        "section_id",
+        "type",
+        "page_start",
+        "page_end",
+        "span_ids",
+        "extraction_eligible"
+      ],
+      "title": "Section",
+      "type": "object"
+    },
+    "SectionType": {
+      "description": "Logical sections detected by the rule-based sectionizer.",
+      "enum": [
+        "title",
+        "abstract",
+        "introduction",
+        "methods",
+        "taxonomic_treatment",
+        "description",
+        "host_list",
+        "key",
+        "table",
+        "caption",
+        "references",
+        "bibliography",
+        "literature_cited",
+        "appendix",
+        "unknown"
+      ],
+      "title": "SectionType",
+      "type": "string"
+    }
+  },
+  "$id": "https://gallformers.org/schemas/sections.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "`sections.json` — top-level container for the document's sections.",
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sections": {
+      "items": {
+        "$ref": "#/$defs/Section"
+      },
+      "title": "Sections",
+      "type": "array"
+    }
+  },
+  "required": [
+    "sections"
+  ],
+  "title": "SectionsFile",
+  "type": "object",
+  "x-schema-version": "1.0.0"
+}

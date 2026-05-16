@@ -19,6 +19,14 @@ defmodule Gallformers.Galls.HostAssociationsTest do
   defp create_gall(name), do: create_species(name, "gall")
   defp create_host(name), do: create_species(name, "plant")
 
+  defp create_placeholder_host(name) do
+    Repo.insert!(%Gallformers.Species.Species{
+      name: name,
+      taxoncode: "plant",
+      genus_placeholder: true
+    })
+  end
+
   # ============================================
   # Schema / Changeset
   # ============================================
@@ -123,6 +131,55 @@ defmodule Gallformers.Galls.HostAssociationsTest do
       hosts = Galls.get_hosts_for_gall(gall1.id)
       assert length(hosts) == 1
       assert hd(hosts).host_name == "Host one"
+    end
+
+    test "surfaces the genus_placeholder flag on each host" do
+      gall = create_gall("Andricus placeholder test")
+      host_real = create_host("Quercus alba placeholder test")
+      host_placeholder = create_placeholder_host("Quercus placeholder spp")
+
+      Galls.create_gall_host(%{gall_species_id: gall.id, host_species_id: host_real.id})
+      Galls.create_gall_host(%{gall_species_id: gall.id, host_species_id: host_placeholder.id})
+
+      hosts = Galls.get_hosts_for_gall(gall.id)
+
+      flags =
+        hosts
+        |> Enum.map(fn h -> {h.host_name, h.genus_placeholder} end)
+        |> Enum.sort()
+
+      assert flags == [
+               {"Quercus alba placeholder test", false},
+               {"Quercus placeholder spp", true}
+             ]
+    end
+  end
+
+  describe "only_placeholder_hosts?/1" do
+    test "returns true when every host is a genus placeholder" do
+      gall = create_gall("Only placeholders gall")
+      ph1 = create_placeholder_host("Quercus only ph1 spp")
+      ph2 = create_placeholder_host("Carya only ph2 spp")
+
+      Galls.create_gall_host(%{gall_species_id: gall.id, host_species_id: ph1.id})
+      Galls.create_gall_host(%{gall_species_id: gall.id, host_species_id: ph2.id})
+
+      assert gall.id |> Galls.get_hosts_for_gall() |> Galls.only_placeholder_hosts?() == true
+    end
+
+    test "returns false when at least one host is a real species" do
+      gall = create_gall("Mixed hosts gall")
+      ph = create_placeholder_host("Quercus mixed ph spp")
+      real = create_host("Quercus mixed real")
+
+      Galls.create_gall_host(%{gall_species_id: gall.id, host_species_id: ph.id})
+      Galls.create_gall_host(%{gall_species_id: gall.id, host_species_id: real.id})
+
+      assert gall.id |> Galls.get_hosts_for_gall() |> Galls.only_placeholder_hosts?() == false
+    end
+
+    test "returns false for an empty host list" do
+      assert Galls.only_placeholder_hosts?([]) == false
     end
   end
 
@@ -400,6 +457,47 @@ defmodule Gallformers.Galls.HostAssociationsTest do
 
       after_save = Repo.get!(Gallformers.Species.Species, gall.id).updated_at
       assert DateTime.compare(after_save, past) == :gt
+    end
+
+    test "rolls back atomically when a host removal targets a non-existent relation",
+         %{gall: gall, host2: host2, relation: relation} do
+      # Pin updated_at to a known past time so we can detect whether touch ran
+      past = ~U[2020-01-01 00:00:00Z]
+
+      Repo.get!(Gallformers.Species.Species, gall.id)
+      |> Ecto.Changeset.change(%{updated_at: past})
+      |> Repo.update!()
+
+      hosts_to_add = [%{host_species_id: host2.id}]
+      hosts_to_remove = MapSet.new([relation.id, 999_999_999])
+
+      assert {:error, _reason} =
+               Galls.save_gall_host_changes(gall.id, hosts_to_add, hosts_to_remove)
+
+      # The existing host must still be present (remove rolled back)
+      hosts = Galls.get_hosts_for_gall(gall.id)
+      names = Enum.map(hosts, & &1.host_name)
+      assert "Existing host" in names
+      # The new host must NOT have been added
+      refute "New host" in names
+      # Species.touch must not have run
+      after_save = Repo.get!(Gallformers.Species.Species, gall.id).updated_at
+      assert DateTime.compare(after_save, past) == :eq
+    end
+
+    test "emits exactly one broadcast on successful batch save",
+         %{gall: gall, host2: host2, relation: relation} do
+      Phoenix.PubSub.subscribe(Gallformers.PubSub, "species")
+
+      hosts_to_add = [%{host_species_id: host2.id}]
+      hosts_to_remove = MapSet.new([relation.id])
+
+      assert {:ok, :ok} = Galls.save_gall_host_changes(gall.id, hosts_to_add, hosts_to_remove)
+
+      gall_id = gall.id
+      assert_receive {:species_updated, %{id: ^gall_id}}, 500
+      # No additional broadcasts for the individual add/remove operations
+      refute_receive {:species_updated, %{id: ^gall_id}}, 200
     end
   end
 end

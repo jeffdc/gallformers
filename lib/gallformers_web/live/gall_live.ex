@@ -91,6 +91,9 @@ defmodule GallformersWeb.GallLive do
 
       gall ->
         hosts = Galls.get_hosts_for_gall(gall_id) |> Enum.sort_by(& &1.host_name)
+
+        only_placeholder_hosts? = Galls.only_placeholder_hosts?(hosts)
+
         images = Images.list_images_for_species(gall_id) |> format_images()
         sources = Sources.get_sources_for_species(gall_id)
         aliases = Species.get_aliases_for_species(gall_id)
@@ -152,6 +155,7 @@ defmodule GallformersWeb.GallLive do
            range: range,
            inherited_range: inherited_range,
            range_bounds: range_bounds,
+           only_placeholder_hosts?: only_placeholder_hosts?,
            related_galls: related_galls,
            common_names: common_names,
            scientific_aliases: scientific_aliases,
@@ -435,14 +439,15 @@ defmodule GallformersWeb.GallLive do
                 <div :if={@gall.hosts && length(@gall.hosts) > 0} class="flex items-center gap-1">
                   <div>
                     <strong>Hosts:</strong>
-                    <em class="taxon-name">
-                      <span :for={{host, idx} <- Enum.with_index(@gall.hosts)}>
-                        {if idx > 0, do: " / "}<.link
-                          href={"/host/#{host.host_species_id}"}
-                          class="hover:underline"
-                        >{host.host_name}</.link>
-                      </span>
-                    </em>
+                    <span :for={{host, idx} <- Enum.with_index(@gall.hosts)}>
+                      {if idx > 0, do: " / "}<.link
+                        href={"/host/#{host.host_species_id}"}
+                        class="hover:underline"
+                      ><.taxon_name
+                          name={host.host_name}
+                          genus_placeholder={host[:genus_placeholder] == true}
+                        /></.link>
+                    </span>
                   </div>
                   <.link
                     :if={@current_user}
@@ -491,7 +496,14 @@ defmodule GallformersWeb.GallLive do
                     <span>Needs review</span>
                   </.link>
                 </div>
+                <p
+                  :if={@only_placeholder_hosts?}
+                  class="text-sm text-gray-600 italic mt-1"
+                >
+                  Range unknown — only genus-level host data available.
+                </p>
                 <.range_map
+                  :if={not @only_placeholder_hosts?}
                   id="gall-range-map"
                   class="min-h-[250px] h-[300px]"
                   in_range={@range}
@@ -499,7 +511,7 @@ defmodule GallformersWeb.GallLive do
                   bounds={@range_bounds}
                   navigable
                 />
-                <div :if={@inherited_range != []} class="mt-1">
+                <div :if={not @only_placeholder_hosts? and @inherited_range != []} class="mt-1">
                   <.range_map_legend mode={:public} />
                 </div>
               </div>

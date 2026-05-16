@@ -8,10 +8,48 @@ defmodule Gallformers.SpeciesTest do
   alias Gallformers.Galls.GallTraits
   alias Gallformers.Repo
   alias Gallformers.Species
+  alias Gallformers.Species.Species, as: SpeciesSchema
   alias Gallformers.Taxonomy
   alias Gallformers.Taxonomy.{Genus, Lineage}
 
   # Test seeds: galls 100-103, 200-201; plants 1-9
+
+  describe "Species.changeset/2" do
+    test "accepts :genus_placeholder boolean field" do
+      attrs = %{
+        "name" => "Arctostaphylos spp",
+        "taxoncode" => "plant",
+        "genus_placeholder" => true
+      }
+
+      changeset = SpeciesSchema.changeset(%SpeciesSchema{}, attrs)
+      assert changeset.valid? == true
+      assert Ecto.Changeset.get_field(changeset, :genus_placeholder) == true
+    end
+
+    test "defaults :genus_placeholder to false when not provided" do
+      attrs = %{
+        "name" => "Quercus alba",
+        "taxoncode" => "plant"
+      }
+
+      changeset = SpeciesSchema.changeset(%SpeciesSchema{}, attrs)
+      assert changeset.valid? == true
+      assert Ecto.Changeset.get_field(changeset, :genus_placeholder) == false
+    end
+
+    test "accepts :genus_placeholder set to false explicitly" do
+      attrs = %{
+        "name" => "Quercus rubra",
+        "taxoncode" => "plant",
+        "genus_placeholder" => false
+      }
+
+      changeset = SpeciesSchema.changeset(%SpeciesSchema{}, attrs)
+      assert changeset.valid? == true
+      assert Ecto.Changeset.get_field(changeset, :genus_placeholder) == false
+    end
+  end
 
   describe "list_species/0" do
     test "returns all seeded species" do

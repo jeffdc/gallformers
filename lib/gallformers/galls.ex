@@ -68,6 +68,7 @@ defmodule Gallformers.Galls do
   defdelegate get_hosts_for_galls(gall_species_ids), to: HostAssociations
   defdelegate get_host_counts_for_galls(gall_species_ids), to: HostAssociations
   defdelegate get_host_species_ids_for_gall(gall_species_id), to: HostAssociations
+  defdelegate only_placeholder_hosts?(hosts), to: HostAssociations
   defdelegate create_gall_host(attrs), to: HostAssociations
   defdelegate add_host_to_gall(gall_species_id, host_species_id), to: HostAssociations
   defdelegate remove_host_from_gall(host_relation_id), to: HostAssociations
@@ -767,13 +768,15 @@ defmodule Gallformers.Galls do
   Computes whether the datacomplete checkbox should be locked and why.
 
   A gall's datacomplete flag is locked to `false` when:
+  - The species has not been saved yet (nil id) — sources cannot be added until save
   - The species has no sources linked — a source is required for completeness
   - The gall is marked undescribed — undescribed species are by definition incomplete
 
   Returns `{locked?, reason}` where reason is a string explaining the lock, or nil if unlocked.
   """
   @spec compute_datacomplete_lock(integer() | nil) :: {boolean(), String.t() | nil}
-  def compute_datacomplete_lock(nil), do: {false, nil}
+  def compute_datacomplete_lock(nil),
+    do: {true, "A source is required to mark a gall as data complete."}
 
   def compute_datacomplete_lock(species_id) do
     cond do
@@ -1269,7 +1272,7 @@ defmodule Gallformers.Galls do
 
     Repo.transaction(fn ->
       case Gallformers.Species.update_species(species, params.species_attrs) do
-        {:ok, updated_species} ->
+        {:ok, _updated_species} ->
           save_alias_changes(species.id, aliases_to_add, aliases_to_remove)
           save_host_changes(species.id, hosts_to_add, hosts_to_remove)
 
@@ -1280,13 +1283,51 @@ defmodule Gallformers.Galls do
           )
 
           update_gall_properties!(species.id, params)
+          enforce_datacomplete_invariant!(species.id)
           Gallformers.Species.touch(species.id)
-          updated_species
+          Repo.get!(Species, species.id)
 
         {:error, changeset} ->
           Repo.rollback(changeset)
       end
     end)
+  end
+
+  # Reads the post-write state for the gall and rolls back the surrounding
+  # transaction if `datacomplete=true` was persisted while the gall is undescribed
+  # or has no sources. This is the data-layer backstop for the form lock — it
+  # catches any save path that bypasses the UI (stale form state, scripts, etc).
+  defp enforce_datacomplete_invariant!(species_id) do
+    species = Repo.get!(Species, species_id)
+
+    if species.datacomplete do
+      cond do
+        not Gallformers.Sources.has_sources?(species_id) ->
+          Repo.rollback(
+            datacomplete_changeset_error(
+              species,
+              "cannot be true: gall has no sources"
+            )
+          )
+
+        undescribed?(species_id) ->
+          Repo.rollback(
+            datacomplete_changeset_error(
+              species,
+              "cannot be true: gall is undescribed"
+            )
+          )
+
+        true ->
+          :ok
+      end
+    end
+  end
+
+  defp datacomplete_changeset_error(species, message) do
+    species
+    |> Ecto.Changeset.change()
+    |> Ecto.Changeset.add_error(:datacomplete, message)
   end
 
   @doc """

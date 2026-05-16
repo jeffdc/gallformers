@@ -7,6 +7,7 @@ defmodule Gallformers.Galls.HostAssociations do
 
   import Ecto.Query
 
+  alias Ecto.Multi
   alias Gallformers.Galls.GallHost
   alias Gallformers.Repo
   alias Gallformers.Species.Species
@@ -25,10 +26,24 @@ defmodule Gallformers.Galls.HostAssociations do
       select: %{
         host_relation_id: h.id,
         host_species_id: s.id,
-        host_name: s.name
+        host_name: s.name,
+        genus_placeholder: s.genus_placeholder
       }
     )
     |> Repo.all()
+  end
+
+  @doc """
+  Returns true when every host in the given list is flagged as a genus-level
+  placeholder (e.g. "Quercus spp").
+
+  Takes the host maps produced by `get_hosts_for_gall/1` so callers that have
+  already loaded hosts don't pay for a second DB round trip. Returns false for
+  an empty list.
+  """
+  @spec only_placeholder_hosts?([map()]) :: boolean()
+  def only_placeholder_hosts?(hosts) when is_list(hosts) do
+    hosts != [] and Enum.all?(hosts, & &1.genus_placeholder)
   end
 
   @doc """
@@ -175,25 +190,65 @@ defmodule Gallformers.Galls.HostAssociations do
         gall_range_entries \\ nil,
         opts \\ []
       ) do
-    Repo.transaction(fn ->
-      for relation_id <- hosts_to_remove do
-        remove_host_from_gall(relation_id)
-      end
+    multi =
+      Multi.new()
+      |> add_remove_steps(hosts_to_remove)
+      |> add_insert_steps(gall_id, hosts_to_add)
+      |> add_range_step(gall_id, gall_range_entries)
+      |> add_confirm_range_step(gall_id, opts[:confirm_range])
+      |> Multi.run(:touch, fn _repo, _changes -> Gallformers.Species.touch(gall_id) end)
 
-      for host <- hosts_to_add do
-        add_host_to_gall(gall_id, host.host_species_id)
-      end
+    case Repo.transaction(multi) do
+      {:ok, _changes} ->
+        broadcast_species_change(gall_id, :species_updated)
+        {:ok, :ok}
 
-      if gall_range_entries do
-        Gallformers.Ranges.set_gall_range(gall_id, gall_range_entries)
-      end
+      {:error, failed_step, reason, _changes_so_far} ->
+        {:error, {failed_step, reason}}
+    end
+  end
 
-      if opts[:confirm_range] do
-        Gallformers.Galls.confirm_gall_range(gall_id)
-      end
+  defp add_remove_steps(multi, hosts_to_remove) do
+    Enum.reduce(hosts_to_remove, multi, fn relation_id, acc ->
+      Multi.run(acc, {:remove, relation_id}, fn repo, _changes ->
+        delete_relation(repo, relation_id)
+      end)
+    end)
+  end
 
-      Gallformers.Species.touch(gall_id)
-      :ok
+  defp delete_relation(repo, relation_id) do
+    case repo.get(GallHost, relation_id) do
+      nil -> {:error, :not_found}
+      relation -> repo.delete(relation)
+    end
+  end
+
+  defp add_insert_steps(multi, gall_id, hosts_to_add) do
+    Enum.reduce(hosts_to_add, multi, fn host, acc ->
+      attrs = %{gall_species_id: gall_id, host_species_id: host.host_species_id}
+
+      Multi.insert(
+        acc,
+        {:add, host.host_species_id},
+        GallHost.changeset(%GallHost{}, attrs)
+      )
+    end)
+  end
+
+  defp add_range_step(multi, _gall_id, nil), do: multi
+
+  defp add_range_step(multi, gall_id, gall_range_entries) do
+    Multi.run(multi, :set_range, fn _repo, _changes ->
+      Gallformers.Ranges.set_gall_range(gall_id, gall_range_entries)
+    end)
+  end
+
+  defp add_confirm_range_step(multi, _gall_id, nil), do: multi
+  defp add_confirm_range_step(multi, _gall_id, false), do: multi
+
+  defp add_confirm_range_step(multi, gall_id, _truthy) do
+    Multi.run(multi, :confirm_range, fn _repo, _changes ->
+      {:ok, Gallformers.Galls.confirm_gall_range(gall_id)}
     end)
   end
 

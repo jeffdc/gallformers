@@ -117,7 +117,10 @@ defmodule GallformersWeb.TreeComponents do
         <% else %>
           <%!-- Leaf node (species) --%>
           <.link href={node.url} class="flex items-center gap-1 ml-5 hover:underline">
-            <.taxon_name name={node.label} />
+            <.taxon_name
+              name={node.label}
+              genus_placeholder={Map.get(node, :genus_placeholder) == true}
+            />
           </.link>
         <% end %>
       </li>

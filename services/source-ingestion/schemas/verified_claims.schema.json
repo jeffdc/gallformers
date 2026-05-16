@@ -1,0 +1,971 @@
+{
+  "$defs": {
+    "ConfidenceBucket": {
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "title": "ConfidenceBucket",
+      "type": "string"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "description": "A single citation pointing at the canonical normalized text.\n\nBoth block-relative addressing (`block_id`) and absolute offsets are\ncarried (per amendment 1 of the artifact contract). UI uses\n`char_start`/`char_end` to render highlights; audit tools use `block_id`\nto trace back to `normalized_text.jsonl`.",
+      "properties": {
+        "block_id": {
+          "description": "ID of the source block in normalized_text.jsonl",
+          "title": "Block Id",
+          "type": "string"
+        },
+        "char_end": {
+          "description": "Absolute char offset (exclusive)",
+          "minimum": 0,
+          "title": "Char End",
+          "type": "integer"
+        },
+        "char_start": {
+          "description": "Absolute char offset in the flat normalized text",
+          "minimum": 0,
+          "title": "Char Start",
+          "type": "integer"
+        },
+        "page": {
+          "description": "1-indexed page number",
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "quote": {
+          "description": "Exact substring at [char_start:char_end] of the flat normalized text",
+          "title": "Quote",
+          "type": "string"
+        }
+      },
+      "required": [
+        "block_id",
+        "page",
+        "char_start",
+        "char_end",
+        "quote"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "EvidenceCell": {
+      "additionalProperties": false,
+      "description": "Every fact field has this shape: value + evidence + verifier verdict.",
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "raw_value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Source phrase before normalization, when different from value",
+          "title": "Raw Value"
+        },
+        "support_status": {
+          "$ref": "#/$defs/SupportStatus"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Extracted value; null when abstained or substring-gate-rejected",
+          "title": "Value"
+        }
+      },
+      "required": [
+        "value",
+        "support_status",
+        "confidence"
+      ],
+      "title": "EvidenceCell",
+      "type": "object"
+    },
+    "GallMaker": {
+      "additionalProperties": false,
+      "description": "The organism that induces the gall. May be unknown (`scientific_name.value` null).",
+      "properties": {
+        "aliases": {
+          "items": {
+            "$ref": "#/$defs/ScientificNameCell"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvidenceCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "common_names": {
+          "items": {
+            "$ref": "#/$defs/EvidenceCell"
+          },
+          "title": "Common Names",
+          "type": "array"
+        },
+        "rank": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvidenceCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Taxonomic rank of scientific_name, e.g. 'species'"
+        },
+        "scientific_name": {
+          "$ref": "#/$defs/ScientificNameCell"
+        },
+        "taxonomy": {
+          "$ref": "#/$defs/Taxonomy"
+        }
+      },
+      "required": [
+        "scientific_name"
+      ],
+      "title": "GallMaker",
+      "type": "object"
+    },
+    "GallRecord": {
+      "additionalProperties": false,
+      "description": "One gall-host association. The atomic unit of extraction.",
+      "properties": {
+        "candidate_id": {
+          "description": "Pipeline-internal candidate ID, e.g. 'C_001'",
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "confidence_bucket": {
+          "$ref": "#/$defs/ConfidenceBucket",
+          "default": "medium"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvidenceCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Morphological description text from the source"
+        },
+        "gall_maker": {
+          "$ref": "#/$defs/GallMaker"
+        },
+        "gall_traits": {
+          "$ref": "#/$defs/GallTraits"
+        },
+        "hosts": {
+          "items": {
+            "$ref": "#/$defs/Host"
+          },
+          "title": "Hosts",
+          "type": "array"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvidenceCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Collection locality if mentioned"
+        },
+        "record_id": {
+          "description": "Stable record ID, e.g. 'R_001'",
+          "title": "Record Id",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/WarningEntry"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "record_id",
+        "candidate_id",
+        "gall_maker"
+      ],
+      "title": "GallRecord",
+      "type": "object"
+    },
+    "GallTraits": {
+      "additionalProperties": false,
+      "description": "Trait fields. `suggested` values come from gallformers-vocab.json.\n\nAdult-insect traits (antennae, wings, mesosoma, body color, etc.) are\nexplicitly disallowed by the extraction prompt — they belong on the\ngall-maker, not the gall.",
+      "properties": {
+        "alignment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TraitCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "cells": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TraitCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TraitCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "detachable": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvidenceCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "One of: unknown, integral, detachable, both (see Detachable enum)"
+        },
+        "form": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TraitCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "plant_part": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TraitCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "season": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TraitCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "shape": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TraitCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "texture": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TraitCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "walls": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TraitCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "GallTraits",
+      "type": "object"
+    },
+    "Host": {
+      "additionalProperties": false,
+      "description": "A host species the gall-maker uses. One record per (gall, host) pair.",
+      "properties": {
+        "authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvidenceCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "rank": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvidenceCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "scientific_name": {
+          "$ref": "#/$defs/ScientificNameCell"
+        }
+      },
+      "required": [
+        "scientific_name"
+      ],
+      "title": "Host",
+      "type": "object"
+    },
+    "ScientificNameCell": {
+      "additionalProperties": false,
+      "description": "Evidence cell for taxonomic names. Carries `name_as_written` and `taxonomy_lookups`.\n\nThe pipeline appends one GBIF entry to `taxonomy_lookups`. The server appends\na WCVP entry for plant names during bundle import.",
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "name_as_written": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Exact source-text form, preserved verbatim. Includes OCR damage and historical spellings.",
+          "title": "Name As Written"
+        },
+        "raw_value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Source phrase before normalization, when different from value",
+          "title": "Raw Value"
+        },
+        "support_status": {
+          "$ref": "#/$defs/SupportStatus"
+        },
+        "taxonomy_lookups": {
+          "items": {
+            "$ref": "#/$defs/TaxonomyLookup"
+          },
+          "title": "Taxonomy Lookups",
+          "type": "array"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Extracted value; null when abstained or substring-gate-rejected",
+          "title": "Value"
+        }
+      },
+      "required": [
+        "value",
+        "support_status",
+        "confidence"
+      ],
+      "title": "ScientificNameCell",
+      "type": "object"
+    },
+    "SupportStatus": {
+      "description": "Verifier/gate verdict on a single field's evidence.\n\n`supported` and `contradicted` are verifier verdicts.\n`evidence_substring_mismatch` is the substring gate's verdict (value nulled).\n`abstained` is the extractor declining to fill the field.",
+      "enum": [
+        "supported",
+        "contradicted",
+        "not_enough_evidence",
+        "needs_human_review",
+        "evidence_substring_mismatch",
+        "abstained"
+      ],
+      "title": "SupportStatus",
+      "type": "string"
+    },
+    "Taxonomy": {
+      "additionalProperties": false,
+      "description": "Higher-classification ranks for a taxon. All optional; populated per source.\n\n`class` is renamed to `class_name` to avoid the Python keyword. Server-side\nconsumers normalize this back to `class` on read if needed.",
+      "properties": {
+        "class_name": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScientificNameCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "family": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScientificNameCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "genus": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScientificNameCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kingdom": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScientificNameCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "order": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScientificNameCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "phylum": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScientificNameCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "subfamily": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScientificNameCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "subgenus": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScientificNameCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "suborder": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScientificNameCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tribe": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScientificNameCell"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Taxonomy",
+      "type": "object"
+    },
+    "TaxonomyLookup": {
+      "additionalProperties": false,
+      "description": "One source's lookup result. Stored as a list per name field.",
+      "properties": {
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Provider-reported match confidence",
+          "title": "Confidence"
+        },
+        "match": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TaxonomyMatch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Populated when status is exact/fuzzy/synonym; null otherwise"
+        },
+        "queried_at": {
+          "format": "date-time",
+          "title": "Queried At",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/TaxonomyLookupSource"
+        },
+        "status": {
+          "$ref": "#/$defs/TaxonomyLookupStatus"
+        }
+      },
+      "required": [
+        "source",
+        "status",
+        "queried_at"
+      ],
+      "title": "TaxonomyLookup",
+      "type": "object"
+    },
+    "TaxonomyLookupSource": {
+      "description": "The pipeline produces GBIF entries only. The server appends WCVP for plants.",
+      "enum": [
+        "GBIF",
+        "WCVP",
+        "COL",
+        "EOL",
+        "ITIS"
+      ],
+      "title": "TaxonomyLookupSource",
+      "type": "string"
+    },
+    "TaxonomyLookupStatus": {
+      "enum": [
+        "exact",
+        "fuzzy",
+        "synonym",
+        "no_match",
+        "api_error"
+      ],
+      "title": "TaxonomyLookupStatus",
+      "type": "string"
+    },
+    "TaxonomyMatch": {
+      "additionalProperties": false,
+      "description": "A single source's matched record. Fields beyond `scientific_name` are best-effort.",
+      "properties": {
+        "accepted_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Populated when status == synonym",
+          "title": "Accepted Name"
+        },
+        "canonical_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Canonical Name"
+        },
+        "class_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Taxonomic class (avoiding Python `class` keyword)",
+          "title": "Class Name"
+        },
+        "family": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Family"
+        },
+        "genus": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Genus"
+        },
+        "kingdom": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Kingdom"
+        },
+        "order": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Order"
+        },
+        "phylum": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phylum"
+        },
+        "rank": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rank"
+        },
+        "scientific_name": {
+          "title": "Scientific Name",
+          "type": "string"
+        },
+        "source_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Provider-native ID, e.g. GBIF usageKey",
+          "title": "Source Key"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        }
+      },
+      "required": [
+        "scientific_name"
+      ],
+      "title": "TaxonomyMatch",
+      "type": "object"
+    },
+    "TraitCell": {
+      "additionalProperties": false,
+      "description": "Trait fields use original-source-phrase + controlled-vocab-suggestions shape.\n\n`suggested` items map to entries in `gallformers-vocab.json`. Pipeline does not\nenforce the vocab at this layer — Instructor uses a per-call dynamic schema\nconstraining `suggested` to allowed values during extraction.",
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "original": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Exact source phrase, e.g. 'bright red'. Null if trait unmentioned.",
+          "title": "Original"
+        },
+        "suggested": {
+          "description": "Controlled-vocab mappings; may be empty",
+          "items": {
+            "type": "string"
+          },
+          "title": "Suggested",
+          "type": "array"
+        },
+        "support_status": {
+          "$ref": "#/$defs/SupportStatus"
+        }
+      },
+      "required": [
+        "original",
+        "support_status",
+        "confidence"
+      ],
+      "title": "TraitCell",
+      "type": "object"
+    },
+    "WarningEntry": {
+      "additionalProperties": false,
+      "description": "One warning. Type-specific detail goes in `detail` as a free-form dict.",
+      "properties": {
+        "detail": {
+          "additionalProperties": true,
+          "description": "Type-specific structured info",
+          "title": "Detail",
+          "type": "object"
+        },
+        "field_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Dotted path to the offending field, e.g. 'gall_traits.color'",
+          "title": "Field Path"
+        },
+        "record_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Gall-record ID when warning is record-scoped",
+          "title": "Record Id"
+        },
+        "severity": {
+          "$ref": "#/$defs/WarningSeverity",
+          "default": "warning"
+        },
+        "type": {
+          "$ref": "#/$defs/WarningType"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "WarningEntry",
+      "type": "object"
+    },
+    "WarningSeverity": {
+      "enum": [
+        "info",
+        "warning",
+        "error"
+      ],
+      "title": "WarningSeverity",
+      "type": "string"
+    },
+    "WarningType": {
+      "description": "Closed enum of warning types. UI rendering depends on this set.",
+      "enum": [
+        "evidence_substring_mismatch",
+        "verifier_contradicted",
+        "schema_repair_applied",
+        "llm_output_invalid",
+        "idle_timeout_retry",
+        "usage_estimated",
+        "section_excluded",
+        "vocab_no_match",
+        "taxonomy_no_match",
+        "taxonomy_fuzzy_match_low_confidence",
+        "taxonomy_api_error",
+        "taxonomy_source_disagreement"
+      ],
+      "title": "WarningType",
+      "type": "string"
+    }
+  },
+  "$id": "https://gallformers.org/schemas/verified_claims.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "`verified_claims.json` — claims with verifier verdicts and GBIF lookups populated.",
+  "properties": {
+    "gall_records": {
+      "items": {
+        "$ref": "#/$defs/GallRecord"
+      },
+      "title": "Gall Records",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "gall_records"
+  ],
+  "title": "VerifiedClaimsFile",
+  "type": "object",
+  "x-schema-version": "1.0.0"
+}

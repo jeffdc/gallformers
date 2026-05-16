@@ -1,0 +1,95 @@
+# phase-b-extract-facts — iteration config for the real extract-facts
+# prompt. Builds on phase-b-find-candidates.yaml: real find-candidates
+# (DeepSeek-V4-Flash, proven on the corpus) plus the real
+# extract-facts prompt under iteration. verify-claims and metadata
+# remain on stubs so prompt drift in those stages can't confound
+# extract-facts quality signal.
+#
+# When extract-facts is ready, move on to verify-claims with another
+# config like this one.
+
+pipeline:
+  name: phase-b-extract-facts
+  schema_version: 1.0.0
+  seed: 42
+
+  defaults:
+    idle_timeout_s: 60
+    total_timeout_s: 300
+    retry_on_idle: 1
+    max_workers: 4
+    structured_output: true
+
+  stages:
+    - step: extract
+      extractor: pymupdf
+
+    - step: preprocess
+      ops:
+        - strip_bhl_boilerplate
+        - strip_plate_pages
+        - strip_page_headers
+        - rejoin_hyphenated
+        - rejoin_lines
+
+    - step: sectionize
+      excluded_section_types: [references, bibliography, literature_cited]
+
+    - step: metadata
+      model: deepinfra/Qwen/Qwen2.5-72B-Instruct
+      prompt: prompts/stubs/metadata.md
+      input_section_types: [title, abstract, introduction]
+
+    - step: find-candidates
+      # Settled in find-candidates Phase B work: DeepSeek-V4-Flash,
+      # 1M context, reasoning, ~$0.03/Cuesta-call at n=3.
+      model: deepinfra/deepseek-ai/DeepSeek-V4-Flash
+      prompt: prompts/find-candidates.md
+      n_samples: 3
+      agreement_threshold: 2
+      max_workers: 3
+
+    - step: evidence-pack
+      context_window: 2
+
+    # ── The stage under iteration ────────────────────────────────────────
+    - step: extract-facts
+      # Selected via bake-off (see docs/extract-facts-model-bakeoff.md):
+      # Qwen3-Next is 8-10x faster than Qwen-2.5-72B / DeepSeek-V4-Flash /
+      # MiniMax-M2.5 on this workload (MoE 80B-total / 3B-active), with
+      # competitive supported-cell count and acceptable 5.6% hallucination
+      # rate. Different family from the verifier (DeepSeek), preserving
+      # the matter's different-family principle.
+      model: deepinfra/Qwen/Qwen3-Next-80B-A3B-Instruct
+      prompt: prompts/extract-facts.md
+      max_workers: 50              # per-candidate parallelism (DeepInfra cap is 200/model/user)
+      idle_timeout_s: 90           # extraction calls are slower than tiny stubs
+
+    - step: verify
+      substring_min_score: 90
+      enrich_offsets: true
+
+    - step: verify-claims
+      model: deepinfra/Qwen/Qwen2.5-72B-Instruct
+      prompt: prompts/stubs/verify-claims.md
+      max_workers: 4
+
+    - step: taxonomy-lookup
+      source: gbif
+      cache_dir: output/cache/gbif
+      max_workers: 4
+      idle_timeout_s: 30
+      on_api_error: continue
+
+    - step: assemble-review
+      outputs:
+        - claims.json
+        - verified_claims.json
+        - review_artifact.json
+        - manifest.json
+      validate: strict
+
+    - step: bundle
+      output: bundle.tar.gz
+      include_candidates: false
+      verify_complete: true

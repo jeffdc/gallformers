@@ -170,6 +170,32 @@ defmodule Gallformers.ProdData.InvariantsTest do
              "Found #{length(bad)} species with section but no genus link: #{inspect(Enum.take(bad, 10))}"
     end
 
+    test "at most one genus-level placeholder species per genus" do
+      # A species's genus is the linked row in `taxonomy` whose type = 'genus'
+      # via the `species_taxonomy` join table. There should never be more than
+      # one species flagged as `genus_placeholder = true` for a given genus.
+      violations =
+        Repo.all(
+          from s in "species",
+            join: st in "species_taxonomy",
+            on: s.id == st.species_id,
+            join: t in "taxonomy",
+            on: st.taxonomy_id == t.id and t.type == "genus",
+            where: s.genus_placeholder == true,
+            group_by: [t.id, t.name],
+            having: count(s.id) > 1,
+            select: %{
+              genus_id: t.id,
+              genus_name: t.name,
+              placeholder_count: count(s.id),
+              species_names: fragment("array_agg(?)", s.name)
+            }
+        )
+
+      assert violations == [],
+             "Found #{length(violations)} genera with multiple genus_placeholder species: #{inspect(Enum.take(violations, 10))}"
+    end
+
     test "every species_taxonomy row points to a valid species_id and taxonomy_id" do
       bad_species =
         Repo.all(

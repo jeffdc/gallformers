@@ -11,8 +11,11 @@ defmodule GallformersWeb.Admin.AliasHandlers do
 
       alias GallformersWeb.Admin.AliasHandlers
 
-      def handle_event("update_new_alias", params, socket),
-        do: {:noreply, AliasHandlers.handle_update_new_alias(socket, params)}
+      def handle_event("update_new_alias_name", params, socket),
+        do: {:noreply, AliasHandlers.handle_update_new_alias_name(socket, params)}
+
+      def handle_event("update_new_alias_type", params, socket),
+        do: {:noreply, AliasHandlers.handle_update_new_alias_type(socket, params)}
 
       def handle_event("add_alias", _params, socket),
         do: {:noreply, AliasHandlers.handle_add_alias(socket)}
@@ -27,19 +30,19 @@ defmodule GallformersWeb.Admin.AliasHandlers do
   alias GallformersWeb.Admin.DeferredChanges
 
   @doc """
-  Handles alias name or type field changes.
-
-  Accepts params from:
-  - The name text input (InputEvent hook): `%{"value" => name}` — type read from assigns
-  - The type select (phx-change): `%{"value" => type, "name" => name}`
+  Handles the alias name text input changing (InputEvent hook fires on each keystroke).
   """
-  def handle_update_new_alias(socket, %{"value" => name} = params)
-      when not is_map_key(params, "name") do
+  def handle_update_new_alias_name(socket, %{"value" => name}) do
     assign(socket, new_alias_name: name)
   end
 
-  def handle_update_new_alias(socket, %{"value" => type, "name" => name}) do
-    assign(socket, new_alias_name: name, new_alias_type: type)
+  @doc """
+  Handles the alias type select changing. The select is inside the parent form, so
+  Phoenix LiveView serializes it as a form field — `name="value"` on the select
+  produces `%{"value" => type}` in the payload.
+  """
+  def handle_update_new_alias_type(socket, %{"value" => type}) do
+    assign(socket, new_alias_type: type)
   end
 
   @doc """

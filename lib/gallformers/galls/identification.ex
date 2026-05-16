@@ -398,7 +398,43 @@ defmodule Gallformers.Galls.Identification do
   defp apply_place_filter(query, nil, _host_ids, _genus_id), do: query
   defp apply_place_filter(query, [], _host_ids, _genus_id), do: query
 
-  defp apply_place_filter(query, place_codes, _host_ids, _genus_id) do
+  defp apply_place_filter(query, place_codes, _host_ids, nil) do
+    {galls_with_range_match, galls_with_host_fallback} = place_filter_subqueries(place_codes)
+
+    from [s, gt] in query,
+      where:
+        s.id in subquery(galls_with_range_match) or
+          s.id in subquery(galls_with_host_fallback)
+  end
+
+  defp apply_place_filter(query, place_codes, _host_ids, genus_id) do
+    {galls_with_range_match, galls_with_host_fallback} = place_filter_subqueries(place_codes)
+
+    # When a genus filter is set, allow a third admit path: a gall whose host
+    # is a genus_placeholder linked to the requested genus passes the region
+    # filter even with no host_range or gall_range. Placeholders by design have
+    # no range data — without this path the gall would be silently dropped.
+    # See matter 53cb.
+    galls_with_placeholder_in_genus =
+      from(gh in "gallhost",
+        join: hs in SpeciesSchema,
+        on: hs.id == gh.host_species_id,
+        join: st in "species_taxonomy",
+        on: st.species_id == hs.id,
+        where: hs.genus_placeholder == true,
+        where: st.taxonomy_id == ^genus_id,
+        select: gh.gall_species_id,
+        distinct: true
+      )
+
+    from [s, gt] in query,
+      where:
+        s.id in subquery(galls_with_range_match) or
+          s.id in subquery(galls_with_host_fallback) or
+          s.id in subquery(galls_with_placeholder_in_genus)
+  end
+
+  defp place_filter_subqueries(place_codes) do
     # Resolve place codes to IDs, then expand hierarchy in both directions
     place_ids =
       Enum.map(place_codes, &Ranges.get_place_id_by_code/1)
@@ -436,10 +472,7 @@ defmodule Gallformers.Galls.Identification do
         distinct: true
       )
 
-    from [s, gt] in query,
-      where:
-        s.id in subquery(galls_with_range_match) or
-          s.id in subquery(galls_with_host_fallback)
+    {galls_with_range_match, galls_with_host_fallback}
   end
 
   defp apply_undescribed_filter(query, nil), do: query
@@ -515,29 +548,77 @@ defmodule Gallformers.Galls.Identification do
     # Descendant IDs: exact matches for the selected place and its subdivisions
     descendant_ids = Enum.flat_map(place_ids, &Places.descendant_ids/1) |> Enum.uniq()
 
+    # Ancestor IDs: needed so country-level host_range rows match when a
+    # subdivision is selected (mirrors apply_place_filter/3's hierarchy logic).
+    ancestor_ids = Enum.flat_map(place_ids, &Places.ancestor_ids/1) |> Enum.uniq()
+    all_matching_place_ids = Enum.uniq(descendant_ids ++ ancestor_ids)
+
     # Get all gall IDs for batch query
     gall_ids = Enum.map(galls, & &1.id)
 
-    # Query: for each gall, check if it has exact gall_range records
-    # that match the selected place or its descendants
-    exact_match_gall_ids =
+    # Tag predicates must mirror the admit predicates in apply_place_filter/4
+    # so the badge truthfully signals the match mechanism:
+    #
+    #   :documented        - admitted via path 1: any gall_range row with
+    #                        place_id in (descendant ∪ ancestor). Real range
+    #                        data, regardless of precision.
+    #   :country_level     - admitted via path 2: no gall_range at all, but
+    #                        some host_range covers region/ancestor (native).
+    #   :genus_placeholder - admitted only via path 3: surfaced through the
+    #                        genus-placeholder waiver, no range data of any
+    #                        kind for the region.
+
+    # Galls with ANY gall_range row matching the region or an ancestor —
+    # mirrors path 1 in apply_place_filter/4.
+    range_match_gall_ids =
       from(gr in "gall_range",
         where: gr.species_id in ^gall_ids,
-        where: gr.place_id in ^descendant_ids,
-        where: gr.precision == "exact",
+        where: gr.place_id in ^all_matching_place_ids,
         select: gr.species_id,
         distinct: true
       )
       |> Repo.all()
       |> MapSet.new()
 
-    # Tag each gall with its place match type
+    # Galls that have ANY gall_range row at all (irrespective of place) —
+    # path 2 requires the gall has NO gall_range entries.
+    galls_with_any_range =
+      from(gr in "gall_range",
+        where: gr.species_id in ^gall_ids,
+        select: gr.species_id,
+        distinct: true
+      )
+      |> Repo.all()
+      |> MapSet.new()
+
+    # Galls with at least one host whose host_range covers the region or an
+    # ancestor (native). Combined with the "no gall_range at all" check,
+    # this exactly mirrors path 2 in apply_place_filter/4.
+    host_range_gall_ids =
+      from(gh in "gallhost",
+        join: hr in "host_range",
+        on: hr.species_id == gh.host_species_id,
+        where: gh.gall_species_id in ^gall_ids,
+        where: hr.place_id in ^all_matching_place_ids,
+        where: hr.distribution_type == "native",
+        select: gh.gall_species_id,
+        distinct: true
+      )
+      |> Repo.all()
+      |> MapSet.new()
+
     Enum.map(galls, fn gall ->
       place_match =
-        if MapSet.member?(exact_match_gall_ids, gall.id) do
-          :documented
-        else
-          :country_level
+        cond do
+          MapSet.member?(range_match_gall_ids, gall.id) ->
+            :documented
+
+          not MapSet.member?(galls_with_any_range, gall.id) and
+              MapSet.member?(host_range_gall_ids, gall.id) ->
+            :country_level
+
+          true ->
+            :genus_placeholder
         end
 
       Map.put(gall, :place_match, place_match)

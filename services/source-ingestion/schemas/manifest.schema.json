@@ -1,0 +1,361 @@
+{
+  "$defs": {
+    "ProviderCallRecord": {
+      "additionalProperties": false,
+      "description": "One LLM call's bookkeeping. Many of these aggregate into a stage record.",
+      "properties": {
+        "cost_usd": {
+          "description": "From LiteLLM completion_cost()",
+          "minimum": 0,
+          "title": "Cost Usd",
+          "type": "number"
+        },
+        "duration_ms": {
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "error_detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Exception class and message when the call failed (e.g. Instructor exhausted retries on schema validation). Only set when status='error'.",
+          "title": "Error Detail"
+        },
+        "idle_timeouts_hit": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Idle Timeouts Hit",
+          "type": "integer"
+        },
+        "input_tokens": {
+          "minimum": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "model": {
+          "description": "LiteLLM model string, e.g. 'deepinfra/Qwen/Qwen2.5-72B-Instruct'",
+          "title": "Model",
+          "type": "string"
+        },
+        "output_tokens": {
+          "minimum": 0,
+          "title": "Output Tokens",
+          "type": "integer"
+        },
+        "prompt_sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Prompt Sha256",
+          "type": "string"
+        },
+        "provider": {
+          "description": "Provider name extracted from model string, e.g. 'deepinfra'",
+          "title": "Provider",
+          "type": "string"
+        },
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "error"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "total_timeout_hit": {
+          "default": false,
+          "title": "Total Timeout Hit",
+          "type": "boolean"
+        },
+        "usage_estimated": {
+          "default": false,
+          "description": "True if LiteLLM didn't return usage and we estimated",
+          "title": "Usage Estimated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "model",
+        "provider",
+        "prompt_sha256",
+        "input_tokens",
+        "output_tokens",
+        "cost_usd",
+        "duration_ms"
+      ],
+      "title": "ProviderCallRecord",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "description": "Source-document identity. Appears in `Manifest`. The PDF bytes ship in the bundle.",
+      "properties": {
+        "pdf_filename": {
+          "title": "Pdf Filename",
+          "type": "string"
+        },
+        "pdf_page_count": {
+          "minimum": 1,
+          "title": "Pdf Page Count",
+          "type": "integer"
+        },
+        "pdf_sha256": {
+          "description": "SHA-256 of source.pdf, lowercase hex",
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Pdf Sha256",
+          "type": "string"
+        },
+        "source_text_sha256": {
+          "description": "SHA-256 of the flat normalized text",
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Source Text Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pdf_sha256",
+        "pdf_filename",
+        "pdf_page_count",
+        "source_text_sha256"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "StageRunRecord": {
+      "additionalProperties": false,
+      "description": "One stage's execution bookkeeping.",
+      "properties": {
+        "artifacts_written": {
+          "description": "Artifact filenames produced",
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifacts Written",
+          "type": "array"
+        },
+        "calls": {
+          "description": "LLM calls made by this stage",
+          "items": {
+            "$ref": "#/$defs/ProviderCallRecord"
+          },
+          "title": "Calls",
+          "type": "array"
+        },
+        "completed_at": {
+          "format": "date-time",
+          "title": "Completed At",
+          "type": "string"
+        },
+        "name": {
+          "description": "Stage name, e.g. 'extract-facts'",
+          "title": "Name",
+          "type": "string"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "default": "ok",
+          "enum": [
+            "ok",
+            "error",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "started_at",
+        "completed_at"
+      ],
+      "title": "StageRunRecord",
+      "type": "object"
+    },
+    "WarningEntry": {
+      "additionalProperties": false,
+      "description": "One warning. Type-specific detail goes in `detail` as a free-form dict.",
+      "properties": {
+        "detail": {
+          "additionalProperties": true,
+          "description": "Type-specific structured info",
+          "title": "Detail",
+          "type": "object"
+        },
+        "field_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Dotted path to the offending field, e.g. 'gall_traits.color'",
+          "title": "Field Path"
+        },
+        "record_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Gall-record ID when warning is record-scoped",
+          "title": "Record Id"
+        },
+        "severity": {
+          "$ref": "#/$defs/WarningSeverity",
+          "default": "warning"
+        },
+        "type": {
+          "$ref": "#/$defs/WarningType"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "WarningEntry",
+      "type": "object"
+    },
+    "WarningSeverity": {
+      "enum": [
+        "info",
+        "warning",
+        "error"
+      ],
+      "title": "WarningSeverity",
+      "type": "string"
+    },
+    "WarningType": {
+      "description": "Closed enum of warning types. UI rendering depends on this set.",
+      "enum": [
+        "evidence_substring_mismatch",
+        "verifier_contradicted",
+        "schema_repair_applied",
+        "llm_output_invalid",
+        "idle_timeout_retry",
+        "usage_estimated",
+        "section_excluded",
+        "vocab_no_match",
+        "taxonomy_no_match",
+        "taxonomy_fuzzy_match_low_confidence",
+        "taxonomy_api_error",
+        "taxonomy_source_disagreement"
+      ],
+      "title": "WarningType",
+      "type": "string"
+    }
+  },
+  "$id": "https://gallformers.org/schemas/manifest.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "`manifest.json` — pipeline run metadata. The authoritative bookkeeper.\n\nRecords schema versions for every artifact in the bundle (especially JSONL\nartifacts that don't carry schema_version themselves).",
+  "properties": {
+    "completed_at": {
+      "format": "date-time",
+      "title": "Completed At",
+      "type": "string"
+    },
+    "pipeline_config_name": {
+      "title": "Pipeline Config Name",
+      "type": "string"
+    },
+    "pipeline_name": {
+      "title": "Pipeline Name",
+      "type": "string"
+    },
+    "pipeline_version": {
+      "title": "Pipeline Version",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "schema_versions": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Map of artifact filename → schema version. Covers JSONL artifacts.",
+      "title": "Schema Versions",
+      "type": "object"
+    },
+    "seed": {
+      "title": "Seed",
+      "type": "integer"
+    },
+    "source": {
+      "$ref": "#/$defs/Source"
+    },
+    "stages": {
+      "items": {
+        "$ref": "#/$defs/StageRunRecord"
+      },
+      "title": "Stages",
+      "type": "array"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "total_cost_usd": {
+      "minimum": 0,
+      "title": "Total Cost Usd",
+      "type": "number"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/WarningEntry"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "pipeline_name",
+    "pipeline_version",
+    "pipeline_config_name",
+    "seed",
+    "started_at",
+    "completed_at",
+    "source",
+    "schema_versions",
+    "stages",
+    "total_cost_usd"
+  ],
+  "title": "Manifest",
+  "type": "object",
+  "x-schema-version": "1.0.0"
+}

@@ -1,0 +1,109 @@
+# north-star-v0-stub — Phase A plumbing test config.
+#
+# Same stage chain as north-star-v0.yaml, but every LLM stage uses a stub
+# prompt that produces minimal schema-valid output. The goal is mechanical
+# correctness: end-to-end run produces a bundle.tar.gz that validates
+# against every schema, even though the extracted facts are placeholders.
+#
+# Use this config to validate the plumbing — schemas, stage wiring,
+# manifests, caching, GBIF cache, bundle assembly — before writing real
+# prompts. Real prompts live at prompts/{stage}.md and are wired by
+# pipelines/north-star-v0.yaml.
+
+pipeline:
+  name: north-star-v0-stub
+  schema_version: 1.0.0
+  seed: 42
+
+  # Smaller workers and shorter total timeout — stub calls are tiny and
+  # we don't need throughput here.
+  defaults:
+    idle_timeout_s: 60
+    total_timeout_s: 300
+    retry_on_idle: 1
+    max_workers: 2
+    structured_output: true
+
+  stages:
+    - step: extract
+      extractor: pymupdf
+
+    - step: preprocess
+      ops:
+        - strip_bhl_boilerplate
+        - strip_plate_pages
+        - strip_page_headers
+        - rejoin_hyphenated
+        - rejoin_lines
+
+    - step: sectionize
+      excluded_section_types: [references, bibliography, literature_cited]
+
+    - step: metadata
+      # DocumentMetadata has ~9 EvidenceCell fields; small models hit
+      # multi-error validation failures on real papers (Llama-3.1-8B
+      # produced 6 schema violations on Nicholls 2022).
+      model: deepinfra/Qwen/Qwen2.5-72B-Instruct
+      prompt: prompts/stubs/metadata.md
+      input_section_types: [title, abstract, introduction]
+
+    - step: find-candidates
+      # find-candidates currently sends the entire eligible document in a
+      # single call; long papers (>32K tokens) can't use Qwen-2.5-72B on
+      # DeepInfra (32K cap on this deployment). Llama-3.1-8B has a 128K
+      # context window. The trade: small model + long input occasionally
+      # confuses Instructor's schema hint (e.g. Cuesta 2022 at 71K tokens
+      # produced JSON wrapped under a `_LLMCandidate` key). Graceful
+      # failure catches that. Phase B work: either chunked find-candidates
+      # input or a larger-context provider for this stage.
+      model: deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct
+      prompt: prompts/stubs/find-candidates.md
+      n_samples: 1                 # stub: skip self-consistency
+      agreement_threshold: 1
+      max_workers: 1
+
+    - step: evidence-pack
+      context_window: 1
+
+    - step: extract-facts
+      # Larger schema (~30 evidence cells) than find-candidates; small
+      # models reliably emit invalid JSON (inline comments, trailing
+      # commas) even on the stub prompt. Use the matter's production
+      # choice — open-weight, fractions of a cent per stub call.
+      model: deepinfra/Qwen/Qwen2.5-72B-Instruct
+      prompt: prompts/stubs/extract-facts.md
+      # No `vocab:` — stub extract-facts abstains everywhere; vocab is
+      # irrelevant. Real pipeline references schemas/gallformers-vocab.json.
+      max_workers: 2
+
+    - step: verify
+      substring_min_score: 90
+      enrich_offsets: true
+
+    - step: verify-claims
+      # Per-cell verifier. Small schema (verdict + reason) but production
+      # guidance is to use a different family from the extractor; for the
+      # stub we just need reliable structured output.
+      model: deepinfra/Qwen/Qwen2.5-72B-Instruct
+      prompt: prompts/stubs/verify-claims.md
+      max_workers: 2
+
+    - step: taxonomy-lookup
+      source: gbif
+      cache_dir: output/cache/gbif
+      max_workers: 4
+      idle_timeout_s: 30
+      on_api_error: continue
+
+    - step: assemble-review
+      outputs:
+        - claims.json
+        - verified_claims.json
+        - review_artifact.json
+        - manifest.json
+      validate: strict
+
+    - step: bundle
+      output: bundle.tar.gz
+      include_candidates: false
+      verify_complete: true

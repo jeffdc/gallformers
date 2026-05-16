@@ -1,8 +1,13 @@
 # Gallformers V2 - Phoenix Dockerfile
 # Multi-stage build for Phoenix release
 
-# Stage 0: Provide a current Node/npm toolchain for asset installs.
-FROM node:22-alpine AS node
+# Stage 0: Install JS production dependencies in isolation.
+# Running npm ci here (rather than copying the npm binary into the builder stage)
+# avoids breakage when node:22-alpine updates npm's internal layout.
+FROM node:22-alpine AS assets
+WORKDIR /assets
+COPY assets/package.json assets/package-lock.json ./
+RUN npm ci --omit=dev
 
 # Stage 1: Build Elixir release
 FROM hexpm/elixir:1.17.3-erlang-27.1.2-alpine-3.20.3 AS builder
@@ -10,12 +15,6 @@ FROM hexpm/elixir:1.17.3-erlang-27.1.2-alpine-3.20.3 AS builder
 # Install build dependencies
 # vips-dev is needed to compile the vix NIF for image processing
 RUN apk add --no-cache build-base git python3 py3-pip vips-dev
-
-# Copy in the Node/npm toolchain rather than relying on Alpine's older package.
-COPY --from=node /usr/local/bin/node /usr/local/bin/node
-COPY --from=node /usr/local/bin/npm /usr/local/bin/npm
-COPY --from=node /usr/local/bin/npx /usr/local/bin/npx
-COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 
 WORKDIR /app
 
@@ -53,8 +52,8 @@ RUN python3 -m pip install --no-cache-dir --target /app/priv/python/vendor /app/
 # Compile first (needed for colocated hooks)
 RUN mix compile
 
-# Install only production npm dependencies for deployed assets.
-RUN cd assets && npm ci --omit=dev
+# Pull the pre-built node_modules from the assets stage.
+COPY --from=assets /assets/node_modules ./assets/node_modules
 
 # Build assets (esbuild + tailwind are installed via mix)
 RUN mix assets.deploy

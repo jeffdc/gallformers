@@ -69,7 +69,8 @@ defmodule Gallformers.Taxonomy.TreeBuilder do
           else
             species_entry = %{
               id: row.species_id,
-              name: row.species_name
+              name: row.species_name,
+              genus_placeholder: Map.get(row, :species_genus_placeholder, false)
             }
 
             {Map.put(genus.species, species_key, species_entry),
@@ -124,7 +125,8 @@ defmodule Gallformers.Taxonomy.TreeBuilder do
       %{
         key: format_key("species", "s", species.id, key_style),
         label: species.name,
-        url: "#{url_prefix}#{species.id}"
+        url: "#{url_prefix}#{species.id}",
+        genus_placeholder: Map.get(species, :genus_placeholder, false)
       }
     end)
   end

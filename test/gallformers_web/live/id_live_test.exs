@@ -450,21 +450,23 @@ defmodule GallformersWeb.IDLiveTest do
       refute html =~ "Filter by name"
     end
 
-    test "changing structured filter clears name filter", %{conn: conn} do
+    test "name filter persists when structured filter changes", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/id?g=GenusAlpha&gt=genus")
 
-      # Apply name filter
+      # Apply name filter — only Andricus should be visible
       render_keyup(view, "filter_by_name", %{"value" => "Andricus"})
 
-      # Change a structured filter (detachable) — triggers URL patch → handle_params
+      # Change a structured filter (detachable=integral matches gall 100, Andricus)
       view
       |> element("form[phx-value-filter='detachable']")
       |> render_change(%{"value" => "integral"})
 
       html = render(view)
 
-      # Name filter should be cleared (input value should be empty)
-      refute html =~ ~s(value="Andricus")
+      # Name filter value should be preserved in the input
+      assert html =~ ~s(value="Andricus")
+      # Andricus matches both the name filter and the detachable=integral filter
+      assert html =~ "Andricus"
     end
   end
 

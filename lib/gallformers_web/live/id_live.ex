@@ -775,24 +775,34 @@ defmodule GallformersWeb.IDLive do
         0
       end
 
+    name_filter = socket.assigns.name_filter
+    filtered_results = apply_name_filter(results, name_filter)
+
     if socket.assigns.filters == default_filters() do
       assign(socket,
         results: results,
-        filtered_results: results,
+        filtered_results: filtered_results,
         summaries: summaries,
         total_count: length(results),
-        name_filter: "",
+        name_filter: name_filter,
         unscoped_count: unscoped_count
       )
     else
       assign(socket,
         results: results,
-        filtered_results: results,
+        filtered_results: filtered_results,
         summaries: summaries,
-        name_filter: "",
+        name_filter: name_filter,
         unscoped_count: unscoped_count
       )
     end
+  end
+
+  defp apply_name_filter(results, ""), do: results
+
+  defp apply_name_filter(results, filter) do
+    term = String.downcase(filter)
+    Enum.filter(results, &String.contains?(String.downcase(&1.name), term))
   end
 
   defp generate_summaries_for_imageless(results) do
@@ -1468,7 +1478,10 @@ defmodule GallformersWeb.IDLive do
         </div>
       </.link>
       <div
-        :if={@gall.undescribed || @gall.non_gall || @gall[:place_match] == :country_level}
+        :if={
+          @gall.undescribed || @gall.non_gall || @gall[:place_match] == :country_level ||
+            @gall[:place_match] == :genus_placeholder
+        }
         class="flex flex-wrap gap-1 px-2 pb-2"
       >
         <span
@@ -1491,6 +1504,13 @@ defmodule GallformersWeb.IDLive do
           title="This gall occurs on hosts with country-level range records — state-level data unavailable for your selected region."
         >
           Country-level
+        </span>
+        <span
+          :if={@gall[:place_match] == :genus_placeholder}
+          class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700 cursor-help"
+          title="Matched genus host; range unverified — this gall is recorded as occurring on additional unidentified members of the host genus, but the range data needed to confirm the region was not available."
+        >
+          Genus-level match
         </span>
       </div>
     </div>

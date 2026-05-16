@@ -701,7 +701,7 @@ defmodule GallformersWeb.FormComponents do
           tabindex="0"
           aria-label={"Selected: #{@display_fn.(@selected)}. Type to search, or press Escape to clear."}
         >
-          <span class="flex-1 text-base italic">{@display_fn.(@selected)}</span>
+          <span class="flex-1 text-base italic text-gray-900">{@display_fn.(@selected)}</span>
           <button
             type="button"
             phx-click={@clear_event}

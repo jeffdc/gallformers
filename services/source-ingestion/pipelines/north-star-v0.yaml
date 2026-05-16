@@ -1,0 +1,107 @@
+# north-star-v0 — born-digital PDF pipeline.
+#
+# Produces bundle.tar.gz containing the 9 contract artifacts:
+#   manifest.json, source.pdf, raw_text.jsonl, normalized_text.jsonl,
+#   sections.json, metadata.json, claims.json, verified_claims.json,
+#   review_artifact.json
+#
+# Tuned for modern born-digital PDFs (clean text layer, no OCR).
+# For scanned papers, use north-star-v0-ocr.yaml instead.
+
+pipeline:
+  name: north-star-v0
+  schema_version: 1.0.0           # target review_artifact.schema_version
+  seed: 42                         # reproducibility; threaded into manifest
+
+  # Defaults applied to every LLM stage unless overridden inline.
+  defaults:
+    idle_timeout_s: 60             # kill stream if no chunk for N seconds
+    total_timeout_s: 600           # backstop ceiling
+    retry_on_idle: 1               # one retry with backoff, then fail
+    max_workers: 4                 # per-stage thread-pool size
+    structured_output: true        # response_format=json_schema where applicable
+
+  stages:
+    # ── Text layer ────────────────────────────────────────────────────────────
+
+    - step: extract                # PDF/URL → raw_text.jsonl
+      extractor: pymupdf           # block-level extraction with page + bbox
+
+    - step: preprocess             # raw_text.jsonl → normalized_text.jsonl
+      # Output is the canonical text substrate evidence offsets address into.
+      # No LLM stage between preprocess and sectionize — deterministic-only
+      # cleanup for born-digital text keeps offsets stable and prevents
+      # hallucinated edits from poisoning the substring gate.
+      ops:                         # all on by default; list to subset
+        - strip_bhl_boilerplate
+        - strip_plate_pages
+        - strip_page_headers
+        - rejoin_hyphenated
+        - rejoin_lines
+
+    - step: sectionize             # normalized_text.jsonl → sections.json
+      excluded_section_types: [references, bibliography, literature_cited]
+      # rule-based; no model
+
+    # ── Metadata ──────────────────────────────────────────────────────────────
+
+    - step: metadata               # → metadata.json (evidence-bound)
+      model: deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct
+      prompt: prompts/metadata.md
+      input_section_types: [title, abstract, introduction]   # scope reduction
+
+    # ── Candidate detection (N=3 self-consistency) ───────────────────────────
+
+    - step: find-candidates        # → candidates.json (scratch)
+      model: deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct
+      prompt: prompts/find-candidates.md
+      n_samples: 3
+      agreement_threshold: 2       # keep candidates appearing in >= N samples
+      max_workers: 3               # one per sample
+
+    - step: evidence-pack          # per-candidate; deterministic
+      context_window: 2            # spans before/after each mention, same section
+
+    # ── Per-field extraction ──────────────────────────────────────────────────
+
+    - step: extract-facts          # per-candidate, dynamic-schema structured output
+      # Selected via bake-off (docs/extract-facts-model-bakeoff.md):
+      # 8-10x faster than alternatives on this workload (MoE 80B/3B-active).
+      model: deepinfra/Qwen/Qwen3-Next-80B-A3B-Instruct
+      prompt: prompts/extract-facts.md
+      vocab: schemas/gallformers-vocab.json
+      max_workers: 50              # per-candidate parallelism (DeepInfra cap is 200/model/user)
+      idle_timeout_s: 90           # override: extraction is slower
+
+    - step: verify                 # deterministic substring gate
+      substring_min_score: 90      # RapidFuzz partial_ratio threshold
+      enrich_offsets: true         # populate absolute char_start/char_end
+
+    - step: verify-claims          # per-field, different model family
+      model: deepinfra/deepseek-ai/DeepSeek-V3
+      prompt: prompts/verify-claims.md
+      max_workers: 50              # many small per-field calls (DeepInfra cap is 200/model/user)
+
+    # ── Taxonomy lookup ───────────────────────────────────────────────────────
+
+    - step: taxonomy-lookup        # GBIF for every surviving scientific_name
+      source: gbif                 # WCVP is server-side; pipeline only does GBIF
+      cache_dir: output/cache/gbif # disk-cached by (name, rank, kingdom_hint)
+      max_workers: 8               # polite concurrent ceiling
+      idle_timeout_s: 30           # GBIF /v1/species/match is usually <1s
+      on_api_error: continue       # populate status=api_error; never block bundle
+
+    # ── Assembly ──────────────────────────────────────────────────────────────
+
+    - step: assemble-review        # roll up scratch → contract artifacts
+      outputs:                     # explicit: which artifacts this step writes
+        - claims.json
+        - verified_claims.json
+        - review_artifact.json
+        - manifest.json
+      validate: strict             # fail on any schema violation
+
+    - step: bundle                 # tar.gz the 9 files + source.pdf
+      output: bundle.tar.gz
+      include_candidates: false    # set true to bundle per-candidate scratch
+      verify_complete: true        # fail if any expected artifact is missing

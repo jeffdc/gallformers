@@ -441,6 +441,7 @@ defmodule GallformersWeb.SearchLive do
                           <.taxon_name
                             name={format_name(result)}
                             rank={search_type_to_rank(result.type)}
+                            genus_placeholder={Map.get(result, :genus_placeholder, false) == true}
                           />
                         </.link>
                         <span

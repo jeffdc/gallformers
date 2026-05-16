@@ -22,16 +22,25 @@ defmodule GallformersWeb.DataDisplayComponents do
   (e.g., names ending in -idae, -oidea are not italicized). Use this when
   the rank is unknown, such as in identification key destinations.
 
+  When `genus_placeholder` is `true`, a subtle non-italic `(genus-level)`
+  annotation is appended after the taxon name to indicate that the record
+  represents an unidentified member of a genus (e.g. "Quercus spp").
+
   ## Examples
 
       <.taxon_name name="Andricus quercuslanigera" />
       <.taxon_name name="Cynipidae" rank="family" />
       <.taxon_name name="Quercus" rank="genus" class="text-lg" />
       <.taxon_name name="Ichneumonoidea" rank="auto" />
+      <.taxon_name name="Quercus spp" genus_placeholder={true} />
   """
   attr :name, :string, required: true
   attr :rank, :any, default: "species"
   attr :class, :any, default: nil
+
+  attr :genus_placeholder, :boolean,
+    default: false,
+    doc: "when true, append a non-italic '(genus-level)' annotation after the name"
 
   def taxon_name(assigns) do
     assigns = assign(assigns, :italicize, should_italicize?(assigns.rank, assigns.name))
@@ -42,6 +51,13 @@ defmodule GallformersWeb.DataDisplayComponents do
     <% else %>
       <span class={@class}>{@name}</span>
     <% end %>
+    <span
+      :if={@genus_placeholder}
+      class="ml-1 text-xs text-gray-500 not-italic align-baseline"
+      title="This host record represents an unidentified member of the genus, not a specific species."
+    >
+      (genus-level)
+    </span>
     """
   end
 

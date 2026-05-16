@@ -106,21 +106,22 @@ defmodule Gallformers.Images.AuditCacheTest do
 
   describe "TTL behavior" do
     test "marks cache as stale after TTL expires" do
-      # Use a very short TTL for testing
-      {pid, name} = start_test_cache(ttl_ms: 10)
+      # TTL must be long enough that the GenServer call after the initial sleep
+      # completes well within it, even under parallel test load.
+      {pid, name} = start_test_cache(ttl_ms: 200)
 
       # Simulate a completed scan by sending the message directly
       send(pid, {:scan_complete, []})
 
       # Give it a moment to process
-      Process.sleep(5)
+      Process.sleep(20)
 
       # Should not be stale yet
       status1 = GenServer.call(name, :status)
       assert status1.stale? == false
 
       # Wait for TTL to expire
-      Process.sleep(20)
+      Process.sleep(250)
 
       # Should be stale now
       status2 = GenServer.call(name, :status)

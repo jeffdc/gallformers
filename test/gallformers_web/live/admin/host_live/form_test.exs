@@ -15,6 +15,8 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
 
   alias Gallformers.Accounts.Auth0User
   alias Gallformers.Plants
+  alias Gallformers.Repo
+  alias Gallformers.Species.Species
 
   # Helper to set up admin session
   defp setup_admin_session(conn) do
@@ -170,6 +172,66 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
     end
   end
 
+  describe "Genus-level placeholder indicator" do
+    setup %{conn: conn} do
+      {:ok, conn: setup_admin_session(conn)}
+    end
+
+    test "edit mode with placeholder=true shows badge, not disabled checkbox", %{conn: conn} do
+      placeholder =
+        Repo.insert!(%Species{
+          name: "Quercus testbadgespp",
+          taxoncode: "plant",
+          genus_placeholder: true
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/admin/hosts/#{placeholder.id}")
+
+      # The disabled checkbox UI lie must be gone.
+      refute html =~ ~r/<input[^>]*type="checkbox"[^>]*disabled/,
+             "edit-mode placeholder UI should not render a disabled checkbox"
+
+      # A recognizable badge must be present.
+      assert html =~ "gf-badge"
+      assert html =~ "Genus-level placeholder"
+    end
+
+    test "edit mode with placeholder=false renders no placeholder badge or checkbox", %{
+      conn: conn
+    } do
+      normal =
+        Repo.insert!(%Species{
+          name: "Quercus testnormalspp",
+          taxoncode: "plant",
+          genus_placeholder: false
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/admin/hosts/#{normal.id}")
+
+      # No disabled placeholder checkbox in the Rename row area.
+      refute html =~ ~r/<input[^>]*type="checkbox"[^>]*disabled/
+
+      # No placeholder badge for non-placeholder hosts.
+      refute html =~ "Genus-level placeholder"
+    end
+
+    test "new mode renders an interactive (non-disabled) placeholder checkbox", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/hosts/new")
+
+      # Create a host so the form is enabled (transitions out of search mode).
+      html = render_click(view, "create_host", %{"name" => "Quercus testnewspp"})
+
+      # A placeholder checkbox is present, NOT disabled, and wired to the toggle event.
+      assert html =~ "Genus-level placeholder"
+      assert html =~ "toggle_genus_placeholder"
+
+      assert has_element?(
+               view,
+               ~s|input[type="checkbox"][phx-click="toggle_genus_placeholder"]:not([disabled])|
+             )
+    end
+  end
+
   describe "Form validation" do
     setup %{conn: conn} do
       {:ok, conn: setup_admin_session(conn)}
@@ -206,39 +268,35 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
     end
   end
 
-  describe "Alias management - update_new_alias event" do
+  describe "Alias management - update events" do
     setup %{conn: conn} do
       {:ok, conn: setup_admin_session(conn)}
     end
 
-    test "update_new_alias handles name field change (phx-keyup)", %{conn: conn} do
+    test "typing in alias name input updates new_alias_name", %{conn: conn} do
       host = require_host()
       {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
 
-      # Simulate typing in alias name field - sends value and type from phx-value-type
-      html =
-        render_click(view, "update_new_alias", %{
-          "value" => "White Oak",
-          "type" => "common name"
-        })
+      html = render_hook(view, "update_new_alias_name", %{"value" => "White Oak"})
 
-      # Should update the input field value
-      assert html =~ "White Oak" or html =~ host.name
+      assert html =~ ~s(value="White Oak")
     end
 
-    test "update_new_alias handles type field change (phx-change)", %{conn: conn} do
+    test "selecting scientific from type select preserves typed name", %{conn: conn} do
       host = require_host()
       {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
 
-      # Simulate changing select - sends value and name from phx-value-name
-      html =
-        render_click(view, "update_new_alias", %{
-          "value" => "scientific synonym",
-          "name" => "Some Alias"
-        })
+      # Type a name first
+      render_hook(view, "update_new_alias_name", %{"value" => "Foobar synonym"})
 
-      # Should update both fields
-      assert html =~ "Some Alias" or html =~ "scientific synonym" or html =~ host.name
+      # Then change the type select. The select has name="value" so Phoenix LV
+      # serializes it as %{"value" => "scientific"} from the form payload.
+      html = render_change(view, "update_new_alias_type", %{"value" => "scientific"})
+
+      # Name must be preserved (bug: previously cleared when type changed).
+      assert html =~ ~s(value="Foobar synonym")
+      # Scientific option should now be selected in the dropdown.
+      assert html =~ ~r/<option[^>]*value="scientific"[^>]*selected/
     end
   end
 
@@ -254,6 +312,34 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
       html = render_click(view, "add_alias", %{})
 
       assert html =~ "cannot be empty"
+    end
+  end
+
+  describe "Clear host - clear_host event" do
+    setup %{conn: conn} do
+      {:ok, conn: setup_admin_session(conn)}
+    end
+
+    test "clearing host redirects to list when form is clean", %{conn: conn} do
+      host = require_host()
+      {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
+
+      assert {:error, {:live_redirect, %{to: "/admin/hosts"}}} =
+               render_click(view, "clear_host", %{})
+    end
+
+    test "clearing dirty form shows discard-confirm modal instead of redirecting",
+         %{conn: conn} do
+      host = require_host()
+      {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
+
+      # Dirty the form by adding a pending alias (issue #547 regression).
+      render_hook(view, "update_new_alias_name", %{"value" => "Dirtying alias"})
+      render_click(view, "add_alias", %{})
+
+      html = render_click(view, "clear_host", %{})
+
+      assert html =~ "Discard"
     end
   end
 
@@ -825,6 +911,35 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
       html = render_click(view, "save", %{"species" => %{}})
 
       assert html =~ "at least one range"
+    end
+
+    test "new mode renders editable range map (not dead-end message)", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/hosts/new")
+
+      render_click(view, "create_host", %{"name" => "GenusAlpha editablemaphost"})
+
+      html = render(view)
+      refute html =~ "Save host first to edit range"
+      assert has_element?(view, "#host-range-map")
+    end
+
+    test "save in new mode succeeds when range added via map click", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/hosts/new")
+
+      render_click(view, "create_host", %{"name" => "GenusAlpha mappedrangehost"})
+      render_click(view, "toggle_region", %{"code" => "US-CA"})
+
+      assert get_assign(view, :range_entries)["US-CA"].distribution_type == "native"
+
+      render_click(view, "save", %{"species" => %{}})
+
+      host = Plants.get_host_by_name("GenusAlpha mappedrangehost")
+      assert host != nil
+
+      place_codes =
+        host.id |> Gallformers.Ranges.get_places_for_host_with_precision() |> Enum.map(& &1.code)
+
+      assert "US-CA" in place_codes
     end
   end
 

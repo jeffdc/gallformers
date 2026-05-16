@@ -54,19 +54,29 @@ defmodule GallformersWeb.KeyLive do
   end
 
   @impl true
-  def handle_params(params, _uri, socket) do
-    case params["path"] do
-      nil ->
-        {:noreply, socket}
+  def handle_params(%{"path" => path_string}, _uri, %{assigns: %{key: key}} = socket)
+      when not is_nil(key) and is_binary(path_string) do
+    socket = replay_path(socket, path_string)
 
-      path_string ->
-        if socket.assigns.key do
-          {:noreply, replay_path(socket, path_string)}
-        else
-          {:noreply, socket}
-        end
+    case scroll_target(socket) do
+      nil -> {:noreply, socket}
+      id -> {:noreply, push_event(socket, "scroll_to_couplet", %{id: id})}
     end
   end
+
+  def handle_params(_params, _uri, socket), do: {:noreply, socket}
+
+  # After replay, scroll to the active couplet if any, else to the last
+  # couplet visited (when a terminal taxon was reached).
+  defp scroll_target(%{assigns: %{active_couplet: number}}) when is_binary(number),
+    do: "couplet-#{number}"
+
+  defp scroll_target(%{assigns: %{path: [_ | _] = path}}) do
+    {couplet_num, _idx, _label} = List.last(path)
+    "couplet-#{couplet_num}"
+  end
+
+  defp scroll_target(_), do: nil
 
   @impl true
   def handle_event("select_lead", %{"couplet" => couplet_num, "lead" => lead_idx_str}, socket) do
@@ -154,6 +164,21 @@ defmodule GallformersWeb.KeyLive do
      socket
      |> assign(path: [], active_couplet: "1", terminal: nil)
      |> push_event("scroll_to_couplet", %{id: "couplet-1"})}
+  end
+
+  def handle_event("back", _params, socket) do
+    case socket.assigns.path do
+      [] ->
+        {:noreply, socket}
+
+      path ->
+        {couplet_num, _lead_index, _label} = List.last(path)
+
+        {:noreply,
+         socket
+         |> assign(path: Enum.drop(path, -1), active_couplet: couplet_num, terminal: nil)
+         |> push_event("scroll_to_couplet", %{id: "couplet-#{couplet_num}"})}
+    end
   end
 
   # Truncate path to just before the given couplet number.

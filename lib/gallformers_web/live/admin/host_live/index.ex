@@ -95,7 +95,7 @@ defmodule GallformersWeb.Admin.HostLive.Index do
         |> assign(:hosts, Plants.list_hosts_paginated(page_size, offset))
 
       query ->
-        results = Plants.search_hosts(query, 500)
+        results = Plants.search_hosts(query, 500, include_placeholders: true)
 
         socket
         |> assign(:total_count, length(results))

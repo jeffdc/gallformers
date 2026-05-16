@@ -1,0 +1,409 @@
+{
+  "schema_version": "1.0.0",
+  "source": "gallformers_dev DB filter_fields tables",
+  "exported_at": "2026-05-13T01:34:36.226395+00:00",
+  "fields": {
+    "color": [
+      {
+        "value": "black"
+      },
+      {
+        "value": "brown"
+      },
+      {
+        "value": "gray"
+      },
+      {
+        "value": "green"
+      },
+      {
+        "value": "orange"
+      },
+      {
+        "value": "pink"
+      },
+      {
+        "value": "purple"
+      },
+      {
+        "value": "red"
+      },
+      {
+        "value": "tan"
+      },
+      {
+        "value": "UV"
+      },
+      {
+        "value": "white"
+      },
+      {
+        "value": "yellow"
+      }
+    ],
+    "shape": [
+      {
+        "value": "cluster",
+        "description": "Individual galls nearly always found in numbers, often pressing together and flattening against each other."
+      },
+      {
+        "value": "conical",
+        "description": "Wide and round at the base, tapering on all sides to a point above."
+      },
+      {
+        "value": "cup",
+        "description": "A circular structure with walls enclosing a volume, open from above."
+      },
+      {
+        "value": "cylindrical",
+        "description": "Circular when viewed from above, rectangular when viewed from the side. Very short galls relative to their diameter are spangles/buttons."
+      },
+      {
+        "value": "globular",
+        "description": "The gall is rounded but not perfectly spherical (including ovate, ellipsoid, irregular, etc)."
+      },
+      {
+        "value": "hemispherical",
+        "description": "Perfectly round or nearly so, but only in one half of a full sphere (often divided by a leaf)"
+      },
+      {
+        "value": "linear",
+        "description": "The gall is a narrow line in shape for much of its form. Often seen as extensions of leaf veins, sometimes widening at a club or spindle-like end. "
+      },
+      {
+        "value": "numerous",
+        "description": "Typically found in large numbers (>10) scattered across every leaf or other plant part on which they occur, but not clustered together."
+      },
+      {
+        "value": "rosette",
+        "description": "A layered bunch of leaves or similar."
+      },
+      {
+        "value": "spangle/button",
+        "description": "A flat, circular disc-like structure. Often with a central umbo."
+      },
+      {
+        "value": "sphere",
+        "description": "Perfectly round, of equal diameter in every dimension,"
+      },
+      {
+        "value": "spindle",
+        "description": "Elongated, round in the middle and narrowed above and below, often pointed above."
+      },
+      {
+        "value": "tuft",
+        "description": "Small galls with structure entirely obscured by long woolly fibers."
+      }
+    ],
+    "texture": [
+      {
+        "value": "areola",
+        "description": "The upper tip of the gall has a ring, often raised and sometimes containing a central umbo, scar, or nipple."
+      },
+      {
+        "value": "bumpy",
+        "description": "The surface of the gall is covered with some kind of slight protrusions."
+      },
+      {
+        "value": "erineum",
+        "description": "The distinctive “sugary” crystalline texture formed by many eriophyid mites."
+      },
+      {
+        "value": "glaucous",
+        "description": "Covered in a whitish layer of fine powder or wax that can be easily rubbed off."
+      },
+      {
+        "value": "hairless",
+        "description": "The gall has no visible hairs at all. Note that late in hte season, hairs may wear off some galls."
+      },
+      {
+        "value": "hairy",
+        "description": "The gall has some hairs, whether that is only a sparse pubescence of short hairs or a dense coat of long wool that obscures the gall or stiff bristles (as in Acraspis erinacei)."
+      },
+      {
+        "value": "honeydew",
+        "description": "Galls releasing sugary solution. Often visible as a shiny wetness, but can be more apparent in the ants and wasps it attracts."
+      },
+      {
+        "value": "leafy",
+        "description": "The gall is surrounded by or composed of a profusion of altered leaves, bud scales, or similar structures."
+      },
+      {
+        "value": "mealy",
+        "description": "Galls appear to be coated in a coarse, granular texture, like flour or cornmeal. This appearance may be caused by a fine bumpiness of the solid exterior of the gall or a layer of short hairs, such that the mealiness may or may not be removable."
+      },
+      {
+        "value": "mottled",
+        "description": "Multiple colors on the surface of the gall mix irregularly."
+      },
+      {
+        "value": "pubescent",
+        "description": "The hair covering the gall is short, soft, and dense. May or may not obscure the color and texture of the surface, but not concealing its shape."
+      },
+      {
+        "value": "resinous dots",
+        "description": "The surface of the gall is covered in dots, often red, that secret sticky resin."
+      },
+      {
+        "value": "ribbed",
+        "description": "The external surface has linear grooves and ridges, typically running from the bottom to the top of the gall."
+      },
+      {
+        "value": "ruptured/split",
+        "description": "Galls emerge from the host plant through a visible rupture in the tissue they form in. Typically observed in stem and occasionally midrib galls. Split edges may not be apparent if galls are large."
+      },
+      {
+        "value": "spiky/thorny",
+        "description": "The gall is covered in sharp spines, prickles, etc."
+      },
+      {
+        "value": "spotted",
+        "description": "The gall contains distinct spots of a different color than its primary surface."
+      },
+      {
+        "value": "stiff",
+        "description": "The gall is hard and incompressable to the touch, generally because they are woody, thick-walled, but sometimes with an almost plastic-like texture."
+      },
+      {
+        "value": "striped",
+        "description": "With alternating bands of two or more distinct colors, either composed of solid lines or clustered dots. May or may not correspond to ribs or ridges in the physical structure of the gall. "
+      },
+      {
+        "value": "succulent",
+        "description": "The walls of the gall (when fresh) are juicy if cut."
+      },
+      {
+        "value": "woolly",
+        "description": "The hair covering the gall is long, soft, and thick, often concealing the surface and structure of the gall completely."
+      },
+      {
+        "value": "wrinkly",
+        "description": "The surface of the gall is often irregular or sunken into folds."
+      }
+    ],
+    "walls": [
+      {
+        "value": "false chamber",
+        "description": "When the gall is cut open, there are two chambers, only one of which contains larvae."
+      },
+      {
+        "value": "mycelium lining",
+        "description": "Some galls, sometimes called \"ambrosia\" type galls, have walls with a fungal inner lining. Examples include those produced by Asteromyia and some Asphondylia species. In some cases the developing midge larva feeds on the fungus; in other cases the role of the fungus is unknown. It may be important for inducing the gall."
+      },
+      {
+        "value": "ostiole",
+        "description": "A circular hole or pore in the structure of the gall, opening at maturity to allow the inducer to exit the gall without the need to chew a hole in the walls of the gall. May be recessed, protruding, conical, or split into bracts. "
+      },
+      {
+        "value": "radiating-fibers",
+        "description": "A central larval cell held in place by many thin, thread-like fibers"
+      },
+      {
+        "value": "slit",
+        "description": "Structure of the gall includes a linear slit through which inducers can exit"
+      },
+      {
+        "value": "spongy",
+        "description": "Space between larval cell and outer walls filled by a spongy substance of a distinct composition from either."
+      },
+      {
+        "value": "thick",
+        "description": "When the gall is cut open, the interior is full of tissue except for the small chamber containing the larvae. The walls are thick enough that the shape of this chamber could (but may not necessarily) differ from the shape of the exterior."
+      },
+      {
+        "value": "thin",
+        "description": "When the gall is cut open, it reveals an interior matching the shape of the exterior. The walls are not thick enough to conceal the shape of the chamber within."
+      }
+    ],
+    "cells": [
+      {
+        "value": "free-rolling",
+        "description": "The cell containing the larva is loose within an open cavity formed by the walls of the gall, free to roll around when disturbed."
+      },
+      {
+        "value": "monothalamous",
+        "description": "One cell or chamber containing a larva or larvae of the inducing insect is present within the gall if single, or within each gall in a cluster. May include galls with empty false chambers."
+      },
+      {
+        "value": "not applicable",
+        "description": "Galls formed by fungi, mites, viruses, aphids, etc, do not have larval cells."
+      },
+      {
+        "value": "polythalamous",
+        "description": "More than one cell or chamber containing a single larva of the inducing insect is present within the gall if single, or within each gall in a cluster. Does not include galls with empty false chambers."
+      }
+    ],
+    "alignment": [
+      {
+        "value": "drooping",
+        "description": "The gall may have any alignment, but its tip is conspicuously curved toward the ground from whatever the primary orientation of the gall is."
+      },
+      {
+        "value": "erect",
+        "description": "The gall stands at nearly 90 degrees from the surface it is attached to. Includes the majority of detachable galls."
+      },
+      {
+        "value": "integral",
+        "description": "The gall is integral with the surface it is attached to. It may not be flat, but it does not protrude out from the surface leaving an angled gap. Includes nearly all non-detachable galls."
+      },
+      {
+        "value": "leaning",
+        "description": "The gall is at an angle from the surface it is attached to."
+      },
+      {
+        "value": "supine",
+        "description": "The gall is only attached at its base but lays nearly flat along the surface it is attached to for most of its length."
+      }
+    ],
+    "plant_part": [
+      {
+        "value": "at leaf vein angles",
+        "description": "Galls located exclusively in the inside of the intersection between the lateral veins and main veins of the leaf."
+      },
+      {
+        "value": "between leaf veins",
+        "description": "Galls are not specifically located only on leaf veins. Galls with this term may sometimes incidentally appear close to veins."
+      },
+      {
+        "value": "bud",
+        "description": "Galls are located in buds (often found where branches intersect the stem, can be mistaken for stem galls)."
+      },
+      {
+        "value": "flower",
+        "description": "Galls are located in flowers. Note this is a botanical term referring to reproductive structures, and some flowers (eg oak catkins) may not be obviously recognizable as such."
+      },
+      {
+        "value": "fruit",
+        "description": "Galls are located in fruit. This is a botanical term referring to seed-bearing structures, and some fruit (eg maple samaras) may not be obviously recognizable as such."
+      },
+      {
+        "value": "leaf edge",
+        "description": "Galls are exclusively located around the edge of the leaf, often curled or folded."
+      },
+      {
+        "value": "leaf midrib",
+        "description": "Galls are located exclusively on the thickest, central vein of the leaf."
+      },
+      {
+        "value": "lower leaf",
+        "description": "Galls are located on the lower (abaxial) side of the leaf."
+      },
+      {
+        "value": "on leaf veins",
+        "description": "Galls are located exclusively on or very close to the veins of the leaf, including but not limited to the midrib."
+      },
+      {
+        "value": "petiole",
+        "description": "Galls are located on the part of the midrib between the leaf and the stem."
+      },
+      {
+        "value": "stem",
+        "description": "Galls are located anywhere in or on the stem (except within buds, which are occasionally deformed by gall inducers enough to appear as stem galls)."
+      },
+      {
+        "value": "underground (roots+)",
+        "description": "Galls are located at or below the soil surface, on roots, rhizomes, underground stems, or other organs. May include galls that sometimes occur on stems slightly above soil surface."
+      },
+      {
+        "value": "upper leaf",
+        "description": "Galls are located on the upper (adaxial) side of the leaf."
+      }
+    ],
+    "form": [
+      {
+        "value": "abrupt swelling",
+        "description": "A significant increase in the diameter of a stem, petiole, etc, emerging directly from unaffected tissue. Sometimes encircling the stem, other times emerging only from one side."
+      },
+      {
+        "value": "bullet",
+        "description": "A globular-to-conical detachable stem gall with hard, thick walls"
+      },
+      {
+        "value": "hidden cell",
+        "description": "A gall making no externally visible change to the host (typically in a stem or fruit) until the inducer chews its egress hole."
+      },
+      {
+        "value": "leaf blister",
+        "description": "Localized distortions of the leaf lamina, typically creating a cup opening toward the lower side of the leaf."
+      },
+      {
+        "value": "leaf curl",
+        "description": "Broad deformation of the lamina of a leaf, pulling the edges in. Typically irregular and sometimes causing entire leaves to roll up. Often accompanied by discoloration."
+      },
+      {
+        "value": "leaf edge fold",
+        "description": "A single layer of the leaf edge folded back against the leaf."
+      },
+      {
+        "value": "leaf edge roll",
+        "description": "A tight roll of tissue only at the edge of a leaf, of varying thickness."
+      },
+      {
+        "value": "leaf snap",
+        "description": "Two distinct, otherwise typical host leaves are joined together around a gall cell"
+      },
+      {
+        "value": "leaf spot",
+        "description": "A flat (never more than slightly thicker than the normal leaf), typically circular spot on the lamina of the leaf, sometimes with distinct rings of darker and lighter coloration (eye spots). Fungal leaf spots often have small dots above; midge spots have an exposed larva below."
+      },
+      {
+        "value": "modified capitulum",
+        "description": "Flowers in Asteraceae are clustered into tight structures called \"capitula\", which themselves resemble a flower at first glance. Developing capitula have the overall appearance of flower buds, and are sometimes called \"flower buds\" or \"inflorescence buds\" in technical and popular literature. Several gall-formers develop within developing capitula. These occupied capitula are referred to as galls, even when there is not an obvious external difference. There are usually at least some external clues (arrested development vs. nearby capitula, color change, change in texture, swelling, etc.), however."
+      },
+      {
+        "value": "non-gall",
+        "description": "Any gall-adjacent plant symptom or other structure that doesn’t meet the definition of a gall: a novel element of a plant caused by an organism living within the plant. Examples of non-galls include scale insects; leaf curl, spots, or blisters caused by pathogens or external herbivores; and stem swellings caused by miners or borers lacking internal cells. "
+      },
+      {
+        "value": "oak apple",
+        "description": "A spherical or near-spherical gall with thin outer walls, a single central larval cell surrounded by either spongy tissue or fine radiating fibers."
+      },
+      {
+        "value": "pip",
+        "description": "A small kernel-like gall, typically hairless and often secreting honeydew, on an immature or mature oak acorn."
+      },
+      {
+        "value": "plum",
+        "description": "A large, thick-walled gall on a mature acorn"
+      },
+      {
+        "value": "pocket",
+        "description": "A structure formed by pinching the leaf lamina together into a narrow opening (a point or line) and stretching it into various forms, from beads to sacks to spindles to long purses. The walls may or may not be thickened relative to the normal leaf."
+      },
+      {
+        "value": "rust",
+        "description": "Plant deformations caused by fungi in the order Pucciniales. They cause swelling and curling of stems and petioles and blisters on leaves, easily recognizable for their bright orange coloration, seen in characteristic rings."
+      },
+      {
+        "value": "scale",
+        "description": "An herbivorous insect of the superfamily Coccoidea. The post-reproductive females of the family Kermesidae have thin, globular, hollow shells fixed in place on their host."
+      },
+      {
+        "value": "stem club",
+        "description": "A substantial enlargement of the growing tip of a woody plant, tapering more or less gradually from normal stem width below it, blunt or rounded above."
+      },
+      {
+        "value": "tapered swelling",
+        "description": "An increase in the diameter of a stem, petiole, etc, gradual from either side of the gall."
+      },
+      {
+        "value": "witches broom",
+        "description": "A dense profusion of buds or shoots on woody plants."
+      }
+    ],
+    "season": [
+      {
+        "value": "Fall"
+      },
+      {
+        "value": "Spring"
+      },
+      {
+        "value": "Summer"
+      },
+      {
+        "value": "Winter"
+      }
+    ]
+  }
+}

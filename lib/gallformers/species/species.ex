@@ -20,6 +20,7 @@ defmodule Gallformers.Species.Species do
           name: String.t() | nil,
           taxoncode: String.t() | nil,
           datacomplete: boolean(),
+          genus_placeholder: boolean(),
           abundance_id: integer() | nil
         }
 
@@ -27,6 +28,7 @@ defmodule Gallformers.Species.Species do
     field :name, :string
     field :taxoncode, :string
     field :datacomplete, :boolean, default: false
+    field :genus_placeholder, :boolean, default: false
 
     belongs_to :abundance, Gallformers.Species.Abundance
 
@@ -82,7 +84,7 @@ defmodule Gallformers.Species.Species do
   """
   def changeset(species, attrs) do
     species
-    |> cast(attrs, [:name, :taxoncode, :datacomplete, :abundance_id])
+    |> cast(attrs, [:name, :taxoncode, :datacomplete, :genus_placeholder, :abundance_id])
     |> trim_strings()
     |> validate_required(@required_fields)
     |> validate_length(:name, min: 1, max: 500)

@@ -1,0 +1,112 @@
+# north-star-v0-ocr — scanned PDF pipeline.
+#
+# Same contract as north-star-v0.yaml (produces bundle.tar.gz with 9 artifacts)
+# but front-loaded with vision-model OCR instead of native text extraction.
+#
+# Use for BHL scans, old journal archives, and any PDF without a usable text
+# layer. For born-digital PDFs, use north-star-v0.yaml — running OCR over a
+# clean text layer is wasteful and adds error.
+#
+# Future Phase 4 work (9314): a `profile-document` stage that picks OCR vs
+# native extraction per-page. For now this pipeline assumes the whole document
+# needs OCR.
+
+pipeline:
+  name: north-star-v0-ocr
+  schema_version: 1.0.0
+  seed: 42
+
+  defaults:
+    idle_timeout_s: 90             # OCR streams are slower than text-only
+    total_timeout_s: 900
+    retry_on_idle: 1
+    max_workers: 4
+    structured_output: true
+
+  stages:
+    # ── Text layer (vision-model OCR) ─────────────────────────────────────────
+
+    - step: ocr                    # PDF pages → raw_text.jsonl (one block per page)
+      model: deepinfra/allenai/olmOCR-2-7B-1025
+      dpi: 200                     # page render resolution; higher = better, costlier
+      max_workers: 6               # page-parallel OCR
+      idle_timeout_s: 120          # vision models can stall on dense pages
+
+    - step: preprocess             # OCR-aware deterministic cleanup
+      # The OCR model produces the canonical text in one pass; preprocess
+      # does deterministic post-OCR cleanup only. No `llm-clean` stage —
+      # cleanup is the OCR model's job (vision models already produce
+      # readable, normalized text). This keeps the substring gate honest:
+      # the only text rewrite in the whole pipeline happens at OCR time.
+      ops:                         # scans have different junk than born-digital
+        - strip_plate_pages
+        - strip_page_headers
+        - rejoin_hyphenated
+        - rejoin_lines
+        # strip_bhl_boilerplate omitted — BHL boilerplate is in the digital
+        # cover sheet which only exists when downloaded via BHL, not in scans
+
+    - step: sectionize
+      excluded_section_types: [references, bibliography, literature_cited]
+      heading_fuzziness: 0.8       # tolerate OCR damage in heading detection
+
+    # ── Metadata ──────────────────────────────────────────────────────────────
+
+    - step: metadata
+      model: deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct
+      prompt: prompts/metadata.md
+      input_section_types: [title, abstract, introduction]
+
+    # ── Candidate detection ──────────────────────────────────────────────────
+
+    - step: find-candidates
+      model: deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct
+      prompt: prompts/find-candidates.md
+      n_samples: 3
+      agreement_threshold: 2
+      max_workers: 3
+
+    - step: evidence-pack
+      context_window: 3            # wider context — OCR damage hurts local extraction
+
+    # ── Per-field extraction ──────────────────────────────────────────────────
+
+    - step: extract-facts
+      model: deepinfra/Qwen/Qwen2.5-72B-Instruct
+      prompt: prompts/extract-facts.md
+      vocab: schemas/gallformers-vocab.json
+      max_workers: 6
+      idle_timeout_s: 120
+
+    - step: verify
+      substring_min_score: 85      # looser threshold — OCR damage is expected
+      enrich_offsets: true
+
+    - step: verify-claims
+      model: deepinfra/deepseek-ai/DeepSeek-V3
+      prompt: prompts/verify-claims.md
+      max_workers: 10
+
+    # ── Taxonomy lookup ───────────────────────────────────────────────────────
+
+    - step: taxonomy-lookup
+      source: gbif                 # WCVP is server-side; pipeline only does GBIF
+      cache_dir: output/cache/gbif
+      max_workers: 8
+      idle_timeout_s: 30
+      on_api_error: continue
+
+    # ── Assembly ──────────────────────────────────────────────────────────────
+
+    - step: assemble-review
+      outputs:
+        - claims.json
+        - verified_claims.json
+        - review_artifact.json
+        - manifest.json
+      validate: strict
+
+    - step: bundle
+      output: bundle.tar.gz
+      include_candidates: false
+      verify_complete: true

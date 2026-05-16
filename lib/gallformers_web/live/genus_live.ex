@@ -349,7 +349,10 @@ defmodule GallformersWeb.GenusLive do
                               href={"#{if species.taxoncode == "gall", do: "/gall", else: "/host"}/#{species.id}"}
                               class="hover:underline"
                             >
-                              <.taxon_name name={species.name} />
+                              <.taxon_name
+                                name={species.name}
+                                genus_placeholder={species[:genus_placeholder] == true}
+                              />
                             </.link>
                           </td>
                           <td class="text-center">{species.common_name}</td>

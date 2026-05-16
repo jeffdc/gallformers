@@ -341,7 +341,10 @@ defmodule GallformersWeb.HostLive do
                       href={"/id?h=#{URI.encode(@host.name)}"}
                       class="hover:underline"
                     >
-                      <.taxon_name name={@host.name} />
+                      <.taxon_name
+                        name={@host.name}
+                        genus_placeholder={@host[:genus_placeholder] == true}
+                      />
                     </.link>
                   </h2>
                   <.link

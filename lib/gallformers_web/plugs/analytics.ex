@@ -4,6 +4,11 @@ defmodule GallformersWeb.Plugs.Analytics do
 
   Runs after the response is sent and spawns an async task to record
   the page view, ensuring no impact on response time.
+
+  Skips LiveView routes — those are tracked by the TrackPageView on_mount
+  hook so navigations via `<.link navigate>` (which never trigger a new
+  HTTP request) are also captured. Without the skip, the dead render that
+  precedes a connected LV mount would be double-counted.
   """
 
   import Plug.Conn
@@ -17,13 +22,19 @@ defmodule GallformersWeb.Plugs.Analytics do
     conn = store_analytics_in_session(conn)
 
     register_before_send(conn, fn conn ->
-      if conn.status == 200 and Analytics.should_track?(conn.request_path, user_agent(conn)) do
+      if conn.status == 200 and not live_view_route?(conn) and
+           Analytics.should_track?(conn.request_path, user_agent(conn)) do
         track(conn)
       end
 
       conn
     end)
   end
+
+  # LiveView routes are tracked by the TrackPageView on_mount hook so the
+  # WebSocket-driven navigations are also captured. Tracking here would
+  # double-count the dead render that precedes the connected mount.
+  defp live_view_route?(conn), do: Map.has_key?(conn.private, :phoenix_live_view)
 
   defp track(conn) do
     ip = get_client_ip(conn)

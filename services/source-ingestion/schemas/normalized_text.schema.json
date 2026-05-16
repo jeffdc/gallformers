@@ -1,0 +1,72 @@
+{
+  "$id": "https://gallformers.org/schemas/normalized_text.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One row of `normalized_text.jsonl` — a cleaned block. Used as a span by extraction.\n\n`char_start`/`char_end` are the block's range in the flat normalized text\n(the concatenation of all normalized blocks separated by '\\n\\n'). Evidence\nin claims/verified_claims addresses *into* the flat text using these\nabsolute offsets, which are stable across re-runs given the same input.",
+  "properties": {
+    "block_id": {
+      "description": "Block identifier; what Evidence.block_id references",
+      "title": "Block Id",
+      "type": "string"
+    },
+    "char_end": {
+      "description": "Block end offset (exclusive) in the flat normalized text",
+      "minimum": 0,
+      "title": "Char End",
+      "type": "integer"
+    },
+    "char_start": {
+      "description": "Block start offset in the flat normalized text",
+      "minimum": 0,
+      "title": "Char Start",
+      "type": "integer"
+    },
+    "page": {
+      "minimum": 1,
+      "title": "Page",
+      "type": "integer"
+    },
+    "raw_block_ids": {
+      "description": "Source blocks in raw_text.jsonl that contributed to this block",
+      "items": {
+        "type": "string"
+      },
+      "title": "Raw Block Ids",
+      "type": "array"
+    },
+    "section_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "ID into sections.json",
+      "title": "Section Id"
+    },
+    "span_id": {
+      "description": "e.g. 'S_0001', zero-padded for sortability",
+      "title": "Span Id",
+      "type": "string"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "span_id",
+    "block_id",
+    "page",
+    "char_start",
+    "char_end",
+    "text",
+    "raw_block_ids"
+  ],
+  "title": "NormalizedBlock",
+  "type": "object",
+  "x-schema-version": "1.0.0"
+}

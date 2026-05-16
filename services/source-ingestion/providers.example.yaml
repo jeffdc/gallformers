@@ -20,6 +20,21 @@ providers:
       - moonshotai/Kimi-K2.5
       - deepseek-ai/DeepSeek-V3
       - Qwen/Qwen2.5-72B-Instruct
+      - meta-llama/Meta-Llama-3.1-8B-Instruct   # north-star: metadata, find-candidates
+  # OpenRouter — optional. Enable if you want a fully cross-provider verifier
+  # setup (e.g., extractor on DeepInfra, verifier on Anthropic via OpenRouter).
+  # Today's north-star pipelines achieve different-family verification within
+  # DeepInfra alone (Qwen extractor + DeepSeek verifier), so OpenRouter is
+  # not required for v1.
+  openrouter:
+    base_url: "https://openrouter.ai/api/v1"
+    env_key: "OPENROUTER_API_KEY"
+    models:
+      - anthropic/claude-haiku-4.5
+      - anthropic/claude-sonnet-4.6
+      - meta-llama/llama-3.1-8b-instruct
+      - qwen/qwen-2.5-72b-instruct
+      - deepseek/deepseek-chat
   deepseek:
     base_url: "https://api.deepseek.com/v1"
     env_key: "DEEPSEEK_API_KEY"

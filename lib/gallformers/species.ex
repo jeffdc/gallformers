@@ -64,7 +64,8 @@ defmodule Gallformers.Species do
       select: %{
         id: s.id,
         name: s.name,
-        taxoncode: s.taxoncode
+        taxoncode: s.taxoncode,
+        genus_placeholder: s.genus_placeholder
       }
     )
     |> Repo.all()

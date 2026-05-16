@@ -31,7 +31,8 @@ defmodule GallformersWeb.KeyComponents do
           <button
             phx-click="jump_to"
             phx-value-index={index}
-            class="text-gf-maroon hover:underline font-medium"
+            title="Jump back to this step"
+            class="text-gf-maroon hover:underline hover:bg-gf-maroon/5 font-medium rounded px-1 py-0.5 transition-colors cursor-pointer"
           >
             {step_label(step)}
           </button>
@@ -43,6 +44,13 @@ defmodule GallformersWeb.KeyComponents do
         </span>
 
         <div class="ml-auto flex items-center gap-3">
+          <button
+            phx-click="back"
+            title="Undo the most recent step"
+            class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gf-maroon hover:underline"
+          >
+            <span aria-hidden="true">←</span> Back
+          </button>
           <button
             :if={@terminal}
             phx-click="copy_path"

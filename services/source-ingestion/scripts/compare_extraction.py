@@ -80,6 +80,7 @@ def extract_pairs(records, alias_map):
 
 def compare_traits(baseline_records, extracted_records, alias_map):
     """Compare traits for gall species found in both sets."""
+
     def index_by_gall(records):
         idx = {}
         for r in records:
@@ -96,8 +97,17 @@ def compare_traits(baseline_records, extracted_records, alias_map):
         print("\nNo common gall species to compare traits.")
         return
 
-    trait_keys = ["shape", "color", "texture", "walls", "cells", "alignment",
-                  "plant_part", "form", "season"]
+    trait_keys = [
+        "shape",
+        "color",
+        "texture",
+        "walls",
+        "cells",
+        "alignment",
+        "plant_part",
+        "form",
+        "season",
+    ]
 
     print(f"\n## Trait Comparison ({len(common)} common species)")
     print()
@@ -136,9 +146,13 @@ def compare_traits(baseline_records, extracted_records, alias_map):
                 if overlap:
                     trait_scores[trait]["partial"] += 1
                     total_partial += 1
-                    mismatches.append(f"  {trait}: baseline={sorted(base_vals)} extracted={sorted(ext_vals)} (partial match)")
+                    mismatches.append(
+                        f"  {trait}: baseline={sorted(base_vals)} extracted={sorted(ext_vals)} (partial match)"
+                    )
                 else:
-                    mismatches.append(f"  {trait}: baseline={sorted(base_vals)} extracted={sorted(ext_vals)}")
+                    mismatches.append(
+                        f"  {trait}: baseline={sorted(base_vals)} extracted={sorted(ext_vals)}"
+                    )
             elif base_vals:
                 mismatches.append(f"  {trait}: baseline={sorted(base_vals)} extracted=[]")
             elif ext_vals:
@@ -165,7 +179,9 @@ def compare_traits(baseline_records, extracted_records, alias_map):
         exact_pct = total_match / total_compared * 100
         partial_pct = (total_match + total_partial) / total_compared * 100
         print(f"Exact match: {total_match}/{total_compared} ({exact_pct:.1f}%)")
-        print(f"Exact + partial: {total_match + total_partial}/{total_compared} ({partial_pct:.1f}%)")
+        print(
+            f"Exact + partial: {total_match + total_partial}/{total_compared} ({partial_pct:.1f}%)"
+        )
 
     print("\nPer-trait accuracy (exact / partial / total):")
     for trait in trait_keys:
@@ -176,7 +192,9 @@ def compare_traits(baseline_records, extracted_records, alias_map):
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python scripts/compare_extraction.py <baseline.json> <extracted.json> [--db <dbname>]")
+        print(
+            "Usage: python scripts/compare_extraction.py <baseline.json> <extracted.json> [--db <dbname>]"
+        )
         sys.exit(1)
 
     baseline = json.loads(Path(sys.argv[1]).read_text())
@@ -192,7 +210,9 @@ def main():
         alias_map = load_alias_map(dbname)
         print(f"Loaded {len(alias_map)} name aliases for matching")
     except psycopg.OperationalError:
-        print(f"Warning: Could not connect to database '{dbname}', proceeding without alias resolution")
+        print(
+            f"Warning: Could not connect to database '{dbname}', proceeding without alias resolution"
+        )
     print()
 
     print("# Extraction Comparison Report")
@@ -208,7 +228,7 @@ def main():
     only_baseline = base_set - ext_set
     only_extracted = ext_set - base_set
 
-    print(f"## Species Coverage")
+    print("## Species Coverage")
     print(f"- Baseline: {len(base_set)} gall species, {len(baseline)} records")
     print(f"- Extracted: {len(ext_set)} gall species, {len(extracted)} records")
     print(f"- In common: {len(common)}")
@@ -248,7 +268,7 @@ def main():
     missed_pairs = base_pairs - ext_pairs
     extra_pairs = ext_pairs - base_pairs
 
-    print(f"## Host Associations")
+    print("## Host Associations")
     print(f"- Baseline pairs: {len(base_pairs)}")
     print(f"- Extracted pairs: {len(ext_pairs)}")
     print(f"- Matching: {len(common_pairs)}")

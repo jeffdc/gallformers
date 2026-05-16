@@ -11,6 +11,10 @@ dependencies = [
     "click>=8.1.0",
     "pyyaml>=6.0",
     "psycopg[binary]>=3.1",
+    "pydantic>=2.12.5",
+    "litellm>=1.83.14",
+    "instructor>=1.15.1",
+    "rapidfuzz>=3.14.5",
 ]
 
 [project.scripts]
@@ -26,9 +30,81 @@ packages = ["src/ingest"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests", "scripts"]
+extend-exclude = ["output", ".venv"]
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "F",     # pyflakes
+    "I",     # isort
+    "B",     # flake8-bugbear
+    "UP",    # pyupgrade
+    "RUF",   # ruff-specific
+    "ASYNC", # async best practices
+    "SIM",   # flake8-simplify
+    "C4",    # flake8-comprehensions
+    "PTH",   # use pathlib
+    "TID",   # flake8-tidy-imports
+]
+ignore = [
+    "E501",     # line length — formatter handles it
+    "SIM108",   # ternary-vs-if is style, not bugs
+    "B008",     # function call in default arg (used for asyncio.Lock etc.)
+    "ASYNC109", # timeout parameter is part of our deliberate API surface
+    "ASYNC240", # we knowingly do small blocking I/O in async stages
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "B017",   # pytest.raises(Exception) is fine in tests
+    "RUF001", # tests intentionally use ambiguous unicode (OCR-damage fixtures)
+    "RUF059", # tests unpack tuples and ignore parts; explicit is fine
+    "RUF043", # pytest.raises(match=...) with metacharacters is fine in tests
+    "F841",   # tests sometimes assign intermediate state for clarity
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pyright]
+include = ["src", "tests", "scripts"]
+exclude = [
+    "**/__pycache__",
+    "output",
+    ".venv",
+    # Legacy scripts predating the new pipeline; not part of Phase A.
+    "scripts/compare_extraction.py",
+    "scripts/export_source_baseline.py",
+]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+reportMissingTypeStubs = false
+
+# Tests construct concrete cells but stage functions return wider unions
+# (EvidenceCell | TraitCell). Asserting type narrowing on every line would
+# drown out real failures; relax attribute-access and argument-type checks
+# in tests only.
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+reportAttributeAccessIssue = "none"
+reportArgumentType = "none"
+reportOptionalMemberAccess = "none"
+reportCallIssue = "none"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
 
 [dependency-groups]
 dev = [
+    "pyright>=1.1.409",
     "pytest>=8.0.0",
+    "pytest-asyncio>=1.3.0",
     "pytest-mock>=3.14.0",
+    "ruff>=0.15.12",
 ]

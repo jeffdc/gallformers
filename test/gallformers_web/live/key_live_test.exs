@@ -105,4 +105,53 @@ defmodule GallformersWeb.KeyLiveTest do
       assert html =~ "Path:"
     end
   end
+
+  describe "Deep link path replay" do
+    test "scrolls to the active couplet after replaying path", %{conn: conn} do
+      # path=1:0,2:0 chooses lead 0 at couplet 1, then lead 0 at couplet 2.
+      # Final destination is couplet 3.
+      {:ok, view, _html} = live(conn, ~p"/keys/oak-parasite-key?path=1:0,2:0")
+      assert_push_event(view, "scroll_to_couplet", %{id: "couplet-3"})
+    end
+
+    test "scrolls to terminating couplet when path ends at a taxon", %{conn: conn} do
+      # path=1:0,2:0,3:0,4:0 reaches terminal taxon Ichneumonidae;
+      # last decision was at couplet 4, so scroll there.
+      {:ok, view, html} = live(conn, ~p"/keys/oak-parasite-key?path=1:0,2:0,3:0,4:0")
+      assert html =~ "Ichneumonidae"
+      assert_push_event(view, "scroll_to_couplet", %{id: "couplet-4"})
+    end
+
+    test "renders Back button when path is non-empty", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/keys/oak-parasite-key")
+      view |> element("[phx-value-couplet='1'][phx-value-lead='0']") |> render_click()
+      assert has_element?(view, "button", "Back")
+    end
+
+    test "does not render Back button when path is empty", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/keys/oak-parasite-key")
+      refute has_element?(view, "button", "Back")
+    end
+
+    test "Back button removes the most recent step", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/keys/oak-parasite-key")
+
+      # Navigate 1 -> 2 -> 3
+      view |> element("[phx-value-couplet='1'][phx-value-lead='0']") |> render_click()
+      view |> element("[phx-value-couplet='2'][phx-value-lead='0']") |> render_click()
+
+      # Click Back: should remove the most recent step, leaving only step 0
+      html = view |> element("button", "Back") |> render_click()
+      assert html =~ "Path:"
+      # After undoing step 1 (the move from couplet 2 -> 3), active couplet is 2.
+      assert_push_event(view, "scroll_to_couplet", %{id: "couplet-2"})
+    end
+
+    test "Back button hides itself when path empties", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/keys/oak-parasite-key")
+      view |> element("[phx-value-couplet='1'][phx-value-lead='0']") |> render_click()
+      view |> element("button", "Back") |> render_click()
+      refute has_element?(view, "button", "Back")
+    end
+  end
 end

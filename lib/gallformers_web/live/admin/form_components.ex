@@ -142,7 +142,8 @@ defmodule GallformersWeb.Admin.FormComponents do
   ## Events
 
   The parent LiveView must handle these events:
-  * `"update_new_alias"` - When name or type input changes
+  * `"update_new_alias_name"` - When the name input changes (via InputEvent hook)
+  * `"update_new_alias_type"` - When the type select changes
   * `"add_alias"` - When plus button clicked
   * `"remove_alias"` - When X button clicked (with `alias-id` value)
 
@@ -194,14 +195,14 @@ defmodule GallformersWeb.Admin.FormComponents do
                   value={@new_alias_name}
                   placeholder="New alias..."
                   phx-hook="InputEvent"
-                  data-event="update_new_alias"
+                  data-event="update_new_alias_name"
                   class="gf-input text-sm"
                 />
               </td>
               <td class="px-3 py-1.5">
                 <select
-                  phx-change="update_new_alias"
-                  phx-value-name={@new_alias_name}
+                  name="value"
+                  phx-change="update_new_alias_type"
                   class="gf-select text-sm"
                 >
                   <option

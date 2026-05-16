@@ -79,7 +79,7 @@ defmodule Gallformers.Plants do
       )
       SELECT f.id, f.name, f.description,
              gf.genus_id, gf.genus_name, gf.genus_description,
-             s.id, s.name
+             s.id, s.name, s.genus_placeholder
       FROM genus_to_family gf
       JOIN taxonomy f ON f.id = gf.current_parent_id AND f.type = 'family'
       JOIN species_taxonomy st ON st.taxonomy_id = gf.genus_id
@@ -88,7 +88,7 @@ defmodule Gallformers.Plants do
       ORDER BY f.name, gf.genus_name, s.name
       """)
 
-    Enum.map(rows, fn [fid, fname, fdesc, gid, gname, gdesc, sid, sname] ->
+    Enum.map(rows, fn [fid, fname, fdesc, gid, gname, gdesc, sid, sname, sph] ->
       %{
         family_id: fid,
         family_name: fname,
@@ -98,6 +98,7 @@ defmodule Gallformers.Plants do
         genus_description: gdesc,
         species_id: sid,
         species_name: sname,
+        species_genus_placeholder: sph,
         undescribed: false
       }
     end)
@@ -171,6 +172,7 @@ defmodule Gallformers.Plants do
         name: s.name,
         taxoncode: s.taxoncode,
         datacomplete: s.datacomplete,
+        genus_placeholder: s.genus_placeholder,
         abundance_id: s.abundance_id,
         abundance_name: a.abundance,
         inserted_at: s.inserted_at,
@@ -216,20 +218,28 @@ defmodule Gallformers.Plants do
 
   Used for typeahead/autocomplete functionality.
   Returns up to `limit` results ordered by name.
+
+  ## Options
+
+    * `:include_placeholders` - when `true`, includes species flagged with
+      `genus_placeholder` (e.g. "Quercus spp"). Defaults to `false` so the
+      public typeahead never surfaces placeholder rows. Admin pickers that
+      need to create or edit placeholders must opt in.
   """
-  @spec search_hosts(String.t(), integer()) :: [map()]
-  def search_hosts(query, limit \\ 20) when is_binary(query) do
+  @spec search_hosts(String.t(), integer(), keyword()) :: [map()]
+  def search_hosts(query, limit \\ 20, opts \\ []) when is_binary(query) do
     terms = TextMatch.parse_terms(query)
 
     if terms == [] do
       []
     else
+      include_placeholders = Keyword.get(opts, :include_placeholders, false)
       normalized = query |> String.downcase() |> String.trim()
-      search_hosts_with_terms(terms, normalized, limit)
+      search_hosts_with_terms(terms, normalized, limit, include_placeholders)
     end
   end
 
-  defp search_hosts_with_terms(terms, raw_query, limit) do
+  defp search_hosts_with_terms(terms, raw_query, limit, include_placeholders) do
     prefix_pattern = "#{raw_query}%"
 
     # Relevance ranking: exact match (0) > prefix match (1) > contains (2)
@@ -281,8 +291,18 @@ defmodule Gallformers.Plants do
         )
       end)
 
-    hosts = Repo.all(query_with_terms)
+    hosts =
+      query_with_terms
+      |> maybe_exclude_placeholders(include_placeholders)
+      |> Repo.all()
+
     attach_aliases_batch(hosts)
+  end
+
+  defp maybe_exclude_placeholders(query, true), do: query
+
+  defp maybe_exclude_placeholders(query, false) do
+    from([s, _als, _a] in query, where: s.genus_placeholder == false)
   end
 
   # Batch-load aliases for multiple hosts in a single query (avoids N+1)
@@ -325,6 +345,26 @@ defmodule Gallformers.Plants do
       }
     )
     |> Repo.all()
+  end
+
+  @doc """
+  Returns the `genus_placeholder` species linked to the given genus taxonomy id,
+  or `nil` if none exists.
+
+  Used by the admin host form to enforce the "one placeholder per genus"
+  invariant (a DB unique index is the eventual backstop; application-level
+  enforcement until then).
+  """
+  @spec get_genus_placeholder(integer()) :: Species.t() | nil
+  def get_genus_placeholder(genus_taxonomy_id) when is_integer(genus_taxonomy_id) do
+    from(s in Species,
+      join: st in "species_taxonomy",
+      on: st.species_id == s.id,
+      where: st.taxonomy_id == ^genus_taxonomy_id,
+      where: s.genus_placeholder == true,
+      limit: 1
+    )
+    |> Repo.one()
   end
 
   @doc """

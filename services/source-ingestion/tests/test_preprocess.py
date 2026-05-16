@@ -1,6 +1,17 @@
-"""Tests for the text pre-processing pipeline."""
+"""Tests for the block-level pre-processing pipeline and its per-block helpers."""
 
-from ingest.preprocess import preprocess, strip_bhl_boilerplate, rejoin_lines, rejoin_hyphenated, strip_page_headers, strip_plate_pages
+from ingest.preprocess import (
+    BLOCK_SEPARATOR,
+    flat_normalized_text,
+    preprocess_blocks,
+    rejoin_hyphenated,
+    rejoin_lines,
+    strip_bhl_boilerplate,
+    strip_page_headers,
+    strip_plate_pages,
+    verify_block_offsets,
+)
+from ingest.schemas import RawTextBlock
 
 
 class TestStripBHLBoilerplate:
@@ -114,26 +125,112 @@ class TestStripPlatPages:
         assert "Plate VI" in result
 
 
-class TestPreprocess:
-    def test_full_pipeline(self):
-        text = (
+def _raw(block_id: str, text: str, page: int = 1) -> RawTextBlock:
+    return RawTextBlock(
+        block_id=block_id,
+        page=page,
+        text=text,
+        bbox=None,
+        extractor="plain-text",
+        quality_signals={},
+    )
+
+
+class TestPreprocessBlocks:
+    def test_single_block_basic(self):
+        blocks = preprocess_blocks([_raw("p1-b0", "Hello world.")])
+        assert len(blocks) == 1
+        b = blocks[0]
+        assert b.span_id == "S_0001"
+        assert b.block_id == "p1-b0"
+        assert b.page == 1
+        assert b.char_start == 0
+        assert b.char_end == len("Hello world.")
+        assert b.text == "Hello world."
+        assert b.raw_block_ids == ["p1-b0"]
+        assert b.section_id is None
+
+    def test_two_blocks_offsets_account_for_separator(self):
+        blocks = preprocess_blocks([_raw("p1-b0", "First."), _raw("p1-b1", "Second.")])
+        assert len(blocks) == 2
+        assert blocks[0].span_id == "S_0001"
+        assert blocks[1].span_id == "S_0002"
+        assert blocks[0].char_start == 0
+        assert blocks[0].char_end == 6  # "First."
+        # Second starts after "First." + "\n\n"
+        assert blocks[1].char_start == 6 + len(BLOCK_SEPARATOR)
+        assert blocks[1].char_end == blocks[1].char_start + 7  # "Second."
+
+    def test_offsets_consistent_with_flat_text(self):
+        blocks = preprocess_blocks(
+            [
+                _raw("p1-b0", "Alpha."),
+                _raw("p2-b0", "Beta gamma.", page=2),
+                _raw("p2-b1", "Delta.", page=2),
+            ]
+        )
+        flat = flat_normalized_text(blocks)
+        assert flat == "Alpha.\n\nBeta gamma.\n\nDelta."
+        verify_block_offsets(blocks)  # must not raise
+        for b in blocks:
+            assert flat[b.char_start : b.char_end] == b.text
+
+    def test_empty_block_after_cleanup_is_dropped(self):
+        # A block consisting entirely of whitespace gets dropped.
+        blocks = preprocess_blocks([_raw("p1-b0", "Real content."), _raw("p1-b1", "   \n  ")])
+        assert len(blocks) == 1
+        assert blocks[0].block_id == "p1-b0"
+
+    def test_bhl_boilerplate_block_dropped(self):
+        # A block that contains only BHL boilerplate becomes empty after cleanup.
+        bhl_only = (
             "[https://www.biodiversitylibrary.org/](https://www.biodiversitylibrary.org/)\n\n"
             "Holding Institution: Some Library\n"
-            "Sponsored by: Some Sponsor\n\n"
-            "This page intentionally left blank.\n\n"
-            "A BIOLOGICAL STUDY\n\n"
-            "Galls are abnormal growths on the stems, leaves, roots, or\n\n"
-            "other parts of plants, caused by the action of in-\nsects.\n\n"
-            "528 Philippine Journal of Science\n1919\n\n"
-            "More real content here.\n\n"
-            "PLATE I. PLANT GALLS.\n\n"
-            "OCR junk |\n\n"
+            "This page intentionally left blank."
         )
-        result = preprocess(text)
-        assert "biodiversitylibrary" not in result
-        assert "intentionally left blank" not in result
-        assert "BIOLOGICAL STUDY" in result
-        assert "Philippine Journal of Science" not in result
-        assert "PLATE I. PLANT GALLS." not in result
-        # Content should be rejoined
-        assert "insects" in result
+        blocks = preprocess_blocks(
+            [_raw("p1-b0", bhl_only), _raw("p1-b1", "Real scientific content.")]
+        )
+        # BHL block becomes empty -> dropped; only the real content block remains.
+        assert len(blocks) == 1
+        assert blocks[0].block_id == "p1-b1"
+        assert blocks[0].span_id == "S_0001"  # span_id renumbers after drops
+
+    def test_page_number_is_preserved_per_block(self):
+        blocks = preprocess_blocks(
+            [
+                _raw("p1-b0", "Alpha.", page=1),
+                _raw("p2-b0", "Beta.", page=2),
+                _raw("p5-b3", "Gamma.", page=5),
+            ]
+        )
+        assert [b.page for b in blocks] == [1, 2, 5]
+
+    def test_raw_block_ids_traces_back(self):
+        blocks = preprocess_blocks([_raw("p1-b0", "Alpha."), _raw("p1-b1", "Beta.")])
+        assert blocks[0].raw_block_ids == ["p1-b0"]
+        assert blocks[1].raw_block_ids == ["p1-b1"]
+
+    def test_empty_input_yields_empty_output(self):
+        assert preprocess_blocks([]) == []
+
+
+class TestVerifyBlockOffsets:
+    def test_tampered_offsets_raises(self):
+        original = preprocess_blocks([_raw("p1-b0", "Hello.")])
+        # Corrupt by directly constructing a block with wrong offsets.
+        from ingest.schemas import NormalizedBlock
+
+        bad = NormalizedBlock(
+            span_id="S_0001",
+            block_id="p1-b0",
+            page=1,
+            char_start=0,
+            char_end=4,  # would slice "Hell", not "Hello."
+            text="Hello.",
+            raw_block_ids=["p1-b0"],
+        )
+        import pytest
+
+        with pytest.raises(ValueError, match="does not match"):
+            verify_block_offsets([bad])

@@ -342,7 +342,8 @@ defmodule Gallformers.Search do
         select: %{
           id: s.id,
           name: s.name,
-          type: "host"
+          type: "host",
+          genus_placeholder: s.genus_placeholder
         }
       )
       |> Repo.all()
@@ -357,7 +358,8 @@ defmodule Gallformers.Search do
         select: %{
           id: s.id,
           name: s.name,
-          type: "host"
+          type: "host",
+          genus_placeholder: s.genus_placeholder
         }
       )
       |> Repo.all()

@@ -206,6 +206,139 @@ defmodule Gallformers.GallsIdentificationTest do
     end
   end
 
+  describe "attach_place_match" do
+    # Three-way tagging:
+    #   :documented        - exact gall_range row for the region
+    #   :country_level     - no exact gall_range, but some host has host_range
+    #                        (region or any ancestor)
+    #   :genus_placeholder - neither — only surfaced via the genus_placeholder
+    #                        admit path in apply_place_filter/3
+    #
+    # See matter 53cb.
+
+    test "gall with exact gall_range row for region tagged :documented" do
+      genus = create_taxonomy("DocGenus", "genus")
+      host = create_species("Hostus docus", "plant")
+      link_species_taxonomy(host.id, genus.id)
+
+      gall = create_species("Gall with explicit range", "gall")
+      create_gall_traits(gall.id)
+      create_gall_host(gall.id, host.id)
+      # explicit gall_range for US-CA (place_id 2)
+      Repo.insert!(%Gallformers.Ranges.GallRange{
+        species_id: gall.id,
+        place_id: 2,
+        precision: "exact"
+      })
+
+      results = Galls.filter_galls(%{place_codes: ["US-CA"]})
+      found = Enum.find(results, &(&1.id == gall.id))
+
+      assert found != nil
+      assert found.place_match == :documented
+    end
+
+    test "gall with non-exact precision gall_range row for region tagged :documented" do
+      # Bug: previously, a gall admitted via path 1 (galls_with_range_match) with
+      # precision != 'exact' would fall through the cond and be tagged
+      # :genus_placeholder. It should be :documented since it has real gall_range
+      # data, not a placeholder admit.
+      genus = create_taxonomy("NonExactGenus", "genus")
+      host = create_species("Hostus nonexactus", "plant")
+      link_species_taxonomy(host.id, genus.id)
+
+      gall = create_species("Gall with non-exact range", "gall")
+      create_gall_traits(gall.id)
+      create_gall_host(gall.id, host.id)
+      # explicit gall_range for US-CA (place_id 2) with non-exact precision
+      Repo.insert!(%Gallformers.Ranges.GallRange{
+        species_id: gall.id,
+        place_id: 2,
+        precision: "country"
+      })
+
+      results = Galls.filter_galls(%{place_codes: ["US-CA"]})
+      found = Enum.find(results, &(&1.id == gall.id))
+
+      assert found != nil
+      assert found.place_match == :documented
+    end
+
+    test "gall admitted via ancestor place_id (country-level gall_range, subdivision filter) tagged :documented" do
+      # Bug: a gall_range at country level "US" (place_id 902) admitted via
+      # ancestor expansion when the user filters by subdivision "US-CA" would
+      # previously fall through to :genus_placeholder because the tagger's
+      # :documented predicate only checked descendant_ids. Should be :documented.
+      genus = create_taxonomy("AncestorGenus", "genus")
+      host = create_species("Hostus ancestrus", "plant")
+      link_species_taxonomy(host.id, genus.id)
+
+      gall = create_species("Gall with country-level range only", "gall")
+      create_gall_traits(gall.id)
+      create_gall_host(gall.id, host.id)
+      # explicit gall_range at the COUNTRY level (US = 902)
+      Repo.insert!(%Gallformers.Ranges.GallRange{
+        species_id: gall.id,
+        place_id: 902,
+        precision: "country"
+      })
+
+      # User filters by subdivision US-CA — gall is admitted via ancestor
+      # expansion (US is an ancestor of US-CA).
+      results = Galls.filter_galls(%{place_codes: ["US-CA"]})
+      found = Enum.find(results, &(&1.id == gall.id))
+
+      assert found != nil
+      assert found.place_match == :documented
+    end
+
+    test "gall with no gall_range but matching host_range tagged :country_level" do
+      genus = create_taxonomy("CountryGenus", "genus")
+      host = create_species("Hostus countryus", "plant")
+      link_species_taxonomy(host.id, genus.id)
+
+      gall = create_species("Gall via host range only", "gall")
+      create_gall_traits(gall.id)
+      create_gall_host(gall.id, host.id)
+      # host_range for US-CA — no gall_range
+      create_host_range(host.id, 2)
+
+      results = Galls.filter_galls(%{place_codes: ["US-CA"]})
+      found = Enum.find(results, &(&1.id == gall.id))
+
+      assert found != nil
+      assert found.place_match == :country_level
+    end
+
+    test "gall surfaced ONLY via genus_placeholder path tagged :genus_placeholder" do
+      genus = create_taxonomy("PlaceholderTagGenus", "genus")
+
+      placeholder =
+        Repo.insert!(%Gallformers.Species.Species{
+          name: "PlaceholderTagGenus spp",
+          taxoncode: "plant",
+          genus_placeholder: true
+        })
+
+      link_species_taxonomy(placeholder.id, genus.id)
+
+      gall = create_species("Gall on placeholder only (tag test)", "gall")
+      create_gall_traits(gall.id)
+      create_gall_host(gall.id, placeholder.id)
+      # No host_range, no gall_range — surfaces only via genus_placeholder admit path
+
+      results =
+        Galls.filter_galls(%{genus_id: genus.id, place_codes: ["US-CA"]})
+
+      found = Enum.find(results, &(&1.id == gall.id))
+
+      assert found != nil, "expected gall to surface via placeholder path"
+
+      assert found.place_match == :genus_placeholder,
+             "expected :genus_placeholder tag, got #{inspect(found.place_match)}"
+    end
+  end
+
   describe "family filter with intermediate taxonomy ranks" do
     # Seed data taxonomy chain:
     #   Cynipidae(30) → Cynipinae(31, subfamily) → Cynipini(32, tribe) → Andricus(33), Cynips(34)
@@ -274,6 +407,101 @@ defmodule Gallformers.GallsIdentificationTest do
 
       count = Galls.count_filtered_galls(%{family_id: family.id})
       assert count == 1, "expected 1 gall for family, got #{count}"
+    end
+  end
+
+  describe "place filter with genus placeholder host" do
+    # User-reported regression (matter 53cb): galls whose only host is a
+    # genus-level placeholder (genus_placeholder=true) are silently filtered
+    # out by the ID region filter because placeholders by design have no
+    # host_range. When the user has chosen a genus, those galls should pass
+    # the place filter as an exploratory exception.
+
+    test "gall with only a placeholder host in selected genus surfaces under region filter" do
+      genus = create_taxonomy("PlaceholderGenus", "genus")
+
+      placeholder =
+        Repo.insert!(%Gallformers.Species.Species{
+          name: "PlaceholderGenus spp",
+          taxoncode: "plant",
+          genus_placeholder: true
+        })
+
+      link_species_taxonomy(placeholder.id, genus.id)
+
+      gall = create_species("Gall on placeholder only", "gall")
+      create_gall_traits(gall.id)
+      create_gall_host(gall.id, placeholder.id)
+      # IMPORTANT: no host_range on the placeholder, no gall_range on the gall
+
+      results =
+        Galls.filter_galls(%{genus_id: genus.id, place_codes: ["US-CA"]})
+
+      gall_ids = Enum.map(results, & &1.id)
+
+      assert gall.id in gall_ids,
+             "expected gall #{gall.id} to surface via genus_placeholder path under region filter"
+    end
+
+    test "placeholder host in a DIFFERENT genus does not surface for the requested genus" do
+      # Two genera, two placeholders. Filter by genus A but a gall hosted only
+      # on genus B's placeholder must NOT surface — proves we're not over-matching.
+      genus_a = create_taxonomy("AlphaGenus", "genus")
+      genus_b = create_taxonomy("BetaGenus", "genus")
+
+      placeholder_b =
+        Repo.insert!(%Gallformers.Species.Species{
+          name: "BetaGenus spp",
+          taxoncode: "plant",
+          genus_placeholder: true
+        })
+
+      link_species_taxonomy(placeholder_b.id, genus_b.id)
+
+      # Need a placeholder in genus_a too so the genus filter itself has something
+      # to match — otherwise the test would pass for the wrong reason (genus
+      # filter rejecting the gall before the place filter runs).
+      placeholder_a =
+        Repo.insert!(%Gallformers.Species.Species{
+          name: "AlphaGenus spp",
+          taxoncode: "plant",
+          genus_placeholder: true
+        })
+
+      link_species_taxonomy(placeholder_a.id, genus_a.id)
+
+      gall = create_species("Gall only on Beta placeholder", "gall")
+      create_gall_traits(gall.id)
+      create_gall_host(gall.id, placeholder_b.id)
+
+      results =
+        Galls.filter_galls(%{genus_id: genus_a.id, place_codes: ["US-CA"]})
+
+      gall_ids = Enum.map(results, & &1.id)
+
+      refute gall.id in gall_ids,
+             "gall on Beta placeholder must not surface under Alpha genus filter"
+    end
+
+    test "gall with a real host_range still surfaces under genus filter (no regression)" do
+      genus = create_taxonomy("RegressionGenus", "genus")
+
+      host = create_species("Hostus regressionus", "plant")
+      link_species_taxonomy(host.id, genus.id)
+
+      gall = create_species("Gall on real host", "gall")
+      create_gall_traits(gall.id)
+      create_gall_host(gall.id, host.id)
+      # US-CA exact native range
+      create_host_range(host.id, 2)
+
+      results =
+        Galls.filter_galls(%{genus_id: genus.id, place_codes: ["US-CA"]})
+
+      gall_ids = Enum.map(results, & &1.id)
+
+      assert gall.id in gall_ids,
+             "real-host gall must still surface under genus+region filter"
     end
   end
 

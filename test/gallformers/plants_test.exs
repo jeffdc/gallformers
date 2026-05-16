@@ -713,4 +713,111 @@ defmodule Gallformers.PlantsTest do
                )
     end
   end
+
+  describe "search_hosts placeholder exclusion" do
+    setup do
+      normal =
+        Repo.insert!(%Species{
+          name: "Quercus testalba",
+          taxoncode: "plant",
+          genus_placeholder: false
+        })
+
+      placeholder =
+        Repo.insert!(%Species{
+          name: "Quercus testspp",
+          taxoncode: "plant",
+          genus_placeholder: true
+        })
+
+      %{normal: normal, placeholder: placeholder}
+    end
+
+    test "default (public) search excludes genus_placeholder species", %{
+      normal: normal,
+      placeholder: placeholder
+    } do
+      results = Plants.search_hosts("Quercus test", 50)
+      ids = Enum.map(results, & &1.id)
+
+      assert normal.id in ids
+      refute placeholder.id in ids
+    end
+
+    test "include_placeholders: true returns genus_placeholder species (admin)", %{
+      normal: normal,
+      placeholder: placeholder
+    } do
+      results = Plants.search_hosts("Quercus test", 50, include_placeholders: true)
+      ids = Enum.map(results, & &1.id)
+
+      assert normal.id in ids
+      assert placeholder.id in ids
+    end
+  end
+
+  describe "get_genus_placeholder/1" do
+    setup do
+      {:ok, family} =
+        Taxonomy.create_taxonomy(%{
+          name: "GetPlaceholderFamily",
+          type: "family",
+          description: "Plant"
+        })
+
+      {:ok, genus_with} =
+        Taxonomy.create_taxonomy(%{
+          name: "Getplaceholderwithgenus",
+          type: "genus",
+          parent_id: family.id
+        })
+
+      {:ok, genus_without} =
+        Taxonomy.create_taxonomy(%{
+          name: "Getplaceholderwithoutgenus",
+          type: "genus",
+          parent_id: family.id
+        })
+
+      placeholder =
+        Repo.insert!(%Species{
+          name: "Getplaceholderwithgenus spp",
+          taxoncode: "plant",
+          genus_placeholder: true
+        })
+
+      Taxonomy.link_species_to_taxonomy(placeholder.id, genus_with.id)
+
+      # A normal (non-placeholder) species linked to the same genus — must not match
+      normal =
+        Repo.insert!(%Species{
+          name: "Getplaceholderwithgenus alba",
+          taxoncode: "plant",
+          genus_placeholder: false
+        })
+
+      Taxonomy.link_species_to_taxonomy(normal.id, genus_with.id)
+
+      %{genus_with: genus_with, genus_without: genus_without, placeholder: placeholder}
+    end
+
+    test "returns the placeholder species for a genus that has one", %{
+      genus_with: genus_with,
+      placeholder: placeholder
+    } do
+      result = Plants.get_genus_placeholder(genus_with.id)
+
+      assert result != nil
+      assert result.id == placeholder.id
+      assert result.genus_placeholder == true
+    end
+
+    test "returns nil for a genus with no placeholder", %{genus_without: genus_without} do
+      assert Plants.get_genus_placeholder(genus_without.id) == nil
+    end
+
+    test "returns nil for an unknown genus id" do
+      assert Plants.get_genus_placeholder(-1) == nil
+    end
+  end
 end

@@ -1,2 +1,30 @@
-output/
+# Python
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# uv / virtualenv
+.venv/
+.python-version
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+.pyright/
+
+# Pipeline run artifacts
+output/
+
+# Iteration corpus — local symlinks to PDFs outside the repo
+test-corpus/
+
+# Live provider config — copy of providers.example.yaml that users may
+# edit locally. Never check in; alpha testers' credentials may end up here.
+providers.yaml
+
+# Ephemeral planning documents (see CLAUDE.md)
+docs/plans/

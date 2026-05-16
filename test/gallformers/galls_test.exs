@@ -256,6 +256,22 @@ defmodule Gallformers.GallsTest do
     end
 
     test "updates species and gall properties", %{species: species} do
+      # Add a source so datacomplete=true satisfies the data-layer invariant
+      {:ok, source} =
+        Gallformers.Sources.create_source(%{
+          title: "Test Source",
+          author: "Author",
+          pubyear: "2026",
+          link: "http://example.com",
+          citation: "Test citation",
+          license: "CC0"
+        })
+
+      Gallformers.Sources.create_species_source(%{
+        species_id: species.id,
+        source_id: source.id
+      })
+
       params = %{
         species_attrs: %{"datacomplete" => true},
         alias_changes: {[], []},
@@ -325,6 +341,132 @@ defmodule Gallformers.GallsTest do
       }
 
       assert {:error, %Ecto.Changeset{}} = Galls.update_gall_with_associations(species, params)
+    end
+  end
+
+  describe "update_gall_with_associations/2 datacomplete invariants" do
+    setup do
+      {:ok, family} =
+        Taxonomy.create_taxonomy(%{
+          name: "TestDataCompleteFamily",
+          type: "family",
+          description: "Wasp"
+        })
+
+      {:ok, genus} =
+        Taxonomy.create_taxonomy(%{
+          name: "Testdatacompletegenus",
+          type: "genus",
+          parent_id: family.id
+        })
+
+      {:ok, species} =
+        Repo.insert(%Species{
+          name: "Testdatacompletegenus testus",
+          taxoncode: "gall",
+          datacomplete: false
+        })
+
+      Taxonomy.link_species_to_taxonomy(species.id, genus.id)
+
+      {:ok, _gall_traits} =
+        Repo.insert(%GallTraits{
+          species_id: species.id,
+          undescribed: false,
+          detachable: "unknown"
+        })
+
+      {:ok, species: species}
+    end
+
+    defp empty_params(species_attrs, undescribed) do
+      %{
+        species_attrs: species_attrs,
+        alias_changes: {[], []},
+        host_changes: {[], []},
+        original_filter_values: %{
+          colors: [],
+          shapes: [],
+          textures: [],
+          alignments: [],
+          walls: [],
+          cells: [],
+          plant_parts: [],
+          forms: [],
+          seasons: []
+        },
+        filter_values: %{
+          colors: [],
+          shapes: [],
+          textures: [],
+          alignments: [],
+          walls: [],
+          cells: [],
+          plant_parts: [],
+          forms: [],
+          seasons: []
+        },
+        detachable: "unknown",
+        undescribed: undescribed
+      }
+    end
+
+    test "rejects datacomplete=true when gall has no sources", %{species: species} do
+      params = empty_params(%{"datacomplete" => true}, false)
+
+      assert {:error, _} = Galls.update_gall_with_associations(species, params)
+
+      reloaded = Repo.get!(Species, species.id)
+      refute reloaded.datacomplete, "datacomplete must not have been persisted"
+    end
+
+    test "rejects datacomplete=true when gall is being marked undescribed in same save",
+         %{species: species} do
+      # Add a source so the no-sources rule wouldn't be the trigger
+      {:ok, source} =
+        Gallformers.Sources.create_source(%{
+          title: "Test Source",
+          author: "Author",
+          pubyear: "2026",
+          link: "http://example.com",
+          citation: "Test citation",
+          license: "CC0"
+        })
+
+      Gallformers.Sources.create_species_source(%{
+        species_id: species.id,
+        source_id: source.id
+      })
+
+      params = empty_params(%{"datacomplete" => true}, true)
+
+      assert {:error, _} = Galls.update_gall_with_associations(species, params)
+
+      reloaded = Repo.get!(Species, species.id)
+      refute reloaded.datacomplete, "datacomplete must not have been persisted"
+    end
+
+    test "allows datacomplete=true when gall has sources and is not undescribed",
+         %{species: species} do
+      {:ok, source} =
+        Gallformers.Sources.create_source(%{
+          title: "Test Source",
+          author: "Author",
+          pubyear: "2026",
+          link: "http://example.com",
+          citation: "Test citation",
+          license: "CC0"
+        })
+
+      Gallformers.Sources.create_species_source(%{
+        species_id: species.id,
+        source_id: source.id
+      })
+
+      params = empty_params(%{"datacomplete" => true}, false)
+
+      assert {:ok, updated} = Galls.update_gall_with_associations(species, params)
+      assert updated.datacomplete == true
     end
   end
 
@@ -507,8 +649,9 @@ defmodule Gallformers.GallsTest do
       assert {false, nil} = Galls.compute_datacomplete_lock(species.id)
     end
 
-    test "unlocked for nil species_id" do
-      assert {false, nil} = Galls.compute_datacomplete_lock(nil)
+    test "locked for nil species_id (unsaved gall has no sources)" do
+      assert {true, reason} = Galls.compute_datacomplete_lock(nil)
+      assert reason =~ "source"
     end
   end
 

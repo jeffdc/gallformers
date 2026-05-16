@@ -1,0 +1,93 @@
+# phase-b-verify-claims — iteration config for the real verify-claims
+# prompt. Builds on phase-b-extract-facts.yaml: real find-candidates,
+# real extract-facts (Qwen-2.5-72B), plus the real verify-claims
+# prompt under iteration. metadata remains on stub so prompt drift
+# there can't confound verify-claims signal.
+#
+# Verifier model is DeepSeek-V4-Flash — different family from the
+# Qwen extractor per the matter's "different family" principle. Same
+# model we settled on for find-candidates; the per-call input is
+# tiny (claim + a few hundred chars of quoted text), so context
+# window doesn't matter and per-call cost is negligible.
+
+pipeline:
+  name: phase-b-verify-claims
+  schema_version: 1.0.0
+  seed: 42
+
+  defaults:
+    idle_timeout_s: 60
+    total_timeout_s: 300
+    retry_on_idle: 1
+    max_workers: 4
+    structured_output: true
+
+  stages:
+    - step: extract
+      extractor: pymupdf
+
+    - step: preprocess
+      ops:
+        - strip_bhl_boilerplate
+        - strip_plate_pages
+        - strip_page_headers
+        - rejoin_hyphenated
+        - rejoin_lines
+
+    - step: sectionize
+      excluded_section_types: [references, bibliography, literature_cited]
+
+    - step: metadata
+      model: deepinfra/Qwen/Qwen2.5-72B-Instruct
+      prompt: prompts/metadata.md
+      input_section_types: [title, abstract, introduction]
+
+    - step: find-candidates
+      model: deepinfra/deepseek-ai/DeepSeek-V4-Flash
+      prompt: prompts/find-candidates.md
+      n_samples: 3
+      agreement_threshold: 2
+      max_workers: 3
+
+    - step: evidence-pack
+      context_window: 2
+
+    - step: extract-facts
+      # Selected via bake-off (docs/extract-facts-model-bakeoff.md).
+      model: deepinfra/Qwen/Qwen3-Next-80B-A3B-Instruct
+      prompt: prompts/extract-facts.md
+      vocab: schemas/gallformers-vocab.json
+      max_workers: 50              # DeepInfra cap is 200/model/user
+      idle_timeout_s: 90
+
+    - step: verify
+      substring_min_score: 90
+      enrich_offsets: true
+
+    # ── The stage under iteration ────────────────────────────────────────
+    - step: verify-claims
+      # Different family from the Qwen extractor (per matter's
+      # "different family" principle). Per-cell input is tiny.
+      model: deepinfra/deepseek-ai/DeepSeek-V4-Flash
+      prompt: prompts/verify-claims.md
+      max_workers: 50              # many small per-field calls; DeepInfra cap is 200/model/user
+
+    - step: taxonomy-lookup
+      source: gbif
+      cache_dir: output/cache/gbif
+      max_workers: 4
+      idle_timeout_s: 30
+      on_api_error: continue
+
+    - step: assemble-review
+      outputs:
+        - claims.json
+        - verified_claims.json
+        - review_artifact.json
+        - manifest.json
+      validate: strict
+
+    - step: bundle
+      output: bundle.tar.gz
+      include_candidates: false
+      verify_complete: true

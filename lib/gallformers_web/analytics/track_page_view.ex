@@ -2,9 +2,9 @@ defmodule GallformersWeb.Analytics.TrackPageView do
   @moduledoc """
   LiveView on_mount hook for tracking page views.
 
-  Tracks page views for LiveView navigations that happen over WebSocket
-  (which bypass the HTTP Plug). The initial page load is already tracked
-  by the Analytics Plug, so we skip the first handle_params call.
+  Tracks page views for every connected LiveView mount and subsequent
+  handle_params call. The Analytics plug skips LiveView routes, so this
+  hook is the only producer of page-view rows for LV-rendered pages.
   """
 
   import Phoenix.Component
@@ -26,10 +26,7 @@ defmodule GallformersWeb.Analytics.TrackPageView do
 
     socket =
       if connected?(socket) do
-        socket
-        # Skip the first handle_params - it's the initial page load already tracked by the Plug
-        |> assign(:analytics_skip_initial, true)
-        |> attach_hook(:track_page_view, :handle_params, &track_navigation/3)
+        attach_hook(socket, :track_page_view, :handle_params, &track_navigation/3)
       else
         socket
       end
@@ -38,30 +35,23 @@ defmodule GallformersWeb.Analytics.TrackPageView do
   end
 
   defp track_navigation(_params, uri, socket) do
-    # Skip tracking on the initial handle_params call (already tracked by Plug)
-    if socket.assigns[:analytics_skip_initial] do
-      {:cont, assign(socket, :analytics_skip_initial, false)}
-    else
-      %URI{path: path} = URI.parse(uri)
+    %URI{path: path} = URI.parse(uri)
+    visitor_hash = get_visitor_hash(socket)
+    same_path? = socket.assigns[:analytics_last_path] == path
 
-      # Get tracking data from socket assigns (set by initial HTTP request)
-      # For LiveView navigations, we reuse the visitor hash from the session
-      visitor_hash = get_visitor_hash(socket)
+    if not same_path? and Analytics.should_track?(path, nil) and visitor_hash do
+      attrs = %{
+        path: path,
+        referrer_host: "(internal)",
+        browser: socket.assigns[:analytics_browser],
+        device_type: socket.assigns[:analytics_device_type],
+        visitor_hash: visitor_hash
+      }
 
-      if Analytics.should_track?(path, nil) and visitor_hash do
-        attrs = %{
-          path: path,
-          referrer_host: "(internal)",
-          browser: socket.assigns[:analytics_browser],
-          device_type: socket.assigns[:analytics_device_type],
-          visitor_hash: visitor_hash
-        }
-
-        Analytics.track_page_view(attrs)
-      end
-
-      {:cont, socket}
+      Analytics.track_page_view(attrs)
     end
+
+    {:cont, assign(socket, :analytics_last_path, path)}
   end
 
   defp get_visitor_hash(socket) do
