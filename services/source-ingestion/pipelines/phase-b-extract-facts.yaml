@@ -48,7 +48,7 @@ pipeline:
 
     - step: metadata
       model: deepinfra/Qwen/Qwen2.5-72B-Instruct
-      prompt: prompts/stubs/metadata.md
+      prompt: prompts/metadata.md
       input_section_types: [title, abstract, introduction]
 
     - step: find-candidates
@@ -82,8 +82,8 @@ pipeline:
 
     - step: verify-claims
       model: deepinfra/Qwen/Qwen2.5-72B-Instruct
-      prompt: prompts/stubs/verify-claims.md
-      max_workers: 4
+      prompt: prompts/verify-claims.md
+      max_workers: 50
 
     - step: taxonomy-lookup
       source: gbif

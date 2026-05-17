@@ -96,9 +96,9 @@ FLAT_NORMALIZED_TEXT = BLOCK_SEPARATOR.join(NORMALIZED_BLOCKS_TEXT)
 # Provenance for the run.
 RUN_STARTED = datetime(2026, 5, 11, 14, 0, 0, tzinfo=UTC)
 RUN_COMPLETED = datetime(2026, 5, 11, 14, 3, 27, tzinfo=UTC)
-PIPELINE_NAME = "north-star-v0"
+PIPELINE_NAME = "default"
 PIPELINE_VERSION = "0.1.0"
-PIPELINE_CONFIG = "north-star-v0"
+PIPELINE_CONFIG = "default"
 SEED = 42
 
 

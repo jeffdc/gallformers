@@ -1,15 +1,18 @@
-# north-star-v0 — born-digital PDF pipeline.
+# default — the production ingestion pipeline.
+#
+# Handles both born-digital and scanned PDFs in a single config: the `ocr`
+# stage runs in `enabled: auto` mode, OCR'ing only pages whose text density
+# is below the threshold. Born-digital PDFs flow straight through; scanned
+# PDFs (BHL, old journals) get a tesseract text layer added before
+# preprocessing.
 #
 # Produces bundle.tar.gz containing the 9 contract artifacts:
 #   manifest.json, source.pdf, raw_text.jsonl, normalized_text.jsonl,
 #   sections.json, metadata.json, claims.json, verified_claims.json,
 #   review_artifact.json
-#
-# Tuned for modern born-digital PDFs (clean text layer, no OCR).
-# For scanned papers, use north-star-v0-ocr.yaml instead.
 
 pipeline:
-  name: north-star-v0
+  name: default
   schema_version: 1.0.0           # target review_artifact.schema_version
   seed: 42                         # reproducibility; threaded into manifest
 
@@ -27,11 +30,22 @@ pipeline:
     - step: extract                # PDF/URL → raw_text.jsonl
       extractor: pymupdf           # block-level extraction with page + bbox
 
+    - step: ocr                    # auto-detect scanned/low-density PDFs
+      # `enabled: auto` runs ocrmypdf only when per-page text density is
+      # below `min_chars_per_page`. Born-digital PDFs are no-op'd; scanned
+      # ones get a tesseract text layer and raw_blocks are replaced with the
+      # OCR'd extraction. The on-disk raw_text.jsonl reflects whatever
+      # downstream stages actually consume.
+      enabled: auto                # auto | always | never
+      min_chars_per_page: 100      # density threshold; pages below this get OCR'd
+      language: eng                # tesseract language(s); see tesseract docs for multi-lang
+      force_ocr: false             # re-OCR even pages that already have text
+
     - step: preprocess             # raw_text.jsonl → normalized_text.jsonl
       # Output is the canonical text substrate evidence offsets address into.
       # No LLM stage between preprocess and sectionize — deterministic-only
-      # cleanup for born-digital text keeps offsets stable and prevents
-      # hallucinated edits from poisoning the substring gate.
+      # cleanup keeps offsets stable and prevents hallucinated edits from
+      # poisoning the substring gate.
       ops:                         # all on by default; list to subset
         - strip_bhl_boilerplate
         - strip_plate_pages
@@ -46,14 +60,19 @@ pipeline:
     # ── Metadata ──────────────────────────────────────────────────────────────
 
     - step: metadata               # → metadata.json (evidence-bound)
-      model: deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct
+      model: deepinfra/Qwen/Qwen2.5-72B-Instruct
       prompt: prompts/metadata.md
       input_section_types: [title, abstract, introduction]   # scope reduction
 
     # ── Candidate detection (N=3 self-consistency) ───────────────────────────
 
     - step: find-candidates        # → candidates.json (scratch)
-      model: deepinfra/meta-llama/Meta-Llama-3.1-8B-Instruct
+      # Llama-3.1-8B was proven unable to follow nuanced inclusion rules
+      # on this corpus — consistently dropped comparison/reference species
+      # mentions even with explicit prompt anti-patterns. DeepSeek-V4-Flash
+      # gives 1M-token context (handles any paper without chunking) and
+      # strong reasoning at ~$0.03/call (n=3).
+      model: deepinfra/deepseek-ai/DeepSeek-V4-Flash
       prompt: prompts/find-candidates.md
       n_samples: 3
       agreement_threshold: 2       # keep candidates appearing in >= N samples
@@ -77,8 +96,11 @@ pipeline:
       substring_min_score: 90      # RapidFuzz partial_ratio threshold
       enrich_offsets: true         # populate absolute char_start/char_end
 
-    - step: verify-claims          # per-field, different model family
-      model: deepinfra/deepseek-ai/DeepSeek-V3
+    - step: verify-claims          # per-field, different model family from extract-facts
+      # DeepSeek family (different from Qwen3-Next extract-facts) preserves
+      # the different-family verifier principle. V4-Flash is the current
+      # DeepSeek model used elsewhere in the pipeline.
+      model: deepinfra/deepseek-ai/DeepSeek-V4-Flash
       prompt: prompts/verify-claims.md
       max_workers: 50              # many small per-field calls (DeepInfra cap is 200/model/user)
 

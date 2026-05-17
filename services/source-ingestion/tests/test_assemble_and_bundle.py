@@ -134,9 +134,9 @@ class TestBuildManifest:
             ),
         ]
         manifest = build_manifest(
-            pipeline_name="north-star-v0",
+            pipeline_name="default",
             pipeline_version="0.1.0",
-            pipeline_config_name="north-star-v0",
+            pipeline_config_name="default",
             seed=42,
             started_at=_ts(),
             completed_at=_ts(10),
@@ -154,7 +154,7 @@ class TestBuildReviewArtifact:
             _block("Second block.", char_start=14, span_id="S_0002"),
         ]
         review = build_review_artifact(
-            pipeline_name="north-star-v0",
+            pipeline_name="default",
             pipeline_version="0.1.0",
             generated_at=_ts(10),
             pdf_sha256="a" * 64,
@@ -173,9 +173,9 @@ class TestBuildReviewArtifact:
 class TestAssembleOneShot:
     def test_assemble_returns_all_four_artifacts(self):
         manifest, claims, verified, review = assemble(
-            pipeline_name="north-star-v0",
+            pipeline_name="default",
             pipeline_version="0.1.0",
-            pipeline_config_name="north-star-v0",
+            pipeline_config_name="default",
             seed=42,
             started_at=_ts(),
             completed_at=_ts(10),
@@ -189,7 +189,7 @@ class TestAssembleOneShot:
             verified_records=[_record()],
             stages=[],
         )
-        assert manifest.pipeline_name == "north-star-v0"
+        assert manifest.pipeline_name == "default"
         assert len(claims.gall_records) == 1
         assert len(verified.gall_records) == 1
         assert review.source.pdf_sha256 == "a" * 64
@@ -259,9 +259,9 @@ class TestWriteBundle:
 class TestAssembleRoundTrip:
     def test_artifacts_serialize_and_parse_back_to_equal_objects(self):
         manifest, claims, verified, review = assemble(
-            pipeline_name="north-star-v0",
+            pipeline_name="default",
             pipeline_version="0.1.0",
-            pipeline_config_name="north-star-v0",
+            pipeline_config_name="default",
             seed=42,
             started_at=_ts(),
             completed_at=_ts(10),

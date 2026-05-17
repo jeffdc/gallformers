@@ -248,11 +248,9 @@ Rationale:
 
 ### Production wiring
 
-- `pipelines/north-star-v0.yaml`: change `extract-facts.model` from
-  `deepinfra/Qwen/Qwen2.5-72B-Instruct` to
-  `deepinfra/Qwen/Qwen3-Next-80B-A3B-Instruct`.
-- `pipelines/phase-b-extract-facts.yaml` and the verify-claims iteration config can
-  be updated as part of the same change.
+Applied as of the pipeline consolidation: `pipelines/default.yaml`,
+`pipelines/phase-b-extract-facts.yaml`, and `pipelines/phase-b-verify-claims.yaml`
+all use `deepinfra/Qwen/Qwen3-Next-80B-A3B-Instruct` for `extract-facts`.
 - `pipelines/bakeoff/` configs are kept for re-running future bake-offs against new
   models or tuning concurrency.
 

@@ -160,7 +160,7 @@ You do **not** need to edit `providers.yaml` for the standard pipeline — DeepI
 
 ## 6. Run the pipeline against a PDF
 
-The default pipeline is **`north-star-v0`** — tuned for born-digital PDFs.
+The production pipeline is **`default.yaml`** — handles both born-digital and scanned PDFs (OCR is auto-detected per-page).
 
 Pick a paper you have rights to (a PDF you authored, a preprint, an open-access article, etc.) and save it somewhere on your machine. The repo intentionally does **not** ship sample PDFs — most published papers are under copyright and can't be redistributed.
 
@@ -168,7 +168,7 @@ Then run:
 
 ```bash
 uv run ingest run \
-  -p pipelines/north-star-v0.yaml \
+  -p pipelines/default.yaml \
   --config providers.yaml \
   --source-id mypaper \
   -i /path/to/your/paper.pdf
@@ -178,14 +178,16 @@ uv run ingest run \
 
 Arguments:
 
-- `-p` — which pipeline YAML to run. Use `pipelines/north-star-v0.yaml` unless told otherwise.
+- `-p` — which pipeline YAML to run. Use `pipelines/default.yaml` unless told otherwise.
 - `--config` — path to your provider config. Always `providers.yaml`.
 - `--source-id` — a short label you choose. It becomes the output directory name. Use lowercase, no spaces (e.g., `smith-2024`, `mypaper`).
 - `-i` — path to the PDF.
 
 ### What you'll see
 
-Output is currently sparse — you'll see one line like `Running pipeline 'north-star-v0' for source mypaper` and then silence while it works. A typical paper takes **2–5 minutes** end-to-end.
+The pipeline streams progress per stage as it runs — start/complete markers for `extract`, `ocr`, `preprocess`, `sectionize`, `metadata`, `find-candidates`, `evidence-pack`, `extract-facts`, `verify`, `verify-claims`, `taxonomy-lookup`, `assemble-review`, and `bundle`, each with timing and a quick result summary (block counts, candidate counts, LLM call counts). A typical paper takes **2–5 minutes** end-to-end; papers that trigger OCR or have many candidates take longer (10–20 min for large reference works).
+
+The most-watched stages by wall time are `extract-facts` (one LLM call per candidate) and `verify-claims` (one per claim, ~15 per candidate). Both run with `max_workers: 50` against DeepInfra's 200/model/user concurrency cap, so they parallelize well — but on a paper with 100+ candidates, expect a noticeable verify-claims phase.
 
 While it runs, you can watch new files appear in `output/<source-id>/`.
 
@@ -242,9 +244,9 @@ Caches live alongside the outputs (`*.cache.json`, `*.stage-cache.json`) and are
 
 The pipeline is in alpha. Things that **don't work yet**:
 
-1. **Scanned / image-only PDFs are not supported.** The pipeline reads the PDF's text layer directly. If your paper is a scan with no real text (you can't select text in a PDF reader), the output will be empty or garbage. A separate OCR pipeline exists but is out of scope for this alpha.
+1. **Scanned PDFs go through OCR automatically.** The default pipeline's `ocr` stage runs in `enabled: auto` mode — pages whose text density is below 100 chars/page get an ocrmypdf text layer added before the rest of the pipeline runs. To force OCR on every page set `enabled: always`; to disable, `enabled: never`.
 
-2. **No URL or HTML input.** Only local PDF files for now. (The `extract` subcommand supports URLs in isolation, but it isn't wired into the full `north-star-v0` pipeline.)
+2. **No URL or HTML input.** Only local PDF files for now. (The `extract` subcommand supports URLs in isolation, but it isn't wired into the full `default` pipeline.)
 
 3. **No batch mode.** One paper per `ingest run` invocation. To process many papers, run the command repeatedly with different `--source-id` and `-i` values.
 
@@ -322,7 +324,7 @@ pipeline:
     # ... etc
 ```
 
-See `pipelines/north-star-v0.yaml` for the canonical production config and `pipelines/north-star-v0-stub.yaml` for a stub (no LLM cost) variant useful for plumbing tests.
+See `pipelines/default.yaml` for the canonical production config. Per-stage settings can be overridden by copying the file and editing inline; the runner respects a per-stage `skip: true` flag for bypassing optional stages without commenting out their block.
 
 ### Provider configuration
 

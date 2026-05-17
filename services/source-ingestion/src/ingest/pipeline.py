@@ -97,6 +97,24 @@ def load_pipeline(config_path: str) -> dict:
         if step not in VALID_STEPS:
             raise ValueError(f"Unknown step type {step!r}. Valid steps: {sorted(VALID_STEPS)}")
 
+    # Drop stages marked ``skip: true``. The runner treats absent stages as
+    # the identity function for downstream data flow where it can; stages
+    # whose outputs are required by later stages (e.g., extract,
+    # find-candidates, extract-facts) will fail loudly if skipped — that's
+    # protective rather than silent.
+    skipped: list[str] = []
+    kept_stages: list[dict] = []
+    for stage in pipeline["stages"]:
+        if bool(stage.get("skip", False)):
+            skipped.append(stage["step"])
+        else:
+            kept_stages.append(stage)
+    if skipped:
+        print(f"[pipeline] skipping stages (skip: true): {', '.join(skipped)}", flush=True)
+    pipeline["stages"] = kept_stages
+    if not kept_stages:
+        raise ValueError(f"All stages were skipped in {config_path}")
+
     return pipeline
 
 
@@ -644,84 +662,93 @@ async def run_pipeline(
     _log(f"[verify] done ({_dur_s(t, verify_done)})")
     stage_records.append(StageRunRecord(name="verify", started_at=t, completed_at=verify_done))
 
-    # ── verify-claims (per cell, LLM verifier) ───────────────────────────
-    vc_cfg = stages_cfg["verify-claims"]
-    vc_prompt, vc_sha = _load_prompt(vc_cfg["prompt"])
-    vc_workers = vc_cfg.get("max_workers", 8)
-    vc_total_timeout = float(vc_cfg.get("total_timeout_s", default_total_timeout))
-    vc_semaphore = asyncio.Semaphore(vc_workers)
-
-    # Cache key spans the full input set: prompt, model, and a hash of all
-    # gated records (the verifier's input). If any record's pre-verifier
-    # state changes, the SHA changes and the cache invalidates wholesale.
-    # Cache is keyed at the stage level (one sidecar) but checks per-record
-    # artifacts existence — so it's robust to partial output deletion.
-    vc_input_sha = _sha_str("\n".join(r.model_dump_json() for r in gated_records))
-    vc_cache_key = {
-        "stage": "verify-claims",
-        "prompt_sha256": vc_sha,
-        "model": vc_cfg["model"],
-        "input_sha": vc_input_sha,
-    }
-    # No single artifact for verify-claims (output is per-record). Use a
-    # standalone sidecar file at the source-dir level.
-    vc_sidecar = src_dir / "verify-claims.stage-cache.json"
-    vc_per_record_paths = [
-        candidates_dir / r.candidate_id / "verified_facts.json" for r in gated_records
-    ]
-    vc_cache_hit = False
-    if vc_sidecar.exists() and all(p.exists() for p in vc_per_record_paths):
-        try:
-            prior = json.loads(vc_sidecar.read_text())
-            vc_cache_hit = all(prior.get(k) == v for k, v in vc_cache_key.items())
-        except (OSError, json.JSONDecodeError):
-            vc_cache_hit = False
-
-    t = _now()
-    if vc_cache_hit:
-        verified_records = [
-            GallRecord.model_validate_json(p.read_text()) for p in vc_per_record_paths
-        ]
-        _log("[verify-claims] cached")
-        stage_records.append(
-            StageRunRecord(
-                name="verify-claims",
-                started_at=t,
-                completed_at=_now(),
-                calls=[],
-                notes="cached",
-            )
-        )
+    # ── verify-claims (per cell, LLM verifier; optional) ─────────────────
+    # Skippable: when absent (omitted from config or ``skip: true``), the
+    # gated records pass through unchanged — the deterministic substring
+    # gate's ``supported`` / ``evidence_substring_mismatch`` verdicts stand
+    # and no LLM verifier verdicts are added.
+    if "verify-claims" not in stages_cfg:
+        verified_records = gated_records
+        _log("[verify-claims] skipped (not in config)")
     else:
-        _log(
-            f"[verify-claims] running LLM verifier over {len(gated_records)} records "
-            f"with {vc_cfg['model']} (max_workers={vc_workers})"
-        )
-        verified_records, vc_calls, vc_warnings = await _verify_records_claims(
-            gated_records,
-            blocks_by_id,
-            vc_cfg["model"],
-            vc_prompt,
-            vc_sha,
-            vc_semaphore,
-            total_timeout=vc_total_timeout,
-        )
-        warnings.extend(vc_warnings)
-        for r in verified_records:
-            (candidates_dir / r.candidate_id / "verified_facts.json").write_text(
-                r.model_dump_json(indent=2)
+        vc_cfg = stages_cfg["verify-claims"]
+        vc_prompt, vc_sha = _load_prompt(vc_cfg["prompt"])
+        vc_workers = vc_cfg.get("max_workers", 8)
+        vc_total_timeout = float(vc_cfg.get("total_timeout_s", default_total_timeout))
+        vc_semaphore = asyncio.Semaphore(vc_workers)
+
+        # Cache key spans the full input set: prompt, model, and a hash of
+        # all gated records (the verifier's input). If any record's
+        # pre-verifier state changes, the SHA changes and the cache
+        # invalidates wholesale. Cache is keyed at the stage level (one
+        # sidecar) but checks per-record artifacts existence — so it's
+        # robust to partial output deletion.
+        vc_input_sha = _sha_str("\n".join(r.model_dump_json() for r in gated_records))
+        vc_cache_key = {
+            "stage": "verify-claims",
+            "prompt_sha256": vc_sha,
+            "model": vc_cfg["model"],
+            "input_sha": vc_input_sha,
+        }
+        # No single artifact for verify-claims (output is per-record). Use a
+        # standalone sidecar file at the source-dir level.
+        vc_sidecar = src_dir / "verify-claims.stage-cache.json"
+        vc_per_record_paths = [
+            candidates_dir / r.candidate_id / "verified_facts.json" for r in gated_records
+        ]
+        vc_cache_hit = False
+        if vc_sidecar.exists() and all(p.exists() for p in vc_per_record_paths):
+            try:
+                prior = json.loads(vc_sidecar.read_text())
+                vc_cache_hit = all(prior.get(k) == v for k, v in vc_cache_key.items())
+            except (OSError, json.JSONDecodeError):
+                vc_cache_hit = False
+
+        t = _now()
+        if vc_cache_hit:
+            verified_records = [
+                GallRecord.model_validate_json(p.read_text()) for p in vc_per_record_paths
+            ]
+            _log("[verify-claims] cached")
+            stage_records.append(
+                StageRunRecord(
+                    name="verify-claims",
+                    started_at=t,
+                    completed_at=_now(),
+                    calls=[],
+                    notes="cached",
+                )
             )
-        vc_sidecar.write_text(json.dumps(vc_cache_key, indent=2, sort_keys=True))
-        vc_done = _now()
-        _log(f"[verify-claims] {len(vc_calls)} verifier calls ({_dur_s(t, vc_done)})")
-        stage_records.append(
-            StageRunRecord(
-                name="verify-claims",
-                started_at=t,
-                completed_at=vc_done,
-                calls=vc_calls,
+        else:
+            _log(
+                f"[verify-claims] running LLM verifier over {len(gated_records)} records "
+                f"with {vc_cfg['model']} (max_workers={vc_workers})"
             )
-        )
+            verified_records, vc_calls, vc_warnings = await _verify_records_claims(
+                gated_records,
+                blocks_by_id,
+                vc_cfg["model"],
+                vc_prompt,
+                vc_sha,
+                vc_semaphore,
+                total_timeout=vc_total_timeout,
+            )
+            warnings.extend(vc_warnings)
+            for r in verified_records:
+                (candidates_dir / r.candidate_id / "verified_facts.json").write_text(
+                    r.model_dump_json(indent=2)
+                )
+            vc_sidecar.write_text(json.dumps(vc_cache_key, indent=2, sort_keys=True))
+            vc_done = _now()
+            _log(f"[verify-claims] {len(vc_calls)} verifier calls ({_dur_s(t, vc_done)})")
+            stage_records.append(
+                StageRunRecord(
+                    name="verify-claims",
+                    started_at=t,
+                    completed_at=vc_done,
+                    calls=vc_calls,
+                )
+            )
 
     # ── taxonomy-lookup ──────────────────────────────────────────────────
     tax_cfg = stages_cfg.get("taxonomy-lookup", {})
