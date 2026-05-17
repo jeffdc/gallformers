@@ -83,18 +83,12 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTraits do
 
   @impl true
   def render(assigns) do
-    locked = is_nil(assigns.workspace.species_review.decision)
-    assigns = assign(assigns, :locked, locked)
-
     ~H"""
     <section id="workspace-section-traits" class="rounded-lg border border-gray-200 p-3">
-      <div class="flex items-center justify-between mb-2">
-        <h3 class="text-sm font-semibold text-gray-900">Traits</h3>
-        <.badge :if={@locked} variant="warning">Locked · resolve identity first</.badge>
-      </div>
+      <h3 class="text-sm font-semibold text-gray-900 mb-2">Traits</h3>
 
       <.table
-        :if={!@locked && @trait_rows != []}
+        :if={@trait_rows != []}
         id="traits-table"
         rows={@trait_rows}
         row_id={fn row -> "trait-#{row.name}" end}
@@ -133,7 +127,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTraits do
         </:col>
       </.table>
 
-      <p :if={!@locked && @trait_rows == []} class="text-sm text-gray-500">
+      <p :if={@trait_rows == []} class="text-sm text-gray-500">
         No traits extracted from source.
       </p>
     </section>

@@ -35,26 +35,19 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceDescription do
 
   @impl true
   def render(assigns) do
-    locked = is_nil(assigns.workspace.species_review.decision)
     decision = assigns.workspace.species_review.decision
     show_segmented = decision == "mapped" && assigns.existing_description != nil
 
-    assigns =
-      assigns
-      |> assign(:locked, locked)
-      |> assign(:show_segmented, show_segmented)
+    assigns = assign(assigns, :show_segmented, show_segmented)
 
     ~H"""
     <section
       id="workspace-section-description"
       class="rounded-lg border border-gray-200 p-4 space-y-4"
     >
-      <div class="flex items-center justify-between">
-        <h3 class="text-base font-semibold text-gray-900">Description</h3>
-        <.badge :if={@locked} variant="warning">Locked · resolve identity first</.badge>
-      </div>
+      <h3 class="text-base font-semibold text-gray-900">Description</h3>
 
-      <div :if={!@locked} class="space-y-4">
+      <div class="space-y-4">
         <div :if={@show_segmented} class="flex gap-1 rounded-lg bg-gray-100 p-1">
           <.mode_button mode="keep" current={@mode} label="Keep current" myself={@myself} />
           <.mode_button mode="append" current={@mode} label="Append" myself={@myself} />

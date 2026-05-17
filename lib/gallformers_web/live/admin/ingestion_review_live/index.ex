@@ -1,12 +1,14 @@
 defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
   use GallformersWeb, :live_view
 
+  require Logger
+
   alias Gallformers.Accounts
-  alias Gallformers.IngestionPipeline.PipelineConfigs
   alias Gallformers.Ingestions
   alias GallformersWeb.Admin.IngestionReviewLive.Presenter
 
-  @pdf_upload_name :pdf
+  @bundle_upload_name :bundle
+  @max_bundle_bytes 200 * 1024 * 1024
 
   @impl true
   def mount(_params, session, socket) do
@@ -20,15 +22,12 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
       |> assign(:page_title, "Source Ingestion Review")
       |> assign(:sort_by, :inserted_at)
       |> assign(:sort_dir, :desc)
-      |> assign(:pdf_form, empty_form(:pdf_submission))
-      |> assign(:url_form, empty_form(:url_submission))
-      |> assign(:text_form, empty_form(:text_submission))
-      |> assign(:pdf_error, nil)
-      |> assign(:pipeline_config_options, PipelineConfigs.config_options())
-      |> allow_upload(@pdf_upload_name,
-        accept: ~w(.pdf),
+      |> assign(:bundle_error, nil)
+      |> allow_upload(@bundle_upload_name,
+        accept: ~w(.gz),
         max_entries: 1,
-        max_file_size: 50_000_000,
+        max_file_size: @max_bundle_bytes,
+        chunk_size: 1_048_576,
         auto_upload: true,
         progress: &handle_progress/3
       )
@@ -54,104 +53,63 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
   end
 
   @impl true
-  def handle_event("validate_pdf_submission", _params, socket) do
-    {:noreply, assign(socket, :pdf_error, nil)}
+  def handle_event("validate_bundle", _params, socket) do
+    {:noreply, assign(socket, :bundle_error, nil)}
   end
 
   @impl true
-  def handle_event("validate_url_submission", %{"url_submission" => params}, socket) do
-    {:noreply, assign(socket, :url_form, to_form(params, as: :url_submission))}
+  def handle_event("cancel_bundle_upload", %{"ref" => ref}, socket) do
+    {:noreply, cancel_upload(socket, @bundle_upload_name, ref)}
   end
 
   @impl true
-  def handle_event("validate_text_submission", %{"text_submission" => params}, socket) do
-    {:noreply, assign(socket, :text_form, to_form(params, as: :text_submission))}
-  end
+  def handle_event("submit_bundle", _params, socket) do
+    uploaded_by_id = socket.assigns.current_user_db_id
 
-  @impl true
-  def handle_event("submit_pdf", params, socket) do
-    pdf_params = Map.get(params, "pdf_submission", %{})
+    if uploaded_by_id == nil do
+      {:noreply,
+       assign(
+         socket,
+         :bundle_error,
+         "You need a database-backed profile to upload bundles."
+       )}
+    else
+      results =
+        consume_uploaded_entries(socket, @bundle_upload_name, fn %{path: path}, _entry ->
+          {:ok, import_archive(path, uploaded_by_id)}
+        end)
 
-    case current_user_db_id(socket) do
-      {:ok, uploaded_by_id} ->
-        case consume_pdf_upload(socket) do
-          {:ok, socket, %{filename: filename, content: content}} ->
-            socket
-            |> submit_ingestion(
-              %{
-                input_type: "pdf",
-                uploaded_by_id: uploaded_by_id,
-                filename: filename,
-                content: content,
-                pipeline_config_id: parse_config_id(pdf_params)
-              },
-              :pdf_submission
-            )
+      case results do
+        [{:ok, ingestion}] ->
+          {:noreply,
+           socket
+           |> put_flash(:info, "Bundle imported (##{ingestion.id}).")
+           |> push_navigate(to: ~p"/admin/ingestion-review/#{ingestion.id}")}
 
-          {:error, socket, error_message} ->
-            {:noreply, assign(socket, :pdf_error, error_message)}
-        end
+        [{:error, reason}] ->
+          Logger.warning("Bundle import failed: #{inspect(reason)}")
+          {:noreply, assign(socket, :bundle_error, format_import_error(reason))}
 
-      {:error, socket} ->
-        {:noreply, socket}
+        [] ->
+          {:noreply, assign(socket, :bundle_error, "Choose a bundle.tar.gz file first.")}
+      end
     end
   end
 
   @impl true
-  def handle_event("submit_url", %{"url_submission" => params}, socket) do
-    case current_user_db_id(socket) do
-      {:ok, uploaded_by_id} ->
-        socket
-        |> submit_ingestion(
-          %{
-            input_type: "url",
-            uploaded_by_id: uploaded_by_id,
-            url: Map.get(params, "url", ""),
-            pipeline_config_id: parse_config_id(params)
-          },
-          :url_submission
-        )
-
-      {:error, socket} ->
-        {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("submit_text", %{"text_submission" => params}, socket) do
-    case current_user_db_id(socket) do
-      {:ok, uploaded_by_id} ->
-        socket
-        |> submit_ingestion(
-          %{
-            input_type: "text",
-            uploaded_by_id: uploaded_by_id,
-            text: Map.get(params, "text", ""),
-            pipeline_config_id: parse_config_id(params)
-          },
-          :text_submission
-        )
-
-      {:error, socket} ->
-        {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("clear_failed_ingestion", %{"id" => id}, socket) do
-    case Ingestions.delete_failed_source_ingestion(String.to_integer(id)) do
+  def handle_event("delete_ingestion", %{"id" => id}, socket) do
+    case Ingestions.delete_source_ingestion(String.to_integer(id)) do
       {:ok, _source_ingestion} ->
         {:noreply,
          socket
-         |> put_flash(:info, "Failed ingestion cleared")
+         |> put_flash(:info, "Ingestion deleted")
          |> load_queue_rows()}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, put_flash(socket, :error, changeset_error_message(changeset, [:status]))}
 
       {:error, reason} ->
-        {:noreply,
-         put_flash(socket, :error, "Failed ingestion cleanup failed: #{inspect(reason)}")}
+        {:noreply, put_flash(socket, :error, "Ingestion deletion failed: #{inspect(reason)}")}
     end
   end
 
@@ -181,9 +139,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
                   >
                     {row.display_title}
                   </.link>
-                  <.badge :if={duplicate_review_row?(row)} variant="warning">
-                    Duplicate review
-                  </.badge>
                 </div>
               </:col>
 
@@ -208,14 +163,14 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
                   Review
                 </.link>
 
-                <.table_actions :if={failed_queue_row?(row)}>
+                <.table_actions>
                   <.action_button
-                    id={"clear-failed-ingestion-#{row.id}"}
+                    id={"delete-ingestion-#{row.id}"}
                     icon="ph-trash"
-                    label="Clear Failed Ingestion"
+                    label="Delete Ingestion"
                     variant="danger"
-                    confirm="Are you sure you want to clear this failed ingestion? This deletes its saved artifacts and cannot be undone."
-                    phx-click="clear_failed_ingestion"
+                    confirm="Are you sure you want to delete this ingestion? This deletes its saved artifacts and cannot be undone."
+                    phx-click="delete_ingestion"
                     phx-value-id={row.id}
                   />
                 </.table_actions>
@@ -224,106 +179,64 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
           </div>
         </.card>
 
-        <.card title="New Source Ingestion" icon="ph-plus-circle">
-          <.tabs id="new-source-tabs" default_tab="pdf">
-            <:tab id="pdf" label="PDF">
-              <.form
-                id="pdf-submission-form"
-                for={@pdf_form}
-                phx-change="validate_pdf_submission"
-                phx-submit="submit_pdf"
-              >
-                <div class="space-y-4">
-                  <.file_dropzone
-                    id="pdf-dropzone"
-                    upload={@uploads.pdf}
-                    label="Upload PDF (.pdf)"
-                  />
+        <.card title="Upload Bundle" icon="ph-file-arrow-up">
+          <.form
+            id="bundle-upload-form"
+            for={%{}}
+            as={:bundle}
+            phx-change="validate_bundle"
+            phx-submit="submit_bundle"
+          >
+            <div class="space-y-4">
+              <p class="text-sm text-gray-600">
+                Upload a <code class="font-mono">bundle.tar.gz</code>
+                produced by the Python source-ingestion pipeline.
+                Must contain <code class="font-mono">review_artifact.json</code>
+                and <code class="font-mono">source.pdf</code>.
+              </p>
 
-                  <div :if={@uploads.pdf.entries != []} class="space-y-2">
-                    <div
-                      :for={entry <- @uploads.pdf.entries}
-                      class="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2 text-sm"
+              <.file_dropzone
+                id="bundle-dropzone"
+                upload={@uploads.bundle}
+                label="Upload bundle (.tar.gz)"
+              />
+
+              <div :if={@uploads.bundle.entries != []} class="space-y-2">
+                <div
+                  :for={entry <- @uploads.bundle.entries}
+                  class="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2 text-sm"
+                >
+                  <span class="font-medium text-gray-700">{entry.client_name}</span>
+                  <div class="flex items-center gap-3">
+                    <span class="text-gray-500">{entry.progress}%</span>
+                    <button
+                      type="button"
+                      phx-click="cancel_bundle_upload"
+                      phx-value-ref={entry.ref}
+                      class="text-xs text-red-600 hover:underline"
                     >
-                      <span class="font-medium text-gray-700">{entry.client_name}</span>
-                      <span class="text-gray-500">{entry.progress}%</span>
-                    </div>
+                      cancel
+                    </button>
                   </div>
-
-                  <.alert :if={@pdf_error} variant="error">{@pdf_error}</.alert>
-
-                  <div :for={error <- upload_errors(@uploads.pdf)}>
-                    <.alert variant="error">{upload_error_message(error)}</.alert>
-                  </div>
-
-                  <.pipeline_config_select
-                    name="pdf_submission[pipeline_config_id]"
-                    options={@pipeline_config_options}
-                  />
-
-                  <.button type="submit" variant="primary">Create</.button>
                 </div>
-              </.form>
-            </:tab>
+              </div>
 
-            <:tab id="url" label="URL">
-              <.form
-                id="url-submission-form"
-                for={@url_form}
-                phx-change="validate_url_submission"
-                phx-submit="submit_url"
-              >
-                <div class="space-y-4">
-                  <.input
-                    field={@url_form[:url]}
-                    type="url"
-                    label="Source URL"
-                    placeholder="https://example.com/article"
-                  />
+              <.alert :if={@bundle_error} variant="error">{@bundle_error}</.alert>
 
-                  <.pipeline_config_select
-                    name="url_submission[pipeline_config_id]"
-                    options={@pipeline_config_options}
-                  />
+              <div :for={error <- upload_errors(@uploads.bundle)}>
+                <.alert variant="error">{upload_error_message(error)}</.alert>
+              </div>
 
-                  <.button type="submit" variant="primary">Create</.button>
-                </div>
-              </.form>
-            </:tab>
-
-            <:tab id="text" label="Text">
-              <.form
-                id="text-submission-form"
-                for={@text_form}
-                phx-change="validate_text_submission"
-                phx-submit="submit_text"
-              >
-                <div class="space-y-4">
-                  <.input
-                    field={@text_form[:text]}
-                    type="textarea"
-                    label="Extracted text"
-                    rows="6"
-                    placeholder="Paste source text here"
-                  />
-
-                  <.pipeline_config_select
-                    name="text_submission[pipeline_config_id]"
-                    options={@pipeline_config_options}
-                  />
-
-                  <.button type="submit" variant="primary">Create</.button>
-                </div>
-              </.form>
-            </:tab>
-          </.tabs>
+              <.button type="submit" variant="primary" disabled={@uploads.bundle.entries == []}>
+                Import bundle
+              </.button>
+            </div>
+          </.form>
         </.card>
       </div>
     </Layouts.admin>
     """
   end
-
-  defp handle_progress(@pdf_upload_name, _entry, socket), do: {:noreply, socket}
 
   defp load_queue_rows(socket) do
     assign(socket, :queue_rows, Presenter.list_source_ingestion_queue_rows())
@@ -345,117 +258,8 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
   defp sort_key(row, :inserted_at), do: row.inserted_at
   defp sort_key(row, :uploaded_by_name), do: String.downcase(row.uploaded_by_name || "")
 
-  defp submit_ingestion(socket, attrs, form_key) do
-    case Ingestions.submit_source_ingestion(attrs) do
-      {:ok, ingestion} ->
-        {:noreply, push_navigate(socket, to: "/admin/ingestion-review/#{ingestion.id}")}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, submission_error_socket(socket, changeset, form_key)}
-
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Submission failed: #{inspect(reason)}")}
-    end
-  end
-
-  defp submission_error_socket(socket, changeset, :pdf_submission) do
-    if field_errors_for_submission?(changeset, [:filename, :content]) do
-      assign(socket, :pdf_error, changeset_error_message(changeset, [:filename, :content]))
-    else
-      put_flash(socket, :error, "Failed to enqueue ingestion")
-    end
-  end
-
-  defp submission_error_socket(socket, changeset, :url_submission) do
-    socket = assign(socket, :url_form, to_form(changeset, as: :url_submission))
-
-    if field_errors_for_submission?(changeset, [:url]) do
-      socket
-    else
-      put_flash(socket, :error, "Failed to enqueue ingestion")
-    end
-  end
-
-  defp submission_error_socket(socket, changeset, :text_submission) do
-    socket = assign(socket, :text_form, to_form(changeset, as: :text_submission))
-
-    if field_errors_for_submission?(changeset, [:text]) do
-      socket
-    else
-      put_flash(socket, :error, "Failed to enqueue ingestion")
-    end
-  end
-
-  defp consume_pdf_upload(socket) do
-    queued_entries = queued_upload_entries(socket, @pdf_upload_name)
-
-    if queued_entries == [] do
-      {:error, socket, "Upload a PDF to continue."}
-    else
-      [pdf_upload] =
-        consume_uploaded_entries(socket, @pdf_upload_name, fn %{path: path}, entry ->
-          {:ok, %{filename: entry.client_name, content: File.read!(path)}}
-        end)
-
-      {:ok, assign(socket, :pdf_error, nil), pdf_upload}
-    end
-  end
-
-  defp queued_upload_entries(socket, upload_name) do
-    socket.assigns.uploads
-    |> Map.fetch!(upload_name)
-    |> Map.get(:entries, [])
-  end
-
-  defp current_user_db_id(socket) do
-    case socket.assigns.current_user_db_id do
-      uploaded_by_id when is_integer(uploaded_by_id) ->
-        {:ok, uploaded_by_id}
-
-      _ ->
-        {:error,
-         put_flash(socket, :error, "You need a database-backed profile to submit sources.")}
-    end
-  end
-
-  defp empty_form(form_name), do: to_form(%{}, as: form_name)
-
-  defp duplicate_review_row?(row), do: row.status == "needs_duplicate_review"
-  defp failed_queue_row?(row), do: row.status == "failed"
-
   defp species_review_link_visible?(row) do
     row.status in ["needs_review", "complete"] and not is_nil(row.source_id)
-  end
-
-  defp pipeline_config_select(assigns) do
-    ~H"""
-    <div :if={@options != []} class="mb-3">
-      <label class="block text-xs font-medium text-gray-600 mb-1">Pipeline Config</label>
-      <select
-        name={@name}
-        class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-gf-maroon focus:ring-gf-maroon"
-      >
-        <option value="">Default (module defaults)</option>
-        <option :for={{id, name} <- @options} value={id}>{name}</option>
-      </select>
-    </div>
-    """
-  end
-
-  defp parse_config_id(%{"pipeline_config_id" => ""}), do: nil
-
-  defp parse_config_id(%{"pipeline_config_id" => id}) when is_binary(id),
-    do: String.to_integer(id)
-
-  defp parse_config_id(_params), do: nil
-
-  defp upload_error_message(:too_large), do: "File is too large."
-  defp upload_error_message(:not_accepted), do: "Only PDF files are accepted."
-  defp upload_error_message(:too_many_files), do: "Only one file at a time."
-  defp upload_error_message(error), do: "Upload error: #{inspect(error)}"
-
-  defp field_errors_for_submission?(changeset, fields) do
-    Enum.any?(fields, &(changeset.errors[&1] != nil))
   end
 
   defp changeset_error_message(changeset, fields) do
@@ -463,4 +267,77 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
     |> Enum.flat_map(&translate_errors(changeset.errors, &1))
     |> Enum.join(", ")
   end
+
+  defp handle_progress(@bundle_upload_name, _entry, socket), do: {:noreply, socket}
+
+  defp import_archive(archive_path, uploaded_by_id) do
+    extract_dir = make_extract_dir()
+
+    try do
+      with :ok <- extract_bundle(archive_path, extract_dir) do
+        bundle_dir = locate_bundle_root(extract_dir)
+        Ingestions.import_bundle(bundle_dir, uploaded_by_id: uploaded_by_id)
+      end
+    after
+      File.rm_rf(extract_dir)
+    end
+  end
+
+  defp make_extract_dir do
+    dir =
+      Path.join(System.tmp_dir!(), "gallformers-bundle-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(dir)
+    dir
+  end
+
+  defp extract_bundle(archive_path, extract_dir) do
+    case :erl_tar.extract(String.to_charlist(archive_path), [
+           :compressed,
+           {:cwd, String.to_charlist(extract_dir)}
+         ]) do
+      :ok -> :ok
+      {:error, reason} -> {:error, {:extract_failed, reason}}
+    end
+  end
+
+  # The Python pipeline writes the bundle either flat (review_artifact.json at
+  # the top level) or nested under a single directory. Detect both.
+  defp locate_bundle_root(extract_dir) do
+    if File.exists?(Path.join(extract_dir, "review_artifact.json")) do
+      extract_dir
+    else
+      nested_bundle_root(extract_dir)
+    end
+  end
+
+  defp nested_bundle_root(extract_dir) do
+    case File.ls!(extract_dir) do
+      [single] ->
+        nested = Path.join(extract_dir, single)
+        if File.dir?(nested), do: nested, else: extract_dir
+
+      _ ->
+        extract_dir
+    end
+  end
+
+  defp format_import_error({:missing_file, name}), do: "Bundle is missing #{name}."
+  defp format_import_error({:invalid_json, _}), do: "review_artifact.json is not valid JSON."
+
+  defp format_import_error({:read_failed, name, _}),
+    do: "Failed to read #{name} from the bundle."
+
+  defp format_import_error({:extract_failed, reason}),
+    do: "Failed to extract archive: #{inspect(reason)}"
+
+  defp format_import_error(%Ecto.Changeset{} = changeset),
+    do: changeset_error_message(changeset, Keyword.keys(changeset.errors))
+
+  defp format_import_error(reason), do: "Import failed: #{inspect(reason)}"
+
+  defp upload_error_message(:too_large), do: "Bundle is too large (max 200 MB)."
+  defp upload_error_message(:too_many_files), do: "Only one bundle at a time."
+  defp upload_error_message(:not_accepted), do: "File type not accepted; upload a .tar.gz."
+  defp upload_error_message(other), do: "Upload error: #{inspect(other)}"
 end

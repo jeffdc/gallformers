@@ -76,44 +76,19 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.IndexTest do
     end
   end
 
-  defmodule WorkerStub do
-    def enqueue(ingestion_id) do
-      send(test_pid(), {:worker_enqueue, ingestion_id})
-
-      Agent.get(state_pid(), fn %{worker_result: worker_result} ->
-        worker_result || {:ok, %{id: ingestion_id}}
-      end)
-    end
-
-    defp state_pid do
-      :gallformers
-      |> Application.get_env(GallformersWeb.Admin.IngestionReviewLive.IndexTest, [])
-      |> Keyword.fetch!(:state_pid)
-    end
-
-    defp test_pid do
-      :gallformers
-      |> Application.get_env(GallformersWeb.Admin.IngestionReviewLive.IndexTest, [])
-      |> Keyword.fetch!(:test_pid)
-    end
-  end
-
   setup do
     previous_storage_config = Application.get_env(:gallformers, SourceArtifacts)
-    previous_ingestions_config = Application.get_env(:gallformers, Ingestions)
     previous_test_config = Application.get_env(:gallformers, __MODULE__)
 
     {:ok, state_pid} =
       Agent.start_link(fn ->
         %{
-          objects: %{},
-          worker_result: nil
+          objects: %{}
         }
       end)
 
     Application.put_env(:gallformers, __MODULE__, state_pid: state_pid, test_pid: self())
     Application.put_env(:gallformers, SourceArtifacts, backend: StorageBackendStub)
-    Application.put_env(:gallformers, Ingestions, worker_module: WorkerStub)
 
     on_exit(fn ->
       if Process.alive?(state_pid) do
@@ -121,7 +96,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.IndexTest do
       end
 
       restore_env(SourceArtifacts, previous_storage_config)
-      restore_env(Ingestions, previous_ingestions_config)
       restore_env(__MODULE__, previous_test_config)
     end)
 
@@ -285,184 +259,103 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.IndexTest do
       assert html =~ "Other Submission"
     end
 
-    test "duplicate-review rows render a distinct badge", %{conn: conn} do
-      current_db_user = db_user_fixture("Current Reviewer")
-      conn = superadmin_conn(conn, current_db_user)
-
-      source_ingestion_fixture(%{
-        uploaded_by_id: current_db_user.id,
-        title: "Duplicate Candidate",
-        status: "needs_duplicate_review",
-        processing_stage: "duplicate_review"
-      })
-
-      {:ok, _view, html} = live(conn, ~p"/admin/ingestion-review")
-
-      assert html =~ "Duplicate Candidate"
-      assert html =~ "Duplicate review"
-      assert html =~ "Needs duplicate review"
-    end
-
-    test "failed rows can be cleared from the queue", %{conn: conn} do
+    test "any row can be deleted from the queue", %{conn: conn} do
       current_db_user = db_user_fixture("Current Reviewer")
 
       ingestion =
         source_ingestion_fixture(%{
           uploaded_by_id: current_db_user.id,
-          title: "Failed Upload",
-          status: "failed",
-          processing_stage: "failed",
-          error_stage: "upload"
+          title: "Deletable Upload",
+          status: "needs_review",
+          processing_stage: "review"
         })
 
       artifact_path = "source-ingestions/#{ingestion.id}/input/source.pdf"
-      put_storage_object(artifact_path, "%PDF-1.4 failed\n")
+      put_storage_object(artifact_path, "%PDF-1.4 needs-review\n")
 
       conn = superadmin_conn(conn, current_db_user)
       {:ok, view, html} = live(conn, ~p"/admin/ingestion-review")
 
-      assert html =~ "Failed Upload"
+      assert html =~ "Deletable Upload"
 
       html =
         view
-        |> element("#clear-failed-ingestion-#{ingestion.id}")
+        |> element("#delete-ingestion-#{ingestion.id}")
         |> render_click()
 
-      assert html =~ "Failed ingestion cleared"
-      refute html =~ "Failed Upload"
+      assert html =~ "Ingestion deleted"
+      refute html =~ "Deletable Upload"
       assert_received {:delete_objects, _, [^artifact_path]}
       assert Ingestions.get_source_ingestion(ingestion.id) == nil
     end
   end
 
-  describe "submissions" do
-    test "selecting a pdf shows the chosen filename in the form", %{conn: conn} do
-      current_db_user = db_user_fixture("Current Reviewer")
+  describe "bundle upload" do
+    @bundle_root Path.expand("../../../../../services/source-ingestion/output", __DIR__)
+
+    test "renders the bundle upload form", %{conn: conn} do
+      current_db_user = db_user_fixture("Bundle Upload Renderer")
+      conn = superadmin_conn(conn, current_db_user)
+
+      {:ok, _view, html} = live(conn, ~p"/admin/ingestion-review")
+
+      assert html =~ "Upload Bundle"
+      assert html =~ "bundle.tar.gz"
+      assert html =~ "Import bundle"
+    end
+
+    test "imports a real cuesta bundle and redirects to the detail page", %{conn: conn} do
+      current_db_user = db_user_fixture("Bundle Uploader")
+      conn = superadmin_conn(conn, current_db_user)
+
+      bundle_path = Path.join([@bundle_root, "cuesta", "bundle.tar.gz"])
+      assert File.exists?(bundle_path), "cuesta bundle missing — run the Python pipeline first"
+
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review")
+
+      upload =
+        file_input(view, "#bundle-upload-form", :bundle, [
+          %{
+            name: "bundle.tar.gz",
+            content: File.read!(bundle_path),
+            type: "application/gzip"
+          }
+        ])
+
+      assert render_upload(upload, "bundle.tar.gz") =~ "100%"
+
+      result = render_submit(view, "submit_bundle", %{})
+
+      assert {:error, {:live_redirect, %{to: "/admin/ingestion-review/" <> id_str}}} = result
+      {ingestion_id, ""} = Integer.parse(id_str)
+
+      ingestion = Ingestions.get_source_ingestion!(ingestion_id)
+      assert ingestion.status == "needs_review"
+      assert ingestion.processing_stage == "review"
+      assert ingestion.uploaded_by_id == current_db_user.id
+    end
+
+    test "reports a clean error for a non-tar upload", %{conn: conn} do
+      current_db_user = db_user_fixture("Bad Bundle Uploader")
       conn = superadmin_conn(conn, current_db_user)
 
       {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review")
 
       upload =
-        file_input(view, "#pdf-submission-form", :pdf, [
+        file_input(view, "#bundle-upload-form", :bundle, [
           %{
-            name: "chosen.pdf",
-            content: "%PDF-1.4 fixture\n",
-            type: "application/pdf"
+            name: "garbage.tar.gz",
+            content: "this is not a tar archive",
+            type: "application/gzip"
           }
         ])
 
-      html = render_upload(upload, "chosen.pdf")
+      assert render_upload(upload, "garbage.tar.gz") =~ "100%"
 
-      assert html =~ "chosen.pdf"
-      assert html =~ "100%"
-    end
+      html = render_submit(view, "submit_bundle", %{})
 
-    test "submits with Auth0 attribution when no database profile exists yet", %{conn: conn} do
-      auth0_user = auth0_user_fixture("Auth0 Only Submitter")
-      conn = superadmin_auth0_conn(conn, auth0_user)
-
-      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review")
-
-      view
-      |> form("#url-submission-form", %{
-        "url_submission" => %{"url" => "https://example.com/auth0-only"}
-      })
-      |> render_submit()
-
-      db_user = Accounts.get_user_by_auth0_id(auth0_user.id)
-      ingestion = latest_ingestion_for(db_user.id)
-      ingestion_id = ingestion.id
-
-      assert db_user.display_name == auth0_user.name
-      assert ingestion.uploaded_by_id == db_user.id
-      assert_redirect(view, "/admin/ingestion-review/#{ingestion_id}")
-    end
-
-    test "submits a pdf and redirects to the persisted detail path", %{conn: conn} do
-      current_db_user = db_user_fixture("Current Reviewer")
-      conn = superadmin_conn(conn, current_db_user)
-
-      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review")
-
-      upload =
-        file_input(view, "#pdf-submission-form", :pdf, [
-          %{
-            name: "test.pdf",
-            content: "%PDF-1.4 fixture\n",
-            type: "application/pdf"
-          }
-        ])
-
-      render_upload(upload, "test.pdf")
-      render_submit(element(view, "#pdf-submission-form"))
-
-      ingestion = latest_ingestion_for(current_db_user.id)
-      ingestion_id = ingestion.id
-      input_path = "source-ingestions/#{ingestion.id}/input/source.pdf"
-
-      assert_received {:upload, _, ^input_path, "%PDF-1.4 fixture\n", "application/pdf"}
-      assert_received {:worker_enqueue, ^ingestion_id}
-      assert_redirect(view, "/admin/ingestion-review/#{ingestion_id}")
-    end
-
-    test "submits a url and redirects to the persisted detail path", %{conn: conn} do
-      current_db_user = db_user_fixture("Current Reviewer")
-      conn = superadmin_conn(conn, current_db_user)
-
-      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review")
-
-      view
-      |> form("#url-submission-form", %{
-        "url_submission" => %{"url" => "https://example.com/galls"}
-      })
-      |> render_submit()
-
-      ingestion = latest_ingestion_for(current_db_user.id)
-      ingestion_id = ingestion.id
-      input_path = "source-ingestions/#{ingestion.id}/input/source.url"
-
-      assert_received {:upload, _, ^input_path, "https://example.com/galls", "text/plain"}
-      assert_received {:worker_enqueue, ^ingestion_id}
-      assert_redirect(view, "/admin/ingestion-review/#{ingestion_id}")
-    end
-
-    test "submits text and redirects to the persisted detail path", %{conn: conn} do
-      current_db_user = db_user_fixture("Current Reviewer")
-      conn = superadmin_conn(conn, current_db_user)
-
-      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review")
-
-      view
-      |> form("#text-submission-form", %{
-        "text_submission" => %{"text" => "Rounded woolly gall on oak twigs."}
-      })
-      |> render_submit()
-
-      ingestion = latest_ingestion_for(current_db_user.id)
-      ingestion_id = ingestion.id
-      input_path = "source-ingestions/#{ingestion.id}/input/source.txt"
-
-      assert_received {:upload, _, ^input_path, "Rounded woolly gall on oak twigs.", "text/plain"}
-      assert_received {:worker_enqueue, ^ingestion_id}
-      assert_redirect(view, "/admin/ingestion-review/#{ingestion_id}")
-    end
-
-    test "submission failure stays on the page and shows an error", %{conn: conn} do
-      current_db_user = db_user_fixture("Current Reviewer")
-      conn = superadmin_conn(conn, current_db_user)
-      set_worker_result({:error, worker_error_changeset()})
-
-      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review")
-
-      html =
-        view
-        |> form("#url-submission-form", %{
-          "url_submission" => %{"url" => "https://example.com/fails"}
-        })
-        |> render_submit()
-
-      assert html =~ "Source Ingestion Review"
-      assert html =~ "Failed to enqueue ingestion"
+      assert html =~ "Failed to extract archive" or html =~ "not valid JSON" or
+               html =~ "missing"
     end
   end
 
@@ -482,13 +375,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.IndexTest do
     |> put_session(:db_display_name, db_user.display_name)
   end
 
-  defp superadmin_auth0_conn(conn, %Auth0User{} = auth0_user) do
-    conn
-    |> init_test_session(%{})
-    |> put_session(:current_user, auth0_user)
-    |> put_session(:db_display_name, Auth0User.display_name(auth0_user))
-  end
-
   defp db_user_fixture(display_name) do
     {:ok, user} =
       Accounts.create_user(%{
@@ -498,17 +384,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.IndexTest do
       })
 
     user
-  end
-
-  defp auth0_user_fixture(display_name) do
-    %Auth0User{
-      id: "auth0|ingestion-review-auth0-only-#{System.unique_integer([:positive])}",
-      email: "auth0-only@test.com",
-      name: display_name,
-      nickname: String.replace(String.downcase(display_name), " ", "-"),
-      picture: nil,
-      roles: ["admin", "superadmin"]
-    }
   end
 
   defp source_ingestion_fixture(attrs) do
@@ -557,15 +432,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.IndexTest do
     |> Enum.find(&(&1.id == ingestion.id))
   end
 
-  defp latest_ingestion_for(uploaded_by_id) do
-    Presenter.list_source_ingestion_queue_rows(
-      uploaded_by_id: uploaded_by_id,
-      include_complete: true
-    )
-    |> hd()
-    |> then(&Ingestions.get_source_ingestion!(&1.id))
-  end
-
   defp source_fixture do
     {:ok, source} =
       Sources.create_source(%{
@@ -581,10 +447,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.IndexTest do
     source
   end
 
-  defp set_worker_result(result) do
-    Agent.update(state_pid(), fn state -> %{state | worker_result: result} end)
-  end
-
   defp put_storage_object(path, body) do
     Agent.update(state_pid(), fn state ->
       %{state | objects: Map.put(state.objects, path, %{body: body})}
@@ -595,12 +457,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.IndexTest do
     :gallformers
     |> Application.get_env(__MODULE__, [])
     |> Keyword.fetch!(:state_pid)
-  end
-
-  defp worker_error_changeset do
-    {%{}, %{ingestion_id: :integer}}
-    |> Ecto.Changeset.cast(%{ingestion_id: nil}, [:ingestion_id])
-    |> Ecto.Changeset.validate_required([:ingestion_id])
   end
 
   defp restore_env(module, nil), do: Application.delete_env(:gallformers, module)

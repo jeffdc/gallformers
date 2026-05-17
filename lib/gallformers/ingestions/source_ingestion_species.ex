@@ -316,6 +316,7 @@ defmodule Gallformers.Ingestions.SourceIngestionSpecies do
     :extracted_authority,
     :species_id,
     :description_prose,
+    :raw_extraction,
     :reviewed_by_id,
     :reviewed_at
   ]
@@ -333,6 +334,7 @@ defmodule Gallformers.Ingestions.SourceIngestionSpecies do
           description_prose: String.t(),
           extraction_payload: ExtractionPayload.t() | nil,
           review_payload: ReviewPayload.t() | nil,
+          raw_extraction: map() | nil,
           reviewed_by_id: integer() | nil,
           reviewed_at: DateTime.t() | nil,
           inserted_at: DateTime.t() | nil,
@@ -347,6 +349,7 @@ defmodule Gallformers.Ingestions.SourceIngestionSpecies do
     field :description_prose, :string, default: ""
     embeds_one :extraction_payload, ExtractionPayload, on_replace: :update
     embeds_one :review_payload, ReviewPayload, on_replace: :update
+    field :raw_extraction, :map
     field :reviewed_at, :utc_datetime
 
     belongs_to :source_ingestion, Gallformers.Ingestions.SourceIngestion

@@ -4,27 +4,9 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   require Logger
 
   alias Gallformers.Accounts
-  alias Gallformers.IngestionPipeline.Broadcaster
-  alias Gallformers.IngestionPipeline.DuplicateResolution
-  alias Gallformers.IngestionPipeline.Worker, as: PipelineWorker
   alias Gallformers.Ingestions
   alias Gallformers.Sources
   alias GallformersWeb.Admin.IngestionReviewLive.Presenter
-
-  @pipeline_stages [
-    {:extract, "Extract"},
-    {:preprocess, "Preprocess"},
-    {:hash_and_dedup, "Hash & Dedup"},
-    {:llm_clean, "LLM Clean"},
-    {:metadata, "Metadata"},
-    {:data_extract, "Data Extract"},
-    {:assemble, "Assemble"},
-    {:upload, "Upload"}
-  ]
-
-  @stage_index @pipeline_stages
-               |> Enum.with_index()
-               |> Enum.into(%{}, fn {{stage, _label}, idx} -> {Atom.to_string(stage), idx} end)
 
   @impl true
   def mount(_params, session, socket) do
@@ -38,78 +20,13 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
      |> assign(:source_search_query, "")
      |> assign(:source_search_results, [])
      |> assign(:source_text, nil)
-     |> assign(:source_text_focus, nil)
-     |> assign(:activity_text, nil)
-     |> assign(:activity_style, :normal)}
+     |> assign(:source_text_focus, nil)}
   end
-
-  @poll_interval_ms 3_000
 
   @impl true
   def handle_params(%{"id" => id}, _uri, socket) do
     ingestion_id = String.to_integer(id)
-    socket = load_review_view(socket, ingestion_id)
-
-    if connected?(socket) && socket.assigns.review_view.status == "processing" do
-      Broadcaster.subscribe(ingestion_id)
-      schedule_poll()
-    end
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("confirm_duplicate_candidate", %{"id" => id}, socket) do
-    with {:ok, reviewed_by_id} <- current_user_db_id(socket),
-         {:ok, _source_ingestion} <-
-           DuplicateResolution.confirm_duplicate(String.to_integer(id), reviewed_by_id) do
-      {:noreply,
-       socket
-       |> put_flash(:info, "Duplicate confirmed")
-       |> reload_review_view()}
-    else
-      {:error, :missing_db_user, socket} ->
-        {:noreply, socket}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, put_flash(socket, :error, changeset_error_message(changeset))}
-    end
-  end
-
-  @impl true
-  def handle_event("reject_duplicate_candidate", %{"id" => id}, socket) do
-    with {:ok, reviewed_by_id} <- current_user_db_id(socket),
-         {:ok, _source_ingestion} <-
-           DuplicateResolution.reject_duplicate(String.to_integer(id), reviewed_by_id) do
-      {:noreply,
-       socket
-       |> put_flash(:info, "Duplicate candidate rejected")
-       |> reload_review_view()}
-    else
-      {:error, :missing_db_user, socket} ->
-        {:noreply, socket}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, put_flash(socket, :error, changeset_error_message(changeset))}
-    end
-  end
-
-  @impl true
-  def handle_event("promote_ingestion_to_unique", _params, socket) do
-    with {:ok, reviewed_by_id} <- current_user_db_id(socket),
-         {:ok, _source_ingestion} <-
-           DuplicateResolution.promote_to_unique(socket.assigns.review_view.id, reviewed_by_id) do
-      {:noreply,
-       socket
-       |> put_flash(:info, "Marked submission as unique")
-       |> reload_review_view()}
-    else
-      {:error, :missing_db_user, socket} ->
-        {:noreply, socket}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, put_flash(socket, :error, changeset_error_message(changeset))}
-    end
+    {:noreply, load_review_view(socket, ingestion_id)}
   end
 
   @impl true
@@ -189,26 +106,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   end
 
   @impl true
-  def handle_event("resume_pipeline", _params, socket) do
-    ingestion_id = socket.assigns.review_view.id
-
-    case resume_ingestion(ingestion_id, socket.assigns.review_view.status) do
-      :ok ->
-        Broadcaster.subscribe(ingestion_id)
-        PipelineWorker.enqueue(ingestion_id)
-        schedule_poll()
-
-        {:noreply,
-         socket
-         |> put_flash(:info, "Pipeline resumed")
-         |> reload_review_view()}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, put_flash(socket, :error, changeset_error_message(changeset))}
-    end
-  end
-
-  @impl true
   def handle_event("clear_source_ingestion", _params, socket) do
     case Ingestions.clear_source_ingestion(socket.assigns.review_view.id) do
       {:ok, _source_ingestion} ->
@@ -224,110 +121,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
         {:noreply,
          put_flash(socket, :error, "Failed ingestion cleanup failed: #{inspect(reason)}")}
     end
-  end
-
-  @impl true
-  def handle_info(:poll_status, socket) do
-    socket = reload_review_view(socket)
-
-    if socket.assigns.review_view.status == "processing" do
-      schedule_poll()
-      {:noreply, socket}
-    else
-      {:noreply, push_event(socket, "stop_timer", %{})}
-    end
-  end
-
-  @impl true
-  def handle_info({:chunk_progress, stage, %{chunk: 0} = progress}, socket) do
-    Logger.debug(
-      "Show.handle_info chunk_progress chunk=0 stage=#{stage} total=#{progress.total_chunks}"
-    )
-
-    text =
-      if progress.total_chunks == 1,
-        do: "Processing...",
-        else: "Processing #{progress.total_chunks} chunks..."
-
-    {:noreply, assign(socket, activity_text: text, activity_style: :normal)}
-  end
-
-  @impl true
-  def handle_info({:chunk_progress, stage, progress}, socket) do
-    Logger.debug(
-      "Show.handle_info chunk_progress chunk=#{progress.chunk}/#{progress.total_chunks} stage=#{stage} tokens=#{progress.tokens}"
-    )
-
-    text = "Chunk #{progress.chunk}/#{progress.total_chunks} — #{progress.tokens} tokens"
-
-    text =
-      if progress.tokens_per_sec,
-        do: text <> ", #{round(progress.tokens_per_sec)} tok/sec",
-        else: text
-
-    {:noreply, assign(socket, activity_text: text, activity_style: :normal)}
-  end
-
-  @impl true
-  def handle_info({:chunk_warning, stage, warning}, socket) do
-    Logger.debug("Show.handle_info chunk_warning stage=#{stage} message=#{warning.message}")
-
-    {:noreply, assign(socket, activity_text: warning.message, activity_style: :warning)}
-  end
-
-  @impl true
-  def handle_info({:stage_complete, stage}, socket) do
-    Logger.debug("Show.handle_info stage_complete stage=#{stage}")
-
-    socket = socket |> assign(activity_text: nil, activity_style: :normal) |> reload_review_view()
-
-    if terminal_status?(socket.assigns.review_view.status) do
-      {:noreply, push_event(socket, "stop_timer", %{})}
-    else
-      {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_info({:error, _stage, reason}, socket) do
-    activity_text =
-      case reason do
-        :timeout ->
-          "Processing stalled — source may be too information-dense for current chunk size"
-
-        {:invalid_contract, messages} when is_list(messages) ->
-          "Validation error: #{Enum.join(messages, "; ")}"
-
-        other ->
-          "Error: #{inspect(other)}"
-      end
-
-    {:noreply,
-     socket
-     |> assign(activity_text: activity_text, activity_style: :warning)
-     |> reload_review_view()
-     |> push_event("stop_timer", %{})}
-  end
-
-  @impl true
-  def handle_info({:needs_duplicate_review, _candidates}, socket) do
-    {:noreply,
-     socket
-     |> reload_review_view()
-     |> push_event("stop_timer", %{})}
-  end
-
-  @impl true
-  def handle_info({:review_ready, _ingestion_id}, socket) do
-    {:noreply,
-     socket
-     |> reload_review_view()
-     |> push_event("stop_timer", %{})}
-  end
-
-  @impl true
-  def handle_info({:progress, _stage, _percent}, socket) do
-    {:noreply, socket}
   end
 
   @impl true
@@ -349,26 +142,12 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
                     {status_label(@review_view)}
                   </.badge>
                   <.badge variant="info">
-                    {@review_view.counts.duplicate_candidates_pending} pending duplicate candidates
-                  </.badge>
-                  <.badge variant="info">
                     {@review_view.counts.species_entries_total} extracted gall entries
                   </.badge>
                 </div>
               </div>
 
               <div class="flex items-center gap-3">
-                <.button
-                  :if={@review_view.retryable?}
-                  id="resume-pipeline"
-                  type="button"
-                  variant="primary"
-                  phx-click="resume_pipeline"
-                  data-confirm={resume_confirm_text(@review_view)}
-                >
-                  Resume Pipeline
-                </.button>
-
                 <.button
                   :if={@review_view.clearable?}
                   id="clear-source-ingestion"
@@ -381,24 +160,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
                 </.button>
               </div>
             </div>
-
-            <.pipeline_progress
-              status={@review_view.status}
-              processing_stage={@review_view.processing_stage}
-              error_stage={@review_view.error_stage}
-              pipeline_active?={@review_view.pipeline_active?}
-              inserted_at={@review_view.inserted_at}
-            />
-
-            <p
-              :if={@activity_text}
-              class={[
-                "text-xs mt-2 font-mono",
-                activity_text_class(@activity_style)
-              ]}
-            >
-              {@activity_text}
-            </p>
 
             <.alert :if={@review_view.status == "failed"} variant="warning">
               Pipeline failed at <strong>{@review_view.error_stage}</strong>
@@ -420,130 +181,8 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
           </div>
         </.card>
 
-        <.card title="Duplicate Review" icon="ph-copy">
-          <div class="space-y-4">
-            <p class="text-sm text-gray-500">
-              The pipeline checks whether this source has already been ingested by comparing titles, DOIs, and text content against existing submissions.
-            </p>
-
-            <.alert
-              :if={
-                !@review_view.duplicate_review_required? &&
-                  @review_view.status == "duplicate_confirmed"
-              }
-              variant="warning"
-            >
-              This submission was confirmed as a duplicate of another ingestion and is no longer reviewable.
-            </.alert>
-
-            <.alert
-              :if={
-                !@review_view.duplicate_review_required? &&
-                  @review_view.status != "duplicate_confirmed"
-              }
-              variant="info"
-            >
-              Duplicate review is complete for this submission.
-            </.alert>
-
-            <div :if={@review_view.duplicate_candidates == []} class="text-sm text-gray-500">
-              No potential duplicates were found — this source appears to be new.
-            </div>
-
-            <div
-              :for={candidate <- @review_view.duplicate_candidates}
-              class="rounded-lg border border-gray-200 p-4 space-y-4"
-            >
-              <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div class="space-y-1">
-                  <h3 class="text-lg font-semibold text-gf-maroon">
-                    {candidate.candidate_display_title}
-                  </h3>
-                  <p :if={candidate.candidate_authors != []} class="text-sm text-gray-600">
-                    {Enum.join(candidate.candidate_authors, ", ")}
-                  </p>
-                  <p :if={candidate.candidate_year} class="text-sm text-gray-600">
-                    {candidate.candidate_year}
-                  </p>
-                </div>
-
-                <.badge variant={candidate_status_badge_variant(candidate.status)}>
-                  {candidate.status}
-                </.badge>
-              </div>
-
-              <div class="space-y-2">
-                <h4 class="text-sm font-medium text-gray-700">Evidence</h4>
-
-                <div :if={candidate.evidence_rows == []} class="text-sm text-gray-500">
-                  No matching evidence details recorded.
-                </div>
-
-                <dl :if={candidate.evidence_rows != []} class="space-y-2">
-                  <div
-                    :for={evidence_row <- candidate.evidence_rows}
-                    class="grid gap-1 rounded-md bg-gray-50 px-3 py-2 md:grid-cols-[220px_1fr]"
-                  >
-                    <dt class="text-sm font-medium text-gray-700">{evidence_row.label}</dt>
-                    <dd class="text-sm text-gray-600">{format_evidence_value(evidence_row.value)}</dd>
-                  </div>
-                </dl>
-              </div>
-
-              <div
-                :if={@review_view.duplicate_review_required? && candidate.status == "pending"}
-                class="flex flex-wrap gap-3"
-              >
-                <.button
-                  id={"confirm-duplicate-candidate-#{candidate.id}"}
-                  type="button"
-                  variant="warning"
-                  phx-click="confirm_duplicate_candidate"
-                  phx-value-id={candidate.id}
-                >
-                  Confirm Duplicate
-                </.button>
-
-                <.button
-                  id={"reject-duplicate-candidate-#{candidate.id}"}
-                  type="button"
-                  variant="secondary"
-                  phx-click="reject_duplicate_candidate"
-                  phx-value-id={candidate.id}
-                >
-                  Reject Candidate
-                </.button>
-              </div>
-            </div>
-
-            <div :if={@review_view.duplicate_review_required?} class="pt-2">
-              <.button
-                id="promote-ingestion-to-unique"
-                type="button"
-                variant="primary"
-                phx-click="promote_ingestion_to_unique"
-              >
-                Promote To Unique
-              </.button>
-            </div>
-          </div>
-        </.card>
-
         <.card title="Source Review" icon="ph-book-open">
-          <div
-            :if={source_review_locked_for_duplicate?(@review_view)}
-            id="source-review-locked"
-            class="space-y-3"
-          >
-            <.alert variant="warning">
-              Resolve duplicate review to enable source mapping.
-            </.alert>
-            <button type="button" class="gf-btn gf-btn-secondary" disabled>
-              Create Or Link Source
-            </button>
-          </div>
-
-          <div :if={!source_review_locked_for_duplicate?(@review_view)} class="space-y-4">
+          <div class="space-y-4">
             <div class="space-y-2">
               <h3 class="text-sm font-semibold text-gray-700">Submission Metadata</h3>
 
@@ -661,34 +300,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
         </.card>
 
         <.card title="Gall Review" icon="gf-gall">
-          <div
-            :if={species_review_locked_for_duplicate?(@review_view)}
-            id="species-review-locked"
-            class="space-y-4"
-          >
-            <.alert variant="warning">
-              Duplicate review must be resolved before gall review.
-            </.alert>
-
-            <.table
-              :if={@review_view.species_entries != []}
-              id="species-review-locked-table"
-              rows={@review_view.species_entries}
-              row_id={&"species-entry-#{&1.id}"}
-            >
-              <:col :let={entry} label="Gall">
-                <div class="space-y-1">
-                  <div class="font-medium">{entry.extracted_name || "Unnamed gall"}</div>
-                  <div :if={entry.extracted_authority} class="text-sm text-gray-500">
-                    {entry.extracted_authority}
-                  </div>
-                </div>
-              </:col>
-              <:col :let={entry} label="Status">{entry.status}</:col>
-            </.table>
-          </div>
-
-          <div :if={!species_review_locked_for_duplicate?(@review_view)} class="space-y-4">
+          <div class="space-y-4">
             <div class="flex flex-wrap items-center gap-3">
               <.badge variant="info">
                 {@review_view.counts.species_entries_pending} of {@review_view.counts.species_entries_total} galls remaining
@@ -772,62 +384,14 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
     load_review_view(socket, socket.assigns.review_view.id)
   end
 
-  defp schedule_poll do
-    Process.send_after(self(), :poll_status, @poll_interval_ms)
-  end
-
-  defp current_user_db_id(socket) do
-    case socket.assigns.current_user_db_id do
-      user_id when is_integer(user_id) ->
-        {:ok, user_id}
-
-      _ ->
-        {:error, :missing_db_user,
-         put_flash(
-           socket,
-           :error,
-           "You need a database-backed profile to review submissions."
-         )}
-    end
-  end
-
-  defp resume_confirm_text(%{status: "failed", error_stage: stage}),
-    do: "Resume pipeline from the #{stage} stage?"
-
-  defp resume_confirm_text(%{processing_stage: stage}),
-    do: "Resume pipeline from the #{stage} stage?"
-
-  defp resume_ingestion(ingestion_id, "failed") do
-    case Ingestions.retry_failed_source_ingestion(ingestion_id) do
-      {:ok, _source_ingestion} -> :ok
-      error -> error
-    end
-  end
-
-  defp resume_ingestion(_ingestion_id, "processing"), do: :ok
-
   defp status_label(review_view), do: Presenter.queue_status_label(review_view)
   defp clear_source_ingestion_label(%{clearability: :abandoned}), do: "Clear Abandoned Ingestion"
   defp clear_source_ingestion_label(_review_view), do: "Clear Failed Ingestion"
 
-  defp status_badge_variant("needs_duplicate_review"), do: "warning"
   defp status_badge_variant("duplicate_confirmed"), do: "warning"
   defp status_badge_variant("failed"), do: "warning"
   defp status_badge_variant("complete"), do: "success"
   defp status_badge_variant(_), do: "info"
-
-  defp candidate_status_badge_variant("confirmed"), do: "success"
-  defp candidate_status_badge_variant("auto_confirmed"), do: "success"
-  defp candidate_status_badge_variant("rejected"), do: "info"
-  defp candidate_status_badge_variant(_), do: "warning"
-
-  defp format_evidence_value(value) when is_binary(value), do: value
-  defp format_evidence_value(value) when is_integer(value), do: Integer.to_string(value)
-
-  defp format_evidence_value(value) when is_float(value),
-    do: :erlang.float_to_binary(value, decimals: 2)
-
-  defp format_evidence_value(value), do: inspect(value)
 
   defp new_source_url(review_view) do
     params =
@@ -875,128 +439,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Show do
   end
 
   defp show_associate_source_action?(_, _), do: false
-
-  attr :status, :string, required: true
-  attr :processing_stage, :string, required: true
-  attr :error_stage, :string, default: nil
-  attr :pipeline_active?, :boolean, required: true
-  attr :inserted_at, :any, required: true
-
-  defp pipeline_progress(assigns) do
-    stages =
-      stage_statuses(
-        assigns.status,
-        assigns.processing_stage,
-        assigns.error_stage,
-        assigns.pipeline_active?
-      )
-
-    assigns = assign(assigns, :stages, stages)
-
-    ~H"""
-    <div class="space-y-3">
-      <div class="flex items-center justify-between">
-        <h3 class="text-sm font-medium text-gray-500">Pipeline Progress</h3>
-        <div
-          :if={@pipeline_active?}
-          id="elapsed-timer"
-          phx-hook="ElapsedTimer"
-          data-started-at={DateTime.to_iso8601(@inserted_at)}
-          class="text-sm font-mono text-gray-500"
-        >
-          <span data-timer-display></span>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-1">
-        <div
-          :for={{_stage_key, label, status} <- @stages}
-          class="flex-1 flex flex-col items-center gap-1"
-        >
-          <div class={[
-            "h-2 w-full rounded-full",
-            stage_bar_class(status)
-          ]} />
-          <span class={[
-            "text-[10px] leading-tight text-center",
-            stage_label_class(status)
-          ]}>
-            {label}
-          </span>
-        </div>
-      </div>
-
-      <p
-        :if={
-          @status not in ~w(complete needs_review failed duplicate_confirmed needs_duplicate_review)
-        }
-        class="text-xs text-gray-400"
-      >
-        Processing typically takes 15–30 minutes. Large files may take longer.
-      </p>
-    </div>
-    """
-  end
-
-  defp stage_statuses("failed", _processing_stage, error_stage, _active?) do
-    error_index = @stage_index[error_stage]
-
-    @pipeline_stages
-    |> Enum.with_index()
-    |> Enum.map(fn {{key, label}, idx} ->
-      cond do
-        error_index && idx < error_index -> {key, label, :completed}
-        error_index && idx == error_index -> {key, label, :failed}
-        true -> {key, label, :pending}
-      end
-    end)
-  end
-
-  defp stage_statuses(status, _processing_stage, _error_stage, _active?)
-       when status in ~w(complete needs_review) do
-    Enum.map(@pipeline_stages, fn {key, label} -> {key, label, :completed} end)
-  end
-
-  defp stage_statuses(_status, processing_stage, _error_stage, active?) do
-    completed_index = @stage_index[processing_stage]
-
-    @pipeline_stages
-    |> Enum.with_index()
-    |> Enum.map(fn {{key, label}, idx} ->
-      cond do
-        completed_index && idx <= completed_index -> {key, label, :completed}
-        completed_index && idx == completed_index + 1 && active? -> {key, label, :running}
-        true -> {key, label, :pending}
-      end
-    end)
-  end
-
-  defp stage_bar_class(:completed), do: "bg-green-500"
-  defp stage_bar_class(:running), do: "bg-amber-400 animate-pulse"
-  defp stage_bar_class(:failed), do: "bg-red-500"
-  defp stage_bar_class(:pending), do: "bg-gray-200"
-
-  defp stage_label_class(:completed), do: "text-green-700 font-medium"
-  defp stage_label_class(:running), do: "text-amber-700 font-medium"
-  defp stage_label_class(:failed), do: "text-red-700 font-medium"
-  defp stage_label_class(:pending), do: "text-gray-400"
-
-  defp activity_text_class(:normal), do: "text-gray-500"
-  defp activity_text_class(:warning), do: "text-amber-600"
-  defp activity_text_class(:success), do: "text-green-600"
-
-  defp terminal_status?("needs_review"), do: true
-  defp terminal_status?("complete"), do: true
-  defp terminal_status?("failed"), do: true
-  defp terminal_status?("duplicate_confirmed"), do: true
-  defp terminal_status?("needs_duplicate_review"), do: true
-  defp terminal_status?(_), do: false
-
-  defp source_review_locked_for_duplicate?(review_view),
-    do: review_view.duplicate_review_required?
-
-  defp species_review_locked_for_duplicate?(review_view),
-    do: review_view.duplicate_review_required?
 
   defp humanize_list([item]), do: item
   defp humanize_list([a, b]), do: "#{a} and #{b}"

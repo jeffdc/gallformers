@@ -1,10 +1,7 @@
 defmodule Gallformers.IngestionsTest do
   use Gallformers.DataCase, async: false
-  use Oban.Testing, repo: Gallformers.Repo
-  import Ecto.Query
 
   alias Gallformers.Accounts
-  alias Gallformers.IngestionPipeline.Worker
   alias Gallformers.Ingestions
   alias Gallformers.Sources
   alias Gallformers.Species.Species
@@ -72,42 +69,24 @@ defmodule Gallformers.IngestionsTest do
     defp test_pid, do: Process.get(:ingestions_test_pid, self())
   end
 
-  defmodule WorkerStub do
-    def enqueue(ingestion_id) do
-      send(test_pid(), {:worker_enqueue, ingestion_id})
-      Process.get(:worker_enqueue_result, {:ok, %{id: ingestion_id}})
-    end
-
-    defp test_pid, do: Process.get(:ingestions_test_pid, self())
-  end
-
   setup do
     previous_storage_config = Application.get_env(:gallformers, SourceArtifacts)
-    previous_ingestions_config = Application.get_env(:gallformers, Ingestions)
 
     Process.put(:ingestions_test_pid, self())
     Process.put(:submission_storage_objects, %{})
 
     Application.put_env(:gallformers, SourceArtifacts, backend: SubmissionStorageBackendStub)
-    Application.put_env(:gallformers, Ingestions, worker_module: WorkerStub)
 
     on_exit(fn ->
       Process.delete(:ingestions_test_pid)
       Process.delete(:submission_storage_objects)
       Process.delete(:submission_storage_upload_result)
       Process.delete(:submission_storage_delete_result)
-      Process.delete(:worker_enqueue_result)
 
       if previous_storage_config == nil do
         Application.delete_env(:gallformers, SourceArtifacts)
       else
         Application.put_env(:gallformers, SourceArtifacts, previous_storage_config)
-      end
-
-      if previous_ingestions_config == nil do
-        Application.delete_env(:gallformers, Ingestions)
-      else
-        Application.put_env(:gallformers, Ingestions, previous_ingestions_config)
       end
     end)
 
@@ -136,140 +115,6 @@ defmodule Gallformers.IngestionsTest do
       assert {:error, changeset} = Ingestions.create_source_ingestion(%{input_type: "epub"})
 
       assert %{input_type: ["is invalid"]} = errors_on(changeset)
-    end
-
-    test "rejects invalid persisted workflow state pairs" do
-      assert {:error, changeset} =
-               Ingestions.create_source_ingestion(%{
-                 input_type: "pdf",
-                 status: "needs_review",
-                 processing_stage: "llm_clean"
-               })
-
-      assert %{processing_stage: ["is invalid for status needs_review"]} = errors_on(changeset)
-    end
-  end
-
-  describe "submit_source_ingestion/1" do
-    test "creates pdf ingestions, uploads the canonical input artifact, and enqueues the worker" do
-      user = user_fixture()
-      pdf_bytes = "%PDF-1.4\nfixture\n"
-
-      assert {:ok, ingestion} =
-               Ingestions.submit_source_ingestion(%{
-                 input_type: "pdf",
-                 uploaded_by_id: user.id,
-                 filename: "paper.pdf",
-                 content: pdf_bytes
-               })
-
-      input_path = "source-ingestions/#{ingestion.id}/input/source.pdf"
-      ingestion_id = ingestion.id
-
-      assert ingestion.input_type == "pdf"
-      assert ingestion.uploaded_by_id == user.id
-      assert ingestion.artifacts_path == SourceArtifacts.private_artifact_prefix(ingestion.id)
-
-      assert_received {:upload, _, ^input_path, ^pdf_bytes, "application/pdf"}
-
-      assert_received {:worker_enqueue, ^ingestion_id}
-    end
-
-    test "creates url ingestions with the canonical url artifact path" do
-      user = user_fixture()
-      url = "https://example.com/galls"
-
-      assert {:ok, ingestion} =
-               Ingestions.submit_source_ingestion(%{
-                 input_type: "url",
-                 uploaded_by_id: user.id,
-                 url: url
-               })
-
-      input_path = "source-ingestions/#{ingestion.id}/input/source.url"
-      ingestion_id = ingestion.id
-
-      assert_received {:upload, _, ^input_path, ^url, "text/plain"}
-
-      assert_received {:worker_enqueue, ^ingestion_id}
-    end
-
-    test "creates text ingestions with the canonical text artifact path" do
-      user = user_fixture()
-      text = "A new gall description."
-
-      assert {:ok, ingestion} =
-               Ingestions.submit_source_ingestion(%{
-                 input_type: "text",
-                 uploaded_by_id: user.id,
-                 text: text
-               })
-
-      input_path = "source-ingestions/#{ingestion.id}/input/source.txt"
-      ingestion_id = ingestion.id
-
-      assert_received {:upload, _, ^input_path, ^text, "text/plain"}
-
-      assert_received {:worker_enqueue, ^ingestion_id}
-    end
-
-    test "validates required attrs by input type" do
-      user = user_fixture()
-
-      assert {:error, changeset} =
-               Ingestions.submit_source_ingestion(%{
-                 input_type: "pdf",
-                 uploaded_by_id: user.id
-               })
-
-      assert %{filename: ["can't be blank"], content: ["can't be blank"]} = errors_on(changeset)
-
-      assert {:error, changeset} =
-               Ingestions.submit_source_ingestion(%{
-                 input_type: "url",
-                 uploaded_by_id: user.id
-               })
-
-      assert %{url: ["can't be blank"]} = errors_on(changeset)
-
-      assert {:error, changeset} =
-               Ingestions.submit_source_ingestion(%{
-                 input_type: "text",
-                 uploaded_by_id: user.id
-               })
-
-      assert %{text: ["can't be blank"]} = errors_on(changeset)
-    end
-
-    test "cleans up uploaded artifacts when enqueue fails" do
-      user = user_fixture()
-      Process.put(:worker_enqueue_result, {:error, worker_error_changeset()})
-
-      assert {:error, changeset} =
-               Ingestions.submit_source_ingestion(%{
-                 input_type: "text",
-                 uploaded_by_id: user.id,
-                 text: "Needs cleanup"
-               })
-
-      assert changeset.errors[:ingestion_id] != nil
-      assert_received {:delete_objects, _, ["source-ingestions/" <> _ = deleted_key]}
-      assert deleted_key =~ "/input/source.txt"
-      assert Process.get(:submission_storage_objects) == %{}
-    end
-
-    test "returns upload errors without enqueuing the worker" do
-      user = user_fixture()
-      Process.put(:submission_storage_upload_result, {:error, :s3_down})
-
-      assert {:error, :s3_down} =
-               Ingestions.submit_source_ingestion(%{
-                 input_type: "text",
-                 uploaded_by_id: user.id,
-                 text: "Upload fails"
-               })
-
-      refute_received {:worker_enqueue, _}
     end
   end
 
@@ -304,8 +149,8 @@ defmodule Gallformers.IngestionsTest do
       ingestion =
         source_ingestion_fixture(%{
           input_type: "url",
-          status: "processing",
-          processing_stage: "metadata"
+          status: "needs_review",
+          processing_stage: "review"
         })
 
       assert {:error, changeset} = Ingestions.delete_failed_source_ingestion(ingestion)
@@ -337,7 +182,7 @@ defmodule Gallformers.IngestionsTest do
       assert Ingestions.get_source_ingestion(ingestion.id).id == ingestion.id
     end
 
-    test "clears abandoned processing ingestions whose worker was discarded" do
+    test "clears any ingestion stuck in processing as abandoned" do
       ingestion =
         source_ingestion_fixture(%{
           input_type: "text",
@@ -351,9 +196,6 @@ defmodule Gallformers.IngestionsTest do
         artifact_path => %{body: "abandoned text"}
       })
 
-      job = Repo.insert!(Worker.new(%{ingestion_id: ingestion.id}))
-      mark_job_discarded(job.id)
-
       assert Ingestions.source_ingestion_clearability(ingestion.id) == :abandoned
       assert {:ok, deleted_ingestion} = Ingestions.clear_source_ingestion(ingestion.id)
 
@@ -361,151 +203,6 @@ defmodule Gallformers.IngestionsTest do
       assert_received {:delete_objects, _, [^artifact_path]}
       assert Ingestions.get_source_ingestion(ingestion.id) == nil
       assert Process.get(:submission_storage_objects) == %{}
-    end
-
-    test "clears abandoned processing ingestions when all jobs completed but stage stuck" do
-      ingestion =
-        source_ingestion_fixture(%{
-          input_type: "pdf",
-          status: "processing",
-          processing_stage: "hash_and_dedup"
-        })
-
-      artifact_path = "source-ingestions/#{ingestion.id}/input/source.pdf"
-
-      Process.put(:submission_storage_objects, %{
-        artifact_path => %{body: "%PDF-1.4 stuck\n"}
-      })
-
-      job = Repo.insert!(Worker.new(%{ingestion_id: ingestion.id}))
-      mark_job_completed(job.id)
-
-      assert Ingestions.source_ingestion_clearability(ingestion.id) == :abandoned
-      assert {:ok, deleted_ingestion} = Ingestions.clear_source_ingestion(ingestion.id)
-
-      assert deleted_ingestion.id == ingestion.id
-      assert Ingestions.get_source_ingestion(ingestion.id) == nil
-    end
-  end
-
-  describe "confirm_duplicate_candidate/2" do
-    test "links a duplicate submission to the canonical ingestion root" do
-      reviewer = user_fixture()
-      canonical = source_ingestion_fixture(%{input_type: "pdf"})
-
-      existing_duplicate =
-        source_ingestion_fixture(%{
-          input_type: "url",
-          status: "duplicate_confirmed",
-          processing_stage: "duplicate_review",
-          duplicate_of_source_ingestion_id: canonical.id
-        })
-
-      subject =
-        source_ingestion_fixture(%{
-          input_type: "text",
-          status: "needs_duplicate_review",
-          processing_stage: "duplicate_review"
-        })
-
-      assert {:ok, candidate} =
-               Ingestions.create_duplicate_candidate(subject, existing_duplicate, %{
-                 evidence: %{"signal" => "normalized_doi"}
-               })
-
-      assert {:ok, %{candidate: updated_candidate, source_ingestion: updated_source_ingestion}} =
-               Ingestions.confirm_duplicate_candidate(candidate, %{reviewed_by_id: reviewer.id})
-
-      assert updated_candidate.status == "confirmed"
-      assert updated_candidate.reviewed_by_id == reviewer.id
-      refute is_nil(updated_candidate.reviewed_at)
-      assert updated_source_ingestion.status == "duplicate_confirmed"
-      assert updated_source_ingestion.processing_stage == "duplicate_review"
-      assert updated_source_ingestion.duplicate_of_source_ingestion_id == canonical.id
-    end
-
-    test "refuses to confirm a second candidate after duplicate review is already resolved" do
-      reviewer = user_fixture()
-
-      subject =
-        source_ingestion_fixture(%{
-          input_type: "pdf",
-          status: "needs_duplicate_review",
-          processing_stage: "duplicate_review"
-        })
-
-      first_candidate_source = source_ingestion_fixture(%{input_type: "url"})
-      second_candidate_source = source_ingestion_fixture(%{input_type: "text"})
-
-      assert {:ok, first_candidate} =
-               Ingestions.create_duplicate_candidate(subject, first_candidate_source)
-
-      assert {:ok, second_candidate} =
-               Ingestions.create_duplicate_candidate(subject, second_candidate_source)
-
-      assert {:ok, _result} =
-               Ingestions.confirm_duplicate_candidate(first_candidate, %{
-                 reviewed_by_id: reviewer.id
-               })
-
-      assert {:error, changeset} =
-               Ingestions.confirm_duplicate_candidate(second_candidate, %{
-                 reviewed_by_id: reviewer.id
-               })
-
-      assert %{status: ["duplicate review is no longer pending"]} = errors_on(changeset)
-    end
-  end
-
-  describe "reject_duplicate_candidate/2" do
-    test "resumes pipeline processing when the last duplicate candidate is rejected" do
-      reviewer = user_fixture()
-
-      subject =
-        source_ingestion_fixture(%{
-          input_type: "pdf",
-          status: "needs_duplicate_review",
-          processing_stage: "duplicate_review"
-        })
-
-      candidate_source = source_ingestion_fixture(%{input_type: "url"})
-
-      assert {:ok, candidate} =
-               Ingestions.create_duplicate_candidate(subject, candidate_source, %{
-                 evidence: %{"signal" => "minhash"}
-               })
-
-      assert {:ok, %{candidate: updated_candidate, source_ingestion: updated_source_ingestion}} =
-               Ingestions.reject_duplicate_candidate(candidate, %{reviewed_by_id: reviewer.id})
-
-      assert updated_candidate.status == "rejected"
-      assert updated_candidate.reviewed_by_id == reviewer.id
-      refute is_nil(updated_candidate.reviewed_at)
-      assert updated_source_ingestion.status == "processing"
-      assert updated_source_ingestion.processing_stage == "duplicate_review"
-    end
-
-    test "refuses to reject a candidate that is no longer pending" do
-      reviewer = user_fixture()
-
-      subject =
-        source_ingestion_fixture(%{
-          input_type: "pdf",
-          status: "needs_duplicate_review",
-          processing_stage: "duplicate_review"
-        })
-
-      candidate_source = source_ingestion_fixture(%{input_type: "url"})
-
-      assert {:ok, candidate} = Ingestions.create_duplicate_candidate(subject, candidate_source)
-
-      assert {:ok, _result} =
-               Ingestions.confirm_duplicate_candidate(candidate, %{reviewed_by_id: reviewer.id})
-
-      assert {:error, changeset} =
-               Ingestions.reject_duplicate_candidate(candidate, %{reviewed_by_id: reviewer.id})
-
-      assert %{status: ["duplicate review is no longer pending"]} = errors_on(changeset)
     end
   end
 
@@ -560,6 +257,43 @@ defmodule Gallformers.IngestionsTest do
       assert updated_item.reviewed_by_id == reviewer.id
       refute is_nil(updated_item.reviewed_at)
       assert Ingestions.all_species_entries_resolved?(ingestion) == true
+    end
+  end
+
+  describe "raw_extraction round-trip" do
+    test "preserves full Python record map through insert + reload" do
+      ingestion =
+        source_ingestion_fixture(%{
+          input_type: "pdf",
+          status: "needs_review",
+          processing_stage: "review"
+        })
+
+      raw = %{
+        "record_id" => "R_001",
+        "candidate_id" => "C_001",
+        "gall_maker" => %{
+          "scientific_name" => %{
+            "value" => "Druon flocculentum",
+            "confidence" => 1.0,
+            "evidence" => [
+              %{"block_id" => "S_0145", "page" => 1, "char_start" => 0, "char_end" => 18}
+            ]
+          }
+        },
+        "confidence_bucket" => "high",
+        "warnings" => []
+      }
+
+      assert {:ok, entry} =
+               Ingestions.create_source_ingestion_species(%{
+                 source_ingestion_id: ingestion.id,
+                 position: 0,
+                 raw_extraction: raw
+               })
+
+      reloaded = Ingestions.get_source_ingestion_species!(entry.id)
+      assert reloaded.raw_extraction == raw
     end
   end
 
@@ -771,27 +505,13 @@ defmodule Gallformers.IngestionsTest do
   end
 
   describe "get_source_ingestion_with_details!/1" do
-    test "preloads duplicate candidates and species entries in review order" do
+    test "preloads species entries in review order" do
       ingestion =
         source_ingestion_fixture(%{
           input_type: "pdf",
-          status: "needs_duplicate_review",
-          processing_stage: "duplicate_review"
+          status: "needs_review",
+          processing_stage: "review"
         })
-
-      second_candidate_source = source_ingestion_fixture(%{input_type: "url"})
-      first_candidate_source = source_ingestion_fixture(%{input_type: "text"})
-
-      assert {:ok, second_candidate} =
-               Ingestions.create_duplicate_candidate(ingestion, second_candidate_source)
-
-      assert {:ok, first_candidate} =
-               Ingestions.create_duplicate_candidate(ingestion, first_candidate_source)
-
-      assert {:ok, _rejected_candidate_result} =
-               Ingestions.reject_duplicate_candidate(second_candidate, %{
-                 reviewed_by_id: user_fixture().id
-               })
 
       assert {:ok, _species_entry} =
                Ingestions.create_source_ingestion_species(%{
@@ -808,11 +528,6 @@ defmodule Gallformers.IngestionsTest do
                })
 
       detailed_ingestion = Ingestions.get_source_ingestion_with_details!(ingestion.id)
-
-      assert Enum.map(detailed_ingestion.duplicate_candidates, & &1.id) == [
-               first_candidate.id,
-               second_candidate.id
-             ]
 
       assert Enum.map(detailed_ingestion.species_entries, & &1.position) == [1, 2]
     end
@@ -851,25 +566,6 @@ defmodule Gallformers.IngestionsTest do
           source_id: source.id
         })
 
-      duplicate_candidate_fixture(
-        review_ready,
-        source_ingestion_fixture(%{
-          input_type: "pdf",
-          status: "complete",
-          processing_stage: "complete"
-        })
-      )
-
-      duplicate_candidate_fixture(
-        review_ready,
-        source_ingestion_fixture(%{
-          input_type: "text",
-          status: "complete",
-          processing_stage: "complete"
-        }),
-        %{status: "rejected"}
-      )
-
       create_species_entry(review_ready, 0, %{status: "pending", extracted_name: "Pending gall"})
 
       create_species_entry(review_ready, 1, %{status: "mapped", extracted_name: "Mapped gall"})
@@ -894,8 +590,6 @@ defmodule Gallformers.IngestionsTest do
                uploaded_by_name: "Ingestion Reviewer",
                source_id: source.id,
                duplicate_of_source_ingestion_id: nil,
-               pending_duplicate_candidates_count: 1,
-               total_duplicate_candidates_count: 2,
                total_species_entries_count: 2,
                pending_species_entries_count: 1,
                resolved_species_entries_count: 1
@@ -962,11 +656,6 @@ defmodule Gallformers.IngestionsTest do
   describe "queue_status_label/1" do
     test "returns the expected labels across queue states" do
       assert Presenter.queue_status_label(%{
-               status: "needs_duplicate_review",
-               processing_stage: "duplicate_review"
-             }) == "Needs duplicate review"
-
-      assert Presenter.queue_status_label(%{
                status: "needs_review",
                processing_stage: "review",
                source_id: nil,
@@ -1021,17 +710,12 @@ defmodule Gallformers.IngestionsTest do
       assert Presenter.queue_status_label(%{
                status: "processing",
                processing_stage: "extract"
-             }) == "Processing: preprocess"
-
-      assert Presenter.queue_status_label(%{
-               status: "processing",
-               processing_stage: "metadata"
-             }) == "Processing: data_extract"
+             }) == "Processing: extract"
 
       assert Presenter.processing_stage_label(%{
                status: "processing",
                processing_stage: "metadata"
-             }) == "data_extract"
+             }) == "metadata"
     end
   end
 
@@ -1067,103 +751,7 @@ defmodule Gallformers.IngestionsTest do
     end
   end
 
-  describe "record_duplicate_signals/2" do
-    test "records various signal fields" do
-      ingestion = source_ingestion_fixture(%{input_type: "pdf"})
-
-      assert {:ok, updated} =
-               Ingestions.record_duplicate_signals(ingestion, %{
-                 doi: "10.1234/example",
-                 normalized_doi: "10.1234/example",
-                 title: "A Research Paper",
-                 normalized_title: "a research paper",
-                 title_fingerprint: "research_paper",
-                 authors: ["Alice Author", "Bob Writer"],
-                 author_fingerprint: "author_writer",
-                 publication_year: 2024,
-                 raw_input_sha256: "a" |> String.duplicate(64),
-                 preprocessed_text_sha256: "b" |> String.duplicate(64),
-                 minhash_signature: [1, 2, 3, 4, 5]
-               })
-
-      assert updated.doi == "10.1234/example"
-      assert updated.normalized_doi == "10.1234/example"
-      assert updated.title == "A Research Paper"
-      assert updated.authors == ["Alice Author", "Bob Writer"]
-      assert updated.publication_year == 2024
-      assert updated.raw_input_sha256 == "a" |> String.duplicate(64)
-      assert updated.minhash_signature == [1, 2, 3, 4, 5]
-    end
-
-    test "ignores unknown fields" do
-      ingestion = source_ingestion_fixture(%{input_type: "pdf"})
-
-      assert {:ok, updated} =
-               Ingestions.record_duplicate_signals(ingestion, %{
-                 title: "Valid Title",
-                 unknown_field: "should be ignored"
-               })
-
-      assert updated.title == "Valid Title"
-      # unknown_field should not cause an error or be stored
-    end
-
-    test "clears explicitly nil signal fields while leaving omitted fields unchanged" do
-      ingestion =
-        source_ingestion_fixture(%{
-          input_type: "pdf",
-          doi: "10.1234/example",
-          title: "Original Title",
-          normalized_title: "original title",
-          publication_year: 2024
-        })
-
-      assert {:ok, updated} =
-               Ingestions.record_duplicate_signals(ingestion, %{
-                 doi: nil,
-                 title: nil
-               })
-
-      assert updated.doi == nil
-      assert updated.title == nil
-      assert updated.normalized_title == "original title"
-      assert updated.publication_year == 2024
-    end
-
-    test "clears explicitly nil string-keyed signal fields" do
-      ingestion =
-        source_ingestion_fixture(%{
-          input_type: "pdf",
-          normalized_doi: "10.1234/example",
-          title_fingerprint: "original_title",
-          author_fingerprint: "author_one"
-        })
-
-      assert {:ok, updated} =
-               Ingestions.record_duplicate_signals(ingestion, %{
-                 "normalized_doi" => nil,
-                 "title_fingerprint" => nil
-               })
-
-      assert updated.normalized_doi == nil
-      assert updated.title_fingerprint == nil
-      assert updated.author_fingerprint == "author_one"
-    end
-  end
-
   describe "self-duplicate prevention" do
-    test "cannot create duplicate candidate comparing ingestion to itself" do
-      ingestion = source_ingestion_fixture(%{input_type: "pdf"})
-
-      assert {:error, changeset} =
-               Ingestions.create_duplicate_candidate(ingestion, ingestion, %{
-                 evidence: %{"signal" => "test"}
-               })
-
-      assert changeset.errors[:candidate_source_ingestion_id] != nil ||
-               changeset.errors[:source_ingestion_id] != nil
-    end
-
     test "cannot confirm ingestion as duplicate of itself via direct update" do
       ingestion = source_ingestion_fixture(%{input_type: "pdf"})
 
@@ -1177,22 +765,12 @@ defmodule Gallformers.IngestionsTest do
   end
 
   describe "transition_source_ingestion_status/3" do
-    test "transitions through status workflow with appropriate stages" do
+    test "transitions through status workflow" do
       ingestion = source_ingestion_fixture(%{input_type: "pdf"})
 
-      # processing -> needs_duplicate_review
-      assert {:ok, needs_dup} =
-               Ingestions.transition_source_ingestion_status(
-                 ingestion,
-                 :needs_duplicate_review
-               )
-
-      assert needs_dup.status == "needs_duplicate_review"
-      assert needs_dup.processing_stage == "duplicate_review"
-
-      # needs_duplicate_review -> needs_review
+      # processing -> needs_review (allowed by validate_inclusion only)
       assert {:ok, needs_review} =
-               Ingestions.transition_source_ingestion_status(needs_dup, :needs_review)
+               Ingestions.transition_source_ingestion_status(ingestion, :needs_review)
 
       assert needs_review.status == "needs_review"
       assert needs_review.processing_stage == "review"
@@ -1223,17 +801,6 @@ defmodule Gallformers.IngestionsTest do
       assert diff_ms >= 0 and diff_ms < 5000
     end
 
-    test "rejects invalid explicit status and processing stage combinations" do
-      ingestion = source_ingestion_fixture(%{input_type: "pdf"})
-
-      assert {:error, changeset} =
-               Ingestions.transition_source_ingestion_status(ingestion, :needs_review, %{
-                 processing_stage: "llm_clean"
-               })
-
-      assert %{processing_stage: ["is invalid for status needs_review"]} = errors_on(changeset)
-    end
-
     test "rejects invalid status values" do
       ingestion = source_ingestion_fixture(%{input_type: "pdf"})
 
@@ -1241,73 +808,6 @@ defmodule Gallformers.IngestionsTest do
                Ingestions.transition_source_ingestion_status(ingestion, "invalid_status")
 
       assert changeset.errors[:status] != nil
-    end
-  end
-
-  describe "transition_source_ingestion_workflow/3" do
-    test "persists canonical workflow transitions for resumable ingestions" do
-      ingestion =
-        source_ingestion_fixture(%{
-          input_type: "pdf",
-          status: "processing",
-          processing_stage: "assemble"
-        })
-
-      assert {:ok, updated_ingestion} =
-               Ingestions.transition_source_ingestion_workflow(ingestion, :upload_succeeded)
-
-      assert updated_ingestion.status == "needs_review"
-      assert updated_ingestion.processing_stage == "review"
-    end
-  end
-
-  describe "retry_failed_source_ingestion/1" do
-    test "resets a failed ingestion to the checkpoint before the failed stage" do
-      ingestion = source_ingestion_fixture(%{input_type: "pdf"})
-
-      assert {:ok, failed} =
-               Ingestions.transition_source_ingestion_status(ingestion, :failed, %{
-                 error_stage: "metadata",
-                 error_message: "boom"
-               })
-
-      assert {:ok, retried} = Ingestions.retry_failed_source_ingestion(failed)
-
-      assert retried.status == "processing"
-      assert retried.processing_stage == "llm_clean"
-      assert retried.error_stage == nil
-      assert retried.error_message == nil
-      assert retried.failed_at == nil
-    end
-
-    test "resumes llm_clean failures from duplicate_review when duplicate candidates exist" do
-      subject =
-        source_ingestion_fixture(%{
-          input_type: "pdf",
-          status: "failed",
-          processing_stage: "failed",
-          error_stage: "llm_clean",
-          error_message: "boom"
-        })
-
-      candidate_source = source_ingestion_fixture(%{input_type: "url"})
-      duplicate_candidate_fixture(subject, candidate_source)
-
-      assert {:ok, retried} = Ingestions.retry_failed_source_ingestion(subject)
-
-      assert retried.status == "processing"
-      assert retried.processing_stage == "duplicate_review"
-      assert retried.error_stage == nil
-      assert retried.error_message == nil
-      assert retried.failed_at == nil
-    end
-
-    test "rejects retrying ingestions that are not failed" do
-      ingestion = source_ingestion_fixture(%{input_type: "pdf"})
-
-      assert {:error, changeset} = Ingestions.retry_failed_source_ingestion(ingestion)
-
-      assert %{status: ["must be failed"]} = errors_on(changeset)
     end
   end
 
@@ -1445,13 +945,6 @@ defmodule Gallformers.IngestionsTest do
     user
   end
 
-  defp duplicate_candidate_fixture(ingestion, candidate, attrs \\ %{}) do
-    assert {:ok, duplicate_candidate} =
-             Ingestions.create_duplicate_candidate(ingestion, candidate, attrs)
-
-    duplicate_candidate
-  end
-
   defp create_species_entry(ingestion, position, attrs) do
     default_payload = %{
       "hosts" => [%{"name" => "Quercus alba"}],
@@ -1473,34 +966,5 @@ defmodule Gallformers.IngestionsTest do
              Ingestions.create_source_ingestion_species(entry_attrs)
 
     source_ingestion_species
-  end
-
-  defp worker_error_changeset do
-    {%{}, %{ingestion_id: :integer}}
-    |> Ecto.Changeset.cast(%{ingestion_id: nil}, [:ingestion_id])
-    |> Ecto.Changeset.validate_required([:ingestion_id])
-  end
-
-  defp mark_job_discarded(job_id) do
-    from(job in "oban_jobs", where: field(job, :id) == ^job_id)
-    |> Repo.update_all(
-      set: [
-        state: "discarded",
-        attempt: 3,
-        max_attempts: 3,
-        discarded_at: DateTime.utc_now()
-      ]
-    )
-  end
-
-  defp mark_job_completed(job_id) do
-    from(job in "oban_jobs", where: field(job, :id) == ^job_id)
-    |> Repo.update_all(
-      set: [
-        state: "completed",
-        attempt: 1,
-        completed_at: DateTime.utc_now()
-      ]
-    )
   end
 end

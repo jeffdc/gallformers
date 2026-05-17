@@ -3,9 +3,8 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.PresenterTest do
 
   alias GallformersWeb.Admin.IngestionReviewLive.Presenter
 
-  import Gallformers.IngestionPipelineFixtures
-
   alias Gallformers.Accounts
+  alias Gallformers.Ingestions
 
   describe "source_ingestion_review_view!/1 species collation" do
     test "collapses duplicate species names into one entry with sibling_ids" do
@@ -107,28 +106,41 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.PresenterTest do
     end
   end
 
-  describe "load_suggested_match/1" do
-    test "finds exact name match in gall catalog" do
-      # Species 100: Andricus quercuscalifornicus (gall)
-      result = Presenter.load_suggested_match("Andricus quercuscalifornicus")
+  defp review_ready_ingestion_fixture(attrs) do
+    merged =
+      attrs
+      |> Map.new()
+      |> Map.put_new(:input_type, "pdf")
+      |> Map.put_new(:status, "needs_review")
+      |> Map.put_new(:processing_stage, "review")
 
-      assert result != nil
-      assert result.id == 100
-      assert result.name == "Andricus quercuscalifornicus"
-      assert result.host_count == 2
-      assert result.alias_count == 1
-    end
+    {:ok, ingestion} = Ingestions.create_source_ingestion(merged)
+    ingestion
+  end
 
-    test "returns nil when no match exists" do
-      assert Presenter.load_suggested_match("Nonexistent gallus impossibilis") == nil
-    end
+  defp source_ingestion_species_fixture(source_ingestion, position, attrs) do
+    default_payload = %{
+      "hosts" => [%{"name" => "Quercus alba", "evidence" => "On Quercus alba twigs"}],
+      "traits" => %{
+        "shape" => %{"original" => "globular", "suggested" => ["globular"]}
+      },
+      "description_evidence" => [
+        %{"text" => "Rounded woolly gall on oak twigs.", "page" => 3}
+      ]
+    }
 
-    test "returns nil for nil input" do
-      assert Presenter.load_suggested_match(nil) == nil
-    end
+    merged =
+      attrs
+      |> Map.new()
+      |> Map.put_new(:source_ingestion_id, source_ingestion.id)
+      |> Map.put_new(:position, position)
+      |> Map.put_new(:status, "pending")
+      |> Map.put_new(:extracted_name, "Gall #{position}")
+      |> Map.put_new(:extracted_authority, "Author")
+      |> Map.put_new(:description_prose, "Rounded woolly gall on oak twigs.")
+      |> Map.put_new(:extraction_payload, default_payload)
 
-    test "returns nil for empty string" do
-      assert Presenter.load_suggested_match("") == nil
-    end
+    {:ok, source_ingestion_species} = Ingestions.create_source_ingestion_species(merged)
+    source_ingestion_species
   end
 end

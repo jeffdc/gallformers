@@ -17,7 +17,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceAliases do
 
   @impl true
   def render(assigns) do
-    locked = is_nil(assigns.workspace.species_review.decision)
     decision = assigns.workspace.species_review.decision
     extracted_aliases = assigns.workspace.extracted_aliases
     existing_aliases = if assigns.existing_gall, do: assigns.existing_gall.aliases, else: []
@@ -30,7 +29,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceAliases do
 
     assigns =
       assigns
-      |> assign(:locked, locked)
       |> assign(:decision, decision)
       |> assign(:extracted_aliases, extracted_aliases)
       |> assign(:existing_aliases, existing_aliases)
@@ -42,13 +40,12 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceAliases do
     <section id="workspace-section-aliases" class="rounded-lg border border-gray-200 p-4 space-y-4">
       <div class="flex items-center justify-between">
         <h3 class="text-base font-semibold text-gray-900">Aliases</h3>
-        <.badge :if={@locked} variant="warning">Locked · resolve identity first</.badge>
-        <span :if={!@locked && @total_count > 0} class="text-xs text-gray-500">
+        <span :if={@total_count > 0} class="text-xs text-gray-500">
           {@accepted_count} of {@total_count} accepted
         </span>
       </div>
 
-      <div :if={!@locked} class="space-y-4">
+      <div class="space-y-4">
         <div :if={@decision == "mapped" && @existing_aliases != []} class="space-y-2">
           <div class="text-xs font-medium uppercase tracking-wide text-gray-500">
             Currently on gall

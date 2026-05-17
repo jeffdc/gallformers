@@ -9,8 +9,6 @@ defmodule Gallformers.Ingestions.SourceIngestion do
 
   @behaviour Gallformers.SchemaFields
 
-  alias Gallformers.IngestionPipeline.Workflow
-
   @input_types ~w(pdf url text docx)
   @statuses ~w(processing needs_duplicate_review needs_review duplicate_confirmed complete failed)
 
@@ -49,8 +47,7 @@ defmodule Gallformers.Ingestions.SourceIngestion do
     :uploaded_by_id,
     :error_stage,
     :error_message,
-    :failed_at,
-    :pipeline_config_id
+    :failed_at
   ]
 
   @signal_fields [
@@ -107,7 +104,6 @@ defmodule Gallformers.Ingestions.SourceIngestion do
           error_stage: String.t() | nil,
           error_message: String.t() | nil,
           failed_at: DateTime.t() | nil,
-          pipeline_config_id: integer() | nil,
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
@@ -135,15 +131,8 @@ defmodule Gallformers.Ingestions.SourceIngestion do
     belongs_to :duplicate_of_source_ingestion, __MODULE__
     belongs_to :source, Gallformers.Sources.Source
     belongs_to :uploaded_by, Gallformers.Accounts.User
-    belongs_to :pipeline_config, Gallformers.IngestionPipeline.PipelineConfig
 
     has_many :canonical_duplicates, __MODULE__, foreign_key: :duplicate_of_source_ingestion_id
-
-    has_many :duplicate_candidates, Gallformers.Ingestions.DuplicateCandidate,
-      foreign_key: :source_ingestion_id
-
-    has_many :candidate_duplicates, Gallformers.Ingestions.DuplicateCandidate,
-      foreign_key: :candidate_source_ingestion_id
 
     has_many :species_entries, Gallformers.Ingestions.SourceIngestionSpecies
 
@@ -178,7 +167,6 @@ defmodule Gallformers.Ingestions.SourceIngestion do
     |> validate_inclusion(:input_type, @input_types)
     |> validate_inclusion(:status, @statuses)
     |> validate_inclusion(:processing_stage, @processing_stages)
-    |> validate_workflow_state_pair()
     |> validate_length(:raw_input_sha256, is: 64)
     |> validate_length(:preprocessed_text_sha256, is: 64)
     |> validate_number(:publication_year,
@@ -189,7 +177,6 @@ defmodule Gallformers.Ingestions.SourceIngestion do
     |> foreign_key_constraint(:duplicate_of_source_ingestion_id)
     |> foreign_key_constraint(:source_id)
     |> foreign_key_constraint(:uploaded_by_id)
-    |> foreign_key_constraint(:pipeline_config_id)
     |> check_constraint(:duplicate_of_source_ingestion_id,
       name: :source_ingestions_no_self_duplicate,
       message: "cannot point to itself as the canonical ingestion"
@@ -205,18 +192,6 @@ defmodule Gallformers.Ingestions.SourceIngestion do
       |> maybe_put_failed_at(status)
 
     changeset(source_ingestion, attrs)
-  end
-
-  defp validate_workflow_state_pair(changeset) do
-    status = get_field(changeset, :status)
-    processing_stage = get_field(changeset, :processing_stage)
-
-    if status in @statuses and processing_stage in @processing_stages and
-         not Workflow.valid_state?({status, processing_stage}) do
-      add_error(changeset, :processing_stage, "is invalid for status #{status}")
-    else
-      changeset
-    end
   end
 
   defp put_default_stage_for_status(attrs, %__MODULE__{processing_stage: processing_stage}) do

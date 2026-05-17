@@ -1,15 +1,11 @@
 defmodule GallformersWeb.Admin.IngestionReviewLive.ShowCompletionTest do
   use GallformersWeb.ConnCase, async: false
 
-  import Ecto.Query
   import Phoenix.LiveViewTest
-  import Gallformers.IngestionPipelineFixtures
 
   alias Gallformers.Accounts
   alias Gallformers.Accounts.Auth0User
-  alias Gallformers.IngestionPipeline.Worker
   alias Gallformers.Ingestions
-  alias Gallformers.Repo
   alias Gallformers.Storage.SourceArtifacts
 
   defmodule StorageBackendStub do
@@ -72,22 +68,8 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowCompletionTest do
     end
   end
 
-  defmodule WorkerStub do
-    def enqueue(ingestion_id) do
-      send(test_pid(), {:worker_enqueue, ingestion_id})
-      {:ok, %{id: ingestion_id}}
-    end
-
-    defp test_pid do
-      :gallformers
-      |> Application.get_env(GallformersWeb.Admin.IngestionReviewLive.ShowCompletionTest, [])
-      |> Keyword.fetch!(:test_pid)
-    end
-  end
-
   setup do
     previous_storage_config = Application.get_env(:gallformers, SourceArtifacts)
-    previous_ingestions_config = Application.get_env(:gallformers, Ingestions)
     previous_test_config = Application.get_env(:gallformers, __MODULE__)
 
     {:ok, state_pid} =
@@ -99,7 +81,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowCompletionTest do
 
     Application.put_env(:gallformers, __MODULE__, state_pid: state_pid, test_pid: self())
     Application.put_env(:gallformers, SourceArtifacts, backend: StorageBackendStub)
-    Application.put_env(:gallformers, Ingestions, worker_module: WorkerStub)
 
     on_exit(fn ->
       if Process.alive?(state_pid) do
@@ -107,7 +88,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowCompletionTest do
       end
 
       restore_env(SourceArtifacts, previous_storage_config)
-      restore_env(Ingestions, previous_ingestions_config)
       restore_env(__MODULE__, previous_test_config)
     end)
 
@@ -161,9 +141,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowCompletionTest do
       artifact_path = "source-ingestions/#{ingestion.id}/input/source.pdf"
       put_storage_object(artifact_path, "%PDF-1.4 abandoned detail\n")
 
-      job = Repo.insert!(Worker.new(%{ingestion_id: ingestion.id}))
-      mark_job_discarded(job.id)
-
       conn = superadmin_conn(conn, reviewer)
       {:ok, view, html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}")
 
@@ -205,6 +182,18 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowCompletionTest do
     user
   end
 
+  defp source_ingestion_fixture(attrs) do
+    merged_attrs =
+      attrs
+      |> Map.new()
+      |> Map.put_new(:input_type, "pdf")
+      |> Map.put_new(:status, "processing")
+      |> Map.put_new(:processing_stage, "submitted")
+
+    {:ok, ingestion} = Ingestions.create_source_ingestion(merged_attrs)
+    ingestion
+  end
+
   defp put_storage_object(path, body) do
     Agent.update(state_pid(), fn state ->
       %{state | objects: Map.put(state.objects, path, %{body: body})}
@@ -219,18 +208,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowCompletionTest do
     :gallformers
     |> Application.get_env(__MODULE__, [])
     |> Keyword.fetch!(:state_pid)
-  end
-
-  defp mark_job_discarded(job_id) do
-    from(job in "oban_jobs", where: field(job, :id) == ^job_id)
-    |> Repo.update_all(
-      set: [
-        state: "discarded",
-        attempt: 3,
-        max_attempts: 3,
-        discarded_at: DateTime.utc_now()
-      ]
-    )
   end
 
   defp restore_env(module, nil), do: Application.delete_env(:gallformers, module)

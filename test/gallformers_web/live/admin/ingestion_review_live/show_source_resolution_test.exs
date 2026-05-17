@@ -2,7 +2,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowSourceResolutionTest do
   use GallformersWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
-  import Gallformers.IngestionPipelineFixtures
 
   alias Gallformers.Accounts
   alias Gallformers.Accounts.Auth0User
@@ -310,5 +309,43 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.ShowSourceResolutionTest do
       {index, _length} -> index
       :nomatch -> flunk("missing row for species entry #{entry_id}")
     end
+  end
+
+  defp review_ready_ingestion_fixture(attrs) do
+    merged =
+      attrs
+      |> Map.new()
+      |> Map.put_new(:input_type, "pdf")
+      |> Map.put_new(:status, "needs_review")
+      |> Map.put_new(:processing_stage, "review")
+
+    {:ok, ingestion} = Ingestions.create_source_ingestion(merged)
+    ingestion
+  end
+
+  defp source_ingestion_species_fixture(source_ingestion, position, attrs) do
+    default_payload = %{
+      "hosts" => [%{"name" => "Quercus alba", "evidence" => "On Quercus alba twigs"}],
+      "traits" => %{
+        "shape" => %{"original" => "globular", "suggested" => ["globular"]}
+      },
+      "description_evidence" => [
+        %{"text" => "Rounded woolly gall on oak twigs.", "page" => 3}
+      ]
+    }
+
+    merged =
+      attrs
+      |> Map.new()
+      |> Map.put_new(:source_ingestion_id, source_ingestion.id)
+      |> Map.put_new(:position, position)
+      |> Map.put_new(:status, "pending")
+      |> Map.put_new(:extracted_name, "Gall #{position}")
+      |> Map.put_new(:extracted_authority, "Author")
+      |> Map.put_new(:description_prose, "Rounded woolly gall on oak twigs.")
+      |> Map.put_new(:extraction_payload, default_payload)
+
+    {:ok, source_ingestion_species} = Ingestions.create_source_ingestion_species(merged)
+    source_ingestion_species
   end
 end

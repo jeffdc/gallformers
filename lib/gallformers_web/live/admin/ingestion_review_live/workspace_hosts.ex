@@ -62,7 +62,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceHosts do
 
   @impl true
   def render(assigns) do
-    locked = is_nil(assigns.workspace.species_review.decision)
     decision = assigns.workspace.species_review.decision
     host_reviews = assigns.workspace.host_reviews
     existing_hosts = if assigns.existing_gall, do: assigns.existing_gall.hosts, else: []
@@ -76,7 +75,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceHosts do
 
     assigns =
       assigns
-      |> assign(:locked, locked)
       |> assign(:decision, decision)
       |> assign(:host_reviews, host_reviews)
       |> assign(:existing_hosts, existing_hosts)
@@ -86,12 +84,9 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceHosts do
 
     ~H"""
     <section id="workspace-section-hosts" class="rounded-lg border border-gray-200 p-4 space-y-4">
-      <div class="flex items-center justify-between">
-        <h3 class="text-base font-semibold text-gray-900">Hosts</h3>
-        <.badge :if={@locked} variant="warning">Locked · resolve identity first</.badge>
-      </div>
+      <h3 class="text-base font-semibold text-gray-900">Hosts</h3>
 
-      <div :if={!@locked} class="space-y-4">
+      <div class="space-y-4">
         <.existing_hosts_group
           :if={@decision == "mapped" && @existing_hosts != []}
           existing_hosts={@existing_hosts}

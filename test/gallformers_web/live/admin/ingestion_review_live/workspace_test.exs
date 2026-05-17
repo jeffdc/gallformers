@@ -2,10 +2,10 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
   use GallformersWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
-  import Gallformers.IngestionPipelineFixtures
 
   alias Gallformers.Accounts
   alias Gallformers.Accounts.Auth0User
+  alias Gallformers.Ingestions
   alias Gallformers.Repo
   alias Gallformers.Sources
   alias Gallformers.Species.Species
@@ -243,9 +243,9 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
   end
 
   describe "workspace shell — section placeholders" do
-    test "sections 2-5 show locked state when identity unresolved", %{conn: conn} do
+    test "sections render extracted data even when identity is unresolved", %{conn: conn} do
       reviewer = db_user_fixture("Section Reviewer")
-      source = source_fixture(%{title: "Locked Source"})
+      source = source_fixture(%{title: "Unresolved Source"})
 
       ingestion =
         review_ready_ingestion_fixture(%{
@@ -256,8 +256,10 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       source_ingestion_species_fixture(ingestion, 0, %{
         extracted_name: "New gall species",
         extraction_payload: %{
-          "hosts" => [],
-          "traits" => %{},
+          "hosts" => [%{"name" => "Quercus alba"}],
+          "traits" => %{
+            "color" => %{"original" => "brown", "suggested" => ["brown"]}
+          },
           "description_evidence" => []
         }
       })
@@ -267,14 +269,15 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
 
       assert html =~ "Identity"
       assert html =~ "Hosts"
-      assert html =~ "Locked"
+      assert html =~ "Quercus alba"
+      refute html =~ "Locked"
     end
   end
 
   describe "identity section" do
-    test "renders suggestion card when suggested_match exists", %{conn: conn} do
-      reviewer = db_user_fixture("Identity Reviewer")
-      source = source_fixture(%{title: "Identity Source"})
+    test "auto-maps identity on exact name match to existing gall", %{conn: conn} do
+      reviewer = db_user_fixture("Identity Auto-Map Reviewer")
+      source = source_fixture(%{title: "Auto-Map Source"})
 
       ingestion =
         review_ready_ingestion_fixture(%{
@@ -282,7 +285,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
           source_id: source.id
         })
 
-      # Use the seed species name so load_suggested_match finds it
       source_ingestion_species_fixture(ingestion, 0, %{
         extracted_name: "Andricus quercuscalifornicus",
         extracted_authority: "Bassett"
@@ -291,61 +293,9 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       conn = superadmin_conn(conn, reviewer)
       {:ok, _view, html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
 
-      assert html =~ "Suggested match"
-      assert html =~ "Accept &amp; map"
-      assert html =~ "Andricus quercuscalifornicus"
-    end
-
-    test "accept & map resolves identity to existing", %{conn: conn} do
-      reviewer = db_user_fixture("Identity Accept Reviewer")
-      source = source_fixture(%{title: "Accept Source"})
-
-      ingestion =
-        review_ready_ingestion_fixture(%{
-          uploaded_by_id: reviewer.id,
-          source_id: source.id
-        })
-
-      source_ingestion_species_fixture(ingestion, 0, %{
-        extracted_name: "Andricus quercuscalifornicus"
-      })
-
-      conn = superadmin_conn(conn, reviewer)
-      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
-
-      view
-      |> element("button[phx-click=accept_match]")
-      |> render_click()
-
-      html = render(view)
       assert html =~ "Mapped"
+      assert html =~ "Andricus quercuscalifornicus"
       refute html =~ "Locked"
-    end
-
-    test "search a different gall opens typeahead", %{conn: conn} do
-      reviewer = db_user_fixture("Identity Search Reviewer")
-      source = source_fixture(%{title: "Search Source"})
-
-      ingestion =
-        review_ready_ingestion_fixture(%{
-          uploaded_by_id: reviewer.id,
-          source_id: source.id
-        })
-
-      source_ingestion_species_fixture(ingestion, 0, %{
-        extracted_name: "Andricus quercuscalifornicus"
-      })
-
-      conn = superadmin_conn(conn, reviewer)
-      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
-
-      html =
-        view
-        |> element("button[phx-click=start_search]")
-        |> render_click()
-
-      assert html =~ "Search gall species"
-      assert html =~ "Treat as new species"
     end
 
     test "treat as new resolves identity to new", %{conn: conn} do
@@ -395,18 +345,13 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       })
 
       conn = superadmin_conn(conn, reviewer)
-      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
+      {:ok, _view, html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
 
-      view
-      |> element("button[phx-click=accept_match]")
-      |> render_click()
-
-      html = render(view)
       assert html =~ "Mapped"
       assert html =~ "Change..."
     end
 
-    test "change resets identity to unresolved and re-locks sections", %{conn: conn} do
+    test "change resets identity to unresolved", %{conn: conn} do
       reviewer = db_user_fixture("Identity Change Reviewer")
       source = source_fixture(%{title: "Change Source"})
 
@@ -424,19 +369,12 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
 
       view
-      |> element("button[phx-click=accept_match]")
-      |> render_click()
-
-      # Must render to get the resolved state with change button
-      render(view)
-
-      view
       |> element("button[phx-click=change_identity]")
       |> render_click()
 
       html = render(view)
-      assert html =~ "Suggested match"
-      assert html =~ "Locked"
+      assert html =~ "Search gall species"
+      refute html =~ "Mapped"
     end
 
     test "+alias pill shown when mapped name differs from extracted name", %{conn: conn} do
@@ -478,9 +416,9 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
   end
 
   describe "hosts section" do
-    test "renders locked state when identity is unresolved", %{conn: conn} do
-      reviewer = db_user_fixture("Hosts Locked Reviewer")
-      source = source_fixture(%{title: "Hosts Locked Source"})
+    test "renders extracted hosts even when identity is unresolved", %{conn: conn} do
+      reviewer = db_user_fixture("Hosts Unresolved Reviewer")
+      source = source_fixture(%{title: "Hosts Unresolved Source"})
 
       ingestion =
         review_ready_ingestion_fixture(%{
@@ -501,10 +439,12 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       {:ok, _view, html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
 
       assert html =~ "Hosts"
-      assert html =~ "Locked"
+      assert html =~ "From source"
+      assert html =~ "Quercus alba"
+      refute html =~ "Locked"
     end
 
-    test "unlocks and shows host list when identity resolved to existing", %{conn: conn} do
+    test "shows host list when identity resolved to existing", %{conn: conn} do
       reviewer = db_user_fixture("Hosts Unlock Reviewer")
       source = source_fixture(%{title: "Hosts Unlock Source"})
 
@@ -525,10 +465,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
 
       conn = superadmin_conn(conn, reviewer)
       {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
-
-      view
-      |> element("button[phx-click=accept_match]")
-      |> render_click()
 
       html = render(view)
 
@@ -559,10 +495,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
 
       conn = superadmin_conn(conn, reviewer)
       {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
-
-      view
-      |> element("button[phx-click=accept_match]")
-      |> render_click()
 
       html = render(view)
 
@@ -914,9 +846,9 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
   end
 
   describe "aliases section" do
-    test "renders locked state when identity is unresolved", %{conn: conn} do
-      reviewer = db_user_fixture("Aliases Locked Reviewer")
-      source = source_fixture(%{title: "Aliases Locked Source"})
+    test "renders extracted aliases even when identity is unresolved", %{conn: conn} do
+      reviewer = db_user_fixture("Aliases Unresolved Reviewer")
+      source = source_fixture(%{title: "Aliases Unresolved Source"})
 
       ingestion =
         review_ready_ingestion_fixture(%{
@@ -938,10 +870,11 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       {:ok, _view, html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
 
       assert html =~ "Aliases"
-      assert html =~ "Locked"
+      assert html =~ "Oak apple gall"
+      refute html =~ "Locked"
     end
 
-    test "shows extracted aliases as checkboxes when unlocked", %{conn: conn} do
+    test "shows extracted aliases as checkboxes when identity is resolved", %{conn: conn} do
       reviewer = db_user_fixture("Aliases Checkbox Reviewer")
       source = source_fixture(%{title: "Aliases Checkbox Source"})
 
@@ -999,10 +932,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       conn = superadmin_conn(conn, reviewer)
       {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
 
-      view
-      |> element("button[phx-click=accept_match]")
-      |> render_click()
-
       html = render(view)
 
       assert html =~ "Currently on gall"
@@ -1050,9 +979,9 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
   end
 
   describe "traits section" do
-    test "renders locked state when identity is unresolved", %{conn: conn} do
-      reviewer = db_user_fixture("Traits Locked Reviewer")
-      source = source_fixture(%{title: "Traits Locked Source"})
+    test "renders extracted traits even when identity is unresolved", %{conn: conn} do
+      reviewer = db_user_fixture("Traits Unresolved Reviewer")
+      source = source_fixture(%{title: "Traits Unresolved Source"})
 
       ingestion =
         review_ready_ingestion_fixture(%{
@@ -1075,7 +1004,8 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       {:ok, _view, html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
 
       assert html =~ "Traits"
-      assert html =~ "Locked"
+      assert html =~ "globular"
+      refute html =~ "Locked"
     end
 
     test "renders as table with Trait, Extracted, Result columns in new mode", %{conn: conn} do
@@ -1151,10 +1081,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
 
       # Accept match to resolve as existing
-      view
-      |> element("button[phx-click=accept_match]")
-      |> render_click()
-
       html = render(view)
 
       # Current column present in existing mode
@@ -1314,12 +1240,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       conn = superadmin_conn(conn, reviewer)
       {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
 
-      view
-      |> element("button[phx-click=accept_match]")
-      |> render_click()
-
-      render(view)
-
       # Toggle off "red" from current
       view
       |> element("button[phx-click=toggle_current][phx-value-trait=color][phx-value-value=red]")
@@ -1381,9 +1301,9 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
   end
 
   describe "description section" do
-    test "renders locked state when identity is unresolved", %{conn: conn} do
-      reviewer = db_user_fixture("Desc Locked Reviewer")
-      source = source_fixture(%{title: "Desc Locked Source"})
+    test "renders extracted description even when identity is unresolved", %{conn: conn} do
+      reviewer = db_user_fixture("Desc Unresolved Reviewer")
+      source = source_fixture(%{title: "Desc Unresolved Source"})
 
       ingestion =
         review_ready_ingestion_fixture(%{
@@ -1393,6 +1313,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
 
       source_ingestion_species_fixture(ingestion, 0, %{
         extracted_name: "Novelus gallicus",
+        description_prose: "A round woody gall on twigs.",
         extraction_payload: %{
           "hosts" => [],
           "traits" => %{},
@@ -1404,7 +1325,8 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       {:ok, _view, html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
 
       assert html =~ "Description"
-      assert html =~ "Locked"
+      assert html =~ "A round woody gall on twigs"
+      refute html =~ "Locked"
     end
 
     test "shows textarea with extracted description when unlocked in new mode", %{conn: conn} do
@@ -1470,10 +1392,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
 
       conn = superadmin_conn(conn, reviewer)
       {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
-
-      view
-      |> element("button[phx-click=accept_match]")
-      |> render_click()
 
       html = render(view)
 
@@ -1680,7 +1598,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
           source_id: source.id
         })
 
-      # Use an extracted name that matches a seeded gall so accept_match can map it.
+      # Use an extracted name that matches a seeded gall so it auto-maps.
       source_ingestion_species_fixture(ingestion, 0, %{
         extracted_name: "Andricus quercuscalifornicus",
         extraction_payload: %{
@@ -1696,11 +1614,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       # Initially status is "pending" — skip is enabled.
       refute has_element?(view, ~s(button[phx-click="skip_species"][disabled]))
 
-      # Map to existing gall, then save → status becomes "mapped" (non-pending).
-      view
-      |> element("#workspace-section-identity button[phx-click=accept_match]")
-      |> render_click()
-
+      # Workspace auto-mapped to existing gall on load; save → status becomes "mapped".
       render_click(view, "save_draft")
 
       # Re-load the workspace; the species's current status should be "mapped".
@@ -1866,5 +1780,43 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       "INSERT INTO #{table} (species_id, #{fk}) VALUES ($1, $2)",
       [species_id, filter_field_id]
     )
+  end
+
+  defp review_ready_ingestion_fixture(attrs) do
+    merged =
+      attrs
+      |> Map.new()
+      |> Map.put_new(:input_type, "pdf")
+      |> Map.put_new(:status, "needs_review")
+      |> Map.put_new(:processing_stage, "review")
+
+    {:ok, ingestion} = Ingestions.create_source_ingestion(merged)
+    ingestion
+  end
+
+  defp source_ingestion_species_fixture(source_ingestion, position, attrs) do
+    default_payload = %{
+      "hosts" => [%{"name" => "Quercus alba", "evidence" => "On Quercus alba twigs"}],
+      "traits" => %{
+        "shape" => %{"original" => "globular", "suggested" => ["globular"]}
+      },
+      "description_evidence" => [
+        %{"text" => "Rounded woolly gall on oak twigs.", "page" => 3}
+      ]
+    }
+
+    merged =
+      attrs
+      |> Map.new()
+      |> Map.put_new(:source_ingestion_id, source_ingestion.id)
+      |> Map.put_new(:position, position)
+      |> Map.put_new(:status, "pending")
+      |> Map.put_new(:extracted_name, "Gall #{position}")
+      |> Map.put_new(:extracted_authority, "Author")
+      |> Map.put_new(:description_prose, "Rounded woolly gall on oak twigs.")
+      |> Map.put_new(:extraction_payload, default_payload)
+
+    {:ok, source_ingestion_species} = Ingestions.create_source_ingestion_species(merged)
+    source_ingestion_species
   end
 end

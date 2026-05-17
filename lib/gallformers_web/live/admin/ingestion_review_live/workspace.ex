@@ -20,7 +20,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
      |> assign(:selected_species, nil)
      |> assign(:workspace, nil)
      |> assign(:existing_gall, nil)
-     |> assign(:suggested_match, nil)
      |> assign(:filter_options, %{})
      |> assign(:drawer_open, false)
      |> assign(:source_text, nil)
@@ -338,7 +337,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
                 module={GallformersWeb.Admin.IngestionReviewLive.WorkspaceIdentity}
                 id="workspace-identity"
                 workspace={@workspace}
-                suggested_match={@suggested_match}
               />
               <.live_component
                 module={GallformersWeb.Admin.IngestionReviewLive.WorkspaceHosts}
@@ -565,7 +563,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
     |> assign(:selected_species, nil)
     |> assign(:workspace, nil)
     |> assign(:existing_gall, nil)
-    |> assign(:suggested_match, nil)
   end
 
   defp load_workspace_for_entry(socket, entry) do
@@ -580,24 +577,18 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
       |> merge_sibling_data(sibling_views)
       |> build_workspace_state()
       |> Map.put(:sibling_ids, sibling_ids)
-      |> auto_match_hosts()
+      |> auto_match_species()
 
     existing_gall =
       if workspace.species_review.species_id,
         do: Presenter.load_existing_gall_data(workspace.species_review.species_id),
         else: nil
 
-    suggested_match =
-      if is_nil(workspace.species_review.decision) do
-        Presenter.load_suggested_match(workspace.extracted_name)
-      end
-
     socket
     |> assign(:current_id, entry.id)
     |> assign(:selected_species, entry)
     |> assign(:workspace, workspace)
     |> assign(:existing_gall, existing_gall)
-    |> assign(:suggested_match, suggested_match)
     |> assign(:dirty, false)
   end
 
@@ -688,6 +679,36 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
         end),
       trait_reviews: workspace_view.trait_reviews
     }
+  end
+
+  defp auto_match_species(workspace) do
+    workspace
+    |> auto_match_hosts()
+    |> auto_match_gall()
+  end
+
+  defp auto_match_gall(workspace) do
+    review = workspace.species_review
+
+    if review.species_id || review.decision == "skip",
+      do: workspace,
+      else: do_auto_match_gall(workspace)
+  end
+
+  defp do_auto_match_gall(workspace) do
+    case find_exact_species(workspace.extracted_name, "gall") do
+      nil ->
+        workspace
+
+      match ->
+        species_review =
+          workspace.species_review
+          |> Map.put(:selected_species, match)
+          |> Map.put(:species_id, match.id)
+          |> Map.put(:decision, "mapped")
+
+        Map.put(workspace, :species_review, species_review)
+    end
   end
 
   defp auto_match_hosts(workspace) do

@@ -4,12 +4,12 @@ defmodule Gallformers.Ingestions.SourceIngestionSpeciesReview do
   import Ecto.Changeset, only: [add_error: 3]
 
   alias Gallformers.Galls
-  alias Gallformers.IngestionPipeline.Storage
   alias Gallformers.Ingestions
   alias Gallformers.Ingestions.{SourceIngestion, SourceIngestionSpecies}
   alias Gallformers.Repo
   alias Gallformers.Sources
   alias Gallformers.Species, as: SpeciesContext
+  alias Gallformers.Storage.SourceArtifacts
   alias Gallformers.Taxonomy
   alias Gallformers.Taxonomy.{Genus, Lineage}
   alias Gallformers.Utils
@@ -113,7 +113,7 @@ defmodule Gallformers.Ingestions.SourceIngestionSpeciesReview do
   end
 
   defp safe_download_review_artifact(source_ingestion_id, stage, filename) do
-    Storage.download_artifact(source_ingestion_id, stage, filename)
+    SourceArtifacts.download_private_artifact(source_ingestion_id, stage, filename)
   rescue
     CaseClauseError -> {:error, :not_found}
   end

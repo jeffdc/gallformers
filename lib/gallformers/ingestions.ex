@@ -2,8 +2,8 @@ defmodule Gallformers.Ingestions do
   @moduledoc """
   The ingestion context.
 
-  Owns persisted source-ingestion records, duplicate-review workflow, and
-  gall-level review items derived from ingested sources.
+  Owns persisted source-ingestion records and gall-level review items derived
+  from ingested sources.
   """
 
   require Logger
@@ -19,26 +19,20 @@ defmodule Gallformers.Ingestions do
       Gallformers.Species,
       Gallformers.Galls,
       Gallformers.Taxonomy,
-      Gallformers.Utils,
-      Gallformers.IngestionPipeline.Storage,
-      Gallformers.IngestionPipeline.Workflow
+      Gallformers.Utils
     ],
     exports: :all
 
   import Ecto.Query
 
-  alias Gallformers.IngestionPipeline.Workflow
-
   alias Gallformers.Ingestions.{
-    DuplicateCandidate,
-    DuplicateReview,
+    BundleImporter,
     Lifecycle,
     SourceIngestion,
     SourceIngestionCreation,
     SourceIngestionSpecies,
     SourceIngestionSpeciesEntries,
-    SourceIngestionSpeciesReview,
-    Submission
+    SourceIngestionSpeciesReview
   }
 
   alias Gallformers.Repo
@@ -53,8 +47,6 @@ defmodule Gallformers.Ingestions do
     :source,
     :uploaded_by,
     :duplicate_of_source_ingestion,
-    duplicate_candidates:
-      {DuplicateReview.ordered_candidates_query(), [:candidate_source_ingestion, :reviewed_by]},
     species_entries: {@ordered_species_entries_query, [:species, :reviewed_by]}
   ]
 
@@ -63,22 +55,6 @@ defmodule Gallformers.Ingestions do
   """
   @spec list_source_ingestion_queue_rows(keyword()) :: [map()]
   def list_source_ingestion_queue_rows(opts \\ []) do
-    duplicate_counts_query =
-      from(duplicate_candidate in DuplicateCandidate,
-        group_by: duplicate_candidate.source_ingestion_id,
-        select: %{
-          source_ingestion_id: duplicate_candidate.source_ingestion_id,
-          pending_duplicate_candidates_count:
-            sum(
-              fragment(
-                "CASE WHEN ? = 'pending' THEN 1 ELSE 0 END",
-                duplicate_candidate.status
-              )
-            ),
-          total_duplicate_candidates_count: count(duplicate_candidate.id)
-        }
-      )
-
     species_counts_query =
       from(source_ingestion_species in SourceIngestionSpecies,
         group_by: source_ingestion_species.source_ingestion_id,
@@ -110,17 +86,11 @@ defmodule Gallformers.Ingestions do
     |> join(
       :left,
       [source_ingestion, _uploaded_by],
-      duplicate_counts in subquery(duplicate_counts_query),
-      on: duplicate_counts.source_ingestion_id == source_ingestion.id
-    )
-    |> join(
-      :left,
-      [source_ingestion, _uploaded_by, _duplicate_counts],
       species_counts in subquery(species_counts_query),
       on: species_counts.source_ingestion_id == source_ingestion.id
     )
     |> order_by([source_ingestion], desc: source_ingestion.inserted_at, desc: source_ingestion.id)
-    |> select([source_ingestion, uploaded_by, duplicate_counts, species_counts], %{
+    |> select([source_ingestion, uploaded_by, species_counts], %{
       id: source_ingestion.id,
       title: source_ingestion.title,
       input_type: source_ingestion.input_type,
@@ -138,8 +108,6 @@ defmodule Gallformers.Ingestions do
         ),
       source_id: source_ingestion.source_id,
       duplicate_of_source_ingestion_id: source_ingestion.duplicate_of_source_ingestion_id,
-      pending_duplicate_candidates_count: duplicate_counts.pending_duplicate_candidates_count,
-      total_duplicate_candidates_count: duplicate_counts.total_duplicate_candidates_count,
       total_species_entries_count: species_counts.total_species_entries_count,
       pending_species_entries_count: species_counts.pending_species_entries_count,
       resolved_species_entries_count: species_counts.resolved_species_entries_count
@@ -191,13 +159,13 @@ defmodule Gallformers.Ingestions do
   end
 
   @doc """
-  Creates a source ingestion submission, uploads its initial artifact, and
-  enqueues the ingestion pipeline worker.
+  Imports an extracted Python-pipeline bundle directory into a persisted
+  `SourceIngestion` plus per-record `SourceIngestionSpecies` rows.
   """
-  @spec submit_source_ingestion(map()) ::
-          {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t() | term()}
-  def submit_source_ingestion(attrs) do
-    Submission.submit_source_ingestion(attrs)
+  @spec import_bundle(Path.t(), keyword()) ::
+          {:ok, SourceIngestion.t()} | {:error, term()}
+  def import_bundle(bundle_dir, opts \\ []) do
+    BundleImporter.import_bundle(bundle_dir, opts)
   end
 
   @doc """
@@ -222,57 +190,6 @@ defmodule Gallformers.Ingestions do
 
     source_ingestion
     |> SourceIngestion.transition_changeset(status, attrs)
-    |> Repo.update()
-  end
-
-  @doc """
-  Persists a workflow event for an ingestion through the canonical workflow semantics.
-  """
-  @spec transition_source_ingestion_workflow(SourceIngestion.t(), Workflow.event(), map()) ::
-          {:ok, SourceIngestion.t()}
-          | {:error, :invalid_state | :invalid_transition | Ecto.Changeset.t()}
-  def transition_source_ingestion_workflow(
-        %SourceIngestion{} = source_ingestion,
-        event,
-        attrs \\ %{}
-      ) do
-    attrs = Map.new(attrs)
-
-    with {:ok, workflow_attrs} <- Workflow.transition_attrs(source_ingestion, event) do
-      status = Map.fetch!(workflow_attrs, :status)
-      transition_attrs = Map.merge(attrs, Map.delete(workflow_attrs, :status))
-
-      transition_source_ingestion_status(source_ingestion, status, transition_attrs)
-    end
-  end
-
-  @doc """
-  Updates the explicit duplicate signals and related normalized metadata on an ingestion.
-  """
-  @spec record_duplicate_signals(SourceIngestion.t(), map()) ::
-          {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t()}
-  def record_duplicate_signals(%SourceIngestion{} = source_ingestion, attrs) do
-    attrs = Map.new(attrs)
-
-    allowed_attrs =
-      SourceIngestion.signal_fields()
-      |> Enum.reduce(%{}, fn field, acc ->
-        string_field = Atom.to_string(field)
-
-        cond do
-          Map.has_key?(attrs, field) ->
-            Map.put(acc, field, Map.get(attrs, field))
-
-          Map.has_key?(attrs, string_field) ->
-            Map.put(acc, field, Map.get(attrs, string_field))
-
-          true ->
-            acc
-        end
-      end)
-
-    source_ingestion
-    |> SourceIngestion.changeset(allowed_attrs)
     |> Repo.update()
   end
 
@@ -302,13 +219,6 @@ defmodule Gallformers.Ingestions do
     |> SourceIngestion.changeset(%{source_id: nil})
     |> Repo.update()
   end
-
-  @doc """
-  Returns whether an ingestion is currently waiting on duplicate review.
-  """
-  @spec duplicate_review_required?(SourceIngestion.t()) :: boolean()
-  def duplicate_review_required?(%SourceIngestion{status: "needs_duplicate_review"}), do: true
-  def duplicate_review_required?(_), do: false
 
   @doc """
   Returns whether source-level review can proceed.
@@ -354,8 +264,7 @@ defmodule Gallformers.Ingestions do
   Completes an ingestion review when every species entry has been resolved.
   """
   @spec maybe_complete_source_ingestion_review(SourceIngestion.t() | integer()) ::
-          {:ok, SourceIngestion.t()}
-          | {:error, :invalid_state | :invalid_transition | Ecto.Changeset.t()}
+          {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t()}
   def maybe_complete_source_ingestion_review(%SourceIngestion{id: source_ingestion_id}) do
     maybe_complete_source_ingestion_review(source_ingestion_id)
   end
@@ -366,7 +275,7 @@ defmodule Gallformers.Ingestions do
 
     if source_ingestion.status == "needs_review" and
          all_species_entries_resolved?(source_ingestion_id) do
-      transition_source_ingestion_workflow(source_ingestion, :review_completed)
+      transition_source_ingestion_status(source_ingestion, :complete)
     else
       {:ok, source_ingestion}
     end
@@ -398,11 +307,6 @@ defmodule Gallformers.Ingestions do
     Lifecycle.source_ingestion_clearability(source_ingestion_id)
   end
 
-  @spec pipeline_job_active?(integer()) :: boolean()
-  def pipeline_job_active?(source_ingestion_id) do
-    Lifecycle.active_worker_job_exists?(source_ingestion_id)
-  end
-
   @doc """
   Deletes a terminal failed ingestion and its private artifacts.
   """
@@ -413,91 +317,12 @@ defmodule Gallformers.Ingestions do
   end
 
   @doc """
-  Resets a failed ingestion to its last resumable checkpoint.
-
-  This is used when retrying a discarded worker job for an ingestion that has
-  already been marked failed.
+  Deletes a source ingestion and its private artifacts regardless of status.
   """
-  @spec retry_failed_source_ingestion(SourceIngestion.t() | integer()) ::
-          {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t()}
-  def retry_failed_source_ingestion(%SourceIngestion{} = source_ingestion) do
-    Lifecycle.retry_failed_source_ingestion(source_ingestion)
-  end
-
-  def retry_failed_source_ingestion(source_ingestion_id) when is_integer(source_ingestion_id) do
-    Lifecycle.retry_failed_source_ingestion(source_ingestion_id)
-  end
-
-  # --- Duplicate candidates ---
-
-  @doc """
-  Returns a changeset for a duplicate candidate.
-  """
-  @spec change_duplicate_candidate(DuplicateCandidate.t(), map()) :: Ecto.Changeset.t()
-  def change_duplicate_candidate(%DuplicateCandidate{} = duplicate_candidate, attrs \\ %{}) do
-    DuplicateReview.change_duplicate_candidate(duplicate_candidate, attrs)
-  end
-
-  @doc """
-  Lists duplicate candidates for an ingestion.
-  """
-  @spec list_duplicate_candidates(SourceIngestion.t() | integer()) :: [DuplicateCandidate.t()]
-  def list_duplicate_candidates(%SourceIngestion{id: source_ingestion_id}) do
-    DuplicateReview.list_duplicate_candidates(source_ingestion_id)
-  end
-
-  def list_duplicate_candidates(source_ingestion_id) when is_integer(source_ingestion_id) do
-    DuplicateReview.list_duplicate_candidates(source_ingestion_id)
-  end
-
-  @doc """
-  Gets a duplicate candidate by ID, raising if it does not exist.
-  """
-  @spec get_duplicate_candidate!(integer()) :: DuplicateCandidate.t()
-  def get_duplicate_candidate!(duplicate_candidate_id) when is_integer(duplicate_candidate_id) do
-    DuplicateReview.get_duplicate_candidate!(duplicate_candidate_id)
-  end
-
-  @doc """
-  Creates a duplicate candidate for an ingestion pair.
-  """
-  @spec create_duplicate_candidate(SourceIngestion.t(), SourceIngestion.t(), map()) ::
-          {:ok, DuplicateCandidate.t()} | {:error, Ecto.Changeset.t()}
-  def create_duplicate_candidate(
-        %SourceIngestion{} = source_ingestion,
-        %SourceIngestion{} = candidate_source_ingestion,
-        attrs \\ %{}
-      ) do
-    DuplicateReview.create_duplicate_candidate(
-      source_ingestion,
-      candidate_source_ingestion,
-      attrs
-    )
-  end
-
-  def create_duplicate_candidate(attrs) do
-    DuplicateReview.create_duplicate_candidate(attrs)
-  end
-
-  @doc """
-  Confirms a duplicate candidate and links the subject ingestion to its canonical ingestion.
-  """
-  @spec confirm_duplicate_candidate(DuplicateCandidate.t(), map()) ::
-          {:ok, %{candidate: DuplicateCandidate.t(), source_ingestion: SourceIngestion.t()}}
-          | {:error, Ecto.Changeset.t()}
-  def confirm_duplicate_candidate(%DuplicateCandidate{} = duplicate_candidate, attrs \\ %{}) do
-    DuplicateReview.confirm_duplicate_candidate(duplicate_candidate, attrs)
-  end
-
-  @doc """
-  Rejects a duplicate candidate and resumes pipeline processing if no pending
-  candidates remain.
-  """
-  @spec reject_duplicate_candidate(DuplicateCandidate.t(), map()) ::
-          {:ok, %{candidate: DuplicateCandidate.t(), source_ingestion: SourceIngestion.t()}}
-          | {:error, Ecto.Changeset.t()}
-  def reject_duplicate_candidate(%DuplicateCandidate{} = duplicate_candidate, attrs \\ %{}) do
-    DuplicateReview.reject_duplicate_candidate(duplicate_candidate, attrs)
+  @spec delete_source_ingestion(SourceIngestion.t() | integer()) ::
+          {:ok, SourceIngestion.t()} | {:error, Ecto.Changeset.t() | term()}
+  def delete_source_ingestion(source_ingestion) do
+    Lifecycle.delete_source_ingestion(source_ingestion)
   end
 
   # --- Species entries ---

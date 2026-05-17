@@ -1,11 +1,9 @@
 defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
   alias Gallformers.Galls
-  alias Gallformers.IngestionPipeline.Workflow
   alias Gallformers.Ingestions
   alias Gallformers.Ingestions.SourceIngestion
   alias Gallformers.Sources
   alias Gallformers.Species, as: SpeciesContext
-  alias Gallformers.Taxonomy
   alias Gallformers.Utils
 
   @doc """
@@ -15,19 +13,9 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
   def source_ingestion_review_view!(id) do
     source_ingestion = Ingestions.get_source_ingestion_with_details!(id)
 
-    duplicate_review_required? = Ingestions.duplicate_review_required?(source_ingestion)
     source_review_unlocked? = Ingestions.source_review_unlocked?(source_ingestion)
     species_review_unlocked? = Ingestions.species_review_unlocked?(source_ingestion)
     clearability = Ingestions.source_ingestion_clearability(source_ingestion)
-
-    pipeline_active? =
-      source_ingestion.status == "processing" and
-        Ingestions.pipeline_job_active?(source_ingestion.id)
-
-    retryable? = can_resume?(source_ingestion, pipeline_active?)
-
-    duplicate_candidates =
-      Enum.map(source_ingestion.duplicate_candidates, &duplicate_candidate_review_view/1)
 
     species_entries =
       source_ingestion.species_entries
@@ -52,18 +40,12 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
       duplicate_of_source_ingestion_id: source_ingestion.duplicate_of_source_ingestion_id,
       clearability: clearability,
       clearable?: not is_nil(clearability),
-      retryable?: retryable?,
-      pipeline_active?: pipeline_active?,
       error_stage: source_ingestion.error_stage,
       error_message: source_ingestion.error_message,
-      duplicate_review_required?: duplicate_review_required?,
       source_review_unlocked?: source_review_unlocked?,
       species_review_unlocked?: species_review_unlocked?,
-      duplicate_candidates: duplicate_candidates,
       species_entries: species_entries,
       counts: %{
-        duplicate_candidates_total: length(duplicate_candidates),
-        duplicate_candidates_pending: Enum.count(duplicate_candidates, &(&1.status == "pending")),
         species_entries_total: length(species_entries),
         species_entries_pending: Enum.count(species_entries, &(&1.status == "pending")),
         species_entries_resolved: Enum.count(species_entries, &(&1.status != "pending"))
@@ -80,9 +62,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
     processing_stage = processing_stage_label(queue_row)
 
     case status do
-      "needs_duplicate_review" ->
-        "Needs duplicate review"
-
       "needs_review" ->
         review_queue_status_label(queue_row)
 
@@ -105,12 +84,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
   """
   @spec processing_stage_label(map() | SourceIngestion.t()) :: String.t()
   def processing_stage_label(source_ingestion) do
-    persisted_stage = Utils.attr_value(source_ingestion, :processing_stage) || "unknown"
-
-    case Workflow.next_stage(source_ingestion) do
-      {:run, stage} -> Atom.to_string(stage)
-      _ -> persisted_stage
-    end
+    Utils.attr_value(source_ingestion, :processing_stage) || "unknown"
   end
 
   @doc """
@@ -142,52 +116,10 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
     }
   end
 
-  @doc """
-  Searches for an exact name match in the gall catalog.
-
-  Used by the identity section to show a suggested match card. Does NOT
-  auto-select — the reviewer must explicitly accept the match.
-  """
-  @spec load_suggested_match(String.t() | nil) :: map() | nil
-  def load_suggested_match(nil), do: nil
-  def load_suggested_match(""), do: nil
-
-  def load_suggested_match(extracted_name) when is_binary(extracted_name) do
-    name_downcased = String.downcase(extracted_name)
-
-    extracted_name
-    |> SpeciesContext.search_species_by_name("gall", 5)
-    |> Enum.find(&(String.downcase(&1.name) == name_downcased))
-    |> case do
-      nil -> nil
-      match -> enrich_suggested_match(match)
-    end
-  end
-
   defp load_existing_description(species_id) do
     case Sources.get_sources_for_species(species_id) do
       [] -> nil
       [source | _] -> source.description
-    end
-  end
-
-  defp enrich_suggested_match(match) do
-    hosts = Galls.get_hosts_for_gall(match.id)
-    aliases = SpeciesContext.get_aliases_for_species(match.id)
-
-    %{
-      id: match.id,
-      name: match.name,
-      family: resolve_family_name(match.name),
-      host_count: length(hosts),
-      alias_count: length(aliases)
-    }
-  end
-
-  defp resolve_family_name(name) do
-    case Taxonomy.resolve_taxonomy_from_name(name) do
-      {:ok, %{family: %{name: family_name}}} -> family_name
-      _ -> nil
     end
   end
 
@@ -199,8 +131,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
 
   defp normalize_queue_counts(queue_row) do
     queue_row
-    |> Map.update(:pending_duplicate_candidates_count, 0, &(&1 || 0))
-    |> Map.update(:total_duplicate_candidates_count, 0, &(&1 || 0))
     |> Map.update(:total_species_entries_count, 0, &(&1 || 0))
     |> Map.update(:pending_species_entries_count, 0, &(&1 || 0))
     |> Map.update(:resolved_species_entries_count, 0, &(&1 || 0))
@@ -257,41 +187,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
     queue_row
     |> Utils.attr_value(field)
     |> Kernel.||(0)
-  end
-
-  defp duplicate_candidate_evidence_rows(evidence) when is_map(evidence) do
-    [
-      {"normalized_doi", "DOI match"},
-      {"preprocessed_text_sha256", "Exact normalized text match"},
-      {"normalized_title", "Title match"},
-      {"title_fingerprint", "Title fingerprint match"},
-      {"author_fingerprint", "Author overlap"},
-      {"publication_year", "Year match"},
-      {"similarity", "Text similarity"}
-    ]
-    |> Enum.flat_map(fn {key, label} ->
-      case Map.fetch(evidence, key) do
-        {:ok, value} -> [%{key: key, label: label, value: value}]
-        :error -> []
-      end
-    end)
-  end
-
-  defp duplicate_candidate_evidence_rows(_), do: []
-
-  defp duplicate_candidate_review_view(duplicate_candidate) do
-    candidate_source_ingestion = duplicate_candidate.candidate_source_ingestion
-
-    %{
-      id: duplicate_candidate.id,
-      status: duplicate_candidate.status,
-      evidence_rows: duplicate_candidate_evidence_rows(duplicate_candidate.evidence),
-      candidate_source_ingestion_id: duplicate_candidate.candidate_source_ingestion_id,
-      candidate_title: candidate_source_ingestion.title,
-      candidate_display_title: display_title(candidate_source_ingestion),
-      candidate_authors: candidate_source_ingestion.authors,
-      candidate_year: candidate_source_ingestion.publication_year
-    }
   end
 
   defp species_entry_review_view(species_entry) do
@@ -384,11 +279,4 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
       pubyear: source.pubyear
     }
   end
-
-  defp can_resume?(%{status: "failed", error_stage: error_stage}, _pipeline_active?)
-       when not is_nil(error_stage),
-       do: true
-
-  defp can_resume?(%{status: "processing"}, false = _pipeline_active?), do: true
-  defp can_resume?(_source_ingestion, _pipeline_active?), do: false
 end

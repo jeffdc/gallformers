@@ -9,26 +9,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceIdentity do
      socket
      |> assign(assigns)
      |> assign_new(:search_query, fn -> "" end)
-     |> assign_new(:search_results, fn -> [] end)
-     |> assign_new(:searching, fn -> false end)}
-  end
-
-  @impl true
-  def handle_event("accept_match", _params, socket) do
-    suggested = socket.assigns.suggested_match
-
-    send(
-      self(),
-      {:identity_resolved, :existing,
-       %{id: suggested.id, name: suggested.name, taxoncode: "gall"}}
-    )
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("start_search", _params, socket) do
-    {:noreply, assign(socket, :searching, true)}
+     |> assign_new(:search_results, fn -> [] end)}
   end
 
   @impl true
@@ -59,8 +40,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceIdentity do
     {:noreply,
      socket
      |> assign(:search_query, "")
-     |> assign(:search_results, [])
-     |> assign(:searching, false)}
+     |> assign(:search_results, [])}
   end
 
   @impl true
@@ -68,8 +48,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceIdentity do
     {:noreply,
      socket
      |> assign(:search_query, "")
-     |> assign(:search_results, [])
-     |> assign(:searching, false)}
+     |> assign(:search_results, [])}
   end
 
   @impl true
@@ -85,8 +64,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceIdentity do
     {:noreply,
      socket
      |> assign(:search_query, "")
-     |> assign(:search_results, [])
-     |> assign(:searching, false)}
+     |> assign(:search_results, [])}
   end
 
   @impl true
@@ -122,78 +100,17 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceIdentity do
           myself={@myself}
         />
       <% else %>
-        <%= if @suggested_match && !@searching do %>
-          <.suggestion_state
-            suggested_match={@suggested_match}
-            myself={@myself}
-          />
-        <% else %>
-          <.search_state
-            search_query={@search_query}
-            search_results={@search_results}
-            myself={@myself}
-          />
-        <% end %>
+        <.search_state
+          search_query={@search_query}
+          search_results={@search_results}
+          myself={@myself}
+        />
       <% end %>
     </section>
     """
   end
 
   # --- Render substates ---
-
-  attr :suggested_match, :map, required: true
-  attr :myself, :any, required: true
-
-  defp suggestion_state(assigns) do
-    ~H"""
-    <div class="rounded-lg border border-green-200 bg-green-50 p-4 space-y-3">
-      <div class="flex items-start justify-between gap-2">
-        <div>
-          <div class="text-xs font-medium uppercase tracking-wide text-green-700">
-            Suggested match
-          </div>
-          <div class="mt-1 font-medium italic text-gray-900">
-            {@suggested_match.name}
-          </div>
-          <div class="text-xs text-gray-600">
-            <span :if={@suggested_match.family}>{@suggested_match.family}  · </span>
-            {@suggested_match.host_count} hosts · {@suggested_match.alias_count} aliases
-          </div>
-        </div>
-        <.button
-          type="button"
-          phx-click="accept_match"
-          phx-target={@myself}
-          variant="primary"
-          size="sm"
-        >
-          Accept &amp; map
-        </.button>
-      </div>
-    </div>
-
-    <div class="text-sm text-gray-500">
-      Not the right match?
-      <button
-        type="button"
-        phx-click="start_search"
-        phx-target={@myself}
-        class="text-gf-maroon hover:underline"
-      >
-        Search a different gall
-      </button>
-      ·
-      <button
-        type="button"
-        phx-click="treat_as_new"
-        phx-target={@myself}
-        class="text-gf-maroon hover:underline"
-      >
-        Treat as new species
-      </button>
-    </div>
-    """
-  end
 
   attr :search_query, :string, required: true
   attr :search_results, :list, required: true
