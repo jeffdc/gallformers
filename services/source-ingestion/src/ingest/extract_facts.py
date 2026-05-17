@@ -28,7 +28,13 @@ from typing import Any
 from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel, Field
 
-from ingest.llm import _provider_from_model, _safe_completion_cost, make_instructor_client
+from ingest.evidence_pack import format_pack_text
+from ingest.llm import (
+    _log_llm_error,
+    _provider_from_model,
+    _safe_completion_cost,
+    make_instructor_client,
+)
 from ingest.schemas import (
     Candidate,
     ConfidenceBucket,
@@ -38,11 +44,16 @@ from ingest.schemas import (
     GallRecord,
     GallTraits,
     Host,
+    ProseParagraph,
     ProviderCallRecord,
     ScientificNameCell,
     SupportStatus,
     TraitCell,
 )
+
+# Stage version. Bump when stage-code changes alter outputs for the same inputs.
+# See services/source-ingestion/CLAUDE.md.
+STAGE_VERSION = "1.0.0"
 
 
 class _LLMFacts(BaseModel):
@@ -77,18 +88,23 @@ def _abstaining_scientific_name() -> ScientificNameCell:
     )
 
 
-def _abstaining_record(candidate: Candidate) -> GallRecord:
+def _abstaining_record(candidate: Candidate, evidence_prose: list[ProseParagraph]) -> GallRecord:
     """Build an abstaining GallRecord for a candidate when extract-facts could not produce facts.
 
     Used when Instructor exhausts its retry budget on the schema. The record
     contract is satisfied (every required field present), but every value is
     null and every cell is marked ``ABSTAINED`` so the reviewer sees that
     the pipeline tried and gave up rather than that the source was empty.
+
+    ``evidence_prose`` is preserved so the curator can still read the source
+    prose even when trait extraction failed.
     """
     return GallRecord(
         record_id=_record_id_from_candidate(candidate.candidate_id),
         candidate_id=candidate.candidate_id,
         gall_maker=GallMaker(scientific_name=_abstaining_scientific_name()),
+        generation=candidate.generation,
+        evidence_prose=evidence_prose,
         hosts=[],
         gall_traits=GallTraits(),
         description=None,
@@ -222,11 +238,19 @@ def _build_messages(
         "## Candidate\n",
         f"- gall_maker_mention: {candidate.gall_maker_mention}",
         f"- candidate_id: {candidate.candidate_id}",
+    ]
+    if candidate.generation != "unspecified":
+        sections.append(
+            f"- generation: {candidate.generation} "
+            "(restrict trait extraction to facts about this generation; facts that "
+            "clearly belong to the other generation should be skipped)"
+        )
+    sections.extend([
         "",
         "## Allowed span IDs (cite only these)\n",
         ", ".join(allowed) if allowed else "(none)",
         "",
-    ]
+    ])
     vocab_block = _format_vocab_block(vocab)
     if vocab_block:
         sections.append(vocab_block)
@@ -241,7 +265,7 @@ def _build_messages(
 
 async def extract_facts(
     candidate: Candidate,
-    evidence_pack_text: str,
+    evidence_prose: list[ProseParagraph],
     allowed_span_ids: list[str],
     model: str,
     prompt: str,
@@ -253,12 +277,17 @@ async def extract_facts(
 ) -> tuple[GallRecord, ProviderCallRecord]:
     """Run extract-facts for one candidate. Returns ``(record, call_record)``.
 
+    ``evidence_prose`` is the structured per-paragraph form. The LLM-facing
+    pack text is derived from it via ``format_pack_text``; the structured
+    list is preserved on the resulting ``GallRecord.evidence_prose``.
+
     ``vocab`` is the parsed gallformers-vocab.json (per-field allowed
     `suggested[]` values for trait cells). When supplied, a controlled-
     vocabulary block is inlined into the user message so the model can
     pick from the closed set. When omitted, the model emits free-form
     `suggested[]` strings (which downstream tooling cannot dedupe).
     """
+    evidence_pack_text = format_pack_text(evidence_prose)
     messages = _build_messages(prompt, candidate, evidence_pack_text, allowed_span_ids, vocab=vocab)
     client = make_instructor_client()
 
@@ -270,12 +299,14 @@ async def extract_facts(
                 messages=messages,
                 response_model=_LLMFacts,
                 max_retries=max_retries,
+                max_tokens=4096,
             ),
             timeout=total_timeout,
         )
     except Exception as exc:
         duration_ms = int((time.monotonic() - started) * 1000)
-        return _abstaining_record(candidate), ProviderCallRecord(
+        detail = _log_llm_error(f"extract-facts ({candidate.candidate_id})", model, exc)
+        return _abstaining_record(candidate, evidence_prose), ProviderCallRecord(
             model=model,
             provider=_provider_from_model(model),
             prompt_sha256=prompt_sha256,
@@ -284,7 +315,7 @@ async def extract_facts(
             cost_usd=0.0,
             duration_ms=duration_ms,
             status="error",
-            error_detail=f"{type(exc).__name__}: {exc}",
+            error_detail=detail,
         )
 
     duration_ms = int((time.monotonic() - started) * 1000)
@@ -318,6 +349,8 @@ async def extract_facts(
         record_id=_record_id_from_candidate(candidate.candidate_id),
         candidate_id=candidate.candidate_id,
         gall_maker=scrubbed.gall_maker,
+        generation=candidate.generation,
+        evidence_prose=evidence_prose,
         hosts=scrubbed.hosts,
         gall_traits=scrubbed.gall_traits,
         description=scrubbed.description,

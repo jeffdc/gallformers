@@ -17,6 +17,7 @@ from ingest.schemas import (
     GallMaker,
     GallTraits,
     Host,
+    ProseParagraph,
     ScientificNameCell,
     SupportStatus,
     Taxonomy,
@@ -49,12 +50,17 @@ def _trait_cell(
     )
 
 
-def _candidate(cid: str = "C_001") -> Candidate:
+def _prose(span_id: str, text: str, page: int = 1) -> ProseParagraph:
+    return ProseParagraph(span_id=span_id, page=page, text=text)
+
+
+def _candidate(cid: str = "C_001", generation: str = "unspecified") -> Candidate:
     return Candidate(
         candidate_id=cid,
         gall_maker_mention="Andricus quercuscalifornicus",
         mention_span_ids=["S_0001"],
         sample_agreement=3,
+        generation=generation,
     )
 
 
@@ -119,7 +125,7 @@ class TestExtractFactsHappyPath:
         _install_mock_client(mocker, _llm_facts())
         record, call = await extract_facts(
             candidate=_candidate("C_007"),
-            evidence_pack_text="[S_0001] some text",
+            evidence_prose=[_prose("S_0001", "some text")],
             allowed_span_ids=["S_0001"],
             model="deepinfra/test",
             prompt="extract prompt",
@@ -132,11 +138,87 @@ class TestExtractFactsHappyPath:
         assert record.gall_traits.color is not None
         assert record.gall_traits.color.suggested == ["red"]
 
+    async def test_record_carries_full_evidence_prose(self, mocker):
+        """Evidence prose is preserved on the record as a structured list of
+        paragraphs (one per selected span) so the UI can render with span-id
+        provenance and per-paragraph PDF-page links."""
+        _install_mock_client(mocker, _llm_facts())
+        prose = [
+            ProseParagraph(span_id="S_0001", page=4, text="Andricus quercuscalifornicus first paragraph."),
+            ProseParagraph(span_id="S_0002", page=4, text="Second paragraph with biology details."),
+            ProseParagraph(span_id="S_0003", page=5, text="Distribution prose across the southwest."),
+        ]
+        record, _ = await extract_facts(
+            candidate=_candidate(),
+            evidence_prose=prose,
+            allowed_span_ids=["S_0001", "S_0002", "S_0003"],
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="z" * 64,
+        )
+        assert record.evidence_prose == prose
+
+    async def test_abstaining_record_carries_evidence_prose(self, mocker):
+        """When Instructor fails, the abstaining record still preserves the
+        evidence prose; curators can still read the source even when trait
+        extraction gave up."""
+        mock_client = MagicMock()
+        mock_client.create_with_completion = AsyncMock(
+            side_effect=RuntimeError("instructor gave up")
+        )
+        mocker.patch("ingest.extract_facts.make_instructor_client", return_value=mock_client)
+        mocker.patch("ingest.extract_facts._safe_completion_cost", return_value=0.0)
+
+        prose = [ProseParagraph(span_id="S_0001", page=2, text="Some paragraph the curator should still see.")]
+        record, _ = await extract_facts(
+            candidate=_candidate(),
+            evidence_prose=prose,
+            allowed_span_ids=["S_0001"],
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="q" * 64,
+        )
+        assert record.evidence_prose == prose
+
+    async def test_record_inherits_generation_from_candidate(self, mocker):
+        """Each GallRecord carries through its candidate's biological generation,
+        so dual-generation species emit two distinct records downstream."""
+        _install_mock_client(mocker, _llm_facts())
+        record, _ = await extract_facts(
+            candidate=_candidate("C_009", generation="sexgen"),
+            evidence_prose=[_prose("S_0001", "some text")],
+            allowed_span_ids=["S_0001"],
+            model="deepinfra/test",
+            prompt="extract prompt",
+            prompt_sha256="g" * 64,
+        )
+        assert record.generation == "sexgen"
+
+    async def test_abstaining_record_preserves_generation(self, mocker):
+        """When Instructor fails, the abstaining record still carries the
+        candidate's generation; downstream must always see a consistent shape."""
+        mock_client = MagicMock()
+        mock_client.create_with_completion = AsyncMock(
+            side_effect=RuntimeError("instructor gave up")
+        )
+        mocker.patch("ingest.extract_facts.make_instructor_client", return_value=mock_client)
+        mocker.patch("ingest.extract_facts._safe_completion_cost", return_value=0.0)
+
+        record, _ = await extract_facts(
+            candidate=_candidate("C_010", generation="agamic"),
+            evidence_prose=[_prose("S_0001", "text")],
+            allowed_span_ids=["S_0001"],
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="h" * 64,
+        )
+        assert record.generation == "agamic"
+
     async def test_call_record_carries_usage_and_cost(self, mocker):
         _install_mock_client(mocker, _llm_facts(), completion=_mock_completion(120, 40))
         _, call = await extract_facts(
             candidate=_candidate(),
-            evidence_pack_text="[S_0001] text",
+            evidence_prose=[_prose("S_0001", "text")],
             allowed_span_ids=["S_0001"],
             model="deepinfra/test",
             prompt="p",
@@ -156,7 +238,7 @@ class TestSpanIdScrub:
         _install_mock_client(mocker, _llm_facts(name_evidence_block="S_BOGUS"))
         record, _ = await extract_facts(
             candidate=_candidate(),
-            evidence_pack_text="[S_0001] text",
+            evidence_prose=[_prose("S_0001", "text")],
             allowed_span_ids=["S_0001"],
             model="deepinfra/test",
             prompt="p",
@@ -172,7 +254,7 @@ class TestSpanIdScrub:
         _install_mock_client(mocker, _llm_facts(trait_evidence_block="S_BOGUS"))
         record, _ = await extract_facts(
             candidate=_candidate(),
-            evidence_pack_text="[S_0001] text",
+            evidence_prose=[_prose("S_0001", "text")],
             allowed_span_ids=["S_0001"],
             model="deepinfra/test",
             prompt="p",
@@ -188,7 +270,7 @@ class TestSpanIdScrub:
         _install_mock_client(mocker, _llm_facts())
         record, _ = await extract_facts(
             candidate=_candidate(),
-            evidence_pack_text="[S_0001] text",
+            evidence_prose=[_prose("S_0001", "text")],
             allowed_span_ids=["S_0001"],
             model="deepinfra/test",
             prompt="p",
@@ -214,7 +296,7 @@ class TestExtractFactsGracefulFailure:
 
         record, call = await extract_facts(
             candidate=_candidate("C_007"),
-            evidence_pack_text="[S_0001] text",
+            evidence_prose=[_prose("S_0001", "text")],
             allowed_span_ids=["S_0001"],
             model="deepinfra/test",
             prompt="p",

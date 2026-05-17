@@ -48,6 +48,7 @@ defmodule Gallformers.Ingestions.SourceIngestionSpeciesReview do
       extracted_authority: source_ingestion_species.extracted_authority,
       status: source_ingestion_species.status,
       description_prose: source_ingestion_species.description_prose,
+      evidence_prose: source_ingestion_species.evidence_prose,
       extracted_aliases: workspace_extracted_aliases(source_ingestion_species),
       description_evidence: workspace_description_evidence(source_ingestion_species),
       species_review: species_review,

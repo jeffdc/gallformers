@@ -160,42 +160,84 @@ def rejoin_hyphenated(text: str) -> str:
     return text
 
 
-def strip_page_headers(text: str) -> str:
-    """Remove page headers and footers from OCR text.
+# ─── Repeated-block detector ──────────────────────────────────────────────
+#
+# Detects running headers, footers, and standalone page-number blocks by
+# their cross-page repetition signal. Replaces the prior per-journal regex
+# approach (Philippines / "AUTHOR: TITLE" patterns) which only ever matched
+# the first test paper and didn't generalize.
 
-    Common patterns:
-    - "528 Philippine Journal of Science\\n1919"
-    - Standalone page numbers
-    - "AUTHOR: TITLE" running headers
+_PAGE_FRACTION_THRESHOLD = 0.4
+_MIN_PAGES_FOR_DETECTION = 5
+_MIN_PAGINATED_MEMBERS = 3
+
+_TRAILING_DIGITS_RE = re.compile(r"(\d+)\s*$")
+_WHITESPACE_RUN_RE = re.compile(r"\s+")
+
+
+def _split_base_and_digit(text: str) -> tuple[str, int | None]:
+    """Return (normalized-base-without-trailing-digits, trailing-digit-or-None).
+
+    Normalization: lowercase, collapse internal whitespace. Trailing digits
+    are stripped so paginated headers (`"... · 11"`, `"... · 13"`) cluster on
+    the same base.
     """
-    # Journal name + year pattern (page number before or after)
-    text = re.sub(
-        r"\n+\d{3,4}\s+Philippine Journal of Science\s*\n+\d{4}\s*\n*",
-        "\n\n",
-        text,
-    )
+    normalized = _WHITESPACE_RUN_RE.sub(" ", text.lower().strip())
+    match = _TRAILING_DIGITS_RE.search(normalized)
+    if not match:
+        return normalized, None
+    base = normalized[: match.start()].rstrip()
+    return base, int(match.group(1))
 
-    # Generic "NUMBER JournalName YEAR" headers
-    text = re.sub(
-        r"\n+\d{3,4}\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\s+\d{4}\s*\n*",
-        "\n\n",
-        text,
-    )
 
-    # "AUTHOR: TITLE" running headers (all caps with colon or brackets)
-    text = re.sub(
-        r"\n+[A-Z]+:\s+[A-Z\s]+\.\s*\]\s*\[?[A-Z\s.,]+\d+[.,]\s*(?:No\.\s*\d+\.?)?\s*\n*",
-        "\n\n",
-        text,
-    )
+def drop_repeated_blocks(
+    raw_blocks: list[RawTextBlock],
+    *,
+    page_fraction_threshold: float = _PAGE_FRACTION_THRESHOLD,
+    min_pages_for_detection: int = _MIN_PAGES_FOR_DETECTION,
+    min_paginated_members: int = _MIN_PAGINATED_MEMBERS,
+) -> list[RawTextBlock]:
+    """Drop running headers, footers, and page-number blocks via repetition signal.
 
-    # Standalone page numbers (3-4 digits alone on a line)
-    text = re.sub(r"\n+(\d{3,4})\s*\n+", "\n\n", text)
+    Two detection paths fire independently per cluster (group of blocks sharing
+    the same normalized base text, after stripping trailing digits):
 
-    # Clean up excessive blank lines
-    text = re.sub(r"\n{3,}", "\n\n", text)
+    - **Frequency** — cluster spans ≥ ``page_fraction_threshold`` of the
+      document's pages. Catches headers without page numbers.
+    - **Paginated** — cluster has ≥ ``min_paginated_members`` blocks whose
+      trailing digit equals the block's own page number. Catches alternating
+      recto/verso headers (each side forms its own cluster) and standalone
+      page-number markers.
 
-    return text
+    Documents below ``min_pages_for_detection`` pages skip detection — the
+    signal is too noisy for short docs.
+    """
+    if not raw_blocks:
+        return raw_blocks
+
+    page_count = max(b.page for b in raw_blocks)
+    if page_count < min_pages_for_detection:
+        return raw_blocks
+
+    groups: dict[str, list[tuple[RawTextBlock, int | None]]] = {}
+    for block in raw_blocks:
+        base, digit = _split_base_and_digit(block.text)
+        groups.setdefault(base, []).append((block, digit))
+
+    dropped_block_ids: set[str] = set()
+    for members in groups.values():
+        distinct_pages = {b.page for b, _ in members}
+        drop = len(distinct_pages) / page_count >= page_fraction_threshold
+        if not drop:
+            paginated = sum(
+                1 for b, d in members if d is not None and d == b.page
+            )
+            drop = paginated >= min_paginated_members
+        if drop:
+            for b, _ in members:
+                dropped_block_ids.add(b.block_id)
+
+    return [b for b in raw_blocks if b.block_id not in dropped_block_ids]
 
 
 def strip_plate_pages(text: str) -> str:
@@ -272,12 +314,15 @@ def preprocess_blocks(raw_blocks: list[RawTextBlock]) -> list[NormalizedBlock]:
     (the concatenation of all kept blocks separated by ``BLOCK_SEPARATOR``).
     Evidence offsets in claims address into that flat text.
     """
+    # Drop running headers/footers/page-number blocks by cross-page repetition
+    # before per-block cleanup, so downstream stages don't see them as content.
+    filtered_blocks = drop_repeated_blocks(raw_blocks)
+
     cleaned: list[tuple[RawTextBlock, str]] = []
-    for raw in raw_blocks:
+    for raw in filtered_blocks:
         text = raw.text
         text = strip_bhl_boilerplate(text)
         text = strip_plate_pages(text)
-        text = strip_page_headers(text)
         text = rejoin_hyphenated(text)
         text = rejoin_lines(text)
         text = text.strip()

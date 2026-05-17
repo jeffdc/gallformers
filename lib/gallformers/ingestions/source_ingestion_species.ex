@@ -316,6 +316,7 @@ defmodule Gallformers.Ingestions.SourceIngestionSpecies do
     :extracted_authority,
     :species_id,
     :description_prose,
+    :evidence_prose,
     :raw_extraction,
     :reviewed_by_id,
     :reviewed_at
@@ -332,6 +333,7 @@ defmodule Gallformers.Ingestions.SourceIngestionSpecies do
           species_id: integer() | nil,
           status: status(),
           description_prose: String.t(),
+          evidence_prose: [map()] | nil,
           extraction_payload: ExtractionPayload.t() | nil,
           review_payload: ReviewPayload.t() | nil,
           raw_extraction: map() | nil,
@@ -347,6 +349,7 @@ defmodule Gallformers.Ingestions.SourceIngestionSpecies do
     field :extracted_authority, :string
     field :status, :string, default: "pending"
     field :description_prose, :string, default: ""
+    field :evidence_prose, {:array, :map}
     embeds_one :extraction_payload, ExtractionPayload, on_replace: :update
     embeds_one :review_payload, ReviewPayload, on_replace: :update
     field :raw_extraction, :map

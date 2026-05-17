@@ -23,16 +23,22 @@ from typing import Any
 import yaml
 
 from ingest.assemble import assemble
+from ingest.block_triage import STAGE_VERSION as BLOCK_TRIAGE_STAGE_VERSION
+from ingest.block_triage import triage_blocks
 from ingest.bundle import write_bundle
-from ingest.evidence_pack import build_evidence_pack
+from ingest.evidence_pack import build_evidence_pack, format_pack_text
 from ingest.extract import extract_blocks
+from ingest.extract_facts import STAGE_VERSION as EXTRACT_FACTS_STAGE_VERSION
 from ingest.extract_facts import extract_facts
+from ingest.find_candidates import STAGE_VERSION as FIND_CANDIDATES_STAGE_VERSION
 from ingest.find_candidates import find_candidates
 from ingest.jsonl import write_jsonl
+from ingest.metadata import STAGE_VERSION as METADATA_STAGE_VERSION
 from ingest.metadata import extract_document_metadata
 from ingest.ocr import maybe_ocr
 from ingest.preprocess import flat_normalized_text, preprocess_blocks
 from ingest.schemas import (
+    SCHEMA_VERSION,
     Candidate,
     CandidatesFile,
     DocumentMetadata,
@@ -48,12 +54,14 @@ from ingest.schemas import (
 from ingest.sectionize import sectionize
 from ingest.taxonomy_lookup import enrich_cells_concurrently
 from ingest.verify import _index_blocks, gate_cell
+from ingest.verify_claims import STAGE_VERSION as VERIFY_CLAIMS_STAGE_VERSION
 from ingest.verify_claims import verify_cell
 
 VALID_STEPS = frozenset(
     {
         "extract",
         "ocr",
+        "block-triage",
         "preprocess",
         "sectionize",
         "metadata",
@@ -367,6 +375,89 @@ async def run_pipeline(
         )
     )
 
+    # ── block-triage ─────────────────────────────────────────────────────
+    # LLM-based filter that drops noise blocks (running headers, footers,
+    # TOC entries, copyright lines, OCR junk, etc.) before they reach any
+    # downstream stage. Replaces per-publisher regex whack-a-mole.
+    if "block-triage" in stages_cfg:
+        triage_cfg = stages_cfg["block-triage"]
+        triage_prompt, triage_prompt_sha = _load_prompt(triage_cfg["prompt"])
+        triage_artifact = src_dir / "block_triage.json"
+        triage_input_sha = _sha_str(
+            "\n".join(f"{b.block_id}:{b.text}" for b in raw_blocks)
+        )
+        triage_cache_key = {
+            "stage": "block-triage",
+            "schema_version": SCHEMA_VERSION,
+            "stage_version": BLOCK_TRIAGE_STAGE_VERSION,
+            "prompt_sha256": triage_prompt_sha,
+            "model": triage_cfg["model"],
+            "n_samples": triage_cfg.get("n_samples", 3),
+            "agreement_threshold": triage_cfg.get("agreement_threshold", 2),
+            "batch_size": triage_cfg.get("batch_size", 50),
+            "max_workers": triage_cfg.get("max_workers", 5),
+            "input_sha": triage_input_sha,
+        }
+        t = _now()
+        if _is_cache_valid(triage_artifact, triage_cache_key):
+            cached = json.loads(triage_artifact.read_text())
+            kept_ids = set(cached["kept_block_ids"])
+            before = len(raw_blocks)
+            raw_blocks = [b for b in raw_blocks if b.block_id in kept_ids]
+            _log(
+                f"[block-triage] cached ({before - len(raw_blocks)} of {before} dropped)"
+            )
+            stage_records.append(
+                StageRunRecord(
+                    name="block-triage",
+                    started_at=t,
+                    completed_at=_now(),
+                    calls=[],
+                    notes="cached",
+                )
+            )
+        else:
+            _log(
+                f"[block-triage] calling {triage_cfg['model']} on {len(raw_blocks)} blocks "
+                f"(n_samples={triage_cfg.get('n_samples', 3)}, "
+                f"batch_size={triage_cfg.get('batch_size', 50)})"
+            )
+            kept_blocks, triage_records = await triage_blocks(
+                blocks=raw_blocks,
+                model=triage_cfg["model"],
+                prompt=triage_prompt,
+                prompt_sha256=triage_prompt_sha,
+                n_samples=triage_cfg.get("n_samples", 3),
+                agreement_threshold=triage_cfg.get("agreement_threshold", 2),
+                batch_size=triage_cfg.get("batch_size", 50),
+                max_concurrency=triage_cfg.get("max_workers", 5),
+            )
+            triage_artifact.write_text(
+                json.dumps({"kept_block_ids": [b.block_id for b in kept_blocks]}, indent=2)
+            )
+            _write_cache_sidecar(triage_artifact, triage_cache_key)
+            before = len(raw_blocks)
+            raw_blocks = kept_blocks
+            for i, sample_call in enumerate(triage_records):
+                w = _warning_for_error_call(
+                    sample_call, stage="block-triage", detail={"sample_idx": i}
+                )
+                if w:
+                    warnings.append(w)
+            triage_done = _now()
+            _log(
+                f"[block-triage] {before - len(raw_blocks)} of {before} blocks dropped "
+                f"({_dur_s(t, triage_done)})"
+            )
+            stage_records.append(
+                StageRunRecord(
+                    name="block-triage",
+                    started_at=t,
+                    completed_at=triage_done,
+                    calls=triage_records,
+                )
+            )
+
     # ── preprocess ───────────────────────────────────────────────────────
     t = _now()
     _log("[preprocess] running deterministic cleanup")
@@ -439,6 +530,8 @@ async def run_pipeline(
         meta_input_sha = _sha_str("\n".join(f"{b.span_id}:{b.text}" for b in meta_input_blocks))
         meta_cache_key = {
             "stage": "metadata",
+            "schema_version": SCHEMA_VERSION,
+            "stage_version": METADATA_STAGE_VERSION,
             "prompt_sha256": prompt_sha,
             "model": cfg["model"],
             "input_sha": meta_input_sha,
@@ -498,6 +591,8 @@ async def run_pipeline(
     eligible_sha = _sha_str("\n".join(f"{b.span_id}:{b.text}" for b in eligible))
     fc_cache_key = {
         "stage": "find-candidates",
+        "schema_version": SCHEMA_VERSION,
+        "stage_version": FIND_CANDIDATES_STAGE_VERSION,
         "prompt_sha256": prompt_sha,
         "model": cfg["model"],
         "n_samples": cfg.get("n_samples", 3),
@@ -572,12 +667,17 @@ async def run_pipeline(
     async def _process_candidate(c: Candidate) -> tuple[GallRecord, ProviderCallRecord | None]:
         candidate_dir = candidates_dir / c.candidate_id
         candidate_dir.mkdir(exist_ok=True)
-        pack_text, meta = build_evidence_pack(c, normalized_blocks, context_window=context_window)
+        prose, meta = build_evidence_pack(
+            c, candidates_file.candidates, normalized_blocks, context_window=context_window
+        )
+        pack_text = format_pack_text(prose)
         (candidate_dir / "evidence_pack.txt").write_text(pack_text)
         (candidate_dir / "evidence_pack.meta.json").write_text(json.dumps(meta, indent=2))
         facts_path = candidate_dir / "facts.json"
         cand_cache_key = {
             "stage": "extract-facts",
+            "schema_version": SCHEMA_VERSION,
+            "stage_version": EXTRACT_FACTS_STAGE_VERSION,
             "prompt_sha256": facts_prompt_sha,
             "model": facts_cfg["model"],
             "vocab_sha": facts_vocab_sha,
@@ -590,7 +690,7 @@ async def run_pipeline(
         async with facts_semaphore:
             record, call = await extract_facts(
                 candidate=c,
-                evidence_pack_text=pack_text,
+                evidence_prose=prose,
                 allowed_span_ids=meta["allowed_span_ids"],
                 model=facts_cfg["model"],
                 prompt=facts_prompt,
@@ -686,6 +786,8 @@ async def run_pipeline(
         vc_input_sha = _sha_str("\n".join(r.model_dump_json() for r in gated_records))
         vc_cache_key = {
             "stage": "verify-claims",
+            "schema_version": SCHEMA_VERSION,
+            "stage_version": VERIFY_CLAIMS_STAGE_VERSION,
             "prompt_sha256": vc_sha,
             "model": vc_cfg["model"],
             "input_sha": vc_input_sha,

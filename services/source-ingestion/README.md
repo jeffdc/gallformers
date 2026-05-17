@@ -89,7 +89,7 @@ To confirm:
 uv run ingest --help
 ```
 
-You should see a list of subcommands (`run`, `extract`, `metadata`, etc.).
+You should see the `run` subcommand (currently the only one).
 
 ---
 
@@ -167,25 +167,35 @@ Pick a paper you have rights to (a PDF you authored, a preprint, an open-access 
 Then run:
 
 ```bash
+uv run ingest run -s mypaper -i /path/to/your/paper.pdf
+```
+
+That's it — every other flag has a sensible default. The full form is:
+
+```bash
 uv run ingest run \
-  -p pipelines/default.yaml \
-  --config providers.yaml \
-  --source-id mypaper \
-  -i /path/to/your/paper.pdf
+  -s mypaper \
+  -i /path/to/your/paper.pdf \
+  [-p pipelines/default.yaml] \
+  [-c providers.yaml] \
+  [-o ./output]
 ```
 
 (On Windows PowerShell, replace the trailing backslashes with backticks `` ` `` or put the whole command on one line.)
 
 Arguments:
 
-- `-p` — which pipeline YAML to run. Use `pipelines/default.yaml` unless told otherwise.
-- `--config` — path to your provider config. Always `providers.yaml`.
-- `--source-id` — a short label you choose. It becomes the output directory name. Use lowercase, no spaces (e.g., `smith-2024`, `mypaper`).
-- `-i` — path to the PDF.
+- `-s`, `--source-id` (**required**) — a short label you choose. It becomes the output directory name. Use lowercase, no spaces (e.g., `smith-2024`, `mypaper`).
+- `-i`, `--input` — path to the PDF.
+- `-p`, `--pipeline` — which pipeline YAML to run. Defaults to `pipelines/default.yaml`.
+- `-c`, `--config` — provider config. Defaults to `providers.yaml`.
+- `-o`, `--output` — parent output directory. Defaults to `./output`. The run lands at `<output>/<source-id>/`.
 
 ### What you'll see
 
-The pipeline streams progress per stage as it runs — start/complete markers for `extract`, `ocr`, `preprocess`, `sectionize`, `metadata`, `find-candidates`, `evidence-pack`, `extract-facts`, `verify`, `verify-claims`, `taxonomy-lookup`, `assemble-review`, and `bundle`, each with timing and a quick result summary (block counts, candidate counts, LLM call counts). A typical paper takes **2–5 minutes** end-to-end; papers that trigger OCR or have many candidates take longer (10–20 min for large reference works).
+The pipeline streams progress per stage as it runs — start/complete markers for `extract`, `ocr`, `block-triage`, `preprocess`, `sectionize`, `metadata`, `find-candidates`, `evidence-pack`, `extract-facts`, `verify`, `verify-claims`, `taxonomy-lookup`, `assemble-review`, and `bundle`, each with timing and a quick result summary (block counts, candidate counts, LLM call counts). A typical paper takes **3–7 minutes** end-to-end; papers that trigger OCR or have many candidates take longer (10–20 min for large reference works).
+
+A full copy of the run output is also tee'd to `output/<source-id>/run.log` so you can review what happened after the fact.
 
 The most-watched stages by wall time are `extract-facts` (one LLM call per candidate) and `verify-claims` (one per claim, ~15 per candidate). Both run with `max_workers: 50` against DeepInfra's 200/model/user concurrency cap, so they parallelize well — but on a paper with 100+ candidates, expect a noticeable verify-claims phase.
 
@@ -204,22 +214,24 @@ output/mypaper/
   manifest.json          ← provenance: every stage, model, prompt SHA, timing
   source.pdf             ← the input PDF (so the bundle is self-contained)
   raw_text.jsonl         ← text extracted from the PDF, page+block addressed
-  normalized_text.jsonl  ← after deterministic cleanup
+  block_triage.json      ← LLM triage decisions (which raw blocks were content vs noise)
+  normalized_text.jsonl  ← after deterministic cleanup of the kept blocks
   sections.json          ← rule-based section detection (abstract, methods, etc.)
   metadata.json          ← title, authors, year, DOI
   candidates.json        ← gall records the model thought it found
   claims.json            ← per-record field extractions (raw)
   verified_claims.json   ← same, after a second model double-checks each claim
+  run.log                ← full stdout/stderr capture of the pipeline run
 ```
 
 The two files most useful for a human reviewer:
 
 1. **`review_artifact.json`** — the rolled-up, structured result. It contains:
    - `document_metadata` — title, authors, year, DOI, etc.
-   - `gall_records` — one entry per gall the model identified. Each has `gall_maker`, `hosts`, `gall_traits`, `description`, `location`, a `confidence_bucket`, and `warnings`. Every field carries `evidence` pointers (block id, page, character offsets, the literal quoted text) back into the source so you can verify any claim.
+   - `gall_records` — one entry per gall the model identified. Each has `gall_maker`, `generation` (`sexgen` / `agamic` / `unspecified` — Cynipid wasps and other species with alternating generations get a record per generation), `evidence_prose` (the verbatim per-paragraph source text the LLM saw, the primary review surface), `hosts`, `gall_traits`, `description`, `location`, a `confidence_bucket`, and `warnings`. Structured fields carry `evidence` pointers (block id, page, character offsets, literal quoted text) back into the source so you can verify any claim.
    - `warnings` — issues the pipeline noticed (e.g., a quoted phrase didn't match the source text closely enough).
 
-2. **`bundle.tar.gz`** — everything above, packaged. This is the file the gallformers server will eventually ingest. Keep it; it's the canonical artifact.
+2. **`bundle.tar.gz`** — everything above, packaged. This is the file the gallformers server will ingest. Keep it; it's the canonical artifact.
 
 To peek at the review JSON quickly:
 
@@ -236,7 +248,7 @@ If you run the same pipeline against the same paper a second time, the tool **re
 - **To re-run a single stage cleanly:** delete the corresponding file in `output/<source-id>/` (e.g., delete `metadata.json` to force a metadata re-extraction).
 - **To start completely fresh:** delete the whole `output/<source-id>/` directory.
 
-Caches live alongside the outputs (`*.cache.json`, `*.stage-cache.json`) and are invalidated automatically if the prompt text or model changes between runs.
+Caches live alongside the outputs (`*.cache.json`, `*.stage-cache.json`) and are invalidated automatically when **any** of these change between runs: prompt text (`prompt_sha256`), model name, stage config (`n_samples`, `batch_size`, etc.), upstream content hash, bundle `SCHEMA_VERSION`, or the stage's own `STAGE_VERSION` constant.
 
 ---
 
@@ -256,7 +268,7 @@ The pipeline is in alpha. Things that **don't work yet**:
 
 6. **No figure or table extraction.** Text only. Plates, photographs, and structured tables in the PDF are ignored.
 
-7. **Output is text-light while running.** The CLI prints one line at the start and nothing until it's done. If you want a sign of life, watch `output/<source-id>/` for new files appearing.
+7. **Block-triage adds latency.** The new LLM-based noise filter classifies every extracted block (in batches) before downstream stages run. It eliminates running headers, footers, table-of-contents lines, copyright boilerplate, and similar layout noise that would otherwise pollute the curator-facing prose. Adds ~1–2 min on a typical paper; well worth it on documents with heavy layout chrome.
 
 If something else looks broken, send the `output/<source-id>/manifest.json` along with the paper — it records every stage, model, and timing.
 
@@ -271,8 +283,20 @@ The sections below are aimed at developers extending the pipeline. Alpha testers
 Today the CLI exposes a single subcommand:
 
 ```
-ingest run --pipeline <yaml> --source-id <id> --input <pdf> [--config <yaml>] [--output <dir>]
+ingest run -s <id> -i <pdf> [-p <yaml>] [-c <yaml>] [-o <dir>]
 ```
+
+Flags:
+
+| Flag | Long | Required | Default |
+|------|------|---------:|---------|
+| `-s` | `--source-id` | yes | — |
+| `-i` | `--input` | (optional when resuming from cache) | — |
+| `-p` | `--pipeline` | no | `pipelines/default.yaml` |
+| `-c` | `--config` | no | `providers.yaml` |
+| `-o` | `--output` | no | `./output` |
+
+All paths are resolved relative to the CWD (run the CLI from inside `services/source-ingestion/`). The run lands at `<output>/<source-id>/`, and stdout + stderr are tee'd to `<output>/<source-id>/run.log`.
 
 Everything else is driven by the pipeline YAML — individual stages aren't exposed as top-level commands.
 
@@ -283,11 +307,13 @@ The stages a pipeline YAML can reference:
 | Stage | LLM? | Description |
 |-------|------|-------------|
 | `extract` | No | Text extraction via pymupdf (PDF) or trafilatura (URL) |
-| `preprocess` | No | Deterministic cleanup heuristics |
+| `ocr` | No | Conditional OCR via ocrmypdf for pages below text-density threshold |
+| `block-triage` | Yes | N-sample LLM filter classifying raw blocks as content vs noise |
+| `preprocess` | No | Deterministic cleanup heuristics on the kept blocks |
 | `sectionize` | No | Rule-based section detection |
 | `metadata` | Yes | Title, authors, year, DOI |
-| `find-candidates` | Yes | N=3 self-consistency over candidate gall records |
-| `evidence-pack` | No | Deterministic per-candidate span gathering |
+| `find-candidates` | Yes | N=3 self-consistency over candidate gall records; species-level dedup with per-generation emission |
+| `evidence-pack` | No | Deterministic per-candidate span gathering; includes sibling-generation candidates' first mention |
 | `extract-facts` | Yes | Per-candidate structured field extraction (dynamic-schema) |
 | `verify` | No | Substring gate (RapidFuzz partial-ratio) |
 | `verify-claims` | Yes | Per-field verification using a different model family |
@@ -302,7 +328,7 @@ A pipeline YAML declares an ordered list of stages plus shared defaults:
 ```yaml
 pipeline:
   name: my-pipeline
-  schema_version: 1.0.0
+  schema_version: 1.4.0
   seed: 42
 
   defaults:
@@ -339,13 +365,13 @@ Reference a model from a pipeline as `provider/model` (e.g., `deepinfra/deepseek
 
 ### Preprocessing heuristics
 
-`preprocess` applies deterministic cleanup tailored for typical journal PDFs:
+`preprocess` applies deterministic cleanup tailored for typical journal PDFs (running headers, footers, TOC entries, and similar layout noise are now handled upstream by the LLM-based `block-triage` stage instead):
 
-1. BHL boilerplate removal — strips Biodiversity Heritage Library cover-page metadata
-2. Plate page removal — drops OCR junk from scanned photograph pages
-3. Page header stripping — removes running headers, journal names, page numbers
-4. Hyphenation rejoining — fixes words split across line breaks
-5. Line rejoining — merges broken lines back into paragraphs
+1. **BHL boilerplate removal** — strips Biodiversity Heritage Library cover-page metadata.
+2. **Plate page removal** — drops OCR junk from scanned photograph pages.
+3. **Repeated-block detector** (`drop_repeated_blocks`) — frequency-based + monotonic-page-number signal catches anything block-triage missed (defense-in-depth, deterministic, no LLM).
+4. **Hyphenation rejoining** — fixes words split across line breaks.
+5. **Line rejoining** — merges broken lines back into paragraphs.
 
 ### Output structure
 
@@ -353,7 +379,7 @@ The pipeline runner writes all artifacts flat under `output/<source_id>/`. See [
 
 ### Resumability and caching
 
-Caching is **prompt-SHA aware**: if a stage's input bytes, prompt text, model spec, and configuration hash all match what's in the cache, the LLM call is skipped. Otherwise the cache entry is invalidated and the stage re-runs. Cache files live alongside the artifacts (`*.cache.json`, `*.stage-cache.json`).
+Each stage's cache key includes: bundle `SCHEMA_VERSION` (the per-artifact Pydantic version), the stage's own `STAGE_VERSION` constant (bumped by engineers when stage code changes alter outputs — see `CLAUDE.md` for the discipline), `prompt_sha256` of the prompt file, model spec, stage-specific config (`n_samples`, `batch_size`, `agreement_threshold`, …), and a content hash of the stage's upstream input. Any change to any of those invalidates the cache. Sidecars live alongside the artifacts (`*.cache.json`, `*.stage-cache.json`).
 
 ### Development
 

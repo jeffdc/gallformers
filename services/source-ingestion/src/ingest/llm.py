@@ -20,7 +20,9 @@ dynamic-schema construction are owned by Instructor, not this module.
 from __future__ import annotations
 
 import asyncio
+import sys
 import time
+import traceback
 from collections.abc import AsyncIterable
 from typing import Any, Literal
 
@@ -28,6 +30,19 @@ import instructor
 import litellm
 
 from ingest.schemas import ProviderCallRecord
+
+
+def _log_llm_error(stage_hint: str, model: str, exc: BaseException) -> str:
+    """Print the exception to stderr (LiteLLM swallows tracebacks otherwise) and
+    return a short ``"ClassName: message"`` for embedding in a ProviderCallRecord's
+    ``error_detail`` field. Without this, retried-then-succeeded failures and
+    silent dropouts leave no diagnostic trail.
+    """
+    detail = f"{type(exc).__name__}: {exc}"
+    tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    print(f"[LLM-ERROR] {stage_hint} model={model} -> {detail}\n{tb}",
+          file=sys.stderr, flush=True)
+    return detail
 
 # ─── Public exceptions ─────────────────────────────────────────────────────
 
@@ -348,8 +363,10 @@ async def call_with_samples(
                 response_format=response_format,
             )
         except (IdleStreamTimeout, TotalStreamTimeout) as e:
-            return ("", e.record)
-        except Exception:
+            detail = _log_llm_error("call_with_samples (timeout)", model, e)
+            return ("", e.record.model_copy(update={"error_detail": detail}))
+        except Exception as e:
+            detail = _log_llm_error("call_with_samples", model, e)
             return (
                 "",
                 ProviderCallRecord(
@@ -361,6 +378,7 @@ async def call_with_samples(
                     cost_usd=0.0,
                     duration_ms=0,
                     status="error",
+                    error_detail=detail,
                 ),
             )
 

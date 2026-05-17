@@ -50,6 +50,8 @@ def _record(record_id: str = "R_001") -> GallRecord:
         record_id=record_id,
         candidate_id=record_id.replace("R_", "C_"),
         gall_maker=GallMaker(scientific_name=_name_cell("Andricus quercuscalifornicus")),
+        generation="unspecified",
+        evidence_prose=[],
     )
 
 
@@ -95,7 +97,7 @@ class TestBuildClaimsAndVerified:
         verified = build_verified_claims_file(records)
         assert len(claims.gall_records) == 2
         assert len(verified.gall_records) == 2
-        assert claims.schema_version == "1.0.0"
+        assert claims.schema_version == "1.4.0"
 
 
 class TestBuildManifest:

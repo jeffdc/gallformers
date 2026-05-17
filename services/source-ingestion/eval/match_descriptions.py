@@ -36,7 +36,6 @@ from ingest.preprocess import (
     rejoin_hyphenated,
     rejoin_lines,
     strip_bhl_boilerplate,
-    strip_page_headers,
     strip_plate_pages,
 )
 
@@ -264,7 +263,6 @@ def extract_pdf_text(pdf_path: Path) -> str:
     text = "\n".join(b.text for b in raw_blocks)
     text = strip_bhl_boilerplate(text)
     text = strip_plate_pages(text)
-    text = strip_page_headers(text)
     text = rejoin_hyphenated(text)
     text = rejoin_lines(text)
     return normalize(text)

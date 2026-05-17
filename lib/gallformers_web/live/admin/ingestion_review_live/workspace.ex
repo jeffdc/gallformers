@@ -338,6 +338,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
                 id="workspace-identity"
                 workspace={@workspace}
               />
+              <.evidence_prose_section evidence_prose={@workspace.evidence_prose} />
               <.live_component
                 module={GallformersWeb.Admin.IngestionReviewLive.WorkspaceHosts}
                 id="workspace-hosts"
@@ -488,6 +489,69 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
     """
   end
 
+  attr :evidence_prose, :list, default: nil
+
+  defp evidence_prose_section(assigns) do
+    paragraphs =
+      case assigns.evidence_prose do
+        list when is_list(list) -> list
+        _ -> []
+      end
+
+    assigns = assign(assigns, :paragraphs, paragraphs)
+
+    ~H"""
+    <section
+      id="workspace-section-evidence"
+      class="rounded-lg border border-gray-200 p-4 space-y-3"
+    >
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-semibold text-gray-900">Source text</h3>
+        <span class="text-xs text-gray-500">
+          Verbatim prose the LLM saw for this species
+        </span>
+      </div>
+
+      <div :if={@paragraphs == []} class="text-sm italic text-gray-500">
+        No source prose available for this species.
+      </div>
+
+      <div :if={@paragraphs != []} class="space-y-3 text-sm text-gray-800">
+        <.evidence_paragraph :for={para <- @paragraphs} paragraph={para} />
+      </div>
+    </section>
+    """
+  end
+
+  attr :paragraph, :map, required: true
+
+  defp evidence_paragraph(assigns) do
+    ~H"""
+    <div
+      class="rounded border border-gray-100 bg-gray-50/50 p-3 space-y-1"
+      data-span-id={@paragraph["span_id"]}
+    >
+      <p class="whitespace-pre-wrap leading-relaxed">{@paragraph["text"]}</p>
+      <div
+        :if={@paragraph["page"] || @paragraph["span_id"]}
+        class="text-xs text-gray-500 flex gap-2"
+      >
+        <button
+          :if={@paragraph["page"]}
+          type="button"
+          class="hover:underline focus:underline"
+          data-page={@paragraph["page"]}
+          data-span-id={@paragraph["span_id"]}
+          title="Open source PDF at this page"
+        >
+          p. {@paragraph["page"]}
+        </button>
+        <span :if={@paragraph["span_id"]} class="font-mono">{@paragraph["span_id"]}</span>
+      </div>
+    </div>
+    """
+  end
+
   attr :species_entries, :list, required: true
   attr :current_id, :integer, default: nil
 
@@ -612,6 +676,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
           Enum.uniq(primary.extracted_aliases ++ Enum.flat_map(siblings, & &1.extracted_aliases)),
         trait_reviews: merge_trait_reviews(primary.trait_reviews, siblings),
         description_prose: merge_description_prose(primary, siblings),
+        evidence_prose: merge_evidence_prose(primary, siblings),
         description_evidence:
           Enum.uniq(
             primary.description_evidence ++ Enum.flat_map(siblings, & &1.description_evidence)
@@ -651,6 +716,18 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
     Enum.join(all_prose, "\n\n")
   end
 
+  defp merge_evidence_prose(primary, siblings) do
+    all_paragraphs =
+      [primary.evidence_prose | Enum.map(siblings, & &1.evidence_prose)]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.flat_map(& &1)
+
+    case all_paragraphs do
+      [] -> nil
+      list -> list
+    end
+  end
+
   defp build_workspace_state(workspace_view) do
     %{
       id: workspace_view.id,
@@ -660,6 +737,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
       extracted_authority: workspace_view.extracted_authority,
       status: workspace_view.status,
       description_prose: workspace_view.description_prose,
+      evidence_prose: workspace_view.evidence_prose,
       description_evidence: workspace_view.description_evidence,
       extracted_aliases:
         Enum.map(workspace_view.extracted_aliases, fn name ->

@@ -77,12 +77,20 @@ defmodule Gallformers.Ingestions.BundleImporter do
   @doc """
   Builds a `SourceIngestionSpecies` attrs map from a single `gall_records[]`
   entry plus its 0-based position.
+
+  Schema-1.1.0 bundles include a top-level `generation` per record
+  (`"agamic" | "sexgen" | "unspecified"`); the suffix is appended to
+  `extracted_name` (`"X (agamic)"`, `"X (sexgen)"`) to match the gallformers
+  species-name convention. Schema-1.0.0 / missing `generation` defaults to
+  `"unspecified"` and the bare name is kept.
   """
   @spec extract_species_attrs(map(), non_neg_integer()) :: map()
   def extract_species_attrs(record, position) when is_map(record) and is_integer(position) do
     gall_maker = Map.get(record, "gall_maker", %{})
     scientific_name = unwrap_value(Map.get(gall_maker, "scientific_name"))
     authority = unwrap_value(Map.get(gall_maker, "authority"))
+    generation = read_generation(record)
+    extracted_name = apply_generation_suffix(scientific_name, generation)
 
     description_prose =
       case unwrap_value(Map.get(record, "description")) do
@@ -90,16 +98,61 @@ defmodule Gallformers.Ingestions.BundleImporter do
         value when is_binary(value) -> value
       end
 
+    evidence_prose = build_evidence_prose(Map.get(record, "evidence_prose"))
+
     %{
       position: position,
       status: "pending",
-      extracted_name: scientific_name,
+      extracted_name: extracted_name,
       extracted_authority: authority,
       description_prose: description_prose,
+      evidence_prose: evidence_prose,
       raw_extraction: record,
       extraction_payload: build_extraction_payload(record)
     }
   end
+
+  defp read_generation(record) do
+    case Map.get(record, "generation") do
+      "agamic" -> "agamic"
+      "sexgen" -> "sexgen"
+      _ -> "unspecified"
+    end
+  end
+
+  defp apply_generation_suffix(nil, _generation), do: nil
+  defp apply_generation_suffix("", _generation), do: nil
+  defp apply_generation_suffix(name, "agamic"), do: "#{name} (agamic)"
+  defp apply_generation_suffix(name, "sexgen"), do: "#{name} (sexgen)"
+  defp apply_generation_suffix(name, _), do: name
+
+  # Schema-1.3.0 evidence_prose is a list of paragraph maps; normalize to a
+  # plain list with string-keyed `span_id` / `page` / `text` fields.
+  # Returns nil when the list is missing or empty so the DB column stays null.
+  defp build_evidence_prose(paragraphs) when is_list(paragraphs) do
+    cleaned =
+      paragraphs
+      |> Enum.map(&normalize_evidence_paragraph/1)
+      |> Enum.reject(&is_nil/1)
+
+    case cleaned do
+      [] -> nil
+      list -> list
+    end
+  end
+
+  defp build_evidence_prose(_), do: nil
+
+  defp normalize_evidence_paragraph(%{"text" => text} = paragraph)
+       when is_binary(text) and text != "" do
+    %{
+      "span_id" => Map.get(paragraph, "span_id"),
+      "page" => Map.get(paragraph, "page"),
+      "text" => text
+    }
+  end
+
+  defp normalize_evidence_paragraph(_), do: nil
 
   # --- Internals ---
 
@@ -189,30 +242,18 @@ defmodule Gallformers.Ingestions.BundleImporter do
 
   defp maybe_attach_existing_species(attrs), do: attrs
 
-  # Bundle names are bare ("Druon fullawayi") but gall species in the DB are
-  # disambiguated by lifecycle generation ("Druon fullawayi (agamic)"). Strip
-  # the parenthetical suffix when matching; if a single candidate matches, map
-  # to it. If multiple generations exist (agamic + sexgen), leave unresolved so
-  # the reviewer picks the right one.
+  # The bundle's `generation` field has already been baked into
+  # `extracted_name` (e.g. "Druon fullawayi (agamic)"), matching the
+  # gallformers species-name convention. Plain case-insensitive exact match
+  # is sufficient — no ambiguity to resolve. For `unspecified` (bare) names,
+  # only bare DB entries will match; anything else stays unresolved for the
+  # reviewer to pick.
   defp find_exact_gall(name) do
     name_downcased = name |> String.trim() |> String.downcase()
 
-    candidates =
-      name
-      |> Species.search_species_by_name("gall", 20)
-      |> Enum.filter(&(base_gall_name(&1.name) == name_downcased))
-
-    case candidates do
-      [single] -> single
-      _ -> nil
-    end
-  end
-
-  defp base_gall_name(name) do
     name
-    |> String.replace(~r/\s*\([^)]+\)\s*$/, "")
-    |> String.trim()
-    |> String.downcase()
+    |> Species.search_species_by_name("gall", 5)
+    |> Enum.find(&(String.downcase(&1.name) == name_downcased))
   end
 
   defp upload_artifacts(ingestion_id, pdf_binary, review_artifact) do

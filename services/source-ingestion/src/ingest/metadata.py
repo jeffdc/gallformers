@@ -24,7 +24,12 @@ from openai.types.chat import ChatCompletionMessageParam
 # Reuse the same span-id scrubbing logic from extract_facts.
 from ingest.extract_facts import _gate_cell_by_allowed
 from ingest.find_candidates import format_chunked_input
-from ingest.llm import _provider_from_model, _safe_completion_cost, make_instructor_client
+from ingest.llm import (
+    _log_llm_error,
+    _provider_from_model,
+    _safe_completion_cost,
+    make_instructor_client,
+)
 from ingest.schemas import (
     DocumentMetadata,
     EvidenceCell,
@@ -32,6 +37,10 @@ from ingest.schemas import (
     ProviderCallRecord,
     SupportStatus,
 )
+
+# Stage version. Bump when stage-code changes alter outputs for the same inputs.
+# See services/source-ingestion/CLAUDE.md.
+STAGE_VERSION = "1.0.0"
 
 
 def _scrub_metadata(metadata: DocumentMetadata, allowed: set[str]) -> DocumentMetadata:
@@ -129,6 +138,7 @@ async def extract_document_metadata(
         )
     except Exception as exc:
         duration_ms = int((time.monotonic() - started) * 1000)
+        detail = _log_llm_error("metadata", model, exc)
         return DocumentMetadata(title=_abstaining_title()), ProviderCallRecord(
             model=model,
             provider=_provider_from_model(model),
@@ -138,7 +148,7 @@ async def extract_document_metadata(
             cost_usd=0.0,
             duration_ms=duration_ms,
             status="error",
-            error_detail=f"{type(exc).__name__}: {exc}",
+            error_detail=detail,
         )
 
     duration_ms = int((time.monotonic() - started) * 1000)

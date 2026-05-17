@@ -45,7 +45,13 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceDescription do
       id="workspace-section-description"
       class="rounded-lg border border-gray-200 p-4 space-y-4"
     >
-      <h3 class="text-base font-semibold text-gray-900">Description</h3>
+      <div class="space-y-1">
+        <h3 class="text-base font-semibold text-gray-900">Description summary</h3>
+        <p class="text-xs text-gray-500">
+          LLM-generated one-liner that goes into the gall's description field on commit.
+          See <strong>Source text</strong> above for the full prose.
+        </p>
+      </div>
 
       <div class="space-y-4">
         <div :if={@show_segmented} class="flex gap-1 rounded-lg bg-gray-100 p-1">

@@ -28,7 +28,12 @@ from typing import Literal
 from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel
 
-from ingest.llm import _provider_from_model, _safe_completion_cost, make_instructor_client
+from ingest.llm import (
+    _log_llm_error,
+    _provider_from_model,
+    _safe_completion_cost,
+    make_instructor_client,
+)
 from ingest.schemas import (
     EvidenceCell,
     NormalizedBlock,
@@ -37,6 +42,10 @@ from ingest.schemas import (
     SupportStatus,
     TraitCell,
 )
+
+# Stage version. Bump when stage-code changes alter outputs for the same inputs.
+# See services/source-ingestion/CLAUDE.md.
+STAGE_VERSION = "1.0.0"
 
 _VERDICT_TO_SUPPORT_STATUS: dict[str, SupportStatus] = {
     "supported": SupportStatus.SUPPORTED,
@@ -167,6 +176,7 @@ async def verify_cell(
         duration_ms = int((time.monotonic() - started) * 1000)
         # Verifier failed — cell remains in whatever support_status the extractor
         # assigned. Caller surfaces a manifest warning from the error record.
+        detail = _log_llm_error("verify-claims", model, exc)
         return cell, ProviderCallRecord(
             model=model,
             provider=_provider_from_model(model),
@@ -176,7 +186,7 @@ async def verify_cell(
             cost_usd=0.0,
             duration_ms=duration_ms,
             status="error",
-            error_detail=f"{type(exc).__name__}: {exc}",
+            error_detail=detail,
         )
 
     duration_ms = int((time.monotonic() - started) * 1000)

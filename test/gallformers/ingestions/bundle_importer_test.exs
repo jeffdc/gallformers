@@ -263,6 +263,59 @@ defmodule Gallformers.Ingestions.BundleImporterTest do
       assert payload[:description_evidence] == []
       assert payload[:location] == nil
     end
+
+    test "extracts evidence_prose as a list of paragraph maps" do
+      prose = [
+        %{"span_id" => "S_0078", "page" => 3, "text" => "First paragraph about hosts."},
+        %{"span_id" => "S_0079", "page" => 3, "text" => "Second paragraph about morphology."},
+        %{"span_id" => "S_0081", "page" => 4, "text" => "Third paragraph about distribution."}
+      ]
+
+      record = %{
+        "gall_maker" => %{"scientific_name" => "Druon evidens"},
+        "evidence_prose" => prose
+      }
+
+      attrs = BundleImporter.extract_species_attrs(record, 0)
+
+      assert attrs[:evidence_prose] == prose
+    end
+
+    test "drops evidence_prose entries with missing or empty text" do
+      record = %{
+        "gall_maker" => %{"scientific_name" => "Druon evidens"},
+        "evidence_prose" => [
+          %{"span_id" => "S_1", "page" => 1, "text" => "Real paragraph."},
+          %{"span_id" => "S_2", "page" => 1, "text" => ""},
+          %{"span_id" => "S_3", "page" => 1}
+        ]
+      }
+
+      attrs = BundleImporter.extract_species_attrs(record, 0)
+
+      assert attrs[:evidence_prose] == [
+               %{"span_id" => "S_1", "page" => 1, "text" => "Real paragraph."}
+             ]
+    end
+
+    test "tolerates missing evidence_prose by setting it to nil" do
+      record = %{"gall_maker" => %{"scientific_name" => "Druon barens"}}
+
+      attrs = BundleImporter.extract_species_attrs(record, 0)
+
+      assert attrs[:evidence_prose] == nil
+    end
+
+    test "tolerates an empty evidence_prose list by setting it to nil" do
+      record = %{
+        "gall_maker" => %{"scientific_name" => "Druon barens"},
+        "evidence_prose" => []
+      }
+
+      attrs = BundleImporter.extract_species_attrs(record, 0)
+
+      assert attrs[:evidence_prose] == nil
+    end
   end
 
   describe "import_bundle/2 happy path (cuesta)" do
@@ -285,7 +338,7 @@ defmodule Gallformers.Ingestions.BundleImporterTest do
       assert ingestion.artifacts_path != ""
 
       species = Ingestions.list_source_ingestion_species(ingestion.id)
-      assert length(species) == 18
+      assert length(species) == 30
 
       [%SourceIngestionSpecies{} = first | _] = species
       assert first.position == 0
@@ -323,35 +376,122 @@ defmodule Gallformers.Ingestions.BundleImporterTest do
   end
 
   describe "import_bundle/2 auto-mapping" do
-    test "auto-maps when only one generation of the gall exists in the DB" do
-      single_gen = insert_gall_species!("Druon testus (agamic)")
+    test "agamic generation maps to the suffixed species" do
+      agamic = insert_gall_species!("Druon testus (agamic)")
+      _sexgen = insert_gall_species!("Druon testus (sexgen)")
 
-      bundle_dir = build_bundle_dir!([%{"scientific_name" => "Druon testus"}])
+      bundle_dir =
+        build_bundle_dir!([
+          %{"scientific_name" => "Druon testus", "generation" => "agamic"}
+        ])
+
       user = user_fixture()
 
       assert {:ok, %SourceIngestion{} = ingestion} =
                BundleImporter.import_bundle(bundle_dir, uploaded_by_id: user.id)
 
       [entry] = Ingestions.list_source_ingestion_species(ingestion.id)
+      assert entry.extracted_name == "Druon testus (agamic)"
       assert entry.status == "mapped"
-      assert entry.species_id == single_gen.id
+      assert entry.species_id == agamic.id
 
       File.rm_rf!(bundle_dir)
     end
 
-    test "does NOT auto-map when multiple generations exist (ambiguous)" do
-      insert_gall_species!("Druon ambiguus (agamic)")
-      insert_gall_species!("Druon ambiguus (sexgen)")
+    test "dual-generation records both land as distinct rows mapped to their suffixed species" do
+      agamic = insert_gall_species!("Druon dualgen (agamic)")
+      sexgen = insert_gall_species!("Druon dualgen (sexgen)")
 
-      bundle_dir = build_bundle_dir!([%{"scientific_name" => "Druon ambiguus"}])
+      bundle_dir =
+        build_bundle_dir!([
+          %{"scientific_name" => "Druon dualgen", "generation" => "agamic"},
+          %{"scientific_name" => "Druon dualgen", "generation" => "sexgen"}
+        ])
+
+      user = user_fixture()
+
+      assert {:ok, %SourceIngestion{} = ingestion} =
+               BundleImporter.import_bundle(bundle_dir, uploaded_by_id: user.id)
+
+      [agamic_entry, sexgen_entry] = Ingestions.list_source_ingestion_species(ingestion.id)
+
+      assert agamic_entry.extracted_name == "Druon dualgen (agamic)"
+      assert agamic_entry.species_id == agamic.id
+      assert agamic_entry.status == "mapped"
+
+      assert sexgen_entry.extracted_name == "Druon dualgen (sexgen)"
+      assert sexgen_entry.species_id == sexgen.id
+      assert sexgen_entry.status == "mapped"
+
+      File.rm_rf!(bundle_dir)
+    end
+
+    test "unspecified generation keeps the bare name and does NOT map to a suffixed species" do
+      _agamic = insert_gall_species!("Druon unknownus (agamic)")
+
+      bundle_dir =
+        build_bundle_dir!([
+          %{"scientific_name" => "Druon unknownus", "generation" => "unspecified"}
+        ])
+
       user = user_fixture()
 
       assert {:ok, %SourceIngestion{} = ingestion} =
                BundleImporter.import_bundle(bundle_dir, uploaded_by_id: user.id)
 
       [entry] = Ingestions.list_source_ingestion_species(ingestion.id)
+      assert entry.extracted_name == "Druon unknownus"
       assert entry.status == "pending"
       assert entry.species_id == nil
+
+      File.rm_rf!(bundle_dir)
+    end
+
+    test "persists evidence_prose end-to-end on the SourceIngestionSpecies row" do
+      prose = [
+        %{"span_id" => "S_0001", "page" => 2, "text" => "Paragraph one of source text."},
+        %{"span_id" => "S_0002", "page" => 2, "text" => "Paragraph two with diagnostic details."},
+        %{"span_id" => "S_0005", "page" => 3, "text" => "Paragraph three on hosts."}
+      ]
+
+      bundle_dir =
+        build_bundle_dir!([
+          %{
+            "scientific_name" => "Druon evidens",
+            "generation" => "agamic",
+            "evidence_prose" => prose
+          }
+        ])
+
+      user = user_fixture()
+
+      assert {:ok, %SourceIngestion{} = ingestion} =
+               BundleImporter.import_bundle(bundle_dir, uploaded_by_id: user.id)
+
+      [entry] = Ingestions.list_source_ingestion_species(ingestion.id)
+      assert entry.evidence_prose == prose
+
+      File.rm_rf!(bundle_dir)
+    end
+
+    test "schema_version 1.0.0 records (no generation field) default to unspecified / bare name" do
+      bare = insert_gall_species!("Druon barens")
+
+      bundle_dir =
+        build_bundle_dir!(
+          [%{"scientific_name" => "Druon barens"}],
+          schema_version: "1.0.0"
+        )
+
+      user = user_fixture()
+
+      assert {:ok, %SourceIngestion{} = ingestion} =
+               BundleImporter.import_bundle(bundle_dir, uploaded_by_id: user.id)
+
+      [entry] = Ingestions.list_source_ingestion_species(ingestion.id)
+      assert entry.extracted_name == "Druon barens"
+      assert entry.status == "mapped"
+      assert entry.species_id == bare.id
 
       File.rm_rf!(bundle_dir)
     end
@@ -490,7 +630,7 @@ defmodule Gallformers.Ingestions.BundleImporterTest do
 
   # --- Helpers ---
 
-  defp expected_record_count("cuesta"), do: 18
+  defp expected_record_count("cuesta"), do: 30
   defp expected_record_count("cook"), do: 2
   defp expected_record_count("mutun"), do: 21
   defp expected_record_count("nicholls"), do: 13
@@ -515,12 +655,27 @@ defmodule Gallformers.Ingestions.BundleImporterTest do
     pdf_sha = String.duplicate("a", 64)
     text_sha = String.duplicate("b", 64)
     title = Keyword.get(opts, :title, "Auto-map test")
+    schema_version = Keyword.get(opts, :schema_version, "1.1.0")
 
-    gall_records = Enum.map(records, fn record -> %{"gall_maker" => record} end)
+    gall_records =
+      Enum.map(records, fn record ->
+        {generation, rest1} = Map.pop(record, "generation")
+        {evidence_prose, gall_maker_fields} = Map.pop(rest1, "evidence_prose")
+
+        gall_record = %{"gall_maker" => gall_maker_fields}
+
+        gall_record =
+          if generation, do: Map.put(gall_record, "generation", generation), else: gall_record
+
+        if evidence_prose,
+          do: Map.put(gall_record, "evidence_prose", evidence_prose),
+          else: gall_record
+      end)
 
     File.write!(
       Path.join(bundle_dir, "review_artifact.json"),
       Jason.encode!(%{
+        "schema_version" => schema_version,
         "source" => %{"pdf_sha256" => pdf_sha, "source_text_sha256" => text_sha},
         "document_metadata" => %{"title" => title},
         "gall_records" => gall_records

@@ -21,44 +21,105 @@ def _block(span_id: str, text: str, section_id: str = "sec-1", page: int = 1) ->
     )
 
 
-def _candidate(mention_span_ids: list[str], cid: str = "C_001") -> Candidate:
+def _candidate(
+    mention_span_ids: list[str],
+    cid: str = "C_001",
+    mention: str = "Andricus quercuscalifornicus",
+    generation: str = "unspecified",
+) -> Candidate:
     return Candidate(
         candidate_id=cid,
-        gall_maker_mention="Andricus quercuscalifornicus",
+        gall_maker_mention=mention,
         mention_span_ids=mention_span_ids,
         sample_agreement=3,
+        generation=generation,
     )
+
+
+class TestSiblingGenerationSpans:
+    """Each candidate's pack should include the first mention span from any
+    sibling-generation candidate for the same species, so species-treatment
+    headers (e.g. ``"Bassettia flavipes ..., comb. nov., asexual generation"``
+    that find-candidates only tagged for the agamic candidate) still appear
+    in the sexgen candidate's pack — and vice versa.
+    """
+
+    def test_includes_first_mention_of_sibling_generation_candidate(self):
+        blocks = [_block(f"S_{i:04d}", f"text {i}") for i in range(1, 11)]
+        sexgen = _candidate(["S_0007"], cid="C_001", mention="Bassettia flavipes", generation="sexgen")
+        agamic = _candidate(
+            ["S_0002", "S_0003", "S_0004"],
+            cid="C_002",
+            mention="Bassettia flavipes",
+            generation="agamic",
+        )
+        prose, meta = build_evidence_pack(sexgen, [sexgen, agamic], blocks, context_window=0)
+        # sexgen's own pack would just be [S_0007]; adding agamic's first mention
+        # (S_0002) at context_window=0 yields [S_0002, S_0007].
+        assert meta["allowed_span_ids"] == ["S_0002", "S_0007"]
+
+    def test_sibling_first_mention_expands_with_context_window(self):
+        """The injected sibling mention also benefits from the context window."""
+        blocks = [_block(f"S_{i:04d}", f"text {i}") for i in range(1, 11)]
+        sexgen = _candidate(["S_0008"], cid="C_001", mention="Bassettia flavipes", generation="sexgen")
+        agamic = _candidate(
+            ["S_0002", "S_0003"], cid="C_002", mention="Bassettia flavipes", generation="agamic"
+        )
+        prose, meta = build_evidence_pack(sexgen, [sexgen, agamic], blocks, context_window=1)
+        # Context window 1 around S_0002 → {S_0001, S_0002, S_0003}; around
+        # S_0008 → {S_0007, S_0008, S_0009}.
+        assert sorted(meta["allowed_span_ids"]) == [
+            "S_0001", "S_0002", "S_0003", "S_0007", "S_0008", "S_0009",
+        ]
+
+    def test_only_unions_siblings_with_same_species_name(self):
+        """Different species names → no cross-pack sharing."""
+        blocks = [_block(f"S_{i:04d}", f"text {i}") for i in range(1, 11)]
+        target = _candidate(["S_0007"], cid="C_001", mention="Bassettia flavipes", generation="sexgen")
+        other_species = _candidate(
+            ["S_0002"], cid="C_002", mention="Andricus balanaspis", generation="agamic"
+        )
+        prose, meta = build_evidence_pack(target, [target, other_species], blocks, context_window=0)
+        # Different species — no sibling spans injected.
+        assert meta["allowed_span_ids"] == ["S_0007"]
+
+    def test_no_change_when_no_siblings(self):
+        """A single candidate (no siblings of any kind) gets its own behavior."""
+        blocks = [_block(f"S_{i:04d}", f"text {i}") for i in range(1, 11)]
+        only = _candidate(["S_0005"], cid="C_001", mention="Andricus solo", generation="unspecified")
+        prose, meta = build_evidence_pack(only, [only], blocks, context_window=0)
+        assert meta["allowed_span_ids"] == ["S_0005"]
 
 
 class TestSingleMention:
     def test_window_zero_yields_only_the_mention_block(self):
         blocks = [_block(f"S_{i:04d}", f"text {i}") for i in range(1, 6)]
         cand = _candidate(["S_0003"])
-        text, meta = build_evidence_pack(cand, blocks, context_window=0)
+        prose, meta = build_evidence_pack(cand, [cand], blocks, context_window=0)
         assert meta["allowed_span_ids"] == ["S_0003"]
-        assert text == "[S_0003] text 3"
+        assert len(prose) == 1
+        assert prose[0].span_id == "S_0003"
+        assert prose[0].text == "text 3"
 
     def test_window_two_yields_five_blocks_around_mention(self):
         blocks = [_block(f"S_{i:04d}", f"text {i}") for i in range(1, 6)]
         cand = _candidate(["S_0003"])
-        text, meta = build_evidence_pack(cand, blocks, context_window=2)
+        prose, meta = build_evidence_pack(cand, [cand], blocks, context_window=2)
         assert meta["allowed_span_ids"] == ["S_0001", "S_0002", "S_0003", "S_0004", "S_0005"]
-        assert "[S_0001] text 1" in text
-        assert "[S_0005] text 5" in text
-        # Spans separated by blank lines.
-        assert text.count("\n\n") == 4
+        assert [p.span_id for p in prose] == ["S_0001", "S_0002", "S_0003", "S_0004", "S_0005"]
+        assert [p.text for p in prose] == ["text 1", "text 2", "text 3", "text 4", "text 5"]
 
     def test_window_clips_at_start_of_document(self):
         blocks = [_block(f"S_{i:04d}", f"text {i}") for i in range(1, 6)]
         cand = _candidate(["S_0001"])
-        text, meta = build_evidence_pack(cand, blocks, context_window=2)
+        text, meta = build_evidence_pack(cand, [cand], blocks, context_window=2)
         # No spans before S_0001; window clips. Result has 3 spans.
         assert meta["allowed_span_ids"] == ["S_0001", "S_0002", "S_0003"]
 
     def test_window_clips_at_end_of_document(self):
         blocks = [_block(f"S_{i:04d}", f"text {i}") for i in range(1, 6)]
         cand = _candidate(["S_0005"])
-        text, meta = build_evidence_pack(cand, blocks, context_window=2)
+        text, meta = build_evidence_pack(cand, [cand], blocks, context_window=2)
         assert meta["allowed_span_ids"] == ["S_0003", "S_0004", "S_0005"]
 
 
@@ -68,7 +129,7 @@ class TestMultipleMentions:
         # Mentions at S_0003 and S_0004; with window=2 the union is
         # {S_0001..S_0006}.
         cand = _candidate(["S_0003", "S_0004"])
-        _, meta = build_evidence_pack(cand, blocks, context_window=2)
+        _, meta = build_evidence_pack(cand, [cand], blocks, context_window=2)
         assert meta["allowed_span_ids"] == [
             "S_0001",
             "S_0002",
@@ -81,7 +142,7 @@ class TestMultipleMentions:
     def test_non_overlapping_windows_both_appear(self):
         blocks = [_block(f"S_{i:04d}", f"text {i}") for i in range(1, 11)]
         cand = _candidate(["S_0002", "S_0008"])
-        _, meta = build_evidence_pack(cand, blocks, context_window=1)
+        _, meta = build_evidence_pack(cand, [cand], blocks, context_window=1)
         # Windows: {S_0001..S_0003} and {S_0007..S_0009}.
         assert meta["allowed_span_ids"] == [
             "S_0001",
@@ -105,7 +166,7 @@ class TestSectionBoundary:
         # Mention at S_0003 (sec-1); window=2 would naively include S_0004
         # and S_0005 but they're in sec-2.
         cand = _candidate(["S_0003"])
-        _, meta = build_evidence_pack(cand, blocks, context_window=2)
+        _, meta = build_evidence_pack(cand, [cand], blocks, context_window=2)
         assert meta["allowed_span_ids"] == ["S_0001", "S_0002", "S_0003"]
 
 
@@ -113,7 +174,7 @@ class TestMeta:
     def test_meta_captures_candidate_id_and_mention(self):
         blocks = [_block("S_0001", "body")]
         cand = _candidate(["S_0001"], cid="C_042")
-        _, meta = build_evidence_pack(cand, blocks, context_window=0)
+        _, meta = build_evidence_pack(cand, [cand], blocks, context_window=0)
         assert meta["candidate_id"] == "C_042"
         assert meta["gall_maker_mention"] == "Andricus quercuscalifornicus"
 
@@ -123,4 +184,4 @@ class TestErrorHandling:
         blocks = [_block("S_0001", "body")]
         cand = _candidate(["S_9999"])
         with pytest.raises(KeyError, match="S_9999"):
-            build_evidence_pack(cand, blocks, context_window=0)
+            build_evidence_pack(cand, [cand], blocks, context_window=0)

@@ -27,7 +27,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-SCHEMA_VERSION: Literal["1.0.0"] = "1.0.0"
+SCHEMA_VERSION: Literal["1.4.0"] = "1.4.0"
 
 
 # ─── Enums ─────────────────────────────────────────────────────────────────
@@ -151,7 +151,12 @@ class Evidence(StrictModel):
     char_start: int = Field(ge=0, description="Absolute char offset in the flat normalized text")
     char_end: int = Field(ge=0, description="Absolute char offset (exclusive)")
     quote: str = Field(
-        description="Exact substring at [char_start:char_end] of the flat normalized text"
+        max_length=2000,
+        description=(
+            "Exact substring at [char_start:char_end] of the flat normalized text. "
+            "Hard-capped to defend against runaway generation when an LLM lands in "
+            "a repetition loop on degenerate input (e.g., TOC leader dots)."
+        ),
     )
 
     @model_validator(mode="after")
@@ -360,7 +365,7 @@ class Section(StrictModel):
 class SectionsFile(StrictModel):
     """`sections.json` — top-level container for the document's sections."""
 
-    schema_version: Literal["1.0.0"] = "1.0.0"
+    schema_version: Literal["1.4.0"] = "1.4.0"
     sections: list[Section]
 
 
@@ -436,7 +441,7 @@ class Manifest(StrictModel):
     artifacts that don't carry schema_version themselves).
     """
 
-    schema_version: Literal["1.0.0"] = "1.0.0"
+    schema_version: Literal["1.4.0"] = "1.4.0"
     pipeline_name: str
     pipeline_version: str
     pipeline_config_name: str
@@ -464,7 +469,7 @@ class Manifest(StrictModel):
 class DocumentMetadata(StrictModel):
     """`metadata.json` — bibliographic metadata, evidence-bound."""
 
-    schema_version: Literal["1.0.0"] = "1.0.0"
+    schema_version: Literal["1.4.0"] = "1.4.0"
     title: EvidenceCell
     authors: list[EvidenceCell] = Field(default_factory=list)
     year: EvidenceCell | None = None
@@ -542,12 +547,39 @@ class GallTraits(StrictModel):
     )
 
 
+class ProseParagraph(StrictModel):
+    """One paragraph of verbatim source-text from a candidate's evidence pack.
+
+    The unit of curator-facing prose. The UI renders these in order, optionally
+    using ``span_id`` for "view source" links and ``page`` for PDF deep-linking.
+    """
+
+    span_id: str = Field(description="Span ID in normalized_text.jsonl, e.g. 'S_0078'")
+    page: int = Field(ge=1, description="1-indexed PDF page number this paragraph came from")
+    text: str = Field(description="Paragraph text, no '[S_NNNN]' prefix")
+
+
 class GallRecord(StrictModel):
     """One gall-host association. The atomic unit of extraction."""
 
     record_id: str = Field(description="Stable record ID, e.g. 'R_001'")
     candidate_id: str = Field(description="Pipeline-internal candidate ID, e.g. 'C_001'")
     gall_maker: GallMaker
+    generation: Literal["sexgen", "agamic", "unspecified"] = Field(
+        description=(
+            "Biological generation this record describes. Inherited from the originating "
+            "Candidate. Dual-generation species (Cynipid sexgen/agamic, aphid morphs, "
+            "etc.) emit two records sharing a gall_maker name but with different generation."
+        ),
+    )
+    evidence_prose: list[ProseParagraph] = Field(
+        description=(
+            "Full verbatim source prose the LLM saw for this candidate, as an ordered "
+            "list of paragraphs. Each carries its source span ID and PDF page so the UI "
+            "can render with provenance links. Primary review surface for curators; "
+            "`description` below is a narrow LLM summary derived from this prose."
+        ),
+    )
     hosts: list[Host] = Field(default_factory=list)
     gall_traits: GallTraits = Field(default_factory=GallTraits)
     description: EvidenceCell | None = Field(
@@ -570,14 +602,14 @@ class ClaimsFile(StrictModel):
     extractor's self-report and the substring gate's verdict at this point.
     """
 
-    schema_version: Literal["1.0.0"] = "1.0.0"
+    schema_version: Literal["1.4.0"] = "1.4.0"
     gall_records: list[GallRecord]
 
 
 class VerifiedClaimsFile(StrictModel):
     """`verified_claims.json` — claims with verifier verdicts and GBIF lookups populated."""
 
-    schema_version: Literal["1.0.0"] = "1.0.0"
+    schema_version: Literal["1.4.0"] = "1.4.0"
     gall_records: list[GallRecord]
 
 
@@ -593,12 +625,19 @@ class Candidate(StrictModel):
     sample_agreement: int = Field(
         ge=1, description="How many of N self-consistency samples produced this candidate"
     )
+    generation: Literal["sexgen", "agamic", "unspecified"] = Field(
+        description=(
+            "Biological generation this candidate describes. When a paper describes both "
+            "generations of a species in separately identifiable passages, find-candidates "
+            "emits two candidates with the same mention but different generation values."
+        ),
+    )
 
 
 class CandidatesFile(StrictModel):
     """`candidates.json` — find-candidates output (scratch, not in bundle)."""
 
-    schema_version: Literal["1.0.0"] = "1.0.0"
+    schema_version: Literal["1.4.0"] = "1.4.0"
     candidates: list[Candidate]
 
 
@@ -625,7 +664,7 @@ class ReviewArtifact(StrictModel):
     without needing to walk other artifacts.
     """
 
-    schema_version: Literal["1.0.0"] = "1.0.0"
+    schema_version: Literal["1.4.0"] = "1.4.0"
     pipeline_name: str
     pipeline_version: str
     generated_at: datetime

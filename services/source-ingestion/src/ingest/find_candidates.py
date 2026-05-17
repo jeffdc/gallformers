@@ -19,6 +19,7 @@ import asyncio
 import re
 import sys
 import time
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -29,6 +30,10 @@ from ingest.schemas import (
     NormalizedBlock,
     ProviderCallRecord,
 )
+
+# Stage version. Bump when stage-code changes alter outputs for the same inputs
+# (dedup logic, post-processing, output fields, …). See services/source-ingestion/CLAUDE.md.
+STAGE_VERSION = "1.1.0"
 
 
 def format_chunked_input(blocks: list[NormalizedBlock]) -> str:
@@ -48,6 +53,7 @@ class _LLMCandidate(BaseModel):
 
     gall_maker_mention: str
     mention_span_ids: list[str]
+    generation: Literal["sexgen", "agamic", "unspecified"]
 
 
 class _LLMResponse(BaseModel):
@@ -181,39 +187,64 @@ async def find_candidates(
     records = [r for _, r in samples]
     parsed_samples = [c for c, _ in samples]
 
-    # Dedup across samples: group by normalized mention string. For each
-    # group, count how many distinct samples contributed it and union the
-    # mention_span_ids. Drop span_ids not in the eligible input set.
-    groups: dict[str, dict] = {}
+    # Dedup across samples in two layers:
+    #
+    # 1. **Species level**: group by normalized mention. Count distinct samples
+    #    contributing each species. Species below ``agreement_threshold`` are
+    #    dropped entirely — they're noise.
+    # 2. **Generation level**: for surviving species, emit one candidate per
+    #    distinct generation any sample tagged. The species is the load-bearing
+    #    signal; the generation tag is softer (LLMs disagree on it within the
+    #    same paper). When at least one sample tags a specific generation
+    #    (sexgen/agamic), suppress the sibling `unspecified` votes — those mean
+    #    "I couldn't tell" and are uninformative when other samples could tell.
+    species_groups: dict[str, dict] = {}
     for sample_idx, sample_candidates in enumerate(parsed_samples):
-        seen_in_sample: set[str] = set()
+        species_in_sample: set[str] = set()
         for c in sample_candidates:
-            key = _normalize_mention(c.gall_maker_mention)
-            if not key:
+            mention_key = _normalize_mention(c.gall_maker_mention)
+            if not mention_key:
                 continue
-            seen_in_sample.add(key)
-            entry = groups.setdefault(
-                key,
-                {"mention": c.gall_maker_mention, "spans": set(), "samples": set()},
+            species_in_sample.add(mention_key)
+            entry = species_groups.setdefault(
+                mention_key,
+                {"mention": c.gall_maker_mention, "samples": set(), "generations": {}},
             )
-            entry["spans"].update(s for s in c.mention_span_ids if s in valid_span_ids)
-        for k in seen_in_sample:
-            groups[k]["samples"].add(sample_idx)
+            gen_entry = entry["generations"].setdefault(
+                c.generation, {"spans": set(), "samples": set()}
+            )
+            gen_entry["spans"].update(s for s in c.mention_span_ids if s in valid_span_ids)
+            gen_entry["samples"].add(sample_idx)
+        for k in species_in_sample:
+            species_groups[k]["samples"].add(sample_idx)
 
-    kept = [entry for entry in groups.values() if len(entry["samples"]) >= agreement_threshold]
-    kept.sort(key=lambda e: (-len(e["samples"]), e["mention"].lower()))
+    kept_species = [
+        entry
+        for entry in species_groups.values()
+        if len(entry["samples"]) >= agreement_threshold
+    ]
+    kept_species.sort(key=lambda e: (-len(e["samples"]), e["mention"].lower()))
 
     candidates: list[Candidate] = []
-    for i, entry in enumerate(kept, start=1):
-        if not entry["spans"]:
-            continue
-        candidates.append(
-            Candidate(
-                candidate_id=f"C_{i:03d}",
-                gall_maker_mention=entry["mention"],
-                mention_span_ids=sorted(entry["spans"]),
-                sample_agreement=len(entry["samples"]),
+    cid = 0
+    for entry in kept_species:
+        gens = entry["generations"]
+        # Suppress unspecified votes when any specific generation is present.
+        has_specific = any(g in gens for g in ("sexgen", "agamic"))
+        gen_keys = sorted(g for g in gens if not (has_specific and g == "unspecified"))
+        for gen in gen_keys:
+            gen_entry = gens[gen]
+            if not gen_entry["spans"]:
+                continue
+            cid += 1
+            candidates.append(
+                Candidate(
+                    candidate_id=f"C_{cid:03d}",
+                    gall_maker_mention=entry["mention"],
+                    mention_span_ids=sorted(gen_entry["spans"]),
+                    sample_agreement=len(gen_entry["samples"]),
+                    generation=gen,
+                )
             )
-        )
 
     return CandidatesFile(candidates=candidates), records

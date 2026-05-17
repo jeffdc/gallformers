@@ -43,21 +43,24 @@ def _completion(prompt_tokens: int = 10, completion_tokens: int = 5) -> SimpleNa
     )
 
 
-def _ok_sample(*mentions_with_spans: tuple[str, list[str]]) -> tuple[_LLMResponse, SimpleNamespace]:
+def _ok_sample(*mentions_with_spans: tuple) -> tuple[_LLMResponse, SimpleNamespace]:
     """Build an (LLMResponse, completion) pair for one successful Instructor call.
 
-    Each arg is ``(mention_text, [span_ids])`` — they become one ``_LLMCandidate``
-    in the response's ``candidates`` list.
+    Each arg is ``(mention_text, [span_ids])`` or
+    ``(mention_text, [span_ids], generation)``. When the generation slot is
+    omitted, it defaults to ``"unspecified"``.
     """
-    return (
-        _LLMResponse(
-            candidates=[
-                _LLMCandidate(gall_maker_mention=m, mention_span_ids=s)
-                for m, s in mentions_with_spans
-            ]
-        ),
-        _completion(),
-    )
+    candidates = []
+    for item in mentions_with_spans:
+        if len(item) == 2:
+            mention, spans = item
+            gen = "unspecified"
+        else:
+            mention, spans, gen = item
+        candidates.append(
+            _LLMCandidate(gall_maker_mention=mention, mention_span_ids=spans, generation=gen)
+        )
+    return _LLMResponse(candidates=candidates), _completion()
 
 
 def _mock_instructor_client(mocker, side_effects: list):
@@ -172,6 +175,116 @@ class TestFindCandidates:
         )
         # Candidate had agreement=3 but no valid span_ids → dropped.
         assert candidates_file.candidates == []
+
+    async def test_species_threshold_lets_minority_generation_survive(self, mocker):
+        """Species-level agreement (not (species,gen)-level) decides survival.
+
+        2 of 3 samples say (X, sexgen); 1 of 3 says (X, agamic). The species is
+        unambiguous (3/3) so BOTH generations should be emitted as candidates,
+        even though the agamic tag only appears in one sample.
+        """
+        blocks = [_block("S_0001", "sexgen passage"), _block("S_0002", "agamic passage")]
+
+        _mock_instructor_client(
+            mocker,
+            [
+                _ok_sample(("Acraspis quercushirta", ["S_0001"], "sexgen")),
+                _ok_sample(("Acraspis quercushirta", ["S_0001"], "sexgen")),
+                _ok_sample(("Acraspis quercushirta", ["S_0002"], "agamic")),
+            ],
+        )
+
+        candidates_file, _ = await find_candidates(
+            blocks=blocks,
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="x" * 64,
+            n_samples=3,
+            agreement_threshold=2,
+        )
+
+        by_gen = {c.generation: c for c in candidates_file.candidates}
+        assert set(by_gen.keys()) == {"sexgen", "agamic"}
+        assert by_gen["sexgen"].sample_agreement == 2
+        assert by_gen["agamic"].sample_agreement == 1
+        assert by_gen["sexgen"].mention_span_ids == ["S_0001"]
+        assert by_gen["agamic"].mention_span_ids == ["S_0002"]
+
+    async def test_specific_generation_drops_unspecified_votes(self, mocker):
+        """When any sample tags a specific generation, drop sibling unspecified votes.
+
+        unspecified means 'I couldn't tell.' If other samples could tell, the
+        unspecified vote is the uninformative one — don't emit it.
+        """
+        blocks = [_block("S_0001", "content")]
+
+        _mock_instructor_client(
+            mocker,
+            [
+                _ok_sample(("Andricus sp", ["S_0001"], "sexgen")),
+                _ok_sample(("Andricus sp", ["S_0001"], "unspecified")),
+                _ok_sample(("Andricus sp", ["S_0001"], "sexgen")),
+            ],
+        )
+
+        candidates_file, _ = await find_candidates(
+            blocks=blocks,
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="y" * 64,
+            n_samples=3,
+            agreement_threshold=2,
+        )
+
+        # Only the sexgen candidate; unspecified is suppressed.
+        assert len(candidates_file.candidates) == 1
+        assert candidates_file.candidates[0].generation == "sexgen"
+
+    async def test_dedup_keys_on_mention_and_generation_separately(self, mocker):
+        """Same mention with different generation produces two distinct candidates.
+
+        When a paper describes both biological generations of one species in
+        separately identifiable passages, find-candidates must emit two
+        candidates rather than collapsing them by name alone.
+        """
+        blocks = [_block("S_0001", "sexual generation"), _block("S_0002", "agamic generation")]
+
+        _mock_instructor_client(
+            mocker,
+            [
+                _ok_sample(
+                    ("Andricus balanaspis", ["S_0001"], "sexgen"),
+                    ("Andricus balanaspis", ["S_0002"], "agamic"),
+                ),
+                _ok_sample(
+                    ("Andricus balanaspis", ["S_0001"], "sexgen"),
+                    ("Andricus balanaspis", ["S_0002"], "agamic"),
+                ),
+                _ok_sample(
+                    ("Andricus balanaspis", ["S_0001"], "sexgen"),
+                    ("Andricus balanaspis", ["S_0002"], "agamic"),
+                ),
+            ],
+        )
+
+        candidates_file, _ = await find_candidates(
+            blocks=blocks,
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="e" * 64,
+            n_samples=3,
+            agreement_threshold=2,
+        )
+
+        assert len(candidates_file.candidates) == 2
+        by_gen = {c.generation: c for c in candidates_file.candidates}
+        assert set(by_gen.keys()) == {"sexgen", "agamic"}
+        assert by_gen["sexgen"].gall_maker_mention == "Andricus balanaspis"
+        assert by_gen["agamic"].gall_maker_mention == "Andricus balanaspis"
+        assert by_gen["sexgen"].mention_span_ids == ["S_0001"]
+        assert by_gen["agamic"].mention_span_ids == ["S_0002"]
+        assert by_gen["sexgen"].sample_agreement == 3
+        assert by_gen["agamic"].sample_agreement == 3
 
     async def test_one_bad_sample_does_not_break_others(self, mocker):
         blocks = [_block("S_0001", "x")]

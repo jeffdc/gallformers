@@ -1,4 +1,4 @@
-# version: 0.1.3
+# version: 0.2.0
 
 You are extracting **gall-maker mentions** from a scientific paper. Your job
 is high-recall detection: find every organism the paper identifies as
@@ -56,7 +56,7 @@ makes; do not make it.
 - Authority annotations: `"Andricus coriarius (Hartig, 1843)"` → `"Andricus coriarius"`
 - Descriptive suffixes: `"A. coriarius galls"` → `"A. coriarius"`,
   `"A. coriarius asexual females"` → `"A. coriarius"`
-- Lifecycle / generation modifiers: `"sexual generation Andricus quercuscalicis"` → `"Andricus quercuscalicis"`
+- Lifecycle / generation modifiers: `"sexual generation Andricus quercuscalicis"` → `"Andricus quercuscalicis"` (the generation goes in the separate `generation` field — see below)
 - Article + noun: `"the wasp Andricus coriarius"` → `"Andricus coriarius"`
 
 Damaged or historical spellings: preserve as the paper writes them. Do
@@ -64,26 +64,76 @@ not silently correct OCR errors. (If a single species appears with both
 a damaged and a clean spelling, prefer the clean one and list both
 spans.)
 
+## Generation tagging
+
+Some species — most prominently Cynipid oak gall wasps and many aphids —
+have alternating biological generations that are morphologically and
+ecologically distinct, and are often described separately in the same
+paper. The `generation` field on each candidate records which generation
+the candidate covers.
+
+Valid values:
+
+- `"sexgen"` — the sexual generation (also called "gamic"; sometimes
+  "spring brood" or "sexual brood").
+- `"agamic"` — the asexual / parthenogenetic generation (also called
+  "asexual generation"; sometimes "summer brood" or "fall brood").
+- `"unspecified"` — the paper does not distinguish generations for this
+  species, or the species lacks generation alternation. Use this for
+  most non-Cynipid, non-aphid species and for any species where the
+  paper doesn't separately treat its generations.
+
+### Cues that signal sexgen or agamic
+
+- **Explicit labels** in headings or prose: "sexual generation",
+  "asexual generation", "agamic generation", "spring brood", "summer
+  brood", "fall brood", "gamic form", "agamic form".
+- **Morphological cues**: "Sexual female (Figs ...)", "Males ...",
+  "Males and females ...", "Agamic females ...", "The asexual generation
+  has been found on ...".
+- **Section structure**: a paper that has separate "Sexual generation"
+  and "Asexual generation" subsections under one species name is
+  splitting that species into two generation-specific descriptions.
+
+### Cross-reference cues — do NOT emit a candidate from these
+
+When a paper says "Asexual generation: see Bassett (1864) and Weld
+(1922a)" or "The agamic form has been recorded by previous authors but
+is not redescribed here", the paper *references* the generation but does
+not *describe* it. Emit only the candidate(s) for the generation(s) the
+paper actually describes.
+
 ## How many candidates to emit
 
-The rule: **one candidate per distinct species**, no more and no fewer.
+The rule: **one candidate per distinct (species, generation) pair**.
 
-**Multiple forms of the same species → one candidate.** When a paper
-introduces a species as `Andricus coriarius` then later refers to it as
-`A. coriarius`, emit a single candidate using the most complete form
-available. List every span where the species appears in any form. The
-Python pipeline normalizes whitespace and case but does not infer that
-an abbreviated form refers to the same species as a full binomial — you
-must consolidate those.
+**Same species, same generation, different mention forms → one
+candidate.** When a paper introduces a species as `Andricus coriarius`
+then later refers to it as `A. coriarius`, emit a single candidate using
+the most complete form available. List every span where the species
+appears in any form. The Python pipeline normalizes whitespace and case
+but does not infer that an abbreviated form refers to the same species
+as a full binomial — you must consolidate those.
 
-**Multiple distinct species → one candidate each.** Different species
-names always mean different candidates, even when one is the paper's
-main subject and others are mentioned only briefly. A comparison species
+**Same species, different generations described separately → two
+candidates** sharing the same `gall_maker_mention` but with different
+`generation` values. Spans that genuinely cover both generations (the
+species-treatment intro, host-plant statements that apply to both, the
+overall taxonomic header) may appear in both candidates' span lists.
+Spans that clearly belong to one generation appear only in that
+candidate.
+
+**Same species, generations conflated or not specified → one candidate**
+with `generation: "unspecified"`.
+
+**Different species → one candidate each.** Different species names
+always mean different candidates, even when one is the paper's main
+subject and others are mentioned only briefly. A comparison species
 invoked once for context still gets its own candidate; a downstream
 extractor will record what facts (if any) the paper provides about it,
 and abstain on the rest.
 
-### Worked example
+### Worked example — distinct species, no generation split
 
 Suppose a paper is primarily about *Andricus coriarius* (mentioned ~10
 times across the body) and contains one sentence referencing prior work
@@ -94,14 +144,34 @@ output:
 ```json
 {
   "candidates": [
-    {"gall_maker_mention": "Andricus coriarius", "mention_span_ids": ["S_0002", "S_0004", "S_0011", "..."]},
-    {"gall_maker_mention": "Andricus quercuscalicis", "mention_span_ids": ["S_0025"]}
+    {"gall_maker_mention": "Andricus coriarius", "generation": "unspecified", "mention_span_ids": ["S_0002", "S_0004", "S_0011", "..."]},
+    {"gall_maker_mention": "Andricus quercuscalicis", "generation": "unspecified", "mention_span_ids": ["S_0025"]}
   ]
 }
 ```
 
 Two distinct species, two candidates. The secondary species gets a
-single span; that is fine.
+single span; that is fine. Neither paper passage distinguishes
+generations, so both are `"unspecified"`.
+
+### Worked example — one species, generations split
+
+Suppose a Cynipid paper covers *Andricus balanaspis* with an "Sexual
+generation" subsection (spans `S_0010`–`S_0020`) and an "Asexual
+generation" subsection (spans `S_0030`–`S_0040`). A species-treatment
+header and shared diagnosis sit at `S_0005`–`S_0006`. Correct output:
+
+```json
+{
+  "candidates": [
+    {"gall_maker_mention": "Andricus balanaspis", "generation": "sexgen", "mention_span_ids": ["S_0005", "S_0006", "S_0010", "S_0011", "..."]},
+    {"gall_maker_mention": "Andricus balanaspis", "generation": "agamic", "mention_span_ids": ["S_0005", "S_0006", "S_0030", "S_0031", "..."]}
+  ]
+}
+```
+
+Same mention string, different generation values, overlapping span
+lists where the prose genuinely covers both generations.
 
 ## Span citations
 
@@ -140,12 +210,12 @@ JSON of this shape:
 ```json
 {
   "candidates": [
-    {"gall_maker_mention": "Andricus quercuscalifornicus", "mention_span_ids": ["S_0042", "S_0043"]},
-    {"gall_maker_mention": "A. quercuscalifornicus", "mention_span_ids": ["S_0058"]},
-    {"gall_maker_mention": "Andricus sp.", "mention_span_ids": ["S_0091"]}
+    {"gall_maker_mention": "Andricus quercuscalifornicus", "generation": "unspecified", "mention_span_ids": ["S_0042", "S_0043", "S_0058"]},
+    {"gall_maker_mention": "Andricus sp.", "generation": "unspecified", "mention_span_ids": ["S_0091"]}
   ]
 }
 ```
 
-Do not include any other fields. Do not add comments inside the JSON. Do
-not wrap the response in additional keys.
+Every candidate object MUST include `gall_maker_mention`, `generation`,
+and `mention_span_ids`. Do not include any other fields. Do not add
+comments inside the JSON. Do not wrap the response in additional keys.

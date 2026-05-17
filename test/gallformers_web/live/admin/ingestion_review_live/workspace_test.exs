@@ -272,6 +272,43 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       assert html =~ "Quercus alba"
       refute html =~ "Locked"
     end
+
+    test "evidence prose section renders structured paragraphs with span_id and page affordances",
+         %{conn: conn} do
+      reviewer = db_user_fixture("Evidence Prose Reviewer")
+      source = source_fixture(%{title: "Evidence Prose Source"})
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: reviewer.id,
+          source_id: source.id
+        })
+
+      source_ingestion_species_fixture(ingestion, 0, %{
+        extracted_name: "Druon evidens (agamic)",
+        evidence_prose: [
+          %{"span_id" => "S_0078", "page" => 3, "text" => "First paragraph about hosts."},
+          %{"span_id" => "S_0079", "page" => 3, "text" => "Second paragraph about morphology."},
+          %{"span_id" => "S_0081", "page" => 4, "text" => "Third paragraph about distribution."}
+        ]
+      })
+
+      conn = superadmin_conn(conn, reviewer)
+      {:ok, _view, html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
+
+      assert html =~ "Source text"
+      assert html =~ "First paragraph about hosts."
+      assert html =~ "Second paragraph about morphology."
+      assert html =~ "Third paragraph about distribution."
+
+      # span_id attached as a data attribute for future PDF deep-link wiring
+      assert html =~ ~s(data-span-id="S_0078")
+      assert html =~ ~s(data-span-id="S_0081")
+
+      # page rendered as a clickable affordance ("p. N")
+      assert html =~ "p. 3"
+      assert html =~ "p. 4"
+    end
   end
 
   describe "identity section" do

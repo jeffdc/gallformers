@@ -2,16 +2,123 @@
 
 from ingest.preprocess import (
     BLOCK_SEPARATOR,
+    drop_repeated_blocks,
     flat_normalized_text,
     preprocess_blocks,
     rejoin_hyphenated,
     rejoin_lines,
     strip_bhl_boilerplate,
-    strip_page_headers,
     strip_plate_pages,
     verify_block_offsets,
 )
 from ingest.schemas import RawTextBlock
+
+
+def _block(page: int, text: str, idx: int = 0) -> RawTextBlock:
+    return RawTextBlock(
+        block_id=f"p{page}-b{idx}",
+        page=page,
+        text=text,
+        extractor="test",
+    )
+
+
+class TestDropRepeatedBlocks:
+    """Frequency- and pagination-based detector for running headers/footers."""
+
+    def test_drops_constant_footer_on_every_page(self):
+        """Path A: a cluster spanning 100% of pages with no trailing digits."""
+        blocks = [_block(p, "© 2022 Magnolia Press", idx=0) for p in range(1, 11)]
+        blocks.append(_block(5, "Unique body content on page 5", idx=1))
+        result = drop_repeated_blocks(blocks)
+        texts = [b.text for b in result]
+        assert "Unique body content on page 5" in texts
+        assert all("Magnolia Press" not in t for t in texts)
+
+    def test_drops_header_where_trailing_digit_equals_page(self):
+        """Path B: 10 blocks each with trailing page number matching its page."""
+        blocks = [
+            _block(p, f"PAIRING OF NEARCTIC OAK GALLWASP GENERATIONS · {p}", idx=0)
+            for p in range(1, 11)
+        ]
+        blocks.append(_block(3, "Body content on page 3", idx=1))
+        result = drop_repeated_blocks(blocks)
+        texts = [b.text for b in result]
+        assert "Body content on page 3" in texts
+        assert all("PAIRING" not in t for t in texts)
+
+    def test_drops_alternating_recto_header(self):
+        """Path B with recto-only headers: digits 1, 3, 5, …, 19, all matching their page."""
+        blocks = []
+        for p in range(1, 21):
+            if p % 2 == 1:
+                blocks.append(_block(p, f"Smith and Jones · {p}", idx=0))
+            blocks.append(_block(p, f"Body prose for page {p} discussing gallwasps.", idx=1))
+        result = drop_repeated_blocks(blocks)
+        texts = [b.text for b in result]
+        assert all("Smith and Jones" not in t for t in texts)
+        assert any(t == "Body prose for page 1 discussing gallwasps." for t in texts)
+
+    def test_drops_standalone_page_numbers(self):
+        """Path B with empty base: blocks containing just a digit equal to the page."""
+        blocks = [
+            _block(p, f"Body prose for page {p} discussing gallwasps.", idx=0)
+            for p in range(1, 11)
+        ]
+        for p in [3, 5, 7, 9]:
+            blocks.append(_block(p, str(p), idx=1))
+        result = drop_repeated_blocks(blocks)
+        texts = [b.text for b in result]
+        for n in [3, 5, 7, 9]:
+            assert str(n) not in texts
+        # Body prose retained — its trailing token is "gallwasps.", not a digit.
+        assert any(t == "Body prose for page 1 discussing gallwasps." for t in texts)
+
+    def test_keeps_figure_captions(self):
+        """Cluster of 'Figure N' blocks has trailing digit ≠ page → Path B does NOT fire."""
+        blocks = [_block(p, f"Body on page {p}", idx=0) for p in range(1, 11)]
+        blocks.append(_block(3, "Figure 1", idx=1))
+        blocks.append(_block(5, "Figure 2", idx=1))
+        blocks.append(_block(7, "Figure 3", idx=1))
+        result = drop_repeated_blocks(blocks)
+        texts = [b.text for b in result]
+        assert "Figure 1" in texts
+        assert "Figure 2" in texts
+        assert "Figure 3" in texts
+
+    def test_keeps_unique_body_content(self):
+        """Blocks each with distinct non-paginated text (cluster size 1) are always kept."""
+        unique_texts = [
+            "Andricus quercuscalifornicus description",
+            "Quercus agrifolia host plant notes",
+            "Gall morphology in spring",
+            "Adult emergence timing",
+            "Distribution across the southwest",
+            "Comparison with related taxa",
+            "Type specimen deposition",
+            "Acknowledgements for fieldwork",
+            "References cited follow",
+            "Conclusions and future work",
+        ]
+        blocks = [_block(p + 1, unique_texts[p], idx=0) for p in range(10)]
+        result = drop_repeated_blocks(blocks)
+        assert len(result) == 10
+
+    def test_keeps_section_heading_spanning_page_break(self):
+        """A heading appearing on 2 of 10 pages (20% < 40%) and with no monotonic digits is kept."""
+        blocks = [_block(p, f"Body on page {p}", idx=0) for p in range(1, 11)]
+        blocks.append(_block(3, "Introduction", idx=1))
+        blocks.append(_block(4, "Introduction", idx=1))
+        result = drop_repeated_blocks(blocks)
+        intro_count = sum(1 for b in result if b.text == "Introduction")
+        assert intro_count == 2
+
+    def test_short_doc_skips_detection(self):
+        """Documents below min_pages_for_detection get no detection — all blocks kept."""
+        blocks = [_block(p, f"Header · {p}", idx=0) for p in range(1, 4)]
+        blocks.append(_block(2, "Body content", idx=1))
+        result = drop_repeated_blocks(blocks)
+        assert len(result) == 4
 
 
 class TestStripBHLBoilerplate:
@@ -81,20 +188,6 @@ class TestRejoinHyphenated:
         text = "a well-known fact"
         result = rejoin_hyphenated(text)
         assert "well-known" in result
-
-
-class TestStripPageHeaders:
-    def test_removes_journal_page_headers(self):
-        text = "end of previous text.\n\n528 Philippine Journal of Science\n1919\n\nStart of next text."
-        result = strip_page_headers(text)
-        assert "Philippine Journal of Science" not in result
-        assert "end of previous text" in result
-        assert "Start of next text" in result
-
-    def test_removes_page_numbers(self):
-        text = "some text.\n\n527\n\nmore text."
-        result = strip_page_headers(text)
-        assert result.strip() == "some text.\n\nmore text."
 
 
 class TestStripPlatPages:

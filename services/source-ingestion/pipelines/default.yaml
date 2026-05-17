@@ -13,7 +13,7 @@
 
 pipeline:
   name: default
-  schema_version: 1.0.0           # target review_artifact.schema_version
+  schema_version: 1.4.0           # target review_artifact.schema_version
   seed: 42                         # reproducibility; threaded into manifest
 
   # Defaults applied to every LLM stage unless overridden inline.
@@ -41,15 +41,35 @@ pipeline:
       language: eng                # tesseract language(s); see tesseract docs for multi-lang
       force_ocr: false             # re-OCR even pages that already have text
 
+    - step: block-triage           # LLM filter: drop noise blocks before they reach any downstream stage
+      # Classifies each raw block as content vs noise (running headers,
+      # footers, TOC entries, copyright lines, plate-page artifacts, OCR
+      # junk, etc.). Replaces per-publisher regex whack-a-mole; one prompt
+      # adapts to every layout via the LLM's semantic understanding.
+      # Bias toward keeping content — drop only on >= agreement_threshold
+      # of n_samples agreeing a block is noise.
+      #
+      # Llama-3.1-8B was attempted first for cost but it failed Instructor
+      # schema validation reliably (emits raw arrays, Instructor expects
+      # an object). DeepSeek-V4-Flash is already proven on find-candidates
+      # / verify-claims with the same Instructor + n=3 voting pattern, so
+      # it's the safe pick.
+      model: deepinfra/deepseek-ai/DeepSeek-V4-Flash
+      prompt: prompts/block-triage.md
+      n_samples: 3
+      agreement_threshold: 2
+      batch_size: 50               # blocks per LLM call
+      max_workers: 5               # concurrent batches in flight (capped to stay polite under DeepInfra's 200/model)
+
     - step: preprocess             # raw_text.jsonl → normalized_text.jsonl
       # Output is the canonical text substrate evidence offsets address into.
       # No LLM stage between preprocess and sectionize — deterministic-only
       # cleanup keeps offsets stable and prevents hallucinated edits from
-      # poisoning the substring gate.
+      # poisoning the substring gate. Running-header / TOC / boilerplate
+      # removal is now handled by the upstream `block-triage` LLM stage.
       ops:                         # all on by default; list to subset
         - strip_bhl_boilerplate
         - strip_plate_pages
-        - strip_page_headers
         - rejoin_hyphenated
         - rejoin_lines
 
