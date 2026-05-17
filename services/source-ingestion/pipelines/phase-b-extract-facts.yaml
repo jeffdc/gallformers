@@ -24,6 +24,17 @@ pipeline:
     - step: extract
       extractor: pymupdf
 
+    - step: ocr
+      # Auto-detect scanned PDFs by text density. ocrmypdf (tesseract)
+      # runs over the whole document and replaces the block list when the
+      # first-pass pymupdf extraction averages below `min_chars_per_page`.
+      # Output cached at output/<source-id>/source.ocr.pdf keyed on PDF
+      # sha256 + ocrmypdf version, so re-runs skip the slow OCR pass.
+      enabled: auto                # auto | always | never
+      min_chars_per_page: 100
+      language: eng
+      force_ocr: false             # let ocrmypdf skip pages with existing text layer
+
     - step: preprocess
       ops:
         - strip_bhl_boilerplate

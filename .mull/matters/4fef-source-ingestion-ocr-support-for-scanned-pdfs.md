@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-05-15
-updated: 2026-05-15
+updated: 2026-05-16
 epic: source-ingestion
 relates: [9314]
 ---
@@ -56,4 +56,32 @@ When OCR support lands, examine actual BHL outputs and broaden the rule so cover
 ## Human test
 
 Process a scanned BHL paper (e.g., the Philippines paper in `test-corpus/`) end-to-end with `north-star-v0` and receive a bundle whose evidence quotes actually appear on the OCR'd page text.
+
+## Phase 1 design — whole-document OCR trigger (2026-05-16)
+
+This phase implements the minimum-viable OCR fallback: a single new pipeline stage that detects scanned PDFs by text density and runs ocrmypdf on the whole document when triggered. The richer per-page profiling + mixed-routing model in section 1 of this matter remains as follow-up.
+
+### Decisions
+
+- **Tool:** `ocrmypdf` (wraps tesseract + ghostscript). Free, deterministic, produces a new PDF with embedded text layer so the existing `extract.py` keeps working unchanged. Vision-LLM OCR (the `north-star-v0-ocr.yaml` stub's olmOCR direction) deferred — swap is one stage rewrite if tesseract quality turns out insufficient on the eval set.
+- **Trigger:** per-document auto-detect on `avg_chars_per_page`. Threshold configurable in pipeline YAML; default 100. Whole-document, not per-page (both initial target papers are uniformly image-only; mixed-mode adds bookkeeping for minimal gain). Pipeline-level overrides: `enabled: auto|always|never`.
+- **Placement:** new `ocr` stage between `extract` and `preprocess`. Adds `"ocr"` to `VALID_STEPS`. New module `src/ingest/ocr.py`. Stage runs after pymupdf's first-pass extraction so the density check has data to evaluate; if triggered, replaces the `RawTextBlock` list before `write_jsonl`. (Note: matter body previously claimed `ocr.py` already existed — it does not. Stale reference, possibly from the old Elixir harness.)
+- **Caching:** sidecar `output/<source-id>/source.ocr.pdf.cache.json` with `{pdf_sha256, ocrmypdf_version, language, force_ocr}`, mirroring the existing `_is_cache_valid` / `_write_cache_sidecar` pattern. Manifest `StageRunRecord` captures the OCR provenance (tool, version, trigger reason) as a separate concern from cache validity — both artifacts exist.
+
+### Success criteria
+
+After this phase ships:
+- Loxaulus (source 103) and Triggerson (source 117) move out of `EXCLUDED` in `eval/pdf_source_map.py`.
+- `uv run python eval/match_descriptions.py` shows ≥70% block match (Tier B) for both.
+- No regression on currently-passing sources (the auto-detect threshold should leave them on the native extract path).
+
+### Wall-time expectation
+
+First OCR run of a scanned paper: ~5-10 min on M-series CPU. Subsequent runs: cache hit, seconds.
+
+### Out of scope for this phase (remains in scope for the matter)
+
+- Per-page profiling + mixed pymupdf/tesseract/vision-LLM routing (section 1 of this matter).
+- BHL boilerplate strip broadening (section 3) — easier to revisit once we can see what real OCR'd BHL output looks like.
+- Vision-LLM provider OCR fallback for cases tesseract can't handle.
 

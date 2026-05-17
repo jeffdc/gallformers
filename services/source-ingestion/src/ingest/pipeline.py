@@ -30,6 +30,7 @@ from ingest.extract_facts import extract_facts
 from ingest.find_candidates import find_candidates
 from ingest.jsonl import write_jsonl
 from ingest.metadata import extract_document_metadata
+from ingest.ocr import maybe_ocr
 from ingest.preprocess import flat_normalized_text, preprocess_blocks
 from ingest.schemas import (
     Candidate,
@@ -52,6 +53,7 @@ from ingest.verify_claims import verify_cell
 VALID_STEPS = frozenset(
     {
         "extract",
+        "ocr",
         "preprocess",
         "sectionize",
         "metadata",
@@ -122,6 +124,22 @@ def _load_prompt(rel_path: str) -> tuple[str, str]:
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+def _log(msg: str) -> None:
+    """Stream a progress message to stdout. Used by the pipeline runner so
+    long stages (OCR, LLM fan-out, taxonomy lookups) don't appear to hang.
+    """
+    print(msg, flush=True)
+
+
+def _dur_s(start: datetime, end: datetime) -> str:
+    """Format a stage duration as a short ``X.Ys`` or ``Xm Ys`` string."""
+    seconds = (end - start).total_seconds()
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    minutes, secs = divmod(seconds, 60)
+    return f"{int(minutes)}m {secs:.1f}s"
 
 
 def _pdf_sha(path: Path) -> str:
@@ -260,36 +278,91 @@ async def run_pipeline(
     stage_records: list[StageRunRecord] = []
     warnings: list[WarningEntry] = []
 
+    _log(f"=== pipeline '{pipeline['name']}' starting (source={source_id}) ===")
+
     # ── extract ──────────────────────────────────────────────────────────
     if "extract" not in stages_cfg:
         raise ValueError("Pipeline must include an 'extract' stage")
     if input_path is None:
         raise ValueError("input_path is required for the 'extract' stage")
     t = _now()
+    _log(f"[extract] reading {input_path}")
     raw_blocks = extract_blocks(input_path)
-    write_jsonl(raw_blocks, src_dir / "raw_text.jsonl")
     pdf_sha = (
         _pdf_sha(Path(input_path))
         if Path(input_path).suffix.lower() == ".pdf"
         else _text_sha(input_path)
     )
+    extract_completed = _now()
+    page_count = max((b.page for b in raw_blocks), default=1)
+    _log(f"[extract] {len(raw_blocks)} blocks across {page_count} pages ({_dur_s(t, extract_completed)})")
+
+    # ── ocr (optional) ───────────────────────────────────────────────────
+    # Runs between extract and preprocess. If the PDF's text density is
+    # below ``min_chars_per_page`` (or ``enabled: always`` is set), runs
+    # ocrmypdf to add a text layer and replaces ``raw_blocks`` with the
+    # OCR'd extraction. raw_text.jsonl is written *after* this stage so
+    # the on-disk artifact reflects whatever the downstream pipeline
+    # actually consumes.
+    ocr_artifacts: list[str] = []
+    if "ocr" in stages_cfg:
+        ocr_cfg = stages_cfg["ocr"]
+        ocr_t = _now()
+        _log(
+            f"[ocr] checking {page_count}-page PDF "
+            f"(enabled={ocr_cfg.get('enabled', 'auto')}, "
+            f"threshold={ocr_cfg.get('min_chars_per_page', 100)} chars/page)"
+        )
+        raw_blocks, ocr_result = maybe_ocr(
+            input_path,
+            raw_blocks,
+            src_dir,
+            enabled=ocr_cfg.get("enabled", "auto"),
+            min_chars_per_page=float(ocr_cfg.get("min_chars_per_page", 100.0)),
+            language=ocr_cfg.get("language", "eng"),
+            force_ocr=bool(ocr_cfg.get("force_ocr", False)),
+        )
+        if ocr_result.ocr_pdf_path is not None:
+            ocr_artifacts.append(ocr_result.ocr_pdf_path.name)
+        notes = ocr_result.reason
+        if ocr_result.ocrmypdf_version:
+            notes = f"{notes} ({ocr_result.ocrmypdf_version})"
+        ocr_done = _now()
+        _log(f"[ocr] {ocr_result.reason} ({_dur_s(ocr_t, ocr_done)})")
+        stage_records.append(
+            StageRunRecord(
+                name="ocr",
+                started_at=ocr_t,
+                completed_at=ocr_done,
+                artifacts_written=ocr_artifacts,
+                notes=notes,
+            )
+        )
+
+    write_jsonl(raw_blocks, src_dir / "raw_text.jsonl")
     stage_records.append(
         StageRunRecord(
             name="extract",
             started_at=t,
-            completed_at=_now(),
+            completed_at=extract_completed,
             artifacts_written=["raw_text.jsonl"],
         )
     )
 
     # ── preprocess ───────────────────────────────────────────────────────
     t = _now()
+    _log("[preprocess] running deterministic cleanup")
     normalized_blocks = preprocess_blocks(raw_blocks)
+    preprocess_done = _now()
+    _log(
+        f"[preprocess] {len(normalized_blocks)} normalized blocks "
+        f"(from {len(raw_blocks)} raw, {_dur_s(t, preprocess_done)})"
+    )
     stage_records.append(
         StageRunRecord(
             name="preprocess",
             started_at=t,
-            completed_at=_now(),
+            completed_at=preprocess_done,
             artifacts_written=[],
         )
     )
@@ -300,16 +373,23 @@ async def run_pipeline(
     # on-disk row would be section_id=null even though in-memory blocks
     # are correct.
     t = _now()
+    _log("[sectionize] identifying sections")
     sections_file, normalized_blocks = sectionize(normalized_blocks)
     write_jsonl(normalized_blocks, src_dir / "normalized_text.jsonl")
     (src_dir / "sections.json").write_text(sections_file.model_dump_json(indent=2))
     sections_by_id = {s.section_id: s for s in sections_file.sections}
     eligibility = {s.section_id: s.extraction_eligible for s in sections_file.sections}
+    sect_done = _now()
+    n_eligible = sum(1 for v in eligibility.values() if v)
+    _log(
+        f"[sectionize] {len(sections_file.sections)} sections "
+        f"({n_eligible} extraction-eligible, {_dur_s(t, sect_done)})"
+    )
     stage_records.append(
         StageRunRecord(
             name="sectionize",
             started_at=t,
-            completed_at=_now(),
+            completed_at=sect_done,
             artifacts_written=["normalized_text.jsonl", "sections.json"],
         )
     )
@@ -349,6 +429,7 @@ async def run_pipeline(
         t = _now()
         if _is_cache_valid(meta_path, meta_cache_key):
             document_metadata = DocumentMetadata.model_validate_json(meta_path.read_text())
+            _log("[metadata] cached")
             stage_records.append(
                 StageRunRecord(
                     name="metadata",
@@ -360,6 +441,7 @@ async def run_pipeline(
                 )
             )
         else:
+            _log(f"[metadata] calling {cfg['model']} ({len(meta_input_blocks)} input blocks)")
             document_metadata, call = await extract_document_metadata(
                 meta_input_blocks,
                 model=cfg["model"],
@@ -372,11 +454,13 @@ async def run_pipeline(
             w = _warning_for_error_call(call, stage="metadata")
             if w:
                 warnings.append(w)
+            meta_done = _now()
+            _log(f"[metadata] done ({_dur_s(t, meta_done)})")
             stage_records.append(
                 StageRunRecord(
                     name="metadata",
                     started_at=t,
-                    completed_at=_now(),
+                    completed_at=meta_done,
                     calls=[call],
                     artifacts_written=["metadata.json"],
                 )
@@ -406,6 +490,7 @@ async def run_pipeline(
     t = _now()
     if _is_cache_valid(candidates_path, fc_cache_key):
         candidates_file = CandidatesFile.model_validate_json(candidates_path.read_text())
+        _log(f"[find-candidates] cached ({len(candidates_file.candidates)} candidates)")
         stage_records.append(
             StageRunRecord(
                 name="find-candidates",
@@ -416,6 +501,10 @@ async def run_pipeline(
             )
         )
     else:
+        _log(
+            f"[find-candidates] calling {cfg['model']} on {len(eligible)} blocks "
+            f"(n_samples={cfg.get('n_samples', 3)})"
+        )
         candidates_file, sample_records = await find_candidates(
             blocks=eligible,
             model=cfg["model"],
@@ -432,11 +521,13 @@ async def run_pipeline(
             )
             if w:
                 warnings.append(w)
+        fc_done = _now()
+        _log(f"[find-candidates] {len(candidates_file.candidates)} candidates ({_dur_s(t, fc_done)})")
         stage_records.append(
             StageRunRecord(
                 name="find-candidates",
                 started_at=t,
-                completed_at=_now(),
+                completed_at=fc_done,
                 calls=sample_records,
             )
         )
@@ -494,6 +585,10 @@ async def run_pipeline(
         return record, call
 
     t = _now()
+    _log(
+        f"[extract-facts] processing {len(candidates_file.candidates)} candidates "
+        f"with {facts_cfg['model']} (max_workers={facts_workers})"
+    )
     facts_results = await asyncio.gather(
         *[_process_candidate(c) for c in candidates_file.candidates]
     )
@@ -516,11 +611,16 @@ async def run_pipeline(
             ],
         )
     )
+    facts_done = _now()
+    _log(
+        f"[extract-facts] done — {len(facts_calls)} fresh calls, "
+        f"{len(facts_results) - len(facts_calls)} cached ({_dur_s(t, facts_done)})"
+    )
     stage_records.append(
         StageRunRecord(
             name="extract-facts",
             started_at=t,
-            completed_at=_now(),
+            completed_at=facts_done,
             calls=facts_calls,
             artifacts_written=[
                 f"candidates/{c.candidate_id}/facts.json" for c in candidates_file.candidates
@@ -530,6 +630,7 @@ async def run_pipeline(
 
     # ── verify (substring gate) ──────────────────────────────────────────
     t = _now()
+    _log(f"[verify] running substring gate over {len(claims_records)} records")
     blocks_by_id = _index_blocks(normalized_blocks)
     gated_records: list[GallRecord] = []
     for record in claims_records:
@@ -539,7 +640,9 @@ async def run_pipeline(
         (candidates_dir / record.candidate_id / "gated_facts.json").write_text(
             gated.model_dump_json(indent=2)
         )
-    stage_records.append(StageRunRecord(name="verify", started_at=t, completed_at=_now()))
+    verify_done = _now()
+    _log(f"[verify] done ({_dur_s(t, verify_done)})")
+    stage_records.append(StageRunRecord(name="verify", started_at=t, completed_at=verify_done))
 
     # ── verify-claims (per cell, LLM verifier) ───────────────────────────
     vc_cfg = stages_cfg["verify-claims"]
@@ -579,6 +682,7 @@ async def run_pipeline(
         verified_records = [
             GallRecord.model_validate_json(p.read_text()) for p in vc_per_record_paths
         ]
+        _log("[verify-claims] cached")
         stage_records.append(
             StageRunRecord(
                 name="verify-claims",
@@ -589,6 +693,10 @@ async def run_pipeline(
             )
         )
     else:
+        _log(
+            f"[verify-claims] running LLM verifier over {len(gated_records)} records "
+            f"with {vc_cfg['model']} (max_workers={vc_workers})"
+        )
         verified_records, vc_calls, vc_warnings = await _verify_records_claims(
             gated_records,
             blocks_by_id,
@@ -604,11 +712,13 @@ async def run_pipeline(
                 r.model_dump_json(indent=2)
             )
         vc_sidecar.write_text(json.dumps(vc_cache_key, indent=2, sort_keys=True))
+        vc_done = _now()
+        _log(f"[verify-claims] {len(vc_calls)} verifier calls ({_dur_s(t, vc_done)})")
         stage_records.append(
             StageRunRecord(
                 name="verify-claims",
                 started_at=t,
-                completed_at=_now(),
+                completed_at=vc_done,
                 calls=vc_calls,
             )
         )
@@ -617,14 +727,18 @@ async def run_pipeline(
     tax_cfg = stages_cfg.get("taxonomy-lookup", {})
     cache_dir = Path(tax_cfg.get("cache_dir", str(src_dir / "cache" / "gbif")))
     t = _now()
+    _log(f"[taxonomy-lookup] enriching {len(verified_records)} records via GBIF")
     verified_records = await _enrich_records_with_taxonomy(
         verified_records,
         cache_dir=cache_dir,
         max_workers=tax_cfg.get("max_workers", 8),
     )
-    stage_records.append(StageRunRecord(name="taxonomy-lookup", started_at=t, completed_at=_now()))
+    tax_done = _now()
+    _log(f"[taxonomy-lookup] done ({_dur_s(t, tax_done)})")
+    stage_records.append(StageRunRecord(name="taxonomy-lookup", started_at=t, completed_at=tax_done))
 
     # ── assemble-review ──────────────────────────────────────────────────
+    _log("[assemble-review] writing claims/verified/review/manifest artifacts")
     completed_at = _now()
     flat_text = flat_normalized_text(normalized_blocks)
     pdf_filename = Path(input_path).name if Path(input_path).is_file() else str(source_id)
@@ -664,12 +778,14 @@ async def run_pipeline(
     # ── bundle ───────────────────────────────────────────────────────────
     bundle_cfg = stages_cfg.get("bundle", {})
     bundle_path = src_dir / bundle_cfg.get("output", "bundle.tar.gz")
+    _log(f"[bundle] writing {bundle_path.name}")
     write_bundle(
         src_dir,
         bundle_path,
         include_candidates=bool(bundle_cfg.get("include_candidates", False)),
         verify_complete=bool(bundle_cfg.get("verify_complete", True)),
     )
+    _log(f"=== pipeline done ({_dur_s(started_at, _now())}) → {bundle_path} ===")
     return bundle_path
 
 
