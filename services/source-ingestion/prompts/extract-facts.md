@@ -1,4 +1,4 @@
-# version: 0.2.1
+# version: 0.2.2
 
 You are extracting **structured facts about a single gall-maker species**
 from a scientific paper. A previous stage identified the candidate
@@ -209,7 +209,16 @@ use 1.
 
 ## Abstention rule
 
-**It is always correct to abstain.** When in doubt:
+**It is always correct to abstain.** The downstream verifier and human
+reviewer prefer abstentions to fabricated values. A field abstained at
+this stage gets no review burden — it simply isn't surfaced.
+
+There are TWO different abstention shapes depending on the cell type.
+Using the wrong shape causes a hard validation failure and burns
+retries — pay attention to which fields use which template.
+
+**EvidenceCell shape** — use for `gall_maker.*`, `hosts[*].*`, `location`,
+and `gall_traits.detachable`:
 
 ```json
 {
@@ -220,9 +229,37 @@ use 1.
 }
 ```
 
-The downstream verifier and human reviewer prefer abstentions to
-fabricated values. A field abstained at this stage gets no review
-burden — it simply isn't surfaced.
+For `detachable` specifically, the abstaining `value` is the string
+`"unknown"` (from the Detachable enum), not `null`:
+
+```json
+{
+  "value": "unknown",
+  "evidence": [],
+  "support_status": "abstained",
+  "confidence": 0.0
+}
+```
+
+**TraitCell shape** — use for the nine free-form trait fields:
+`gall_traits.color`, `shape`, `texture`, `walls`, `cells`, `alignment`,
+`plant_part`, `form`, `season`. These have `original` and `suggested`,
+NOT `value`:
+
+```json
+{
+  "original": null,
+  "suggested": [],
+  "evidence": [],
+  "support_status": "abstained",
+  "confidence": 0.0
+}
+```
+
+Do not put `"value"` in a TraitCell, and do not put `"original"` /
+`"suggested"` in an EvidenceCell. The schema is strict — any extra
+field, or any missing required field, fails validation and forces a
+retry that often introduces a fresh error elsewhere.
 
 ## OCR-damaged or historical names
 

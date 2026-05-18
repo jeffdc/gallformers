@@ -1,4 +1,4 @@
-# version: 0.2.0
+# version: 0.3.0
 
 You are extracting **gall-maker mentions** from a scientific paper. Your job
 is high-recall detection: find every organism the paper identifies as
@@ -126,33 +126,55 @@ candidate.
 **Same species, generations conflated or not specified → one candidate**
 with `generation: "unspecified"`.
 
-**Different species → one candidate each.** Different species names
-always mean different candidates, even when one is the paper's main
-subject and others are mentioned only briefly. A comparison species
-invoked once for context still gets its own candidate; a downstream
-extractor will record what facts (if any) the paper provides about it,
-and abstain on the rest.
+**Different species → one candidate each, but only when the paper
+TREATS the species as a subject.** Many papers reference species the
+paper does not actually treat — citations, comparison-table rows,
+synonymy entries, "differs from X" diagnostic asides, "see Smith 1989
+for the asexual generation" pointers. Those species belong in the
+references and downstream analysis, **not in this candidate list**.
+
+A species qualifies as a candidate when the paper provides at least one
+of:
+
+- a morphological description of its galls or the gall-maker,
+- host plants explicitly attributed to it,
+- distribution or locality information for it,
+- biology, life-cycle, or behavior notes about it,
+- a diagnosis or treatment section dedicated to it.
+
+A species DOES NOT qualify when it appears only:
+
+- in a bibliographic citation (e.g., "Burks 1979", "Kinsey (1930)"),
+- as a row in a comparison or synonymy table that just lists name +
+  author + year + reference, with no prose about the species itself,
+- in a single "differs from X" or "similar to Y" sentence, where the
+  paper is treating a DIFFERENT species and just naming X/Y in passing,
+- as a name within another species' synonymy list (e.g., "= A.
+  macrocarpae Bassett, 1890, syn. nov.").
+
+When in doubt, ask: "Would removing every passage about this species
+significantly reduce what the paper communicates about it?" If no —
+the paper isn't really treating it — skip the candidate.
 
 ### Worked example — distinct species, no generation split
 
 Suppose a paper is primarily about *Andricus coriarius* (mentioned ~10
-times across the body) and contains one sentence referencing prior work
-on a different species: `galls of Andricus quercuscalicis at the
-advancing edge of their range may show similar patterns`. Correct
-output:
+times across the body, with diagnosis, host attribution, and biology)
+and contains one sentence referencing a different species: `galls of
+Andricus quercuscalicis at the advancing edge of their range may show
+similar patterns`. Correct output:
 
 ```json
 {
   "candidates": [
-    {"gall_maker_mention": "Andricus coriarius", "generation": "unspecified", "mention_span_ids": ["S_0002", "S_0004", "S_0011", "..."]},
-    {"gall_maker_mention": "Andricus quercuscalicis", "generation": "unspecified", "mention_span_ids": ["S_0025"]}
+    {"gall_maker_mention": "Andricus coriarius", "generation": "unspecified", "mention_span_ids": ["S_0002", "S_0004", "S_0011", "..."]}
   ]
 }
 ```
 
-Two distinct species, two candidates. The secondary species gets a
-single span; that is fine. Neither paper passage distinguishes
-generations, so both are `"unspecified"`.
+ONE candidate. *Andricus quercuscalicis* appears in a single comparative
+remark — the paper isn't treating it as a subject, it's just citing it.
+Do not emit a candidate for it.
 
 ### Worked example — one species, generations split
 

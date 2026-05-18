@@ -93,15 +93,18 @@ class TestNormalizeMention:
 
 class TestFindCandidates:
     async def test_agreement_threshold_filters_singletons(self, mocker):
-        blocks = [_block("S_0001", "Andricus quercuscalifornicus paragraph.")]
+        blocks = [
+            _block("S_0001", "Andricus quercuscalifornicus paragraph."),
+            _block("S_0002", "Continuation."),
+        ]
 
         # 3 samples: two agree on the same mention; one is a one-off.
         _mock_instructor_client(
             mocker,
             [
-                _ok_sample(("Andricus quercuscalifornicus", ["S_0001"])),
-                _ok_sample(("Andricus quercuscalifornicus", ["S_0001"])),
-                _ok_sample(("Phylloxera quercus", ["S_0001"])),
+                _ok_sample(("Andricus quercuscalifornicus", ["S_0001", "S_0002"])),
+                _ok_sample(("Andricus quercuscalifornicus", ["S_0001", "S_0002"])),
+                _ok_sample(("Phylloxera quercus", ["S_0001", "S_0002"])),
             ],
         )
 
@@ -121,7 +124,7 @@ class TestFindCandidates:
         c = candidates_file.candidates[0]
         assert c.candidate_id == "C_001"
         assert c.gall_maker_mention == "Andricus quercuscalifornicus"
-        assert c.mention_span_ids == ["S_0001"]
+        assert c.mention_span_ids == ["S_0001", "S_0002"]
         assert c.sample_agreement == 2
 
     async def test_dedup_by_normalized_mention(self, mocker):
@@ -183,14 +186,19 @@ class TestFindCandidates:
         unambiguous (3/3) so BOTH generations should be emitted as candidates,
         even though the agamic tag only appears in one sample.
         """
-        blocks = [_block("S_0001", "sexgen passage"), _block("S_0002", "agamic passage")]
+        blocks = [
+            _block("S_0001", "sexgen passage 1"),
+            _block("S_0002", "sexgen passage 2"),
+            _block("S_0003", "agamic passage 1"),
+            _block("S_0004", "agamic passage 2"),
+        ]
 
         _mock_instructor_client(
             mocker,
             [
-                _ok_sample(("Acraspis quercushirta", ["S_0001"], "sexgen")),
-                _ok_sample(("Acraspis quercushirta", ["S_0001"], "sexgen")),
-                _ok_sample(("Acraspis quercushirta", ["S_0002"], "agamic")),
+                _ok_sample(("Acraspis quercushirta", ["S_0001", "S_0002"], "sexgen")),
+                _ok_sample(("Acraspis quercushirta", ["S_0001", "S_0002"], "sexgen")),
+                _ok_sample(("Acraspis quercushirta", ["S_0003", "S_0004"], "agamic")),
             ],
         )
 
@@ -207,8 +215,8 @@ class TestFindCandidates:
         assert set(by_gen.keys()) == {"sexgen", "agamic"}
         assert by_gen["sexgen"].sample_agreement == 2
         assert by_gen["agamic"].sample_agreement == 1
-        assert by_gen["sexgen"].mention_span_ids == ["S_0001"]
-        assert by_gen["agamic"].mention_span_ids == ["S_0002"]
+        assert by_gen["sexgen"].mention_span_ids == ["S_0001", "S_0002"]
+        assert by_gen["agamic"].mention_span_ids == ["S_0003", "S_0004"]
 
     async def test_specific_generation_drops_unspecified_votes(self, mocker):
         """When any sample tags a specific generation, drop sibling unspecified votes.
@@ -216,14 +224,14 @@ class TestFindCandidates:
         unspecified means 'I couldn't tell.' If other samples could tell, the
         unspecified vote is the uninformative one — don't emit it.
         """
-        blocks = [_block("S_0001", "content")]
+        blocks = [_block("S_0001", "content"), _block("S_0002", "more content")]
 
         _mock_instructor_client(
             mocker,
             [
-                _ok_sample(("Andricus sp", ["S_0001"], "sexgen")),
-                _ok_sample(("Andricus sp", ["S_0001"], "unspecified")),
-                _ok_sample(("Andricus sp", ["S_0001"], "sexgen")),
+                _ok_sample(("Andricus sp", ["S_0001", "S_0002"], "sexgen")),
+                _ok_sample(("Andricus sp", ["S_0001", "S_0002"], "unspecified")),
+                _ok_sample(("Andricus sp", ["S_0001", "S_0002"], "sexgen")),
             ],
         )
 
@@ -247,22 +255,27 @@ class TestFindCandidates:
         separately identifiable passages, find-candidates must emit two
         candidates rather than collapsing them by name alone.
         """
-        blocks = [_block("S_0001", "sexual generation"), _block("S_0002", "agamic generation")]
+        blocks = [
+            _block("S_0001", "sexual gen part 1"),
+            _block("S_0002", "sexual gen part 2"),
+            _block("S_0003", "agamic gen part 1"),
+            _block("S_0004", "agamic gen part 2"),
+        ]
 
         _mock_instructor_client(
             mocker,
             [
                 _ok_sample(
-                    ("Andricus balanaspis", ["S_0001"], "sexgen"),
-                    ("Andricus balanaspis", ["S_0002"], "agamic"),
+                    ("Andricus balanaspis", ["S_0001", "S_0002"], "sexgen"),
+                    ("Andricus balanaspis", ["S_0003", "S_0004"], "agamic"),
                 ),
                 _ok_sample(
-                    ("Andricus balanaspis", ["S_0001"], "sexgen"),
-                    ("Andricus balanaspis", ["S_0002"], "agamic"),
+                    ("Andricus balanaspis", ["S_0001", "S_0002"], "sexgen"),
+                    ("Andricus balanaspis", ["S_0003", "S_0004"], "agamic"),
                 ),
                 _ok_sample(
-                    ("Andricus balanaspis", ["S_0001"], "sexgen"),
-                    ("Andricus balanaspis", ["S_0002"], "agamic"),
+                    ("Andricus balanaspis", ["S_0001", "S_0002"], "sexgen"),
+                    ("Andricus balanaspis", ["S_0003", "S_0004"], "agamic"),
                 ),
             ],
         )
@@ -281,13 +294,64 @@ class TestFindCandidates:
         assert set(by_gen.keys()) == {"sexgen", "agamic"}
         assert by_gen["sexgen"].gall_maker_mention == "Andricus balanaspis"
         assert by_gen["agamic"].gall_maker_mention == "Andricus balanaspis"
-        assert by_gen["sexgen"].mention_span_ids == ["S_0001"]
-        assert by_gen["agamic"].mention_span_ids == ["S_0002"]
+        assert by_gen["sexgen"].mention_span_ids == ["S_0001", "S_0002"]
+        assert by_gen["agamic"].mention_span_ids == ["S_0003", "S_0004"]
         assert by_gen["sexgen"].sample_agreement == 3
         assert by_gen["agamic"].sample_agreement == 3
 
+    async def test_single_mention_candidates_dropped(self, mocker):
+        """Candidates whose only support is a single mention span are dropped.
+
+        Real species treatments produce multiple mentions: a treatment header,
+        diagnosis, biology, etc. A single mention is almost always a
+        comparison-table row, a citation, or a side reference. (Nicholls 2022
+        ran 94 candidates → 45 of them had exactly one mention each, all
+        literal table-row entries from the species-comparison appendix.)"""
+        blocks = [_block("S_0001", "x"), _block("S_0002", "y"), _block("S_0003", "z")]
+
+        # Three samples all agree on a single-mention candidate.
+        _mock_instructor_client(
+            mocker,
+            [
+                _ok_sample(("Andricus passing", ["S_0001"])),
+                _ok_sample(("Andricus passing", ["S_0001"])),
+                _ok_sample(("Andricus passing", ["S_0001"])),
+            ],
+        )
+        candidates_file, _ = await find_candidates(
+            blocks=blocks,
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="e" * 64,
+            n_samples=3,
+            agreement_threshold=2,
+        )
+        assert candidates_file.candidates == []
+
+    async def test_multi_mention_candidates_kept(self, mocker):
+        """Candidates with two or more mention spans clear the filter."""
+        blocks = [_block("S_0001", "x"), _block("S_0002", "y"), _block("S_0003", "z")]
+        _mock_instructor_client(
+            mocker,
+            [
+                _ok_sample(("Andricus real", ["S_0001", "S_0002"])),
+                _ok_sample(("Andricus real", ["S_0001", "S_0002"])),
+                _ok_sample(("Andricus real", ["S_0001", "S_0002"])),
+            ],
+        )
+        candidates_file, _ = await find_candidates(
+            blocks=blocks,
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="f" * 64,
+            n_samples=3,
+            agreement_threshold=2,
+        )
+        assert len(candidates_file.candidates) == 1
+        assert candidates_file.candidates[0].mention_span_ids == ["S_0001", "S_0002"]
+
     async def test_one_bad_sample_does_not_break_others(self, mocker):
-        blocks = [_block("S_0001", "x")]
+        blocks = [_block("S_0001", "x"), _block("S_0002", "y")]
 
         # First sample raises (simulating Instructor giving up after max_retries);
         # other two succeed with the same mention.
@@ -295,8 +359,8 @@ class TestFindCandidates:
             mocker,
             [
                 Exception("instructor validation failed after retries"),
-                _ok_sample(("Foo", ["S_0001"])),
-                _ok_sample(("Foo", ["S_0001"])),
+                _ok_sample(("Foo", ["S_0001", "S_0002"])),
+                _ok_sample(("Foo", ["S_0001", "S_0002"])),
             ],
         )
 

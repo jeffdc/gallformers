@@ -33,7 +33,15 @@ from ingest.schemas import (
 
 # Stage version. Bump when stage-code changes alter outputs for the same inputs
 # (dedup logic, post-processing, output fields, …). See services/source-ingestion/CLAUDE.md.
-STAGE_VERSION = "1.1.0"
+STAGE_VERSION = "1.2.0"
+
+# Candidates whose support reduces to a single span across all samples are almost
+# always comparison-table rows, bibliographic citations, or single-sentence side
+# references — not species the paper treats as a subject. The find-candidates
+# prompt already discourages these, but the floor catches anything the LLM lets
+# through. (Nicholls 2022: 45 of 94 raw candidates had exactly one mention each,
+# all literal table-row entries from the species-comparison appendix.)
+MIN_MENTION_SPANS = 2
 
 
 def format_chunked_input(blocks: list[NormalizedBlock]) -> str:
@@ -225,6 +233,7 @@ async def find_candidates(
 
     candidates: list[Candidate] = []
     cid = 0
+    dropped_single_mention = 0
     for entry in kept_species:
         gens = entry["generations"]
         # Suppress unspecified votes when any specific generation is present.
@@ -233,6 +242,14 @@ async def find_candidates(
         for gen in gen_keys:
             gen_entry = gens[gen]
             if not gen_entry["spans"]:
+                continue
+            if len(gen_entry["spans"]) < MIN_MENTION_SPANS:
+                dropped_single_mention += 1
+                print(
+                    f"[find-candidates] dropped {entry['mention']!r} (generation={gen}): "
+                    f"{len(gen_entry['spans'])} mention span(s) < MIN_MENTION_SPANS={MIN_MENTION_SPANS}",
+                    file=sys.stderr,
+                )
                 continue
             cid += 1
             candidates.append(
@@ -244,5 +261,12 @@ async def find_candidates(
                     generation=gen,
                 )
             )
+
+    if dropped_single_mention:
+        print(
+            f"[find-candidates] dropped {dropped_single_mention} candidate(s) "
+            f"with fewer than {MIN_MENTION_SPANS} mention spans",
+            file=sys.stderr,
+        )
 
     return CandidatesFile(candidates=candidates), records

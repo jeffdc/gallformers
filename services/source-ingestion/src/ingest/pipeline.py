@@ -1164,7 +1164,6 @@ async def _verify_records_claims(
                     "gall_maker": new_gm,
                     "hosts": new_hosts,
                     "gall_traits": new_traits,
-                    "description": by_loc[(r_idx, "description")],
                     "location": by_loc[(r_idx, "location")],
                 }
             )

@@ -53,7 +53,15 @@ from ingest.schemas import (
 
 # Stage version. Bump when stage-code changes alter outputs for the same inputs.
 # See services/source-ingestion/CLAUDE.md.
-STAGE_VERSION = "1.0.0"
+STAGE_VERSION = "1.1.0"
+
+# Cap on the LLM's completion length. Bounded to keep runaway generation
+# from a degenerate input (e.g. TOC leader-dot lines that defeated Qwen3-Next
+# in the May 17 Nicholls incident) from burning tokens unboundedly, but
+# large enough to fit a richly-extracted candidate: full traits + several
+# hosts + a long location quote can comfortably exceed 4k completion
+# tokens (observed 4.4k on Nicholls C_007).
+MAX_COMPLETION_TOKENS = 8192
 
 
 class _LLMFacts(BaseModel):
@@ -406,7 +414,7 @@ async def extract_facts(
                 messages=messages,
                 response_model=_LLMFacts,
                 max_retries=max_retries,
-                max_tokens=4096,
+                max_tokens=MAX_COMPLETION_TOKENS,
             ),
             timeout=total_timeout,
         )
