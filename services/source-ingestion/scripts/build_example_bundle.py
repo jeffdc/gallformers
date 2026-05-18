@@ -55,6 +55,7 @@ from ingest.schemas import (
     Host,
     Manifest,
     NormalizedBlock,
+    ProseParagraph,
     ProviderCallRecord,
     RawTextBlock,
     ReviewArtifact,
@@ -412,26 +413,62 @@ def _gall_traits() -> GallTraits:
     )
 
 
+def _example_evidence_prose() -> list[ProseParagraph]:
+    """Build a representative evidence_prose list from the three example blocks.
+
+    Each ProseParagraph carries the per-span signals the curator UI consumes:
+    char offsets into the flat normalized text, structural flags, and a
+    bucketed relevance hint. Values mirror what the live pipeline would emit
+    for this example — block 0 is the mention span; all three blocks were
+    cited by extracted facts, so all three are HIGH.
+    """
+    offsets = block_offsets()
+    return [
+        ProseParagraph(
+            span_id="S_0001",
+            page=1,
+            char_start=offsets[0][0],
+            char_end=offsets[0][1],
+            text=NORMALIZED_BLOCKS_TEXT[0],
+            is_mention=True,
+            name_occurrences=1,
+            is_cited=True,
+            cited_by_fields=["gall_maker.scientific_name", "hosts[0].scientific_name"],
+            relevance="high",
+        ),
+        ProseParagraph(
+            span_id="S_0002",
+            page=1,
+            char_start=offsets[1][0],
+            char_end=offsets[1][1],
+            text=NORMALIZED_BLOCKS_TEXT[1],
+            is_cited=True,
+            cited_by_fields=["gall_traits.color", "gall_traits.shape"],
+            relevance="high",
+        ),
+        ProseParagraph(
+            span_id="S_0003",
+            page=1,
+            char_start=offsets[2][0],
+            char_end=offsets[2][1],
+            text=NORMALIZED_BLOCKS_TEXT[2],
+            is_cited=True,
+            cited_by_fields=["gall_traits.plant_part", "gall_traits.season", "location"],
+            relevance="high",
+        ),
+    ]
+
+
 def build_claims() -> ClaimsFile:
     """Pre-verification: no taxonomy_lookups yet, support_status from extractor + substring gate."""
     record = GallRecord(
         record_id="R_001",
         candidate_id="C_001",
         gall_maker=_gall_maker_with_lookups(include_gbif=False),
+        generation="unspecified",
+        evidence_prose=_example_evidence_prose(),
         hosts=[_host_with_lookups(include_gbif=False)],
         gall_traits=_gall_traits(),
-        description=EvidenceCell(
-            value="A large, woody, oak-apple gall, globular, 2-4 cm in diameter, with a bright red exterior fading to brown.",
-            evidence=[
-                quote_evidence(0, "large, woody, oak-apple gall"),
-                quote_evidence(
-                    1,
-                    "globular, 2-4 cm in diameter, with a bright red exterior that fades to brown",
-                ),
-            ],
-            support_status=SupportStatus.SUPPORTED,
-            confidence=0.85,
-        ),
         confidence_bucket=ConfidenceBucket.HIGH,
     )
     return ClaimsFile(gall_records=[record])
@@ -443,20 +480,10 @@ def build_verified_claims() -> VerifiedClaimsFile:
         record_id="R_001",
         candidate_id="C_001",
         gall_maker=_gall_maker_with_lookups(include_gbif=True),
+        generation="unspecified",
+        evidence_prose=_example_evidence_prose(),
         hosts=[_host_with_lookups(include_gbif=True)],
         gall_traits=_gall_traits(),
-        description=EvidenceCell(
-            value="A large, woody, oak-apple gall, globular, 2-4 cm in diameter, with a bright red exterior fading to brown.",
-            evidence=[
-                quote_evidence(0, "large, woody, oak-apple gall"),
-                quote_evidence(
-                    1,
-                    "globular, 2-4 cm in diameter, with a bright red exterior that fades to brown",
-                ),
-            ],
-            support_status=SupportStatus.SUPPORTED,
-            confidence=0.85,
-        ),
         confidence_bucket=ConfidenceBucket.HIGH,
         warnings=[
             WarningEntry(
@@ -666,6 +693,7 @@ def build_candidates() -> CandidatesFile:
                 gall_maker_mention="Andricus quercuscalifornicus",
                 mention_span_ids=["S_0001"],
                 sample_agreement=3,
+                generation="unspecified",
             )
         ]
     )

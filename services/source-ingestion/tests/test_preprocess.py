@@ -62,8 +62,7 @@ class TestDropRepeatedBlocks:
     def test_drops_standalone_page_numbers(self):
         """Path B with empty base: blocks containing just a digit equal to the page."""
         blocks = [
-            _block(p, f"Body prose for page {p} discussing gallwasps.", idx=0)
-            for p in range(1, 11)
+            _block(p, f"Body prose for page {p} discussing gallwasps.", idx=0) for p in range(1, 11)
         ]
         for p in [3, 5, 7, 9]:
             blocks.append(_block(p, str(p), idx=1))

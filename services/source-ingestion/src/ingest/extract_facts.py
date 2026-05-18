@@ -67,7 +67,6 @@ class _LLMFacts(BaseModel):
     gall_maker: GallMaker
     hosts: list[Host] = Field(default_factory=list)
     gall_traits: GallTraits = Field(default_factory=GallTraits)
-    description: EvidenceCell | None = None
     location: EvidenceCell | None = None
     confidence_bucket: ConfidenceBucket = ConfidenceBucket.MEDIUM
 
@@ -88,6 +87,116 @@ def _abstaining_scientific_name() -> ScientificNameCell:
     )
 
 
+# Bucket rule for ProseParagraph.relevance. MEDIUM requires text length above this
+# floor in addition to a mention/name signal, so headings and table-row fragments
+# (e.g. "Acraspis quercushirta (Bassett, 1864)") get demoted to LOW.
+RELEVANCE_LENGTH_FLOOR = 80
+
+
+def _compute_relevance(
+    *, is_cited: bool, is_mention: bool, name_occurrences: int, text_length: int
+) -> str:
+    """HIGH if cited; MEDIUM if mention/name AND long enough; LOW otherwise."""
+    if is_cited:
+        return "high"
+    if (is_mention or name_occurrences >= 1) and text_length >= RELEVANCE_LENGTH_FLOOR:
+        return "medium"
+    return "low"
+
+
+def _collect_citations(facts: _LLMFacts) -> dict[str, list[str]]:
+    """Walk every cell in the (scrubbed) facts; return ``{span_id: [field_path, ...]}``.
+
+    Each Evidence in each cell contributes its ``block_id`` to the citing field
+    path. Field paths use dot notation with bracketed indices for list fields
+    (e.g. ``"hosts[0].scientific_name"``). Per-span lists are sorted for stable
+    curator-facing output.
+    """
+    citations: dict[str, set[str]] = {}
+
+    def add(cell: EvidenceCell | None, path: str) -> None:
+        if cell is None:
+            return
+        for ev in cell.evidence:
+            citations.setdefault(ev.block_id, set()).add(path)
+
+    gm = facts.gall_maker
+    add(gm.scientific_name, "gall_maker.scientific_name")
+    add(gm.authority, "gall_maker.authority")
+    add(gm.rank, "gall_maker.rank")
+    for i, alias in enumerate(gm.aliases):
+        add(alias, f"gall_maker.aliases[{i}]")
+    for i, common in enumerate(gm.common_names):
+        add(common, f"gall_maker.common_names[{i}]")
+    for rank_name in (
+        "kingdom",
+        "phylum",
+        "class_name",
+        "order",
+        "suborder",
+        "family",
+        "subfamily",
+        "tribe",
+        "genus",
+        "subgenus",
+    ):
+        add(getattr(gm.taxonomy, rank_name), f"gall_maker.taxonomy.{rank_name}")
+
+    for i, host in enumerate(facts.hosts):
+        add(host.scientific_name, f"hosts[{i}].scientific_name")
+        add(host.authority, f"hosts[{i}].authority")
+        add(host.rank, f"hosts[{i}].rank")
+
+    traits = facts.gall_traits
+    for trait_name in (
+        "color",
+        "shape",
+        "texture",
+        "walls",
+        "cells",
+        "alignment",
+        "plant_part",
+        "form",
+        "season",
+        "detachable",
+    ):
+        add(getattr(traits, trait_name), f"gall_traits.{trait_name}")
+
+    add(facts.location, "location")
+
+    return {sid: sorted(paths) for sid, paths in citations.items()}
+
+
+def _enrich_prose(prose: list[ProseParagraph], facts: _LLMFacts | None) -> list[ProseParagraph]:
+    """Tag each ProseParagraph with is_cited / cited_by_fields / relevance.
+
+    ``facts`` is the post-scrub _LLMFacts; pass ``None`` for the abstaining
+    path where no LLM output exists. Returns new ProseParagraph instances —
+    inputs are not mutated.
+    """
+    citations = _collect_citations(facts) if facts is not None else {}
+    enriched: list[ProseParagraph] = []
+    for p in prose:
+        cited_paths = citations.get(p.span_id, [])
+        is_cited = bool(cited_paths)
+        relevance = _compute_relevance(
+            is_cited=is_cited,
+            is_mention=p.is_mention,
+            name_occurrences=p.name_occurrences,
+            text_length=len(p.text),
+        )
+        enriched.append(
+            p.model_copy(
+                update={
+                    "is_cited": is_cited,
+                    "cited_by_fields": cited_paths,
+                    "relevance": relevance,
+                }
+            )
+        )
+    return enriched
+
+
 def _abstaining_record(candidate: Candidate, evidence_prose: list[ProseParagraph]) -> GallRecord:
     """Build an abstaining GallRecord for a candidate when extract-facts could not produce facts.
 
@@ -104,10 +213,9 @@ def _abstaining_record(candidate: Candidate, evidence_prose: list[ProseParagraph
         candidate_id=candidate.candidate_id,
         gall_maker=GallMaker(scientific_name=_abstaining_scientific_name()),
         generation=candidate.generation,
-        evidence_prose=evidence_prose,
+        evidence_prose=_enrich_prose(evidence_prose, None),
         hosts=[],
         gall_traits=GallTraits(),
-        description=None,
         location=None,
         confidence_bucket=ConfidenceBucket.LOW,
         warnings=[],
@@ -198,9 +306,6 @@ def _scrub_facts(facts: _LLMFacts, allowed: set[str]) -> _LLMFacts:
             "gall_maker": new_gm,
             "hosts": new_hosts,
             "gall_traits": new_traits,
-            "description": _gate_cell_by_allowed(facts.description, allowed)
-            if facts.description
-            else None,
             "location": _gate_cell_by_allowed(facts.location, allowed) if facts.location else None,
         }
     )
@@ -245,12 +350,14 @@ def _build_messages(
             "(restrict trait extraction to facts about this generation; facts that "
             "clearly belong to the other generation should be skipped)"
         )
-    sections.extend([
-        "",
-        "## Allowed span IDs (cite only these)\n",
-        ", ".join(allowed) if allowed else "(none)",
-        "",
-    ])
+    sections.extend(
+        [
+            "",
+            "## Allowed span IDs (cite only these)\n",
+            ", ".join(allowed) if allowed else "(none)",
+            "",
+        ]
+    )
     vocab_block = _format_vocab_block(vocab)
     if vocab_block:
         sections.append(vocab_block)
@@ -350,10 +457,9 @@ async def extract_facts(
         candidate_id=candidate.candidate_id,
         gall_maker=scrubbed.gall_maker,
         generation=candidate.generation,
-        evidence_prose=evidence_prose,
+        evidence_prose=_enrich_prose(evidence_prose, scrubbed),
         hosts=scrubbed.hosts,
         gall_traits=scrubbed.gall_traits,
-        description=scrubbed.description,
         location=scrubbed.location,
         confidence_bucket=scrubbed.confidence_bucket,
         warnings=[],

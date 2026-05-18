@@ -321,7 +321,9 @@ async def run_pipeline(
     )
     extract_completed = _now()
     page_count = max((b.page for b in raw_blocks), default=1)
-    _log(f"[extract] {len(raw_blocks)} blocks across {page_count} pages ({_dur_s(t, extract_completed)})")
+    _log(
+        f"[extract] {len(raw_blocks)} blocks across {page_count} pages ({_dur_s(t, extract_completed)})"
+    )
 
     # ── ocr (optional) ───────────────────────────────────────────────────
     # Runs between extract and preprocess. If the PDF's text density is
@@ -383,9 +385,7 @@ async def run_pipeline(
         triage_cfg = stages_cfg["block-triage"]
         triage_prompt, triage_prompt_sha = _load_prompt(triage_cfg["prompt"])
         triage_artifact = src_dir / "block_triage.json"
-        triage_input_sha = _sha_str(
-            "\n".join(f"{b.block_id}:{b.text}" for b in raw_blocks)
-        )
+        triage_input_sha = _sha_str("\n".join(f"{b.block_id}:{b.text}" for b in raw_blocks))
         triage_cache_key = {
             "stage": "block-triage",
             "schema_version": SCHEMA_VERSION,
@@ -404,9 +404,7 @@ async def run_pipeline(
             kept_ids = set(cached["kept_block_ids"])
             before = len(raw_blocks)
             raw_blocks = [b for b in raw_blocks if b.block_id in kept_ids]
-            _log(
-                f"[block-triage] cached ({before - len(raw_blocks)} of {before} dropped)"
-            )
+            _log(f"[block-triage] cached ({before - len(raw_blocks)} of {before} dropped)")
             stage_records.append(
                 StageRunRecord(
                     name="block-triage",
@@ -635,7 +633,9 @@ async def run_pipeline(
             if w:
                 warnings.append(w)
         fc_done = _now()
-        _log(f"[find-candidates] {len(candidates_file.candidates)} candidates ({_dur_s(t, fc_done)})")
+        _log(
+            f"[find-candidates] {len(candidates_file.candidates)} candidates ({_dur_s(t, fc_done)})"
+        )
         stage_records.append(
             StageRunRecord(
                 name="find-candidates",
@@ -864,7 +864,9 @@ async def run_pipeline(
     )
     tax_done = _now()
     _log(f"[taxonomy-lookup] done ({_dur_s(t, tax_done)})")
-    stage_records.append(StageRunRecord(name="taxonomy-lookup", started_at=t, completed_at=tax_done))
+    stage_records.append(
+        StageRunRecord(name="taxonomy-lookup", started_at=t, completed_at=tax_done)
+    )
 
     # ── assemble-review ──────────────────────────────────────────────────
     _log("[assemble-review] writing claims/verified/review/manifest artifacts")
@@ -979,8 +981,6 @@ def _gate_record(record: GallRecord, blocks_by_id: dict) -> tuple[GallRecord, li
         warnings.extend(w)
     new_traits = record.gall_traits.model_copy(update=new_traits_update)
 
-    new_desc, w = _gate(record.description, f"{field_path_base}.description")
-    warnings.extend(w)
     new_loc, w = _gate(record.location, f"{field_path_base}.location")
     warnings.extend(w)
 
@@ -990,7 +990,6 @@ def _gate_record(record: GallRecord, blocks_by_id: dict) -> tuple[GallRecord, li
                 "gall_maker": new_gm,
                 "hosts": new_hosts,
                 "gall_traits": new_traits,
-                "description": new_desc,
                 "location": new_loc,
                 "warnings": record.warnings + warnings,
             }
@@ -1106,9 +1105,6 @@ async def _verify_records_claims(
                     record_summary,
                 )
             )
-        jobs.append(
-            (r_idx, "description", f"{path_base}.description", record.description, record_summary)
-        )
         jobs.append((r_idx, "location", f"{path_base}.location", record.location, record_summary))
 
     # Run the whole batch concurrently. Semaphore enforces the in-flight

@@ -229,9 +229,7 @@ def drop_repeated_blocks(
         distinct_pages = {b.page for b, _ in members}
         drop = len(distinct_pages) / page_count >= page_fraction_threshold
         if not drop:
-            paginated = sum(
-                1 for b, d in members if d is not None and d == b.page
-            )
+            paginated = sum(1 for b, d in members if d is not None and d == b.page)
             drop = paginated >= min_paginated_members
         if drop:
             for b, _ in members:

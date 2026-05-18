@@ -97,7 +97,7 @@ class TestBuildClaimsAndVerified:
         verified = build_verified_claims_file(records)
         assert len(claims.gall_records) == 2
         assert len(verified.gall_records) == 2
-        assert claims.schema_version == "1.4.0"
+        assert claims.schema_version == "1.5.0"
 
 
 class TestBuildManifest:

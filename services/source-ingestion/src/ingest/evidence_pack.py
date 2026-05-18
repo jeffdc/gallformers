@@ -28,6 +28,7 @@ def _normalize_mention(mention: str) -> str:
     """Normalized form of a gall-maker mention for grouping sibling candidates."""
     return _WS_RE.sub(" ", mention.strip().lower())
 
+
 SPAN_SEPARATOR = "\n\n"
 
 
@@ -52,9 +53,7 @@ class _BlockIndex:
         return self.blocks[self.index_of(span_id)].section_id
 
 
-def _sibling_first_mentions(
-    candidate: Candidate, all_candidates: list[Candidate]
-) -> list[str]:
+def _sibling_first_mentions(candidate: Candidate, all_candidates: list[Candidate]) -> list[str]:
     """Return the first mention_span_id from each sibling-generation candidate.
 
     A sibling is another candidate with the same normalized ``gall_maker_mention``
@@ -129,9 +128,19 @@ def build_evidence_pack(
             if blocks[i].section_id == mention_section:
                 selected.add(i)
 
+    own_mentions = set(candidate.mention_span_ids)
+    mention_lower = candidate.gall_maker_mention.lower()
     sorted_indices = sorted(selected)
     prose = [
-        ProseParagraph(span_id=blocks[i].span_id, page=blocks[i].page, text=blocks[i].text)
+        ProseParagraph(
+            span_id=blocks[i].span_id,
+            page=blocks[i].page,
+            char_start=blocks[i].char_start,
+            char_end=blocks[i].char_end,
+            text=blocks[i].text,
+            is_mention=blocks[i].span_id in own_mentions,
+            name_occurrences=blocks[i].text.lower().count(mention_lower) if mention_lower else 0,
+        )
         for i in sorted_indices
     ]
     meta = {

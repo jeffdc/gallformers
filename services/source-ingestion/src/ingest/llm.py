@@ -40,9 +40,9 @@ def _log_llm_error(stage_hint: str, model: str, exc: BaseException) -> str:
     """
     detail = f"{type(exc).__name__}: {exc}"
     tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    print(f"[LLM-ERROR] {stage_hint} model={model} -> {detail}\n{tb}",
-          file=sys.stderr, flush=True)
+    print(f"[LLM-ERROR] {stage_hint} model={model} -> {detail}\n{tb}", file=sys.stderr, flush=True)
     return detail
+
 
 # ─── Public exceptions ─────────────────────────────────────────────────────
 

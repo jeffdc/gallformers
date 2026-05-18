@@ -13,9 +13,7 @@ class TestGatherBounded:
             await asyncio.sleep(0)
             return x
 
-        results = await gather_bounded(
-            [identity(i) for i in range(10)], max_concurrency=3
-        )
+        results = await gather_bounded([identity(i) for i in range(10)], max_concurrency=3)
         assert results == list(range(10))
 
     async def test_caps_in_flight_concurrency(self):
@@ -34,9 +32,7 @@ class TestGatherBounded:
                 in_flight -= 1
             return x
 
-        results = await gather_bounded(
-            [slow(i) for i in range(20)], max_concurrency=3
-        )
+        results = await gather_bounded([slow(i) for i in range(20)], max_concurrency=3)
         assert results == list(range(20))
         assert peak <= 3, f"Expected <= 3 concurrent, observed {peak}"
 
@@ -52,8 +48,6 @@ class TestGatherBounded:
             await asyncio.sleep(0)
             return x
 
-        await gather_bounded(
-            [append(i) for i in range(5)], max_concurrency=1
-        )
+        await gather_bounded([append(i) for i in range(5)], max_concurrency=1)
         # With concurrency=1, scheduling is strictly sequential.
         assert order == list(range(5))

@@ -166,11 +166,8 @@ For each trait, the cell has:
   trait; `abstained` if not addressed.
 - `confidence`: 0.0 to 1.0.
 
-### description / location
+### location
 
-- `description`: a free-text morphological description of the gall
-  from the paper, when one exists. Quote the most relevant sentence
-  or paragraph as evidence.
 - `location`: collection locality if the paper mentions where the
   galls were found (e.g. "Alexandra Park, London, UK"). Only set
   when explicitly stated; do not infer from author affiliations.

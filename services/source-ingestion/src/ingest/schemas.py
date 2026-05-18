@@ -27,7 +27,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-SCHEMA_VERSION: Literal["1.4.0"] = "1.4.0"
+SCHEMA_VERSION: Literal["1.5.0"] = "1.5.0"
 
 
 # ─── Enums ─────────────────────────────────────────────────────────────────
@@ -365,7 +365,7 @@ class Section(StrictModel):
 class SectionsFile(StrictModel):
     """`sections.json` — top-level container for the document's sections."""
 
-    schema_version: Literal["1.4.0"] = "1.4.0"
+    schema_version: Literal["1.5.0"] = "1.5.0"
     sections: list[Section]
 
 
@@ -441,7 +441,7 @@ class Manifest(StrictModel):
     artifacts that don't carry schema_version themselves).
     """
 
-    schema_version: Literal["1.4.0"] = "1.4.0"
+    schema_version: Literal["1.5.0"] = "1.5.0"
     pipeline_name: str
     pipeline_version: str
     pipeline_config_name: str
@@ -469,7 +469,7 @@ class Manifest(StrictModel):
 class DocumentMetadata(StrictModel):
     """`metadata.json` — bibliographic metadata, evidence-bound."""
 
-    schema_version: Literal["1.4.0"] = "1.4.0"
+    schema_version: Literal["1.5.0"] = "1.5.0"
     title: EvidenceCell
     authors: list[EvidenceCell] = Field(default_factory=list)
     year: EvidenceCell | None = None
@@ -550,13 +550,52 @@ class GallTraits(StrictModel):
 class ProseParagraph(StrictModel):
     """One paragraph of verbatim source-text from a candidate's evidence pack.
 
-    The unit of curator-facing prose. The UI renders these in order, optionally
-    using ``span_id`` for "view source" links and ``page`` for PDF deep-linking.
+    The unit of curator-facing prose. The UI renders these in order, using
+    ``span_id`` / ``page`` for source links and ``char_start`` / ``char_end``
+    for highlighted-in-context views against ``ReviewSource.normalized_text``.
     """
 
     span_id: str = Field(description="Span ID in normalized_text.jsonl, e.g. 'S_0078'")
     page: int = Field(ge=1, description="1-indexed PDF page number this paragraph came from")
+    char_start: int = Field(
+        ge=0,
+        description="Absolute char offset into ReviewSource.normalized_text (for UI deep-linking)",
+    )
+    char_end: int = Field(ge=0, description="Absolute char offset (exclusive)")
     text: str = Field(description="Paragraph text, no '[S_NNNN]' prefix")
+    is_mention: bool = Field(
+        default=False,
+        description="True if this span is in the candidate's direct mention_span_ids list",
+    )
+    name_occurrences: int = Field(
+        default=0,
+        ge=0,
+        description="Case-insensitive count of the candidate's name as a substring in this span's text",
+    )
+    is_cited: bool = Field(
+        default=False,
+        description="True if any extracted fact's Evidence.block_id references this span",
+    )
+    cited_by_fields: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Field paths in the GallRecord whose evidence cites this span, sorted "
+            "alphabetically — e.g. ['gall_maker.scientific_name', 'gall_traits.color']."
+        ),
+    )
+    relevance: Literal["high", "medium", "low"] = Field(
+        default="low",
+        description=(
+            "Bucketed UI relevance hint. HIGH when is_cited; MEDIUM when "
+            "(is_mention OR name_occurrences>=1) AND len(text)>=80; LOW otherwise."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _check_range(self) -> ProseParagraph:
+        if self.char_end <= self.char_start:
+            raise ValueError(f"char_end ({self.char_end}) must be > char_start ({self.char_start})")
+        return self
 
 
 class GallRecord(StrictModel):
@@ -575,16 +614,15 @@ class GallRecord(StrictModel):
     evidence_prose: list[ProseParagraph] = Field(
         description=(
             "Full verbatim source prose the LLM saw for this candidate, as an ordered "
-            "list of paragraphs. Each carries its source span ID and PDF page so the UI "
-            "can render with provenance links. Primary review surface for curators; "
-            "`description` below is a narrow LLM summary derived from this prose."
+            "list of paragraphs. Each carries source provenance, structural signals "
+            "(is_mention, name_occurrences, char offsets), and citation-derived signals "
+            "(is_cited, cited_by_fields, relevance). The curator UI builds the species "
+            "description by selecting from these chunks; the pipeline no longer "
+            "synthesizes a description string."
         ),
     )
     hosts: list[Host] = Field(default_factory=list)
     gall_traits: GallTraits = Field(default_factory=GallTraits)
-    description: EvidenceCell | None = Field(
-        default=None, description="Morphological description text from the source"
-    )
     location: EvidenceCell | None = Field(
         default=None, description="Collection locality if mentioned"
     )
@@ -602,14 +640,14 @@ class ClaimsFile(StrictModel):
     extractor's self-report and the substring gate's verdict at this point.
     """
 
-    schema_version: Literal["1.4.0"] = "1.4.0"
+    schema_version: Literal["1.5.0"] = "1.5.0"
     gall_records: list[GallRecord]
 
 
 class VerifiedClaimsFile(StrictModel):
     """`verified_claims.json` — claims with verifier verdicts and GBIF lookups populated."""
 
-    schema_version: Literal["1.4.0"] = "1.4.0"
+    schema_version: Literal["1.5.0"] = "1.5.0"
     gall_records: list[GallRecord]
 
 
@@ -637,7 +675,7 @@ class Candidate(StrictModel):
 class CandidatesFile(StrictModel):
     """`candidates.json` — find-candidates output (scratch, not in bundle)."""
 
-    schema_version: Literal["1.4.0"] = "1.4.0"
+    schema_version: Literal["1.5.0"] = "1.5.0"
     candidates: list[Candidate]
 
 
@@ -664,7 +702,7 @@ class ReviewArtifact(StrictModel):
     without needing to walk other artifacts.
     """
 
-    schema_version: Literal["1.4.0"] = "1.4.0"
+    schema_version: Literal["1.5.0"] = "1.5.0"
     pipeline_name: str
     pipeline_version: str
     generated_at: datetime

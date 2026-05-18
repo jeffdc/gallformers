@@ -50,9 +50,7 @@ def should_ocr(
     if enabled == "always":
         return True, "always"
     if enabled != "auto":
-        raise ValueError(
-            f"Invalid enabled value: {enabled!r}; expected one of auto|always|never"
-        )
+        raise ValueError(f"Invalid enabled value: {enabled!r}; expected one of auto|always|never")
     density = avg_chars_per_page(blocks)
     if density < min_chars_per_page:
         return True, f"auto: {density:.1f} chars/page < {min_chars_per_page:.1f}"
@@ -166,9 +164,7 @@ def _ocrmypdf_version() -> str:
         raise RuntimeError(
             "ocrmypdf binary not found on PATH. Install via 'brew install ocrmypdf'."
         )
-    result = subprocess.run(
-        [binary, "--version"], capture_output=True, text=True, check=True
-    )
+    result = subprocess.run([binary, "--version"], capture_output=True, text=True, check=True)
     return f"ocrmypdf-{result.stdout.strip()}"
 
 

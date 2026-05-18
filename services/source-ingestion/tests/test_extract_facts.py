@@ -51,7 +51,9 @@ def _trait_cell(
 
 
 def _prose(span_id: str, text: str, page: int = 1) -> ProseParagraph:
-    return ProseParagraph(span_id=span_id, page=page, text=text)
+    return ProseParagraph(
+        span_id=span_id, page=page, char_start=0, char_end=max(len(text), 1), text=text
+    )
 
 
 def _candidate(cid: str = "C_001", generation: str = "unspecified") -> Candidate:
@@ -86,7 +88,6 @@ def _llm_facts(
         gall_traits=GallTraits(
             color=_trait_cell("red", ["red"], evidence_block_id=trait_evidence_block),
         ),
-        description=None,
         location=None,
         confidence_bucket=ConfidenceBucket.HIGH,
     )
@@ -139,14 +140,13 @@ class TestExtractFactsHappyPath:
         assert record.gall_traits.color.suggested == ["red"]
 
     async def test_record_carries_full_evidence_prose(self, mocker):
-        """Evidence prose is preserved on the record as a structured list of
-        paragraphs (one per selected span) so the UI can render with span-id
-        provenance and per-paragraph PDF-page links."""
+        """Every span in the pack appears in the record's evidence_prose so the
+        UI can render the full curator-facing prose pack with per-span signals."""
         _install_mock_client(mocker, _llm_facts())
         prose = [
-            ProseParagraph(span_id="S_0001", page=4, text="Andricus quercuscalifornicus first paragraph."),
-            ProseParagraph(span_id="S_0002", page=4, text="Second paragraph with biology details."),
-            ProseParagraph(span_id="S_0003", page=5, text="Distribution prose across the southwest."),
+            _prose("S_0001", "Andricus quercuscalifornicus first paragraph.", page=4),
+            _prose("S_0002", "Second paragraph with biology details.", page=4),
+            _prose("S_0003", "Distribution prose across the southwest.", page=5),
         ]
         record, _ = await extract_facts(
             candidate=_candidate(),
@@ -156,7 +156,184 @@ class TestExtractFactsHappyPath:
             prompt="p",
             prompt_sha256="z" * 64,
         )
-        assert record.evidence_prose == prose
+        assert [p.span_id for p in record.evidence_prose] == ["S_0001", "S_0002", "S_0003"]
+        assert [p.text for p in record.evidence_prose] == [p.text for p in prose]
+
+    async def test_is_cited_true_for_spans_referenced_by_any_cell(self, mocker):
+        """A span is is_cited=True if any extracted fact's Evidence.block_id
+        references it. Spans that no cell cites are is_cited=False."""
+        # _llm_facts() cites S_0001 from gall_maker.scientific_name, hosts[0].scientific_name,
+        # and gall_traits.color. S_0002 is in the pack but not cited.
+        _install_mock_client(mocker, _llm_facts())
+        prose = [
+            _prose("S_0001", "Andricus quercuscalifornicus is the gall maker.", page=1),
+            _prose("S_0002", "An unrelated paragraph not cited by any fact.", page=1),
+        ]
+        record, _ = await extract_facts(
+            candidate=_candidate(),
+            evidence_prose=prose,
+            allowed_span_ids=["S_0001", "S_0002"],
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="z" * 64,
+        )
+        by_span = {p.span_id: p for p in record.evidence_prose}
+        assert by_span["S_0001"].is_cited is True
+        assert by_span["S_0002"].is_cited is False
+
+    async def test_cited_by_fields_lists_all_citing_paths_sorted(self, mocker):
+        """cited_by_fields enumerates every field path whose evidence references
+        this span. Multiple citations of the same span list every field; paths
+        are stable-sorted for deterministic curator-facing output."""
+        _install_mock_client(mocker, _llm_facts())
+        prose = [_prose("S_0001", "Some text.", page=1)]
+        record, _ = await extract_facts(
+            candidate=_candidate(),
+            evidence_prose=prose,
+            allowed_span_ids=["S_0001"],
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="z" * 64,
+        )
+        # _llm_facts cites S_0001 from gall_maker.scientific_name, hosts[0].scientific_name,
+        # and gall_traits.color.
+        assert record.evidence_prose[0].cited_by_fields == [
+            "gall_maker.scientific_name",
+            "gall_traits.color",
+            "hosts[0].scientific_name",
+        ]
+
+    async def test_relevance_high_when_cited(self, mocker):
+        """A cited span is HIGH regardless of mention/length signals."""
+        _install_mock_client(mocker, _llm_facts())  # cites S_0001
+        # Short text, not a mention — would be LOW without the citation.
+        cand = Candidate(
+            candidate_id="C_001",
+            gall_maker_mention="Andricus quercuscalifornicus",
+            mention_span_ids=[],
+            sample_agreement=3,
+            generation="unspecified",
+        )
+        prose = [_prose("S_0001", "short")]
+        record, _ = await extract_facts(
+            candidate=cand,
+            evidence_prose=prose,
+            allowed_span_ids=["S_0001"],
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="z" * 64,
+        )
+        assert record.evidence_prose[0].relevance == "high"
+
+    async def test_relevance_medium_when_mention_and_long_text(self, mocker):
+        """is_mention + length>=80, not cited → MEDIUM."""
+        _install_mock_client(mocker, _llm_facts())  # cites S_0001 only
+        long_text = "X" * 80  # exactly the floor
+        prose = [
+            _prose("S_0001", "cited span"),
+            ProseParagraph(
+                span_id="S_0002",
+                page=1,
+                char_start=0,
+                char_end=len(long_text),
+                text=long_text,
+                is_mention=True,
+                name_occurrences=0,
+            ),
+        ]
+        record, _ = await extract_facts(
+            candidate=_candidate(),
+            evidence_prose=prose,
+            allowed_span_ids=["S_0001", "S_0002"],
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="z" * 64,
+        )
+        by_span = {p.span_id: p for p in record.evidence_prose}
+        assert by_span["S_0002"].relevance == "medium"
+
+    async def test_relevance_medium_when_name_appears_and_long_text(self, mocker):
+        """name_occurrences>=1 + length>=80, not cited, not a mention → MEDIUM."""
+        _install_mock_client(mocker, _llm_facts())
+        # name_occurrences=1 (set explicitly), is_mention=False, length=80 → MEDIUM
+        long_text = "Y" * 80
+        prose = [
+            _prose("S_0001", "cited span"),
+            ProseParagraph(
+                span_id="S_0002",
+                page=1,
+                char_start=0,
+                char_end=len(long_text),
+                text=long_text,
+                is_mention=False,
+                name_occurrences=1,
+            ),
+        ]
+        record, _ = await extract_facts(
+            candidate=_candidate(),
+            evidence_prose=prose,
+            allowed_span_ids=["S_0001", "S_0002"],
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="z" * 64,
+        )
+        by_span = {p.span_id: p for p in record.evidence_prose}
+        assert by_span["S_0002"].relevance == "medium"
+
+    async def test_relevance_low_when_short_text_even_with_mention(self, mocker):
+        """is_mention but length<80 → LOW. Headings and table-row fragments get
+        demoted by the length floor."""
+        _install_mock_client(mocker, _llm_facts())
+        short_text = "Acraspis quercushirta (Bassett, 1864)"  # 37 chars
+        prose = [
+            _prose("S_0001", "cited span"),
+            ProseParagraph(
+                span_id="S_0002",
+                page=1,
+                char_start=0,
+                char_end=len(short_text),
+                text=short_text,
+                is_mention=True,
+                name_occurrences=1,
+            ),
+        ]
+        record, _ = await extract_facts(
+            candidate=_candidate(),
+            evidence_prose=prose,
+            allowed_span_ids=["S_0001", "S_0002"],
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="z" * 64,
+        )
+        by_span = {p.span_id: p for p in record.evidence_prose}
+        assert by_span["S_0002"].relevance == "low"
+
+    async def test_relevance_low_when_no_signal(self, mocker):
+        """Not cited, not a mention, no name in text → LOW regardless of length."""
+        _install_mock_client(mocker, _llm_facts())
+        long_text = "Unrelated content. " * 10  # long but no signal
+        prose = [
+            _prose("S_0001", "cited span"),
+            ProseParagraph(
+                span_id="S_0002",
+                page=1,
+                char_start=0,
+                char_end=len(long_text),
+                text=long_text,
+                is_mention=False,
+                name_occurrences=0,
+            ),
+        ]
+        record, _ = await extract_facts(
+            candidate=_candidate(),
+            evidence_prose=prose,
+            allowed_span_ids=["S_0001", "S_0002"],
+            model="deepinfra/test",
+            prompt="p",
+            prompt_sha256="z" * 64,
+        )
+        by_span = {p.span_id: p for p in record.evidence_prose}
+        assert by_span["S_0002"].relevance == "low"
 
     async def test_abstaining_record_carries_evidence_prose(self, mocker):
         """When Instructor fails, the abstaining record still preserves the
@@ -169,7 +346,7 @@ class TestExtractFactsHappyPath:
         mocker.patch("ingest.extract_facts.make_instructor_client", return_value=mock_client)
         mocker.patch("ingest.extract_facts._safe_completion_cost", return_value=0.0)
 
-        prose = [ProseParagraph(span_id="S_0001", page=2, text="Some paragraph the curator should still see.")]
+        prose = [_prose("S_0001", "Some paragraph the curator should still see.", page=2)]
         record, _ = await extract_facts(
             candidate=_candidate(),
             evidence_prose=prose,

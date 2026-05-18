@@ -219,9 +219,7 @@ async def find_candidates(
             species_groups[k]["samples"].add(sample_idx)
 
     kept_species = [
-        entry
-        for entry in species_groups.values()
-        if len(entry["samples"]) >= agreement_threshold
+        entry for entry in species_groups.values() if len(entry["samples"]) >= agreement_threshold
     ]
     kept_species.sort(key=lambda e: (-len(e["samples"]), e["mention"].lower()))
 
