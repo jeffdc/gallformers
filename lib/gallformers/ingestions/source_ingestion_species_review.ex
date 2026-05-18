@@ -145,13 +145,14 @@ defmodule Gallformers.Ingestions.SourceIngestionSpeciesReview do
         |> Utils.attr_value(:description_prose)
         |> Utils.normalize_optional_string(source_ingestion_species.description_prose)
 
+      description_review_payload =
+        build_description_review_payload(source_ingestion_species, attrs, description_prose)
+
       review_payload = %{
         "species_review" => species_review.payload,
         "host_reviews" => Enum.map(host_reviews, & &1.payload),
         "trait_reviews" => trait_reviews.payload,
-        "description_review" => %{
-          "edited" => description_prose != source_ingestion_species.description_prose
-        }
+        "description_review" => description_review_payload
       }
 
       {:ok,
@@ -163,6 +164,61 @@ defmodule Gallformers.Ingestions.SourceIngestionSpeciesReview do
        }}
     end
   end
+
+  defp build_description_review_payload(source_ingestion_species, attrs, description_prose) do
+    description_review_attrs = Utils.nested_value(attrs, :description_review, %{})
+
+    selected_span_ids =
+      description_review_attrs
+      |> Utils.nested_value(:selected_span_ids, [])
+      |> Utils.normalize_string_list()
+
+    mode =
+      description_review_attrs
+      |> Utils.nested_value(:mode, "replace")
+      |> normalize_description_mode()
+
+    draft_dirty =
+      description_review_attrs
+      |> Utils.nested_value(:draft_dirty, false)
+      |> normalize_boolean()
+
+    draft =
+      description_review_attrs
+      |> Utils.nested_value(:draft, nil)
+      |> normalize_optional_draft()
+
+    description_review_engaged? =
+      Map.has_key?(attrs, :description_review) or Map.has_key?(attrs, "description_review")
+
+    edited =
+      description_review_engaged? or
+        description_prose != source_ingestion_species.description_prose
+
+    %{
+      "edited" => edited,
+      "selected_span_ids" => selected_span_ids,
+      "mode" => mode,
+      "draft_dirty" => draft_dirty,
+      "draft" => draft
+    }
+  end
+
+  defp normalize_description_mode(mode) when mode in ["keep", "append", "replace"], do: mode
+  defp normalize_description_mode(:keep), do: "keep"
+  defp normalize_description_mode(:append), do: "append"
+  defp normalize_description_mode(:replace), do: "replace"
+  defp normalize_description_mode(_), do: "replace"
+
+  defp normalize_boolean(true), do: true
+  defp normalize_boolean(false), do: false
+  defp normalize_boolean("true"), do: true
+  defp normalize_boolean("false"), do: false
+  defp normalize_boolean(_), do: false
+
+  defp normalize_optional_draft(nil), do: nil
+  defp normalize_optional_draft(value) when is_binary(value), do: value
+  defp normalize_optional_draft(_), do: nil
 
   defp normalize_workspace_species_review(attrs) do
     species_review_attrs = Utils.nested_value(attrs, :species_review, %{})
@@ -386,7 +442,7 @@ defmodule Gallformers.Ingestions.SourceIngestionSpeciesReview do
          |> SourceIngestionSpecies.changeset(%{})
          |> add_error(:status, "cannot mark complete while host reviews are unresolved")}
 
-      is_nil(Map.get(description_review, "edited")) ->
+      Map.get(description_review, "edited") != true ->
         {:error,
          %SourceIngestionSpecies{}
          |> SourceIngestionSpecies.changeset(%{})
@@ -508,8 +564,40 @@ defmodule Gallformers.Ingestions.SourceIngestionSpeciesReview do
     persisted_review =
       Utils.nested_value(source_ingestion_species.review_payload, :description_review, %{})
 
-    %{edited: Utils.nested_value(persisted_review, :edited, false)}
+    mode =
+      persisted_review
+      |> Utils.nested_value(:mode, "replace")
+      |> hydrate_description_mode()
+
+    %{
+      edited: Utils.nested_value(persisted_review, :edited, false) || false,
+      selected_span_ids:
+        persisted_review
+        |> Utils.nested_value(:selected_span_ids, [])
+        |> Utils.normalize_string_list(),
+      mode: mode,
+      draft_dirty: hydrate_boolean(Utils.nested_value(persisted_review, :draft_dirty, false)),
+      draft: hydrate_optional_string(Utils.nested_value(persisted_review, :draft, nil))
+    }
   end
+
+  defp hydrate_description_mode("keep"), do: :keep
+  defp hydrate_description_mode("append"), do: :append
+  defp hydrate_description_mode("replace"), do: :replace
+  defp hydrate_description_mode(:keep), do: :keep
+  defp hydrate_description_mode(:append), do: :append
+  defp hydrate_description_mode(:replace), do: :replace
+  defp hydrate_description_mode(_), do: :replace
+
+  defp hydrate_boolean(true), do: true
+  defp hydrate_boolean(false), do: false
+  defp hydrate_boolean("true"), do: true
+  defp hydrate_boolean("false"), do: false
+  defp hydrate_boolean(_), do: false
+
+  defp hydrate_optional_string(nil), do: nil
+  defp hydrate_optional_string(value) when is_binary(value), do: value
+  defp hydrate_optional_string(_), do: nil
 
   defp workspace_description_evidence(source_ingestion_species) do
     source_ingestion_species.extraction_payload

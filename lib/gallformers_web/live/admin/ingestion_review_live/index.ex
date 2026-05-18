@@ -63,40 +63,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
   end
 
   @impl true
-  def handle_event("submit_bundle", _params, socket) do
-    uploaded_by_id = socket.assigns.current_user_db_id
-
-    if uploaded_by_id == nil do
-      {:noreply,
-       assign(
-         socket,
-         :bundle_error,
-         "You need a database-backed profile to upload bundles."
-       )}
-    else
-      results =
-        consume_uploaded_entries(socket, @bundle_upload_name, fn %{path: path}, _entry ->
-          {:ok, import_archive(path, uploaded_by_id)}
-        end)
-
-      case results do
-        [{:ok, ingestion}] ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Bundle imported (##{ingestion.id}).")
-           |> push_navigate(to: ~p"/admin/ingestion-review/#{ingestion.id}")}
-
-        [{:error, reason}] ->
-          Logger.warning("Bundle import failed: #{inspect(reason)}")
-          {:noreply, assign(socket, :bundle_error, format_import_error(reason))}
-
-        [] ->
-          {:noreply, assign(socket, :bundle_error, "Choose a bundle.tar.gz file first.")}
-      end
-    end
-  end
-
-  @impl true
   def handle_event("delete_ingestion", %{"id" => id}, socket) do
     case Ingestions.delete_source_ingestion(String.to_integer(id)) do
       {:ok, _source_ingestion} ->
@@ -185,7 +151,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
             for={%{}}
             as={:bundle}
             phx-change="validate_bundle"
-            phx-submit="submit_bundle"
           >
             <div class="space-y-4">
               <p class="text-sm text-gray-600">
@@ -193,6 +158,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
                 produced by the Python source-ingestion pipeline.
                 Must contain <code class="font-mono">review_artifact.json</code>
                 and <code class="font-mono">source.pdf</code>.
+                Import starts automatically once the upload finishes.
               </p>
 
               <.file_dropzone
@@ -226,10 +192,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
               <div :for={error <- upload_errors(@uploads.bundle)}>
                 <.alert variant="error">{upload_error_message(error)}</.alert>
               </div>
-
-              <.button type="submit" variant="primary" disabled={@uploads.bundle.entries == []}>
-                Import bundle
-              </.button>
             </div>
           </.form>
         </.card>
@@ -268,7 +230,51 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Index do
     |> Enum.join(", ")
   end
 
-  defp handle_progress(@bundle_upload_name, _entry, socket), do: {:noreply, socket}
+  defp handle_progress(@bundle_upload_name, entry, socket) do
+    if entry.done? do
+      {:noreply, consume_and_import(socket)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info({:bundle_imported, ingestion_id}, socket) do
+    {:noreply,
+     socket
+     |> put_flash(:info, "Bundle imported (##{ingestion_id}).")
+     |> push_navigate(to: ~p"/admin/ingestion-review/#{ingestion_id}")}
+  end
+
+  defp consume_and_import(socket) do
+    uploaded_by_id = socket.assigns.current_user_db_id
+
+    if uploaded_by_id == nil do
+      assign(
+        socket,
+        :bundle_error,
+        "You need a database-backed profile to upload bundles."
+      )
+    else
+      results =
+        consume_uploaded_entries(socket, @bundle_upload_name, fn %{path: path}, _entry ->
+          {:ok, import_archive(path, uploaded_by_id)}
+        end)
+
+      case results do
+        [{:ok, ingestion}] ->
+          send(self(), {:bundle_imported, ingestion.id})
+          socket
+
+        [{:error, reason}] ->
+          Logger.warning("Bundle import failed: #{inspect(reason)}")
+          assign(socket, :bundle_error, format_import_error(reason))
+
+        [] ->
+          socket
+      end
+    end
+  end
 
   defp import_archive(archive_path, uploaded_by_id) do
     extract_dir = make_extract_dir()

@@ -23,6 +23,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
      |> assign(:filter_options, %{})
      |> assign(:drawer_open, false)
      |> assign(:source_text, nil)
+     |> assign(:normalized_text, nil)
      |> assign(:saved_at, nil)
      |> assign(:create_host_modal, nil)
      |> assign(:dirty, false)}
@@ -52,6 +53,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
      |> assign(:species_entries, species_entries)
      |> assign(:page_title, "Species Review: #{review_view.display_title}")
      |> assign(:source_text, source_text)
+     |> assign(:normalized_text, review_view.normalized_text)
      |> assign(:filter_options, filter_options)
      |> load_workspace_for_entry(first_unreviewed)}
   end
@@ -109,12 +111,11 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
       description_prose: workspace.description_prose
     }
 
-    with {:ok, _updated} <-
-           Ingestions.update_source_ingestion_species_review(entry, attrs, reviewer_id),
-         :ok <- save_sibling_entries(workspace.sibling_ids, attrs, reviewer_id) do
-      socket = reload_species_entries(socket)
-      {:noreply, advance_to_next_unreviewed(socket)}
-    else
+    case Ingestions.update_source_ingestion_species_review(entry, attrs, reviewer_id) do
+      {:ok, _updated} ->
+        socket = reload_species_entries(socket)
+        {:noreply, advance_to_next_unreviewed(socket)}
+
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Failed to skip")}
     end
@@ -302,14 +303,43 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
   end
 
   @impl true
-  def handle_info({:description_updated, _mode, text}, socket) do
+  def handle_info({:description_updated, %{} = payload}, socket) do
+    selection = Map.get(payload, :selection, [])
+    draft = Map.get(payload, :draft, "")
+    mode = Map.get(payload, :mode, :replace)
+    dirty = Map.get(payload, :dirty, false)
+
+    existing_description =
+      case socket.assigns.existing_gall do
+        %{description: d} when is_binary(d) and d != "" -> d
+        _ -> nil
+      end
+
+    final_text = compose_description(mode, draft, existing_description)
+
     {:noreply,
      socket
      |> update_workspace(fn workspace ->
-       Map.put(workspace, :description_prose, text)
+       workspace
+       |> Map.put(:description_prose, final_text)
+       |> Map.put(:description_selection, selection)
+       |> Map.put(:description_draft, draft)
+       |> Map.put(:description_mode, mode)
+       |> Map.put(:description_draft_dirty, dirty)
+       |> Map.put(:description_edited, true)
      end)
      |> mark_dirty()}
   end
+
+  defp compose_description(:keep, _draft, existing) when is_binary(existing) and existing != "",
+    do: existing
+
+  defp compose_description(:append, draft, existing)
+       when is_binary(existing) and existing != "" do
+    existing <> "\n\n" <> (draft || "")
+  end
+
+  defp compose_description(_mode, draft, _existing), do: draft || ""
 
   # --- Render ---
 
@@ -338,7 +368,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
                 id="workspace-identity"
                 workspace={@workspace}
               />
-              <.evidence_prose_section evidence_prose={@workspace.evidence_prose} />
               <.live_component
                 module={GallformersWeb.Admin.IngestionReviewLive.WorkspaceHosts}
                 id="workspace-hosts"
@@ -363,6 +392,12 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
                 id="workspace-description"
                 workspace={@workspace}
                 existing_gall={@existing_gall}
+                evidence_prose={@workspace.evidence_prose}
+                normalized_text={@normalized_text}
+                hydrated_selection={Map.get(@workspace, :description_selection)}
+                hydrated_mode={Map.get(@workspace, :description_mode)}
+                hydrated_draft_dirty={Map.get(@workspace, :description_draft_dirty)}
+                hydrated_draft={Map.get(@workspace, :description_draft)}
               />
               <.workspace_action_bar
                 workspace={@workspace}
@@ -489,69 +524,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
     """
   end
 
-  attr :evidence_prose, :list, default: nil
-
-  defp evidence_prose_section(assigns) do
-    paragraphs =
-      case assigns.evidence_prose do
-        list when is_list(list) -> list
-        _ -> []
-      end
-
-    assigns = assign(assigns, :paragraphs, paragraphs)
-
-    ~H"""
-    <section
-      id="workspace-section-evidence"
-      class="rounded-lg border border-gray-200 p-4 space-y-3"
-    >
-      <div class="flex items-center justify-between">
-        <h3 class="text-base font-semibold text-gray-900">Source text</h3>
-        <span class="text-xs text-gray-500">
-          Verbatim prose the LLM saw for this species
-        </span>
-      </div>
-
-      <div :if={@paragraphs == []} class="text-sm italic text-gray-500">
-        No source prose available for this species.
-      </div>
-
-      <div :if={@paragraphs != []} class="space-y-3 text-sm text-gray-800">
-        <.evidence_paragraph :for={para <- @paragraphs} paragraph={para} />
-      </div>
-    </section>
-    """
-  end
-
-  attr :paragraph, :map, required: true
-
-  defp evidence_paragraph(assigns) do
-    ~H"""
-    <div
-      class="rounded border border-gray-100 bg-gray-50/50 p-3 space-y-1"
-      data-span-id={@paragraph["span_id"]}
-    >
-      <p class="whitespace-pre-wrap leading-relaxed">{@paragraph["text"]}</p>
-      <div
-        :if={@paragraph["page"] || @paragraph["span_id"]}
-        class="text-xs text-gray-500 flex gap-2"
-      >
-        <button
-          :if={@paragraph["page"]}
-          type="button"
-          class="hover:underline focus:underline"
-          data-page={@paragraph["page"]}
-          data-span-id={@paragraph["span_id"]}
-          title="Open source PDF at this page"
-        >
-          p. {@paragraph["page"]}
-        </button>
-        <span :if={@paragraph["span_id"]} class="font-mono">{@paragraph["span_id"]}</span>
-      </div>
-    </div>
-    """
-  end
-
   attr :species_entries, :list, required: true
   attr :current_id, :integer, default: nil
 
@@ -630,17 +602,11 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
   end
 
   defp load_workspace_for_entry(socket, entry) do
-    sibling_ids = Map.get(entry, :sibling_ids, [])
     workspace_view = Ingestions.source_ingestion_species_review_workspace!(entry.id)
-
-    sibling_views =
-      Enum.map(sibling_ids, &Ingestions.source_ingestion_species_review_workspace!/1)
 
     workspace =
       workspace_view
-      |> merge_sibling_data(sibling_views)
       |> build_workspace_state()
-      |> Map.put(:sibling_ids, sibling_ids)
       |> auto_match_species()
 
     existing_gall =
@@ -656,79 +622,9 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
     |> assign(:dirty, false)
   end
 
-  defp merge_sibling_data(primary, []), do: primary
-
-  defp merge_sibling_data(primary, siblings) do
-    %{
-      primary
-      | extracted_authority:
-          primary.extracted_authority ||
-            Enum.find_value(siblings, & &1.extracted_authority),
-        host_reviews:
-          merge_unique_by(
-            primary.host_reviews,
-            Enum.flat_map(siblings, & &1.host_reviews),
-            & &1.extracted_name
-          )
-          |> Enum.with_index()
-          |> Enum.map(fn {review, i} -> %{review | index: i} end),
-        extracted_aliases:
-          Enum.uniq(primary.extracted_aliases ++ Enum.flat_map(siblings, & &1.extracted_aliases)),
-        trait_reviews: merge_trait_reviews(primary.trait_reviews, siblings),
-        description_prose: merge_description_prose(primary, siblings),
-        evidence_prose: merge_evidence_prose(primary, siblings),
-        description_evidence:
-          Enum.uniq(
-            primary.description_evidence ++ Enum.flat_map(siblings, & &1.description_evidence)
-          )
-    }
-  end
-
-  defp merge_unique_by(primary_list, sibling_list, key_fn) do
-    existing_keys = MapSet.new(primary_list, key_fn)
-
-    primary_list ++
-      Enum.reject(sibling_list, &MapSet.member?(existing_keys, key_fn.(&1)))
-  end
-
-  defp merge_trait_reviews(primary_traits, siblings) do
-    sibling_traits =
-      siblings
-      |> Enum.flat_map(& &1.trait_reviews)
-      |> Enum.group_by(& &1.name)
-
-    existing_names = MapSet.new(primary_traits, & &1.name)
-
-    new_traits =
-      sibling_traits
-      |> Enum.reject(fn {name, _} -> MapSet.member?(existing_names, name) end)
-      |> Enum.map(fn {_name, [first | _]} -> first end)
-
-    primary_traits ++ new_traits
-  end
-
-  defp merge_description_prose(primary, siblings) do
-    all_prose =
-      [primary.description_prose | Enum.map(siblings, & &1.description_prose)]
-      |> Enum.reject(&(&1 in [nil, ""]))
-      |> Enum.uniq()
-
-    Enum.join(all_prose, "\n\n")
-  end
-
-  defp merge_evidence_prose(primary, siblings) do
-    all_paragraphs =
-      [primary.evidence_prose | Enum.map(siblings, & &1.evidence_prose)]
-      |> Enum.reject(&is_nil/1)
-      |> Enum.flat_map(& &1)
-
-    case all_paragraphs do
-      [] -> nil
-      list -> list
-    end
-  end
-
   defp build_workspace_state(workspace_view) do
+    description_review = workspace_view.description_review
+
     %{
       id: workspace_view.id,
       source_ingestion_id: workspace_view.source_ingestion_id,
@@ -737,6 +633,11 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
       extracted_authority: workspace_view.extracted_authority,
       status: workspace_view.status,
       description_prose: workspace_view.description_prose,
+      description_selection: Map.get(description_review, :selected_span_ids, []),
+      description_mode: Map.get(description_review, :mode, :replace),
+      description_draft_dirty: Map.get(description_review, :draft_dirty, false),
+      description_draft: Map.get(description_review, :draft),
+      description_edited: Map.get(description_review, :edited, false),
       evidence_prose: workspace_view.evidence_prose,
       description_evidence: workspace_view.description_evidence,
       extracted_aliases:
@@ -791,7 +692,11 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
 
   defp auto_match_hosts(workspace) do
     Map.update!(workspace, :host_reviews, fn reviews ->
-      Enum.map(reviews, &maybe_auto_match_host/1)
+      Enum.map(reviews, fn review ->
+        review
+        |> maybe_auto_match_host()
+        |> maybe_seed_host_search()
+      end)
     end)
   end
 
@@ -804,6 +709,26 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
       match -> %{review | selected_species: match, species_id: match.id, decision: "mapped"}
     end
   end
+
+  # For unmatched hosts that have not yet been searched, seed the typeahead
+  # query and results from the extracted name so candidates appear without
+  # the curator having to type anything.
+  defp maybe_seed_host_search(%{species_id: id} = review) when not is_nil(id), do: review
+  defp maybe_seed_host_search(%{decision: "skip"} = review), do: review
+
+  defp maybe_seed_host_search(%{search_query: q} = review) when is_binary(q) and q != "",
+    do: review
+
+  defp maybe_seed_host_search(%{extracted_name: name} = review)
+       when is_binary(name) and name != "" do
+    %{
+      review
+      | search_query: name,
+        search_results: Species.search_species_by_name(name, "plant", 10)
+    }
+  end
+
+  defp maybe_seed_host_search(review), do: review
 
   defp find_exact_species(nil, _taxoncode), do: nil
   defp find_exact_species("", _taxoncode), do: nil
@@ -920,28 +845,13 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
     attrs = collect_workspace_attrs(workspace, action)
     reviewer_id = socket.assigns.current_user_db_id
 
-    with {:ok, _updated} <-
-           Ingestions.update_source_ingestion_species_review(entry, attrs, reviewer_id),
-         :ok <- save_sibling_entries(workspace.sibling_ids, attrs, reviewer_id) do
-      {:ok, socket |> reload_species_entries() |> assign(:dirty, false)}
-    else
-      {:error, _reason} -> {:error, socket}
+    case Ingestions.update_source_ingestion_species_review(entry, attrs, reviewer_id) do
+      {:ok, _updated} ->
+        {:ok, socket |> reload_species_entries() |> assign(:dirty, false)}
+
+      {:error, _reason} ->
+        {:error, socket}
     end
-  end
-
-  defp save_sibling_entries([], _attrs, _reviewer_id), do: :ok
-
-  defp save_sibling_entries(sibling_ids, _attrs, reviewer_id) do
-    Enum.reduce_while(sibling_ids, :ok, fn id, :ok ->
-      entry = Ingestions.get_source_ingestion_species!(id)
-
-      case Ingestions.transition_source_ingestion_species_status(entry, "complete", %{
-             reviewed_by_id: reviewer_id
-           }) do
-        {:ok, _} -> {:cont, :ok}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
   end
 
   defp collect_workspace_attrs(workspace, action) do
@@ -968,7 +878,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
         {review.name, %{selected_values: review.selected_values}}
       end)
 
-    %{
+    base_attrs = %{
       action: action,
       species_review: %{
         decision: workspace.species_review.decision,
@@ -979,7 +889,38 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Workspace do
       trait_reviews: trait_reviews,
       description_prose: workspace.description_prose
     }
+
+    case build_description_review_attrs(workspace) do
+      nil -> base_attrs
+      attrs -> Map.put(base_attrs, :description_review, attrs)
+    end
   end
+
+  defp build_description_review_attrs(workspace) do
+    selection = Map.get(workspace, :description_selection)
+    mode = Map.get(workspace, :description_mode)
+    draft_dirty = Map.get(workspace, :description_draft_dirty)
+    draft = Map.get(workspace, :description_draft)
+    edited? = Map.get(workspace, :description_edited, false)
+
+    if is_nil(selection) and is_nil(mode) and is_nil(draft_dirty) and is_nil(draft) and
+         not edited? do
+      nil
+    else
+      %{
+        selected_span_ids: selection || [],
+        mode: encode_description_mode(mode || :replace),
+        draft_dirty: draft_dirty || false,
+        draft: draft
+      }
+    end
+  end
+
+  defp encode_description_mode(:keep), do: "keep"
+  defp encode_description_mode(:append), do: "append"
+  defp encode_description_mode(:replace), do: "replace"
+  defp encode_description_mode(mode) when is_binary(mode), do: mode
+  defp encode_description_mode(_), do: "replace"
 
   defp reload_species_entries(socket) do
     review_view = Presenter.source_ingestion_review_view!(socket.assigns.review_view.id)

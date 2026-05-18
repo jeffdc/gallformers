@@ -142,6 +142,37 @@ defmodule Gallformers.Ingestions.BundleImporterTest do
       assert attrs[:publication_year] == nil
       assert attrs[:doi] == nil
     end
+
+    test "pulls normalized_text from source.normalized_text (schema 1.5.0)" do
+      review_artifact = %{
+        "source" => %{
+          "pdf_sha256" => String.duplicate("a", 64),
+          "source_text_sha256" => String.duplicate("b", 64),
+          "normalized_text" => "This is the flat normalized source text."
+        },
+        "document_metadata" => %{
+          "title" => %{"value" => "Some Title"}
+        }
+      }
+
+      attrs = BundleImporter.extract_paper_attrs(review_artifact)
+
+      assert attrs[:normalized_text] == "This is the flat normalized source text."
+    end
+
+    test "tolerates missing source.normalized_text (older bundles) by setting nil" do
+      review_artifact = %{
+        "source" => %{
+          "pdf_sha256" => String.duplicate("a", 64),
+          "source_text_sha256" => String.duplicate("b", 64)
+        },
+        "document_metadata" => %{"title" => %{"value" => "Some Title"}}
+      }
+
+      attrs = BundleImporter.extract_paper_attrs(review_artifact)
+
+      assert attrs[:normalized_text] == nil
+    end
   end
 
   describe "extract_species_attrs/2" do
@@ -193,7 +224,10 @@ defmodule Gallformers.Ingestions.BundleImporterTest do
       assert attrs[:status] == "pending"
       assert attrs[:extracted_name] == "Druon flocculentum"
       assert attrs[:extracted_authority] == "Kinsey, 1937"
-      assert attrs[:description_prose] == "A globular gall."
+      # Schema 1.5.0 dropped LLM-synthesized descriptions; the importer must
+      # ignore any legacy `description` field and always set description_prose
+      # to the empty string.
+      assert attrs[:description_prose] == ""
       assert attrs[:raw_extraction] == record
 
       payload = attrs[:extraction_payload]
@@ -264,7 +298,9 @@ defmodule Gallformers.Ingestions.BundleImporterTest do
       assert payload[:location] == nil
     end
 
-    test "extracts evidence_prose as a list of paragraph maps" do
+    test "extracts evidence_prose as a list of paragraph maps (legacy 3-field paragraphs)" do
+      # Pre-1.5.0 paragraphs carry only span_id/page/text; the importer
+      # back-fills 1.5.0 defaults so the on-disk shape is uniform.
       prose = [
         %{"span_id" => "S_0078", "page" => 3, "text" => "First paragraph about hosts."},
         %{"span_id" => "S_0079", "page" => 3, "text" => "Second paragraph about morphology."},
@@ -278,7 +314,20 @@ defmodule Gallformers.Ingestions.BundleImporterTest do
 
       attrs = BundleImporter.extract_species_attrs(record, 0)
 
-      assert attrs[:evidence_prose] == prose
+      assert [first, second, third] = attrs[:evidence_prose]
+      assert first["span_id"] == "S_0078"
+      assert first["page"] == 3
+      assert first["text"] == "First paragraph about hosts."
+      assert first["char_start"] == 0
+      assert first["char_end"] == 0
+      assert first["is_mention"] == false
+      assert first["name_occurrences"] == 0
+      assert first["is_cited"] == false
+      assert first["cited_by_fields"] == []
+      assert first["relevance"] == "low"
+
+      assert second["span_id"] == "S_0079"
+      assert third["span_id"] == "S_0081"
     end
 
     test "drops evidence_prose entries with missing or empty text" do
@@ -293,9 +342,18 @@ defmodule Gallformers.Ingestions.BundleImporterTest do
 
       attrs = BundleImporter.extract_species_attrs(record, 0)
 
-      assert attrs[:evidence_prose] == [
-               %{"span_id" => "S_1", "page" => 1, "text" => "Real paragraph."}
-             ]
+      assert [only] = attrs[:evidence_prose]
+      assert only["span_id"] == "S_1"
+      assert only["page"] == 1
+      assert only["text"] == "Real paragraph."
+      # Back-filled 1.5.0 defaults still present.
+      assert only["char_start"] == 0
+      assert only["char_end"] == 0
+      assert only["is_mention"] == false
+      assert only["name_occurrences"] == 0
+      assert only["is_cited"] == false
+      assert only["cited_by_fields"] == []
+      assert only["relevance"] == "low"
     end
 
     test "tolerates missing evidence_prose by setting it to nil" do
@@ -304,6 +362,84 @@ defmodule Gallformers.Ingestions.BundleImporterTest do
       attrs = BundleImporter.extract_species_attrs(record, 0)
 
       assert attrs[:evidence_prose] == nil
+    end
+
+    test "preserves schema-1.5.0 paragraph fields (char offsets, citation, relevance)" do
+      paragraph = %{
+        "span_id" => "S_0042",
+        "page" => 7,
+        "char_start" => 1234,
+        "char_end" => 1456,
+        "text" => "A diagnostic paragraph about the gall.",
+        "is_mention" => true,
+        "name_occurrences" => 3,
+        "is_cited" => true,
+        "cited_by_fields" => ["gall_maker.scientific_name", "gall_traits.color"],
+        "relevance" => "high"
+      }
+
+      record = %{
+        "gall_maker" => %{"scientific_name" => "Druon cited"},
+        "evidence_prose" => [paragraph]
+      }
+
+      attrs = BundleImporter.extract_species_attrs(record, 0)
+
+      assert [normalized] = attrs[:evidence_prose]
+      assert normalized["span_id"] == "S_0042"
+      assert normalized["page"] == 7
+      assert normalized["text"] == "A diagnostic paragraph about the gall."
+      assert normalized["char_start"] == 1234
+      assert normalized["char_end"] == 1456
+      assert normalized["is_mention"] == true
+      assert normalized["name_occurrences"] == 3
+      assert normalized["is_cited"] == true
+
+      assert normalized["cited_by_fields"] == [
+               "gall_maker.scientific_name",
+               "gall_traits.color"
+             ]
+
+      assert normalized["relevance"] == "high"
+    end
+
+    test "defaults schema-1.5.0 paragraph fields when older bundles omit them" do
+      paragraph = %{
+        "span_id" => "S_0001",
+        "page" => 1,
+        "text" => "Older-style paragraph without 1.5.0 fields."
+      }
+
+      record = %{
+        "gall_maker" => %{"scientific_name" => "Druon legacy"},
+        "evidence_prose" => [paragraph]
+      }
+
+      attrs = BundleImporter.extract_species_attrs(record, 0)
+
+      assert [normalized] = attrs[:evidence_prose]
+      assert normalized["span_id"] == "S_0001"
+      assert normalized["page"] == 1
+      assert normalized["text"] == "Older-style paragraph without 1.5.0 fields."
+      assert normalized["char_start"] == 0
+      assert normalized["char_end"] == 0
+      assert normalized["is_mention"] == false
+      assert normalized["name_occurrences"] == 0
+      assert normalized["is_cited"] == false
+      assert normalized["cited_by_fields"] == []
+      assert normalized["relevance"] == "low"
+    end
+
+    test "ignores legacy description field — description_prose is always empty (1.5.0)" do
+      record = %{
+        "gall_maker" => %{"scientific_name" => "Druon legacydesc"},
+        # Synthetic legacy 1.4.0 field — the 1.5.0 importer must drop it.
+        "description" => %{"value" => "Legacy synthesized description text."}
+      }
+
+      attrs = BundleImporter.extract_species_attrs(record, 0)
+
+      assert attrs[:description_prose] == ""
     end
 
     test "tolerates an empty evidence_prose list by setting it to nil" do
@@ -338,7 +474,7 @@ defmodule Gallformers.Ingestions.BundleImporterTest do
       assert ingestion.artifacts_path != ""
 
       species = Ingestions.list_source_ingestion_species(ingestion.id)
-      assert length(species) == 30
+      assert length(species) == 23
 
       [%SourceIngestionSpecies{} = first | _] = species
       assert first.position == 0
@@ -448,6 +584,8 @@ defmodule Gallformers.Ingestions.BundleImporterTest do
     end
 
     test "persists evidence_prose end-to-end on the SourceIngestionSpecies row" do
+      # Legacy 3-field paragraphs; the importer back-fills 1.5.0 defaults
+      # before persisting, so the round-tripped maps include the new fields.
       prose = [
         %{"span_id" => "S_0001", "page" => 2, "text" => "Paragraph one of source text."},
         %{"span_id" => "S_0002", "page" => 2, "text" => "Paragraph two with diagnostic details."},
@@ -469,7 +607,16 @@ defmodule Gallformers.Ingestions.BundleImporterTest do
                BundleImporter.import_bundle(bundle_dir, uploaded_by_id: user.id)
 
       [entry] = Ingestions.list_source_ingestion_species(ingestion.id)
-      assert entry.evidence_prose == prose
+
+      assert [first, second, third] = entry.evidence_prose
+      assert first["span_id"] == "S_0001"
+      assert first["page"] == 2
+      assert first["text"] == "Paragraph one of source text."
+      assert first["relevance"] == "low"
+      assert first["is_cited"] == false
+      assert first["cited_by_fields"] == []
+      assert second["span_id"] == "S_0002"
+      assert third["span_id"] == "S_0005"
 
       File.rm_rf!(bundle_dir)
     end
@@ -589,6 +736,63 @@ defmodule Gallformers.Ingestions.BundleImporterTest do
     end
   end
 
+  describe "import_bundle/2 schema 1.5.0" do
+    test "persists source.normalized_text on the SourceIngestion row" do
+      bundle_dir = build_v150_bundle_dir!()
+      user = user_fixture()
+
+      assert {:ok, %SourceIngestion{} = ingestion} =
+               BundleImporter.import_bundle(bundle_dir, uploaded_by_id: user.id)
+
+      assert ingestion.normalized_text ==
+               "Flat normalized text. Block one. Block two. Block three."
+
+      File.rm_rf!(bundle_dir)
+    end
+
+    test "ignores any legacy `description` field on records (description_prose is empty)" do
+      bundle_dir = build_v150_bundle_dir!()
+      user = user_fixture()
+
+      assert {:ok, %SourceIngestion{} = ingestion} =
+               BundleImporter.import_bundle(bundle_dir, uploaded_by_id: user.id)
+
+      [entry] = Ingestions.list_source_ingestion_species(ingestion.id)
+      assert entry.description_prose == ""
+
+      File.rm_rf!(bundle_dir)
+    end
+
+    test "round-trips all seven new ProseParagraph fields on persisted evidence_prose" do
+      bundle_dir = build_v150_bundle_dir!()
+      user = user_fixture()
+
+      assert {:ok, %SourceIngestion{} = ingestion} =
+               BundleImporter.import_bundle(bundle_dir, uploaded_by_id: user.id)
+
+      [entry] = Ingestions.list_source_ingestion_species(ingestion.id)
+
+      assert [paragraph] = entry.evidence_prose
+      assert paragraph["span_id"] == "S_0042"
+      assert paragraph["page"] == 7
+      assert paragraph["text"] == "A diagnostic paragraph about the gall."
+      assert paragraph["char_start"] == 1234
+      assert paragraph["char_end"] == 1456
+      assert paragraph["is_mention"] == true
+      assert paragraph["name_occurrences"] == 3
+      assert paragraph["is_cited"] == true
+
+      assert paragraph["cited_by_fields"] == [
+               "gall_maker.scientific_name",
+               "gall_traits.color"
+             ]
+
+      assert paragraph["relevance"] == "high"
+
+      File.rm_rf!(bundle_dir)
+    end
+  end
+
   describe "import_bundle/2 error cases" do
     test "returns error when review_artifact.json is missing" do
       bundle_dir =
@@ -630,10 +834,10 @@ defmodule Gallformers.Ingestions.BundleImporterTest do
 
   # --- Helpers ---
 
-  defp expected_record_count("cuesta"), do: 30
+  defp expected_record_count("cuesta"), do: 23
   defp expected_record_count("cook"), do: 2
   defp expected_record_count("mutun"), do: 21
-  defp expected_record_count("nicholls"), do: 13
+  defp expected_record_count("nicholls"), do: 26
 
   defp insert_gall_species!(name) do
     {:ok, species} =
@@ -680,6 +884,97 @@ defmodule Gallformers.Ingestions.BundleImporterTest do
         "document_metadata" => %{"title" => title},
         "gall_records" => gall_records
       })
+    )
+
+    File.write!(Path.join(bundle_dir, "source.pdf"), "fake-pdf-bytes")
+    bundle_dir
+  end
+
+  # Builds a minimal but schema-valid 1.5.0 review_artifact.json + source.pdf
+  # bundle on disk, with exactly one gall record carrying one prose paragraph
+  # that exercises all seven new ProseParagraph fields. Includes a synthetic
+  # legacy `description` on the record to verify the importer ignores it.
+  defp build_v150_bundle_dir! do
+    bundle_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "bundle_importer_v150_#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(bundle_dir)
+
+    review_artifact = %{
+      "schema_version" => "1.5.0",
+      "pipeline_name" => "default",
+      "pipeline_version" => "0.1.0",
+      "generated_at" => "2026-05-18T00:00:00Z",
+      "source" => %{
+        "pdf_sha256" => String.duplicate("a", 64),
+        "pdf_filename" => "fixture.pdf",
+        "pdf_page_count" => 8,
+        "source_text_sha256" => String.duplicate("b", 64),
+        "normalized_text" => "Flat normalized text. Block one. Block two. Block three."
+      },
+      "document_metadata" => %{
+        "title" => %{"value" => "Synthetic 1.5.0 Fixture"},
+        "authors" => [%{"value" => "Tester"}],
+        "year" => %{"value" => "2026"},
+        "doi" => nil
+      },
+      "gall_records" => [
+        %{
+          "record_id" => "R_001",
+          "candidate_id" => "C_001",
+          "gall_maker" => %{
+            "scientific_name" => %{"value" => "Druon syntheticus"},
+            "authority" => nil,
+            "taxonomy" => %{"family" => nil, "order" => nil},
+            "aliases" => []
+          },
+          "generation" => "unspecified",
+          "evidence_prose" => [
+            %{
+              "span_id" => "S_0042",
+              "page" => 7,
+              "char_start" => 1234,
+              "char_end" => 1456,
+              "text" => "A diagnostic paragraph about the gall.",
+              "is_mention" => true,
+              "name_occurrences" => 3,
+              "is_cited" => true,
+              "cited_by_fields" => [
+                "gall_maker.scientific_name",
+                "gall_traits.color"
+              ],
+              "relevance" => "high"
+            }
+          ],
+          "hosts" => [],
+          "gall_traits" => %{
+            "color" => %{"original" => nil, "suggested" => []},
+            "shape" => %{"original" => nil, "suggested" => []},
+            "texture" => %{"original" => nil, "suggested" => []},
+            "walls" => %{"original" => nil, "suggested" => []},
+            "cells" => %{"original" => nil, "suggested" => []},
+            "alignment" => %{"original" => nil, "suggested" => []},
+            "plant_part" => %{"original" => nil, "suggested" => []},
+            "form" => %{"original" => nil, "suggested" => []},
+            "season" => %{"original" => nil, "suggested" => []},
+            "detachable" => %{"value" => "unknown"}
+          },
+          "location" => nil,
+          "confidence_bucket" => "medium",
+          "warnings" => [],
+          # Synthetic legacy field — 1.5.0 dropped it, importer must ignore it.
+          "description" => %{"value" => "Legacy synthesized description."}
+        }
+      ],
+      "warnings" => []
+    }
+
+    File.write!(
+      Path.join(bundle_dir, "review_artifact.json"),
+      Jason.encode!(review_artifact)
     )
 
     File.write!(Path.join(bundle_dir, "source.pdf"), "fake-pdf-bytes")

@@ -25,7 +25,6 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceCreateHost do
         |> assign(:wcvp_available, wcvp_lookup().available?())
         |> assign(:wcvp_results, [])
         |> assign(:wcvp_searching, false)
-        |> assign(:wcvp_selected, nil)
         |> assign(:wcvp_loading, false)
         |> assign(:error_message, nil)
 
@@ -60,15 +59,29 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceCreateHost do
      |> assign(:wcvp_results, [])}
   end
 
-  def handle_async(:wcvp_select, {:ok, data}, socket) do
+  # Single-click create: fetch WCVP details, then immediately persist the host.
+  def handle_async(:wcvp_create, {:ok, data}, socket) do
+    name = socket.assigns.name
+    index = socket.assigns.index
+
+    case create_host(name, data) do
+      {:ok, host} ->
+        send(self(), {:host_created_and_mapped, index, host})
+        {:noreply, assign(socket, :wcvp_loading, false)}
+
+      {:error, message} ->
+        {:noreply,
+         socket
+         |> assign(:wcvp_loading, false)
+         |> assign(:error_message, message)}
+    end
+  end
+
+  def handle_async(:wcvp_create, {:exit, _reason}, socket) do
     {:noreply,
      socket
      |> assign(:wcvp_loading, false)
-     |> assign(:wcvp_selected, data)}
-  end
-
-  def handle_async(:wcvp_select, {:exit, _reason}, socket) do
-    {:noreply, assign(socket, :wcvp_loading, false)}
+     |> assign(:error_message, "Failed to fetch WCVP details. Try again or create without WCVP.")}
   end
 
   @impl true
@@ -78,20 +91,20 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceCreateHost do
   end
 
   @impl true
-  def handle_event("select_wcvp", %{"id" => plant_name_id}, socket) do
+  def handle_event("create_from_wcvp", %{"id" => plant_name_id}, socket) do
     {:noreply,
      socket
      |> assign(:wcvp_loading, true)
-     |> start_async(:wcvp_select, fn -> wcvp_lookup().get(plant_name_id) end)}
+     |> assign(:error_message, nil)
+     |> start_async(:wcvp_create, fn -> wcvp_lookup().get(plant_name_id) end)}
   end
 
   @impl true
   def handle_event("create_host", _params, socket) do
     name = socket.assigns.name
-    wcvp = socket.assigns.wcvp_selected
     index = socket.assigns.index
 
-    case create_host(name, wcvp) do
+    case create_host(name, nil) do
       {:ok, host} ->
         send(self(), {:host_created_and_mapped, index, host})
         {:noreply, socket}
@@ -200,7 +213,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceCreateHost do
         />
       </div>
 
-      <div :if={@wcvp_available && is_nil(@wcvp_selected)}>
+      <div :if={@wcvp_available}>
         <div class="text-xs font-medium uppercase tracking-wide text-gray-500 mb-2">
           POWO/WCVP matches
         </div>
@@ -223,33 +236,25 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceCreateHost do
             <span class="text-xs text-gray-400 ml-auto mr-2">{result.family}</span>
             <button
               type="button"
-              phx-click="select_wcvp"
+              phx-click="create_from_wcvp"
               phx-value-id={result.plant_name_id}
               phx-target={@myself}
-              class="text-xs text-gf-maroon hover:underline"
+              disabled={@wcvp_loading}
+              class={[
+                "rounded px-2 py-1 text-xs font-medium",
+                if(@wcvp_loading,
+                  do: "bg-gray-100 text-gray-400 cursor-not-allowed",
+                  else: "bg-green-50 text-green-700 hover:bg-green-100"
+                )
+              ]}
             >
-              Use
+              <span
+                :if={@wcvp_loading}
+                class="ph-arrows-clockwise size-3.5 inline-block mr-1 motion-safe:animate-spin"
+              /> Create from this match
             </button>
           </li>
         </ul>
-      </div>
-
-      <div
-        :if={@wcvp_selected}
-        class="rounded border border-green-200 bg-green-50 px-3 py-3 text-sm space-y-1"
-      >
-        <div class="text-xs font-medium uppercase tracking-wide text-green-700">Selected match</div>
-        <div>
-          <span class="font-medium italic">{@wcvp_selected.taxon_name}</span>
-          <span class="text-gray-500 ml-1">{@wcvp_selected.taxon_authors}</span>
-        </div>
-        <div class="text-xs text-gray-600">
-          Family <span class="font-medium">{@wcvp_selected.family}</span>
-          · {length(@wcvp_selected.native_distribution)} native
-          <span :if={@wcvp_selected.introduced_distribution != []}>
-            · {length(@wcvp_selected.introduced_distribution)} introduced
-          </span>
-        </div>
       </div>
 
       <div
@@ -281,7 +286,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceCreateHost do
           phx-target={@myself}
           class="gf-btn gf-btn-primary"
         >
-          Create host
+          Create without WCVP
         </button>
       </div>
     </div>

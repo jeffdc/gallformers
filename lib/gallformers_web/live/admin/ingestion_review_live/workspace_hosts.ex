@@ -218,7 +218,22 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceHosts do
         </div>
       </div>
 
-      <div :if={!@already_linked && !@matched && !@declined} class="pt-1">
+      <div :if={!@already_linked && !@matched && !@declined} class="pt-1 space-y-2">
+        <div
+          :if={@review.extracted_name not in [nil, ""]}
+          class="flex justify-end"
+        >
+          <button
+            id={"host-quick-create-#{@review.index}"}
+            type="button"
+            phx-click={"host_create_#{@review.index}"}
+            phx-value-name={@review.extracted_name}
+            phx-target={@myself}
+            class="rounded px-2.5 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100"
+          >
+            <.icon name="ph-plus" class="size-3.5 inline-block mr-1" /> Create new host
+          </button>
+        </div>
         <.typeahead
           id={"host-picker-#{@review.index}"}
           label="Search host species"

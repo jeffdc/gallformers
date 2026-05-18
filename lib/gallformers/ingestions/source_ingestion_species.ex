@@ -267,15 +267,31 @@ defmodule Gallformers.Ingestions.SourceIngestionSpecies do
     use Ecto.Schema
     import Ecto.Changeset
 
-    @type t :: %__MODULE__{edited: boolean() | nil}
+    @type t :: %__MODULE__{
+            edited: boolean() | nil,
+            selected_span_ids: [String.t()] | nil,
+            mode: String.t() | nil,
+            draft_dirty: boolean() | nil,
+            draft: String.t() | nil
+          }
 
     @primary_key false
     embedded_schema do
       field :edited, :boolean
+      field :selected_span_ids, {:array, :string}, default: []
+      field :mode, :string, default: "replace"
+      field :draft_dirty, :boolean, default: false
+      field :draft, :string
     end
 
     def changeset(description_review, attrs) do
-      cast(description_review, attrs, [:edited])
+      cast(description_review, attrs, [
+        :edited,
+        :selected_span_ids,
+        :mode,
+        :draft_dirty,
+        :draft
+      ])
     end
   end
 

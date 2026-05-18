@@ -70,7 +70,11 @@ defmodule Gallformers.Ingestions.BundleImporter do
       title: unwrap_value(Map.get(metadata, "title")),
       authors: unwrap_authors(Map.get(metadata, "authors")),
       publication_year: parse_year(unwrap_value(Map.get(metadata, "year"))),
-      doi: unwrap_value(Map.get(metadata, "doi"))
+      doi: unwrap_value(Map.get(metadata, "doi")),
+      # Schema-1.5.0 carries the flat normalized source text inline so the
+      # review UI can render evidence highlights without re-walking artifacts.
+      # Plain string in 1.5.0 (NOT wrapped). Older bundles omit it → nil.
+      normalized_text: Map.get(source, "normalized_text")
     }
   end
 
@@ -78,11 +82,14 @@ defmodule Gallformers.Ingestions.BundleImporter do
   Builds a `SourceIngestionSpecies` attrs map from a single `gall_records[]`
   entry plus its 0-based position.
 
-  Schema-1.1.0 bundles include a top-level `generation` per record
+  Schema-1.1.0+ bundles include a top-level `generation` per record
   (`"agamic" | "sexgen" | "unspecified"`); the suffix is appended to
   `extracted_name` (`"X (agamic)"`, `"X (sexgen)"`) to match the gallformers
   species-name convention. Schema-1.0.0 / missing `generation` defaults to
   `"unspecified"` and the bare name is kept.
+
+  Schema-1.5.0 dropped the LLM-synthesized `description` field on each record;
+  `description_prose` is always `""`. Any legacy `description` is ignored.
   """
   @spec extract_species_attrs(map(), non_neg_integer()) :: map()
   def extract_species_attrs(record, position) when is_map(record) and is_integer(position) do
@@ -92,12 +99,6 @@ defmodule Gallformers.Ingestions.BundleImporter do
     generation = read_generation(record)
     extracted_name = apply_generation_suffix(scientific_name, generation)
 
-    description_prose =
-      case unwrap_value(Map.get(record, "description")) do
-        nil -> ""
-        value when is_binary(value) -> value
-      end
-
     evidence_prose = build_evidence_prose(Map.get(record, "evidence_prose"))
 
     %{
@@ -105,7 +106,10 @@ defmodule Gallformers.Ingestions.BundleImporter do
       status: "pending",
       extracted_name: extracted_name,
       extracted_authority: authority,
-      description_prose: description_prose,
+      # Schema-1.5.0 dropped the LLM-synthesized description; the curator UI
+      # now builds the species description from `evidence_prose`. Any legacy
+      # `description` field on the record is ignored.
+      description_prose: "",
       evidence_prose: evidence_prose,
       raw_extraction: record,
       extraction_payload: build_extraction_payload(record)
@@ -126,9 +130,13 @@ defmodule Gallformers.Ingestions.BundleImporter do
   defp apply_generation_suffix(name, "sexgen"), do: "#{name} (sexgen)"
   defp apply_generation_suffix(name, _), do: name
 
-  # Schema-1.3.0 evidence_prose is a list of paragraph maps; normalize to a
-  # plain list with string-keyed `span_id` / `page` / `text` fields.
-  # Returns nil when the list is missing or empty so the DB column stays null.
+  # Schema-1.5.0 evidence_prose is a list of paragraph maps; normalize to a
+  # plain list of string-keyed maps for jsonb. Carries `span_id` / `page` /
+  # `text` plus the 1.5.0 signal fields (`char_start`, `char_end`,
+  # `is_mention`, `name_occurrences`, `is_cited`, `cited_by_fields`,
+  # `relevance`). Older bundles missing the 1.5.0 fields get documented
+  # defaults. Returns nil when the list is missing or empty so the DB column
+  # stays null.
   defp build_evidence_prose(paragraphs) when is_list(paragraphs) do
     cleaned =
       paragraphs
@@ -148,7 +156,14 @@ defmodule Gallformers.Ingestions.BundleImporter do
     %{
       "span_id" => Map.get(paragraph, "span_id"),
       "page" => Map.get(paragraph, "page"),
-      "text" => text
+      "text" => text,
+      "char_start" => Map.get(paragraph, "char_start", 0),
+      "char_end" => Map.get(paragraph, "char_end", 0),
+      "is_mention" => Map.get(paragraph, "is_mention", false),
+      "name_occurrences" => Map.get(paragraph, "name_occurrences", 0),
+      "is_cited" => Map.get(paragraph, "is_cited", false),
+      "cited_by_fields" => Map.get(paragraph, "cited_by_fields", []),
+      "relevance" => Map.get(paragraph, "relevance", "low")
     }
   end
 

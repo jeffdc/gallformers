@@ -47,7 +47,8 @@ defmodule Gallformers.Ingestions.SourceIngestion do
     :uploaded_by_id,
     :error_stage,
     :error_message,
-    :failed_at
+    :failed_at,
+    :normalized_text
   ]
 
   @signal_fields [
@@ -104,6 +105,7 @@ defmodule Gallformers.Ingestions.SourceIngestion do
           error_stage: String.t() | nil,
           error_message: String.t() | nil,
           failed_at: DateTime.t() | nil,
+          normalized_text: String.t() | nil,
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
@@ -127,6 +129,7 @@ defmodule Gallformers.Ingestions.SourceIngestion do
     field :error_stage, :string
     field :error_message, :string
     field :failed_at, :utc_datetime
+    field :normalized_text, :string
 
     belongs_to :duplicate_of_source_ingestion, __MODULE__
     belongs_to :source, Gallformers.Sources.Source

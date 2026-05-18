@@ -19,6 +19,7 @@ import InputEvent from "./hooks/input_event"
 import RangeMap from "./hooks/range_map"
 import RegionPrompt from "./hooks/region_prompt"
 import RegionScope from "./hooks/region_scope"
+import ScrollHighlightIntoView from "./hooks/scroll_highlight_into_view"
 import ScrollToCouplet from "./hooks/scroll_to_couplet"
 import SortableImages from "./hooks/sortable_images"
 import Tabs from "./hooks/tabs"
@@ -29,7 +30,7 @@ const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: () => ({_csrf_token: csrfToken, continent: localStorage.getItem("gf_continent")}),
-  hooks: {AdminNav, ArticleImageUpload, AutoDismiss, ContentImageUpload, CopyToClipboard, DailyChart, ElapsedTimer, ImageGallery, ImageUpload, IndeterminateCheckbox, InputEvent, RangeMap, RegionPrompt, RegionScope, ScrollToCouplet, SortableImages, Tabs, Typeahead},
+  hooks: {AdminNav, ArticleImageUpload, AutoDismiss, ContentImageUpload, CopyToClipboard, DailyChart, ElapsedTimer, ImageGallery, ImageUpload, IndeterminateCheckbox, InputEvent, RangeMap, RegionPrompt, RegionScope, ScrollHighlightIntoView, ScrollToCouplet, SortableImages, Tabs, Typeahead},
 })
 
 // Show progress bar on live navigation and form submits

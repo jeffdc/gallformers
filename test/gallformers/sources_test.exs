@@ -144,4 +144,39 @@ defmodule Gallformers.SourcesTest do
 
     source
   end
+
+  describe "get_source_by_title/1" do
+    test "matches case-insensitively" do
+      {:ok, source} =
+        Sources.create_source(%{
+          title: "A Field Guide to Galls",
+          author: "Author Authoritus",
+          pubyear: "2025",
+          link: "http://example.com",
+          citation: "Test citation",
+          license: "CC BY"
+        })
+
+      assert %{id: id} = Sources.get_source_by_title("A Field Guide to Galls")
+      assert id == source.id
+
+      assert %{id: ^id} = Sources.get_source_by_title("a field guide to galls")
+      assert %{id: ^id} = Sources.get_source_by_title("A FIELD GUIDE TO GALLS")
+      assert %{id: ^id} = Sources.get_source_by_title("a FIELD guide TO galls")
+    end
+
+    test "returns nil when title does not match" do
+      {:ok, _source} =
+        Sources.create_source(%{
+          title: "Something Else Entirely",
+          author: "Other",
+          pubyear: "2024",
+          link: "http://example.com",
+          citation: "x",
+          license: "CC BY"
+        })
+
+      assert Sources.get_source_by_title("nope nothing") == nil
+    end
+  end
 end

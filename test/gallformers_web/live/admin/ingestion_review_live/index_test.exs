@@ -301,10 +301,10 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.IndexTest do
 
       assert html =~ "Upload Bundle"
       assert html =~ "bundle.tar.gz"
-      assert html =~ "Import bundle"
+      refute html =~ "Import bundle"
     end
 
-    test "imports a real cuesta bundle and redirects to the detail page", %{conn: conn} do
+    test "auto-imports a real cuesta bundle when the upload finishes", %{conn: conn} do
       current_db_user = db_user_fixture("Bundle Uploader")
       conn = superadmin_conn(conn, current_db_user)
 
@@ -322,17 +322,16 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.IndexTest do
           }
         ])
 
-      assert render_upload(upload, "bundle.tar.gz") =~ "100%"
+      render_upload(upload, "bundle.tar.gz")
 
-      result = render_submit(view, "submit_bundle", %{})
+      # No "Import bundle" click — auto-import runs on upload completion.
+      ingestion =
+        Ingestions.list_source_ingestions()
+        |> Enum.find(&(&1.uploaded_by_id == current_db_user.id))
 
-      assert {:error, {:live_redirect, %{to: "/admin/ingestion-review/" <> id_str}}} = result
-      {ingestion_id, ""} = Integer.parse(id_str)
-
-      ingestion = Ingestions.get_source_ingestion!(ingestion_id)
+      assert ingestion != nil, "expected a SourceIngestion to be created by the auto-import"
       assert ingestion.status == "needs_review"
       assert ingestion.processing_stage == "review"
-      assert ingestion.uploaded_by_id == current_db_user.id
     end
 
     test "reports a clean error for a non-tar upload", %{conn: conn} do
@@ -350,9 +349,14 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.IndexTest do
           }
         ])
 
-      assert render_upload(upload, "garbage.tar.gz") =~ "100%"
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          render_upload(upload, "garbage.tar.gz")
+        end)
 
-      html = render_submit(view, "submit_bundle", %{})
+      assert log =~ "Bundle import failed"
+
+      html = render(view)
 
       assert html =~ "Failed to extract archive" or html =~ "not valid JSON" or
                html =~ "missing"

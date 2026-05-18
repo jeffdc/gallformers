@@ -273,8 +273,10 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       refute html =~ "Locked"
     end
 
-    test "evidence prose section renders structured paragraphs with span_id and page affordances",
-         %{conn: conn} do
+    test "description section renders evidence_prose chunks as picker cards", %{conn: conn} do
+      # In the new shape, evidence_prose paragraphs become chunk-picker cards
+      # inside the description section. At the default :high disclosure level,
+      # only chunks marked relevance=high or is_cited=true show.
       reviewer = db_user_fixture("Evidence Prose Reviewer")
       source = source_fixture(%{title: "Evidence Prose Source"})
 
@@ -287,25 +289,55 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       source_ingestion_species_fixture(ingestion, 0, %{
         extracted_name: "Druon evidens (agamic)",
         evidence_prose: [
-          %{"span_id" => "S_0078", "page" => 3, "text" => "First paragraph about hosts."},
-          %{"span_id" => "S_0079", "page" => 3, "text" => "Second paragraph about morphology."},
-          %{"span_id" => "S_0081", "page" => 4, "text" => "Third paragraph about distribution."}
+          %{
+            "span_id" => "S_0078",
+            "page" => 3,
+            "char_start" => 0,
+            "char_end" => 28,
+            "text" => "First paragraph about hosts.",
+            "is_mention" => true,
+            "is_cited" => false,
+            "cited_by_fields" => [],
+            "relevance" => "high"
+          },
+          %{
+            "span_id" => "S_0079",
+            "page" => 3,
+            "char_start" => 30,
+            "char_end" => 64,
+            "text" => "Second paragraph about morphology.",
+            "is_mention" => false,
+            "is_cited" => false,
+            "cited_by_fields" => [],
+            "relevance" => "high"
+          },
+          %{
+            "span_id" => "S_0081",
+            "page" => 4,
+            "char_start" => 70,
+            "char_end" => 104,
+            "text" => "Third paragraph about distribution.",
+            "is_mention" => false,
+            "is_cited" => false,
+            "cited_by_fields" => [],
+            "relevance" => "high"
+          }
         ]
       })
 
       conn = superadmin_conn(conn, reviewer)
       {:ok, _view, html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
 
-      assert html =~ "Source text"
+      # Each high-relevance chunk is rendered as a card with its text.
       assert html =~ "First paragraph about hosts."
       assert html =~ "Second paragraph about morphology."
       assert html =~ "Third paragraph about distribution."
 
-      # span_id attached as a data attribute for future PDF deep-link wiring
+      # span_id attached as a data attribute on each chunk card.
       assert html =~ ~s(data-span-id="S_0078")
       assert html =~ ~s(data-span-id="S_0081")
 
-      # page rendered as a clickable affordance ("p. N")
+      # page rendered on the chunk card.
       assert html =~ "p. 3"
       assert html =~ "p. 4"
     end
@@ -782,9 +814,9 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       assert html =~ "Testaceae"
     end
 
-    test "selecting a WCVP result shows it as the chosen match", %{conn: conn} do
-      reviewer = db_user_fixture("Host WCVP Select Reviewer")
-      source = source_fixture(%{title: "Host WCVP Select Source"})
+    test "pre-populates the typeahead query with extracted_name for unmatched host", %{conn: conn} do
+      reviewer = db_user_fixture("Host Prepop Reviewer")
+      source = source_fixture(%{title: "Host Prepop Source"})
 
       ingestion =
         review_ready_ingestion_fixture(%{
@@ -792,10 +824,12 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
           source_id: source.id
         })
 
+      # "Quercus" matches the seeded Quercus species via search prefix but is not
+      # an exact match for any, so the host does not auto-match.
       source_ingestion_species_fixture(ingestion, 0, %{
         extracted_name: "Novelus gallicus",
         extraction_payload: %{
-          "hosts" => [%{"name" => "Wcvptestus alpinus"}],
+          "hosts" => [%{"name" => "Quercus"}],
           "traits" => %{},
           "description_evidence" => []
         }
@@ -808,25 +842,89 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       |> element("#workspace-section-identity button[phx-click=treat_as_new]")
       |> render_click()
 
-      send(view.pid, {:request_create_host, 0, "Wcvptestus alpinus"})
-      render_async(view)
-
-      view
-      |> element(~s(#workspace-create-host button[phx-click="select_wcvp"][phx-value-id="700"]))
-      |> render_click()
-
-      render_async(view)
       html = render(view)
 
-      # The chosen-match summary shows family + native distribution count
-      assert html =~ "Selected match"
-      assert html =~ "Testaceae"
-      assert html =~ "1 native"
+      # The typeahead input is pre-populated with the extracted name
+      assert html =~ ~s(data-query="Quercus")
+      # And the prefix-matched seeded species are visible without typing
+      assert html =~ "Quercus alba"
+      assert html =~ "Quercus rubra"
     end
 
-    test "clicking Create persists host with WCVP data and maps to review", %{conn: conn} do
-      reviewer = db_user_fixture("Host Create WCVP Reviewer")
-      source = source_fixture(%{title: "Host Create WCVP Source"})
+    test "does not pre-populate when extracted_name is empty", %{conn: conn} do
+      reviewer = db_user_fixture("Host Empty Name Reviewer")
+      source = source_fixture(%{title: "Host Empty Name Source"})
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: reviewer.id,
+          source_id: source.id
+        })
+
+      source_ingestion_species_fixture(ingestion, 0, %{
+        extracted_name: "Novelus gallicus",
+        extraction_payload: %{
+          "hosts" => [%{"name" => ""}],
+          "traits" => %{},
+          "description_evidence" => []
+        }
+      })
+
+      conn = superadmin_conn(conn, reviewer)
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
+
+      view
+      |> element("#workspace-section-identity button[phx-click=treat_as_new]")
+      |> render_click()
+
+      html = render(view)
+
+      # No data-query value for the empty host (only the empty default)
+      assert html =~ ~s(data-query="")
+    end
+
+    test "renders a Create new host button on unmatched host rows", %{conn: conn} do
+      reviewer = db_user_fixture("Host Quick Create Reviewer")
+      source = source_fixture(%{title: "Host Quick Create Source"})
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: reviewer.id,
+          source_id: source.id
+        })
+
+      source_ingestion_species_fixture(ingestion, 0, %{
+        extracted_name: "Novelus gallicus",
+        extraction_payload: %{
+          "hosts" => [%{"name" => "Nonexistus speciesus"}],
+          "traits" => %{},
+          "description_evidence" => []
+        }
+      })
+
+      conn = superadmin_conn(conn, reviewer)
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
+
+      view
+      |> element("#workspace-section-identity button[phx-click=treat_as_new]")
+      |> render_click()
+
+      # Clicking the per-row quick-create button opens the modal with the
+      # extracted name pre-filled.
+      view
+      |> element(~s(button#host-quick-create-0))
+      |> render_click()
+
+      _ = render(view)
+
+      assert has_element?(view, "#create-host-modal")
+      assert render(view) =~ "Nonexistus speciesus"
+    end
+
+    test "clicking Create from this match on a WCVP row persists the host directly",
+         %{conn: conn} do
+      reviewer = db_user_fixture("Host WCVP One-Click Reviewer")
+      source = source_fixture(%{title: "Host WCVP One-Click Source"})
 
       ingestion =
         review_ready_ingestion_fixture(%{
@@ -853,14 +951,11 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       send(view.pid, {:request_create_host, 0, "Wcvptestus alpinus"})
       render_async(view)
 
+      # Single click on the WCVP result row both fetches details and creates.
       view
-      |> element(~s(#workspace-create-host button[phx-click="select_wcvp"][phx-value-id="700"]))
-      |> render_click()
-
-      render_async(view)
-
-      view
-      |> element(~s(#workspace-create-host button[phx-click="create_host"]))
+      |> element(
+        ~s(#workspace-create-host button[phx-click="create_from_wcvp"][phx-value-id="700"])
+      )
       |> render_click()
 
       render_async(view)
@@ -879,6 +974,106 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       # Host review now mapped to the new species
       html = render(view)
       assert html =~ "→ Wcvptestus alpinus"
+    end
+
+    test "Create without WCVP fallback button still creates a host", %{conn: conn} do
+      reviewer = db_user_fixture("Host Fallback Create Reviewer")
+      source = source_fixture(%{title: "Host Fallback Create Source"})
+
+      # Pre-create a plant taxonomy so the new host can resolve a family
+      # without needing WCVP data.
+      family =
+        Repo.insert!(%Gallformers.Taxonomy.Taxonomy{
+          name: "NoWcvpFamily",
+          description: "Plant",
+          type: "family",
+          is_placeholder: false
+        })
+
+      _genus =
+        Repo.insert!(%Gallformers.Taxonomy.Taxonomy{
+          name: "Newhostus",
+          description: "test genus",
+          type: "genus",
+          parent_id: family.id,
+          is_placeholder: false
+        })
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: reviewer.id,
+          source_id: source.id
+        })
+
+      source_ingestion_species_fixture(ingestion, 0, %{
+        extracted_name: "Novelus gallicus",
+        extraction_payload: %{
+          "hosts" => [%{"name" => "Newhostus rarus"}],
+          "traits" => %{},
+          "description_evidence" => []
+        }
+      })
+
+      conn = superadmin_conn(conn, reviewer)
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
+
+      view
+      |> element("#workspace-section-identity button[phx-click=treat_as_new]")
+      |> render_click()
+
+      send(view.pid, {:request_create_host, 0, "Newhostus rarus"})
+      render_async(view)
+
+      html = render(view)
+      assert html =~ "Create without WCVP"
+
+      view
+      |> element(~s(#workspace-create-host button[phx-click="create_host"]))
+      |> render_click()
+
+      render_async(view)
+
+      refute has_element?(view, "#create-host-modal")
+
+      assert %Species{} =
+               Repo.get_by(Species, name: "Newhostus rarus", taxoncode: "plant")
+    end
+
+    test "Cancel in the create-host modal closes it without creating", %{conn: conn} do
+      reviewer = db_user_fixture("Host Cancel Reviewer")
+      source = source_fixture(%{title: "Host Cancel Source"})
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: reviewer.id,
+          source_id: source.id
+        })
+
+      source_ingestion_species_fixture(ingestion, 0, %{
+        extracted_name: "Novelus gallicus",
+        extraction_payload: %{
+          "hosts" => [%{"name" => "Wcvptestus alpinus"}],
+          "traits" => %{},
+          "description_evidence" => []
+        }
+      })
+
+      conn = superadmin_conn(conn, reviewer)
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
+
+      view
+      |> element("#workspace-section-identity button[phx-click=treat_as_new]")
+      |> render_click()
+
+      send(view.pid, {:request_create_host, 0, "Wcvptestus alpinus"})
+      render_async(view)
+
+      view
+      |> element(~s(#workspace-create-host button[phx-click="cancel"]))
+      |> render_click()
+
+      refute has_element?(view, "#create-host-modal")
+      refute Repo.get_by(Species, name: "Wcvptestus alpinus", taxoncode: "plant")
     end
   end
 
@@ -1338,7 +1533,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
   end
 
   describe "description section" do
-    test "renders extracted description even when identity is unresolved", %{conn: conn} do
+    test "renders evidence_prose chunks even when identity is unresolved", %{conn: conn} do
       reviewer = db_user_fixture("Desc Unresolved Reviewer")
       source = source_fixture(%{title: "Desc Unresolved Source"})
 
@@ -1350,23 +1545,32 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
 
       source_ingestion_species_fixture(ingestion, 0, %{
         extracted_name: "Novelus gallicus",
-        description_prose: "A round woody gall on twigs.",
-        extraction_payload: %{
-          "hosts" => [],
-          "traits" => %{},
-          "description_evidence" => [%{"text" => "A round gall."}]
-        }
+        evidence_prose: [
+          %{
+            "span_id" => "S_0001",
+            "page" => 1,
+            "char_start" => 0,
+            "char_end" => 28,
+            "text" => "A round woody gall on twigs.",
+            "is_mention" => true,
+            "is_cited" => false,
+            "cited_by_fields" => [],
+            "relevance" => "high"
+          }
+        ]
       })
 
       conn = superadmin_conn(conn, reviewer)
       {:ok, _view, html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
 
       assert html =~ "Description"
+      # New chunk-picker renders the evidence_prose paragraph as a card and
+      # also as part of the auto-selected draft preview.
       assert html =~ "A round woody gall on twigs"
       refute html =~ "Locked"
     end
 
-    test "shows textarea with extracted description when unlocked in new mode", %{conn: conn} do
+    test "shows draft preview with selected high-relevance chunks in new mode", %{conn: conn} do
       reviewer = db_user_fixture("Desc New Reviewer")
       source = source_fixture(%{title: "Desc New Source"})
 
@@ -1378,12 +1582,19 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
 
       source_ingestion_species_fixture(ingestion, 0, %{
         extracted_name: "Novelus gallicus",
-        description_prose: "A round woolly gall.",
-        extraction_payload: %{
-          "hosts" => [],
-          "traits" => %{},
-          "description_evidence" => [%{"text" => "Evidence text here."}]
-        }
+        evidence_prose: [
+          %{
+            "span_id" => "S_0001",
+            "page" => 1,
+            "char_start" => 0,
+            "char_end" => 20,
+            "text" => "A round woolly gall.",
+            "is_mention" => true,
+            "is_cited" => false,
+            "cited_by_fields" => [],
+            "relevance" => "high"
+          }
+        ]
       })
 
       conn = superadmin_conn(conn, reviewer)
@@ -1395,7 +1606,11 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
 
       html = render(view)
 
+      # The selected high-relevance chunk's text appears in the draft preview
+      # and the chunk card.
       assert html =~ "A round woolly gall."
+      # In "new" mode (no existing_gall.description) the mode selector is
+      # hidden.
       refute html =~ "Keep current"
     end
 
@@ -1435,6 +1650,396 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
       assert html =~ "Keep current"
       assert html =~ "Append"
       assert html =~ "Replace"
+    end
+  end
+
+  describe "description review persistence round-trip" do
+    test "selection, mode, draft, dirty round-trip through save and reload",
+         %{conn: conn} do
+      reviewer = db_user_fixture("Desc Roundtrip Reviewer")
+      source = source_fixture(%{title: "Desc Roundtrip Source"})
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: reviewer.id,
+          source_id: source.id
+        })
+
+      entry =
+        source_ingestion_species_fixture(ingestion, 0, %{
+          extracted_name: "Novelus gallicus",
+          evidence_prose: roundtrip_prose_fixture(),
+          extraction_payload: %{
+            "hosts" => [],
+            "traits" => %{},
+            "description_evidence" => []
+          }
+        })
+
+      conn = superadmin_conn(conn, reviewer)
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
+
+      # Treat as new so identity resolves and we can save.
+      view
+      |> element("#workspace-section-identity button[phx-click=treat_as_new]")
+      |> render_click()
+
+      # Emit description_updated with specific selection, append mode, draft text.
+      send(
+        view.pid,
+        {:description_updated,
+         %{
+           selection: ["S_0021", "S_0024"],
+           draft: "Curator wrote this.",
+           mode: :append,
+           dirty: false
+         }}
+      )
+
+      render(view)
+
+      render_click(view, "save_draft")
+
+      # Reload from the database — the workspace view should carry the new keys.
+      workspace_view = Ingestions.source_ingestion_species_review_workspace!(entry.id)
+
+      assert workspace_view.description_review.selected_span_ids == ["S_0021", "S_0024"]
+      assert workspace_view.description_review.mode == :append
+      assert workspace_view.description_review.draft_dirty == false
+      assert workspace_view.description_review.draft == "Curator wrote this."
+      assert workspace_view.description_review.edited == true
+
+      # The component on a fresh mount should reflect the persisted state.
+      {:ok, _view2, html2} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
+
+      # On the second mount, the description draft should hydrate to "Curator wrote this.".
+      assert html2 =~ "Curator wrote this."
+    end
+
+    test "completion gate blocks completing a fresh species (edited == false)",
+         %{conn: _conn} do
+      reviewer = db_user_fixture("Desc Gate Block Reviewer")
+      source = source_fixture(%{title: "Desc Gate Block Source"})
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: reviewer.id,
+          source_id: source.id
+        })
+
+      entry =
+        source_ingestion_species_fixture(ingestion, 0, %{
+          extracted_name: "Andricus quercuscalifornicus",
+          extraction_payload: %{
+            "hosts" => [],
+            "traits" => %{},
+            "description_evidence" => []
+          }
+        })
+
+      # Try to commit "complete" without ever engaging the description.
+      attrs = %{
+        action: "complete",
+        species_review: %{decision: "mapped", species_id: 100, accepted_aliases: []},
+        host_reviews: %{},
+        trait_reviews: %{},
+        description_prose: entry.description_prose
+      }
+
+      assert {:error, changeset} =
+               Ingestions.update_source_ingestion_species_review(entry, attrs, reviewer.id)
+
+      assert {"cannot mark complete until the description is reviewed", _} =
+               changeset.errors[:status]
+    end
+
+    test "completion gate allows commit once curator has engaged the description picker",
+         %{conn: _conn} do
+      reviewer = db_user_fixture("Desc Gate Pass Reviewer")
+      source = source_fixture(%{title: "Desc Gate Pass Source"})
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: reviewer.id,
+          source_id: source.id
+        })
+
+      entry =
+        source_ingestion_species_fixture(ingestion, 0, %{
+          extracted_name: "Andricus quercuscalifornicus",
+          extraction_payload: %{
+            "hosts" => [],
+            "traits" => %{},
+            "description_evidence" => []
+          }
+        })
+
+      attrs = %{
+        action: "complete",
+        species_review: %{decision: "mapped", species_id: 100, accepted_aliases: []},
+        host_reviews: %{},
+        trait_reviews: %{},
+        description_prose: "Curator-supplied final description.",
+        description_review: %{
+          selected_span_ids: ["S_0001"],
+          mode: "replace",
+          draft_dirty: false,
+          draft: "Curator-supplied final description."
+        }
+      }
+
+      assert {:ok, updated} =
+               Ingestions.update_source_ingestion_species_review(entry, attrs, reviewer.id)
+
+      assert updated.status == "complete"
+      assert updated.review_payload.description_review.edited == true
+      assert updated.review_payload.description_review.selected_span_ids == ["S_0001"]
+      assert updated.review_payload.description_review.mode == "replace"
+
+      assert updated.review_payload.description_review.draft ==
+               "Curator-supplied final description."
+    end
+
+    test "mode :replace without existing produces description_prose == draft", %{conn: conn} do
+      reviewer = db_user_fixture("Desc Replace No-Existing Reviewer")
+      source = source_fixture(%{title: "Desc Replace No-Existing Source"})
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: reviewer.id,
+          source_id: source.id
+        })
+
+      entry =
+        source_ingestion_species_fixture(ingestion, 0, %{
+          extracted_name: "Novelus gallicus",
+          evidence_prose: roundtrip_prose_fixture(),
+          extraction_payload: %{
+            "hosts" => [],
+            "traits" => %{},
+            "description_evidence" => []
+          }
+        })
+
+      conn = superadmin_conn(conn, reviewer)
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
+
+      view
+      |> element("#workspace-section-identity button[phx-click=treat_as_new]")
+      |> render_click()
+
+      send(
+        view.pid,
+        {:description_updated,
+         %{
+           selection: ["S_0021"],
+           draft: "Fresh description.",
+           mode: :replace,
+           dirty: false
+         }}
+      )
+
+      render(view)
+      render_click(view, "save_draft")
+
+      reloaded = Ingestions.get_source_ingestion_species!(entry.id)
+      assert reloaded.description_prose == "Fresh description."
+    end
+
+    test "mode :replace with existing description still produces description_prose == draft",
+         %{conn: conn} do
+      reviewer = db_user_fixture("Desc Replace Existing Reviewer")
+      source = source_fixture(%{title: "Desc Replace Existing Source"})
+
+      {:ok, _} =
+        Sources.create_species_source(%{
+          species_id: 100,
+          source_id: source.id,
+          description: "Old description."
+        })
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: reviewer.id,
+          source_id: source.id
+        })
+
+      entry =
+        source_ingestion_species_fixture(ingestion, 0, %{
+          extracted_name: "Andricus quercuscalifornicus",
+          evidence_prose: roundtrip_prose_fixture(),
+          extraction_payload: %{
+            "hosts" => [],
+            "traits" => %{},
+            "description_evidence" => []
+          }
+        })
+
+      conn = superadmin_conn(conn, reviewer)
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
+
+      send(
+        view.pid,
+        {:description_updated,
+         %{
+           selection: ["S_0021"],
+           draft: "New description.",
+           mode: :replace,
+           dirty: false
+         }}
+      )
+
+      render(view)
+      render_click(view, "save_draft")
+
+      reloaded = Ingestions.get_source_ingestion_species!(entry.id)
+      assert reloaded.description_prose == "New description."
+    end
+
+    test "mode :append with existing concatenates existing and draft", %{conn: conn} do
+      reviewer = db_user_fixture("Desc Append Reviewer")
+      source = source_fixture(%{title: "Desc Append Source"})
+
+      {:ok, _} =
+        Sources.create_species_source(%{
+          species_id: 100,
+          source_id: source.id,
+          description: "Old text."
+        })
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: reviewer.id,
+          source_id: source.id
+        })
+
+      entry =
+        source_ingestion_species_fixture(ingestion, 0, %{
+          extracted_name: "Andricus quercuscalifornicus",
+          evidence_prose: roundtrip_prose_fixture(),
+          extraction_payload: %{
+            "hosts" => [],
+            "traits" => %{},
+            "description_evidence" => []
+          }
+        })
+
+      conn = superadmin_conn(conn, reviewer)
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
+
+      send(
+        view.pid,
+        {:description_updated,
+         %{
+           selection: ["S_0021"],
+           draft: "the gall is...",
+           mode: :append,
+           dirty: false
+         }}
+      )
+
+      render(view)
+      render_click(view, "save_draft")
+
+      reloaded = Ingestions.get_source_ingestion_species!(entry.id)
+      assert reloaded.description_prose == "Old text.\n\nthe gall is..."
+    end
+
+    test "mode :keep with existing preserves existing description", %{conn: conn} do
+      reviewer = db_user_fixture("Desc Keep Reviewer")
+      source = source_fixture(%{title: "Desc Keep Source"})
+
+      {:ok, _} =
+        Sources.create_species_source(%{
+          species_id: 100,
+          source_id: source.id,
+          description: "Old text."
+        })
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: reviewer.id,
+          source_id: source.id
+        })
+
+      entry =
+        source_ingestion_species_fixture(ingestion, 0, %{
+          extracted_name: "Andricus quercuscalifornicus",
+          evidence_prose: roundtrip_prose_fixture(),
+          extraction_payload: %{
+            "hosts" => [],
+            "traits" => %{},
+            "description_evidence" => []
+          }
+        })
+
+      conn = superadmin_conn(conn, reviewer)
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
+
+      send(
+        view.pid,
+        {:description_updated,
+         %{
+           selection: ["S_0021"],
+           draft: "ignored draft",
+           mode: :keep,
+           dirty: false
+         }}
+      )
+
+      render(view)
+      render_click(view, "save_draft")
+
+      reloaded = Ingestions.get_source_ingestion_species!(entry.id)
+      assert reloaded.description_prose == "Old text."
+    end
+
+    test "mode :keep without existing falls back to draft (compose_description default branch)",
+         %{conn: conn} do
+      reviewer = db_user_fixture("Desc Keep No-Existing Reviewer")
+      source = source_fixture(%{title: "Desc Keep No-Existing Source"})
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: reviewer.id,
+          source_id: source.id
+        })
+
+      entry =
+        source_ingestion_species_fixture(ingestion, 0, %{
+          extracted_name: "Novelus gallicus",
+          evidence_prose: roundtrip_prose_fixture(),
+          extraction_payload: %{
+            "hosts" => [],
+            "traits" => %{},
+            "description_evidence" => []
+          }
+        })
+
+      conn = superadmin_conn(conn, reviewer)
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
+
+      view
+      |> element("#workspace-section-identity button[phx-click=treat_as_new]")
+      |> render_click()
+
+      send(
+        view.pid,
+        {:description_updated,
+         %{
+           selection: ["S_0021"],
+           draft: "Curator draft.",
+           mode: :keep,
+           dirty: false
+         }}
+      )
+
+      render(view)
+      render_click(view, "save_draft")
+
+      reloaded = Ingestions.get_source_ingestion_species!(entry.id)
+      # No existing description, so :keep falls back to draft.
+      assert reloaded.description_prose == "Curator draft."
     end
   end
 
@@ -1661,6 +2266,161 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
     end
   end
 
+  describe "same-name companion entries are independent" do
+    test "loading the workspace does not merge data from a same-name companion entry", %{
+      conn: conn
+    } do
+      reviewer = db_user_fixture("Companion Load Reviewer")
+      source = source_fixture(%{title: "Companion Load Source"})
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: reviewer.id,
+          source_id: source.id
+        })
+
+      # Two entries with the SAME extracted_name but different generation suffixes
+      # and different host/trait/alias data. Loading entry_a must show only A's data.
+      entry_a =
+        source_ingestion_species_fixture(ingestion, 0, %{
+          extracted_name: "Druon evidens (agamic)",
+          extraction_payload: %{
+            "hosts" => [%{"name" => "Quercus alba"}],
+            "traits" => %{
+              "shape" => %{"original" => "globular", "suggested" => ["globular"]}
+            },
+            "aliases" => ["Agamic-only alias"],
+            "description_evidence" => []
+          }
+        })
+
+      _entry_b =
+        source_ingestion_species_fixture(ingestion, 1, %{
+          extracted_name: "Druon evidens (sexgen)",
+          extraction_payload: %{
+            "hosts" => [%{"name" => "Quercus rubra"}],
+            "traits" => %{
+              "color" => %{"original" => "red", "suggested" => ["red"]}
+            },
+            "aliases" => ["Sexgen-only alias"],
+            "description_evidence" => []
+          }
+        })
+
+      conn = superadmin_conn(conn, reviewer)
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
+
+      # The first entry is auto-selected. Verify only A's data is loaded.
+      html = render(view)
+
+      assert html =~ "Quercus alba"
+      refute html =~ "Quercus rubra"
+
+      assert html =~ "Agamic-only alias"
+      refute html =~ "Sexgen-only alias"
+
+      # Switch to entry A explicitly to be sure we're looking at A (auto-selected anyway).
+      html =
+        view
+        |> element("#workspace-nav-#{entry_a.id}")
+        |> render_click()
+
+      assert html =~ "Quercus alba"
+      refute html =~ "Quercus rubra"
+      assert html =~ "Agamic-only alias"
+      refute html =~ "Sexgen-only alias"
+    end
+
+    test "saving the current entry leaves the same-name companion's status unchanged", %{
+      conn: conn
+    } do
+      reviewer = db_user_fixture("Companion Save Reviewer")
+      source = source_fixture(%{title: "Companion Save Source"})
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: reviewer.id,
+          source_id: source.id
+        })
+
+      _entry_a =
+        source_ingestion_species_fixture(ingestion, 0, %{
+          extracted_name: "Druon evidens (agamic)",
+          extraction_payload: %{
+            "hosts" => [],
+            "traits" => %{},
+            "description_evidence" => []
+          }
+        })
+
+      entry_b =
+        source_ingestion_species_fixture(ingestion, 1, %{
+          extracted_name: "Druon evidens (sexgen)",
+          extraction_payload: %{
+            "hosts" => [],
+            "traits" => %{},
+            "description_evidence" => []
+          }
+        })
+
+      conn = superadmin_conn(conn, reviewer)
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
+
+      # Treat current (entry A) as new, then save the draft.
+      view
+      |> element("#workspace-section-identity button[phx-click=treat_as_new]")
+      |> render_click()
+
+      render_click(view, "save_draft")
+
+      # Entry B's status must still be "pending" — saving A must not fan out to B.
+      reloaded_b = Ingestions.get_source_ingestion_species!(entry_b.id)
+      assert reloaded_b.status == "pending"
+    end
+
+    test "skipping the current entry leaves the same-name companion's status unchanged", %{
+      conn: conn
+    } do
+      reviewer = db_user_fixture("Companion Skip Reviewer")
+      source = source_fixture(%{title: "Companion Skip Source"})
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: reviewer.id,
+          source_id: source.id
+        })
+
+      _entry_a =
+        source_ingestion_species_fixture(ingestion, 0, %{
+          extracted_name: "Druon evidens (agamic)",
+          extraction_payload: %{
+            "hosts" => [],
+            "traits" => %{},
+            "description_evidence" => []
+          }
+        })
+
+      entry_b =
+        source_ingestion_species_fixture(ingestion, 1, %{
+          extracted_name: "Druon evidens (sexgen)",
+          extraction_payload: %{
+            "hosts" => [],
+            "traits" => %{},
+            "description_evidence" => []
+          }
+        })
+
+      conn = superadmin_conn(conn, reviewer)
+      {:ok, view, _html} = live(conn, ~p"/admin/ingestion-review/#{ingestion.id}/review")
+
+      render_click(view, "skip_species")
+
+      # Entry B's status must still be "pending" — skipping A must not fan out to B.
+      reloaded_b = Ingestions.get_source_ingestion_species!(entry_b.id)
+      assert reloaded_b.status == "pending"
+    end
+  end
+
   describe "keyboard navigation" do
     test "J key navigates to next species", %{conn: conn} do
       reviewer = db_user_fixture("KeyNav J Reviewer")
@@ -1829,6 +2589,33 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.WorkspaceTest do
 
     {:ok, ingestion} = Ingestions.create_source_ingestion(merged)
     ingestion
+  end
+
+  defp roundtrip_prose_fixture do
+    [
+      %{
+        "span_id" => "S_0021",
+        "page" => 1,
+        "char_start" => 0,
+        "char_end" => 20,
+        "text" => "Round woolly gall.",
+        "is_mention" => true,
+        "is_cited" => false,
+        "cited_by_fields" => [],
+        "relevance" => "high"
+      },
+      %{
+        "span_id" => "S_0024",
+        "page" => 2,
+        "char_start" => 50,
+        "char_end" => 80,
+        "text" => "Found on oak twigs.",
+        "is_mention" => false,
+        "is_cited" => true,
+        "cited_by_fields" => ["hosts[0].scientific_name"],
+        "relevance" => "low"
+      }
+    ]
   end
 
   defp source_ingestion_species_fixture(source_ingestion, position, attrs) do

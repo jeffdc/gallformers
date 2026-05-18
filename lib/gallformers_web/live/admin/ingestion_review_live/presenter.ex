@@ -20,7 +20,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
     species_entries =
       source_ingestion.species_entries
       |> Enum.map(&species_entry_review_view/1)
-      |> collate_species_entries()
+      |> Enum.reject(&(&1.extracted_name in [nil, ""]))
       |> Enum.sort_by(& &1.extracted_name)
 
     %{
@@ -45,6 +45,7 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
       source_review_unlocked?: source_review_unlocked?,
       species_review_unlocked?: species_review_unlocked?,
       species_entries: species_entries,
+      normalized_text: source_ingestion.normalized_text,
       counts: %{
         species_entries_total: length(species_entries),
         species_entries_pending: Enum.count(species_entries, &(&1.status == "pending")),
@@ -200,35 +201,10 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.Presenter do
       mapped_species_name: mapped_species_name(species_entry.species),
       host_count: host_count(payload),
       status: species_entry.status,
-      sibling_ids: [],
       extracted_aliases: extraction_aliases(payload),
       extracted_hosts: extraction_hosts(payload),
       extracted_trait_names: extraction_trait_names(payload)
     }
-  end
-
-  defp collate_species_entries(entries) do
-    entries
-    |> Enum.reject(&(&1.extracted_name in [nil, ""]))
-    |> Enum.group_by(fn entry ->
-      (entry.extracted_name || "") |> String.downcase()
-    end)
-    |> Enum.map(fn {_key, group} ->
-      primary = hd(group)
-      sibling_ids = group |> tl() |> Enum.map(& &1.id)
-
-      authority =
-        Enum.find_value(group, fn e -> e.extracted_authority end) || primary.extracted_authority
-
-      status =
-        cond do
-          Enum.all?(group, &(&1.status in ~w(complete mapped created))) -> primary.status
-          Enum.any?(group, &(&1.status == "pending")) -> "pending"
-          true -> primary.status
-        end
-
-      %{primary | extracted_authority: authority, status: status, sibling_ids: sibling_ids}
-    end)
   end
 
   defp extraction_aliases(%{aliases: aliases}) when is_list(aliases), do: aliases

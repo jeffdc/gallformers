@@ -73,12 +73,14 @@ defmodule Gallformers.Sources do
   end
 
   @doc """
-  Gets a source by title.
+  Gets a source by title. Match is case-insensitive.
   """
   @spec get_source_by_title(String.t()) :: Source.t() | nil
   def get_source_by_title(title) do
+    needle = String.downcase(title)
+
     from(s in Source,
-      where: s.title == ^title
+      where: fragment("lower(?)", s.title) == ^needle
     )
     |> Repo.one()
   end

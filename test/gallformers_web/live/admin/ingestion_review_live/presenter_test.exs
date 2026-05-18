@@ -6,32 +6,24 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.PresenterTest do
   alias Gallformers.Accounts
   alias Gallformers.Ingestions
 
-  describe "source_ingestion_review_view!/1 species collation" do
-    test "collapses duplicate species names into one entry with sibling_ids" do
+  describe "source_ingestion_review_view!/1 species entries" do
+    test "keeps generation-suffixed species as separate entries (no collation)" do
       {:ok, user} =
         Accounts.create_user(%{
           auth0_id: "auth0|presenter-test-#{System.unique_integer([:positive])}",
           display_name: "Presenter Reviewer"
         })
 
-      ingestion =
-        review_ready_ingestion_fixture(%{uploaded_by_id: user.id})
+      ingestion = review_ready_ingestion_fixture(%{uploaded_by_id: user.id})
 
-      _entry_a =
+      _entry_agamic =
         source_ingestion_species_fixture(ingestion, 0, %{
-          extracted_name: "Andricus csokai",
-          extracted_authority: nil
+          extracted_name: "Acraspis quercushirta (agamic)"
         })
 
-      _entry_b =
+      _entry_sexgen =
         source_ingestion_species_fixture(ingestion, 1, %{
-          extracted_name: "Andricus csokai",
-          extracted_authority: "Melika & Tavakoli, 2008"
-        })
-
-      _entry_c =
-        source_ingestion_species_fixture(ingestion, 2, %{
-          extracted_name: "Andricus paradoxus"
+          extracted_name: "Acraspis quercushirta (sexgen)"
         })
 
       review_view = Presenter.source_ingestion_review_view!(ingestion.id)
@@ -39,12 +31,79 @@ defmodule GallformersWeb.Admin.IngestionReviewLive.PresenterTest do
 
       assert length(entries) == 2
 
-      collated = Enum.find(entries, &(&1.extracted_name == "Andricus csokai"))
-      assert collated.extracted_authority == "Melika & Tavakoli, 2008"
-      assert length(collated.sibling_ids) == 1
+      names = Enum.map(entries, & &1.extracted_name)
+      assert "Acraspis quercushirta (agamic)" in names
+      assert "Acraspis quercushirta (sexgen)" in names
+    end
 
-      solo = Enum.find(entries, &(&1.extracted_name == "Andricus paradoxus"))
-      assert solo.sibling_ids == []
+    test "filters out entries with nil or empty extracted_name" do
+      {:ok, user} =
+        Accounts.create_user(%{
+          auth0_id: "auth0|presenter-test-#{System.unique_integer([:positive])}",
+          display_name: "Presenter Reviewer"
+        })
+
+      ingestion = review_ready_ingestion_fixture(%{uploaded_by_id: user.id})
+
+      _named =
+        source_ingestion_species_fixture(ingestion, 0, %{
+          extracted_name: "Andricus paradoxus"
+        })
+
+      _nil_named =
+        source_ingestion_species_fixture(ingestion, 1, %{
+          extracted_name: nil
+        })
+
+      _empty_named =
+        source_ingestion_species_fixture(ingestion, 2, %{
+          extracted_name: ""
+        })
+
+      review_view = Presenter.source_ingestion_review_view!(ingestion.id)
+      entries = review_view.species_entries
+
+      assert length(entries) == 1
+      assert hd(entries).extracted_name == "Andricus paradoxus"
+    end
+
+    test "returned entries do not carry a :sibling_ids key" do
+      {:ok, user} =
+        Accounts.create_user(%{
+          auth0_id: "auth0|presenter-test-#{System.unique_integer([:positive])}",
+          display_name: "Presenter Reviewer"
+        })
+
+      ingestion = review_ready_ingestion_fixture(%{uploaded_by_id: user.id})
+
+      _entry =
+        source_ingestion_species_fixture(ingestion, 0, %{
+          extracted_name: "Andricus paradoxus"
+        })
+
+      review_view = Presenter.source_ingestion_review_view!(ingestion.id)
+      [entry] = review_view.species_entries
+
+      refute Map.has_key?(entry, :sibling_ids)
+    end
+
+    test "review_view includes normalized_text from the source ingestion" do
+      {:ok, user} =
+        Accounts.create_user(%{
+          auth0_id: "auth0|presenter-test-#{System.unique_integer([:positive])}",
+          display_name: "Presenter Reviewer"
+        })
+
+      ingestion =
+        review_ready_ingestion_fixture(%{
+          uploaded_by_id: user.id,
+          normalized_text: "Verbatim normalized source text for the workspace modal."
+        })
+
+      review_view = Presenter.source_ingestion_review_view!(ingestion.id)
+
+      assert review_view.normalized_text ==
+               "Verbatim normalized source text for the workspace modal."
     end
   end
 
