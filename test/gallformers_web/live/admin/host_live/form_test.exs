@@ -289,9 +289,7 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
       # Type a name first
       render_hook(view, "update_new_alias_name", %{"value" => "Foobar synonym"})
 
-      # Then change the type select. The select has name="value" so Phoenix LV
-      # serializes it as %{"value" => "scientific"} from the form payload.
-      html = render_change(view, "update_new_alias_type", %{"value" => "scientific"})
+      html = render_change(view, "update_new_alias_type", %{"alias_type" => "scientific"})
 
       # Name must be preserved (bug: previously cleared when type changed).
       assert html =~ ~s(value="Foobar synonym")

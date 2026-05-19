@@ -201,7 +201,7 @@ defmodule GallformersWeb.Admin.FormComponents do
               </td>
               <td class="px-3 py-1.5">
                 <select
-                  name="value"
+                  name="alias_type"
                   phx-change="update_new_alias_type"
                   class="gf-select text-sm"
                 >

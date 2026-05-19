@@ -244,7 +244,7 @@ defmodule GallformersWeb.Admin.GallLive.FormTest do
 
       render_hook(view, "update_new_alias_name", %{"value" => "Foobar synonym"})
 
-      html = render_change(view, "update_new_alias_type", %{"value" => "scientific"})
+      html = render_change(view, "update_new_alias_type", %{"alias_type" => "scientific"})
 
       assert html =~ ~s(value="Foobar synonym")
       assert html =~ ~r/<option[^>]*value="scientific"[^>]*selected/

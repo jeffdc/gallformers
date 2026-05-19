@@ -37,11 +37,11 @@ defmodule GallformersWeb.Admin.AliasHandlers do
   end
 
   @doc """
-  Handles the alias type select changing. The select is inside the parent form, so
-  Phoenix LiveView serializes it as a form field — `name="value"` on the select
-  produces `%{"value" => type}` in the payload.
+  Handles the alias type select changing. The select uses `name="alias_type"` (not
+  `name="value"`) to avoid colliding with other `name="value"` selects in the same
+  parent form when Phoenix LV serializes the full form on phx-change.
   """
-  def handle_update_new_alias_type(socket, %{"value" => type}) do
+  def handle_update_new_alias_type(socket, %{"alias_type" => type}) do
     assign(socket, new_alias_type: type)
   end
 
