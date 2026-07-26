@@ -94,6 +94,21 @@ defmodule GallformersWeb.GallLiveTest do
       end
     end
 
+    test "disclaims the range map as a host-range estimate", %{conn: conn} do
+      galls = Galls.list_galls()
+
+      if length(galls) > 0 do
+        gall = hd(galls)
+        {:ok, view, html} = live(conn, ~p"/gall/#{gall.id}")
+
+        # The disclaimer accompanies the map, so only assert it when a map rendered
+        if has_element?(view, "#gall-range-map") do
+          assert html =~ "Not an occurrence map"
+          assert html =~ "has not been documented throughout this area"
+        end
+      end
+    end
+
     test "displays completion status badge", %{conn: conn} do
       galls = Galls.list_galls()
 

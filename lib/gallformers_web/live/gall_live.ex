@@ -502,6 +502,10 @@ defmodule GallformersWeb.GallLive do
                 >
                   Range unknown — only genus-level host data available.
                 </p>
+                <.alert :if={not @only_placeholder_hosts?} variant="info" class="mt-1 mb-2">
+                  Not an occurrence map: this shows where this gall's hosts grow. In most cases the
+                  gall has not been documented throughout this area.
+                </.alert>
                 <.range_map
                   :if={not @only_placeholder_hosts?}
                   id="gall-range-map"
