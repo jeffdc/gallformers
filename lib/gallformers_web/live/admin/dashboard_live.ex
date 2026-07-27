@@ -28,7 +28,7 @@ defmodule GallformersWeb.Admin.DashboardLive do
       <div class="relative">
         <p class="text-sm text-gray-500 absolute right-0 top-0.5">
           <a
-            href="https://github.com/jeffdc/gallformers/blob/main/docs/ops/admin-onboarding.md"
+            href="https://github.com/jeffdc/gallformers/blob/main/docs/domain/admin-onboarding.md"
             target="_blank"
             class="text-gf-maroon hover:underline"
           >
