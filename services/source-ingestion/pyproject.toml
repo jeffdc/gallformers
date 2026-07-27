@@ -12,7 +12,7 @@ dependencies = [
     "pyyaml>=6.0",
     "psycopg[binary]>=3.1",
     "pydantic>=2.12.5",
-    "litellm>=1.83.14",
+    "litellm>=1.84.0",
     "instructor>=1.15.1",
     "rapidfuzz>=3.14.5",
 ]
