@@ -132,6 +132,9 @@ html {
   font-weight: 400; /* Normal weight for better readability */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Keep #anchor targets (e.g. glossary term links) clear of the sticky
+     site header, which is ~78px tall (70px logo + py-1). */
+  scroll-padding-top: 5.5rem;
 }
 
 /* Restore heading sizes stripped by Tailwind preflight */
