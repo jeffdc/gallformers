@@ -124,14 +124,10 @@ defmodule GallformersWeb.Admin.KeyLive.Form do
 
   @impl true
   def handle_event("save", params, socket) do
-    key_params = Map.get(params, "key", %{})
-
-    # Merge couplets from JSON input into params
     key_params =
-      case parse_json_couplets(socket.assigns.json_input) do
-        {:ok, couplets_json} -> Map.put(key_params, "couplets", couplets_json)
-        _ -> key_params
-      end
+      params
+      |> Map.get("key", %{})
+      |> merge_json_only_fields(socket.assigns.json_input)
 
     handle_save(%{"key" => key_params}, socket)
   end
@@ -225,21 +221,27 @@ defmodule GallformersWeb.Admin.KeyLive.Form do
     {:noreply, socket}
   end
 
-  defp parse_json_couplets(json_text) do
+  # `couplets` and `authors` have no inputs of their own in the form, so the
+  # browser never posts them. Both are merged in from the JSON textarea on save,
+  # otherwise the changeset never casts them and the stored values go stale.
+  defp merge_json_only_fields(key_params, json_text) do
     case Jason.decode(json_text) do
       {:ok, data} when is_map(data) ->
-        couplets = data["couplets"]
-
-        if is_map(couplets) and map_size(couplets) > 0 do
-          {:ok, Jason.encode!(couplets)}
-        else
-          :error
-        end
+        key_params
+        |> maybe_put_couplets(data["couplets"])
+        |> Map.put("authors", Jason.encode!(data["authors"] || []))
 
       _ ->
-        :error
+        key_params
     end
   end
+
+  defp maybe_put_couplets(key_params, couplets)
+       when is_map(couplets) and map_size(couplets) > 0 do
+    Map.put(key_params, "couplets", Jason.encode!(couplets))
+  end
+
+  defp maybe_put_couplets(key_params, _couplets), do: key_params
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
