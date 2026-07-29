@@ -1126,6 +1126,63 @@ defmodule Gallformers.Taxonomy.Tree do
   # =====================================================================
 
   @doc """
+  Lists genera from the opposite domain associated with species in a genus.
+
+  For a gall genus this returns host genera; for a plant genus it returns
+  gall-former genera. Each result includes the focal species IDs so genus
+  pages can filter their species table without another query.
+  """
+  @spec list_associated_genera(integer(), String.t()) :: [map()]
+  def list_associated_genera(genus_id, taxoncode) when taxoncode in ["gall", "plant"] do
+    {focal_join, related_join, focal_column} =
+      if taxoncode == "gall" do
+        {
+          "JOIN gallhost gh ON gh.gall_species_id = focal.id",
+          "JOIN species_taxonomy related_st ON related_st.species_id = gh.host_species_id",
+          "gh.gall_species_id"
+        }
+      else
+        {
+          "JOIN gallhost gh ON gh.host_species_id = focal.id",
+          "JOIN species_taxonomy related_st ON related_st.species_id = gh.gall_species_id",
+          "gh.host_species_id"
+        }
+      end
+
+    query = """
+    SELECT related.id,
+           related.name,
+           COUNT(DISTINCT #{focal_column}) AS focal_species_count,
+           COUNT(DISTINCT gh.id) AS association_count,
+           ARRAY_AGG(DISTINCT #{focal_column} ORDER BY #{focal_column}) AS focal_species_ids
+    FROM species_taxonomy focal_st
+    JOIN species focal ON focal.id = focal_st.species_id AND focal.taxoncode = $2
+    #{focal_join}
+    #{related_join}
+    JOIN taxonomy related ON related.id = related_st.taxonomy_id AND related.type = 'genus'
+    WHERE focal_st.taxonomy_id = $1::bigint
+    GROUP BY related.id, related.name
+    ORDER BY related.name
+    """
+
+    case Repo.query(query, [genus_id, taxoncode]) do
+      {:ok, %{rows: rows}} ->
+        Enum.map(rows, fn [id, name, focal_count, association_count, focal_ids] ->
+          %{
+            id: id,
+            name: name,
+            focal_species_count: focal_count,
+            association_count: association_count,
+            focal_species_ids: focal_ids
+          }
+        end)
+
+      {:error, _} ->
+        []
+    end
+  end
+
+  @doc """
   Lists families for galls that occur on a given host.
   """
   @spec list_gall_families_for_host(integer()) :: [map()]

@@ -198,6 +198,7 @@ defmodule Gallformers.Taxonomy do
   # Delegated to Taxonomy.Tree — Cross-domain Queries
   # =====================================================================
 
+  defdelegate list_associated_genera(genus_id, taxoncode), to: Tree
   defdelegate list_gall_families_for_host(host_id), to: Tree
   defdelegate list_gall_families_for_host_genus(host_genus_id), to: Tree
   defdelegate list_sections_with_details(), to: Tree
