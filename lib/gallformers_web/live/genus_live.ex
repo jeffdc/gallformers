@@ -351,13 +351,14 @@ defmodule GallformersWeb.GenusLive do
             <div class="mt-6">
               <%= if @total_species_count > 0 do %>
                 <div :if={@related_genera != []} class="mb-6">
-                  <button
+                  <.button
                     :if={!@show_related_genera}
                     type="button"
+                    variant="secondary"
                     phx-click="toggle_related_genera"
                     aria-expanded="false"
                     aria-controls="related-genera-filters"
-                    class="w-full flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white px-4 py-3 text-left text-gf-maroon shadow-sm hover:border-gf-maroon hover:bg-gf-cream transition-colors"
+                    class="w-full justify-between gap-4 rounded-lg px-4 py-3 text-left shadow-sm hover:border-gf-maroon hover:bg-gf-cream"
                   >
                     <span class="flex min-w-0 items-center gap-2">
                       <.icon name="ph-arrows-left-right" class="size-5 shrink-0" />
@@ -376,7 +377,7 @@ defmodule GallformersWeb.GenusLive do
                     <span class="flex shrink-0 items-center gap-1 text-sm">
                       Show filters <.icon name="ph-caret-down" class="size-4" />
                     </span>
-                  </button>
+                  </.button>
 
                   <.card
                     :if={@show_related_genera}
@@ -385,15 +386,17 @@ defmodule GallformersWeb.GenusLive do
                     id="related-genera-filters"
                   >
                     <:actions>
-                      <button
+                      <.button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         phx-click="toggle_related_genera"
                         aria-expanded="true"
                         aria-controls="related-genera-filters"
-                        class="inline-flex items-center gap-1 text-sm text-gf-maroon hover:underline"
+                        class="gap-1 hover:underline"
                       >
                         Hide <.icon name="ph-caret-up" class="size-4" />
-                      </button>
+                      </.button>
                     </:actions>
                     <p class="text-sm text-gray-600 mb-4">
                       Select a genus to filter the species list below. Counts show how many species
@@ -405,35 +408,31 @@ defmodule GallformersWeb.GenusLive do
                       role="group"
                       aria-label={"Filter by #{@related_filter_label}"}
                     >
-                      <button
+                      <.button
                         type="button"
+                        variant={if is_nil(@selected_related_genus), do: "primary", else: "secondary"}
+                        size="sm"
                         phx-click="filter_related_genus"
                         phx-value-id="all"
                         aria-pressed={is_nil(@selected_related_genus)}
-                        class={[
-                          "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                          is_nil(@selected_related_genus) &&
-                            "border-gf-maroon bg-gf-maroon text-white",
-                          !is_nil(@selected_related_genus) &&
-                            "border-gray-300 bg-white text-gray-700 hover:border-gf-maroon"
-                        ]}
+                        class="gap-2 rounded-full"
                       >
                         All species <span class="text-xs opacity-80">{@total_species_count}</span>
-                      </button>
-                      <button
+                      </.button>
+                      <.button
                         :for={genus <- @related_genera}
                         type="button"
+                        variant={
+                          if @selected_related_genus == genus.id,
+                            do: "primary",
+                            else: "secondary"
+                        }
+                        size="sm"
                         phx-click="filter_related_genus"
                         phx-value-id={genus.id}
                         aria-pressed={@selected_related_genus == genus.id}
                         title={"#{genus.association_count} species-to-species associations"}
-                        class={[
-                          "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                          @selected_related_genus == genus.id &&
-                            "border-gf-maroon bg-gf-maroon text-white",
-                          @selected_related_genus != genus.id &&
-                            "border-gray-300 bg-white text-gray-700 hover:border-gf-maroon hover:bg-gf-cream"
-                        ]}
+                        class="gap-2 rounded-full hover:border-gf-maroon"
                       >
                         <.taxon_name name={genus.name} rank="genus" />
                         <span class={[
@@ -443,7 +442,7 @@ defmodule GallformersWeb.GenusLive do
                         ]}>
                           {genus.focal_species_count}
                         </span>
-                      </button>
+                      </.button>
                     </div>
                     <p :if={@selected_related_genus} class="mt-4 text-sm text-gray-600">
                       Showing species associated with
@@ -451,14 +450,16 @@ defmodule GallformersWeb.GenusLive do
                         name={Enum.find(@related_genera, &(&1.id == @selected_related_genus)).name}
                         rank="genus"
                       />.
-                      <button
+                      <.button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         phx-click="filter_related_genus"
                         phx-value-id="all"
-                        class="ml-1 text-gf-maroon underline hover:no-underline"
+                        class="ml-1 px-1 underline hover:no-underline"
                       >
                         Clear filter
-                      </button>
+                      </.button>
                     </p>
                   </.card>
                 </div>

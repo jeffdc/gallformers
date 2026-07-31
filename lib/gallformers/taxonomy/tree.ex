@@ -8,6 +8,7 @@ defmodule Gallformers.Taxonomy.Tree do
 
   require Logger
   import Ecto.Query
+  alias Gallformers.Galls.GallHost
   alias Gallformers.Repo
   alias Gallformers.Species.Species
   alias Gallformers.TaxonName
@@ -1133,53 +1134,37 @@ defmodule Gallformers.Taxonomy.Tree do
   pages can filter their species table without another query.
   """
   @spec list_associated_genera(integer(), String.t()) :: [map()]
-  def list_associated_genera(genus_id, taxoncode) when taxoncode in ["gall", "plant"] do
-    {focal_join, related_join, focal_column} =
-      if taxoncode == "gall" do
-        {
-          "JOIN gallhost gh ON gh.gall_species_id = focal.id",
-          "JOIN species_taxonomy related_st ON related_st.species_id = gh.host_species_id",
-          "gh.gall_species_id"
-        }
-      else
-        {
-          "JOIN gallhost gh ON gh.host_species_id = focal.id",
-          "JOIN species_taxonomy related_st ON related_st.species_id = gh.gall_species_id",
-          "gh.host_species_id"
-        }
-      end
+  def list_associated_genera(genus_id, "gall") do
+    do_list_associated_genera(genus_id, "gall", :gall_species_id, :host_species_id)
+  end
 
-    query = """
-    SELECT related.id,
-           related.name,
-           COUNT(DISTINCT #{focal_column}) AS focal_species_count,
-           COUNT(DISTINCT gh.id) AS association_count,
-           ARRAY_AGG(DISTINCT #{focal_column} ORDER BY #{focal_column}) AS focal_species_ids
-    FROM species_taxonomy focal_st
-    JOIN species focal ON focal.id = focal_st.species_id AND focal.taxoncode = $2
-    #{focal_join}
-    #{related_join}
-    JOIN taxonomy related ON related.id = related_st.taxonomy_id AND related.type = 'genus'
-    WHERE focal_st.taxonomy_id = $1::bigint
-    GROUP BY related.id, related.name
-    ORDER BY related.name
-    """
+  def list_associated_genera(genus_id, "plant") do
+    do_list_associated_genera(genus_id, "plant", :host_species_id, :gall_species_id)
+  end
 
-    case Repo.query(query, [genus_id, taxoncode]) do
-      {:ok, %{rows: rows}} ->
-        Enum.map(rows, fn [id, name, focal_count, association_count, focal_ids] ->
-          %{
-            id: id,
-            name: name,
-            focal_species_count: focal_count,
-            association_count: association_count,
-            focal_species_ids: focal_ids
-          }
-        end)
-
-      {:error, _} ->
-        []
-    end
+  defp do_list_associated_genera(genus_id, taxoncode, focal_key, related_key) do
+    from(focal_link in "species_taxonomy",
+      join: focal in Species,
+      on: focal.id == focal_link.species_id and focal.taxoncode == ^taxoncode,
+      join: association in GallHost,
+      on: field(association, ^focal_key) == focal.id,
+      join: related_link in "species_taxonomy",
+      on: related_link.species_id == field(association, ^related_key),
+      join: related in Taxonomy,
+      on: related.id == related_link.taxonomy_id and related.type == "genus",
+      where: focal_link.taxonomy_id == ^genus_id,
+      group_by: [related.id, related.name],
+      order_by: related.name,
+      select: %{
+        id: related.id,
+        name: related.name,
+        focal_species_count: count(field(association, ^focal_key), :distinct),
+        association_count: count(association.id, :distinct),
+        focal_species_ids: fragment("array_agg(DISTINCT ?)", field(association, ^focal_key))
+      }
+    )
+    |> Repo.all()
+    |> Enum.map(&Map.update!(&1, :focal_species_ids, fn ids -> Enum.sort(ids) end))
   end
 
   @doc """

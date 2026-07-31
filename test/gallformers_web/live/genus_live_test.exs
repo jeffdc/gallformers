@@ -47,18 +47,9 @@ defmodule GallformersWeb.GenusLiveTest do
     end
 
     test "shows associated host genera collapsed and filters species when expanded", %{conn: conn} do
-      host_genus = create_host_mapping()
+      fixture = create_mapping_fixture()
 
-      unrelated_gall =
-        Repo.insert!(%Species{
-          name: "Andricus testunrelated",
-          taxoncode: "gall",
-          abundance_id: 1
-        })
-
-      {:ok, _} = Taxonomy.link_species_to_taxonomy(unrelated_gall.id, 33)
-
-      {:ok, view, html} = live(conn, "/genus/Andricus")
+      {:ok, view, html} = live(conn, "/genus/#{fixture.gall_genus.name}")
 
       assert html =~ "Host genera used by this genus"
       assert html =~ "Show filters"
@@ -69,49 +60,109 @@ defmodule GallformersWeb.GenusLiveTest do
       |> render_click()
 
       assert has_element?(view, "#related-genera-filters")
-      assert render(view) =~ "TestHostGenus"
+      assert render(view) =~ fixture.host_genus.name
 
       view
-      |> element("button[phx-click='filter_related_genus'][phx-value-id='#{host_genus.id}']")
+      |> element(
+        "button[phx-click='filter_related_genus'][phx-value-id='#{fixture.host_genus.id}']"
+      )
       |> render_click()
 
       filtered_html = render(view)
-      assert filtered_html =~ "Andricus crystallinus"
-      refute filtered_html =~ "Andricus testunrelated"
+      assert filtered_html =~ fixture.associated_gall.name
+      refute filtered_html =~ fixture.unrelated_gall.name
     end
 
-    test "lists gall genera associated with a host genus" do
-      host_genus = create_host_mapping()
+    test "shows associated gall genera collapsed and filters hosts when expanded", %{conn: conn} do
+      fixture = create_mapping_fixture()
 
-      assert [
-               %{
-                 id: 33,
-                 name: "Andricus",
-                 focal_species_count: 1,
-                 focal_species_ids: [1]
-               }
-             ] = Taxonomy.list_associated_genera(host_genus.id, "plant")
+      {:ok, view, html} = live(conn, "/genus/#{fixture.host_genus.name}")
+
+      assert html =~ "Gall-former genera found on this host"
+      assert html =~ "Show filters"
+      refute has_element?(view, "#related-genera-filters")
+
+      view
+      |> element("button[phx-click='toggle_related_genera']")
+      |> render_click()
+
+      assert has_element?(view, "#related-genera-filters")
+      assert render(view) =~ fixture.gall_genus.name
+
+      view
+      |> element(
+        "button[phx-click='filter_related_genus'][phx-value-id='#{fixture.gall_genus.id}']"
+      )
+      |> render_click()
+
+      filtered_html = render(view)
+      assert filtered_html =~ fixture.associated_host.name
+      refute filtered_html =~ fixture.unrelated_host.name
     end
   end
 
-  defp create_host_mapping do
-    {:ok, family} =
+  defp create_mapping_fixture do
+    {:ok, gall_family} =
       Taxonomy.create_taxonomy(%{
-        name: "TestHostFamily",
+        name: "LiveMappingGallFamily",
+        description: "Wasp",
+        type: "family"
+      })
+
+    {:ok, host_family} =
+      Taxonomy.create_taxonomy(%{
+        name: "LiveMappingHostFamily",
         description: "Plant",
         type: "family"
       })
 
-    {:ok, host_genus} =
+    {:ok, gall_genus} =
       Taxonomy.create_taxonomy(%{
-        name: "TestHostGenus",
+        name: "LiveMappingGallGenus",
         type: "genus",
-        parent_id: family.id
+        parent_id: gall_family.id
       })
 
-    {:ok, _} = Taxonomy.link_species_to_taxonomy(1, host_genus.id)
-    {:ok, _} = Galls.create_gall_host(%{gall_species_id: 200, host_species_id: 1})
+    {:ok, host_genus} =
+      Taxonomy.create_taxonomy(%{
+        name: "LiveMappingHostGenus",
+        type: "genus",
+        parent_id: host_family.id
+      })
 
-    host_genus
+    associated_gall =
+      Repo.insert!(%Species{name: "LiveMappingGallGenus associated", taxoncode: "gall"})
+
+    unrelated_gall =
+      Repo.insert!(%Species{name: "LiveMappingGallGenus unrelated", taxoncode: "gall"})
+
+    associated_host =
+      Repo.insert!(%Species{name: "LiveMappingHostGenus associated", taxoncode: "plant"})
+
+    unrelated_host =
+      Repo.insert!(%Species{name: "LiveMappingHostGenus unrelated", taxoncode: "plant"})
+
+    for species <- [associated_gall, unrelated_gall] do
+      {:ok, _} = Taxonomy.link_species_to_taxonomy(species.id, gall_genus.id)
+    end
+
+    for species <- [associated_host, unrelated_host] do
+      {:ok, _} = Taxonomy.link_species_to_taxonomy(species.id, host_genus.id)
+    end
+
+    {:ok, _} =
+      Galls.create_gall_host(%{
+        gall_species_id: associated_gall.id,
+        host_species_id: associated_host.id
+      })
+
+    %{
+      gall_genus: gall_genus,
+      host_genus: host_genus,
+      associated_gall: associated_gall,
+      unrelated_gall: unrelated_gall,
+      associated_host: associated_host,
+      unrelated_host: unrelated_host
+    }
   end
 end
