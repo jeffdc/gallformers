@@ -1160,11 +1160,15 @@ defmodule Gallformers.Taxonomy.Tree do
         name: related.name,
         focal_species_count: count(field(association, ^focal_key), :distinct),
         association_count: count(association.id, :distinct),
-        focal_species_ids: fragment("array_agg(DISTINCT ?)", field(association, ^focal_key))
+        focal_species_ids:
+          fragment(
+            "array_agg(DISTINCT ? ORDER BY ?)",
+            field(association, ^focal_key),
+            field(association, ^focal_key)
+          )
       }
     )
     |> Repo.all()
-    |> Enum.map(&Map.update!(&1, :focal_species_ids, fn ids -> Enum.sort(ids) end))
   end
 
   @doc """

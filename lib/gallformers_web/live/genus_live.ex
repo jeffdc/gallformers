@@ -358,24 +358,28 @@ defmodule GallformersWeb.GenusLive do
                     phx-click="toggle_related_genera"
                     aria-expanded="false"
                     aria-controls="related-genera-filters"
-                    class="w-full justify-between gap-4 rounded-lg px-4 py-3 text-left shadow-sm hover:border-gf-maroon hover:bg-gf-cream"
+                    class="w-full text-left shadow-sm"
                   >
-                    <span class="flex min-w-0 items-center gap-2">
-                      <.icon name="ph-arrows-left-right" class="size-5 shrink-0" />
-                      <span class="font-medium">{@related_heading}</span>
-                      <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                        {length(@related_genera)}
+                    <span class="flex w-full items-center justify-between gap-4">
+                      <span class="flex min-w-0 items-center gap-2">
+                        <.icon name="ph-arrows-left-right" class="size-5 shrink-0" />
+                        <span class="font-medium">{@related_heading}</span>
+                        <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                          {length(@related_genera)}
+                        </span>
+                        <span :if={@selected_related_genus} class="truncate text-sm text-gray-600">
+                          — filtered by
+                          <.taxon_name
+                            name={
+                              Enum.find(@related_genera, &(&1.id == @selected_related_genus)).name
+                            }
+                            rank="genus"
+                          />
+                        </span>
                       </span>
-                      <span :if={@selected_related_genus} class="truncate text-sm text-gray-600">
-                        — filtered by
-                        <.taxon_name
-                          name={Enum.find(@related_genera, &(&1.id == @selected_related_genus)).name}
-                          rank="genus"
-                        />
+                      <span class="flex shrink-0 items-center gap-1 text-sm">
+                        Show filters <.icon name="ph-caret-down" class="size-4" />
                       </span>
-                    </span>
-                    <span class="flex shrink-0 items-center gap-1 text-sm">
-                      Show filters <.icon name="ph-caret-down" class="size-4" />
                     </span>
                   </.button>
 
@@ -412,10 +416,11 @@ defmodule GallformersWeb.GenusLive do
                         type="button"
                         variant={if is_nil(@selected_related_genus), do: "primary", else: "secondary"}
                         size="sm"
+                        shape="pill"
                         phx-click="filter_related_genus"
                         phx-value-id="all"
                         aria-pressed={is_nil(@selected_related_genus)}
-                        class="gap-2 rounded-full"
+                        class="gap-2"
                       >
                         All species <span class="text-xs opacity-80">{@total_species_count}</span>
                       </.button>
@@ -428,11 +433,12 @@ defmodule GallformersWeb.GenusLive do
                             else: "secondary"
                         }
                         size="sm"
+                        shape="pill"
                         phx-click="filter_related_genus"
                         phx-value-id={genus.id}
                         aria-pressed={@selected_related_genus == genus.id}
                         title={"#{genus.association_count} species-to-species associations"}
-                        class="gap-2 rounded-full hover:border-gf-maroon"
+                        class="gap-2"
                       >
                         <.taxon_name name={genus.name} rank="genus" />
                         <span class={[
@@ -456,7 +462,7 @@ defmodule GallformersWeb.GenusLive do
                         size="sm"
                         phx-click="filter_related_genus"
                         phx-value-id="all"
-                        class="ml-1 px-1 underline hover:no-underline"
+                        class="ml-1 underline hover:no-underline"
                       >
                         Clear filter
                       </.button>

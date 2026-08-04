@@ -684,6 +684,11 @@ a.gf-btn-primary:hover {
   font-size: 1rem;
 }
 
+/* Button shapes */
+.gf-btn-pill {
+  border-radius: 9999px;
+}
+
 /* ============================================
    Admin Info Banner
    ============================================ */

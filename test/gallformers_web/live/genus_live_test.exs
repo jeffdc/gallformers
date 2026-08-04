@@ -61,6 +61,7 @@ defmodule GallformersWeb.GenusLiveTest do
 
       assert has_element?(view, "#related-genera-filters")
       assert render(view) =~ fixture.host_genus.name
+      assert has_element?(view, "button.gf-btn-pill[phx-value-id='all']")
 
       view
       |> element(
@@ -88,6 +89,7 @@ defmodule GallformersWeb.GenusLiveTest do
 
       assert has_element?(view, "#related-genera-filters")
       assert render(view) =~ fixture.gall_genus.name
+      assert has_element?(view, "button.gf-btn-pill[phx-value-id='all']")
 
       view
       |> element(
