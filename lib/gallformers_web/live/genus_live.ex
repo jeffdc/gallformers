@@ -138,6 +138,9 @@ defmodule GallformersWeb.GenusLive do
           "Count"
       end
 
+    {related_genera, related_heading, related_filter_label} =
+      related_genus_assigns(genus_id, species)
+
     assign(socket,
       page_title: "Genus #{lineage.genus.name}",
       page_description:
@@ -150,6 +153,11 @@ defmodule GallformersWeb.GenusLive do
       disambiguation: nil,
       species: species,
       search_query: "",
+      show_related_genera: false,
+      selected_related_genus: nil,
+      related_genera: related_genera,
+      related_heading: related_heading,
+      related_filter_label: related_filter_label,
       sort_by: :name,
       sort_dir: :asc,
       filtered_species: species,
@@ -158,6 +166,20 @@ defmodule GallformersWeb.GenusLive do
       error: nil
     )
   end
+
+  defp related_genus_assigns(_genus_id, []), do: {[], nil, nil}
+
+  defp related_genus_assigns(genus_id, [%{taxoncode: "gall"} | _]) do
+    related_genera = Taxonomy.list_associated_genera(genus_id, "gall")
+    {related_genera, "Host genera used by this genus", "host genus"}
+  end
+
+  defp related_genus_assigns(genus_id, [%{taxoncode: "plant"} | _]) do
+    related_genera = Taxonomy.list_associated_genera(genus_id, "plant")
+    {related_genera, "Gall-former genera found on this host", "gall-former genus"}
+  end
+
+  defp related_genus_assigns(_genus_id, _species), do: {[], nil, nil}
 
   defp format_with_description(name, description) do
     if description && String.trim(description) != "" do
@@ -173,6 +195,22 @@ defmodule GallformersWeb.GenusLive do
      socket
      |> assign(:search_query, query)
      |> filter_species()}
+  end
+
+  @impl true
+  def handle_event("filter_related_genus", %{"id" => id}, socket) do
+    selected_id = if id == "all", do: nil, else: String.to_integer(id)
+
+    {:noreply,
+     socket
+     |> assign(:show_related_genera, true)
+     |> assign(:selected_related_genus, selected_id)
+     |> filter_species()}
+  end
+
+  @impl true
+  def handle_event("toggle_related_genera", _params, socket) do
+    {:noreply, update(socket, :show_related_genera, &(!&1))}
   end
 
   @impl true
@@ -195,16 +233,36 @@ defmodule GallformersWeb.GenusLive do
     query = String.downcase(socket.assigns.search_query)
 
     filtered =
-      if query == "" do
-        socket.assigns.species
-      else
-        Enum.filter(socket.assigns.species, fn s ->
-          String.contains?(String.downcase(s.name), query) ||
-            (s.common_name && String.contains?(String.downcase(s.common_name), query))
-        end)
-      end
+      socket.assigns.species
+      |> filter_by_related_genus(
+        socket.assigns.selected_related_genus,
+        socket.assigns.related_genera
+      )
+      |> filter_by_search(query)
 
     assign(socket, :filtered_species, filtered)
+  end
+
+  defp filter_by_search(species, ""), do: species
+
+  defp filter_by_search(species, query) do
+    Enum.filter(species, fn species ->
+      String.contains?(String.downcase(species.name), query) ||
+        (species.common_name &&
+           String.contains?(String.downcase(species.common_name), query))
+    end)
+  end
+
+  defp filter_by_related_genus(species, nil, _related_genera), do: species
+
+  defp filter_by_related_genus(species, selected_id, related_genera) do
+    allowed_ids =
+      related_genera
+      |> Enum.find(%{focal_species_ids: []}, &(&1.id == selected_id))
+      |> Map.fetch!(:focal_species_ids)
+      |> MapSet.new()
+
+    Enum.filter(species, &MapSet.member?(allowed_ids, &1.id))
   end
 
   defp sorted_species(species, sort_by, sort_dir) do
@@ -292,6 +350,126 @@ defmodule GallformersWeb.GenusLive do
             <%!-- Species list --%>
             <div class="mt-6">
               <%= if @total_species_count > 0 do %>
+                <div :if={@related_genera != []} class="mb-6">
+                  <.button
+                    :if={!@show_related_genera}
+                    type="button"
+                    variant="secondary"
+                    phx-click="toggle_related_genera"
+                    aria-expanded="false"
+                    aria-controls="related-genera-filters"
+                    class="w-full text-left shadow-sm"
+                  >
+                    <span class="flex w-full items-center justify-between gap-4">
+                      <span class="flex min-w-0 items-center gap-2">
+                        <.icon name="ph-arrows-left-right" class="size-5 shrink-0" />
+                        <span class="font-medium">{@related_heading}</span>
+                        <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                          {length(@related_genera)}
+                        </span>
+                        <span :if={@selected_related_genus} class="truncate text-sm text-gray-600">
+                          — filtered by
+                          <.taxon_name
+                            name={
+                              Enum.find(@related_genera, &(&1.id == @selected_related_genus)).name
+                            }
+                            rank="genus"
+                          />
+                        </span>
+                      </span>
+                      <span class="flex shrink-0 items-center gap-1 text-sm">
+                        Show filters <.icon name="ph-caret-down" class="size-4" />
+                      </span>
+                    </span>
+                  </.button>
+
+                  <.card
+                    :if={@show_related_genera}
+                    title={"#{@related_heading} (#{length(@related_genera)})"}
+                    icon="ph-arrows-left-right"
+                    id="related-genera-filters"
+                  >
+                    <:actions>
+                      <.button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        phx-click="toggle_related_genera"
+                        aria-expanded="true"
+                        aria-controls="related-genera-filters"
+                        class="gap-1 hover:underline"
+                      >
+                        Hide <.icon name="ph-caret-up" class="size-4" />
+                      </.button>
+                    </:actions>
+                    <p class="text-sm text-gray-600 mb-4">
+                      Select a genus to filter the species list below. Counts show how many species
+                      in <.taxon_name name={@lineage.genus.name} rank="genus" />
+                      have that association.
+                    </p>
+                    <div
+                      class="flex flex-wrap gap-2"
+                      role="group"
+                      aria-label={"Filter by #{@related_filter_label}"}
+                    >
+                      <.button
+                        type="button"
+                        variant={if is_nil(@selected_related_genus), do: "primary", else: "secondary"}
+                        size="sm"
+                        shape="pill"
+                        phx-click="filter_related_genus"
+                        phx-value-id="all"
+                        aria-pressed={is_nil(@selected_related_genus)}
+                        class="gap-2"
+                      >
+                        All species <span class="text-xs opacity-80">{@total_species_count}</span>
+                      </.button>
+                      <.button
+                        :for={genus <- @related_genera}
+                        type="button"
+                        variant={
+                          if @selected_related_genus == genus.id,
+                            do: "primary",
+                            else: "secondary"
+                        }
+                        size="sm"
+                        shape="pill"
+                        phx-click="filter_related_genus"
+                        phx-value-id={genus.id}
+                        aria-pressed={@selected_related_genus == genus.id}
+                        title={"#{genus.association_count} species-to-species associations"}
+                        class="gap-2"
+                      >
+                        <.taxon_name name={genus.name} rank="genus" />
+                        <span class={[
+                          "rounded-full px-1.5 py-0.5 text-xs",
+                          @selected_related_genus == genus.id && "bg-white/20",
+                          @selected_related_genus != genus.id && "bg-gray-100 text-gray-600"
+                        ]}>
+                          {genus.focal_species_count}
+                        </span>
+                      </.button>
+                    </div>
+                    <p :if={@selected_related_genus} class="mt-4 text-sm text-gray-600">
+                      Showing species associated with
+                      <.taxon_name
+                        name={Enum.find(@related_genera, &(&1.id == @selected_related_genus)).name}
+                        rank="genus"
+                      />.
+                      <.button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        phx-click="filter_related_genus"
+                        phx-value-id="all"
+                        class="ml-1 underline hover:no-underline"
+                      >
+                        Clear filter
+                      </.button>
+                    </p>
+                  </.card>
+                </div>
+
                 <h2 class="text-lg font-semibold text-gray-800 mb-3">
                   Species ({@total_species_count})
                 </h2>

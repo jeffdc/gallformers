@@ -124,11 +124,17 @@ defmodule GallformersWeb.CoreComponents do
     * `ghost` - Transparent background, maroon text
     * `soft` - Light maroon background, maroon text (default)
 
+  ## Shapes
+
+    * `rect` - Rounded rectangle (default)
+    * `pill` - Fully rounded pill
+
   ## Examples
 
       <.button>Send!</.button>
       <.button phx-click="go" variant="primary">Send!</.button>
       <.button variant="danger">Delete</.button>
+      <.button shape="pill">Filter</.button>
       <.button navigate={~p"/"}>Home</.button>
       <.button type="submit" variant="primary">Save</.button>
   """
@@ -139,6 +145,7 @@ defmodule GallformersWeb.CoreComponents do
   attr :class, :any, default: nil
   attr :variant, :string, default: "soft", values: ~w(primary secondary danger warning ghost soft)
   attr :size, :string, default: "md", values: ~w(sm md lg)
+  attr :shape, :string, default: "rect", values: ~w(rect pill)
   slot :inner_block, required: true
 
   def button(%{rest: rest} = assigns) do
@@ -157,20 +164,26 @@ defmodule GallformersWeb.CoreComponents do
       "lg" => "gf-btn-lg"
     }
 
+    shapes = %{
+      "rect" => nil,
+      "pill" => "gf-btn-pill"
+    }
+
     assigns =
       assigns
       |> assign(:variant_class, Map.fetch!(variants, assigns.variant))
       |> assign(:size_class, Map.fetch!(sizes, assigns.size))
+      |> assign(:shape_class, Map.fetch!(shapes, assigns.shape))
 
     if rest[:href] || rest[:navigate] || rest[:patch] do
       ~H"""
-      <.link class={["gf-btn", @variant_class, @size_class, @class]} {@rest}>
+      <.link class={["gf-btn", @variant_class, @size_class, @shape_class, @class]} {@rest}>
         {render_slot(@inner_block)}
       </.link>
       """
     else
       ~H"""
-      <button class={["gf-btn", @variant_class, @size_class, @class]} {@rest}>
+      <button class={["gf-btn", @variant_class, @size_class, @shape_class, @class]} {@rest}>
         {render_slot(@inner_block)}
       </button>
       """

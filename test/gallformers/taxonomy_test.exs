@@ -4,7 +4,7 @@ defmodule Gallformers.TaxonomyTest do
   """
   use Gallformers.DataCase, async: true
 
-  alias Gallformers.Repo
+  alias Gallformers.{Galls, Repo}
   alias Gallformers.Species.Alias
   alias Gallformers.Species.Species
   alias Gallformers.Taxonomy
@@ -2930,5 +2930,103 @@ defmodule Gallformers.TaxonomyTest do
 
       assert section.id in section_ids
     end
+  end
+
+  describe "list_associated_genera/2" do
+    test "lists host genera associated with species in a gall genus" do
+      fixture = create_associated_genera_fixture()
+      host_genus_id = fixture.host_genus.id
+      host_genus_name = fixture.host_genus.name
+
+      assert [
+               %{
+                 id: ^host_genus_id,
+                 name: ^host_genus_name,
+                 focal_species_count: 2,
+                 association_count: 3,
+                 focal_species_ids: gall_ids
+               }
+             ] = Taxonomy.list_associated_genera(fixture.gall_genus.id, "gall")
+
+      assert gall_ids == Enum.sort([fixture.gall_one.id, fixture.gall_two.id])
+    end
+
+    test "lists gall genera associated with species in a host genus" do
+      fixture = create_associated_genera_fixture()
+      gall_genus_id = fixture.gall_genus.id
+      gall_genus_name = fixture.gall_genus.name
+
+      assert [
+               %{
+                 id: ^gall_genus_id,
+                 name: ^gall_genus_name,
+                 focal_species_count: 2,
+                 association_count: 3,
+                 focal_species_ids: host_ids
+               }
+             ] = Taxonomy.list_associated_genera(fixture.host_genus.id, "plant")
+
+      assert host_ids == Enum.sort([fixture.host_one.id, fixture.host_two.id])
+    end
+  end
+
+  defp create_associated_genera_fixture do
+    {:ok, gall_family} =
+      Taxonomy.create_taxonomy(%{
+        name: "AssociatedGallFamily",
+        description: "Wasp",
+        type: "family"
+      })
+
+    {:ok, host_family} =
+      Taxonomy.create_taxonomy(%{
+        name: "AssociatedHostFamily",
+        description: "Plant",
+        type: "family"
+      })
+
+    {:ok, gall_genus} =
+      Taxonomy.create_taxonomy(%{
+        name: "AssociatedGallGenus",
+        type: "genus",
+        parent_id: gall_family.id
+      })
+
+    {:ok, host_genus} =
+      Taxonomy.create_taxonomy(%{
+        name: "AssociatedHostGenus",
+        type: "genus",
+        parent_id: host_family.id
+      })
+
+    gall_one = Repo.insert!(%Species{name: "AssociatedGallGenus one", taxoncode: "gall"})
+    gall_two = Repo.insert!(%Species{name: "AssociatedGallGenus two", taxoncode: "gall"})
+    host_one = Repo.insert!(%Species{name: "AssociatedHostGenus one", taxoncode: "plant"})
+    host_two = Repo.insert!(%Species{name: "AssociatedHostGenus two", taxoncode: "plant"})
+
+    for species <- [gall_one, gall_two] do
+      {:ok, _} = Taxonomy.link_species_to_taxonomy(species.id, gall_genus.id)
+    end
+
+    for species <- [host_one, host_two] do
+      {:ok, _} = Taxonomy.link_species_to_taxonomy(species.id, host_genus.id)
+    end
+
+    for {gall, host} <- [{gall_one, host_one}, {gall_one, host_two}, {gall_two, host_one}] do
+      {:ok, _} =
+        Galls.create_gall_host(%{
+          gall_species_id: gall.id,
+          host_species_id: host.id
+        })
+    end
+
+    %{
+      gall_genus: gall_genus,
+      host_genus: host_genus,
+      gall_one: gall_one,
+      gall_two: gall_two,
+      host_one: host_one,
+      host_two: host_two
+    }
   end
 end
