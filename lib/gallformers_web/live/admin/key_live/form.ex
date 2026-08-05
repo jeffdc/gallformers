@@ -227,21 +227,21 @@ defmodule GallformersWeb.Admin.KeyLive.Form do
   defp merge_json_only_fields(key_params, json_text) do
     case Jason.decode(json_text) do
       {:ok, data} when is_map(data) ->
-        key_params
-        |> maybe_put_couplets(data["couplets"])
-        |> Map.put("authors", Jason.encode!(data["authors"] || []))
+        key_params =
+          case data["couplets"] do
+            c when is_map(c) and map_size(c) > 0 ->
+              Map.put(key_params, "couplets", Jason.encode!(c))
+
+            _ ->
+              key_params
+          end
+
+        Map.put(key_params, "authors", Jason.encode!(data["authors"] || []))
 
       _ ->
         key_params
     end
   end
-
-  defp maybe_put_couplets(key_params, couplets)
-       when is_map(couplets) and map_size(couplets) > 0 do
-    Map.put(key_params, "couplets", Jason.encode!(couplets))
-  end
-
-  defp maybe_put_couplets(key_params, _couplets), do: key_params
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
