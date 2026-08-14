@@ -8,6 +8,7 @@ defmodule Gallformers.Taxonomy.Tree do
 
   require Logger
   import Ecto.Query
+  alias Gallformers.Galls.GallHost
   alias Gallformers.Repo
   alias Gallformers.Species.Species
   alias Gallformers.TaxonName
@@ -1124,6 +1125,51 @@ defmodule Gallformers.Taxonomy.Tree do
   # =====================================================================
   # Cross-domain Taxonomy Queries
   # =====================================================================
+
+  @doc """
+  Lists genera from the opposite domain associated with species in a genus.
+
+  For a gall genus this returns host genera; for a plant genus it returns
+  gall-former genera. Each result includes the focal species IDs so genus
+  pages can filter their species table without another query.
+  """
+  @spec list_associated_genera(integer(), String.t()) :: [map()]
+  def list_associated_genera(genus_id, "gall") do
+    do_list_associated_genera(genus_id, "gall", :gall_species_id, :host_species_id)
+  end
+
+  def list_associated_genera(genus_id, "plant") do
+    do_list_associated_genera(genus_id, "plant", :host_species_id, :gall_species_id)
+  end
+
+  defp do_list_associated_genera(genus_id, taxoncode, focal_key, related_key) do
+    from(focal_link in "species_taxonomy",
+      join: focal in Species,
+      on: focal.id == focal_link.species_id and focal.taxoncode == ^taxoncode,
+      join: association in GallHost,
+      on: field(association, ^focal_key) == focal.id,
+      join: related_link in "species_taxonomy",
+      on: related_link.species_id == field(association, ^related_key),
+      join: related in Taxonomy,
+      on: related.id == related_link.taxonomy_id and related.type == "genus",
+      where: focal_link.taxonomy_id == ^genus_id,
+      group_by: [related.id, related.name],
+      order_by: related.name,
+      select: %{
+        id: related.id,
+        name: related.name,
+        focal_species_count: count(field(association, ^focal_key), :distinct),
+        association_count: count(association.id, :distinct),
+        focal_species_ids:
+          fragment(
+            "array_agg(DISTINCT ? ORDER BY ?)",
+            field(association, ^focal_key),
+            field(association, ^focal_key)
+          )
+      }
+    )
+    |> Repo.all()
+  end
 
   @doc """
   Lists families for galls that occur on a given host.
