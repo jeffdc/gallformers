@@ -3,9 +3,8 @@ status: refined
 tags: [low-priority]
 effort: small
 created: 2026-04-28
-updated: 2026-04-28
+updated: 2026-08-12
 epic: source-ingestion
-relates: [cab4]
 ---
 
 # Low-priority cleanup: move WCVP dump upload behind storage boundary
@@ -79,4 +78,3 @@ If not implemented:
 - redesigning the WCVP import/build process itself
 - changing dump format or retention policy unless a small improvement is obvious
 - treating this as required follow-up for the main storage refactor
-

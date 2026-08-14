@@ -1,9 +1,10 @@
 ---
 status: planned
 created: 2026-07-28
-updated: 2026-07-28
+updated: 2026-08-12
 epic: admin
 relates: [91cf]
+blocks: [2cb2]
 ---
 
 # Taxonomic name authorship

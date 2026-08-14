@@ -1,9 +1,8 @@
 ---
 status: raw
 created: 2026-05-12
-updated: 2026-05-15
+updated: 2026-08-12
 epic: source-ingestion
-relates: [c744]
 ---
 
 # Source ingestion pipeline polish: follow-ups from c744
@@ -80,4 +79,3 @@ These are explicitly out of scope per c744 and remain so:
   Phase 6 work)
 - Beta UX / distribution
 - GBIF↔WCVP disagreement resolution (server-side)
-
