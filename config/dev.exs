@@ -10,7 +10,7 @@ config :gallformers, tiles_url: System.get_env("TILES_URL", "/data/boundaries.pm
 
 # Configure your database
 config :gallformers, Gallformers.Repo,
-  database: "gallformers_dev",
+  database: System.get_env("PGDATABASE", "gallformers_dev"),
   username: System.get_env("PGUSER", System.get_env("USER")),
   password: System.get_env("PGPASSWORD"),
   hostname: System.get_env("PGHOST", "localhost"),

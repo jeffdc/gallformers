@@ -9,6 +9,7 @@ Operational runbooks for Gallformers.
 | [Diagnose Deployment Issue](./diagnose-deployment-issue.md) | Identify what's wrong after a deployment |
 | [Rollback Deployment](./rollback-deployment.md) | Revert to a previous release |
 | [Restore Database](./restore-database.md) | Recover PostgreSQL database from backup |
+| [Restore Deleted Gall](./restore-deleted-gall.md) | Restore one deleted gall and its images without replacing current production data |
 | [Postgres Maintenance](./postgres-maintenance.md) | Day-to-day Postgres operations, monitoring, and queries |
 | [Oban Operations](./oban.md) | Inspect queues, retry jobs, and troubleshoot background work |
 | [PostgreSQL Migration Cutover](./postgres-cutover.md) | Cutover procedures and post-migration cleanup |
