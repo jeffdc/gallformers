@@ -23,6 +23,7 @@ defmodule GallformersWeb.Admin.ArticleLive.Index do
       |> assign(:status_filter, "")
       |> assign(:all_tags, all_tags)
       |> assign(:delete_article, nil)
+      |> assign(:delete_confirmation, "")
 
     {:ok, socket}
   end
@@ -52,38 +53,59 @@ defmodule GallformersWeb.Admin.ArticleLive.Index do
   end
 
   @impl true
-  def handle_event("confirm_delete", %{"id" => id}, socket) do
+  def handle_event("delete", %{"id" => id}, socket) do
     article = Articles.get_article!(String.to_integer(id))
-    {:noreply, assign(socket, :delete_article, article)}
+
+    {:noreply,
+     socket
+     |> assign(:delete_article, article)
+     |> assign(:delete_confirmation, "")}
+  end
+
+  @impl true
+  def handle_event("update_delete_confirmation", %{"value" => value}, socket) do
+    {:noreply, assign(socket, :delete_confirmation, value)}
+  end
+
+  @impl true
+  def handle_event("confirm_delete", %{"confirmation" => confirmation}, socket) do
+    selected_article = socket.assigns.delete_article
+
+    case selected_article && Articles.get_article(selected_article.id) do
+      nil ->
+        {:noreply,
+         socket
+         |> assign(:delete_article, nil)
+         |> assign(:delete_confirmation, "")
+         |> put_flash(:info, "Article already deleted")
+         |> reload_articles()}
+
+      article when confirmation != article.title ->
+        {:noreply,
+         put_flash(socket, :error, "Title does not match. Type the exact article title.")}
+
+      article ->
+        case Articles.delete_article(article) do
+          {:ok, _} ->
+            {:noreply,
+             socket
+             |> assign(:delete_article, nil)
+             |> assign(:delete_confirmation, "")
+             |> put_flash(:info, "Article deleted.")
+             |> reload_articles()}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Failed to delete article.")}
+        end
+    end
   end
 
   @impl true
   def handle_event("cancel_delete", _params, socket) do
-    {:noreply, assign(socket, :delete_article, nil)}
-  end
-
-  @impl true
-  def handle_event("delete_article", %{"id" => id}, socket) do
-    article = Articles.get_article!(String.to_integer(id))
-
-    case Articles.delete_article(article) do
-      {:ok, _} ->
-        articles = Articles.list_articles()
-        all_tags = Articles.list_all_tags()
-
-        socket =
-          socket
-          |> assign(:articles, articles)
-          |> assign(:all_tags, all_tags)
-          |> assign(:delete_article, nil)
-          |> apply_filters()
-          |> put_flash(:info, "Article deleted.")
-
-        {:noreply, socket}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to delete article.")}
-    end
+    {:noreply,
+     socket
+     |> assign(:delete_article, nil)
+     |> assign(:delete_confirmation, "")}
   end
 
   @impl true
@@ -198,7 +220,7 @@ defmodule GallformersWeb.Admin.ArticleLive.Index do
                         icon="ph-trash"
                         label="Delete"
                         variant="danger"
-                        phx-click="confirm_delete"
+                        phx-click="delete"
                         phx-value-id={article.id}
                       />
                     </.table_actions>
@@ -217,40 +239,26 @@ defmodule GallformersWeb.Admin.ArticleLive.Index do
         </p>
       </div>
 
-      <%!-- Delete Confirmation Modal --%>
-      <.modal
+      <.dangerous_delete_modal
         :if={@delete_article}
-        id="delete-modal"
         show
-        on_cancel={JS.push("cancel_delete")}
-        class="gf-modal-md"
-      >
-        <:header>Delete Article</:header>
-        <:body>
-          <p class="text-gray-600 mb-4">
-            Are you sure you want to delete "<strong>{@delete_article.title}</strong>"? This action cannot be undone.
-          </p>
-        </:body>
-        <:footer>
-          <button
-            type="button"
-            phx-click="cancel_delete"
-            class="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            phx-click="delete_article"
-            phx-value-id={@delete_article.id}
-            class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-          >
-            Delete
-          </button>
-        </:footer>
-      </.modal>
+        item_type="article"
+        item_name={@delete_article.title}
+        consequences={[
+          "The article content, publication state, and tags will be permanently deleted.",
+          "All images owned by this article will be deleted from storage."
+        ]}
+        confirmation_value={@delete_confirmation}
+      />
     </Layouts.admin>
     """
+  end
+
+  defp reload_articles(socket) do
+    socket
+    |> assign(:articles, Articles.list_articles())
+    |> assign(:all_tags, Articles.list_all_tags())
+    |> apply_filters()
   end
 
   defp apply_filters(socket) do

@@ -25,6 +25,8 @@ defmodule GallformersWeb.Admin.HostLive.Index do
       |> assign(:search_query, "")
       |> assign(:current_page, 1)
       |> assign(:page_size, @page_size)
+      |> assign(:delete_host, nil)
+      |> assign(:delete_confirmation, "")
       |> load_hosts()
 
     {:ok, socket}
@@ -64,11 +66,42 @@ defmodule GallformersWeb.Admin.HostLive.Index do
          |> put_flash(:info, "Host already deleted")
          |> load_hosts()}
 
-      species ->
-        case Species.delete_species(species) do
+      host ->
+        {:noreply,
+         socket
+         |> assign(:delete_host, host)
+         |> assign(:delete_confirmation, "")}
+    end
+  end
+
+  @impl true
+  def handle_event("update_delete_confirmation", %{"value" => value}, socket) do
+    {:noreply, assign(socket, :delete_confirmation, value)}
+  end
+
+  @impl true
+  def handle_event("confirm_delete", %{"confirmation" => confirmation}, socket) do
+    selected_host = socket.assigns.delete_host
+
+    case selected_host && Species.get_species(selected_host.id) do
+      nil ->
+        {:noreply,
+         socket
+         |> assign(:delete_host, nil)
+         |> assign(:delete_confirmation, "")
+         |> put_flash(:info, "Host already deleted")
+         |> load_hosts()}
+
+      host when confirmation != host.name ->
+        {:noreply, put_flash(socket, :error, "Name does not match. Type the exact host name.")}
+
+      host ->
+        case Species.delete_species(host) do
           {:ok, _} ->
             {:noreply,
              socket
+             |> assign(:delete_host, nil)
+             |> assign(:delete_confirmation, "")
              |> put_flash(:info, "Host deleted successfully")
              |> load_hosts()}
 
@@ -79,8 +112,22 @@ defmodule GallformersWeb.Admin.HostLive.Index do
   end
 
   @impl true
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:delete_host, nil)
+     |> assign(:delete_confirmation, "")}
+  end
+
+  @impl true
   def handle_info({event, _}, socket)
-      when event in [:host_created, :host_updated, :species_deleted] do
+      when event in [
+             :host_created,
+             :host_updated,
+             :species_created,
+             :species_updated,
+             :species_deleted
+           ] do
     {:noreply, load_hosts(socket)}
   end
 
@@ -190,7 +237,6 @@ defmodule GallformersWeb.Admin.HostLive.Index do
                       variant="danger"
                       phx-click="delete"
                       phx-value-id={host.id}
-                      confirm="Are you sure? This will delete the host and all its gall associations."
                     />
                   </.table_actions>
                 </td>
@@ -217,6 +263,17 @@ defmodule GallformersWeb.Admin.HostLive.Index do
             Showing {@total_count} hosts
           </p>
         <% end %>
+        <.dangerous_delete_modal
+          :if={@delete_host}
+          show
+          item_type="host"
+          item_name={@delete_host.name}
+          consequences={[
+            "All uploaded images will be deleted from storage.",
+            "Gall mappings, source associations, taxonomy, range, alias, and trait records associated with this host will be removed."
+          ]}
+          confirmation_value={@delete_confirmation}
+        />
       </div>
     </Layouts.admin>
     """

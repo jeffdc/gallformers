@@ -401,13 +401,42 @@ defmodule GallformersWeb.Admin.HostLive.Form do
 
   @impl true
   def handle_event("delete", _params, socket) do
-    case Species.get_species(socket.assigns.host.id) do
-      nil ->
-        {:noreply, put_flash(socket, :error, "Host not found")}
+    {:noreply,
+     socket
+     |> assign(:show_delete_modal, true)
+     |> assign(:delete_confirmation, "")}
+  end
 
-      species ->
-        do_delete_host(socket, species)
+  @impl true
+  def handle_event("update_delete_confirmation", %{"value" => value}, socket) do
+    {:noreply, assign(socket, :delete_confirmation, value)}
+  end
+
+  @impl true
+  def handle_event("confirm_delete", %{"confirmation" => confirmation}, socket) do
+    selected_host = socket.assigns.host
+
+    case selected_host && Species.get_species(selected_host.id) do
+      nil ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Host already deleted")
+         |> build_default_assigns()}
+
+      host when confirmation != host.name ->
+        {:noreply, put_flash(socket, :error, "Name does not match. Type the exact host name.")}
+
+      host ->
+        do_delete_host(socket, host)
     end
+  end
+
+  @impl true
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_delete_modal, false)
+     |> assign(:delete_confirmation, "")}
   end
 
   defp do_delete_host(socket, species) do
@@ -618,6 +647,8 @@ defmodule GallformersWeb.Admin.HostLive.Form do
     |> assign(:mode, :search)
     |> assign(:host, nil)
     |> assign(:form, nil)
+    |> assign(:show_delete_modal, false)
+    |> assign(:delete_confirmation, "")
     # Deferred changes tracking
     |> assign(DeferredChanges.init(:aliases, []))
     |> assign(:range_entries, %{})
@@ -1833,7 +1864,6 @@ defmodule GallformersWeb.Admin.HostLive.Form do
                   :if={@mode == :edit}
                   type="button"
                   phx-click="delete"
-                  data-confirm="Are you sure you want to delete this host? This will remove all associated gall mappings and range data."
                   class="gf-btn gf-btn-danger"
                 >
                   Delete
@@ -1967,6 +1997,18 @@ defmodule GallformersWeb.Admin.HostLive.Form do
         </.modal>
 
         <.discard_confirm_modal show={@show_discard_confirm} />
+
+        <.dangerous_delete_modal
+          :if={@host}
+          show={@show_delete_modal}
+          item_type="host"
+          item_name={@host.name}
+          consequences={[
+            "All uploaded images will be deleted from storage.",
+            "Gall mappings, source associations, taxonomy, range, alias, and trait records associated with this host will be removed."
+          ]}
+          confirmation_value={@delete_confirmation}
+        />
       </Layouts.admin_edit_layout>
 
       <.live_component

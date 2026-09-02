@@ -357,6 +357,20 @@ defmodule Gallformers.Taxonomy.Reclassification do
     }
   end
 
+  def get_deletion_impact(%Taxonomy{id: id, type: "section"} = taxonomy) do
+    species_count = SpeciesLink.count_species_for_taxonomies([id])
+
+    %{
+      taxonomy: taxonomy,
+      genera: [],
+      genera_count: 0,
+      sections: [],
+      sections_count: 0,
+      species_count: species_count,
+      has_impact: species_count > 0
+    }
+  end
+
   def get_deletion_impact(%Taxonomy{} = taxonomy) do
     %{
       taxonomy: taxonomy,

@@ -166,4 +166,57 @@ defmodule GallformersWeb.Admin.KeyLive.FormTest do
       assert map_size(Keys.get_key!(key.id).couplets) == 2
     end
   end
+
+  describe "dangerous delete confirmation" do
+    test "edit view requires the exact key title before deletion", %{conn: conn} do
+      {:ok, key} =
+        Keys.create_key(%{
+          title: "Destructive delete key",
+          version: "2026-09-02",
+          couplets: @couplets
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/keys/#{key.id}")
+
+      render_click(view, "delete")
+
+      assert has_element?(view, "#dangerous-delete-modal", key.title)
+      assert Keys.get_key!(key.id).id == key.id
+
+      html = render_submit(view, "confirm_delete", %{"confirmation" => "wrong title"})
+
+      assert html =~ "Title does not match"
+      assert Keys.get_key!(key.id).id == key.id
+
+      render_submit(view, "confirm_delete", %{"confirmation" => key.title})
+
+      assert_redirect(view, "/admin/keys")
+      assert {:error, :not_found} = Keys.get_key(key.slug)
+    end
+
+    test "index view requires the exact key title before deletion", %{conn: conn} do
+      {:ok, key} =
+        Keys.create_key(%{
+          title: "Destructive delete key",
+          version: "2026-09-02",
+          couplets: @couplets
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/keys")
+
+      render_click(view, "delete", %{"id" => Integer.to_string(key.id)})
+
+      assert has_element?(view, "#dangerous-delete-modal", key.title)
+      assert Keys.get_key!(key.id).id == key.id
+
+      html = render_submit(view, "confirm_delete", %{"confirmation" => "wrong title"})
+
+      assert html =~ "Title does not match"
+      assert Keys.get_key!(key.id).id == key.id
+
+      render_submit(view, "confirm_delete", %{"confirmation" => key.title})
+
+      assert {:error, :not_found} = Keys.get_key(key.slug)
+    end
+  end
 end

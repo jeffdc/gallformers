@@ -79,6 +79,8 @@ defmodule GallformersWeb.Admin.KeyLive.Form do
       |> assign(:json_input, "")
       |> assign(:json_error, nil)
       |> assign(:couplet_count, nil)
+      |> assign(:show_delete_modal, false)
+      |> assign(:delete_confirmation, "")
       |> allow_upload(:key_json,
         accept: ~w(.json),
         max_entries: 1,
@@ -133,7 +135,44 @@ defmodule GallformersWeb.Admin.KeyLive.Form do
   end
 
   @impl true
-  def handle_event("delete", params, socket), do: handle_delete(params, socket)
+  def handle_event("delete", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_delete_modal, true)
+     |> assign(:delete_confirmation, "")}
+  end
+
+  @impl true
+  def handle_event("update_delete_confirmation", %{"value" => value}, socket) do
+    {:noreply, assign(socket, :delete_confirmation, value)}
+  end
+
+  @impl true
+  def handle_event("confirm_delete", %{"confirmation" => confirmation}, socket) do
+    selected_key = socket.assigns.key
+
+    case selected_key && Keys.get_key_by_id(selected_key.id) do
+      nil ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Key already deleted")
+         |> push_navigate(to: list_path())}
+
+      key when confirmation != key.title ->
+        {:noreply, put_flash(socket, :error, "Title does not match. Type the exact key title.")}
+
+      key ->
+        handle_delete(%{}, assign(socket, :key, key))
+    end
+  end
+
+  @impl true
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_delete_modal, false)
+     |> assign(:delete_confirmation, "")}
+  end
 
   @impl true
   def handle_event("regenerate_pdfs", _params, socket) do
@@ -412,7 +451,6 @@ defmodule GallformersWeb.Admin.KeyLive.Form do
                 :if={@mode == :edit}
                 type="button"
                 phx-click="delete"
-                data-confirm="Are you sure you want to delete this key? This cannot be undone."
                 class="gf-btn gf-btn-danger"
               >
                 Delete
@@ -443,6 +481,18 @@ defmodule GallformersWeb.Admin.KeyLive.Form do
         </div>
 
         <.discard_confirm_modal show={@show_discard_confirm} />
+
+        <.dangerous_delete_modal
+          :if={@key}
+          show={@show_delete_modal}
+          item_type="identification key"
+          item_name={@key.title}
+          consequences={[
+            "The complete identification key and all of its couplets will be permanently deleted.",
+            "All images owned by this key will be deleted from storage."
+          ]}
+          confirmation_value={@delete_confirmation}
+        />
       </Layouts.admin_edit_layout>
     </Layouts.admin>
     """

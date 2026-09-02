@@ -8,7 +8,7 @@ defmodule GallformersWeb.FormComponents do
   use Phoenix.Component
   use Gettext, backend: GallformersWeb.Gettext
 
-  import GallformersWeb.CoreComponents, only: [icon: 1, modal: 1]
+  import GallformersWeb.CoreComponents, only: [button: 1, icon: 1, modal: 1]
   import GallformersWeb.DataDisplayComponents, only: [taxon_name: 1]
   import GallformersWeb.UIComponents, only: [alert: 1]
 
@@ -991,6 +991,86 @@ defmodule GallformersWeb.FormComponents do
   end
 
   @doc """
+  Renders a high-friction confirmation modal for destructive admin deletes.
+
+  The record is not deletable until the admin types its exact name. The parent
+  LiveView must handle `update_delete_confirmation`, `confirm_delete`, and
+  `cancel_delete`, and must validate the submitted confirmation again before
+  deleting.
+  """
+  attr :show, :boolean, required: true, doc: "whether to show the modal"
+  attr :item_type, :string, required: true, doc: "human-readable record type"
+  attr :item_name, :string, required: true, doc: "exact record name required for confirmation"
+  attr :consequences, :list, required: true, doc: "descriptions of data affected by deletion"
+  attr :confirmation_value, :string, default: "", doc: "current confirmation input value"
+  attr :id, :string, default: "dangerous-delete-modal", doc: "modal DOM id"
+
+  def dangerous_delete_modal(assigns) do
+    ~H"""
+    <.modal
+      :if={@show}
+      id={@id}
+      show
+      on_cancel={JS.push("cancel_delete")}
+      class="gf-modal-sm ring-2 ring-red-600"
+    >
+      <:header>
+        <span class="flex items-center gap-2 text-red-800">
+          <.icon name="ph-warning-octagon" class="size-6 shrink-0" />
+          Permanently delete this {@item_type}?
+        </span>
+      </:header>
+      <:body>
+        <div class="space-y-5">
+          <div class="rounded-lg border border-red-300 bg-red-50 p-4 text-red-900">
+            <p class="font-bold">This cannot be undone.</p>
+            <p class="mt-2">
+              Deleting <strong>{@item_name}</strong> will have the following impact:
+            </p>
+            <ul class="mt-2 list-disc space-y-1 pl-5">
+              <li :for={consequence <- @consequences}>{consequence}</li>
+            </ul>
+          </div>
+
+          <form id={"#{@id}-form"} phx-submit="confirm_delete">
+            <label for="dangerous-delete-confirmation" class="gf-label">
+              Type <strong class="text-red-700">{@item_name}</strong> to confirm:
+            </label>
+            <input
+              type="text"
+              id="dangerous-delete-confirmation"
+              name="confirmation"
+              value={@confirmation_value}
+              phx-hook="InputEvent"
+              data-event="update_delete_confirmation"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              class="gf-input mt-2 focus:border-red-600 focus:ring-red-600"
+              autofocus
+            />
+          </form>
+        </div>
+      </:body>
+      <:footer>
+        <.button type="button" variant="secondary" phx-click="cancel_delete">
+          Cancel
+        </.button>
+        <.button
+          id="dangerous-delete-submit"
+          type="submit"
+          form={"#{@id}-form"}
+          variant="danger"
+          disabled={@confirmation_value != @item_name}
+        >
+          <.icon name="ph-trash" class="size-4" /> Delete permanently
+        </.button>
+      </:footer>
+    </.modal>
+    """
+  end
+
+  @doc """
   Renders a cascade delete confirmation modal.
 
   Shows the impact of deleting an entity with cascading relationships:
@@ -1029,6 +1109,14 @@ defmodule GallformersWeb.FormComponents do
   attr :confirmation_value, :string, default: "", doc: "current value in the confirmation input"
 
   def cascade_delete_modal(assigns) do
+    section_blocked =
+      case assigns.impact do
+        %{taxonomy: %{type: "section"}, species_count: count} when count > 0 -> true
+        _ -> false
+      end
+
+    assigns = assign(assigns, :section_blocked, section_blocked)
+
     ~H"""
     <.modal
       :if={@show and @impact}
@@ -1063,15 +1151,28 @@ defmodule GallformersWeb.FormComponents do
           </div>
           <%!-- Family/genus: cascade delete message --%>
           <p
-            :if={@impact.taxonomy.type != "intermediate"}
+            :if={@impact.taxonomy.type in ["family", "genus"]}
             class="text-red-700 font-medium"
           >
             To delete this {@impact.taxonomy.type}, all dependent data will be permanently deleted.
           </p>
 
+          <div
+            :if={@impact.taxonomy.type == "section" and @impact.has_impact}
+            class="bg-red-50 border border-red-200 rounded-lg p-4"
+          >
+            <p class="font-medium text-red-800">
+              This section has <strong>{@impact.species_count} linked species</strong>.
+            </p>
+            <p class="mt-2 text-sm text-red-700">
+              The species themselves will not be deleted, but this section cannot be deleted until
+              they are reclassified.
+            </p>
+          </div>
+
           <%!-- Impact Summary (family/genus cascade) --%>
           <div
-            :if={@impact.taxonomy.type != "intermediate" and @impact.has_impact}
+            :if={@impact.taxonomy.type in ["family", "genus"] and @impact.has_impact}
             class="bg-red-50 border border-red-200 rounded-lg p-4"
           >
             <p class="font-medium text-red-800 mb-2">This will delete:</p>
@@ -1129,7 +1230,12 @@ defmodule GallformersWeb.FormComponents do
           </details>
 
           <%!-- Type to Confirm --%>
-          <form id="cascade-delete-form" phx-submit="confirm_cascade_delete" class="mt-4">
+          <form
+            :if={not @section_blocked}
+            id="cascade-delete-form"
+            phx-submit="confirm_cascade_delete"
+            class="mt-4"
+          >
             <label for="delete-confirmation" class="block text-sm text-gray-700 mb-1">
               Type <strong class="text-red-700">{@impact.taxonomy.name}</strong> to confirm:
             </label>
@@ -1156,6 +1262,7 @@ defmodule GallformersWeb.FormComponents do
           Cancel
         </button>
         <button
+          :if={not @section_blocked}
           type="submit"
           form="cascade-delete-form"
           class="px-4 py-2 bg-red-600 text-white font-medium rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"

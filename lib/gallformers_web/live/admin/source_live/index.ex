@@ -24,6 +24,8 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
       |> assign(:page_size, @page_size)
       |> assign(:sort_by, :title)
       |> assign(:sort_dir, :asc)
+      |> assign(:delete_source, nil)
+      |> assign(:delete_confirmation, "")
       |> load_sources()
 
     {:ok, socket}
@@ -75,16 +77,56 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
   def handle_event("delete", %{"id" => id}, socket) do
     source = Sources.get_source!(String.to_integer(id))
 
-    case Sources.delete_source(source) do
-      {:ok, _} ->
+    {:noreply,
+     socket
+     |> assign(:delete_source, source)
+     |> assign(:delete_confirmation, "")}
+  end
+
+  @impl true
+  def handle_event("update_delete_confirmation", %{"value" => value}, socket) do
+    {:noreply, assign(socket, :delete_confirmation, value)}
+  end
+
+  @impl true
+  def handle_event("confirm_delete", %{"confirmation" => confirmation}, socket) do
+    selected_source = socket.assigns.delete_source
+
+    case selected_source && Sources.get_source(selected_source.id) do
+      nil ->
         {:noreply,
          socket
-         |> put_flash(:info, "Source deleted successfully")
+         |> assign(:delete_source, nil)
+         |> assign(:delete_confirmation, "")
+         |> put_flash(:info, "Source already deleted")
          |> load_sources()}
 
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to delete source")}
+      source when confirmation != source.title ->
+        {:noreply,
+         put_flash(socket, :error, "Title does not match. Type the exact source title.")}
+
+      source ->
+        case Sources.delete_source(source) do
+          {:ok, _} ->
+            {:noreply,
+             socket
+             |> assign(:delete_source, nil)
+             |> assign(:delete_confirmation, "")
+             |> put_flash(:info, "Source deleted successfully")
+             |> load_sources()}
+
+          {:error, _changeset} ->
+            {:noreply, put_flash(socket, :error, "Failed to delete source")}
+        end
     end
+  end
+
+  @impl true
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:delete_source, nil)
+     |> assign(:delete_confirmation, "")}
   end
 
   @impl true
@@ -224,7 +266,6 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
                       variant="danger"
                       phx-click="delete"
                       phx-value-id={source.id}
-                      confirm="Are you sure? This will remove all species associations."
                     />
                   </.table_actions>
                 </td>
@@ -251,6 +292,17 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
             Showing {length(@sources)} sources
           </p>
         <% end %>
+        <.dangerous_delete_modal
+          :if={@delete_source}
+          show
+          item_type="source"
+          item_name={@delete_source.title}
+          consequences={[
+            "Every species-source mapping for this source will be removed.",
+            "The source record and its citation metadata will be permanently deleted."
+          ]}
+          confirmation_value={@delete_confirmation}
+        />
       </div>
     </Layouts.admin>
     """

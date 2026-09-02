@@ -101,6 +101,8 @@ defmodule GallformersWeb.Admin.GallLive.Form do
     |> assign(:gall_data, nil)
     |> assign(:form, nil)
     |> assign(:gall_id, nil)
+    |> assign(:show_delete_modal, false)
+    |> assign(:delete_confirmation, "")
     # Deferred changes tracking
     |> assign(DeferredChanges.init(:aliases, []))
     |> assign(DeferredChanges.init(:hosts, []))
@@ -640,16 +642,51 @@ defmodule GallformersWeb.Admin.GallLive.Form do
 
   @impl true
   def handle_event("delete", _params, socket) do
-    case Species.delete_species(socket.assigns.gall) do
-      {:ok, _} ->
+    {:noreply,
+     socket
+     |> assign(:show_delete_modal, true)
+     |> assign(:delete_confirmation, "")}
+  end
+
+  @impl true
+  def handle_event("update_delete_confirmation", %{"value" => value}, socket) do
+    {:noreply, assign(socket, :delete_confirmation, value)}
+  end
+
+  @impl true
+  def handle_event("confirm_delete", %{"confirmation" => confirmation}, socket) do
+    selected_gall = socket.assigns.gall
+
+    case selected_gall && Species.get_species(selected_gall.id) do
+      nil ->
         {:noreply,
          socket
-         |> put_flash(:info, "Gall deleted successfully")
+         |> put_flash(:info, "Gall already deleted")
          |> init_empty_gall_state()}
 
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to delete gall")}
+      gall when confirmation != gall.name ->
+        {:noreply, put_flash(socket, :error, "Name does not match. Type the exact gall name.")}
+
+      gall ->
+        case Species.delete_species(gall) do
+          {:ok, _} ->
+            {:noreply,
+             socket
+             |> put_flash(:info, "Gall deleted successfully")
+             |> init_empty_gall_state()}
+
+          {:error, _changeset} ->
+            {:noreply, put_flash(socket, :error, "Failed to delete gall")}
+        end
     end
+  end
+
+  @impl true
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_delete_modal, false)
+     |> assign(:delete_confirmation, "")}
   end
 
   # =================================================================
@@ -1313,7 +1350,6 @@ defmodule GallformersWeb.Admin.GallLive.Form do
                   :if={@mode == :edit}
                   type="button"
                   phx-click="delete"
-                  data-confirm="Are you sure? This will delete the gall and all its associations."
                   class="gf-btn gf-btn-danger"
                 >
                   Delete
@@ -1341,6 +1377,18 @@ defmodule GallformersWeb.Admin.GallLive.Form do
         </div>
 
         <.discard_confirm_modal show={@show_discard_confirm} />
+
+        <.dangerous_delete_modal
+          :if={@gall}
+          show={@show_delete_modal}
+          item_type="gall"
+          item_name={@gall.name}
+          consequences={[
+            "All uploaded images will be deleted from storage.",
+            "Host, source, taxonomy, range, alias, and trait records associated with this gall will be removed."
+          ]}
+          confirmation_value={@delete_confirmation}
+        />
       </Layouts.admin_edit_layout>
 
       <.live_component

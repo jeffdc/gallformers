@@ -392,25 +392,37 @@ defmodule GallformersWeb.Admin.TaxonomyLive.Form do
   def handle_event("confirm_cascade_delete", %{"confirmation" => confirmation}, socket) do
     taxonomy = socket.assigns.taxonomy
     expected_name = taxonomy.name
+    impact = Taxonomy.get_deletion_impact(taxonomy)
 
-    if String.trim(confirmation) == expected_name do
-      case Taxonomy.delete_taxonomy_cascade(taxonomy) do
-        {:ok, impact} ->
-          message = build_delete_success_message(taxonomy, impact)
+    cond do
+      taxonomy.type == "section" and impact.species_count > 0 ->
+        {:noreply,
+         socket
+         |> assign(:deletion_impact, impact)
+         |> put_flash(
+           :error,
+           "This section cannot be deleted until its linked species are reclassified."
+         )}
 
-          {:noreply,
-           socket
-           |> put_flash(:info, message)
-           |> push_navigate(to: ~p"/admin/taxonomy")}
+      confirmation != expected_name ->
+        {:noreply, put_flash(socket, :error, "Name does not match. Please type the exact name.")}
 
-        {:error, reason} ->
-          {:noreply,
-           socket
-           |> assign(:show_delete_modal, false)
-           |> put_flash(:error, "Delete failed: #{inspect(reason)}")}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "Name does not match. Please type the exact name.")}
+      true ->
+        case Taxonomy.delete_taxonomy_cascade(taxonomy) do
+          {:ok, deleted_impact} ->
+            message = build_delete_success_message(taxonomy, deleted_impact)
+
+            {:noreply,
+             socket
+             |> put_flash(:info, message)
+             |> push_navigate(to: ~p"/admin/taxonomy")}
+
+          {:error, reason} ->
+            {:noreply,
+             socket
+             |> assign(:show_delete_modal, false)
+             |> put_flash(:error, "Delete failed: #{inspect(reason)}")}
+        end
     end
   end
 
