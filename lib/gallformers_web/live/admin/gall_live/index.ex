@@ -22,6 +22,8 @@ defmodule GallformersWeb.Admin.GallLive.Index do
       |> assign(:search_query, "")
       |> assign(:current_page, 1)
       |> assign(:page_size, @page_size)
+      |> assign(:delete_gall, nil)
+      |> assign(:delete_confirmation, "")
       |> load_galls()
 
     {:ok, socket}
@@ -61,11 +63,42 @@ defmodule GallformersWeb.Admin.GallLive.Index do
          |> put_flash(:info, "Gall already deleted")
          |> load_galls()}
 
-      species ->
-        case Species.delete_species(species) do
+      gall ->
+        {:noreply,
+         socket
+         |> assign(:delete_gall, gall)
+         |> assign(:delete_confirmation, "")}
+    end
+  end
+
+  @impl true
+  def handle_event("update_delete_confirmation", %{"value" => value}, socket) do
+    {:noreply, assign(socket, :delete_confirmation, value)}
+  end
+
+  @impl true
+  def handle_event("confirm_delete", %{"confirmation" => confirmation}, socket) do
+    selected_gall = socket.assigns.delete_gall
+
+    case selected_gall && Species.get_species(selected_gall.id) do
+      nil ->
+        {:noreply,
+         socket
+         |> assign(:delete_gall, nil)
+         |> assign(:delete_confirmation, "")
+         |> put_flash(:info, "Gall already deleted")
+         |> load_galls()}
+
+      gall when confirmation != gall.name ->
+        {:noreply, put_flash(socket, :error, "Name does not match. Type the exact gall name.")}
+
+      gall ->
+        case Species.delete_species(gall) do
           {:ok, _} ->
             {:noreply,
              socket
+             |> assign(:delete_gall, nil)
+             |> assign(:delete_confirmation, "")
              |> put_flash(:info, "Gall deleted successfully")
              |> load_galls()}
 
@@ -73,6 +106,14 @@ defmodule GallformersWeb.Admin.GallLive.Index do
             {:noreply, put_flash(socket, :error, "Failed to delete gall")}
         end
     end
+  end
+
+  @impl true
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:delete_gall, nil)
+     |> assign(:delete_confirmation, "")}
   end
 
   @impl true
@@ -194,7 +235,6 @@ defmodule GallformersWeb.Admin.GallLive.Index do
                       variant="danger"
                       phx-click="delete"
                       phx-value-id={gall.id}
-                      confirm="Are you sure? This will delete the gall and all its associations."
                     />
                   </.table_actions>
                 </td>
@@ -221,6 +261,17 @@ defmodule GallformersWeb.Admin.GallLive.Index do
             Showing {@total_count} galls
           </p>
         <% end %>
+        <.dangerous_delete_modal
+          :if={@delete_gall}
+          show
+          item_type="gall"
+          item_name={@delete_gall.name}
+          consequences={[
+            "All uploaded images will be deleted from storage.",
+            "Host, source, taxonomy, range, alias, and trait records associated with this gall will be removed."
+          ]}
+          confirmation_value={@delete_confirmation}
+        />
       </div>
     </Layouts.admin>
     """

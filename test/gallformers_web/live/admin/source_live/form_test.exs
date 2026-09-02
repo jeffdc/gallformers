@@ -11,6 +11,7 @@ defmodule GallformersWeb.Admin.SourceLive.FormTest do
   import Phoenix.LiveViewTest
 
   alias Gallformers.Accounts.Auth0User
+  alias Gallformers.Sources
 
   # Helper to set up admin session
   defp setup_admin_session(conn) do
@@ -27,6 +28,21 @@ defmodule GallformersWeb.Admin.SourceLive.FormTest do
     |> init_test_session(%{})
     |> put_session(:current_user, user)
     |> put_session(:db_display_name, "Test User")
+  end
+
+  defp create_source! do
+    {:ok, source} =
+      Sources.create_source(%{
+        title: "Destructive delete source",
+        author: "Test Author",
+        pubyear: "2026",
+        link: "https://example.com/source",
+        citation: "Test Author. Destructive delete source. 2026.",
+        license: "CC-BY",
+        licenselink: "https://creativecommons.org/licenses/by/4.0/"
+      })
+
+    source
   end
 
   describe "Create source navigation" do
@@ -62,6 +78,51 @@ defmodule GallformersWeb.Admin.SourceLive.FormTest do
       assert html =~ "Editing"
       assert html =~ "Test Source Title"
       assert html =~ "Test Author"
+    end
+  end
+
+  describe "dangerous delete confirmation" do
+    setup %{conn: conn} do
+      {:ok, conn: setup_admin_session(conn)}
+    end
+
+    test "edit view requires the exact source title before deletion", %{conn: conn} do
+      source = create_source!()
+      {:ok, view, _html} = live(conn, ~p"/admin/sources/#{source.id}")
+
+      render_click(view, "delete")
+
+      assert has_element?(view, "#dangerous-delete-modal", source.title)
+      assert Sources.get_source(source.id) != nil
+
+      html = render_submit(view, "confirm_delete", %{"confirmation" => "wrong title"})
+
+      assert html =~ "Title does not match"
+      assert Sources.get_source(source.id) != nil
+
+      render_submit(view, "confirm_delete", %{"confirmation" => source.title})
+
+      assert_redirect(view, "/admin/sources")
+      refute Sources.get_source(source.id)
+    end
+
+    test "index view requires the exact source title before deletion", %{conn: conn} do
+      source = create_source!()
+      {:ok, view, _html} = live(conn, ~p"/admin/sources")
+
+      render_click(view, "delete", %{"id" => Integer.to_string(source.id)})
+
+      assert has_element?(view, "#dangerous-delete-modal", source.title)
+      assert Sources.get_source(source.id) != nil
+
+      html = render_submit(view, "confirm_delete", %{"confirmation" => "wrong title"})
+
+      assert html =~ "Title does not match"
+      assert Sources.get_source(source.id) != nil
+
+      render_submit(view, "confirm_delete", %{"confirmation" => source.title})
+
+      refute Sources.get_source(source.id)
     end
   end
 end

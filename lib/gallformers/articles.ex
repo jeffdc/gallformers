@@ -114,6 +114,12 @@ defmodule Gallformers.Articles do
   end
 
   @doc """
+  Gets an article by ID, returning nil if it no longer exists.
+  """
+  @spec get_article(integer()) :: Article.t() | nil
+  def get_article(id), do: Repo.get(Article, id)
+
+  @doc """
   Gets an article by ID.
 
   Raises `Ecto.NoResultsError` if not found.

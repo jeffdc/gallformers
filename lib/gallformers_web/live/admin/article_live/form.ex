@@ -44,6 +44,8 @@ defmodule GallformersWeb.Admin.ArticleLive.Form do
       # Image delete confirmation state
       |> assign(:image_to_delete, nil)
       |> assign(:image_references, [])
+      |> assign(:show_delete_modal, false)
+      |> assign(:delete_confirmation, "")
       # Tag dropdown state
       |> assign(:form_tags, [])
       |> assign(:tag_search_query, "")
@@ -170,16 +172,52 @@ defmodule GallformersWeb.Admin.ArticleLive.Form do
 
   @impl true
   def handle_event("delete", _params, socket) do
-    case Articles.delete_article(socket.assigns.article) do
-      {:ok, _} ->
+    {:noreply,
+     socket
+     |> assign(:show_delete_modal, true)
+     |> assign(:delete_confirmation, "")}
+  end
+
+  @impl true
+  def handle_event("update_delete_confirmation", %{"value" => value}, socket) do
+    {:noreply, assign(socket, :delete_confirmation, value)}
+  end
+
+  @impl true
+  def handle_event("confirm_delete", %{"confirmation" => confirmation}, socket) do
+    selected_article = socket.assigns.article
+
+    case selected_article && Articles.get_article(selected_article.id) do
+      nil ->
         {:noreply,
          socket
-         |> put_flash(:info, "Article deleted successfully")
+         |> put_flash(:info, "Article already deleted")
          |> push_navigate(to: ~p"/admin/articles")}
 
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to delete article")}
+      article when confirmation != article.title ->
+        {:noreply,
+         put_flash(socket, :error, "Title does not match. Type the exact article title.")}
+
+      article ->
+        case Articles.delete_article(article) do
+          {:ok, _} ->
+            {:noreply,
+             socket
+             |> put_flash(:info, "Article deleted successfully")
+             |> push_navigate(to: ~p"/admin/articles")}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Failed to delete article")}
+        end
     end
+  end
+
+  @impl true
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_delete_modal, false)
+     |> assign(:delete_confirmation, "")}
   end
 
   @impl true
@@ -697,7 +735,6 @@ defmodule GallformersWeb.Admin.ArticleLive.Form do
                     :if={@mode == :edit}
                     type="button"
                     phx-click="delete"
-                    data-confirm="Are you sure you want to delete this article?"
                     class="gf-btn gf-btn-danger"
                   >
                     Delete
@@ -762,6 +799,18 @@ defmodule GallformersWeb.Admin.ArticleLive.Form do
         </div>
 
         <.discard_confirm_modal show={@show_discard_confirm} />
+
+        <.dangerous_delete_modal
+          :if={@article}
+          show={@show_delete_modal}
+          item_type="article"
+          item_name={@article.title}
+          consequences={[
+            "The article content, publication state, and tags will be permanently deleted.",
+            "All images owned by this article will be deleted from storage."
+          ]}
+          confirmation_value={@delete_confirmation}
+        />
       </Layouts.admin_edit_layout>
     </Layouts.admin>
     """

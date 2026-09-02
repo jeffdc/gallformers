@@ -61,6 +61,12 @@ defmodule Gallformers.Keys do
   end
 
   @doc """
+  Gets a key by ID, returning nil if it no longer exists.
+  """
+  @spec get_key_by_id(integer()) :: Key.t() | nil
+  def get_key_by_id(id), do: Repo.get(Key, id)
+
+  @doc """
   Returns the couplet numbers for a key, sorted numerically.
   """
   @spec couplet_numbers(Key.t() | map()) :: [String.t()]

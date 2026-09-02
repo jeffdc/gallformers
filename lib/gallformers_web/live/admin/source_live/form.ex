@@ -42,7 +42,11 @@ defmodule GallformersWeb.Admin.SourceLive.Form do
 
   @impl true
   def mount(_params, session, socket) do
-    {:ok, init_admin_form(socket, session)}
+    {:ok,
+     socket
+     |> init_admin_form(session)
+     |> assign(:show_delete_modal, false)
+     |> assign(:delete_confirmation, "")}
   end
 
   def close_form(socket) do
@@ -64,7 +68,45 @@ defmodule GallformersWeb.Admin.SourceLive.Form do
   def handle_event("save", params, socket), do: handle_save(params, socket)
 
   @impl true
-  def handle_event("delete", params, socket), do: handle_delete(params, socket)
+  def handle_event("delete", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_delete_modal, true)
+     |> assign(:delete_confirmation, "")}
+  end
+
+  @impl true
+  def handle_event("update_delete_confirmation", %{"value" => value}, socket) do
+    {:noreply, assign(socket, :delete_confirmation, value)}
+  end
+
+  @impl true
+  def handle_event("confirm_delete", %{"confirmation" => confirmation}, socket) do
+    selected_source = socket.assigns.source
+
+    case selected_source && Gallformers.Sources.get_source(selected_source.id) do
+      nil ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Source already deleted")
+         |> push_navigate(to: list_path())}
+
+      source when confirmation != source.title ->
+        {:noreply,
+         put_flash(socket, :error, "Title does not match. Type the exact source title.")}
+
+      source ->
+        handle_delete(%{}, assign(socket, :source, source))
+    end
+  end
+
+  @impl true
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_delete_modal, false)
+     |> assign(:delete_confirmation, "")}
+  end
 
   @impl true
   def handle_event(event, params, socket)
@@ -227,7 +269,6 @@ defmodule GallformersWeb.Admin.SourceLive.Form do
                 :if={@mode == :edit}
                 type="button"
                 phx-click="delete"
-                data-confirm="Are you sure you want to delete this source? This will also remove all species-source mappings."
                 class="gf-btn gf-btn-danger"
               >
                 Delete
@@ -244,6 +285,18 @@ defmodule GallformersWeb.Admin.SourceLive.Form do
         />
 
         <.discard_confirm_modal show={@show_discard_confirm} />
+
+        <.dangerous_delete_modal
+          :if={@source}
+          show={@show_delete_modal}
+          item_type="source"
+          item_name={@source.title}
+          consequences={[
+            "Every species-source mapping for this source will be removed.",
+            "The source record and its citation metadata will be permanently deleted."
+          ]}
+          confirmation_value={@delete_confirmation}
+        />
       </Layouts.admin_edit_layout>
     </Layouts.admin>
     """

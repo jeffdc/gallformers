@@ -85,6 +85,41 @@ defmodule GallformersWeb.FormComponentsTest do
     def handle_event("cancel_cascade_delete", _, socket), do: {:noreply, socket}
   end
 
+  defmodule DangerousDeleteTestLive do
+    use Phoenix.LiveView
+
+    def render(assigns) do
+      ~H"""
+      <FormComponents.dangerous_delete_modal
+        show={@show}
+        item_type="gall"
+        item_name="Andricus testus"
+        consequences={[
+          "All host and source associations will be removed.",
+          "All images and range data will be permanently deleted."
+        ]}
+        confirmation_value={@confirmation_value}
+      />
+      """
+    end
+
+    def mount(_params, _session, socket) do
+      {:ok, assign(socket, show: true, confirmation_value: "")}
+    end
+
+    def handle_event("update_delete_confirmation", %{"value" => value}, socket) do
+      {:noreply, assign(socket, confirmation_value: value)}
+    end
+
+    def handle_event("confirm_delete", %{"confirmation" => _}, socket) do
+      {:noreply, assign(socket, show: false)}
+    end
+
+    def handle_event("cancel_delete", _, socket) do
+      {:noreply, assign(socket, show: false)}
+    end
+  end
+
   defmodule GroupedTypeaheadTestLive do
     use Phoenix.LiveView
 
@@ -450,6 +485,28 @@ defmodule GallformersWeb.FormComponentsTest do
       refute html =~ ~s(role="presentation")
       assert html =~ "Brazil"
       assert html =~ "Canada"
+    end
+  end
+
+  describe "dangerous_delete_modal/1" do
+    test "makes permanent impact explicit and requires the exact record name", %{conn: conn} do
+      {:ok, view, html} = live_isolated(conn, DangerousDeleteTestLive)
+
+      assert html =~ "Permanently delete this gall?"
+      assert html =~ "This cannot be undone"
+      assert html =~ "All host and source associations will be removed."
+      assert html =~ "All images and range data will be permanently deleted."
+      assert html =~ "Andricus testus"
+      assert html =~ ~s(id="dangerous-delete-confirmation")
+      assert has_element?(view, "#dangerous-delete-submit[disabled]")
+
+      render_hook(view, "update_delete_confirmation", %{"value" => " Andricus testus "})
+
+      assert has_element?(view, "#dangerous-delete-submit[disabled]")
+
+      render_hook(view, "update_delete_confirmation", %{"value" => "Andricus testus"})
+
+      refute has_element?(view, "#dangerous-delete-submit[disabled]")
     end
   end
 

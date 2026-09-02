@@ -642,6 +642,50 @@ defmodule GallformersWeb.Admin.GallLive.FormTest do
     end
   end
 
+  describe "dangerous delete confirmation" do
+    setup %{conn: conn} do
+      {:ok, conn: setup_admin_session(conn)}
+    end
+
+    test "edit view requires the exact gall name before deletion", %{conn: conn} do
+      gall = require_gall()
+      {:ok, view, _html} = live(conn, ~p"/admin/galls/#{gall.id}")
+
+      render_click(view, "delete")
+
+      assert has_element?(view, "#dangerous-delete-modal", gall.name)
+      assert Gallformers.Species.get_species(gall.id) != nil
+
+      html = render_submit(view, "confirm_delete", %{"confirmation" => " #{gall.name} "})
+
+      assert html =~ "Name does not match"
+      assert Gallformers.Species.get_species(gall.id) != nil
+
+      render_submit(view, "confirm_delete", %{"confirmation" => gall.name})
+
+      refute Gallformers.Species.get_species(gall.id)
+    end
+
+    test "index view requires the exact gall name before deletion", %{conn: conn} do
+      gall = require_gall()
+      {:ok, view, _html} = live(conn, ~p"/admin/galls")
+
+      render_click(view, "delete", %{"id" => Integer.to_string(gall.id)})
+
+      assert has_element?(view, "#dangerous-delete-modal", gall.name)
+      assert Gallformers.Species.get_species(gall.id) != nil
+
+      html = render_submit(view, "confirm_delete", %{"confirmation" => "wrong name"})
+
+      assert html =~ "Name does not match"
+      assert Gallformers.Species.get_species(gall.id) != nil
+
+      render_submit(view, "confirm_delete", %{"confirmation" => gall.name})
+
+      refute Gallformers.Species.get_species(gall.id)
+    end
+  end
+
   describe "Access control" do
     test "page requires admin session", %{conn: _conn} do
       conn_without_admin = build_conn()

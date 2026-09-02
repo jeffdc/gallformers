@@ -330,19 +330,60 @@ defmodule GallformersWeb.Admin.TaxonomyLive.FormTest do
       {:ok, conn: setup_admin_session(conn), family: family, genus: genus, section: section}
     end
 
-    test "section delete shows no cascade impact", %{conn: conn, section: section} do
+    test "section delete shows linked species impact", %{conn: conn, section: section} do
+      {:ok, species} =
+        Repo.insert(%Species{
+          name: "SectionDeleteTestGenus species",
+          taxoncode: "plant",
+          datacomplete: false
+        })
+
+      Taxonomy.link_species_to_taxonomy(species.id, section.id)
       {:ok, view, _html} = live(conn, ~p"/admin/taxonomy/#{section.id}")
 
       view |> element("button", "Delete") |> render_click()
 
       html = render(view)
 
-      # Should show "no dependent data" message
-      assert html =~ "no dependent data"
-      assert html =~ "safely deleted"
+      assert html =~ "1 linked species"
+      assert html =~ "The species themselves will not be deleted"
+      refute html =~ "safely deleted"
+      refute has_element?(view, "form[phx-submit=confirm_cascade_delete]")
 
-      # Should NOT show "This will delete:"
-      refute html =~ "This will delete:"
+      html =
+        render_click(view, "confirm_cascade_delete", %{
+          "confirmation" => "SectionDeleteTestSection"
+        })
+
+      assert html =~ "cannot be deleted until its linked species are reclassified"
+      assert Repo.get(TaxonomySchema, section.id) != nil
+    end
+
+    test "section impact refreshes when a species is linked after the modal opens", %{
+      conn: conn,
+      section: section
+    } do
+      {:ok, view, _html} = live(conn, ~p"/admin/taxonomy/#{section.id}")
+      view |> element("button", "Delete") |> render_click()
+
+      assert has_element?(view, "form[phx-submit=confirm_cascade_delete]")
+
+      {:ok, species} =
+        Repo.insert(%Species{
+          name: "SectionDeleteTestGenus late",
+          taxoncode: "plant",
+          datacomplete: false
+        })
+
+      Taxonomy.link_species_to_taxonomy(species.id, section.id)
+
+      render_click(view, "confirm_cascade_delete", %{
+        "confirmation" => "SectionDeleteTestSection"
+      })
+
+      assert has_element?(view, "#cascade-delete-modal", "1 linked species")
+      refute has_element?(view, "form[phx-submit=confirm_cascade_delete]")
+      assert Repo.get(TaxonomySchema, section.id) != nil
     end
 
     test "section delete only deletes section", %{

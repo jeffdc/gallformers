@@ -12,6 +12,8 @@ defmodule GallformersWeb.Admin.KeyLive.Index do
       socket
       |> assign(:current_user, session["current_user"])
       |> assign(:page_title, "Keys")
+      |> assign(:delete_key, nil)
+      |> assign(:delete_confirmation, "")
       |> load_keys()
 
     {:ok, socket}
@@ -33,16 +35,55 @@ defmodule GallformersWeb.Admin.KeyLive.Index do
   def handle_event("delete", %{"id" => id}, socket) do
     key = Keys.get_key!(String.to_integer(id))
 
-    case Keys.delete_key(key) do
-      {:ok, _} ->
+    {:noreply,
+     socket
+     |> assign(:delete_key, key)
+     |> assign(:delete_confirmation, "")}
+  end
+
+  @impl true
+  def handle_event("update_delete_confirmation", %{"value" => value}, socket) do
+    {:noreply, assign(socket, :delete_confirmation, value)}
+  end
+
+  @impl true
+  def handle_event("confirm_delete", %{"confirmation" => confirmation}, socket) do
+    selected_key = socket.assigns.delete_key
+
+    case selected_key && Keys.get_key_by_id(selected_key.id) do
+      nil ->
         {:noreply,
          socket
-         |> put_flash(:info, "Key deleted successfully")
+         |> assign(:delete_key, nil)
+         |> assign(:delete_confirmation, "")
+         |> put_flash(:info, "Key already deleted")
          |> load_keys()}
 
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to delete key")}
+      key when confirmation != key.title ->
+        {:noreply, put_flash(socket, :error, "Title does not match. Type the exact key title.")}
+
+      key ->
+        case Keys.delete_key(key) do
+          {:ok, _} ->
+            {:noreply,
+             socket
+             |> assign(:delete_key, nil)
+             |> assign(:delete_confirmation, "")
+             |> put_flash(:info, "Key deleted successfully")
+             |> load_keys()}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Failed to delete key")}
+        end
     end
+  end
+
+  @impl true
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:delete_key, nil)
+     |> assign(:delete_confirmation, "")}
   end
 
   @impl true
@@ -108,7 +149,6 @@ defmodule GallformersWeb.Admin.KeyLive.Index do
                         variant="danger"
                         phx-click="delete"
                         phx-value-id={key.id}
-                        confirm="Are you sure you want to delete this key?"
                       />
                     </.table_actions>
                   </td>
@@ -119,6 +159,18 @@ defmodule GallformersWeb.Admin.KeyLive.Index do
         </div>
 
         <p class="mt-2 text-sm text-gray-500">{length(@keys)} key(s)</p>
+
+        <.dangerous_delete_modal
+          :if={@delete_key}
+          show
+          item_type="identification key"
+          item_name={@delete_key.title}
+          consequences={[
+            "The complete identification key and all of its couplets will be permanently deleted.",
+            "All images owned by this key will be deleted from storage."
+          ]}
+          confirmation_value={@delete_confirmation}
+        />
       </div>
     </Layouts.admin>
     """

@@ -1004,6 +1004,60 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
     end
   end
 
+  describe "dangerous delete confirmation" do
+    setup %{conn: conn} do
+      {:ok, conn: setup_admin_session(conn)}
+    end
+
+    test "index remains live when the species topic broadcasts an update", %{conn: conn} do
+      host = require_host()
+      {:ok, view, _html} = live(conn, ~p"/admin/hosts")
+
+      send(view.pid, {:species_updated, %{id: host.id}})
+
+      assert render(view) =~ host.name
+    end
+
+    test "edit view requires the exact host name before deletion", %{conn: conn} do
+      host = require_host()
+      {:ok, view, _html} = live(conn, ~p"/admin/hosts/#{host.id}")
+
+      render_click(view, "delete")
+
+      assert has_element?(view, "#dangerous-delete-modal", host.name)
+      assert Gallformers.Species.get_species(host.id) != nil
+
+      html = render_submit(view, "confirm_delete", %{"confirmation" => "wrong name"})
+
+      assert html =~ "Name does not match"
+      assert Gallformers.Species.get_species(host.id) != nil
+
+      render_submit(view, "confirm_delete", %{"confirmation" => host.name})
+
+      assert_redirect(view, "/admin/hosts")
+      refute Gallformers.Species.get_species(host.id)
+    end
+
+    test "index view requires the exact host name before deletion", %{conn: conn} do
+      host = require_host()
+      {:ok, view, _html} = live(conn, ~p"/admin/hosts")
+
+      render_click(view, "delete", %{"id" => Integer.to_string(host.id)})
+
+      assert has_element?(view, "#dangerous-delete-modal", host.name)
+      assert Gallformers.Species.get_species(host.id) != nil
+
+      html = render_submit(view, "confirm_delete", %{"confirmation" => "wrong name"})
+
+      assert html =~ "Name does not match"
+      assert Gallformers.Species.get_species(host.id) != nil
+
+      render_submit(view, "confirm_delete", %{"confirmation" => host.name})
+
+      refute Gallformers.Species.get_species(host.id)
+    end
+  end
+
   describe "Access control" do
     test "page requires admin session", %{conn: _conn} do
       conn_without_admin = build_conn()
