@@ -1060,6 +1060,10 @@ a.gf-btn-primary:hover {
   transition: background-color 0.2s ease-in-out;
 }
 
+.peer:checked + .gf-toggle-track {
+  background-color: #661419;
+}
+
 .gf-toggle-track::after {
   content: '';
   position: absolute;

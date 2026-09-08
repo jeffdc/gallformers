@@ -55,6 +55,7 @@ defmodule Gallformers.Galls do
 
   defdelegate filter_galls(filters \\ %{}), to: Identification
   defdelegate count_filtered_galls(filters \\ %{}), to: Identification
+  defdelegate filter_gall_species_ids(filters \\ %{}), to: Identification
   defdelegate get_hosts_for_filters(filters \\ %{}), to: Identification
   defdelegate get_filter_options(), to: Identification
   defdelegate get_summary_data(gall_ids), to: Identification

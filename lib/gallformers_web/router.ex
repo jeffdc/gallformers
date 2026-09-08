@@ -172,6 +172,9 @@ defmodule GallformersWeb.Router do
     get "/privacy", PrivacyController, :show
     get "/filterguide", FilterGuideController, :show
 
+    # Phenology CSV export (companion to the public /phenology explorer)
+    get "/phenology/export.csv", PhenologyController, :export
+
     live_session :public,
       on_mount: [
         {GallformersWeb.Live.UserAuth, :fetch_current_user},
@@ -188,6 +191,7 @@ defmodule GallformersWeb.Router do
       live "/galls", GallsBrowseLive
       live "/hosts", HostsBrowseLive
       live "/places", PlacesBrowseLive
+      live "/phenology", PhenologyLive
 
       # ID Tool
       live "/id", IDLive

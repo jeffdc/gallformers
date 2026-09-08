@@ -376,14 +376,12 @@ defmodule GallformersWeb.Layouts do
 
         <%!-- Navigation Links - right side (desktop) --%>
         <nav class="hidden sm:flex items-center gap-x-4" aria-label="Footer navigation">
-          <a
-            href="https://megachile.shinyapps.io/doycalc/"
-            target="_blank"
-            rel="noopener noreferrer"
+          <.link
+            navigate={~p"/phenology"}
             class="text-base font-medium hover:underline"
           >
             Phenology Tool
-          </a>
+          </.link>
           <a
             href="https://www.patreon.com/gallformers"
             target="_blank"
@@ -454,14 +452,12 @@ defmodule GallformersWeb.Layouts do
             Login
           </a>
         <% end %>
-        <a
-          href="https://megachile.shinyapps.io/doycalc/"
-          target="_blank"
-          rel="noopener noreferrer"
+        <.link
+          navigate={~p"/phenology"}
           class="block text-base font-medium hover:underline py-1 px-4"
         >
           Phenology Tool
-        </a>
+        </.link>
         <a
           href="https://www.patreon.com/gallformers"
           target="_blank"

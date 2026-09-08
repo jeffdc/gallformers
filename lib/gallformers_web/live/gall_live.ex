@@ -11,6 +11,7 @@ defmodule GallformersWeb.GallLive do
     Galls,
     Glossaries,
     Markdown,
+    Phenology,
     Places,
     Ranges,
     Sources,
@@ -20,6 +21,7 @@ defmodule GallformersWeb.GallLive do
 
   alias Gallformers.Images
   alias Gallformers.Images.Image
+  alias GallformersWeb.PhenologyComponents
   alias GallformersWeb.SEO
 
   @aliases_page_size 10
@@ -157,6 +159,13 @@ defmodule GallformersWeb.GallLive do
            range_bounds: range_bounds,
            only_placeholder_hosts?: only_placeholder_hosts?,
            related_galls: related_galls,
+           phenology_observations: nil,
+           phenology_open: false,
+           phenology_predictions: [],
+           phenology_points_json: "[]",
+           phenology_sources: %{},
+           phenology_notice: "Enter a latitude to estimate timing (25–55°N).",
+           phenology_target_lat: nil,
            common_names: common_names,
            scientific_aliases: scientific_aliases,
            gallformers_code: gallformers_code,
@@ -209,6 +218,32 @@ defmodule GallformersWeb.GallLive do
   end
 
   defp get_detachable_display(value), do: Map.get(@detachable_values, value, "")
+
+  defp update_phenology_predictions(socket) do
+    result =
+      case Float.parse(to_string(socket.assigns.phenology_target_lat || "")) do
+        {latitude, ""} ->
+          Phenology.predict(
+            socket.assigns.phenology_observations || [],
+            latitude,
+            [:onset, :emergence, :rearing]
+          )
+
+        _ ->
+          {:error, :missing_latitude}
+      end
+
+    {predictions, notice} =
+      case result do
+        {:ok, []} -> {[], "No usable evidence for these timing estimates."}
+        {:ok, predictions} -> {predictions, nil}
+        {:error, :missing_latitude} -> {[], "Enter a latitude to estimate timing (25–55°N)."}
+        {:error, :unsupported_latitude} -> {[], "Predictions currently support 25–55°N."}
+      end
+
+    assign(socket, phenology_predictions: predictions, phenology_notice: notice)
+  end
+
   defp format_fields(fields), do: Enum.map_join(fields, ", ", & &1.field)
 
   # Parses generation qualifier from species name and fetches glossary definition.
@@ -227,6 +262,32 @@ defmodule GallformersWeb.GallLive do
   end
 
   @impl true
+  def handle_event("set_phenology_lat", %{"target_lat" => value}, socket) do
+    socket = assign(socket, phenology_target_lat: value)
+    {:noreply, update_phenology_predictions(socket)}
+  end
+
+  def handle_event("toggle_phenology", _params, socket) do
+    socket =
+      if socket.assigns.phenology_observations do
+        socket
+      else
+        observations = Phenology.search_observations(%{species_id: socket.assigns.gall.id})
+
+        assign(socket,
+          phenology_observations: observations,
+          phenology_points_json:
+            observations |> GallformersWeb.PhenologyChartData.points() |> Jason.encode!(),
+          phenology_sources: Enum.frequencies_by(observations, & &1.source_type)
+        )
+      end
+
+    {:noreply,
+     socket
+     |> assign(phenology_open: not socket.assigns.phenology_open)
+     |> update_phenology_predictions()}
+  end
+
   def handle_event("dismiss_notes_alert", _params, socket) do
     {:noreply, assign(socket, notes_alert_dismissed: true)}
   end
@@ -584,6 +645,19 @@ defmodule GallformersWeb.GallLive do
                 current_user={@current_user}
               />
             </div>
+          </div>
+
+          <div class="my-4">
+            <PhenologyComponents.phenology_summary
+              species_id={@gall.id}
+              open={@phenology_open}
+              count={length(@phenology_observations || [])}
+              predictions={@phenology_predictions}
+              notice={@phenology_notice}
+              target_lat={@phenology_target_lat}
+              points_json={@phenology_points_json}
+              sources={@phenology_sources}
+            />
           </div>
 
           <hr class="border-gray-200 my-4" />
