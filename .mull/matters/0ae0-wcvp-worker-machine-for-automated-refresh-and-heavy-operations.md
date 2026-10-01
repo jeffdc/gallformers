@@ -2,7 +2,7 @@
 status: raw
 created: 2026-03-17
 updated: 2026-04-25
-epic: postgres
+epic: platform
 ---
 
 # WCVP worker machine for automated refresh and heavy operations

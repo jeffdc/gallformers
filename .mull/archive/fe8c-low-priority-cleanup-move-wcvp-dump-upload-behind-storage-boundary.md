@@ -1,9 +1,9 @@
 ---
-status: refined
+status: dropped
 tags: [low-priority]
 effort: small
 created: 2026-04-28
-updated: 2026-08-12
+updated: 2026-09-13
 epic: source-ingestion
 ---
 

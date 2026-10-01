@@ -1,8 +1,8 @@
 ---
 status: planned
 created: 2026-04-21
-updated: 2026-04-25
-epic: ingestion
+updated: 2026-09-13
+epic: source-ingestion
 relates: [fa48]
 blocks: [7fda]
 parent: 7fda
@@ -109,3 +109,14 @@ The exact UI shell can adapt during implementation, but the information architec
 ## Deliverable
 
 A production source-ingestion review workflow that matches the direction of `fa48` and `7fda`, updated for `93b8`: persisted queue, explicit duplicate-review state and actions, persisted detail page, source-gated gall review, gall-level prose and trait evidence, and completion based on resolving all ingestion-species items rather than on local artifact files.
+
+
+## Review requirements retained from ce28 and db32 consolidation
+
+ce28 and db32 are being closed with unfinished work assigned to active owners. This section supersedes conflicting old a80e/PoC payload assumptions: consume the current versioned Python producer bundle, following the revised fa48 design and 7fda production boundary rather than introducing another extraction schema.
+
+Implement persisted, evidence-aware decisions: show exact source context, verifier status, uncertainty and conflicting values; approve source metadata separately from biological facts; support accept, edit with evidence preserved/replaced, reject with reason and insufficient evidence; and make entity mapping/create decisions explicit through normal domain APIs. No confidence-based auto-writeback, silent synonym assertion or silent overwrite of curator conclusions. Persist review progress and make reviewer edits/rejections usable by the 9314 evaluation process without inventing a permanent domain store of every unaccepted claim.
+
+Wire approved domain changes to 7fda's accepted-assertion/source-evidence boundary and explicit final-markdown publication using the existing SourcePublisher operation. Keep private source/bundle/intermediate artifacts private; only intentionally approved final markdown gets a public sources/ path. Workflow completion must not conceal unresolved approval or publication failures. Deployment/access verification is owned by 7fda, not certified by db32's closure.
+
+The separate gall/shared-taxon admin-safety design remains subject to 4dcd/2cb2 approval. Preserve duplicate-first and source-first review gating while rebasing its implementation on current contracts.

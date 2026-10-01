@@ -1,8 +1,9 @@
 ---
 status: raw
 created: 2026-03-17
-updated: 2026-04-25
+updated: 2026-09-13
 epic: postgres
+blocks: [1121]
 ---
 
 # Preview Postgres setup with WCVP data

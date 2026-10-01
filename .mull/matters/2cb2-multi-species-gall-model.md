@@ -1,10 +1,10 @@
 ---
 status: raw
 created: 2026-08-12
-updated: 2026-08-14
+updated: 2026-09-14
 epic: taxonomy
-relates: [8ba0]
-blocks: [1832, 3e8c, 0a58]
+relates: [8ba0, 86e7, bf97]
+blocks: [1832, 3e8c, 0a58, e1d2]
 needs: [d108, e2cb]
 ---
 
@@ -13,6 +13,18 @@ needs: [d108, e2cb]
 ## Status
 
 Draft design for owner review. The design sections were developed collaboratively, but the matter is **not approved or planned** until Jeff reads and approves this document in full.
+
+## Critical product risk: administrator understanding
+
+**Separating Species from Gall changes the meaning and reach of ordinary admin edits. Treat this as a release-blocking product risk, not a training/documentation footnote.** Jeff explicitly called for this risk to be strongly highlighted during the September 10 planning discussion.
+
+Today, an editor can reasonably think they are editing one gall record. After separation, changing a shared organism's name, classification, or identity can affect several gall records. Conversely, changing which organism is associated with one gall must not rename or reclassify that organism everywhere.
+
+Primary risks include accidental shared-taxon edits, duplicate organism records created for different gall forms, confusing gall labels with scientific names, treating a changed determination as a taxon rename, and mistaking a curator's accepted uncertain association for a confirmed biological identity.
+
+Proposed release gate, pending owner approval: representative admins must be able to create/edit a gall, reuse an existing organism, handle an unresolved organism, change one gall's association, and recognize the wider impact of editing a shared organism. The workflow must make editing scope and affected galls clear before saving. Training alone is not sufficient mitigation.
+
+The reduced-foundation scope discussed in matter `4dcd` is a proposal, not approval of this draft. Any scope reduction must preserve a safe, complete admin workflow and accurate treatment of existing records; it must not hide the entity distinction behind silent cascading edits.
 
 ## TL;DR — Product impact
 
@@ -155,36 +167,7 @@ The foundational migration preserves one gall record per current row and perform
 
 ## Gall labels and organism names
 
-A gall has exactly one nonblank label (maximum 500 characters), unique after trimming and case folding. Gall ID remains stable identity, but duplicate labels are rejected because two indistinguishable records should be one gall and two distinguishable records need a user-visible discriminator. The existing database already enforces unique species-backed gall names and the production snapshot has zero case-folded duplicates, so uniqueness preserves current behavior rather than creating a migration conflict.
-
-### Structured Gall Label Builder
-
-All gall creation and renaming uses a Gall Label Builder; the ordinary editor does not expose an unrestricted label field. The builder stores the rendered label and a structured recipe describing its source components.
-
-Two base modes are supported:
-
-1. **Taxon-based:** use the accepted name of the primary named species or the display label of a provisional species concept. The base excludes nomenclatural authorship.
-2. **Descriptive:** when no suitable species-level primary exists, adapt the current undescribed-gall workflow: select a known genus or family, select a linked host, and enter a short normalized descriptive phrase. This produces a gall label and Gallformers Code without fabricating a taxonomic species name.
-
-Editors add only the discriminators necessary to distinguish the record. Each discriminator references structured gall data rather than copying it into a free-form field. Initial builder components are:
-
-- reproductive generation;
-- seasonal generation when that dimension is structured;
-- one or more linked hosts;
-- plant part;
-- season;
-- gall form;
-- lifecycle/rust stage when that dimension is structured.
-
-Components render through code-defined templates, including `(agamic)`, `(sexgen)`, `(on Pyrus)`, and other reviewed conventions. The builder validates that referenced hosts and trait values are already attached to the gall, presents a live preview, and checks case-insensitive uniqueness before save. A collision blocks save and directs the editor either to the existing record or to add a supported discriminator.
-
-A genuinely unmodeled distinction uses an exceptional editorial qualifier, not a general label textbox. It requires a rationale, is visibly marked in admin as unstructured, and enters a review queue so recurring concepts can become structured fields or builder components. This escape hatch handles novel biology without making free-form parentheticals the default data model.
-
-The recipe is persisted. Changing a primary taxon or structured value used by the recipe requires label regeneration in the same reviewed operation; taxon rename/reclassification previews all affected gall labels and blocks on uniqueness conflicts. Probable or possible primary inducers may supply a taxon-based label, but confidence remains visibly displayed and the label is not evidence of confirmation.
-
-Migration preserves every current full label. Known naming patterns are converted to structured recipes. Labels that cannot be parsed without biological judgment become audited legacy-exception recipes and enter the same review queue; migration never rewrites them heuristically.
-
-A gall label has no taxonomic aliases or nomenclatural authorship.
+The gall name-builder proposal now lives in [`86e7` — Structured gall name builder](./86e7-structured-gall-name-builder.md). That matter owns name formation, structured distinctions, preview/uniqueness behavior, exceptional names, regeneration, and preservation of existing names. Its details remain Raw for owner review; this matter retains overall model, migration, and integration responsibilities.
 
 ### Taxon naming
 
@@ -356,7 +339,7 @@ Lookalikes are visibly labeled as non-gall identification aids and excluded from
 
 ## Admin experience
 
-The gall editor manages gall-owned fields. Creation and rename operations use the structured Gall Label Builder. Structured fields are selected before label components, the preview updates immediately, and the rendered label is read-only outside the builder. Exceptional editorial qualifiers require rationale and the elevated override action described above.
+The gall editor manages gall-owned fields. Creation and rename use the name-builder workflow described in [`86e7` — Structured gall name builder](./86e7-structured-gall-name-builder.md); review its editing and exception behavior there.
 
 A dedicated organism-association editor:
 
@@ -369,7 +352,7 @@ A dedicated organism-association editor:
 - optionally scopes the association to existing gall hosts;
 - previews the label-recipe effect before save.
 
-Changing a primary inducer or any structured value referenced by the label recipe requires regeneration and uniqueness validation. Taxon names, authorship, synonyms, common names, iNaturalist mapping, and placement remain in taxonomy/species workflows.
+Changes to associations or structured values used in gall names must integrate with the reviewed name-builder contract in [`86e7` — Structured gall name builder](./86e7-structured-gall-name-builder.md). Taxon names, authorship, synonyms, common names, iNaturalist mapping, and placement remain in taxonomy/species workflows.
 
 ## API v2 cutover
 
@@ -509,3 +492,12 @@ Final repository verification requires `mix compile --warnings-as-errors`, focus
 - Luz and Mendonça (2019), “Guilds in Insect Galls: Who is Who,” motivates distinguishing overlapping guild dimensions including inquilines, cecidophages, successors, predators, and parasitoids: https://doi.org/10.1653/024.102.0133
 
 
+## Scope reduction proposal under review — 2026-09-10
+
+Jeff requested a smaller foundation that unlocks ingestion and other model-dependent work, with strong emphasis on admin-user risk. Matter 4dcd records the proposed keep/defer boundaries. It would retain independent gall/organism identity, accurate associations and unresolved identity, safe end-to-end editing and cutover, preservation of all existing data, and a working accepted-assertion provenance path. It proposes revisiting the full d108/e2cb prerequisites and deferring expanded community, discovery, and integration features where they are not needed for correct existing behavior.
+
+This is NOT approval of the reduced scope, and the detailed design and dependency metadata below remain unreconciled. The critical administrator-understanding risk is highlighted near the top of this matter. No implementation should assume these proposals supersede prior decisions until Jeff approves the reconciliation.
+
+## Name-builder extraction — 2026-09-14
+
+Jeff identified the name builder as an important feature during product review. Its existing proposal was extracted to [`86e7` — Structured gall name builder](./86e7-structured-gall-name-builder.md) without approving or redesigning it. The earlier suggestion to defer it is not an agreed scope decision.

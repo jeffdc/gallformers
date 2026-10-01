@@ -1,7 +1,7 @@
 ---
-status: raw
+status: done
 created: 2026-05-09
-updated: 2026-05-09
+updated: 2026-09-13
 epic: source-ingestion
 ---
 
@@ -411,3 +411,18 @@ Mitigations (all mapped to specific stages above):
 ## Relationship to existing matters
 
 - **7c2b** (Decompose data_extract into multi-pass extraction pipeline) — narrower; addresses the current single-call extraction stage. This matter (greenfield synthesis) supersedes 7c2b's scope if pursued. Decide whether to retire 7c2b or keep it as the incremental path.
+
+
+## Closure — superseded synthesis; unfinished requirements transferred
+
+Closed as superseded with Jeff's authorization, after saving and verifying the remaining requirements in these active owners. This does not declare the synthesis fully implemented.
+
+- 9314: current producer quality roadmap, representative 30+ document gold evaluation, calibration/regression gates, evidence and domain failure cases, metadata/taxonomy reconciliation, measured cost/latency, and producer hardening. Old port-to-Elixir instructions, illustrative contracts/model defaults and auto-accept thresholds are superseded, not new work to implement.
+- 4fef: page profiling, scanned/mixed-document OCR, extraction-quality signals, BHL/source-OCR comparison, page-level caching and traceable source evidence.
+- 7fda: existing-bundle consumption, durable production orchestration, duplicate/source resolution, human-approved accepted-claim provenance/writeback, storage release verification and publication.
+- fa48: evidence/conflict/uncertainty-aware reviewer design, explicit decisions and domain/admin safety.
+- 7c67: persisted implementation of that review workflow, decision feedback for evaluation, and integration with approved writeback/publication.
+- 7a83: the single-source trait-vocabulary export and CI drift guard; no duplicate exporter.
+- db6f: processing and review of ALL existing Sources, preserving curator work and accepted evidence. Neither the producer's iteration corpus nor a gold-set evaluation completes the backscan.
+
+Continue from the existing Python producer/bundle baseline developed under c744. This historical synthesis is no longer an active prerequisite or an instruction to recreate completed work. Only accepted claims enter queryable domain provenance; no confidence threshold authorizes automatic production writes. Taxonomy separation remains proposed, not approved, and this consolidation does not start implementation or production batch processing.

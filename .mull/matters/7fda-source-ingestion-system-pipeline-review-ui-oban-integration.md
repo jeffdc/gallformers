@@ -2,8 +2,8 @@
 status: planned
 tags: [design]
 created: 2026-03-04
-updated: 2026-04-25
-epic: ingestion
+updated: 2026-09-13
+epic: source-ingestion
 relates: [fa48]
 needs: [7c67]
 ---
@@ -254,3 +254,34 @@ Update as implementation lands:
 ## Summary
 
 `7fda` is no longer "wrap the Python PoC and get it onto main." The repo already has the PoC. The remaining work is to build the real, persisted, Elixir-native ingestion system on top of Oban and Postgres, with explicit duplicate signals, explicit duplicate-review workflow, and ingestion-owned artifact/state semantics throughout.
+
+
+## Consolidation of db32 and ce28 — current production responsibilities
+
+Jeff authorized preserving the remaining requirements in their active owners and closing db32 and ce28. This section supersedes conflicting architecture, storage, and release assumptions earlier in this matter; it does not authorize implementation or approve the proposed taxonomy foundation.
+
+### Current boundary
+
+The versioned Python producer bundle in services/source-ingestion/ is the existing baseline (developed under c744), not work to recreate or port wholesale to Elixir. Elixir owns durable production orchestration through Oban, persisted review state, authorization, source/entity resolution, accepted-claim writeback, and publication. Python must not write production domain records. No persistent Python service or idle GPU is required by the inherited design. Reuse current schemas and implementations; do not revive ce28's illustrative JSON or obsolete stage/file layout as a second contract.
+
+### Remaining storage release gate inherited from db32
+
+The repository has the private/public storage split and SourcePublisher.publish_markdown/2; deployment was NOT verified by the portfolio audit. Before production ingestion/publication is released, record deployment evidence that:
+- gallformers-private exists with all four S3 public-access-block settings enabled and no policy granting public access.
+- Application configuration and IAM permit the required private read/write/list/delete operations; private originals and intermediate artifacts cannot be fetched anonymously.
+- Incomplete multipart uploads expire after seven days; this is not an authorization for unrelated object-retention changes.
+- Input documents, raw/normalized text, manifests, review bundles and working/debug artifacts are stored privately under the ingestion-owned namespace. Preserve the existing source-ingestions/{ingestion_id}/... boundary; map current bundle artifacts through existing APIs rather than resurrecting old producer filenames. Preserve the original document and immutable evidence artifacts needed to audit accepted claims; the earlier statement that original uploads are unnecessary is superseded for this workflow.
+- Approved final markdown alone is intentionally published to the public sources/{source_id}/{snake_cased_truncated_title}.md path through the existing publisher/path builder. Copy bytes without a second normalization pass; verify deterministic republishing and explicit failure when the private source artifact is missing. Do not publish arbitrary pipeline artifacts or invent public URLs for them.
+
+Exercise the actual deployed private/public path with the application's credentials and anonymous access checks before recording this gate as satisfied. Repository declarations alone are insufficient. db32 closure transfers this outstanding gate here; it does not certify deployed infrastructure.
+
+### Remaining production integration inherited from ce28
+
+- Consume and validate the existing versioned producer bundle, manifest/hashes and evidence references. Resolve duplicates and the existing/new Source before biological review; preserve auditable source text, names as written, and conflicting evidence rather than silently normalizing it away.
+- Humans explicitly approve database changes; extraction confidence or verifier status never grants an automatic writeback shortcut. Only accepted assertions enter the domain provenance queries, with specific supporting sources/evidence. Private candidate/review artifacts are not a mandate for a database of every rejected or unaccepted claim.
+- Support both directions of accepted provenance: why Gall X has Host Y, and all accepted host assertions attributable to Source Z. Broad legacy source links cannot be promoted into invented per-fact support.
+- Integrate the persisted reviewer (7c67, designed in fa48), domain writeback, and explicit final-markdown publication. Prove one real paper can reach reviewed accepted data and its published artifact without losing source evidence or exposing intermediates. Preserve curator work and avoid duplicate assertions/evidence when retrying or reprocessing.
+- Own durable retry/status/operator behavior, bounded provider concurrency, failure reporting, selected-stage rerun integration, and recording costs/latency/config provenance. Producer-side evaluation and hardening belong in 9314; OCR belongs in 4fef; vocabulary drift prevention belongs in 7a83.
+- Full existing-source processing is the separately tracked db6f campaign, not satisfied by a successful sample or the producer's iteration corpus.
+
+Taxonomy separation remains proposed, not approved. If chosen, establish the bounded gall/taxon/accepted-provenance foundation and its admin-safety gate before substantial production approval/writeback integration. This consolidation does not make unrelated taxonomy expansion a prerequisite.

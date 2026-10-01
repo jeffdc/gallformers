@@ -1,7 +1,7 @@
 ---
-status: raw
+status: dropped
 created: 2026-02-13
-updated: 2026-02-19
+updated: 2026-09-13
 epic: idea-bucket
 relates: [9737]
 ---

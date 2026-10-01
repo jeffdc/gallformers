@@ -1,7 +1,7 @@
 ---
-status: raw
+status: dropped
 created: 2026-02-19
-updated: 2026-02-19
+updated: 2026-09-13
 epic: external
 relates: [29dc, 2a27, 5d49]
 docket: true

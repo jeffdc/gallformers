@@ -1,7 +1,7 @@
 ---
-status: planned
+status: done
 created: 2026-04-25
-updated: 2026-04-25
+updated: 2026-09-13
 epic: ingestion
 parent: 7fda
 ---
@@ -241,3 +241,14 @@ The following storage and ingestion pieces already exist and should be refactore
 - publication copies final markdown from private pipeline storage to the public `sources/` namespace without a second normalization pass
 - the application storage API clearly distinguishes private pipeline artifacts from public published-source artifacts
 - the implementation supports v1 markdown publication without preventing future public source derivatives from being added under `sources/`
+
+
+## Closure — implemented storage boundary; remaining release work transferred
+
+Closed with Jeff's authorization after the remaining requirements were saved and verified in active owners. This is not a claim that deployment or the end-to-end publication workflow has been verified.
+
+- 7fda now owns the explicit deployed-bucket/IAM/application configuration gate, four public-access-block settings, anonymous-access checks, seven-day incomplete-upload lifecycle verification, private artifact/original retention boundary, and a real approved-markdown publication exercise.
+- 7fda owns production writeback/publication integration; 7c67 owns the persisted reviewer path that invokes it. Both explicitly reuse the implemented storage APIs and SourcePublisher rather than rebuild db32.
+- The public path and byte-for-byte copy/idempotent publication requirements are retained in 7fda. Arbitrary pipeline artifacts remain private.
+
+The storage implementation is the delivered portion; these active matters are now the source of truth for outstanding release and integration acceptance. Do not interpret this closure as proof that gallformers-private is deployed.

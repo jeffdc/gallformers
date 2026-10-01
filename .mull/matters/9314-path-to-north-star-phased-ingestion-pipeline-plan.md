@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-05-10
-updated: 2026-05-15
+updated: 2026-09-13
 epic: source-ingestion
 relates: [4fef]
 ---
@@ -402,3 +402,30 @@ A full pass over the reviewer experience for beta quality. Detailed scope deferr
 The pipeline cannot go to beta until this phase is complete.
 
 **Human test**: a beta user can submit a paper, review the extraction including per-field evidence quotes and verifier status, and approve it into the production tables without confusion or hand-holding.
+
+
+## Current scope after retiring ce28
+
+Jeff authorized consolidating the remaining synthesis requirements here and in the execution owners below, then closing ce28 as superseded. This section supersedes the old phase sequencing, port-to-Elixir mandate, illustrative schemas, model defaults and historical current-state claims above. They are design history, not a pending implementation checklist. Continue from the existing versioned Python producer bundle under services/source-ingestion/ (c744 baseline); do not rebuild completed extraction/sectionization/configuration work.
+
+### Remaining producer quality and evaluation outcomes
+
+- Establish a representative labeled gold corpus before choosing new prompt/model defaults: preserve ce28's target of at least 30 documents, covering approximately 10 modern born-digital papers, 10 scanned old papers, 5 table-heavy papers, and 5 long monographs/taxonomic treatments. This replaces the smaller historical sanity-set target as the full evaluation goal. The four-paper iteration corpus is not this gold set and is not the ALL-source backscan.
+- Label metadata; gall-maker identity, authority/rank, names as written, aliases/common names and taxonomic context; explicit host relationships; gall traits and prose; exact supporting page/block/span evidence; and facts on which the extractor should abstain. Include OCR-damaged names, synonyms, unnamed makers, multiple hosts, alternate generations, keys, plates, adult-morphology traps and bibliography contamination.
+- Measure metadata accuracy, association/host/trait precision and recall, evidence support, unsupported/hallucinated facts, abstention quality, gall-versus-maker confusion, reviewer edits/rejections, cost per paper/page and latency. Compare configurations on the same source artifacts and labels, not on output volume.
+- Implement calibration measurement and regression reporting for model/prompt/schema changes. Calibration drift is a release gate: do not ship worse calibration merely because average accuracy increased. Define measurement/acceptance criteria from evidence rather than treating model self-confidence as ground truth. Track OCR quality, sample agreement, verifier support and cross-source disagreement separately where available.
+- Preserve source-grounded extraction: closed-set evidence selection and programmatic quote/location validation against immutable source text, raw-to-normalized span mapping, source names retained independently of normalization suggestions, bibliography exclusion, no adult-trait leakage, no proximity-only host inference, and conflicts rather than silent reconciliation. Audit the existing implementation first and close measured gaps, not recreate the pipeline. ce28's fuzzy-match threshold is historical, not permission to call a plausible quote exact evidence.
+- Preserve different-family independent claim verification and focused evidence-bound extraction. Evaluate hard table/column, caption/plate, long-document and multi-association cases; use measured evidence to decide any extraction/retrieval improvements. Named providers/models, N=3 sampling policies, and old cost estimates are hypotheses or historical choices, not new frozen defaults.
+- Complete measured producer hardening: provider fallback, bounded timeouts/retries, expensive-work caching keyed by content/config/prompt/schema/model identity, selected-stage resumability and versioned immutable manifests/artifacts with warnings, cost and timing. Reuse what already exists; identify remaining failure cases through real runs.
+- Retain DOI/title metadata verification and competing metadata claims where needed, suggestion-only taxonomic reconciliation, and evidence-backed controlled-vocabulary mapping. External taxonomic authority/precedence, tolerable recall and cost ceilings remain explicit decisions to settle through evaluation rather than silently treating GBIF or Catalogue of Life as accepted Gallformers taxonomy.
+
+### Ownership and decision boundaries
+
+- 4fef owns profiling, scanned/mixed-page OCR, extraction-quality signals and BHL handling.
+- 7a83 owns vocabulary export and its schema/prompt drift guard; do not build another independent enum source here.
+- fa48 owns revised reviewer design; 7c67 implements persisted evidence-aware review and usable evaluation feedback from reviewer decisions.
+- 7fda owns bundle import, durable production orchestration, accepted-claim provenance/writeback, storage deployment verification and final publication. It is not a mandate to port the producer into Elixir.
+- db6f owns completion across ALL existing sources. A gold set, beta demonstration or completed machine extraction is not completion of that campaign.
+
+Human approval remains mandatory. ce28's proposed automatic-accept thresholds are explicitly retired; neither repeated claims nor high confidence bypass review. Accepted-only domain provenance does not require storing every unaccepted claim in the domain database. This update preserves requirements and ownership, not approval to start implementation or finalize the proposed taxonomy foundation.
+

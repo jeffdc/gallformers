@@ -1,8 +1,8 @@
 ---
-status: planned
+status: done
 tags: [design]
 created: 2026-04-09
-updated: 2026-04-09
+updated: 2026-09-13
 epic: gall-traits
 ---
 

@@ -1,9 +1,10 @@
 ---
-status: planned
+status: active
 created: 2026-03-03
-updated: 2026-05-15
+updated: 2026-09-13
 epic: cynipid
 relates: [67c9]
+blocks: [1121]
 ---
 
 # Genus-level host associations
@@ -179,4 +180,3 @@ User-reported regression: galls hosted only on `[Genus] spp` placeholders are si
 ### Slug-redirect prerequisite
 
 Not needed. Public host pages route by ID (`/host/:id`, router.ex:201). Renaming `[Genus] sp` → `[Genus] spp` doesn't change URLs.
-

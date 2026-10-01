@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-05-15
-updated: 2026-05-15
+updated: 2026-09-13
 epic: source-ingestion
 relates: [9314]
 ---
@@ -56,4 +56,18 @@ When OCR support lands, examine actual BHL outputs and broaden the rule so cover
 ## Human test
 
 Process a scanned BHL paper (e.g., the Philippines paper in `test-corpus/`) end-to-end with `north-star-v0` and receive a bundle whose evidence quotes actually appear on the OCR'd page text.
+
+
+## Requirements retained from ce28 on consolidation
+
+ce28 is being retired as superseded; this matter owns its remaining document-profiling/OCR outcomes. Continue from the current Python producer/bundle contract (c744 baseline), not a mandatory port into the obsolete Elixir-stage layout described above.
+
+In addition to the scope above, preserve these acceptance concerns:
+- Profile mixed documents per page, including text density, suspicious characters/spacing/line breaks, scientific-name damage, image coverage and table/column risk; route OCR only where needed.
+- Preserve page/block identity, positions/bounding boxes where available, extractor/OCR method and version, and available quality/confidence signals in the shared evidence artifact contract. Do not fabricate confidence that an engine does not supply. Keep raw text immutable and normalized evidence traceable back to it.
+- Compare source-provided BHL OCR with local/provider extraction on representative documents; choose by measured page quality, preserving alternatives/provenance where they differ materially. Source-provided OCR is not automatically authoritative.
+- Cache page OCR by image/content and relevant configuration identity, and handle easy scans versus degraded scans through measured routing. The old list of OCR engines is a candidate set, not a commitment to implement every one.
+- Demonstrate that scanned and mixed documents retain real, resolvable evidence for names, host relationships and gall traits despite columns, tables and boilerplate. Feed representative scans and OCR-damaged-name cases into the 9314 gold-set evaluation.
+
+Full-source completion is tracked in db6f; born-digital preparation and supported processing need not wait for this matter. Closing ce28 does not mark OCR as delivered.
 

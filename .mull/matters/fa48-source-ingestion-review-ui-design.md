@@ -1,8 +1,8 @@
 ---
 status: refined
 created: 2026-03-22
-updated: 2026-04-25
-epic: ingestion
+updated: 2026-09-13
+epic: source-ingestion
 relates: [7fda, 7c67]
 ---
 
@@ -129,3 +129,14 @@ For multi-value traits: Final defaults to Current (conservative, don't override)
 - Source creation: inline form vs new tab (depends on scope of 881c unified API)
 - Upload mechanism: direct-to-S3 vs LiveView socket (production performance concern)
 - Pipeline operationalization: Oban worker design, S3 artifact storage (tracked in 7fda)
+
+
+## Review-design requirements retained from ce28
+
+ce28 is being retired as superseded. This section supersedes conflicting behavior in the earlier design, while preserving useful queue/source/detail concepts. Design against the current versioned producer bundle and the domain model chosen through 4dcd/2cb2, not ce28's illustrative JSON or a mandatory old species-only hierarchy.
+
+The revised design must make explicit: proposed versus accepted values; exact evidence and source context; verifier status, OCR uncertainty and conflicts; separate source-metadata and biological-fact approval; and accept, edit with retained/replaced evidence, reject with reason, or insufficient-evidence decisions. Entity matching and normalization are suggestions: mapping a historical name must not silently assert an accepted synonym or reclassification.
+
+No high-confidence auto-accept rule or silent conflict overwrite. Preserve existing curator conclusions and require a deliberate resolution when incoming evidence disagrees. Distinguish gall identity/determination, shared organism taxon edits, and source-supported host/trait assertions; show shared-edit impact if the proposed separation is adopted. Only accepted assertions become queryable domain provenance; private review artifacts are not a requirement to model every unaccepted claim as a permanent domain assertion.
+
+Reviewer decisions should yield explicit usable evaluation feedback for 9314, not hidden prompt changes inside UI behavior. 7c67 owns implementation; 7fda owns writeback and publication. This consolidation does not approve the taxonomy proposal or authorize a UI implementation.

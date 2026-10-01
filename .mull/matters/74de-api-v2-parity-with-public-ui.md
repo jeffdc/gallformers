@@ -1,9 +1,8 @@
 ---
 status: refined
 created: 2026-03-02
-updated: 2026-03-02
+updated: 2026-09-13
 epic: platform
-relates: [8c5c]
 ---
 
 # API v2 parity with public UI
