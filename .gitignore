@@ -6,6 +6,8 @@
 
 # Logs
 log.log
+# Local development log
+/dev.log
 
 # Spell check
 cspell.json
@@ -72,6 +74,9 @@ npm-debug.log
 /assets/node_modules/
 /assets/css/app_legacy.css
 
+# Generated Python packaging metadata
+*.egg-info/
+
 # Database files
 *.db
 *.db-*
@@ -94,6 +99,9 @@ npm-debug.log
 
 # Request logs (development only, production uses /data/logs)
 /priv/logs/
+
+# Local source-ingestion artifacts and uploaded PDFs
+/priv/storage/
 
 # API compiled binaries
 api/bin/

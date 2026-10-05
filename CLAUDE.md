@@ -34,6 +34,12 @@ All component files are in `lib/gallformers_web/components/`.
 
 See **[CODING_STANDARDS.md](./CODING_STANDARDS.md)** for details as needed.
 
+## Domain Model
+
+- **[docs/domain/domain-model.md](docs/domain/domain-model.md)** records the **domain language** being discovered for the redesign (galls, organisms, Sources, Observations). It is about the domain, not software, and is **not yet implemented**. The software design draft lives in matter `8567`.
+- **The current code and database** follow [docs/domain/general.md](docs/domain/general.md) and [docs/domain/admin-domain-reference.md](docs/domain/admin-domain-reference.md) ("everything is a species") until the taxonomy migration (matter `8567`).
+- Don't use the target model to explain current code, or the current docs to design new work.
+
 ## Work Tracking & Planning
 
 ### Mull is the single source of truth
@@ -60,6 +66,7 @@ After a planning or brainstorming session:
 | Content | Location | Persisted? |
 |---------|----------|------------|
 | Work tracking, plans, status | Mull matter body | Yes (until purged) |
+| Domain model definition | `docs/domain/domain-model.md` | Yes |
 | Ephemeral planning drafts | `docs/plans/` (gitignored) | No |
 | Incident docs | `docs/investigations/` | Yes |
 | Operational procedures | `runbooks/` | Yes |
