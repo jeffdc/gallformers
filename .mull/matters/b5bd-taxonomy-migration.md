@@ -10,24 +10,119 @@ relates: [1121, 8567]
 
 How to move today's data and application onto the domain model ([`docs/domain/domain-model.md`](../../docs/domain/domain-model.md)) and the owned-taxonomy design in matter `8567`. This matter tracks the migration details.
 
-## Phases
+## Migration plan (draft, 2026-10-05)
 
-- **Phase 1 (gall system):** split galls from species — gall entries keep their IDs; inducer taxa are created from the gall rows, merging generation pairs — and add the taxon identity layer over today's taxonomy tables.
-- **Phase 2 (taxonomy system):** move taxa into the rebuilt taxonomy system behind the same taxon IDs; plants become POWO-imported taxa.
+From starting the replacement system to running it in production. Covers **phase 1** (the gall system on today's taxonomy, released after the backscan); phase 2 (the taxonomy system) gets its own shorter plan later — see M8. Build order and design live in `8567`; import format in `e381`.
 
-## Work items
+### M0. Strategy decisions (settle first)
 
-- **Inducer taxa** from gall rows: ~2,440 distinct described names, merging the 76 agamic/sexgen pairs; undescribed galls link at genus or section (625) or at the family named in a placeholder genus (927).
-- **Taxon identity layer:** one stable taxon ID for every existing `species` row and `taxonomy` node.
-- **iNat correspondence (optional):** iNat taxon IDs as external references, useful for observations and barcodes, not for taxonomy. Name matching works well (see *iNat correspondence*).
-- **Non-gall review**: hand-review all 120 `form = non-gall` records; don't migrate them; redirect their URLs to a new gall-lookalikes Article (write the Article).
-- **Name-suffix mapping**: ~900 tokens map mechanically to the generation trait; curate the 47 names listed under *Name-suffix categorization*.
-- **Alias classification**: gall "scientific" aliases → taxon synonymy; gall common names → gall facts.
-- **Placeholder genera**: map each "Unknown (Family)" placeholder's galls to a family-level inducer link (or none).
-- **Taxonomy ID crosswalk** for the legacy `/taxonomy/:id` redirect.
-- **Key couplets**: review each of the 4 keys' targets (gall or taxon).
-- **iNat observation IDs**: parse the 5,365 iNat image URLs.
-- **Rerun the inventory** before final planning; last run 2026-10-02 against a production copy.
+- **Cutover style — agreed:** **one cutover in a maintenance window**, rehearsed many times on production copies — not a long-running dual-write. Scale is small (~10⁶ rows) and the maintenance-mode runbook exists (`runbooks/planned-maintenance.md`).
+- **Where the backscan runs — probably:** run it against a **staging copy** on the new system; record curator approvals there; at cutover, **replay the approved batches** into production after the data migration. Batches are portable files, so replay is deterministic. (The backscan of ~927 Sources takes weeks and can't happen inside a maintenance window.)
+- **Changes on the live site meanwhile — agreed:** the data migration always runs from the latest production copy; a short **edit freeze** before cutover; new or changed Sources since the backscan get a final small backscan pass.
+- **Legacy Facts the backscan doesn't confirm — undecided:** investigate once the backscan produces the list; options include a legacy-data Source with curator review, or attribution to Gallformers.
+- **Today's stored gall ranges — decided:** leave ranges as alone as possible (`8567` rule 10). The potential range is computed from the Hosts; only **differences** from it are stored, as inclusion/exclusion Facts. Migration compares each Gall's stored range with its host union: regions in both are dropped (redundant); regions removed from the union become **exclusion** Facts attributed to Gallformers (today's curator removals); regions outside the union become **inclusion** Facts (attribution per the legacy-Facts decision).
+- **Rollback — agreed:** a full pre-cutover backup, a rehearsed restore, and a time limit after which we fix forward instead of rolling back.
+- **How migrations run in production — known:** schema migrations run automatically at boot (`Ecto.Migrator` in the supervision tree when `RUN_MIGRATIONS=true`, set by `docker-entrypoint.sh`; `lib/gallformers/application.ex`). **The data migration must not be a boot-time Ecto migration:** it is long-running, and boot would stall under Fly health checks and `HealthWatchdog`, risking restarts mid-migration. Run it as a separate, explicit step in the maintenance window (e.g. a release task on a one-off machine).
+
+### M1. Foundations (build on `taxogall`; order per `8567`)
+
+- Taxonomy facade over today's tables (`8567` step 1 plan): ancestry read model, the 14 references and raw `species_taxonomy` / sitemap queries routed through it, explicit `boundary` exports, the taxon-changed listener. Ships to main ahead of the rest.
+- Taxon identity layer, built with the gall split: stable taxon IDs for plants (their species IDs), higher taxa and Inducers (new IDs above today's highest species ID), plus the crosswalk.
+- Sources–Facts layer and audit, acceptance tests first (`8567` step 2). Sources gain kind, authorship date (from `pubyear` for existing ones), and retraction status.
+- Gall system: Galls split from species; Traits, Relationships (15 types), qualifiers, aliases, and range as Facts; synchronous taxonomy-change listener.
+- Import: committed JSON Schema (`e381` v2), importer (bucket + Oban), curator upload wrapper.
+- Prerequisite UI the backscan needs — minimal, per `8567` rule 12: **batch review with approve/deny**, unresolved-reference handling, retraction entry. Gallformers statements arrive as batches too (curator notes → LLM → batch), so no statement editor.
+- Audit (`ede2`): who changed what — needed before curators edit the new system.
+- Test infrastructure: rewrite `priv/repo/test_seeds.sql` for the new model; adapt the prod-data test targets (`make test-prod-data*`).
+
+### M2. Data migration scripts (repeatable, run against copies until cutover)
+
+- Refresh the data inventory on a fresh production copy.
+- Gall split: every gall row becomes a Gall entry keeping its ID, Gallformers Code, URL, and image paths.
+- Inducer taxa from gall rows: ~2,440 described names, merging the 76 agamic/sexgen pairs; undescribed Galls link at genus/section (625) or at the family named in a placeholder genus (927); "Unknown (Unknown)" gets no Inducer.
+- Plants: carried over as taxa (POWO-imported in phase 2); genus placeholders become genus-level Hosts, keeping their range data.
+- Taxonomy crosswalk for the legacy `/taxonomy/:id` redirect.
+- Traits → Facts, including generation from the name-suffix mapping (~900 mechanical, 47 curated — see *Name-suffix categorization*).
+- Hosts → *host of* Facts; existing community data → Relationship Facts.
+- Aliases: gall "scientific" aliases → taxon synonymy; gall common names → gall alias Facts.
+- Sources: existing records → Sources with kind, authorship date, license; record-level citations (`species_source`) → attributions on the legacy-data Source or the cited Source, per the M0 decision.
+- Source 58 ("Gallformers ID Notes", 1,323 Galls) → **Gallformers** statements: attributed to Gallformers, audit author unknown for legacy text.
+- Gall ranges: diff each stored range against the Gall's host union (as of the migration); keep only the differences as inclusion/exclusion Facts. Expect the 232k rows to shrink to a small fraction — measure on the next inventory refresh.
+- Non-galls: hand-review all 120; don't migrate; record their IDs for redirects.
+- Images: attach to Gall entries (paths unchanged); parse the 5,365 iNat image URLs for observation IDs.
+- Keys: re-target each of the 4 keys' couplets to Galls or taxa.
+- Editorial carry-over: abundance, data-complete flags, name overrides, photo order.
+- Optional: iNat taxon IDs as external references (see *iNat correspondence*).
+
+### M3. Application surface
+
+- Public pages: Gall, Host, genus / family / section / intermediate ranks, Source, place, browse.
+- ID tool: use the potential range with inclusion/exclusion Facts applied — effectively today's behavior; verify results don't change on a sample of real queries.
+- Global search and its name index (taxonomy read model).
+- Name builder (`86e7`): derived names with generation / Host / form qualifiers, overrides, uniqueness.
+- API v1/v2: traffic is trivial; minimal effort (keep it working or version it simply).
+- Admin — as few screens as possible (`8567` rule 12): taxonomy admin and reclassification, the batch review/retraction screens, and only what else proves unavoidable (e.g. images). Retire Gall/Host/gall–host/range/Source forms in favor of batches wherever possible.
+- Redirects: `/taxonomy/:id` via the crosswalk; the 120 non-gall URLs to a new **gall-lookalikes Article** (write it).
+- Derived outputs: sitemap, any markdown/AI-crawler rendering (`9737`), knowledge-base export (`2a27`).
+
+### M4. Pipeline and backscan
+
+- The pipeline workstream (`7fda`, `db6f`) produces `e381` v2 batches; Gallformers validates them.
+- Trial batches end to end on staging: a few Sources of different kinds (paper, website, research data), including a correction and a retraction.
+- Full backscan of every existing Source on staging; curators approve or deny batches; resolve unresolved references; track coverage (Facts confirmed, Facts with no Source support).
+- Disposition of legacy Facts the backscan didn't confirm (per M0).
+
+### M5. Rehearsal (repeat until boring)
+
+- Run the full migration plus batch replay on a fresh production copy (`make experiment-db`), then on the **Fly preview** environment for production-like timing.
+- Verification suite:
+  - counts reconcile (Galls, Hosts, Sources, images, Codes);
+  - every old `/gall/:id`, `/host/:id`, Gallformers Code, and image path still resolves;
+  - `/taxonomy/:id` and non-gall redirects work;
+  - keys resolve;
+  - ID tool and search parity on a sample of real queries;
+  - API responses compatible;
+  - spot-check a set of well-known Galls by hand.
+- Time the migration to size the maintenance window.
+- Rehearse rollback: restore the pre-cutover backup and confirm the old release runs against it.
+
+### M6. Cutover
+
+1. Announce the window; start the edit freeze.
+2. Final small backscan pass for Sources added or changed since the backscan; approve.
+3. Full production backup to S3; verify it restores.
+4. Enable maintenance mode (`runbooks/planned-maintenance.md`).
+5. Deploy the release; schema migrations run automatically at boot.
+6. Run the data migration as a separate step (not at boot); replay approved batches.
+7. Run the verification suite against production.
+8. Smoke-test as a curator and as a visitor; lift maintenance mode.
+9. Watch errors, Oban queues, and traffic; apply the rollback criteria from M0.
+
+### M7. After release
+
+- Remove legacy code paths and tables (the old `species`-centric model) once stable; tighten remaining `boundary` exports.
+- Replace `docs/domain/general.md` and `admin-domain-reference.md`; update `CLAUDE.md`, admin onboarding, and runbooks that assume the old tables (e.g. `restore-deleted-gall.md`).
+- Close or reconcile related matters (`2cb2`, `86e7`, `e2cb`, `d108`, `1832`, `53cb`, `0a58`, `3e8c`, `5c56`).
+
+### M8. Phase 2 (later, own plan)
+
+- Rebuild the taxonomy system behind the same taxon IDs: sourced names, authorship, placement, taxonomic acts with history; POWO import for plants.
+- Learn from iNat's taxonomy curation and query practice first (`8567` open question).
+- Migration: today's taxa into the new taxonomy system; curated vs POWO-imported origins; no Gall changes.
+
+### Estimate (2026-10-05)
+
+Anchored on Jeff's actual velocity, not bottom-up task counts: the early-2026 rewrite (new stack, SQLite → Postgres, DigitalOcean → Fly, new maps, world coverage, every admin screen) took ~8 focused weeks with AI agents. This effort is smaller in surface (same stack and host, pipeline-first admin with few screens, trivial API traffic) but changes the model rather than porting it — and that design work is mostly done. Single-threaded: Jeff plus one agent.
+
+| | Focused weeks |
+|---|---|
+| Phase 1 build — facade, Sources–Facts, gall split, importer, minimal screens, pages, ID tool, search, migration scripts | ~4–7 |
+| Rehearsal and cutover | ~1 |
+| Pipeline trust + backscan review (largely Jeff's time; can overlap the build) | ~2–4 |
+| **Phase 1 to production** | **~6–11** |
+| Phase 2 (taxonomy system), later | ~3–5 |
+
+**The schedule risk is not the code:** it's the pipeline reaching trusted output (release waits on the backscan), Jeff's review time, and migration decisions — none of which agents accelerate.
 
 ## Migration notes
 
@@ -38,13 +133,13 @@ How to move today's data and application onto the domain model ([`docs/domain/do
   - Inducer taxa get new IDs: one inducer can merge several old rows (e.g. its agamic and sexgen galls), and the gall keeps the old number.
   - Higher taxa get new IDs; 1,562 of their 1,615 old IDs collide with species IDs. Only the legacy `/taxonomy/:id` redirect needs a crosswalk — genus and family pages are addressed by name.
   - Each system owns its own IDs; cross-system references are typed. New taxa draw from the taxonomy system's sequence, starting above today's highest species ID (7,143 in the 2026-09-30 production copy) so they don't clash with the plant IDs it keeps.
-- **Genus placeholder plants** ("*Quercus* spp.") become genus-level host links, and **their range data keeps contributing to the theoretical range exactly as today.** The code check that said placeholders have no range data was wrong: 86 of the 159 placeholders own 89,328 host-range rows (e.g. *Bidens* spp. 4,100, *Hibiscus* spp. 4,018), and today's host-union fallback includes them. Dropping them would narrow ID results.
+- **Genus placeholder plants** ("*Quercus* spp.") become genus-level host links, and **their range data keeps contributing to the potential range exactly as today.** The code check that said placeholders have no range data was wrong: 86 of the 159 placeholders own 89,328 host-range rows (e.g. *Bidens* spp. 4,100, *Hibiscus* spp. 4,018), and today's host-union fallback includes them. Dropping them would narrow ID results.
 - **Placeholder genera** ("Unknown (Cynipidae)", 102 of them) are not migrated. Galls linked to them get an inducer link at the family named in the placeholder, or no inducer link for "Unknown (Unknown)".
 - **Name suffixes need a curated mapping, not a parser.** Parentheses in gall names carry generation terms (agamic, sexgen, spring/summer generation), rust spore stages (aecial, telial), and host-scoped forms ("on betula", "(q-bicolor)", even "(agamic) (q-bicolor)").
 - **Aliases.** "Scientific" aliases on gall rows are mostly inducer synonyms and move to the taxon side. Common names on galls become gall facts; none has a Source today.
 - **Non-galls are reviewed by hand, then not migrated.** All 120 `form = non-gall` records get a manual review. They don't enter the new model; their old URLs redirect to a new Article about gall lookalikes.
-- **Today's stored gall range** becomes range Facts only once backed by Sources (the backscan). Only 44 of 3,509 galls with a stored range are marked confirmed; most stored ranges are probably copies of host unions. Observational data (Research Grade iNat overlay) is a separate, future layer.
-- **The ID tool changes from "stored range, else host union" to the theoretical range.** That may broaden some results; verify it doesn't make ID worse.
+- **Today's stored gall range** is reduced to its differences from the host union (inclusion/exclusion Facts; see M0). Only 44 of 3,509 galls with a stored range are marked confirmed; most stored ranges are probably copies of host unions. Observational data (Research Grade iNat overlay) is a separate, future layer.
+- **The ID tool keeps today's effective behavior:** potential range with curator exclusions applied (today: "stored range, else host union," where stored ranges mostly encode those exclusions). Verify with a parity check.
 - **Images from iNat** (5,365 of 7,663 gall images) store the observation URL; parsing it recovers observation IDs and gives a head start on observation links.
 - **Keys** (4) have couplets pointing at species IDs; each target needs a semantic review (gall or taxon).
 - **Plants become POWO-imported taxa** (phase 2), keeping their WCVP/POWO IDs; curators can adjust them editorially. Host distributions stay outside Facts.

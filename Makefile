@@ -2,7 +2,7 @@
 #
 # Phoenix/LiveView development commands
 
-.PHONY: dev dev-cloudfront dev-lan test test-db test-prod-data test-prod-data-e2e test-prod-data-all download-db ci preflight help deps assets setup clean check-db build run-local-release dump-schema preview preview-stop preview-destroy wcvp-restore wcvp-check check-full check-bg
+.PHONY: dev dev-cloudfront dev-lan test test-db test-prod-data test-prod-data-e2e test-prod-data-all download-db experiment-db ci preflight help deps assets setup clean check-db build run-local-release dump-schema preview preview-stop preview-destroy wcvp-restore wcvp-check check-full check-bg
 
 # Download production database for local dev
 # Downloads full pg_dump from private S3 bucket and restores into local Postgres
@@ -16,8 +16,8 @@ download-db:
 	aws s3 cp s3://$(DUMP_BUCKET)/$(LATEST_DATE)/gallformers.dump /tmp/gallformers.dump
 	@echo "Restoring into gallformers_dev..."
 	@psql -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'gallformers_dev' AND pid <> pg_backend_pid();" --quiet 2>/dev/null || true
-	mix ecto.drop
-	mix ecto.create
+	PGDATABASE=gallformers_dev mix ecto.drop
+	PGDATABASE=gallformers_dev mix ecto.create
 	pg_restore --no-owner --no-acl -d gallformers_dev /tmp/gallformers.dump || true
 	@echo "Verifying..."
 	@psql -d gallformers_dev -tAc "SELECT count(*) FROM species" | grep -qE '^[1-9]' || { \
@@ -25,6 +25,23 @@ download-db:
 		exit 1; \
 	}
 	@echo "Database restored to gallformers_dev"
+
+# Disposable experiment database for branch work (e.g. taxogall): a clone of
+# gallformers_dev, so migrations can be tried without touching the production
+# copy. Re-running drops and re-clones it. Point the app at it with:
+#   export PGDATABASE=gallformers_taxogall
+EXPERIMENT_DB ?= gallformers_taxogall
+
+experiment-db:
+	@echo "Cloning gallformers_dev into $(EXPERIMENT_DB)..."
+	@psql -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IN ('gallformers_dev', '$(EXPERIMENT_DB)') AND pid <> pg_backend_pid();" --quiet 2>/dev/null || true
+	dropdb --if-exists $(EXPERIMENT_DB)
+	createdb -T gallformers_dev $(EXPERIMENT_DB)
+	@psql -d $(EXPERIMENT_DB) -tAc "SELECT count(*) FROM species" | grep -qE '^[1-9]' || { \
+		echo "ERROR: Clone failed — no species data found"; \
+		exit 1; \
+	}
+	@echo "Ready: $(EXPERIMENT_DB). Use it with: export PGDATABASE=$(EXPERIMENT_DB)"
 
 # =============================================================================
 # Build Dependencies
@@ -390,6 +407,7 @@ help:
 	@echo ""
 	@echo "Database:"
 	@echo "  make download-db       Download pg_dump from S3 and restore to local Postgres"
+	@echo "  make experiment-db     Clone gallformers_dev into a disposable experiment DB (re-run to reset)"
 	@echo "  make test-db           Rebuild test database (drop, create, migrate, seed)"
 	@echo "  make wcvp-restore      Restore WCVP data from S3 into local wcvp database"
 	@echo "  make wcvp-check        Check that local wcvp database has data"

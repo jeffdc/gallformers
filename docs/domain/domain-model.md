@@ -48,11 +48,15 @@ A website and database to aid the **Identification** and **Cataloging** of gall-
 
 - **Source** — documented scientific discovery: a paper, book, website, or database (iNaturalist, as a database, is a Source), research data from pending (unpublished) research — such as a lab's records of galls it is still describing — or other documented work. **Gallformers itself is a Source**, authored by "Gallformers Contributors," for curator knowledge and for the positions Gallformers takes.
 - **Citation** — a Source is cited on a Gall's page (today, e.g., `/gall/587?source=58`); individual Facts may later get their own links.
-- **Fact** — a statement about a Gall (its Traits, the Species that induces it, its Hosts, the Places it occurs, its Inducer's placement in the Taxonomy — what the literature and research tell us). Every Fact is attributed to a Source.
+- **Fact** — a statement about a Gall (its Traits, the Species that induces it, its Hosts, the Places it occurs, its Inducer's placement in the Taxonomy — what the literature and research tell us). A Fact stands on its own; Sources **confirm** or **deny** it. Every Fact is attributed to at least one Source.
+- **Newer work wins** — what Gallformers currently holds is decided by the most recently authored Source to confirm or deny a Fact, not by when Gallformers learned of it. A Fact a newer Source denies is **withdrawn**; where a Fact has one value (a placement, a current name), a newer value **supersedes** the older one. Both stay visible as history. Gallformers states its own position by making a newer statement as a Source.
+- **Correction** and **retraction** — a published correction (erratum, corrigendum) or a later revision is simply a newer Source. A **retracted** Source can no longer be relied on: everything it confirmed or denied stops counting, and it stays visible, marked as retracted.
 - **Relationship** — the formal, general connection between a Gall and another member of its Community, e.g. "the *Andricus weldi* gall has Parasitoid *Torymus* sp." A Relationship is a Fact. The word is not used for connections between individual Observations.
 - **Observations and Facts** — Observations are not Facts and are never Sources, but they can support Facts: a Source's statement can cite them. Typically the Source is Gallformers — e.g. "the *Andricus weldi* gall has Parasitoid *Torymus* sp., according to iNaturalist Observations 12345 and 67890."
 - **Observational data** — Observations shown as what they are, without a Fact per Observation. For example, Research Grade locations overlaid on a range map show where a Gall has actually been seen. At most, the body of Research Grade iNaturalist Observations counts as one Source.
-- **Range** — where a Gall occurs. Its Hosts' distribution gives where it *could* occur; observational data shows where it has actually been found. A Host's distribution is outside Gallformers' Facts: it comes from POWO, and curators can adjust it.
+- **Potential range** — where a Gall *could* occur: the union of its Hosts' ranges. Every Gall has one, and it follows from its Host Facts (a Gall linked to a Host inherits that Host's range). A Host's range is outside Gallformers' Facts: it comes from POWO, and curators can adjust it. For most Galls this is the best information there is, and the site says so.
+- **Range inclusion / exclusion** — Facts that adjust a Gall's potential range: a region where the Gall is known to occur outside its Hosts' ranges, or a region within them where it doesn't. Sources can state them; a curator removing a region is an exclusion attributed to Gallformers.
+- **Observed range** — where a Gall has actually been found, from observational data. Future.
 - **Attribution vs. audit** — **attribution** is whose authority stands behind a Fact (for curator knowledge, Gallformers); **audit** is which person made a change. They are different questions.
 
 ### Traits
@@ -61,7 +65,7 @@ Traits describe a Gall. Traits of the abstract Gall are Facts; the Traits of an 
 
 | Trait | What it describes | Values supported today |
 |---|---|---|
-| **Generation** | which generation of the Inducer's life cycle the Gall belongs to | terms vary by group: agamic / sexual (cynipids), spring / summer / autumn generation, rust spore stages (aecial, telial), … |
+| **Generation** | which generation of the Inducer's life cycle the Gall belongs to | terms vary by group. Provisional list: agamic, sexual, spring, summer, autumn (aphid host-alternation phases still open) |
 | **Detachable** | whether the Gall separates from the plant | integral, detachable, both, unknown |
 | **Plant part** | where on the Host the Gall forms | at leaf vein angles, between leaf veins, bud, flower, fruit, leaf edge, leaf midrib, lower leaf, on leaf veins, petiole, stem, underground (roots+), upper leaf |
 | **Form** | the Gall's overall type | abrupt swelling, bullet, hat, hidden cell, jacket, leaf blister, leaf curl, leaf edge fold, leaf edge roll, leaf snap, leaf spot, modified capitulum, oak apple, pip, plum, pocket, rust, scale, stem club, tapered swelling, wig, witches broom |
@@ -79,22 +83,27 @@ Traits describe a Gall. Traits of the abstract Gall are Facts; the Traits of an 
 
 A Relationship is the formal, general connection between a Gall and a member of its Community. Each is a Fact. The kinds:
 
-| Relationship | Meaning | Qualifiers |
-|---|---|---|
-| **inducer of** | the organism that induces the Gall | — |
-| **host of** | the plant the Gall occurs on | — |
-| **symbiont of** | an organism the Gall depends on, e.g. a fungus a gall midge carries | required for formation |
-| **cecidophage in** | feeds on the Gall's tissue | lethal / non-lethal |
-| **parasitoid in** | a Parasitoid reared from the Gall, its target unknown | parasitism mode |
-| **feeds on** | eats the Gall from outside | — |
-| **successor in** | moves into the vacated Gall | — |
-| **modified form of** | one Gall is a distinct form of another, produced when an Inquiline modifies it | — |
-| **alternate generation of** | two Galls are generations of one Inducer's life cycle | — |
-| **parasitoid of** | one organism parasitizes another, within a Gall | parasitism mode |
-| **vectored by** | one organism is carried by another, within a Gall | — |
-| **predator of** | one organism eats another, within a Gall | — |
+| Relationship | Inverse | Meaning | Qualifiers |
+|---|---|---|---|
+| **inducer of** | induced by | the organism that induces the Gall | — |
+| **host of** | induced on | the plant the Gall occurs on | — |
+| **symbiont of** | has symbiont | an organism the Gall depends on, e.g. a fungus a gall midge carries | required for formation |
+| **inquiline of** | has inquiline | lives in the Gall without having induced it | lethal / non-lethal |
+| **cecidophage in** | has cecidophage | feeds on the Gall's tissue | lethal / non-lethal |
+| **parasitoid in** | has parasitoid | a Parasitoid reared from the Gall, its target unknown | parasitism mode |
+| **emerged from** | has emerged | emerged from the Gall, its role unknown — neutral about whether it is a Parasitoid, Inquiline, or something else | — |
+| **feeds on** | fed on by | eats the Gall, without saying whether its tissue, its occupants, or both — neutral, for when the Source doesn't say | — |
+| **herbivore of** | has herbivore | eats the Gall's plant tissue only — not the Inducer or other occupants | — |
+| **successor in** | habitat for | moves into the vacated Gall | — |
+| **modified form of** | has modified form | one Gall is a distinct form of another, produced when an Inquiline modifies it | — |
+| **alternate generation of** | alternate generation of | two Galls are generations of one Inducer's life cycle | — |
+| **parasitoid of** | has parasitoid | one organism parasitizes another, within a Gall | parasitism mode |
+| **vectored by** | is vector for | one organism is carried by another, within a Gall | — |
+| **predator of** | preyed on by | one organism eats another, within a Gall | — |
 
 Parasitism mode covers idiobiont/koinobiont, solitary/gregarious, and ecto/endo.
+
+**Neutral and specific kinds.** Where Sources are often vague, there's a neutral kind alongside the specific ones, so a Fact never says more than its Source: *emerged from* (role unknown) beside *parasitoid in* and *inquiline of*; *feeds on* (what it eats unspecified) beside *herbivore of* and *predator of*. An organism that eats both a Gall's tissue and its Inducer is two Facts: *herbivore of* the Gall and *predator of* the Inducer, in the Gall.
 
 **Rules:**
 
@@ -115,7 +124,11 @@ Parasitism mode covers idiobiont/koinobiont, solitary/gregarious, and ecto/endo.
 | A parasitoid attacks the inducing wasp inside its gall | parasitoid *parasitoid of* wasp, in the gall; if what it attacked is unknown, parasitoid *parasitoid in* the gall |
 | A hyperparasitoid attacks a parasitoid, which attacks the inducing wasp, in one gall | parasitoid *parasitoid of* wasp, and hyperparasitoid *parasitoid of* parasitoid, both in the gall; the hyperparasitism follows |
 | A cecidophage feeds inside a gall without killing the inducer or changing the gall's form | cecidophage *cecidophage in* gall (non-lethal) |
-| A caterpillar eats a gall | caterpillar *feeds on* gall; a woodpecker eating the larva inside: woodpecker *predator of* larva, in the gall |
+| An inquiline wasp lives in a gall without changing its form | inquiline *inquiline of* gall (non-lethal, if the Source says so) |
+| A chalcid emerges from a reared gall, its role unknown | chalcid *emerged from* gall |
+| A caterpillar eats a gall's tissue | caterpillar *herbivore of* gall; a woodpecker eating the larva inside: woodpecker *predator of* larva, in the gall |
+| A Source says only "squirrels eat these galls" | squirrel *feeds on* gall |
+| A Source says a caterpillar eats the gall tissue and the larva inside | caterpillar *herbivore of* gall; caterpillar *predator of* larva, in the gall |
 | An ant colony moves into a vacated gall | ant *successor in* gall |
 | A study shows an agamic gall and a sexual gall alternate | agamic gall *alternate generation of* sexual gall, sourced to the study |
 
