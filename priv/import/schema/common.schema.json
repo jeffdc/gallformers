@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gallformers.org/schemas/import/v3/schema/common.schema.json",
+  "title": "Gallformers import — shared definitions",
+  "description": "Definitions shared by taxonomy batches and gall batches: the envelope, the Source block, taxon references, evidence, and controlled-value wrappers. DRAFT (format v3, 2026-10-07). See PRODUCER_GUIDE.md for the rules a schema cannot express.",
+
+  "$defs": {
+    "envelope": {
+      "description": "Fields every batch carries. Each batch schema adds its own content and fixes batch_type.",
+      "type": "object",
+      "required": ["format", "format_version", "vocabulary_version", "batch_type", "mode", "batch_id", "produced_at", "producer", "source"],
+      "properties": {
+        "format": { "const": "gallformers-import", "description": "Identifies the file as a Gallformers import batch." },
+        "format_version": { "const": 3, "description": "Bumped only for breaking changes to the shape." },
+        "vocabulary_version": { "$ref": "#/$defs/date_full", "description": "Date of the vocabulary files (vocab/) the producer used. Vocabularies grow without a format_version bump; this tells the validator which lists apply." },
+        "batch_type": { "enum": ["taxonomy", "gall"], "description": "Taxonomy batches are applied before gall batches from the same Source." },
+        "mode": {
+          "enum": ["replace", "add"],
+          "description": "replace: a whole re-run of this Source; replaces all of the Source's existing attributions of this batch_type. add: new statements that leave existing attributions alone. Gallformers batches are always add."
+        },
+        "batch_id": { "type": "string", "minLength": 8, "description": "Unique ID for this batch (a UUID is recommended). Used in the audit trail." },
+        "produced_at": { "type": "string", "format": "date-time" },
+        "producer": { "$ref": "#/$defs/producer" },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+
+    "producer": {
+      "description": "Who or what produced the batch. model and instructions_version let the golden regression set trace output changes to model or prompt changes.",
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "description": "The model used, if any (exact model ID)." },
+        "instructions_version": { "type": "string", "description": "Version of the prompt/skill set used, if any." }
+      },
+      "additionalProperties": false
+    },
+
+    "source": {
+      "description": "Exactly one Source per batch: Gallformers itself (when it has the gallformers key), otherwise a document Source.",
+      "type": "object",
+      "if": { "required": ["gallformers"] },
+      "then": { "$ref": "#/$defs/gallformers_source" },
+      "else": { "$ref": "#/$defs/document_source" }
+    },
+
+    "gallformers_source": {
+      "description": "Gallformers' own statements (author: Gallformers Contributors). No bibliographic fields; each statement carries its own date and text in its evidence. Batches with this Source must use mode add.",
+      "type": "object",
+      "required": ["gallformers"],
+      "properties": {
+        "gallformers": { "const": true }
+      },
+      "additionalProperties": false
+    },
+
+    "document_source": {
+      "description": "A publication, website, database, unpublished work, or research data.",
+      "type": "object",
+      "required": ["kind", "title", "authors", "authored", "citation", "license", "document"],
+      "properties": {
+        "gallformers_source_id": { "type": "integer", "minimum": 1, "description": "Optional. If given, the validator checks it matches the bibliographic fields; otherwise Gallformers matches or creates the Source." },
+        "kind": { "enum": ["publication", "website", "database", "unpublished", "research_data"] },
+        "title": { "type": "string", "minLength": 1 },
+        "authors": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Names exactly as written, in order. Not parsed."
+        },
+        "authored": {
+          "description": "The single date that decides recency. For websites: the date of the version read — the stated last-modified date if the site gives one, otherwise the access date.",
+          "type": "object",
+          "required": ["date", "as_written"],
+          "properties": {
+            "date": { "$ref": "#/$defs/date_partial" },
+            "as_written": { "type": "string", "minLength": 1, "description": "The date as the Source states it, e.g. '1999 with ongoing revisions, accessed 2022'." }
+          },
+          "additionalProperties": false
+        },
+        "citation": { "type": "string", "minLength": 1, "description": "The full citation as it should be displayed." },
+        "identifiers": {
+          "type": "object",
+          "properties": {
+            "doi": { "type": "string" },
+            "url": { "type": "string", "format": "uri" },
+            "isbn": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "license": {
+          "type": "object",
+          "required": ["value", "as_written"],
+          "properties": {
+            "value": { "$ref": "../vocab/licenses.schema.json" },
+            "as_written": { "type": "string", "description": "The license or rights statement as found, or 'not stated'." }
+          },
+          "additionalProperties": false
+        },
+        "document": {
+          "description": "The phase-0 structured document (a DoclingDocument, document.json) beside this batch, or null with a reason.",
+          "type": "object",
+          "if": { "required": ["none"] },
+          "else": {
+              "type": "object",
+              "required": ["file", "sha256"],
+              "properties": {
+                "file": { "const": "document.json" },
+                "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+              },
+              "additionalProperties": false
+          },
+          "then": {
+              "type": "object",
+              "required": ["none"],
+              "properties": {
+                "none": { "type": "string", "minLength": 1, "description": "Why there is no document, e.g. 'scanned, unreadable'. Quotes are still required but cannot be verified." }
+              },
+              "additionalProperties": false
+          }
+        },
+        "retracts": {
+          "description": "If this Source is a retraction notice: the Source it retracts. Retraction cancels all of that Source's stances; the Source stays visible, marked.",
+          "type": "object",
+          "required": ["citation_as_written"],
+          "properties": {
+            "gallformers_source_id": { "type": "integer", "minimum": 1 },
+            "citation_as_written": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "taxon_ref": {
+      "description": "A taxon the Source names, declared once and referred to by ref. Write the name exactly as the Source does; Gallformers resolves it (current names plus synonyms). Never map names to IDs yourself.",
+      "type": "object",
+      "required": ["ref", "name_as_written", "rank"],
+      "properties": {
+        "ref": { "$ref": "#/$defs/taxon_ref_id" },
+        "name_as_written": { "type": "string", "minLength": 1 },
+        "rank": { "$ref": "../vocab/ranks.schema.json" },
+        "new": {
+          "description": "Only when the Source itself claims novelty (sp. nov., gen. nov., comb. nov., stat. nov.). Never because a name failed to resolve.",
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": { "type": "string", "minLength": 1, "description": "As written, e.g. 'sp. nov.'." }
+          },
+          "additionalProperties": false
+        },
+        "gallformers_taxon_id": { "type": "integer", "minimum": 1, "description": "Optional; checked against the name. Omit unless certain." }
+      },
+      "additionalProperties": false
+    },
+
+    "taxon_ref_id": { "type": "string", "pattern": "^t[0-9]+$", "description": "Batch-local taxon reference: t1, t2, …" },
+    "gall_ref_id": { "type": "string", "pattern": "^g[0-9]+$", "description": "Batch-local Gall reference: g1, g2, …" },
+    "fact_id": { "type": "string", "pattern": "^f[0-9]+$", "description": "Batch-unique Fact ID: f1, f2, …" },
+    "act_id": { "type": "string", "pattern": "^a[0-9]+$", "description": "Batch-unique taxonomic act ID: a1, a2, …" },
+
+    "stance": {
+      "enum": ["confirm", "deny"],
+      "description": "deny only when the Source explicitly says so. Omission is never denial."
+    },
+
+    "evidence": {
+      "description": "At least one per Fact or act. A quote from the document, or (Gallformers batches only) a dated statement.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "if": { "required": ["statement"] },
+        "then": { "$ref": "#/$defs/statement_evidence" },
+        "else": { "$ref": "#/$defs/quote_evidence" }
+      }
+    },
+
+    "quote_evidence": {
+      "description": "Evidence from the Source's document: a verbatim quote anchored to the item it appears in, or a whole item. Gallformers resolves and stores the exact location (item + character span) itself; producers never give offsets.",
+      "type": "object",
+      "if": { "required": ["whole_item"] },
+      "then": { "required": ["item"], "properties": { "quote": false } },
+      "else": { "required": ["quote"] },
+      "properties": {
+        "item": { "type": "string", "pattern": "^#/", "description": "Reference of the document item the evidence comes from (a DoclingDocument self_ref, e.g. '#/texts/42'). Required whenever the batch has a document. The PDF page comes from the item's provenance." },
+        "quote": { "type": "string", "minLength": 1, "description": "Verbatim text from the item, long enough to be unambiguous within it. The validator checks it appears there." },
+        "whole_item": { "const": true, "description": "The evidence is the item's entire text (e.g. a descriptive paragraph); Gallformers takes the text from the document. Only with item, never with quote, and only when the batch has a document." },
+        "page": { "type": "string", "description": "Page number as PRINTED in the Source (for citations), if known — not the PDF page index, which comes from the item." },
+        "url": { "type": "string", "format": "uri", "description": "Deep link to this place in the Source (e.g. a scanned-book page or a website's species page)." },
+        "observations": { "$ref": "#/$defs/observations" }
+      },
+      "additionalProperties": false
+    },
+
+    "statement_evidence": {
+      "description": "Gallformers batches only: Gallformers' own statement.",
+      "type": "object",
+      "required": ["statement"],
+      "properties": {
+        "statement": {
+          "type": "object",
+          "required": ["text", "stated_on"],
+          "properties": {
+            "text": { "type": "string", "minLength": 1 },
+            "stated_on": { "$ref": "#/$defs/date_full" }
+          },
+          "additionalProperties": false
+        },
+        "observations": { "$ref": "#/$defs/observations" }
+      },
+      "additionalProperties": false
+    },
+
+    "unmapped": {
+      "description": "Source terms that fit no vocabulary value, so no Fact was made from them. They travel with the batch for review and show where the vocabulary should grow. Never force a term into the nearest value instead.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["term", "slot", "evidence"],
+        "properties": {
+          "term": { "type": "string", "minLength": 1, "description": "The Source's term, as written." },
+          "slot": {
+            "enum": ["detachable", "plant_part", "form", "shape", "color", "texture", "alignment", "walls", "cells", "season", "generation", "relationship_type", "lethality", "parasitism_mode", "place", "rank", "other"],
+            "description": "Which vocabulary it would have belonged to."
+          },
+          "gall": { "$ref": "#/$defs/gall_ref_id", "description": "The Gall it describes, if any (gall batches)." },
+          "evidence": { "$ref": "#/$defs/evidence" },
+          "note": { "type": "string", "description": "Optional: why no value fits, or a suggested new value." }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "observations": {
+      "description": "Observations the statement cites. Observations are evidence, never Sources.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["provider", "id"],
+        "properties": {
+          "provider": { "enum": ["inaturalist", "bugguide", "other"] },
+          "id": { "type": "string", "minLength": 1 },
+          "url": { "type": "string", "format": "uri" }
+        },
+        "additionalProperties": false
+      }
+    },
+
+    "date_partial": { "type": "string", "pattern": "^[0-9]{4}(-[0-9]{2}(-[0-9]{2})?)?$", "description": "YYYY, YYYY-MM, or YYYY-MM-DD." },
+    "date_full": { "type": "string", "format": "date" }
+  }
+}

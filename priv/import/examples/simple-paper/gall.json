@@ -1,0 +1,126 @@
+{
+  "format": "gallformers-import",
+  "format_version": 3,
+  "vocabulary_version": "2026-10-07",
+  "batch_type": "gall",
+  "mode": "replace",
+  "batch_id": "0b5e3a52-6d0f-4c41-9d6e-1f2a3b4c5d01",
+  "produced_at": "2026-10-07T14:00:00Z",
+  "producer": { "name": "example", "version": "0.0.1", "model": "example-model", "instructions_version": "2026-10-07" },
+
+  "source": {
+    "kind": "publication",
+    "title": "Galls of the Example Hills",
+    "authors": ["Example, A.", "Sample, B."],
+    "authored": { "date": "2024", "as_written": "2024" },
+    "citation": "Example, A. & Sample, B. 2024. Galls of the Example Hills. Journal of Examples 12: 50-70.",
+    "identifiers": { "doi": "10.0000/example.2024.12" },
+    "license": { "value": "CC-BY", "as_written": "This article is distributed under CC BY 4.0" },
+    "document": { "file": "document.json", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
+  },
+
+  "taxa": [
+    { "ref": "t1", "name_as_written": "Andricus quercuscalifornicus", "rank": "species" },
+    { "ref": "t2", "name_as_written": "Q. lobata", "rank": "species" },
+    { "ref": "t3", "name_as_written": "Q. douglasii", "rank": "species" },
+    { "ref": "t4", "name_as_written": "Torymus", "rank": "genus" },
+    { "ref": "t5", "name_as_written": "Andricus", "rank": "genus" }
+  ],
+
+  "galls": [
+    {
+      "ref": "g1",
+      "name_as_written": "the California gall wasp's large stem gall",
+      "identified_by": { "inducer": "t1", "generation": { "value": "agamic", "as_written": "agamic generation" } }
+    },
+    {
+      "ref": "g2",
+      "new": true,
+      "name_as_written": "a small spindle-shaped gall on the leaf midrib, inducer unknown beyond Andricus",
+      "identified_by": { "inducer": "t5", "host": "t2" }
+    }
+  ],
+
+  "facts": [
+    {
+      "id": "f1", "stance": "confirm", "kind": "relationship", "type": "inducer_of", "subject": "t1", "object": "g1",
+      "evidence": [{ "item": "#/texts/41", "quote": "the large stem galls produced by the agamic generation of Andricus quercuscalifornicus", "page": "58" }]
+    },
+    {
+      "id": "f2", "stance": "confirm", "kind": "relationship", "type": "host_of", "subject": "t2", "object": "g1",
+      "evidence": [{ "item": "#/texts/42", "quote": "common on Q. lobata throughout the hills", "page": "58" }]
+    },
+    {
+      "id": "f3", "stance": "deny", "kind": "relationship", "type": "host_of", "subject": "t3", "object": "g1",
+      "evidence": [{ "item": "#/texts/43", "quote": "earlier records from Q. douglasii are misidentifications", "page": "58" }]
+    },
+    {
+      "id": "f4", "stance": "confirm", "kind": "relationship", "type": "parasitoid_in", "subject": "t4", "object": "g1",
+      "evidence": [{ "item": "#/tables/3", "quote": "Torymus sp. | 14 | reared", "page": "60" }]
+    },
+    {
+      "id": "f5", "stance": "confirm", "kind": "qualifier", "of": "f4", "qualifier": "parasitism_mode",
+      "value": { "value": "ecto", "as_written": "external parasitoid" },
+      "evidence": [{ "item": "#/texts/50", "quote": "Torymus developed as an external parasitoid of the gall wasp larva", "page": "60" }]
+    },
+    {
+      "id": "f6", "stance": "confirm", "kind": "trait", "gall": "g1", "trait": "color",
+      "value": { "value": "tan", "as_written": "pale tan" },
+      "evidence": [{ "item": "#/texts/44", "quote": "pale tan when mature", "page": "58" }]
+    },
+    {
+      "id": "f7", "stance": "confirm", "kind": "trait", "gall": "g1", "trait": "plant_part",
+      "value": { "value": "stem", "as_written": "twigs" },
+      "evidence": [{ "item": "#/texts/41", "quote": "the large stem galls", "page": "58" }]
+    },
+    {
+      "id": "f8", "stance": "confirm", "kind": "trait", "gall": "g1", "trait": "detachable",
+      "value": { "value": "integral", "as_written": "not falling from the twig" },
+      "evidence": [{ "item": "#/texts/44", "quote": "remaining on the twig for years, never falling", "page": "58" }]
+    },
+    {
+      "id": "f9", "stance": "confirm", "kind": "range", "gall": "g1", "adjustment": "exclude",
+      "place": { "value": "US-OR", "as_written": "Oregon" },
+      "evidence": [{ "item": "#/texts/45", "quote": "despite extensive searching, the gall was not found in Oregon, where its host also grows", "page": "59" }]
+    },
+    {
+      "id": "f10", "stance": "confirm", "kind": "alias", "gall": "g1", "name": "California oak apple",
+      "evidence": [{ "item": "#/texts/40", "quote": "known locally as the California oak apple", "page": "57" }]
+    },
+    {
+      "id": "f11", "stance": "confirm", "kind": "description", "gall": "g1",
+      "evidence": [
+        { "item": "#/texts/41", "quote": "The large stem galls produced by the agamic generation are globular, up to 10 cm across, and pale tan when mature.", "page": "58" },
+        { "item": "#/texts/46", "whole_item": true, "page": "58" }
+      ]
+    },
+    {
+      "id": "f12", "stance": "confirm", "kind": "relationship", "type": "host_of", "subject": "t2", "object": "g2",
+      "evidence": [{ "item": "#/texts/61", "quote": "a small spindle gall on the midrib of Q. lobata leaves", "page": "64" }]
+    },
+    {
+      "id": "f13", "stance": "confirm", "kind": "trait", "gall": "g2", "trait": "shape",
+      "value": { "value": "spindle", "as_written": "spindle" },
+      "evidence": [{ "item": "#/texts/61", "quote": "a small spindle gall on the midrib", "page": "64" }]
+    },
+    {
+      "id": "f15", "stance": "confirm", "kind": "relationship", "type": "inducer_of", "subject": "t5", "object": "g2",
+      "evidence": [{ "item": "#/texts/62", "quote": "reared adults belong to Andricus but could not be assigned to species", "page": "64" }]
+    },
+    {
+      "id": "f14", "stance": "confirm", "kind": "trait", "gall": "g2", "trait": "plant_part",
+      "value": { "value": "leaf midrib", "as_written": "midrib" },
+      "evidence": [{ "item": "#/texts/61", "quote": "a small spindle gall on the midrib", "page": "64" }]
+    }
+  ],
+
+  "unmapped": [
+    {
+      "term": "lignified",
+      "slot": "texture",
+      "gall": "g1",
+      "evidence": [{ "item": "#/texts/44", "quote": "becoming lignified in the second year", "page": "58" }],
+      "note": "No texture value for woody/lignified; consider adding one."
+    }
+  ]
+}

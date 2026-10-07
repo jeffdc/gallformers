@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-10-02
-updated: 2026-10-04
+updated: 2026-10-06
 epic: taxonomy
-relates: [1121, 8567]
+relates: [1121, 8567, b119]
 ---
 
 # Taxonomy migration
@@ -26,7 +26,8 @@ From starting the replacement system to running it in production. Covers **phase
 
 ### M1. Foundations (build on `taxogall`; order per `8567`)
 
-- Taxonomy facade over today's tables (`8567` step 1 plan): ancestry read model, the 14 references and raw `species_taxonomy` / sitemap queries routed through it, explicit `boundary` exports, the taxon-changed listener. Ships to main ahead of the rest.
+- **First, de-risk the pipeline (reordered 2026-10-06):** import schema and validator (`294c`), the one-off pipeline-vs-database diff (`b119`), pipeline trial on existing Sources as a go/no-go (`8546`) — steps 1–3 of the M2 approach.
+- Taxonomy facade over today's tables (`36ca`): ancestry read model, the 14 references and raw `species_taxonomy` / sitemap queries routed through it, explicit `boundary` exports, the taxon-changed listener. Ships to main; timing floats, before Sources–Facts.
 - Taxon identity layer, built with the gall split: stable taxon IDs for plants (their species IDs), higher taxa and Inducers (new IDs above today's highest species ID), plus the crosswalk.
 - Sources–Facts layer and audit, acceptance tests first (`8567` step 2). Sources gain kind, authorship date (from `pubyear` for existing ones), and retraction status.
 - Gall system: Galls split from species; Traits, Relationships (15 types), qualifiers, aliases, and range as Facts; synchronous taxonomy-change listener.
@@ -36,6 +37,27 @@ From starting the replacement system to running it in production. Covers **phase
 - Test infrastructure: rewrite `priv/repo/test_seeds.sql` for the new model; adapt the prod-data test targets (`make test-prod-data*`).
 
 ### M2. Data migration scripts (repeatable, run against copies until cutover)
+
+**Approach (Jeff, 2026-10-06).** Today there are no Facts — data hangs off species rows, with Sources linked per page (`species_source`). **The pipeline is the migration for everything that lives in Sources;** only what can't come out of a Source migrates directly. Assuming a pipeline that turns an arbitrary Source into valid JSON:
+
+1. Run some high-value existing Sources through the pipeline → JSON.
+2. A one-off tool (`b119`) compares that JSON with the data stored today for the same species (where the species is on both sides; the pipeline may produce more).
+3. Iterate pipeline and diff until satisfied the pipeline produces accurate data (`8546`).
+4. Run **all** current Sources, including Gallformers ID Notes, through the pipeline → JSON.
+5. Bulk-import the JSON into the new system.
+6. One-off sanity check, old database vs new: they should be similar, the new much better. Needs human judgement. (Possibly the same tool as step 2.)
+7. Not good enough → back to step 1, tweak the pipeline.
+8. Good enough → release.
+
+**What migrates directly** — what doesn't come out of Sources; certain so far:
+- **Gall entries as skeletons:** ID, name, Gallformers Code, URL, images, editorial data — so `/gall/:id`, Codes, and images survive, and batches can reference Galls by ID.
+- **Skeletal taxonomy, taken as accurate as currently defined** — no taxonomy changes during imports; old names in Sources resolve through synonymy (aliases). It **includes Inducer species**, which today exist only inside gall names (suffix mapping, agamic/sexgen merging).
+- **Hosts:** plants with their POWO ranges and genus placeholders.
+- **Range exceptions** (curator removals): Gallformers data — curatorial, with other Sources possible later.
+- **Sources as records** (bibliographic data; the page deep links in `species_source.externallink` unless the pipeline reproduces them).
+- Keys and other non-Fact data.
+
+What else migrates is open until step 6 shows what the pipeline doesn't reproduce; each class gets a decision then (M0). The items below predate this approach: those describing Facts (Traits, Hosts as Facts, Relationships, aliases, Source 58, gall ranges beyond exceptions) are now produced by the pipeline and need re-review.
 
 - Refresh the data inventory on a fresh production copy.
 - Gall split: every gall row becomes a Gall entry keeping its ID, Gallformers Code, URL, and image paths.
@@ -68,7 +90,7 @@ From starting the replacement system to running it in production. Covers **phase
 ### M4. Pipeline and backscan
 
 - The pipeline workstream (`7fda`, `db6f`) produces `e381` v2 batches; Gallformers validates them.
-- Trial batches end to end on staging: a few Sources of different kinds (paper, website, research data), including a correction and a retraction.
+- Trial batches end to end on staging: a few Sources of different kinds (paper, website, research data), including a correction and a retraction. (The go/no-go trial on existing Sources, `8546`, comes much earlier — before the build.)
 - Full backscan of every existing Source on staging; curators approve or deny batches; resolve unresolved references; track coverage (Facts confirmed, Facts with no Source support).
 - Disposition of legacy Facts the backscan didn't confirm (per M0).
 

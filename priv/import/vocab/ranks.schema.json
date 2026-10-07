@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gallformers.org/schemas/import/v3/vocab/ranks.schema.json",
+  "title": "Taxon ranks",
+  "description": "Ranks a taxon reference may have. Nothing above family.",
+  "enum": ["family", "subfamily", "tribe", "subtribe", "genus", "subgenus", "section", "species", "subspecies", "variety", "form"]
+}

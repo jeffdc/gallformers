@@ -1,0 +1,45 @@
+{
+  "format": "gallformers-import",
+  "format_version": 3,
+  "vocabulary_version": "2026-10-07",
+  "batch_type": "gall",
+  "mode": "add",
+  "batch_id": "0b5e3a52-6d0f-4c41-9d6e-1f2a3b4c5d04",
+  "produced_at": "2026-10-07T14:00:00Z",
+  "producer": { "name": "curator-notes", "version": "0.0.1", "model": "example-model", "instructions_version": "2026-10-07" },
+
+  "source": { "gallformers": true },
+
+  "taxa": [
+    { "ref": "t1", "name_as_written": "Andricus quercuscalifornicus", "rank": "species" },
+    { "ref": "t2", "name_as_written": "Quercus douglasii", "rank": "species" }
+  ],
+
+  "galls": [
+    {
+      "ref": "g1",
+      "name_as_written": "Andricus quercuscalifornicus agamic gall",
+      "identified_by": { "inducer": "t1", "generation": { "value": "agamic", "as_written": "agamic" } }
+    }
+  ],
+
+  "facts": [
+    {
+      "id": "f1", "stance": "confirm", "kind": "range", "gall": "g1", "adjustment": "exclude",
+      "place": { "value": "US-NV", "as_written": "Nevada" },
+      "evidence": [{
+        "statement": { "text": "The host's range reaches western Nevada, but no gall has ever been recorded there; excluded until a record appears.", "stated_on": "2026-10-07" }
+      }]
+    },
+    {
+      "id": "f2", "stance": "confirm", "kind": "relationship", "type": "host_of", "subject": "t2", "object": "g1",
+      "evidence": [{
+        "statement": { "text": "Verified on Q. douglasii from several Research Grade observations with clear host photos.", "stated_on": "2026-10-07" },
+        "observations": [
+          { "provider": "inaturalist", "id": "123456789" },
+          { "provider": "inaturalist", "id": "123456790" }
+        ]
+      }]
+    }
+  ]
+}

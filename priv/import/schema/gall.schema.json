@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gallformers.org/schemas/import/v3/schema/gall.schema.json",
+  "title": "Gallformers import — gall batch",
+  "description": "What a Source states about Galls: Relationships (including Hosts and Inducers), qualifiers, Traits, range adjustments, common names, and descriptions (quotes). Applied after the taxonomy batch from the same Source. Never contains taxonomic acts. DRAFT (format v3, 2026-10-07).",
+  "type": "object",
+  "allOf": [{ "$ref": "common.schema.json#/$defs/envelope" }],
+  "required": ["batch_type", "taxa", "galls", "facts"],
+  "properties": {
+    "format": true, "format_version": true, "vocabulary_version": true, "mode": true,
+    "batch_id": true, "produced_at": true, "producer": true, "source": true,
+    "batch_type": { "const": "gall" },
+    "taxa": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/taxon_ref" },
+      "description": "Every taxon the Galls and Facts mention (Inducers, Hosts, other organisms), declared once."
+    },
+    "galls": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/gall_ref" },
+      "description": "Every Gall the Facts mention, declared once."
+    },
+    "facts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/fact" },
+      "description": "May be empty only for a retraction notice."
+    },
+    "unmapped": { "$ref": "common.schema.json#/$defs/unmapped" }
+  },
+  "unevaluatedProperties": false,
+
+  "$defs": {
+    "gall_ref": {
+      "description": "A Gall, described by what identifies it in the Source. Gallformers resolves it to a Gall entry; never map it to an ID yourself.",
+      "type": "object",
+      "required": ["ref", "name_as_written", "identified_by"],
+      "properties": {
+        "ref": { "$ref": "common.schema.json#/$defs/gall_ref_id" },
+        "name_as_written": { "type": "string", "minLength": 1, "description": "How the Source refers to the Gall (e.g. 'the agamic gall of Andricus …', 'a small spindle gall on the midrib')." },
+        "identified_by": {
+          "type": "object",
+          "properties": {
+            "inducer": { "$ref": "common.schema.json#/$defs/taxon_ref_id", "description": "The Inducer, at whatever rank the Source gives (species, or genus/family for undescribed Galls)." },
+            "generation": {
+              "type": "object",
+              "required": ["value", "as_written"],
+              "properties": {
+                "value": { "$ref": "../vocab/traits.schema.json#/$defs/generation" },
+                "as_written": { "type": "string", "minLength": 1 }
+              },
+              "additionalProperties": false
+            },
+            "host": { "$ref": "common.schema.json#/$defs/taxon_ref_id", "description": "Use when the Host distinguishes the Gall (e.g. an undescribed Gall known only from its Host)." }
+          },
+          "anyOf": [{ "required": ["inducer"] }, { "required": ["host"] }],
+          "additionalProperties": false
+        },
+        "new": {
+          "type": "boolean",
+          "description": "true only when the Source describes a Gall Gallformers does not have. The batch must then contain at least one Fact about it."
+        },
+        "gallformers_gall_id": { "type": "integer", "minimum": 1, "description": "Optional; checked against identified_by. Omit unless certain." }
+      },
+      "additionalProperties": false
+    },
+
+    "fact": {
+      "description": "Dispatches on kind (if/then rather than oneOf, so validation errors point at the offending field).",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["relationship", "qualifier", "trait", "range", "alias", "description"] }
+      },
+      "allOf": [
+        { "if": { "properties": { "kind": { "const": "relationship" } } }, "then": { "$ref": "#/$defs/relationship_fact" } },
+        { "if": { "properties": { "kind": { "const": "qualifier" } } }, "then": { "$ref": "#/$defs/qualifier_fact" } },
+        { "if": { "properties": { "kind": { "const": "trait" } } }, "then": { "$ref": "#/$defs/trait_fact" } },
+        { "if": { "properties": { "kind": { "const": "range" } } }, "then": { "$ref": "#/$defs/range_fact" } },
+        { "if": { "properties": { "kind": { "const": "alias" } } }, "then": { "$ref": "#/$defs/alias_fact" } },
+        { "if": { "properties": { "kind": { "const": "description" } } }, "then": { "$ref": "#/$defs/description_fact" } }
+      ]
+    },
+
+    "fact_base": {
+      "type": "object",
+      "required": ["id", "stance", "kind", "evidence"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/fact_id" },
+        "stance": { "$ref": "common.schema.json#/$defs/stance" },
+        "evidence": { "$ref": "common.schema.json#/$defs/evidence" }
+      }
+    },
+
+    "relationship_fact": {
+      "description": "A Relationship. Endpoint kinds depend on type: organism → Gall; Gall → Gall; or organism → organism within a Gall (gall_context). host_of needs a plant subject (checked in the dry run).",
+      "allOf": [
+        { "$ref": "#/$defs/fact_base" },
+        {
+          "if": { "properties": { "type": { "$ref": "../vocab/relationships.schema.json#/$defs/taxon_to_gall" } } },
+          "then": {
+            "properties": {
+              "subject": { "$ref": "common.schema.json#/$defs/taxon_ref_id" },
+              "object": { "$ref": "common.schema.json#/$defs/gall_ref_id" },
+              "gall_context": false
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "$ref": "../vocab/relationships.schema.json#/$defs/gall_to_gall" } } },
+          "then": {
+            "properties": {
+              "subject": { "$ref": "common.schema.json#/$defs/gall_ref_id" },
+              "object": { "$ref": "common.schema.json#/$defs/gall_ref_id" },
+              "gall_context": false
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "$ref": "../vocab/relationships.schema.json#/$defs/taxon_to_taxon_in_gall" } } },
+          "then": {
+            "required": ["gall_context"],
+            "properties": {
+              "subject": { "$ref": "common.schema.json#/$defs/taxon_ref_id" },
+              "object": { "$ref": "common.schema.json#/$defs/taxon_ref_id" }
+            }
+          }
+        }
+      ],
+      "required": ["type", "subject", "object"],
+      "properties": {
+        "kind": { "const": "relationship" },
+        "type": { "$ref": "../vocab/relationships.schema.json#/$defs/type" },
+        "subject": { "type": "string" },
+        "object": { "type": "string" },
+        "gall_context": { "$ref": "common.schema.json#/$defs/gall_ref_id" }
+      },
+      "unevaluatedProperties": false
+    },
+
+    "qualifier_fact": {
+      "description": "A qualifier on a Relationship Fact in this batch (of = that Fact's id). Its own Fact, independently sourced. Which qualifiers fit which Relationship types: see PRODUCER_GUIDE.md.",
+      "allOf": [
+        { "$ref": "#/$defs/fact_base" },
+        { "if": { "properties": { "qualifier": { "const": "required_for_formation" } } }, "then": { "properties": { "value": { "properties": { "value": { "const": true } } } } } },
+        { "if": { "properties": { "qualifier": { "const": "lethality" } } }, "then": { "properties": { "value": { "properties": { "value": { "$ref": "../vocab/relationships.schema.json#/$defs/lethality" } } } } } },
+        { "if": { "properties": { "qualifier": { "const": "parasitism_mode" } } }, "then": { "properties": { "value": { "properties": { "value": { "$ref": "../vocab/relationships.schema.json#/$defs/parasitism_mode" } } } } } }
+      ],
+      "required": ["of", "qualifier", "value"],
+      "properties": {
+        "kind": { "const": "qualifier" },
+        "of": { "$ref": "common.schema.json#/$defs/fact_id" },
+        "qualifier": { "enum": ["required_for_formation", "lethality", "parasitism_mode"] },
+        "value": { "$ref": "#/$defs/controlled_value" }
+      },
+      "unevaluatedProperties": false
+    },
+
+    "trait_fact": {
+      "description": "One Trait value of a Gall. Multi-valued Traits get one Fact per value. detachable is single-valued (the newest value is current). Generation is not a Fact: it identifies the Gall (galls[].identified_by).",
+      "allOf": [
+        { "$ref": "#/$defs/fact_base" },
+        { "$ref": "#/$defs/trait_value_for" }
+      ],
+      "required": ["gall", "trait", "value"],
+      "properties": {
+        "kind": { "const": "trait" },
+        "gall": { "$ref": "common.schema.json#/$defs/gall_ref_id" },
+        "trait": { "enum": ["detachable", "plant_part", "form", "shape", "color", "texture", "alignment", "walls", "cells", "season"] },
+        "value": { "$ref": "#/$defs/controlled_value" }
+      },
+      "unevaluatedProperties": false
+    },
+
+    "trait_value_for": {
+      "description": "The allowed values for each trait.",
+      "allOf": [
+        { "if": { "properties": { "trait": { "const": "detachable" } } }, "then": { "properties": { "value": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/detachable" } } } } } },
+        { "if": { "properties": { "trait": { "const": "plant_part" } } }, "then": { "properties": { "value": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/plant_part" } } } } } },
+        { "if": { "properties": { "trait": { "const": "form" } } }, "then": { "properties": { "value": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/form" } } } } } },
+        { "if": { "properties": { "trait": { "const": "shape" } } }, "then": { "properties": { "value": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/shape" } } } } } },
+        { "if": { "properties": { "trait": { "const": "color" } } }, "then": { "properties": { "value": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/color" } } } } } },
+        { "if": { "properties": { "trait": { "const": "texture" } } }, "then": { "properties": { "value": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/texture" } } } } } },
+        { "if": { "properties": { "trait": { "const": "alignment" } } }, "then": { "properties": { "value": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/alignment" } } } } } },
+        { "if": { "properties": { "trait": { "const": "walls" } } }, "then": { "properties": { "value": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/walls" } } } } } },
+        { "if": { "properties": { "trait": { "const": "cells" } } }, "then": { "properties": { "value": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/cells" } } } } } },
+        { "if": { "properties": { "trait": { "const": "season" } } }, "then": { "properties": { "value": { "properties": { "value": { "$ref": "../vocab/traits.schema.json#/$defs/season" } } } } } }
+      ]
+    },
+
+    "range_fact": {
+      "description": "An adjustment to the Gall's potential range, which Gallformers computes from its Hosts and is never imported. include: the Gall occurs in a place outside the Hosts' ranges. exclude: it does not occur in a place within them.",
+      "allOf": [{ "$ref": "#/$defs/fact_base" }],
+      "required": ["gall", "adjustment", "place"],
+      "properties": {
+        "kind": { "const": "range" },
+        "gall": { "$ref": "common.schema.json#/$defs/gall_ref_id" },
+        "adjustment": { "enum": ["include", "exclude"] },
+        "place": {
+          "$ref": "#/$defs/controlled_value",
+          "properties": { "value": { "$ref": "../vocab/place-codes.schema.json" } }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+
+    "alias_fact": {
+      "description": "A common name for the Gall. Scientific names are taxon synonyms and belong in taxonomy batches.",
+      "allOf": [{ "$ref": "#/$defs/fact_base" }],
+      "required": ["gall", "name"],
+      "properties": {
+        "kind": { "const": "alias" },
+        "gall": { "$ref": "common.schema.json#/$defs/gall_ref_id" },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "unevaluatedProperties": false
+    },
+
+    "description_fact": {
+      "description": "The Source's description of a Gall: a collage of direct quotes, in reading order. The quotes in evidence ARE the description. No summaries or paraphrase. At most one per Gall per Source.",
+      "allOf": [{ "$ref": "#/$defs/fact_base" }],
+      "required": ["gall"],
+      "properties": {
+        "kind": { "const": "description" },
+        "gall": { "$ref": "common.schema.json#/$defs/gall_ref_id" }
+      },
+      "unevaluatedProperties": false
+    },
+
+    "controlled_value": {
+      "description": "A controlled value with the Source's own wording beside it.",
+      "type": "object",
+      "required": ["value", "as_written"],
+      "properties": {
+        "value": true,
+        "as_written": { "type": "string", "minLength": 1, "description": "The Source's own term or phrase that was mapped to value." }
+      },
+      "additionalProperties": false
+    }
+  }
+}

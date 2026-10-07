@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gallformers.org/schemas/import/v3/schema/taxonomy.schema.json",
+  "title": "Gallformers import — taxonomy batch",
+  "description": "Taxonomic acts a Source states: names, placements, synonymies, splits. Applied before the gall batch from the same Source. Never contains Galls. Never changes plant taxa (except the rare gall-forming plant). DRAFT (format v3, 2026-10-07).",
+  "type": "object",
+  "allOf": [{ "$ref": "common.schema.json#/$defs/envelope" }],
+  "required": ["batch_type", "taxa", "acts"],
+  "properties": {
+    "format": true, "format_version": true, "vocabulary_version": true, "mode": true,
+    "batch_id": true, "produced_at": true, "producer": true, "source": true,
+    "batch_type": { "const": "taxonomy" },
+    "taxa": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "common.schema.json#/$defs/taxon_ref" },
+      "description": "Every taxon the acts mention, declared once."
+    },
+    "acts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/act" },
+      "description": "May be empty only for a retraction notice."
+    },
+    "unmapped": { "$ref": "common.schema.json#/$defs/unmapped" }
+  },
+  "unevaluatedProperties": false,
+
+  "$defs": {
+    "act": {
+      "description": "Dispatches on kind (if/then rather than oneOf, so validation errors point at the offending field).",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["name", "placement", "synonymy", "split"] }
+      },
+      "allOf": [
+        { "if": { "properties": { "kind": { "const": "name" } } }, "then": { "$ref": "#/$defs/name_act" } },
+        { "if": { "properties": { "kind": { "const": "placement" } } }, "then": { "$ref": "#/$defs/placement_act" } },
+        { "if": { "properties": { "kind": { "const": "synonymy" } } }, "then": { "$ref": "#/$defs/synonymy_act" } },
+        { "if": { "properties": { "kind": { "const": "split" } } }, "then": { "$ref": "#/$defs/split_act" } }
+      ]
+    },
+
+    "act_base": {
+      "type": "object",
+      "required": ["id", "stance", "kind", "evidence"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/act_id" },
+        "stance": { "$ref": "common.schema.json#/$defs/stance" },
+        "evidence": { "$ref": "common.schema.json#/$defs/evidence" }
+      }
+    },
+
+    "name_act": {
+      "description": "The taxon exists with this name and rank, with this authorship. Combined with taxa[].new, the Source's description of a new taxon or new combination.",
+      "allOf": [{ "$ref": "#/$defs/act_base" }],
+      "required": ["taxon"],
+      "properties": {
+        "kind": { "const": "name" },
+        "taxon": { "$ref": "common.schema.json#/$defs/taxon_ref_id" },
+        "authorship": {
+          "type": "object",
+          "required": ["as_written"],
+          "properties": {
+            "as_written": { "type": "string", "minLength": 1, "description": "Exactly as written, e.g. '(Ashmead, 1881)'. Not parsed." }
+          },
+          "additionalProperties": false
+        }
+      },
+      "unevaluatedProperties": false
+    },
+
+    "placement_act": {
+      "description": "The taxon sits under this parent. A newer placement than the current one is a move. A new intermediate rank is a name act plus placements.",
+      "allOf": [{ "$ref": "#/$defs/act_base" }],
+      "required": ["taxon", "parent"],
+      "properties": {
+        "kind": { "const": "placement" },
+        "taxon": { "$ref": "common.schema.json#/$defs/taxon_ref_id" },
+        "parent": { "$ref": "common.schema.json#/$defs/taxon_ref_id" }
+      },
+      "unevaluatedProperties": false
+    },
+
+    "synonymy_act": {
+      "description": "name is a synonym of accepted. A lump is several synonymy acts. A recombination is a placement, the new combination's name act, and the old combination as a synonym.",
+      "allOf": [{ "$ref": "#/$defs/act_base" }],
+      "required": ["name", "accepted"],
+      "properties": {
+        "kind": { "const": "synonymy" },
+        "name": { "$ref": "common.schema.json#/$defs/taxon_ref_id" },
+        "accepted": { "$ref": "common.schema.json#/$defs/taxon_ref_id" }
+      },
+      "unevaluatedProperties": false
+    },
+
+    "split_act": {
+      "description": "The taxon was divided into these taxa. States the division only; assigning existing records to the daughters is curator work.",
+      "allOf": [{ "$ref": "#/$defs/act_base" }],
+      "required": ["taxon", "into"],
+      "properties": {
+        "kind": { "const": "split" },
+        "taxon": { "$ref": "common.schema.json#/$defs/taxon_ref_id" },
+        "into": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/taxon_ref_id" }
+        }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

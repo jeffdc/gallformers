@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gallformers.org/schemas/import/v3/vocab/relationships.schema.json",
+  "title": "Relationship types and qualifiers",
+  "description": "The system-level fixed list of Relationship types (domain model), grouped by endpoint kinds, and the qualifier vocabularies. Meanings: docs/domain/domain-model.md and PRODUCER_GUIDE.md.",
+  "$defs": {
+    "type": {
+      "description": "All Relationship types (the union of the three endpoint groups below).",
+      "enum": ["inducer_of", "host_of", "symbiont_of", "inquiline_of", "cecidophage_in", "parasitoid_in", "emerged_from", "feeds_on", "herbivore_of", "successor_in", "modified_form_of", "alternate_generation_of", "parasitoid_of", "vectored_by", "predator_of"]
+    },
+    "taxon_to_gall": {
+      "description": "Subject is an organism (taxon); object is a Gall.",
+      "enum": ["inducer_of", "host_of", "symbiont_of", "inquiline_of", "cecidophage_in", "parasitoid_in", "emerged_from", "feeds_on", "herbivore_of", "successor_in"]
+    },
+    "gall_to_gall": {
+      "description": "Subject and object are Galls.",
+      "enum": ["modified_form_of", "alternate_generation_of"]
+    },
+    "taxon_to_taxon_in_gall": {
+      "description": "Subject and object are organisms; the Relationship happens in a Gall (gall_context).",
+      "enum": ["parasitoid_of", "vectored_by", "predator_of"]
+    },
+    "lethality": { "enum": ["lethal", "non-lethal"] },
+    "parasitism_mode": { "enum": ["idiobiont", "koinobiont", "solitary", "gregarious", "ecto", "endo"] }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gallformers.org/schemas/import/v3/vocab/licenses.schema.json",
+  "title": "Licenses",
+  "description": "Exactly Gallformers.Licenses.all/0. A Source with no stated license is 'All Rights Reserved'.",
+  "enum": ["Public Domain / CC0", "CC-BY", "CC-BY-SA", "CC-BY-NC", "CC-BY-NC-SA", "CC-BY-ND", "CC-BY-NC-ND", "All Rights Reserved"]
+}

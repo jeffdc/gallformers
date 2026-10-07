@@ -1,0 +1,73 @@
+{
+  "format": "gallformers-import",
+  "format_version": 3,
+  "vocabulary_version": "2026-10-07",
+  "batch_type": "gall",
+  "mode": "replace",
+  "batch_id": "0b5e3a52-6d0f-4c41-9d6e-1f2a3b4c5d03",
+  "produced_at": "2026-10-07T14:00:00Z",
+  "producer": { "name": "example", "version": "0.0.1", "model": "example-model", "instructions_version": "2026-10-07" },
+
+  "source": {
+    "kind": "publication",
+    "title": "A revision of example oak gall wasps",
+    "authors": ["Smith, C.", "Jones, D."],
+    "authored": { "date": "2025-03", "as_written": "March 2025" },
+    "citation": "Smith, C. & Jones, D. 2025. A revision of example oak gall wasps. Example Zootaxa 5000: 1-80.",
+    "license": { "value": "All Rights Reserved", "as_written": "© 2025 Example Press" },
+    "document": { "file": "document.json", "sha256": "1111111111111111111111111111111111111111111111111111111111111111" }
+  },
+
+  "taxa": [
+    { "ref": "t1", "name_as_written": "Andricus exemplaris", "rank": "species" },
+    { "ref": "t2", "name_as_written": "Quercus garryana", "rank": "species" }
+  ],
+
+  "galls": [
+    {
+      "ref": "g1",
+      "new": true,
+      "name_as_written": "the sexual-generation bud gall of Andricus exemplaris",
+      "identified_by": { "inducer": "t1", "generation": { "value": "sexual", "as_written": "sexual generation" } }
+    },
+    {
+      "ref": "g2",
+      "new": true,
+      "name_as_written": "the agamic-generation leaf gall of Andricus exemplaris",
+      "identified_by": { "inducer": "t1", "generation": { "value": "agamic", "as_written": "asexual generation" } }
+    }
+  ],
+
+  "facts": [
+    {
+      "id": "f1", "stance": "confirm", "kind": "relationship", "type": "inducer_of", "subject": "t1", "object": "g1",
+      "evidence": [{ "item": "#/texts/125", "quote": "Sexual generation: galls in buds of Quercus garryana", "page": "13" }]
+    },
+    {
+      "id": "f2", "stance": "confirm", "kind": "relationship", "type": "inducer_of", "subject": "t1", "object": "g2",
+      "evidence": [{ "item": "#/texts/130", "quote": "Asexual generation: galls on the underside of leaves", "page": "14" }]
+    },
+    {
+      "id": "f3", "stance": "confirm", "kind": "relationship", "type": "host_of", "subject": "t2", "object": "g1",
+      "evidence": [{ "item": "#/texts/125", "quote": "galls in buds of Quercus garryana", "page": "13" }]
+    },
+    {
+      "id": "f4", "stance": "confirm", "kind": "relationship", "type": "host_of", "subject": "t2", "object": "g2",
+      "evidence": [{ "item": "#/texts/131", "quote": "known only from Q. garryana", "page": "14" }]
+    },
+    {
+      "id": "f5", "stance": "confirm", "kind": "relationship", "type": "alternate_generation_of", "subject": "g1", "object": "g2",
+      "evidence": [{ "item": "#/texts/140", "quote": "rearing experiments confirmed that the two generations alternate", "page": "15" }]
+    },
+    {
+      "id": "f6", "stance": "confirm", "kind": "trait", "gall": "g1", "trait": "plant_part",
+      "value": { "value": "bud", "as_written": "buds" },
+      "evidence": [{ "item": "#/texts/125", "quote": "galls in buds of Quercus garryana", "page": "13" }]
+    },
+    {
+      "id": "f7", "stance": "confirm", "kind": "trait", "gall": "g2", "trait": "plant_part",
+      "value": { "value": "lower leaf", "as_written": "underside of leaves" },
+      "evidence": [{ "item": "#/texts/130", "quote": "galls on the underside of leaves", "page": "14" }]
+    }
+  ]
+}

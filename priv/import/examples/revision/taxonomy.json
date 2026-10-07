@@ -1,0 +1,68 @@
+{
+  "format": "gallformers-import",
+  "format_version": 3,
+  "vocabulary_version": "2026-10-07",
+  "batch_type": "taxonomy",
+  "mode": "replace",
+  "batch_id": "0b5e3a52-6d0f-4c41-9d6e-1f2a3b4c5d02",
+  "produced_at": "2026-10-07T14:00:00Z",
+  "producer": { "name": "example", "version": "0.0.1", "model": "example-model", "instructions_version": "2026-10-07" },
+
+  "source": {
+    "kind": "publication",
+    "title": "A revision of example oak gall wasps",
+    "authors": ["Smith, C.", "Jones, D."],
+    "authored": { "date": "2025-03", "as_written": "March 2025" },
+    "citation": "Smith, C. & Jones, D. 2025. A revision of example oak gall wasps. Example Zootaxa 5000: 1-80.",
+    "license": { "value": "All Rights Reserved", "as_written": "© 2025 Example Press" },
+    "document": { "file": "document.json", "sha256": "1111111111111111111111111111111111111111111111111111111111111111" }
+  },
+
+  "taxa": [
+    { "ref": "t1", "name_as_written": "Andricus", "rank": "genus" },
+    { "ref": "t2", "name_as_written": "Cynipini", "rank": "tribe" },
+    { "ref": "t3", "name_as_written": "Andricus exemplaris", "rank": "species", "new": { "status": "sp. nov." } },
+    { "ref": "t4", "name_as_written": "Callirhytis quercusexempla", "rank": "species" },
+    { "ref": "t5", "name_as_written": "Andricus quercusexempla", "rank": "species", "new": { "status": "comb. nov." } },
+    { "ref": "t6", "name_as_written": "Andricus primus", "rank": "species" },
+    { "ref": "t7", "name_as_written": "Andricus secundus", "rank": "species" },
+    { "ref": "t8", "name_as_written": "Andricus tertius", "rank": "species", "new": { "status": "sp. nov." } }
+  ],
+
+  "acts": [
+    {
+      "id": "a1", "stance": "confirm", "kind": "name", "taxon": "t3",
+      "authorship": { "as_written": "Smith & Jones, 2025" },
+      "evidence": [{ "item": "#/texts/120", "quote": "Andricus exemplaris Smith & Jones, sp. nov.", "page": "12" }]
+    },
+    {
+      "id": "a2", "stance": "confirm", "kind": "placement", "taxon": "t3", "parent": "t1",
+      "evidence": [{ "item": "#/texts/120", "quote": "Andricus exemplaris Smith & Jones, sp. nov.", "page": "12" }]
+    },
+    {
+      "id": "a3", "stance": "confirm", "kind": "name", "taxon": "t5",
+      "authorship": { "as_written": "(Ashmead, 1885)" },
+      "evidence": [{ "item": "#/texts/200", "quote": "Andricus quercusexempla (Ashmead, 1885), comb. nov.", "page": "20" }]
+    },
+    {
+      "id": "a4", "stance": "confirm", "kind": "placement", "taxon": "t5", "parent": "t1",
+      "evidence": [{ "item": "#/texts/200", "quote": "Andricus quercusexempla (Ashmead, 1885), comb. nov.", "page": "20" }]
+    },
+    {
+      "id": "a5", "stance": "confirm", "kind": "synonymy", "name": "t4", "accepted": "t5",
+      "evidence": [{ "item": "#/texts/201", "quote": "Callirhytis quercusexempla Ashmead, 1885 is transferred to Andricus", "page": "20" }]
+    },
+    {
+      "id": "a6", "stance": "confirm", "kind": "placement", "taxon": "t1", "parent": "t2",
+      "evidence": [{ "item": "#/texts/15", "quote": "Andricus, the largest genus of the tribe Cynipini", "page": "4" }]
+    },
+    {
+      "id": "a7", "stance": "confirm", "kind": "split", "taxon": "t6", "into": ["t6", "t8"],
+      "evidence": [{ "item": "#/texts/300", "quote": "material formerly treated as A. primus comprises two species; the western populations are described here as A. tertius", "page": "31" }]
+    },
+    {
+      "id": "a8", "stance": "confirm", "kind": "synonymy", "name": "t7", "accepted": "t6",
+      "evidence": [{ "item": "#/texts/310", "quote": "A. secundus syn. nov. of A. primus", "page": "33" }]
+    }
+  ]
+}

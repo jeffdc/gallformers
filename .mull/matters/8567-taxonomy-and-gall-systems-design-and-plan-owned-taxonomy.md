@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-10-03
-updated: 2026-10-05
+updated: 2026-10-06
 epic: taxonomy
-relates: [1121, b5bd, e381]
+relates: [1121, b5bd, e381, 36ca, 294c, b119, 8546]
 ---
 
 # Taxonomy and gall systems — design and plan (owned taxonomy)
@@ -41,7 +41,7 @@ Both systems are black boxes behind internal APIs (Phoenix contexts; `boundary` 
 9. **Gall names** are derived (Inducer plus qualifiers as needed for uniqueness: generation, Host, form), overridable, and unique.
 10. **Ranges — leave as much alone as possible** (Jeff, 2026-10-05). **Potential range** = union of all Hosts' ranges (POWO/WCVP or curator-adjusted), genus-level Hosts included as today — computed, not stored, inherited through Host Facts. Adjustments are Facts: **range inclusion / exclusion** (Gall + place), stated by Sources or by Gallformers (a curator removing a region = an exclusion attributed to Gallformers). The ID tool uses the potential range with adjustments applied — effectively what it uses today. Only the adjustments are stored, which removes the bloat of today's stored gall range (mostly copies of the host union). **Observed range** (Research Grade iNat observational data) is future.
 11. **Import** follows `e381`. Facts from a Source aren't curated after import; a curator who disagrees adds a **Gallformers** statement (confirming or denying). Re-import replaces a Source's attributions.
-12. **Pipeline artifacts are the primary admin interface** (Jeff, 2026-10-05). Data gets in and gets fixed through trusted pipeline batches, not hand-edited forms; screens exist only where unavoidable — taxonomy, batch approve/deny (with unresolved references), and retraction. Curator corrections can follow the same path: a curator writes plain notes, an LLM turns them into a batch attributed to the Gallformers Source, and it is validated and approved like any other. Consequence: the pipeline becomes a critical system, and the quality of its output must be earned, measured, and maintained.
+12. **Pipeline artifacts are the primary admin interface** (Jeff, 2026-10-05). Data gets in and gets fixed through trusted pipeline batches, not hand-edited forms; screens exist only where unavoidable — taxonomy, batch approve/deny (with unresolved references), and retraction. Curator corrections can follow the same path: a curator writes plain notes, an LLM turns them into a batch attributed to the Gallformers Source, and it is validated and approved like any other. Consequence: the pipeline becomes a critical system, and the quality of its output must be earned, measured, and maintained. **Restated 2026-10-06: every write is a batch** — the interface is the import JSON Schema (or a fragment of it), so any tool, screen, human, or LLM that produces valid JSON can deliver updates; nothing depends on the LLM itself. The pipeline is an LLM with skills/docs (derived from the domain doc and `e381`) plus the validator (`294c`).
 
 ## Sources–Facts design (0b, 2026-10-05)
 
@@ -51,9 +51,9 @@ Both systems are black boxes behind internal APIs (Phoenix contexts; `boundary` 
 4. **Standings:** *Current* (shown) · *Withdrawn* — newest stance denies (shown, marked) · *Superseded* — a newer value replaced it (shown as history) · *Retracted* — its support was retracted (shown, marked) · *Unsupported* — re-import dropped it (hidden; audit keeps it).
 5. **Storage:** a central `facts` table (ID, kind, precomputed standing); each system owns typed detail tables keyed by Fact ID; attributions reference the Fact ID with a real foreign key. Hot reads use the stored standing.
 6. **Identity:** each kind has a natural key (Host = Gall + host taxon; Trait = Gall + Trait + value; Range adjustment = Gall + place + include/exclude; Placement = taxon + parent). **Relationship qualifiers are separate Facts** about the Relationship, independently sourced.
-7. **An attribution carries:** stance; locator (required for imported literature); optional short quote; **structured cited Observations** (provider + ID); **statement text** (required for Gallformers). The authorship date comes from the Source (Sources need one — today only `pubyear` exists; each Gallformers statement is its own dated entry). Who made the entry is audit.
+7. **An attribution carries:** stance; **quote** plus page hint (required for imported literature; replaces offset locators, 2026-10-06 — quotes are checkable against the stored plain text); **`name_as_written`** for each taxon the Source names (2026-10-06 — after a taxonomic split, Facts can only be re-resolved if we know the name the Source used); **structured cited Observations** (provider + ID); **statement text** (required for Gallformers). The authorship date comes from the Source (Sources need one — today only `pubyear` exists; each Gallformers statement is its own dated entry). Who made the entry is audit.
 
-**Scale (Fermi, checked against the production copy):** ~4×10³ Galls × ~90 Facts each ≈ 3.6×10⁵ Facts; × ~1.5–2 Sources per Fact ≈ 6–7×10⁵ attributions; taxonomic Facts add ~2–3×10⁴. Realistic ~10⁶ rows, generous ceiling ~10⁷. Production already holds 1.08 million `host_range` rows. **Scale is not a risk; the spike was dropped.** The rule cases become acceptance tests, written first, in step 2.
+**Scale (Fermi, checked against the production copy):** ~4×10³ Galls × ~90 Facts each ≈ 3.6×10⁵ Facts; × ~1.5–2 Sources per Fact ≈ 6–7×10⁵ attributions; taxonomic Facts add ~2–3×10⁴. Realistic ~10⁶ rows, generous ceiling ~10⁷. Production already holds 1.08 million `host_range` rows. **Scale is not a risk; the spike was dropped.** The rule cases become acceptance tests, written first, in step 4.
 
 ## What Relationships need from the taxonomy API
 
@@ -69,21 +69,39 @@ Both systems are black boxes behind internal APIs (Phoenix contexts; `boundary` 
 ## Phases
 
 1. **Gall system, on today's taxonomy.** Split Galls from species; Relationships and Sources–Facts; a **taxon identity layer** (one stable taxon ID per existing `species` row and `taxonomy` node, wrapping today's tables) so Galls can link to any rank. Build shared parts generically. Ship.
-2. **Taxonomy system,** rebuilt behind the same IDs: sourced names, authorship, placement, taxonomic acts with history, POWO import. No gall changes.
+2. **Taxonomy system,** rebuilt behind the same IDs: sourced names, authorship, placement, taxonomic acts with history, POWO import. No gall changes. Phase 2 is mainly about the hard taxonomy edits — **splits and lumps**. Their mechanics can wait, but **the data they need must be captured in phase 1** (e.g. `name_as_written` on attributions). (Jeff, 2026-10-06)
 
 ## Work ordering
+
+**Reordered 2026-10-06** (Jeff's review): the real unknown is not code but **whether LLM output is good enough to be the input** — Adam is confident, Jeff is unsure — so the plan gets that evidence first, before the expensive work.
 
 | Step | What |
 |---|---|
 | 0a | ✅ Coupling inventory (below). |
 | 0b | ✅ Sources–Facts design (above). Spike dropped: scale isn't a risk. |
 | 0c | ✅ **Relationship-type review** (domain doc); the taxonomy API follows from the table above. |
-| 1 | **Taxonomy facade** over today's tables: ancestry read model, explicit `boundary` exports, the taxon-changed listener; route existing code through it. Ships to **main** as a behavior-preserving PR. Plan below. |
-| 2 | **Sources–Facts and audit,** built from the 0b design, acceptance tests first: two Sources confirming one Host; a denial arriving in both orders; a placement superseded; a retraction; re-import dropping a Fact; a qualifier denied while its Relationship stands; a Gallformers override citing Observations. |
-| 3 | **Import schema** (`e381`), validated with hand-made batches — gives the pipeline workstream a fixed target. |
-| 4 | **Gall system:** split from species; **taxon identity layer** (moved here from step 1, 2026-10-05: Inducer taxa only exist once galls split and agamic/sexgen pairs merge, and nothing reads taxon IDs before then); Traits and Relationships as Facts; ranges; read models for ID tool, search, pages, API (migration: `b5bd`). |
-| 5 | **Migration rehearsal, backscan, release** (release is sequenced with the backscan). |
-| 6 | **Phase 2:** taxonomy rebuilt behind the same API. |
+| 1 | **Import schema and validator** (`294c`): the `e381` format as a committed contract. |
+| 2 | **Pipeline-vs-database diff** (`b119`): a one-off tool comparing pipeline JSON with today's data for the same species. **The pipeline is the migration for everything that lives in Sources;** only what can't come out of a Source migrates directly (the eight-step approach in `b5bd` M2). |
+| 3 | **Pipeline trial on existing Sources — go/no-go** (`8546`). |
+| 4 | **Sources–Facts and audit,** built from the 0b design, acceptance tests first: two Sources confirming one Host; a denial arriving in both orders; a placement superseded; a retraction; re-import dropping a Fact; a qualifier denied while its Relationship stands; a Gallformers override citing Observations. |
+| 5 | **Gall system:** split from species; **taxon identity layer** (Inducer taxa only exist once galls split and agamic/sexgen pairs merge, and nothing reads taxon IDs before then); Traits and Relationships as Facts; ranges; read models for ID tool, search, pages, API (migration: `b5bd`). |
+| 6 | **Migration rehearsal, backscan, release** (release is sequenced with the backscan). |
+| 7 | **Phase 2:** taxonomy rebuilt behind the same API. |
+| floats | **Taxonomy facade** (`36ca`): ships to main; nothing in steps 1–3 depends on it. Do it after the trial, or as filler while waiting on Adam's trial batches — in any case before step 4. |
+
+**Shipping dark** (steps 4's tables and importer to main, unused, to shorten `taxogall`'s life): not adopted, kept in mind. The site has been stable for months and Jeff is the main committer, so the long-lived branch's risk is modest.
+
+## Success criteria (2026-10-06)
+
+- **ID-tool parity** with today on a sample of real queries.
+- **100% Fact–Source coverage** — Facts arrive from the pipeline's batches, plus Gallformers data for what no Source holds (e.g. range exceptions).
+- **Old vs new sanity check passes human judgement** (`b5bd` M2 step 6): similar to today, much better data.
+- **Trial metrics** (`8546`): agreement with the database, error attribution (database's vs LLM's), quote verification rate, cost per Source.
+
+## Review and admin (2026-10-06)
+
+- **The admin UI is the schema plus the delta view.** Batch approval will honestly be a rubber stamp, so **quality must come from the system, not the reviewer**: the delta view ranks changes by risk — *confirms* an existing Fact (bulk-approve), *new* Fact, *denies or replaces* one (where attention goes) — and **sample audits** check random Facts against their quotes, tracking an error rate over time.
+- **Click-through curators are effectively cut off** — an accepted cost of pipeline-first. Mitigation if needed: a small form that emits a schema fragment (rule 12).
 
 ## Step 0a findings (2026-10-04)
 
@@ -103,68 +121,7 @@ Script: `docs/plans/coupling_inventory.py` (local). **The taxonomy facade is sma
   - Web, 9 in 4 files: `admin/reclassify_helpers.ex` (`Lineage`, `Genus`); `admin/taxonomy_live/form.ex` (`Tree` ×2, `Taxonomy` ×2); `admin/taxonomy_live/index.ex` (`Taxonomy` ×2); `genus_live.ex` (`Lineage`).
   - Plus what the compiler can't see: raw `species_taxonomy` queries (5 files) and `sitemap_controller.ex`'s 4 raw `taxonomy` queries.
 - **Out of Taxonomy — 12 references in 3 files:** `taxonomy/reclassification.ex` (9), `taxonomy/species_link.ex` (1), `taxonomy/tree.ex` (2). One reaches into **Galls** (`reclassification.ex:107`), violating "taxonomy knows nothing about galls"; the other 11 reach into **Species** — species-as-taxa that move into the taxonomy system when galls split from species.
-- **Facade size: about 12–13 files**, confirming the estimate.
-
-## Step 1 plan — taxonomy facade (2026-10-05)
-
-**Goal:** make `Gallformers.Taxonomy` a black box over today's tables, so the gall split (step 4) and the taxonomy rebuild (phase 2) change what's behind it, not its callers. **No behavior change.**
-
-**Decisions (Jeff, 2026-10-05):** ships to **main** as an ordinary PR (branch from main, e.g. `taxonomy-facade`; then merge main into `taxogall`), keeping the long-lived branch from drifting on ~20 shared files. The taxon identity layer moves to step 4. The rule-6 listener is built now, with one real use.
-
-**Findings that shape it:**
-- Callers mostly use the context's ~60 public functions already. Leaks: the 14 internal-module references, raw `species_taxonomy` joins in `galls.ex`, `plants.ex` (3), `galls/identification.ex` (3), `search.ex`, and 4 raw `taxonomy` queries in `sitemap_controller.ex`.
-- **15 recursive CTEs walk the same tree** (genus → family, family → descendants) across `taxonomy/tree.ex` (7), `taxonomy/search.ex` (2), `taxonomy/species_link.ex` (2), `galls.ex`, `plants.ex` (2). One published read model replaces them.
-- Taxonomy reads gall data: `list_associated_genera`, `list_gall_families_for_host`, `list_gall_families_for_host_genus` join `gallhost`; `reclassification.ex:107` calls `Galls.force_undescribed_if_placeholder` inside its transaction. Its 11 references into `Species` are species-as-taxa and stay until step 4.
-- The `Species` and `Alias` schemas' `many_to_many :taxonomies` associations are unused; drop them.
-
-**Verification approach:** before any change, capture golden outputs from the unchanged code against the experiment DB (`gallformers_taxogall`): `Galls.get_galls_tree/1`, `get_undescribed_tree/1`, `Plants.get_hosts_tree/1`, the sitemap XML, `Search.search_taxonomy/1` for a sample of queries, and ID-tool results for a sample of genus/family/place filter combinations. Save them in `docs/plans/` (local) via a small script run with `MIX_ENV=dev PGDATABASE=gallformers_taxogall mix run`. Diff after every task; any difference is a bug.
-
-### Task 1: Ancestry read model
-
-- **Create:** a migration in `priv/repo/migrations/` defining two plain (non-materialized) Postgres views; `lib/gallformers/taxonomy/ancestry.ex` and `lib/gallformers/taxonomy/placement.ex` (read-only Ecto schemas over them); `test/gallformers/taxonomy/read_model_test.exs`.
-- **`taxonomy_ancestry`** — one row per (node, ancestor-or-self): `taxonomy_id, ancestor_id, ancestor_type, ancestor_rank, depth` (0 = self).
-- **`species_placement`** — one row per (species, node it sits under): `species_id, taxonomy_id, type, depth`, derived from `species_taxonomy` plus ancestry; distinct on (species, node), since a plant linked to both a section and its genus reaches the genus twice.
-- The views are the **published shape**: in step 4 they are redefined over the new taxa tables and consumers don't change. Plain views suffice at this size (1,615 nodes, ~7k links); check with `EXPLAIN ANALYZE` on the experiment DB, and materialize only if a hot page measurably slows.
-- **Tests:** a genus directly under a family; a genus under intermediates (subfamily → tribe); a section under a genus; a placeholder genus; a plant linked to genus and section (no duplicate rows); a gall linked to a genus; the self row at depth 0.
-
-### Task 2: Taxonomy internals use the read model
-
-- **Modify:** `taxonomy/tree.ex`, `taxonomy/search.ex`, `taxonomy/species_link.ex` — replace the recursive CTEs with joins on the views ("everything under family X" becomes `ancestor_id = X`).
-- Existing tests (`test/gallformers/taxonomy_test.exs`, `taxonomy/tree_test.exs`, `taxonomy/species_link_test.exs`) must pass unchanged; golden outputs unchanged.
-
-### Task 3: Route outside raw queries through the facade
-
-- **Modify:**
-  - `galls.ex` (`fetch_gall_tree_data`) and `plants.ex` (`fetch_host_tree_data`, the host-list family join ~line 872) — join `species_placement` instead of walking `taxonomy`.
-  - `galls/identification.ex` — genus filter (~249), family filter (~257, drops `Tree.genus_ids_for_family`), placeholder-in-genus path (~422) — join `species_placement`.
-  - `plants.ex` `get_genus_placeholder` (~361) and `update_species_section_link` (~714) — use `Taxonomy` API functions (add `unlink_species_from_taxonomy/2` beside `link_species_to_taxonomy/2`).
-  - `search.ex` `search_taxonomy` (~426) — move the query into `Taxonomy.Search` and delegate; `search.ex` stops referencing the `Taxonomy` schema.
-  - `sitemap_controller.ex` — use `Taxonomy.list_taxonomies_by_type/1` (or a lean `list_names_by_type/1` if the struct load is wasteful).
-  - Drop the unused `:taxonomies` associations from `species/species.ex` and `species/alias.ex`.
-- **Tests:** the existing gall/host tree, ID-tool (`test/gallformers/galls_identification_test.exs`, `test/gallformers_web/live/id_live_test.exs`), search and sitemap tests pass; golden outputs unchanged.
-
-### Task 4: Move gall-data queries out of Taxonomy
-
-- **Move** `list_associated_genera/2`, `list_gall_families_for_host/1`, `list_gall_families_for_host_genus/1` from `taxonomy/tree.ex` into `Galls` (they read `gallhost`), re-expressed over `species_placement`; update their callers (genus and host pages). Remove the delegates from `taxonomy.ex`.
-- `count_families_for_taxoncode/1` and `count_genera_for_taxoncode/1` filter on `species.taxoncode` (species-as-taxa); they stay in Taxonomy until step 4.
-- **Tests:** move the corresponding tests with the functions; golden outputs unchanged.
-
-### Task 5: Taxon-changed listener (rule 6)
-
-- **Create:** `lib/gallformers/taxonomy/change_listener.ex` (behaviour: `handle_taxon_change(change) :: :ok | {:error, reason}`); `lib/gallformers/taxonomy/change.ex` (event struct; first kind `:species_reassigned` with `species_id`, `from_genus_id`, `to_genus_id`, `to_placeholder?`); `lib/gallformers/galls/taxonomy_listener.ex`.
-- **Modify:** `taxonomy/reclassification.ex` — replace the direct `Galls` call with `notify/1`, which calls each listener in order **inside the transaction** and rolls back on the first `{:error, _}`. Listeners come from config (`config :gallformers, Gallformers.Taxonomy, change_listeners: [Gallformers.Galls.TaxonomyListener]` in `config/config.exs`), read at runtime so tests can substitute; Taxonomy's code never names Galls. `Galls.force_undescribed_if_placeholder/2` becomes the listener's body (made private to Galls).
-- The event fires at the same point as today's call (genus reassignment in Reclassification only), so behavior is identical. Renames, moves, merges and splits join later as more change kinds.
-- **Tests:** reassigning a species into a placeholder genus marks its gall undescribed (existing `reclassification_test.exs` case keeps passing); a test listener returning `{:error, :collision}` makes the reassignment fail and leaves genus and name unchanged; no listeners configured → reassignment works.
-- Remove `Gallformers.Galls` from Taxonomy's `dirty_xrefs`.
-
-### Task 6: Explicit exports
-
-- **Modify:** `lib/gallformers/taxonomy.ex` — `exports:` becomes the public types: `Taxonomy` (schema struct), `Lineage`, `Family`, `Genus`, `Intermediate`, `Section`, `Ancestry`, `Placement`, `ChangeListener`, `Change`. `TreeBuilder` is reached through a `Taxonomy.build_tree/3` delegate (it is pure display shaping).
-- Web: replace `Taxonomy.Tree.get_children_for_parents/1` and `Tree.name_parent_exists?/3` in `admin/taxonomy_live/form.ex` with context functions (add `name_parent_exists?/3` to `taxonomy.ex`); `reclassify_helpers.ex` and `genus_live.ex` use the now-exported `Lineage`/`Genus`. Remove the four `Gallformers.Taxonomy.*` entries from `GallformersWeb`'s `dirty_xrefs` (`lib/gallformers_web.ex:40–43`).
-- `galls.ex:765` spec and `identification.ex`'s `Tree` alias go through public names.
-- **Done when:** `MIX_ENV=dev mix compile --force --warnings-as-errors` is clean with `exports:` explicit; Taxonomy's `dirty_xrefs` lists only `Species` modules (step 4 removes them); `mix precommit` passes; golden outputs unchanged on the experiment DB.
-
-**Size:** a few focused days. Tests insert `%Gallformers.Taxonomy.Taxonomy{}` directly in many places; that's fine (tests aren't boundary-checked) and needs no change.
+- **Facade size: about 12–13 files**, confirming the estimate. Its plan is in `36ca`.
 
 ## Open questions
 
