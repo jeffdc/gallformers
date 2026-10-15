@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+
+# uv / virtualenv
+.venv/
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+
+# Package outputs (documents and batches derived from copyrighted Sources)
+output/
+
+# Source files for trial runs (PDFs, saved web pages), named <gallformers source id>-<short name>.<ext>
+sources/

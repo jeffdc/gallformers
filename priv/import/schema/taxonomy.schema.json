@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gallformers.org/schemas/import/v3/schema/taxonomy.schema.json",
   "title": "Gallformers import — taxonomy batch",
-  "description": "Taxonomic acts a Source states: names, placements, synonymies, splits. Applied before the gall batch from the same Source. Never contains Galls. Never changes plant taxa (except the rare gall-forming plant). DRAFT (format v3, 2026-10-07).",
+  "description": "Taxonomic acts a Source states: names, placements, synonymies, splits. Applied before the gall batch from the same Source. Never contains Galls. Never changes plant taxa (except the rare gall-forming plant). Written for every Source: empty taxa and acts mean the Source states no taxonomic acts.",
   "type": "object",
   "allOf": [{ "$ref": "common.schema.json#/$defs/envelope" }],
   "required": ["batch_type", "taxa", "acts"],
@@ -12,14 +12,13 @@
     "batch_type": { "const": "taxonomy" },
     "taxa": {
       "type": "array",
-      "minItems": 1,
       "items": { "$ref": "common.schema.json#/$defs/taxon_ref" },
-      "description": "Every taxon the acts mention, declared once."
+      "description": "Every taxon the acts mention, declared once. Empty when acts is empty."
     },
     "acts": {
       "type": "array",
       "items": { "$ref": "#/$defs/act" },
-      "description": "May be empty only for a retraction notice."
+      "description": "Empty means the Source states no taxonomic acts (or, on a retraction notice, that it carries none). With mode replace, that clears acts previously attributed to the Source."
     },
     "unmapped": { "$ref": "common.schema.json#/$defs/unmapped" }
   },
@@ -31,13 +30,14 @@
       "type": "object",
       "required": ["kind"],
       "properties": {
-        "kind": { "enum": ["name", "placement", "synonymy", "split"] }
+        "kind": { "enum": ["name", "placement", "synonymy", "split", "common_name"] }
       },
       "allOf": [
         { "if": { "properties": { "kind": { "const": "name" } } }, "then": { "$ref": "#/$defs/name_act" } },
         { "if": { "properties": { "kind": { "const": "placement" } } }, "then": { "$ref": "#/$defs/placement_act" } },
         { "if": { "properties": { "kind": { "const": "synonymy" } } }, "then": { "$ref": "#/$defs/synonymy_act" } },
-        { "if": { "properties": { "kind": { "const": "split" } } }, "then": { "$ref": "#/$defs/split_act" } }
+        { "if": { "properties": { "kind": { "const": "split" } } }, "then": { "$ref": "#/$defs/split_act" } },
+        { "if": { "properties": { "kind": { "const": "common_name" } } }, "then": { "$ref": "#/$defs/common_name_act" } }
       ]
     },
 
@@ -47,7 +47,12 @@
       "properties": {
         "id": { "$ref": "common.schema.json#/$defs/act_id" },
         "stance": { "$ref": "common.schema.json#/$defs/stance" },
-        "evidence": { "$ref": "common.schema.json#/$defs/evidence" }
+        "evidence": { "$ref": "common.schema.json#/$defs/evidence" },
+        "status_as_written": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional. The Source's own status words for this act, as written: 'syn. nov.' (this Source makes the synonymy), 'stat. rev.', 'incorrect spelling', 'nomen dubium', 'combination by Smith (1900)'. Kept for review and later parsing; not a controlled value."
+        }
       }
     },
 
@@ -107,6 +112,18 @@
           "uniqueItems": true,
           "items": { "$ref": "common.schema.json#/$defs/taxon_ref_id" }
         }
+      },
+      "unevaluatedProperties": false
+    },
+
+    "common_name_act": {
+      "description": "A common name of the organism, as written (e.g. 'Poplar vagabond aphid'). Common names of Galls are alias Facts in the gall batch.",
+      "allOf": [{ "$ref": "#/$defs/act_base" }],
+      "required": ["taxon", "common_name"],
+      "properties": {
+        "kind": { "const": "common_name" },
+        "taxon": { "$ref": "common.schema.json#/$defs/taxon_ref_id" },
+        "common_name": { "type": "string", "minLength": 1 }
       },
       "unevaluatedProperties": false
     }

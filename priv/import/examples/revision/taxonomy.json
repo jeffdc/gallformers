@@ -1,7 +1,7 @@
 {
   "format": "gallformers-import",
   "format_version": 3,
-  "vocabulary_version": "2026-10-07",
+  "vocabulary_version": "2026-10-11",
   "batch_type": "taxonomy",
   "mode": "replace",
   "batch_id": "0b5e3a52-6d0f-4c41-9d6e-1f2a3b4c5d02",
@@ -15,7 +15,7 @@
     "authored": { "date": "2025-03", "as_written": "March 2025" },
     "citation": "Smith, C. & Jones, D. 2025. A revision of example oak gall wasps. Example Zootaxa 5000: 1-80.",
     "license": { "value": "All Rights Reserved", "as_written": "© 2025 Example Press" },
-    "document": { "file": "document.json", "sha256": "1111111111111111111111111111111111111111111111111111111111111111" }
+    "document": { "file": "document.json", "sha256": "3c54e77b66af56ba38380330f5c07f23017713f5f9dbdace9fe8a8162da6576b" }
   },
 
   "taxa": [
@@ -54,14 +54,14 @@
     },
     {
       "id": "a6", "stance": "confirm", "kind": "placement", "taxon": "t1", "parent": "t2",
-      "evidence": [{ "item": "#/texts/15", "quote": "Andricus, the largest genus of the tribe Cynipini", "page": "4" }]
+      "evidence": [{ "item": "#/texts/15", "quote": "we treat Andricus as a member of the tribe Cynipini", "page": "4" }]
     },
     {
       "id": "a7", "stance": "confirm", "kind": "split", "taxon": "t6", "into": ["t6", "t8"],
       "evidence": [{ "item": "#/texts/300", "quote": "material formerly treated as A. primus comprises two species; the western populations are described here as A. tertius", "page": "31" }]
     },
     {
-      "id": "a8", "stance": "confirm", "kind": "synonymy", "name": "t7", "accepted": "t6",
+      "id": "a8", "stance": "confirm", "kind": "synonymy", "name": "t7", "accepted": "t6", "status_as_written": "syn. nov.",
       "evidence": [{ "item": "#/texts/310", "quote": "A. secundus syn. nov. of A. primus", "page": "33" }]
     }
   ]

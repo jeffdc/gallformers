@@ -1,8 +1,8 @@
 ---
-status: planned
+status: done
 tags: [design]
 created: 2026-03-04
-updated: 2026-09-13
+updated: 2026-10-15
 epic: source-ingestion
 relates: [fa48]
 needs: [7c67]
@@ -285,3 +285,7 @@ Exercise the actual deployed private/public path with the application's credenti
 - Full existing-source processing is the separately tracked db6f campaign, not satisfied by a successful sample or the producer's iteration corpus.
 
 Taxonomy separation remains proposed, not approved. If chosen, establish the bounded gall/taxon/accepted-provenance foundation and its admin-safety gate before substantial production approval/writeback integration. This consolidation does not make unrelated taxonomy expansion a prerequisite.
+
+
+
+**Closed 2026-10-15 (Jeff: "go with the proposals").** Superseded by the import contract (`294c`, `priv/import/`) and the Gallformers-side import plan (`e381`), which carries the requirements still valid from this plan (storage release gate, humans approve every database change, provenance in both directions, persisted review state). The old code is retired under the new matter "Retire the old source-ingestion system".

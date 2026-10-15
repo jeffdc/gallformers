@@ -1,0 +1,58 @@
+[project]
+name = "import-producer"
+version = "0.1.0"
+description = "Proof of concept: turn a gall-related Source (PDF) into a Gallformers import package"
+requires-python = ">=3.12"
+dependencies = [
+    "docling>=2.0.0",
+    "pymupdf>=1.24.0",
+    "click>=8.1.0",
+    "jsonschema>=4.18",
+    "referencing>=0.30",
+    "ocrmypdf>=16.0",
+]
+
+[project.scripts]
+produce = "producer.cli:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/producer"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+filterwarnings = [
+    # PyMuPDF's SWIG-generated bindings on Python 3.13; not our code.
+    "ignore:builtin type SwigPyPacked has no __module__ attribute:DeprecationWarning",
+    "ignore:builtin type SwigPyObject has no __module__ attribute:DeprecationWarning",
+    "ignore:builtin type swigvarlink has no __module__ attribute:DeprecationWarning",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+extend-exclude = ["output", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "RUF", "SIM", "C4", "PTH"]
+ignore = ["E501", "SIM108"]
+
+[tool.ruff.lint.per-file-ignores]
+# The noise measure lists the typographic symbols scientific prose legitimately uses.
+"src/producer/quality.py" = ["RUF001", "RUF003"]
+# Name normalization matches the no-break space and the hybrid signs Sources use.
+"scripts/dryrun.py" = ["RUF001"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.15.0",
+]

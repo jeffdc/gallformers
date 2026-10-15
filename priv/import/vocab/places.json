@@ -22738,5 +22738,5 @@
     ],
     "vocabulary": "places",
     "description": "Every Gallformers place: code, name, type (continent, country, state, province). For mapping a Source's place names to codes; validate against place-codes.schema.json.",
-    "vocabulary_version": "2026-10-07"
+    "vocabulary_version": "2026-10-11"
 }

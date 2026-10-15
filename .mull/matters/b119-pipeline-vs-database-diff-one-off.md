@@ -1,7 +1,7 @@
 ---
-status: raw
+status: done
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-15
 epic: taxonomy
 relates: [8567, b5bd]
 blocks: [8546]
@@ -27,3 +27,7 @@ Takes the JSON the pipeline produced for a Source and compares it with the data 
 - Name resolution: pipeline `name_as_written` vs today's names and aliases.
 - What "align" means per kind (exact trait values, host sets, range differences, description passages).
 - Output a human can read during the trial, with a judgement per difference of whose error it is — the database's or the LLM's.
+
+
+
+**Closed 2026-10-15.** The pipeline trial built this comparison as an approximate dry run (`services/import-producer/scripts/dryrun.py`: name and Gall resolution against the dev database, and a Fact diff against the entries linked to the Source); results are in `8546`. A whole-database check after the bulk import, if wanted, belongs to the importer work (`e381`).

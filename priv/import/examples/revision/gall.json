@@ -1,7 +1,7 @@
 {
   "format": "gallformers-import",
   "format_version": 3,
-  "vocabulary_version": "2026-10-07",
+  "vocabulary_version": "2026-10-11",
   "batch_type": "gall",
   "mode": "replace",
   "batch_id": "0b5e3a52-6d0f-4c41-9d6e-1f2a3b4c5d03",
@@ -15,7 +15,7 @@
     "authored": { "date": "2025-03", "as_written": "March 2025" },
     "citation": "Smith, C. & Jones, D. 2025. A revision of example oak gall wasps. Example Zootaxa 5000: 1-80.",
     "license": { "value": "All Rights Reserved", "as_written": "© 2025 Example Press" },
-    "document": { "file": "document.json", "sha256": "1111111111111111111111111111111111111111111111111111111111111111" }
+    "document": { "file": "document.json", "sha256": "3c54e77b66af56ba38380330f5c07f23017713f5f9dbdace9fe8a8162da6576b" }
   },
 
   "taxa": [

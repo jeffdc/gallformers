@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gallformers.org/schemas/import/v3/schema/common.schema.json",
   "title": "Gallformers import — shared definitions",
-  "description": "Definitions shared by taxonomy batches and gall batches: the envelope, the Source block, taxon references, evidence, and controlled-value wrappers. DRAFT (format v3, 2026-10-07). See PRODUCER_GUIDE.md for the rules a schema cannot express.",
+  "description": "Definitions shared by taxonomy batches and gall batches: the envelope, the Source block, taxon references, evidence, and controlled-value wrappers. See PRODUCER_GUIDE.md for the rules a schema cannot express.",
 
   "$defs": {
     "envelope": {
@@ -100,26 +100,14 @@
           "additionalProperties": false
         },
         "document": {
-          "description": "The phase-0 structured document (a DoclingDocument, document.json) beside this batch, or null with a reason.",
+          "description": "The phase 1 document (a DoclingDocument, document.json) beside this batch, and its sha256.",
           "type": "object",
-          "if": { "required": ["none"] },
-          "else": {
-              "type": "object",
-              "required": ["file", "sha256"],
-              "properties": {
-                "file": { "const": "document.json" },
-                "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
-              },
-              "additionalProperties": false
+          "required": ["file", "sha256"],
+          "properties": {
+            "file": { "const": "document.json" },
+            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
           },
-          "then": {
-              "type": "object",
-              "required": ["none"],
-              "properties": {
-                "none": { "type": "string", "minLength": 1, "description": "Why there is no document, e.g. 'scanned, unreadable'. Quotes are still required but cannot be verified." }
-              },
-              "additionalProperties": false
-          }
+          "additionalProperties": false
         },
         "retracts": {
           "description": "If this Source is a retraction notice: the Source it retracts. Retraction cancels all of that Source's stances; the Source stays visible, marked.",
@@ -141,14 +129,16 @@
       "required": ["ref", "name_as_written", "rank"],
       "properties": {
         "ref": { "$ref": "#/$defs/taxon_ref_id" },
-        "name_as_written": { "type": "string", "minLength": 1 },
+        "name_as_written": { "type": "string", "minLength": 1, "description": "Verbatim from the document, so it matches the quotes — including OCR damage." },
+        "name_reading": { "type": "string", "minLength": 1, "description": "Optional. The evident printed name when the document's text of it is damaged by OCR or extraction (\"Cynips Jlocossa\" → \"Cynips flocossa\"). Never a correction of the author's own spelling. Gallformers resolves on it when name_as_written fails." },
         "rank": { "$ref": "../vocab/ranks.schema.json" },
+        "sensu": { "type": "string", "minLength": 1, "description": "Optional. For a misapplied name: the usage the Source means, as written (\"O. S. non Harris\"), not the species the name's author described." },
         "new": {
-          "description": "Only when the Source itself claims novelty (sp. nov., gen. nov., comb. nov., stat. nov.). Never because a name failed to resolve.",
+          "description": "Only when the Source itself claims novelty: sp. nov., gen. nov., subgen. nov., comb. nov., comb. rev., stat. nov., stat. rev., nom. nov. Never because a name failed to resolve.",
           "type": "object",
           "required": ["status"],
           "properties": {
-            "status": { "type": "string", "minLength": 1, "description": "As written, e.g. 'sp. nov.'." }
+            "status": { "type": "string", "minLength": 1, "description": "As written, e.g. 'sp. nov.', 'new species', 'comb. rev.'." }
           },
           "additionalProperties": false
         },
@@ -164,7 +154,7 @@
 
     "stance": {
       "enum": ["confirm", "deny"],
-      "description": "deny only when the Source explicitly says so. Omission is never denial."
+      "description": "deny only where the Source corrects a published statement (PRODUCER_GUIDE.md rule 6). Omission is never denial."
     },
 
     "evidence": {
@@ -191,6 +181,15 @@
         "whole_item": { "const": true, "description": "The evidence is the item's entire text (e.g. a descriptive paragraph); Gallformers takes the text from the document. Only with item, never with quote, and only when the batch has a document." },
         "page": { "type": "string", "description": "Page number as PRINTED in the Source (for citations), if known — not the PDF page index, which comes from the item." },
         "url": { "type": "string", "format": "uri", "description": "Deep link to this place in the Source (e.g. a scanned-book page or a website's species page)." },
+        "cites": {
+          "description": "Optional. The Source states this by citing another work (\"Q. alba (Kinsey 1923)\"). The Fact is still this Source's, at this Source's date; cites records where the claim came from.",
+          "type": "object",
+          "required": ["as_written"],
+          "properties": {
+            "as_written": { "type": "string", "minLength": 1, "description": "The citation as the Source gives it, e.g. 'Kinsey 1923'." }
+          },
+          "additionalProperties": false
+        },
         "observations": { "$ref": "#/$defs/observations" }
       },
       "additionalProperties": false
@@ -224,7 +223,7 @@
         "properties": {
           "term": { "type": "string", "minLength": 1, "description": "The Source's term, as written." },
           "slot": {
-            "enum": ["detachable", "plant_part", "form", "shape", "color", "texture", "alignment", "walls", "cells", "season", "generation", "relationship_type", "lethality", "parasitism_mode", "place", "rank", "other"],
+            "enum": ["detachable", "plant_part", "form", "shape", "color", "texture", "alignment", "walls", "cells", "season", "generation", "relationship_type", "lethality", "parasitism_mode", "place", "rank", "taxonomic_act", "other"],
             "description": "Which vocabulary it would have belonged to."
           },
           "gall": { "$ref": "#/$defs/gall_ref_id", "description": "The Gall it describes, if any (gall batches)." },

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gallformers.org/schemas/import/v3/vocab/relationships.schema.json",
   "title": "Relationship types and qualifiers",
-  "description": "The system-level fixed list of Relationship types (domain model), grouped by endpoint kinds, and the qualifier vocabularies. Meanings: docs/domain/domain-model.md and PRODUCER_GUIDE.md.",
+  "description": "The fixed list of Relationship types, grouped by endpoint kinds, and the qualifier vocabularies. Meanings: PRODUCER_GUIDE.md, Phase 3 (Relationships, Qualifiers).",
   "$defs": {
     "type": {
       "description": "All Relationship types (the union of the three endpoint groups below).",

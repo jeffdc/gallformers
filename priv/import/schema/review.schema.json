@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gallformers.org/schemas/import/v3/schema/review.schema.json",
+  "title": "Gallformers import — phase 5 review and phase 6 response",
+  "description": "The phase 5 check of a package's batches against its document (VERIFY_GUIDE.md), and the producer's phase 6 answer to each finding (PRODUCER_GUIDE.md). Delivered with the package: disputed findings go to a human reviewer at intake.",
+  "type": "object",
+  "required": ["format", "reviewed", "findings"],
+  "properties": {
+    "format": { "const": "gallformers-review" },
+    "reviewed": { "$ref": "#/$defs/hashes", "description": "The sha256 of each batch file as reviewed in phase 5." },
+    "reviewers": {
+      "description": "Who reviewed: one entry per reviewer whose findings are listed.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/agent" }
+    },
+    "findings": {
+      "description": "One entry per problem found. Empty when every statement checks out.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["batch", "id", "problem", "reason"],
+        "properties": {
+          "batch": { "enum": ["taxonomy.json", "gall.json"] },
+          "id": { "type": "string", "pattern": "^[aftg][0-9]+$", "description": "The act, Fact, taxon or Gall the finding is about." },
+          "problem": {
+            "enum": ["unsupported", "wrong_value", "wrong_type", "wrong_stance", "wrong_target", "rule"],
+            "description": "unsupported: the evidence does not say it. wrong_value: a controlled value doesn't match its definition or the quote. wrong_type: the wrong Relationship type, act kind or qualifier. wrong_stance: confirm/deny is wrong. wrong_target: the wrong taxon, Gall or generation. rule: a PRODUCER_GUIDE.md rule is broken."
+          },
+          "reason": { "type": "string", "minLength": 1, "description": "What is wrong, citing the document." },
+          "suggestion": { "type": "string", "minLength": 1, "description": "Optional: what the statement should be." },
+          "reviewer": { "type": "string", "minLength": 1, "description": "Which reviewer found it (its model), when several reviewed." },
+          "response": {
+            "description": "Phase 6: the producer's answer. agree: the statement was fixed. disagree: the statement stands, and the finding goes to a human reviewer at intake.",
+            "type": "object",
+            "required": ["decision", "reason"],
+            "properties": {
+              "decision": { "enum": ["agree", "disagree"] },
+              "reason": { "type": "string", "minLength": 1, "description": "For agree, what was changed; for disagree, why the statement stands, citing the document or the guide." }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "responded": {
+      "description": "Phase 6: written once every finding has a response.",
+      "type": "object",
+      "required": ["result"],
+      "properties": {
+        "responder": { "$ref": "#/$defs/agent" },
+        "result": { "$ref": "#/$defs/hashes", "description": "The sha256 of each batch file after the phase 6 fixes." }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "hashes": {
+      "type": "object",
+      "propertyNames": { "enum": ["taxonomy.json", "gall.json"] },
+      "additionalProperties": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    },
+    "agent": {
+      "type": "object",
+      "properties": {
+        "model": { "type": "string", "minLength": 1 },
+        "instructions_version": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

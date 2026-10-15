@@ -1,122 +1,155 @@
 # Gallformers import — producer guide
 
-**Status: DRAFT, format v3 (2026-10-07).** This guide and the schemas in `schema/` are the contract for delivering data into Gallformers. Anything — an LLM pipeline, a script, a form, a person — that produces files meeting this contract can deliver data. Decisions behind it are recorded in mull matter `e381`; the domain's words (Gall, Source, Fact, Relationship, Trait) are defined in `docs/domain/domain-model.md`.
+How to turn one Source into a Gallformers import package. Follow these rules exactly. The schemas in `schema/` define the shape of every file; this guide says what goes in them.
 
-Each section gives **rules first**, then *why*. An LLM producing batches should follow the rules exactly; a developer should read the why.
+**Terms.** A *Source* is a publication, website or dataset. A *Gall* is a kind of gall (two generations of one species are two Galls). The *Inducer* makes the Gall; a *Host* is a plant it grows on. A *Fact* is one statement about a Gall; an *act* is one taxonomic statement.
 
-## 1. What you produce
-
-For each Source, a package directory:
+## The phases
 
 ```
 <package>/
-  document.json   phase 0: the Source as a structured document (a DoclingDocument)
-  taxonomy.json   phase 1: taxonomic acts the Source states (omit if none)
-  gall.json       phase 2: what the Source states about Galls
+  document.json   Phase 1  Document
+  taxonomy.json   Phase 2  Taxonomy batch
+  gall.json       Phase 3  Gall batch
+                  Phase 4  Validate (validate.py)
+  review.json     Phase 5  Review
+                  Phase 6  Respond
 ```
 
-Rules:
+Run the phases in order. Phase 4 must pass before phase 5 runs. The package is ready when `validate.py --review` passes; deliver all four files.
 
-- **Phase 0** turns the Source into a DoclingDocument (`document.json`). Both later phases read this document, not the original PDF or web page.
-- **Phase 1** produces a taxonomy batch (`schema/taxonomy.schema.json`) if, and only if, the Source states taxonomic acts.
-- **Phase 2** produces a gall batch (`schema/gall.schema.json`). Resolve taxon names as they stand **after** phase 1.
-- Every batch validates against its schema before delivery.
-- Gallformers approves the taxonomy batch before the gall batch.
+## Phase 1 — Document
 
-*Why:* each phase is a smaller, more reliable task, and each output can be checked on its own. The document gives every quote a stable anchor.
+Convert the Source into a DoclingDocument, `document.json`. Every later phase reads this document.
 
-## 2. Rules for every batch
+## Writing a batch (phases 2 and 3)
 
-1. **One Source per batch.** Describe it in `source`, or use `{ "gallformers": true }` for Gallformers' own statements.
-2. **Choose `mode` deliberately.**
-   - Use `replace` for a full run over a Source. It replaces everything that Source previously contributed in this batch type.
-   - Use `add` for extra statements. Gallformers batches are always `add`.
-3. **Write names exactly as the Source writes them** (`name_as_written`), including abbreviations like "Q. lobata". Do not correct, expand, or modernize them. Give the rank the Source implies.
-4. **Never look up or guess Gallformers IDs.** Gallformers resolves names and Galls itself. An ID field may be filled only if you are certain; a wrong ID is worse than none.
-5. **A name that you can't match to anything is not new.** Set `new` only when the Source itself claims novelty: *sp. nov.*, *gen. nov.*, *comb. nov.*, *stat. nov.* for taxa, or a Gall described as previously unknown. Unknown names are left for Gallformers to flag.
-6. **Every controlled value carries `as_written`:** the mapped value from the vocabulary plus the Source's own words, e.g. `{ "value": "tan", "as_written": "pale tan" }`.
-   - If no vocabulary value fits, **do not force one**. Leave the Fact out and add the term to the batch's `unmapped` list with:
-     - `term`;
-     - `slot` (which vocabulary it would belong to);
-     - the Gall, if any;
-     - evidence;
-     - an optional note.
-7. **Deny only what the Source explicitly denies.** `stance: "deny"` needs words like "not", "misidentified", "erroneous", "never found". **Omission is never denial:** a Source listing three hosts does not deny a fourth.
-8. **Every Fact and act has evidence** (see §6).
-9. **Batch-local references** use fixed prefixes: taxa `t1, t2, …`; Galls `g1, g2, …`; Facts `f1, f2, …`; acts `a1, a2, …`. Declare each taxon and Gall once and refer to it by ref.
-10. **The Source's date.** Set `source.authored.date` to the single date that decides recency, and keep the original wording in `as_written`.
-    - Publications: the publication date, as precise as known (year at minimum).
-    - Websites: the date of the version read. Use the stated last-modified date if given, otherwise the access date.
+### Rules for every batch
 
-*Why:* when Sources disagree, Gallformers decides between them by authorship date (newest wins) and by explicit stances. Guessing IDs, inventing novelty, or inferring denials from silence would all create errors that pass validation unnoticed. `as_written` makes every mapping reviewable, and shows where the vocabulary should grow.
+1. **One Source per batch,** described in `source` (see "The Source block").
+2. **`mode`:** `replace` for a full run over a Source; `add` for statements that supplement an earlier run.
+3. **Names exactly as the Source writes them** (`name_as_written`), abbreviations included ("Q. lobata"), with the rank the Source implies. Identify every taxon by its name and rank, and every Gall by `identified_by` (Phase 3, "Galls").
+   - When the document's text of a name is damaged by OCR or extraction ("Cynips Jlocossa" where the page evidently prints *flocossa*), keep `name_as_written` verbatim and give the evident printed name as `name_reading`. `name_reading` repairs damaged letters only: the author's own spelling stays as written, and capitals from small caps ("ANDRICUS RILEYI") stay too, since Gallformers normalises case.
+   - When a passage names an organism by a common name only and the Source pairs that common name with a scientific name anywhere ("the red oak, Quercus rubrum"), declare the taxon by the scientific name and cite both passages. A common name the Source never pairs with a scientific name ("rose", with *Rosa* never printed) goes to `unmapped`.
+   - A named hybrid ("Populus deltoides × P. angustifolia") is a taxon at rank species; an unnamed one ("hybrid intermediates") goes to `unmapped`.
+4. **`new`** marks novelty the Source itself claims: *sp. nov.*, *gen. nov.*, *comb. nov.*, *comb. rev.*, *stat. nov.*, *stat. rev.*, *nom. nov.* for taxa; for Galls, see Phase 3, "Galls". A formal description of a taxon the Source names as its own counts, with or without those words, and so does a provisional name ("I call it provisionally…"); `new.status` holds the Source's words, or "described here".
+5. **Controlled values** carry `as_written`: the vocabulary value plus the Source's own words, e.g. `{ "value": "tan", "as_written": "pale tan" }`. Choose values by their definitions (Phase 3, "Traits"). When no value's definition fits, record the term in `unmapped` with `term`, `slot`, the Gall if any, evidence, and an optional note. Every `as_written` field (authorship and status words included) is verbatim, OCR errors and all.
+6. **Deny** where the Source corrects a published statement: another Source's Fact or act, or earlier records it calls wrong ("earlier records from Q. douglasii are misidentifications", "erroneously synonymized"). Any Fact or act can be denied this way, Trait values included. Leave other negatives out of the batch, `unmapped` included: contrasts within a description ("not woody"), absences ("no inquilines were reared"), rejected unpublished reports. State only what the Source says: a list of three Hosts says nothing about a fourth. A record the Source reassigns to another Gall ("the latter reference concerns N. quercusminutissimus") is a `confirm` on that Gall.
+7. **Assertions only.** Hedged or doubted statements ("putative", "probably", "may", "must be confirmed", "not clear if", "is said to") go to `unmapped` (slot `other`) with their quote, in place of a Fact, act, or flag.
+   - A hedged correction ("this report has been questioned") is a hedge: `unmapped`, not a `deny`.
+   - A statement made outright stays a statement when the Source adds that later work may revise it ("further research may call this into question").
+   - A named person's record the Source reports ("Professor Riley says: …") is stated, with `cites`.
+8. **Evidence** on every Fact and act (see "Evidence").
+9. **References** use fixed prefixes: taxa `t1, t2, …`; Galls `g1, g2, …`; Facts `f1, f2, …`; acts `a1, a2, …`. Declare each taxon and Gall once and refer to it by its ref.
+10. **The Source's date:** `source.authored.date` is the single date that decides recency, with the original wording in `as_written`. For a publication, the publication date the document prints, as precisely as it gives it (year at minimum); for a website, the stated last-modified date, or else the access date (the operator supplies it with the document).
 
-## 3. The Source block
+### The Source block
 
-- Required: `kind`, `title`, `authors`, `authored`, `citation`, `license`, `document`.
-- `kind` is one of: `publication`, `website`, `database`, `unpublished`, `research_data`.
-- `authors` is a list of names exactly as written, in order.
-- `license`: the value comes from `vocab/licenses.schema.json`. A Source with no stated license is `All Rights Reserved`. Put the rights statement as found in `as_written`, or "not stated".
-- `document`: `{ "file": "document.json", "sha256": … }`, or `{ "none": "<reason>" }` when no document could be made (e.g. an unreadable scan).
-- `retracts`: only on a retraction notice. Name the retracted Source, with its citation as written and its ID if known.
-  - Retraction is a status on the retracted Source as a whole. It cancels everything that Source contributed, in both batch types. The notice's own batch usually has no Facts.
-- Do not include editorial fields such as data-completeness flags.
+- `kind`: `publication`, `website`, `database`, `unpublished`, or `research_data`.
+- `title`, `citation`, and `authors` (names exactly as written, in order).
+- `authored`: see rule 10.
+- `license`: a value from `vocab/licenses.schema.json`, with the rights statement as found in `as_written`. A Source with no stated license is `All Rights Reserved`, `as_written` "not stated", unless it is in the public domain by age or origin (e.g. a US Government publication): then `Public Domain / CC0`, with the reason in `as_written`.
+- `document`: `{ "file": "document.json", "sha256": "<sha256 of document.json>" }`.
+- `identifiers` (`doi`, `url`, `isbn`) when the Source gives them.
+- `retracts`, on a retraction notice only: the retracted Source's citation as written. A retraction cancels everything the retracted Source contributed; the notice's own batches usually hold no Facts or acts.
 
-## 4. Taxonomy batches
+### Evidence
+
+Each evidence entry quotes the document:
+
+- `item`: the reference of the document item the evidence is in (e.g. `#/texts/42`, `#/tables/3`).
+- `quote`: verbatim text from that item, long enough to be unambiguous within it — a sentence or a clause. Copy the document's text as it stands, OCR errors included. For a table row, the row's cells joined with " | ".
+- Cite the passage that states the Fact: the sentence that says it, in preference to a figure caption or a heading that names it.
+- A statement that spans two items (a name broken over two lines, a column break) takes one evidence entry per item.
+- `whole_item: true` in place of `quote` when the evidence is the item's entire text (typically a descriptive paragraph).
+- `page`: the page number as printed in the Source, when known.
+- `url`: a deep link to this place in the Source, when one exists (a Biodiversity Heritage Library page, a website's species page).
+- `cites`: when the Source states this by citing another work ("Q. alba (Kinsey 1923)"), that citation as written.
+- `observations`: Observations the Source cites, if any.
+
+### Vocabularies
+
+`vocab/` holds every controlled list (`*.schema.json`), plus `places.json` (place names for codes) and `traits.json` (Trait definitions and term mappings). Set `vocabulary_version` to the `vocabulary_version` those files carry (they share one).
+
+### Examples
+
+`examples/` holds complete packages that illustrate the format. Their Sources are fictional.
+
+- `simple-paper`: Hosts, a denial, a parasitoid with a qualifier, Traits, a range exclusion, a common name, a description, and a new undescribed Gall.
+- `revision`: a taxonomy batch (new species, recombination, placement into a tribe, split, synonymy) and its gall batch (new Galls, alternate generations).
+- `retraction`: a retraction notice.
+
+## Phase 2 — Taxonomy batch
+
+Write `taxonomy.json` (`schema/taxonomy.schema.json`). When the Source states no taxonomic acts, its `taxa` and `acts` are empty.
 
 Acts (`acts[]`), each with `id`, `stance`, `kind`, and `evidence`:
 
 | kind | Fields | Meaning |
 |---|---|---|
 | `name` | `taxon`, optional `authorship.as_written` | The taxon exists with this name and rank. With `taxa[].new`, the Source describes it as new. |
-| `placement` | `taxon`, `parent` | The taxon sits under this parent. A placement different from the current one is a move. |
+| `placement` | `taxon`, `parent` | The taxon sits under this parent. |
 | `synonymy` | `name`, `accepted` | `name` is a synonym of `accepted`. |
 | `split` | `taxon`, `into` | The taxon was divided into these taxa. |
+| `common_name` | `taxon`, `common_name` | A common name of the organism ("Poplar vagabond aphid"). Common names of Galls are Phase 3 `alias` Facts. |
+
+`status_as_written` on any act holds the Source's own status words for it: "syn. nov.", "stat. rev.", "incorrect spelling", "nomen dubium".
+
+**Misapplied names.** A name the Source says was used for the wrong species ("C. confluens O. S. non Harris": Osten Sacken's use of the name, not Harris's species) is declared with `sensu`, the usage as written ("O. S. non Harris"). A `synonymy` act from it to the right taxon states the correction.
 
 Rules:
 
-- **Compose, don't invent kinds:**
+- **State the acts the Source makes or adopts:** its own new acts, its synonymy lists, and earlier acts it says it follows ("We follow this treatment"). An earlier act the Source rejects may be a `deny`.
+- **Using a name is not a name act.** A `name` act is a name the Source introduces, changes or adopts in a treatment of its own.
+- **State a placement when the Source adopts the classification:** a new or changed placement, or a classification the Source states as its own. Labels that only organize the text (a title's "(Hymenoptera: Cynipidae)", a checklist's family headings) and classification mentioned in passing ("the only representatives of the tribe Phanacidini") are context.
+- **A new genus** with no parent stated: its `name` act alone.
+- **A placement the author doubts** goes to `unmapped` (rule 7); the binomial's `name` act stands.
+- **An original genus given only in the authorship** ("Thecabius gravicornis (Patch, 1913) (Pemphigus)") stays in the authorship; the old combination isn't composed.
+- **Compose:**
   - **New species:** `taxa[].new` + `name` + `placement`.
-  - **Recombination (comb. nov.):** `placement` of the new combination + its `name` (with `new.status: "comb. nov."`) + `synonymy` of the old combination to the new one.
+  - **Recombination (comb. nov., comb. rev.):** `placement` of the combination + its `name` (with `new.status`) + `synonymy` of the old combination to it.
+  - **Change of status (stat. nov., stat. rev., a variety raised to species):** `name` at the new rank (with `new.status` when the Source writes one) + `synonymy` of the old name to it.
   - **Lump:** one `synonymy` per lumped name.
-  - **New intermediate rank (e.g. a tribe):** a `name` for it + `placement`s of its members.
-- **Split:** state the division only. Do not try to assign existing records to the daughter taxa.
-- **Authorship:** keep it exactly as written, e.g. "(Ashmead, 1881)". Do not parse it.
-- **Ranks:** family, subfamily, tribe, subtribe, genus, subgenus, section, species, subspecies, variety, form. Nothing above family.
-- **Never state acts on plant taxa.** Plants come from POWO; the only exception is a plant that is itself a gall-former.
-- **Never put Galls or gall Facts in a taxonomy batch.**
+  - **New intermediate rank (e.g. a tribe):** `name` for it + `placement`s of its members.
+  - **Split:** the division only (`taxon` and `into`).
+- **Authorship** exactly as written, e.g. "(Ashmead, 1881)".
+- **Ranks:** any rank in `vocab/ranks.schema.json`, kingdom to form. Synonymy and splits are at family rank or below.
+- **Taxa:** acts concern animals, fungi and other gall-associated organisms. Plants appear as acts only when the plant is itself a gall-former.
+- **Unmapped taxonomy** uses slot `taxonomic_act` (an act the contract can't express or the Source hedges) or `rank`.
 
-*Why:* four composable kinds cover everything papers do, and each maps to one checkable statement. Assigning old records after a split needs judgement the Source rarely supports.
+## Phase 3 — Gall batch
 
-## 5. Gall batches
+Write `gall.json` (`schema/gall.schema.json`), using taxon names as they stand after phase 2.
 
-### 5.1 Identifying Galls
+### Galls
 
-**Rules:**
 - Declare each Gall in `galls[]` with `name_as_written` and `identified_by`:
-  - `inducer`: a taxon ref, at the rank the Source gives (genus or family for undescribed Galls);
+  - `inducer`: a taxon ref, at the rank the Source gives (genus or family for an undescribed Gall);
   - `generation`: when the Source distinguishes generations;
-  - `host`: when the Host distinguishes the Gall, e.g. an undescribed Gall known only from its Host.
-- At least one of `inducer` or `host` is required.
-- Gallformers matches this description to its Gall entries. Never supply a Gall ID unless certain.
-- `new: true` only for a Gall the Source presents as previously unknown, and the batch must contain at least one Fact about it.
-- `identified_by` is for matching only. **State the Relationships themselves as Facts** (e.g. `inducer_of`, `host_of`) when the Source states them.
+  - `host`: when the Host distinguishes the Gall, e.g. an undescribed Gall known only from its Host;
+  - `plant_part`: when two Galls of one Inducer and Host differ by where they grow (a collar gall and a spindle gall of one *Antistrophus* on one plant).
+  - At least one of `inducer` and `host`.
+- **`new: true`** for a Gall the Source presents as previously unknown, including a newly described generation of a known species ("the first sexual generation to be described for Phylloteras") and undescribed Galls it describes as unrecorded ("Oak-galls not mentioned in the paper"). The batch states at least one Fact about it.
+- **`formerly_undescribed: true`** for a Gall known before whose Inducer this Source names for the first time (a gall reported in 1959, its wasp described in 1997), with its Host in `identified_by`.
+- **Declare Galls of the taxa the Source treats.** A Gall the Source only mentions (e.g. in a comparison) is declared when the Source itself states a Fact about it ("the galls of A. quercuscitriformis are … smooth and glabrous … lemon-yellow"). A taxon the Source only cites from another work ("according to Kinsey (1923), var. albipleurae induces galls on Q. breviloba") gets no Gall; its statement goes to `unmapped`.
+- **Facts come from the Source's treatment of its subject.** Introductions, background sections and photo captions that show galls outside that subject (an oak gall pictured in a guide to galls on brambles and herbs) produce no Galls.
+- **Entries the Source itself marks unverified or doubtful** (a section headed "Unverified galls & hosts") are hedged statements: they go to `unmapped` (rule 7).
+- **Statements about a species rather than a generation** (distribution, "earlier records are from Q. alba") attach to a Gall when the Source ties them to a generation, or when the species has a single Gall in the Source. Otherwise they go to `unmapped` with the note "applies to the species".
+- **Statements about a group of Galls** the Source then separates (a species group split by host in a table) attach to each of them.
+- `identified_by` identifies the Gall; state its Relationships (`inducer_of`, `host_of`, …) as Facts.
 
-*Why:* Gallformers catalogs Galls as entries (two generations of one species are two entries). The Source knows the Inducer, the generation, and sometimes the Host, which is enough for Gallformers to find the entry.
-
-### 5.2 Relationships
-
-Subject → object; endpoint kinds are enforced by the schema.
+### Relationships
 
 | type | Subject → object | Meaning |
 |---|---|---|
 | `inducer_of` | taxon → Gall | the organism that induces the Gall |
-| `host_of` | plant taxon → Gall | the plant the Gall occurs on (genus-level allowed, e.g. "Quercus spp.") |
+| `host_of` | plant taxon → Gall | the plant the Gall occurs on (genus level allowed, e.g. "Quercus spp.") |
 | `symbiont_of` | taxon → Gall | an organism the Gall depends on, e.g. a fungus a gall midge carries |
 | `inquiline_of` | taxon → Gall | lives in the Gall without having induced it |
 | `cecidophage_in` | taxon → Gall | feeds on the Gall's tissue |
 | `parasitoid_in` | taxon → Gall | a parasitoid reared from the Gall, its target unknown |
-| `emerged_from` | taxon → Gall | emerged from the Gall, its role unknown (neutral) |
-| `feeds_on` | taxon → Gall | eats the Gall, unspecified whether tissue or occupants (neutral) |
+| `emerged_from` | taxon → Gall | emerged from the Gall, its role unknown |
+| `feeds_on` | taxon → Gall | eats the Gall, whether tissue or occupants unspecified |
 | `herbivore_of` | taxon → Gall | eats the Gall's plant tissue only |
 | `successor_in` | taxon → Gall | moves into the vacated Gall |
 | `modified_form_of` | Gall → Gall | a distinct form produced when an inquiline modifies the other Gall |
@@ -125,117 +158,81 @@ Subject → object; endpoint kinds are enforced by the schema.
 | `vectored_by` | taxon → taxon, in a Gall | one organism is carried by another, within `gall_context` |
 | `predator_of` | taxon → taxon, in a Gall | one organism eats another, within `gall_context` |
 
-Rules:
-- **Use the most specific type the Source supports, and no more.**
-  - "Reared from the gall" with no stated role is `emerged_from`, not `parasitoid_in`.
-  - "Squirrels eat these galls" is `feeds_on`.
-  - A Source can support both a neutral and a specific type. For example, a caterpillar eating gall tissue and the larva inside is `herbivore_of` plus `predator_of` (in the Gall).
-- **At most one Inducer per Gall.**
-- **Do not state hyperparasitism.** Gallformers derives it from chains of `parasitoid_of`.
+- **Use the most specific type the Source supports.** "Reared from the gall" with no stated role is `emerged_from`; a role the Source states elsewhere counts ("stem galls of cecidomyiid flies … all of the individuals I have reared from these galls were Lasioptera solani" is `inducer_of`). A Source can support a neutral and a specific type together: a caterpillar eating gall tissue and the larva inside is `herbivore_of` plus `predator_of` (in the Gall).
+- **Hosts:** when the Source lists a Gall's Host species, state those; a genus `host_of` only when it names no species. Galls found under or near a plant ("on the ground, under an oak") don't make it a Host, and plants the Inducer lives on without a Gall (an aphid's secondary hosts) aren't Hosts: both go to `unmapped`.
+- **One Inducer per Gall.**
+- **Hyperparasitism** is stated as `parasitoid_of` between the organisms involved.
 
-### 5.3 Qualifiers
+### Qualifiers
 
-A qualifier is its own Fact pointing at a Relationship Fact in the same batch (`of`):
+A qualifier is its own Fact, pointing at a Relationship Fact in the same batch (`of`):
 
-| qualifier | Allowed on | Values |
+| qualifier | On | Values |
 |---|---|---|
 | `required_for_formation` | `symbiont_of` | `true` |
 | `lethality` | `inquiline_of`, `cecidophage_in` | `lethal`, `non-lethal` |
 | `parasitism_mode` | `parasitoid_in`, `parasitoid_of` | `idiobiont`, `koinobiont`, `solitary`, `gregarious`, `ecto`, `endo` (one Fact per value) |
 
-### 5.4 Traits
+### Traits
 
-**Rules:**
-- One Fact per value. Values come from `vocab/traits.schema.json`.
-- Traits: `detachable`, `plant_part`, `form`, `shape`, `color`, `texture`, `alignment`, `walls`, `cells`, `season`.
-- `detachable` is single-valued; all others may have several values.
-- Generation is not a Trait Fact: it belongs in `galls[].identified_by`.
-- If the Source's term has no fitting value, put it in `unmapped` (rule 2.6). Never pick the nearest value just to fill a slot.
+- Traits: `detachable`, `plant_part`, `form`, `shape`, `color`, `texture`, `alignment`, `walls`, `cells`, `season`. Values come from `vocab/traits.schema.json`.
+- **A value's definition in `vocab/traits.json` decides whether it fits;** the value's name is shorthand for its definition. `traits.json` also maps common Source terms onto values.
+- A Gall can have several values of each Trait, one Fact per value; `detachable` has one value.
+- `season` is the time of year the Gall can be seen.
+- `detachable` is whether the Gall can be removed from the Host without cutting it out or destroying the surrounding tissue.
+- `texture` describes the surface.
+- `color` is what you see on the Gall, its covering (hairs, wool) included; a Gall can have several colours.
+- `plant_part`: the most precise location the Source supports. A usual location ("usually along the midrib") counts as the location. A leaf Gall with no side, vein or midrib stated is both `upper leaf` and `lower leaf`.
+- Map by definition, not by word: a described single central cell is `monothalamous` though the Source never says "monothalamous". A value a definition merely implies (cells `not applicable` for an aphid gall) is left out unless the Source says it.
+- Generation identifies the Gall (`identified_by`), not a Trait.
+- A Trait the Source states for one Host only ("smooth and large when on Q. alba") goes to `unmapped`.
 
-### 5.5 Range adjustments
+### Range adjustments
 
-**Rules:**
-- Gallformers computes a Gall's potential range from its Hosts. **Do not list where the Gall occurs in general.** State only adjustments:
-  - `include`: the Gall occurs in a place outside its Hosts' ranges;
-  - `exclude`: the Source states it does not occur in a place within them.
-- `place.value` is a code from `vocab/place-codes.schema.json`. Look the name up in `vocab/places.json`.
+A Gall's range is computed from its Hosts' ranges, native and introduced. State only adjustments to it:
 
-*Why:* nearly all of a Gall's range follows from its Hosts. Storing only the exceptions avoids copying the Hosts' ranges into every Gall.
+- `include`: the Gall occurs in a place where none of its Hosts grows, natively or introduced;
+- `exclude`: the Source states the Gall does not occur in a place within its Hosts' ranges;
+- `only`: the Source says the Gall occurs only in this place ("in Texas only"); one Fact per place.
 
-### 5.6 Common names
+`place.value` is a code from `vocab/place-codes.schema.json`; find it by name in `vocab/places.json`.
 
-`alias` Facts carry common names only. Scientific names, including synonyms and old combinations, belong in taxonomy batches.
+### Common names
 
-### 5.7 Descriptions
+`alias` Facts carry common names. Scientific names, synonyms and old combinations are taxonomy (phase 2).
 
-**Rules:**
-- A `description` Fact is the Source's description of a Gall, as a **collage of direct quotes** in reading order. The quotes in `evidence` *are* the description.
-- **Never summarize or paraphrase.**
-- At most one per Gall per Source.
+### Descriptions
 
-*Why:* quotes are verifiable against the document, and the Source's words stay the Source's. Any summary Gallformers shows, it generates itself.
+A `description` Fact is the Source's description of a Gall as a collage of direct quotes, in reading order: the quotes in its `evidence` are the description. One per Gall.
 
-### 5.8 Not in batches
+## Phase 4 — Validate
 
-Never include: abundance, "undescribed" flags (derived), range-confirmed or data-complete flags, images, Gall names (Gallformers derives them), the Hosts' ranges, or anything Gallformers computes.
+Run `validate.py` on the package and fix every error it reports; warnings (e.g. a taxon declared but never used) are worth a look. Run phase 5 only once phase 4 passes.
 
-## 6. Evidence
+```
+uv run priv/import/validate.py <package-dir>
+python3 priv/import/validate.py <package-dir>     # needs jsonschema >= 4.18
+```
 
-**Rules:**
-- **Quote evidence (document Sources):**
-  - `item`: the DoclingDocument reference of the item the evidence is in (e.g. `#/texts/42`, `#/tables/3`). Required whenever the package has a `document.json`.
-  - `quote`: verbatim text, long enough to be unambiguous within its item. Use a sentence or a clause; for a table row, the row's cells joined with " | ".
-  - `whole_item: true` instead of `quote`, when the evidence is the item's entire text (typically a descriptive paragraph). This is only allowed with `item` and a document. Gallformers takes the text from the document, so nothing is copied.
-  - **Never give character offsets.** Gallformers finds the quote in its item and stores the exact span itself.
-  - `page`: the page number **as printed** in the Source, if known (for citations). This is not the PDF page index; Gallformers takes that from the item.
-  - `url`: a deep link to this place in the Source, if one exists. Examples: a Biodiversity Heritage Library or HathiTrust page, or a website's species page.
-  - `observations`: Observations the Source cites, if any.
-- **Statement evidence (Gallformers batches only):**
-  - `statement.text`: Gallformers' statement in plain words;
-  - `statement.stated_on`: its date;
-  - optional `observations`: e.g. iNaturalist observation IDs that support it.
-- **Observations are never Sources.** They appear only as cited evidence.
+It checks each batch against its schema, that `source.document.sha256` matches `document.json`, that every quote is found in its item, and that references, qualifiers, Inducers, descriptions and `new` Galls are consistent.
 
-*Why:* review of large batches can't be line-by-line, so quality rests on checks the system can make. Gallformers verifies every quote against its document item and samples Facts for audit.
+## Phase 5 — Review
 
-## 7. Validation
+A fresh reviewer, following `VERIFY_GUIDE.md`, checks every act and Fact against the document and writes `review.json` with its findings. The reviewer works from this guide, the vocabularies, `document.json` and the two batches only, and changes nothing. Several reviewers (for example, different models) may review the same batches; their findings are combined in one `review.json`, each naming its `reviewer`.
 
-**Layer 1: the schemas.**
-- Validate each batch against `schema/taxonomy.schema.json` or `schema/gall.schema.json` (JSON Schema draft 2020-12).
-- They reference `common.schema.json` and the files in `vocab/`.
-- **Run it with `validate.py`** on batch files or package directories:
-  - `uv run priv/import/validate.py <package-dir>`, or
-  - `python3 priv/import/validate.py <package-dir>` (needs `jsonschema` ≥ 4.18).
+When there are no findings, the package is ready. Otherwise, run phase 6.
 
-  Each error names the exact field and lists the allowed values. Fix your batch from them and re-run until it is valid.
+## Phase 6 — Respond
 
-**Layer 2: the Gallformers dry run.** These checks need Gallformers' data or cross-references. A batch that fails them is reported, not imported.
-1. Every taxon name resolves (current names plus synonyms), or is flagged unresolved, or is `new` with a status.
-2. Every Gall resolves to one entry, or is flagged unresolved/ambiguous, or is `new` with at least one Fact.
-3. Supplied IDs agree with the names and descriptions they accompany.
-4. `host_of` subjects are plants; other organism subjects are not, except for gall-forming plants.
-5. Qualifiers point at a Relationship Fact in the batch, of a type the qualifier allows (§5.3).
-6. At most one `inducer_of` per Gall per batch.
-7. Gallformers batches use `mode: "add"` and statement evidence only; document Sources use quote evidence only.
-8. Taxonomy batches state no acts on plant taxa (except gall-forming plants).
-9. Every quote is found in its `item` (after normalizing whitespace and hyphenation), and Gallformers records the resolved span (item + character offsets). `whole_item` evidence needs an item that exists. If there is no document, quotes are marked unverifiable and `whole_item` is an error.
-10. A gall batch whose names depend on a pending taxonomy batch from the same Source waits for it.
-11. `facts` / `acts` may be empty only for a retraction notice.
+The producer answers every finding once, in its `response`:
 
-## 8. Vocabularies and versions
+- **Agree** when the finding is right by this guide and the document. Fix the statement (as suggested, or better), and say what changed in `reason`.
+- **Disagree** when the statement already follows this guide and the document. Leave it as it is, and say why in `reason`, citing the document or the rule. A disputed finding goes to a human reviewer at intake.
 
-- `vocab/` holds every controlled list. Validate against `*.schema.json`; `places.json` adds names for mapping place names to codes.
-- Vocabularies come from the Gallformers database. The draft files were extracted 2026-10-07; a generator task will replace them.
-- Set `vocabulary_version` to the date of the vocab files you used.
-- **Provisional:** the `generation` list (aphid host-alternation phases are still open).
-- `format_version` changes only for breaking changes to the shape. Adding vocabulary values does not change it.
+Then run phase 4 again, and record `responded`: the sha256 of each batch as you leave it (`result`). The package is ready when this passes:
 
-## 9. Examples
+```
+uv run priv/import/validate.py --review <package-dir>
+```
 
-`examples/` has complete batches:
-- `simple-paper`: Hosts, a denial, a parasitoid with a qualifier, Traits, a range exclusion, a common name, a description, and a new undescribed Gall.
-- `revision`: a taxonomy batch (new species, recombination, placement, split, synonymy) plus its gall batch (new Galls and alternate generations).
-- `gallformers-statement`: a curator's range exclusion and a Host verified from Observations.
-- `retraction`: a retraction notice.
-
-The Sources and quotes in the examples are fictional, and their `document.json` files are not included.
+`--review` adds to the phase 4 checks: `review.json` is well-formed; with no findings, it covers the current batches; otherwise every finding has a response and the batches are the ones `responded` names. Disputed findings are listed for intake.

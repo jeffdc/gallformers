@@ -2,6 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gallformers.org/schemas/import/v3/vocab/ranks.schema.json",
   "title": "Taxon ranks",
-  "description": "Ranks a taxon reference may have. Nothing above family.",
-  "enum": ["family", "subfamily", "tribe", "subtribe", "genus", "subgenus", "section", "species", "subspecies", "variety", "form"]
+  "description": "Ranks a taxon reference may have: any Linnaean rank, kingdom to form. Synonymy and split acts above family are not supported (validate.py rejects them).",
+  "enum": [
+    "kingdom", "subkingdom", "phylum", "subphylum", "class", "subclass", "infraclass",
+    "superorder", "order", "suborder", "infraorder", "superfamily",
+    "family", "subfamily", "tribe", "subtribe", "genus", "subgenus", "section",
+    "species", "subspecies", "variety", "form"
+  ]
 }

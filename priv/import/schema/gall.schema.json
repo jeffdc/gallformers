@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gallformers.org/schemas/import/v3/schema/gall.schema.json",
   "title": "Gallformers import — gall batch",
-  "description": "What a Source states about Galls: Relationships (including Hosts and Inducers), qualifiers, Traits, range adjustments, common names, and descriptions (quotes). Applied after the taxonomy batch from the same Source. Never contains taxonomic acts. DRAFT (format v3, 2026-10-07).",
+  "description": "What a Source states about Galls: Relationships (including Hosts and Inducers), qualifiers, Traits, range adjustments, common names, and descriptions (quotes). Applied after the taxonomy batch from the same Source. Never contains taxonomic acts.",
   "type": "object",
   "allOf": [{ "$ref": "common.schema.json#/$defs/envelope" }],
   "required": ["batch_type", "taxa", "galls", "facts"],
@@ -50,14 +50,28 @@
               },
               "additionalProperties": false
             },
-            "host": { "$ref": "common.schema.json#/$defs/taxon_ref_id", "description": "Use when the Host distinguishes the Gall (e.g. an undescribed Gall known only from its Host)." }
+            "host": { "$ref": "common.schema.json#/$defs/taxon_ref_id", "description": "Use when the Host distinguishes the Gall (e.g. an undescribed Gall known only from its Host)." },
+            "plant_part": {
+              "description": "Use when two Galls of one Inducer and Host differ by where they grow (a collar gall and a spindle gall of one Antistrophus on one plant).",
+              "type": "object",
+              "required": ["value", "as_written"],
+              "properties": {
+                "value": { "$ref": "../vocab/traits.schema.json#/$defs/plant_part" },
+                "as_written": { "type": "string", "minLength": 1 }
+              },
+              "additionalProperties": false
+            }
           },
           "anyOf": [{ "required": ["inducer"] }, { "required": ["host"] }],
           "additionalProperties": false
         },
         "new": {
           "type": "boolean",
-          "description": "true only when the Source describes a Gall Gallformers does not have. The batch must then contain at least one Fact about it."
+          "description": "true only when the Source presents the Gall as previously unknown — including a newly described generation of a known species. The batch must then contain at least one Fact about it."
+        },
+        "formerly_undescribed": {
+          "type": "boolean",
+          "description": "true when the Gall was known before but this Source names its Inducer for the first time (e.g. a gall reported in 1959, its wasp described in 1997). Give the Host in identified_by: Gallformers matches its undescribed entry on that Host and links the Inducer."
         },
         "gallformers_gall_id": { "type": "integer", "minimum": 1, "description": "Optional; checked against identified_by. Omit unless certain." }
       },
@@ -188,13 +202,13 @@
     },
 
     "range_fact": {
-      "description": "An adjustment to the Gall's potential range, which Gallformers computes from its Hosts and is never imported. include: the Gall occurs in a place outside the Hosts' ranges. exclude: it does not occur in a place within them.",
+      "description": "An adjustment to the Gall's potential range, which Gallformers computes from its Hosts (native and introduced ranges) and is never imported. include: the Gall occurs in a place where none of its Hosts grows. exclude: it does not occur in a place within them. only: it occurs only in this place (one Fact per place); Gallformers computes the exclusions.",
       "allOf": [{ "$ref": "#/$defs/fact_base" }],
       "required": ["gall", "adjustment", "place"],
       "properties": {
         "kind": { "const": "range" },
         "gall": { "$ref": "common.schema.json#/$defs/gall_ref_id" },
-        "adjustment": { "enum": ["include", "exclude"] },
+        "adjustment": { "enum": ["include", "exclude", "only"] },
         "place": {
           "$ref": "#/$defs/controlled_value",
           "properties": { "value": { "$ref": "../vocab/place-codes.schema.json" } }

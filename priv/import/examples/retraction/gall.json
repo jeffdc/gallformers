@@ -1,7 +1,7 @@
 {
   "format": "gallformers-import",
   "format_version": 3,
-  "vocabulary_version": "2026-10-07",
+  "vocabulary_version": "2026-10-11",
   "batch_type": "gall",
   "mode": "add",
   "batch_id": "0b5e3a52-6d0f-4c41-9d6e-1f2a3b4c5d05",
@@ -15,7 +15,7 @@
     "authored": { "date": "2026-05-01", "as_written": "1 May 2026" },
     "citation": "Journal of Examples Editors. 2026. Retraction notice: Example & Sample 2024. Journal of Examples 14: 1.",
     "license": { "value": "CC-BY", "as_written": "CC BY 4.0" },
-    "document": { "none": "one-paragraph retraction notice; it states no Facts" },
+    "document": { "file": "document.json", "sha256": "d5ef2321728834f47c519ace6abfa315526d9745b22904ca1aab41bbcf992524" },
     "retracts": {
       "citation_as_written": "Example, A. & Sample, B. 2024. Galls of the Example Hills. Journal of Examples 12: 50-70."
     }

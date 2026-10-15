@@ -1,7 +1,7 @@
 {
   "format": "gallformers-import",
   "format_version": 3,
-  "vocabulary_version": "2026-10-07",
+  "vocabulary_version": "2026-10-11",
   "batch_type": "gall",
   "mode": "replace",
   "batch_id": "0b5e3a52-6d0f-4c41-9d6e-1f2a3b4c5d01",
@@ -16,7 +16,7 @@
     "citation": "Example, A. & Sample, B. 2024. Galls of the Example Hills. Journal of Examples 12: 50-70.",
     "identifiers": { "doi": "10.0000/example.2024.12" },
     "license": { "value": "CC-BY", "as_written": "This article is distributed under CC BY 4.0" },
-    "document": { "file": "document.json", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
+    "document": { "file": "document.json", "sha256": "7b392751151d599627f28742bc07cae7bda55f45dbaec5c1378240a07cd758f2" }
   },
 
   "taxa": [

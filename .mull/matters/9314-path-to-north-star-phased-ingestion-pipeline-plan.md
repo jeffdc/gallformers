@@ -1,7 +1,7 @@
 ---
-status: raw
+status: done
 created: 2026-05-10
-updated: 2026-09-13
+updated: 2026-10-15
 epic: source-ingestion
 relates: [4fef]
 ---
@@ -429,3 +429,6 @@ Jeff authorized consolidating the remaining synthesis requirements here and in t
 
 Human approval remains mandatory. ce28's proposed automatic-accept thresholds are explicitly retired; neither repeated claims nor high confidence bypass review. Accepted-only domain provenance does not require storing every unaccepted claim in the domain database. This update preserves requirements and ownership, not approval to start implementation or finalize the proposed taxonomy foundation.
 
+
+
+**Closed 2026-10-15 (Jeff: "go with the proposals").** Superseded by the import contract (`294c`, `priv/import/`) and the Gallformers-side import plan (`e381`), which carries the requirements still valid from this plan (storage release gate, humans approve every database change, provenance in both directions, persisted review state). The old code is retired under the new matter "Retire the old source-ingestion system".

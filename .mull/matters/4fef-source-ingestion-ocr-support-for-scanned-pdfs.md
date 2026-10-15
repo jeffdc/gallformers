@@ -1,7 +1,7 @@
 ---
-status: raw
+status: done
 created: 2026-05-15
-updated: 2026-09-13
+updated: 2026-10-15
 epic: source-ingestion
 relates: [9314]
 ---
@@ -71,3 +71,6 @@ In addition to the scope above, preserve these acceptance concerns:
 
 Full-source completion is tracked in db6f; born-digital preparation and supported processing need not wait for this matter. Closing ce28 does not mark OCR as delivered.
 
+
+
+**Closed 2026-10-15 (Jeff: "go with the proposals").** Superseded by the import contract (`294c`, `priv/import/`) and the Gallformers-side import plan (`e381`), which carries the requirements still valid from this plan (storage release gate, humans approve every database change, provenance in both directions, persisted review state). The old code is retired under the new matter "Retire the old source-ingestion system".

@@ -1,0 +1,58 @@
+{
+  "schema_name": "DoclingDocument",
+  "version": "1.10.0",
+  "name": "retraction",
+  "furniture": {
+    "self_ref": "#/furniture",
+    "children": [],
+    "content_layer": "furniture",
+    "name": "_root_",
+    "label": "unspecified"
+  },
+  "body": {
+    "self_ref": "#/body",
+    "children": [
+      {
+        "$ref": "#/texts/0"
+      }
+    ],
+    "content_layer": "body",
+    "name": "_root_",
+    "label": "unspecified"
+  },
+  "groups": [],
+  "texts": [
+    {
+      "self_ref": "#/texts/0",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 0,
+            "t": 0,
+            "r": 0,
+            "b": 0,
+            "coord_origin": "BOTTOMLEFT"
+          },
+          "charspan": [
+            0,
+            0
+          ]
+        }
+      ],
+      "orig": "Retraction notice. The editors of the Journal of Examples retract Example, A. & Sample, B. 2024. Galls of the Example Hills. Journal of Examples 12: 50-70, at the authors' request: the host identifications could not be verified.",
+      "text": "Retraction notice. The editors of the Journal of Examples retract Example, A. & Sample, B. 2024. Galls of the Example Hills. Journal of Examples 12: 50-70, at the authors' request: the host identifications could not be verified."
+    }
+  ],
+  "pictures": [],
+  "tables": [],
+  "key_value_items": [],
+  "form_items": [],
+  "pages": {}
+}
