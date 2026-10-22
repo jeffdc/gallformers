@@ -9,22 +9,9 @@ defmodule GallformersWeb.Plugs.EnforceReadOnlyTest do
   alias Gallformers.Accounts.Auth0User
   alias GallformersWeb.Plugs.EnforceReadOnly
 
-  # Write directly to persistent_term instead of using SiteSettings.set/2.
-  # SiteSettings.set writes to DB + persistent_term + broadcasts via PubSub.
-  # The PubSub broadcast triggers the GenServer to reload from DB, which can
-  # race with the Ecto sandbox rollback — the GenServer reloads read_only: true
-  # from the DB before the sandbox rolls back, poisoning persistent_term for
-  # subsequent tests (e.g. admin LiveView tests that hit the EnforceReadOnly plug).
-  #
-  # Reset the persistent_term cache before each test so we start from a clean
-  # state.
-  setup do
-    cache_key = {Gallformers.SiteSettings, :cache}
-    previous = :persistent_term.get(cache_key, %{})
-    :persistent_term.put(cache_key, %{})
-    on_exit(fn -> :persistent_term.put(cache_key, previous) end)
-    :ok
-  end
+  # Tests write read_only directly to persistent_term rather than via
+  # SiteSettings.set/2, which also writes the DB and broadcasts. ConnCase
+  # clears the cache before and after each sync test.
 
   defp admin_conn(conn) do
     user = %Auth0User{

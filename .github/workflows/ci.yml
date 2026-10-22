@@ -120,6 +120,9 @@ jobs:
       - name: Install npm dependencies
         run: npm ci --prefix assets
 
+      - name: Run JS tests
+        run: npm test --prefix assets
+
       - name: Build assets
         run: mix assets.deploy
 

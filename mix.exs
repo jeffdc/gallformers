@@ -119,21 +119,43 @@ defmodule Gallformers.MixProject do
       ],
       "test.check_exclusions_run": &check_test_exclusions/1,
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["compile", "tailwind gallformers", "esbuild gallformers"],
+      "assets.build": [
+        "compile",
+        "tailwind gallformers",
+        "esbuild gallformers",
+        "esbuild maplibre_worker"
+      ],
       "assets.deploy": [
         "tailwind gallformers --minify",
         "esbuild gallformers --minify",
+        "esbuild maplibre_worker --minify",
         "phx.digest"
       ],
+      "assets.test": &run_js_tests/1,
       precommit: [
         "format_check",
         "compile --warnings-as-errors",
         "credo --strict",
         "deps.unlock --unused",
+        "assets.test",
         "test",
         "test.check_exclusions"
       ]
     ]
+  end
+
+  # Runs the vitest suite in assets/. In CI the Assets job runs it, because
+  # that job installs npm dependencies; the Phoenix job runs precommit without
+  # them, so the suite is skipped there.
+  defp run_js_tests(_args) do
+    if System.get_env("CI") do
+      Mix.shell().info("==> Skipping JS tests (the CI Assets job runs them)")
+    else
+      case Mix.shell().cmd("npm test --prefix assets") do
+        0 -> :ok
+        status -> Mix.raise("JS tests failed (exit status #{status})")
+      end
+    end
   end
 
   defp dialyzer do

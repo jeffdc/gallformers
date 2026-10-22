@@ -325,3 +325,24 @@ describe('RangeMap viewport sync', () => {
     expect(hook.fitToRange).not.toHaveBeenCalled()
   })
 })
+
+// ============================================
+// createMap
+// ============================================
+
+describe('RangeMap createMap', () => {
+  // A browser without WebGL2 returns no context, so the real MapLibre
+  // constructor throws.
+  test('shows a message instead of a map when WebGL2 is unavailable', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+    const hook = mountHook(RangeMap, '<div></div>')
+
+    const map = hook.createMap({
+      container: hook.el,
+      style: { version: 8, sources: {}, layers: [] }
+    })
+
+    expect(map).toBeNull()
+    expect(hook.el.textContent).toContain('Map unavailable in this browser')
+  })
+})

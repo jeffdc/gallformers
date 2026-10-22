@@ -6,17 +6,6 @@ defmodule Gallformers.SiteSettingsTest do
 
   alias Gallformers.SiteSettings
 
-  # The SiteSettings GenServer loads from the dev database on app boot into
-  # persistent_term, which is global and not rolled back by Ecto sandboxes.
-  # Reset to an empty cache before each test so defaults are tested accurately.
-  setup do
-    cache_key = {Gallformers.SiteSettings, :cache}
-    previous = :persistent_term.get(cache_key, %{})
-    :persistent_term.put(cache_key, %{})
-    on_exit(fn -> :persistent_term.put(cache_key, previous) end)
-    :ok
-  end
-
   describe "get/1" do
     test "returns nil for missing key" do
       assert SiteSettings.get("nonexistent_key") == nil
@@ -118,6 +107,36 @@ defmodule Gallformers.SiteSettingsTest do
     test "read_only? returns true after setting" do
       SiteSettings.set("read_only", true)
       assert SiteSettings.read_only?() == true
+    end
+  end
+
+  describe "reset_site_settings/0" do
+    test "discards a setting whose broadcast the GenServer has not processed yet" do
+      server = Process.whereis(SiteSettings)
+      test_pid = self()
+
+      # Park the GenServer inside a :sys callback so the broadcast from set/2
+      # is still in its mailbox when the reset runs.
+      parked =
+        Task.async(fn ->
+          :sys.replace_state(server, fn state ->
+            send(test_pid, :server_parked)
+
+            receive do
+              :release -> state
+            end
+          end)
+        end)
+
+      assert_receive :server_parked
+      SiteSettings.set("read_only", true)
+      Process.send_after(server, :release, 50)
+
+      reset_site_settings()
+      Task.await(parked)
+      :sys.get_state(server)
+
+      refute SiteSettings.read_only?()
     end
   end
 end
