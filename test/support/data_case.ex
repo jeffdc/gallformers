@@ -40,6 +40,28 @@ defmodule Gallformers.DataCase do
   def setup_sandbox(tags) do
     pid = Sandbox.start_owner!(Gallformers.Repo, shared: not tags[:async])
     on_exit(fn -> Sandbox.stop_owner(pid) end)
+
+    # SiteSettings is global state. Sync tests may change it (e.g. read_only),
+    # so each one starts and finishes with an empty cache.
+    unless tags[:async] do
+      reset_site_settings()
+      on_exit(&reset_site_settings/0)
+    end
+
+    :ok
+  end
+
+  @doc """
+  Clears the global SiteSettings cache.
+
+  `SiteSettings.set/2` broadcasts each change, and the SiteSettings GenServer
+  writes it into the cache asynchronously. `:sys.get_state/1` waits until the
+  GenServer has handled every broadcast already in its mailbox, so a late
+  broadcast cannot write a value back after the reset.
+  """
+  def reset_site_settings do
+    :sys.get_state(Gallformers.SiteSettings)
+    :persistent_term.put({Gallformers.SiteSettings, :cache}, %{})
   end
 
   @doc """

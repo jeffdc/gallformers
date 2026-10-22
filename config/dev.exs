@@ -39,6 +39,8 @@ config :gallformers, GallformersWeb.Endpoint,
   secret_key_base: "7FjN9MMQWSwTXLk2h88NQ/dHYWEpNTFJC8IdiQSJ1kiTAZnV+MZmhGHlJ208V46a",
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:gallformers, ~w(--sourcemap=inline --watch)]},
+    # One-shot build: the worker only changes when maplibre-gl is upgraded.
+    maplibre_worker: {Esbuild, :install_and_run, [:maplibre_worker, ~w()]},
     tailwind: {Tailwind, :install_and_run, [:gallformers, ~w(--watch)]}
   ]
 
