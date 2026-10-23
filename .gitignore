@@ -100,9 +100,6 @@ npm-debug.log
 # Request logs (development only, production uses /data/logs)
 /priv/logs/
 
-# Local source-ingestion artifacts and uploaded PDFs
-/priv/storage/
-
 # API compiled binaries
 api/bin/
 

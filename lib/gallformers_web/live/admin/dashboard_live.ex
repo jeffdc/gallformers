@@ -180,13 +180,6 @@ defmodule GallformersWeb.Admin.DashboardLive do
               accent="slate"
               small
             />
-            <.action_card
-              label="Ingestion Review"
-              href="/admin/ingestion-review"
-              icon="ph-file-arrow-up"
-              accent="slate"
-              small
-            />
           </div>
         </div>
       <% end %>
