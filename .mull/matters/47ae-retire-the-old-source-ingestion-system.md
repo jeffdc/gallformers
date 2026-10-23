@@ -1,5 +1,5 @@
 ---
-status: active
+status: done
 created: 2026-10-15
 updated: 2026-10-23
 epic: source-ingestion
@@ -54,7 +54,13 @@ One branch, one PR.
 - Python lines in both Dockerfiles were added only by `4127a877` (the extractor commit); removal restores the pre-extractor lines.
 - Verified: `mix compile --warnings-as-errors`, `mix precommit` (1932 tests, 0 failures), migration run against the local prod copy, `make test-db`.
 
-## After merge (Jeff)
+## Cleanup done (2026-10-23)
+
+- Local leftovers deleted (`priv/python/`, `priv/storage/`, `services/source-ingestion/` outputs).
+- Dependabot branches for `services/source-ingestion` cleaned up.
+- S3: `s3://gallformers-private/source-ingestions/` deleted (10 objects, 1.0 MiB, from local test runs on 2026-05-02/06; bucket unversioned). Bucket is now empty and kept for `e381`. `s3://gallformers-images-us-east-1/sources/` never had objects (no versions or delete markers).
+
+## After merge (Jeff) — original checklist
 
 - Delete ignored leftovers on disk: `priv/python/` (`.venv`, egg-info), `priv/storage/dev/` (now untracked since its `.gitignore` entry was removed).
 
