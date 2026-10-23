@@ -13,7 +13,7 @@ config :gallformers,
 
 config :gallformers, Oban,
   repo: Gallformers.Repo,
-  queues: [default: 10, extraction: 2, maintenance: 5],
+  queues: [default: 10, maintenance: 5],
   plugins: [
     {Oban.Plugins.Pruner, max_age: 7 * 24 * 60 * 60},
     Oban.Plugins.Reindexer,
@@ -104,11 +104,6 @@ config :gallformers, :images,
   # Presigned URL expiry (5 minutes)
   presign_expiry: 300
 
-config :gallformers, :source_storage,
-  private_bucket: "gallformers-private",
-  public_bucket: "gallformers-images-us-east-1",
-  public_base_url: "https://gallformers-images-us-east-1.s3.amazonaws.com"
-
 # Configure Ueberauth for Auth0 authentication
 # Client ID and secret are set in runtime.exs from environment variables
 config :ueberauth, Ueberauth,
@@ -118,16 +113,6 @@ config :ueberauth, Ueberauth,
 
 # WCVP lookup database (read-only, no migrations)
 config :gallformers, Gallformers.Repo.WCVP, pool_size: 2
-
-config :gallformers, :ingestion_pipeline,
-  models: %{
-    llm_clean: "deepseek-ai/DeepSeek-V3-0324",
-    metadata: "deepseek-ai/DeepSeek-V3-0324",
-    data_extract: "deepseek-ai/DeepSeek-V3-0324"
-  },
-  api_url: "https://api.deepinfra.com/v1/openai/chat/completions",
-  receive_timeout: 120_000,
-  retry_backoffs: [1_000, 2_000, 4_000]
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

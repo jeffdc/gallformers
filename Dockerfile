@@ -14,7 +14,7 @@ FROM hexpm/elixir:1.17.3-erlang-27.1.2-alpine-3.20.3 AS builder
 
 # Install build dependencies
 # vips-dev is needed to compile the vix NIF for image processing
-RUN apk add --no-cache build-base git python3 py3-pip vips-dev
+RUN apk add --no-cache build-base git vips-dev
 
 WORKDIR /app
 
@@ -46,9 +46,6 @@ COPY rel rel
 # Copy runtime config
 COPY config/runtime.exs config/
 
-# Vendor the Python extractor dependencies into priv/python for release images.
-RUN python3 -m pip install --no-cache-dir --target /app/priv/python/vendor /app/priv/python
-
 # Compile first (needed for colocated hooks)
 RUN mix compile
 
@@ -65,10 +62,9 @@ RUN mix release
 FROM alpine:3.20 AS runtime
 
 # Runtime dependencies
-# python3 is needed for the PDF text extractor shipped under priv/python
 # vips is needed for image processing (resizing variants)
 # curl is needed for downloading data files from S3 on first boot
-RUN apk add --no-cache libstdc++ openssl ncurses-libs python3 su-exec vips curl
+RUN apk add --no-cache libstdc++ openssl ncurses-libs su-exec vips curl
 
 # Install Typst for PDF generation of identification keys
 ADD https://github.com/typst/typst/releases/download/v0.14.2/typst-x86_64-unknown-linux-musl.tar.xz /tmp/typst.tar.xz
