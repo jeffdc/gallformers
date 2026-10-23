@@ -1,5 +1,5 @@
 ---
-status: planned
+status: done
 tags: [design, nix]
 created: 2026-10-23
 updated: 2026-10-23
@@ -50,7 +50,7 @@ Prod compiles with an older Elixir/OTP than CI tests with. Typst is downloaded i
 - Start script prints the port and fails clearly if it's taken.
 - One shared cluster for all worktrees (same behavior as Postgres.app today): data dir outside the repo, e.g. `~/.local/share/gallformers/postgres`, overridable.
 - Coexists with Postgres.app; no need to quit it.
-- No Elixir config changes needed: Postgrex `default_opts/1` (`deps/postgrex/lib/postgrex/utils.ex`) fills `:port` from `PGPORT`, and `dev.exs` / `test.exs` don't set `:port`.
+- ~~No Elixir config changes needed~~ **Wrong (found 2026-10-23):** `ecto_sql`'s `Ecto.Adapters.Postgres.Connection` (`deps/ecto_sql/lib/ecto/adapters/postgres/connection.ex:14`) does `Keyword.put_new(:port, 5432)` before Postgrex's `PGPORT` default, so pooled connections (migrations, the app) went to 5432 while `ecto.create`/`drop` honored `PGPORT`. Fixed by setting `port: String.to_integer(System.get_env("PGPORT", "5432"))` on both repos in `dev.exs` and `test.exs`.
 - Dev data reload: new 17 cluster starts empty → `make download-db` (prod pg_dump from S3, which is 17) plus the WCVP restore. Existing Postgres.app 18 data can't be restored into 17; don't try.
 - Rejected: Unix-socket-only. Would need `dev.exs`/`test.exs` changes (config passes `PGHOST` as `:hostname`, bypassing Postgrex's socket-dir handling) and risks the ~104-char macOS socket path limit under `.worktrees/`.
 
@@ -66,7 +66,7 @@ Prod compiles with an older Elixir/OTP than CI tests with. Typst is downloaded i
 - Setup becomes: install Nix + direnv, `direnv allow`, start DB, load data. Remove brew/asdf/Postgres.app instructions.
 
 ## To verify during implementation
-- ~~`Makefile:119` port-less `DATABASE_URL`~~ — resolved during planning: Ecto `parse_url/1` drops a nil port, so Postgrex falls back to `PGPORT`. No change needed.
+- ~~`Makefile:119` port-less `DATABASE_URL`~~ — the planning-time conclusion was wrong (same ecto_sql 5432 default as above); `run-local-release` now builds the URL from `PGHOST`/`PGPORT`.
 - Exact nixpkgs Elixir/OTP patch versions vs. available hexpm/elixir tags — pick a combo that exists in both.
 - Whether nixpkgs' Typst version matches the Dockerfile's 0.14.2.
 
@@ -92,11 +92,22 @@ Prod compiles with an older Elixir/OTP than CI tests with. Typst is downloaded i
 
 **Notes:** Needs Nix installed (Task 2's prerequisite). Python no longer ships in the prod image (`47ae`), so it doesn't need to match Alpine.
 
+**Result (2026-10-23):**
+- nixpkgs-unstable rev `5adc50831c259f87faeb09ddf930d43597197473` (`nixpkgs-26.11pre1097770`). Attribute names confirmed: `beam.packages.erlang_28.elixir_1_19`, `beam.packages.erlang_28.erlang`.
+- **Elixir 1.19.6 / OTP 28.5.0.8** — exact match with `hexpm/elixir:1.19.6-erlang-28.5.0.8-alpine-3.24.3` (amd64 + arm64). Runtime stage → `alpine:3.24.3`.
+- Node 22.23.3, Postgres 17.11 (prod is postgres-flex 17.2 — same major), vips 8.18.7, Python 3.13.16 (`python313`; default `python3` is 3.14.8).
+- All of the above are prebuilt in cache.nixos.org for aarch64-darwin (`nix build --dry-run`: 115 paths fetched, nothing built).
+- **Typst: nixpkgs has 0.15.1, Dockerfile has 0.14.2.** 0.15.0 breaking changes (removed `path`/`pattern`/`pdf.embed`/scoped `decode`, backslash file paths, baseline/math layout changes) — `priv/typst/key.typ` uses none of the removed features. `pdf_generator_test.exs --include typst` passes under 0.15.1. Possible silent layout shifts are not covered by tests — eyeball a generated key PDF. **Decided (Jeff, 2026-10-23): bump the Dockerfiles to Typst 0.15.1**; flake uses nixpkgs `typst`.
+- **Decided (Jeff, 2026-10-23): Python 3.13 (`python313`)** — import-producer has only been run on 3.13 (`cpython-313` bytecode); Docling on 3.14 unverified.
+
 ### Task 2: Install Nix + direnv on Jeff's Mac (manual, Jeff runs)
 
 **Files:** none.
 
 **Behavior:** Install Nix (pick the installer then — upstream or Determinate; verify current state of both before recommending), enable flakes if the installer doesn't, install direnv + nix-direnv, hook direnv into zsh. Postgres.app stays installed and running.
+
+**Result (2026-10-23):** Done. NixOS community installer (`artifacts.nixos.org/nix-installer`, upstream Nix 2.35.4, `--enable-flakes`; chosen over Determinate, which since 2026-01 only installs Determinate Nix). direnv 2.38.2 from Homebrew (no Homebrew formula exists for Nix or nix-direnv); nix-direnv via `nix profile`. Gotcha: the installer only hooks `/etc/zshrc`, which Claude Code's shell doesn't load — Jeff added the `nix-daemon.sh` sourcing to `~/.zshrc` (also protects against macOS updates resetting `/etc/zshrc`).
+- Agent commands don't trigger direnv's prompt hook. **Solved (2026-10-23)** with Claude Code's documented pattern (code.claude.com/docs/en/hooks-guide, direnv section): global hooks in `~/.claude/settings.json` — `SessionStart` and `CwdChanged` run `direnv export bash > "$CLAUDE_ENV_FILE"`, `FileChanged` (matcher `.envrc|flake.nix|flake.lock`) re-exports. Claude Code runs that file before every Bash command, so no `nix develop -c` prefixes. Timeout 300s for a cold nix-direnv build. Still to verify once the flake exists: that subagents' Bash commands get it (undocumented).
 
 ### Task 3: Dockerfile alignment
 
@@ -116,6 +127,15 @@ Prod compiles with an older Elixir/OTP than CI tests with. Typst is downloaded i
 - Same build for `Dockerfile.preview`.
 
 **Notes:** Independent of the flake; can merge on its own first. Prod deploy happens on merge to main (deploy.yml), so the local image build is the only gate before prod — be thorough.
+
+**Result (2026-10-23), branch `align-toolchain-versions`:**
+- Done: builder `hexpm/elixir:1.19.6-erlang-28.5.0.8-alpine-3.24.3`, runtime `alpine:3.24.3`, Typst 0.15.1 verified with `sha256sum -c` in `RUN` (not `ADD --checksum`, which needs a newer Dockerfile frontend that Fly's builder may not have).
+- **Root cause found while testing — OTP 28.5.0.6 httpc header limit.** OTP 28.5.0.6 (OTP-20343, inets 9.6.2.3) made `httpc` reject responses with more than 10240 bytes of headers unless the caller passes the new `max_header_size` option. GitHub release-download redirects carry ~10.8 KB of headers (long signed `Location`), so every Elixir tool that fetches GitHub releases with plain `httpc` fails on OTP ≥ 28.5.0.6: vix's precompiled NIF (via `elixir_make` 0.9.0 — which hides it as `:enoent`; 0.10.0 doesn't fix it), vix's precompiled libvips (`header_too_long`; still so in vix 0.42.0), and the `tailwind` package's binary download. esbuild is unaffected (npm). Reproduced with the same request: OTP 27.1.2 → 200; OTP 28.5.0.8 → `{:header_too_long, {:max, 10240}}`. The libvips header errors in the log are noise from vix's Makefile running dependency generation before the (failing) libvips download.
+- **Fix in both Dockerfiles:** `VIX_COMPILATION_MODE=PLATFORM_PROVIDED_LIBVIPS` + `pkgconf` (vix 0.36.0 compiles cleanly against Alpine's libvips 8.18.2 and links `/usr/lib/libvips.so.42`); Tailwind 4.1.12 x64-musl binary placed at `/app/_build/tailwind-linux-x64-musl` via `ADD` + `sha256sum -c`, so the tailwind package skips its download. Same direction a Nix-built image needs (no network in builds).
+- **Verified:** emulated linux/amd64 build of `Dockerfile` passes; in the release, Elixir 1.19.6, ERTS 16.4.0.7, Typst 0.15.1, and vix creates an image through system libvips (`Vix.Vips.Operation.black/2`).
+- **Local-only gotcha:** under QEMU (amd64 on Apple Silicon) the OTP 28 JIT crashes at boot (`prim_tty:isatty` `nif_error undef`). Workaround for local emulated builds only: `ENV ERL_FLAGS="+JMsingle true"` in a scratch copy of the Dockerfile. Not needed on Fly (native amd64) or native arm64.
+- **Latent elsewhere:** CI already runs OTP 28.5.0.8 (setup-beam `28`) and passes only because the `deps`/`_build` cache (compiled vix, downloaded tailwind) is restored. A cold cache would fail the same way. Tasks 4 and 6 must set `VIX_COMPILATION_MODE=PLATFORM_PROVIDED_LIBVIPS` (with libvips + pkg-config in the shell) and provide Tailwind (nixpkgs `tailwindcss_4`, matching version, via `config :tailwind, path:` or the `_build/tailwind-<target>` location).
+- Upstream: worth reporting to `elixir_make`, vix and `phoenixframework/tailwind` (pass `max_header_size` for GitHub downloads).
 
 ### Task 4: `flake.nix` dev shell + direnv
 
@@ -146,6 +166,13 @@ export PGHOST="$GALLFORMERS_PG_HOST" PGPORT="$GALLFORMERS_PG_PORT" PGDATA="$GALL
 - Worktree: `cd .worktrees/<any>` gets the same shell (worktrees have their own `.envrc` checkout once merged; until then verify on main).
 
 **Notes:** Data dir path includes the major version (`postgres-17`) so a future PG 18 cluster lives alongside instead of failing on an incompatible data dir. Because the data dir is outside the repo, all worktrees share one cluster — same as Postgres.app today.
+
+**Result Tasks 4 + 5 (2026-10-23), branch `nix-dev-shell` (stacked on `align-toolchain-versions`):**
+- `flake.nix` (aarch64-darwin + x86_64-linux), `flake.lock` pinned to nixpkgs `5adc5083`, `.envrc` (`source_env_if_exists .envrc.local` then `use flake`), `.gitignore` (`.direnv/`, `.envrc.local`).
+- Shell provides: Elixir 1.19.6 / OTP 28.5.0.8, Node 22.23.3, Python 3.13.16 + uv 0.13.1 (`UV_PYTHON` points at it, `UV_PYTHON_DOWNLOADS=never`), Typst 0.15.1, Postgres 17.11, libvips 8.18.7 via pkg-config, tesseract + ghostscript (import-producer's ocrmypdf), Tailwind 4.1.12 fetched by URL + hash and exposed as `MIX_TAILWIND_PATH` (`config :tailwind, path: System.get_env("MIX_TAILWIND_PATH")` in config.exs; nil → package default, as in Docker). `VIX_COMPILATION_MODE=PLATFORM_PROVIDED_LIBVIPS`.
+- `scripts/dev-db start|stop|status` + `make db-start/db-stop/db-status`. TCP only (`unix_socket_directories=''`) — the in-`$PGDATA` socket idea broke on macOS's 103-byte socket path limit with a longer data path. Refuses outside the dev shell, on a taken port (before initdb), and on a different-major data dir. initdb: trust auth, UTF8, en_US.UTF-8.
+- Verified (scratch data dir): failure cases; start/idempotent start/status/stop; vix compiles from source against Nix libvips on macOS; `mix compile --warnings-as-errors`; `make test-db`; **`mix precommit` passes in the shell against Nix PG 17 (1932 tests, 0 failures)**; `mix assets.deploy` uses the pinned Tailwind; Typst PDF tests pass.
+- **Switchover done (2026-10-23):** `direnv allow` + Claude Code restart → plain Bash commands get the dev shell (Nix `elixir` 1.19.6/OTP 28.5.0.8, all env vars) in the main session **and in subagents** (verified with a test subagent — answers the undocumented question). `make db-start` initialized `~/.local/share/gallformers/postgres-17`; `make download-db` (6845 species) and `make wcvp-restore` (1,441,152 names) landed on the Nix PG 17.11 at 54317 (checked with `inet_server_port()`). `make test-db` + `mix precommit` pass with plain commands (1932 tests, 0 failures). Postgres.app left untouched.
 
 ### Task 5: Dev Postgres script + make targets
 
@@ -223,6 +250,20 @@ export PGHOST="$GALLFORMERS_PG_HOST" PGPORT="$GALLFORMERS_PG_PORT" PGDATA="$GALL
 1. Task 1 + 2 (decide versions, install Nix).
 2. PR A: Task 3 (Dockerfiles). Fixes the prod drift on its own; merge first.
 3. PR B: Tasks 4–8 (flake, dev DB, CI, guard, README). Jeff switches his own dev DB over (Task 5's manual run-through) before merging.
+
+**Status (2026-10-23):**
+- PR A = branch `align-toolchain-versions`, commit `3ca4500b` (Task 3). Not pushed.
+- PR B = branch `nix-dev-shell` (stacked on PR A), commit `e0dc7d5e` (Tasks 4–8). Not pushed. Rebase onto main after PR A merges, or open it against `align-toolchain-versions`.
+- Task 6: ci.yml Phoenix + Assets jobs and deploy.yml smoke test run via `shell: 'nix develop -c bash -e {0}'` after `cachix/install-nix-action@v31` and a separate "Build dev shell" step (pattern from the action's README). Phoenix job sets `GALLFORMERS_PG_HOST=localhost`, `GALLFORMERS_PG_PORT=5432` for the service container. Cache key now includes `hashFiles('flake.lock')` (first run is cold — that run exercises the vix/Tailwind no-download path). Paths filters include flake.nix/lock, Dockerfiles, scripts/**. No Nix store cache; measure the first runs before adding one.
+- Task 7: `scripts/check-toolchain` (CI step in Phoenix job): Dockerfile + Dockerfile.preview Elixir/OTP vs shell, runtime Alpine = builder Alpine, Typst vs shell, Tailwind URL vs config.exs, flake.nix tailwindVersion vs config.exs. Tested against drifted copies (`CHECK_TOOLCHAIN_ROOT`) — caught all planted mismatches, and caught a bug in its own config.exs parsing (read esbuild's version) which was fixed.
+- Task 8: README Quick Start/Prerequisites/Database rewritten for Nix + direnv (+ Claude Code hook note).
+- Found after the switchover: on macOS the shell's `DEVELOPER_DIR` (Nix Apple SDK) breaks `/usr/bin/git` (xcrun stub → "tool 'git' not found"). Fixed by adding `pkgs.git` to the shell (Nix git ships git-credential-osxkeychain, matching Jeff's `credential.helper`). The `FileChanged` hook reloaded the session env on the flake edit without a restart. But anything launched from a direnv-loaded terminal before the fix (e.g. Claude Code itself, whose statusline runs `git` with Claude Code's own process env) keeps the broken `/usr/bin/git` until restarted from a reloaded shell — the ccstatusline branch display went blank until Jeff restarted Claude Code.
+- Verified: `nix flake check`, x86_64-linux shell evaluates, actionlint + shellcheck clean, `mix precommit` (1932 tests, 0 failures) with plain commands.
+- Still to watch: first CI run on the PR (cold cache, Linux shell build, timings).
+
+**Shipped (2026-10-23):** PR #595 merged as merge commit `4cf631ed` (contains `3ca4500b` Dockerfiles, `e0dc7d5e` Nix dev shell/CI, `80add8d0` .dockerignore build context 583 MB → ~5 MB). CI on the PR: cold-cache run green (vix compiled from source, Tailwind from the flake, check-toolchain ok, 1932 tests), warm run green. Both Dockerfiles built on Fly's Depot builder via `--build-only` against `gallformers-preview` (note: `--dockerfile` is ignored when the fly.toml has `[build] dockerfile`; use `fly deploy --build-only -a gallformers-preview` for the prod Dockerfile). Prod deploy + smoke test green; `/health` 200; Jeff confirmed admin image upload (vix/libvips) and key PDF (Typst 0.15.1) work. Prod, CI and dev now all run Elixir 1.19.6 / OTP 28.5.0.8.
+
+**Follow-ups (not in this matter):** preview has no `DATABASE_URL` (machine crash-loops at migrations; see `f465`); upstream issues for vix / elixir_make / phoenixframework/tailwind to pass `max_header_size` on GitHub downloads; recurring `Postgrex … client exited` log line in passing test runs; Future steps 2–3 above (Nix-built image, NixOS hosting) and the parked DB-first idea.
 
 ## Out of scope
 Postgres 18, Nix-built release images, NixOS hosting, Nix-managed Postgres in CI.
