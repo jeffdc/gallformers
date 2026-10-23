@@ -103,6 +103,10 @@ npm-debug.log
 # API compiled binaries
 api/bin/
 
+# direnv / nix-direnv cache and per-user overrides
+.direnv/
+.envrc.local
+
 # Environment secrets (copy .env.sample to .env)
 .env
 .env.local

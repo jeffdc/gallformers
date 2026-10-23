@@ -7,81 +7,49 @@ The gallformers.org website - a comprehensive database and reference guide for g
 
 ## Quick Start
 
-```bash
-# Install Elixir dependencies
-mix setup
+The whole toolchain (Elixir, Erlang/OTP, Node, Postgres, libvips, Typst, Tailwind, Python/uv) comes from a Nix flake, pinned in `flake.lock` and shared with CI. The Dockerfiles use the same versions; CI checks that with `scripts/check-toolchain`.
 
-# Start the dev server
-mix phx.server
+```bash
+direnv allow            # once per checkout: loads the dev shell from flake.nix
+make db-start           # start the dev Postgres 17 (127.0.0.1:54317)
+make download-db        # restore the latest production snapshot (needs AWS credentials)
+make wcvp-restore       # restore the WCVP plant-name database
+make dev                # start the dev server
 ```
 
 Visit [localhost:4000](http://localhost:4000) in your browser.
 
 ## Prerequisites
 
-- **Elixir 1.19+** and **OTP 28+**
-- **Node.js 20+** (for asset compilation)
-- **PostgreSQL 16+**
-- **libvips** (for image processing - resizing uploaded images)
-- **Playwright** (for E2E tests only — `make e2e-setup` installs browsers)
+- **[Nix](https://github.com/NixOS/nix-installer)** with flakes enabled. The NixOS community installer: `curl -sSfL https://artifacts.nixos.org/nix-installer | sh -s -- install --enable-flakes`
+- **[direnv](https://direnv.net/)** hooked into your shell (`eval "$(direnv hook zsh)"`), plus **[nix-direnv](https://github.com/nix-community/nix-direnv)** for caching (`nix profile install nixpkgs#nix-direnv`, then `source $HOME/.nix-profile/share/nix-direnv/direnvrc` in `~/.config/direnv/direnvrc`)
+- **AWS credentials** for `make download-db` (private backups bucket)
+- **Playwright browsers** for E2E tests only: `make e2e-setup`
 
-### Installing Elixir
+Without direnv, `nix develop` opens the same shell.
 
-The easiest way on macOS:
+**Claude Code:** its Bash tool doesn't run direnv's prompt hook. Add `SessionStart` and `CwdChanged` hooks that run `direnv export bash > "$CLAUDE_ENV_FILE"` (see the direnv section of the [hooks guide](https://code.claude.com/docs/en/hooks-guide)) so commands and subagents get the dev shell.
 
-```bash
-brew install elixir
-```
+## Database
 
-Or use [asdf](https://asdf-vm.com/) for version management:
+The dev shell runs its own Postgres 17, separate from any other Postgres on the machine:
 
 ```bash
-asdf plugin add elixir
-asdf plugin add erlang
-asdf install erlang 28.0
-asdf install elixir 1.19.0-otp-28
+make db-start           # start (initializes the cluster on first run)
+make db-status          # running? which port, data dir, version
+make db-stop            # stop
 ```
 
-### Installing PostgreSQL
+- Listens on TCP only at `127.0.0.1:54317`, never 5432, so it can run next to Postgres.app or a Homebrew Postgres.
+- Data lives in `~/.local/share/gallformers/postgres-17`, shared by all worktrees.
+- Override the port, host or data directory in a gitignored `.envrc.local`, then `direnv reload`:
 
-```bash
-# macOS
-brew install postgresql@16
-brew services start postgresql@16
+  ```bash
+  export GALLFORMERS_PG_PORT=55432
+  export GALLFORMERS_PG_DATA=/some/other/dir
+  ```
 
-# Ubuntu/Debian
-sudo apt-get install postgresql postgresql-contrib
-```
-
-### Installing libvips (for image processing)
-
-```bash
-# macOS
-brew install libvips
-
-# Ubuntu/Debian
-sudo apt-get install libvips libvips-dev
-```
-
-### Installing Playwright Browsers (for E2E tests)
-
-```bash
-make e2e-setup
-```
-
-Verify with `make e2e-setup`.
-
-## Database Setup
-
-Ensure PostgreSQL is running locally, then:
-
-```bash
-# Create the database and run migrations
-mix ecto.setup
-
-# Or download a snapshot from production and restore locally
-make download-db
-```
+To create an empty database instead of restoring production data, run `mix ecto.setup`.
 
 ## Development
 

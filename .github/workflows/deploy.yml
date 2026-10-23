@@ -33,14 +33,18 @@ jobs:
     name: Smoke Test
     runs-on: ubuntu-latest
     needs: deploy
+    # Toolchain from the flake's dev shell (flake.nix), same as CI and local dev.
+    defaults:
+      run:
+        shell: 'nix develop -c bash -e {0}'
     steps:
       - uses: actions/checkout@v5
 
-      - name: Set up Elixir
-        uses: erlef/setup-beam@v1
-        with:
-          elixir-version: '1.19'
-          otp-version: '28'
+      - uses: cachix/install-nix-action@v31
+
+      - name: Build dev shell
+        shell: bash
+        run: nix build --no-link .#devShells.x86_64-linux.default
 
       - name: Restore dependencies cache
         uses: actions/cache@v5
@@ -48,8 +52,8 @@ jobs:
           path: |
             deps
             _build
-          key: ${{ runner.os }}-mix-${{ hashFiles('mix.lock') }}
-          restore-keys: ${{ runner.os }}-mix-
+          key: ${{ runner.os }}-mix-${{ hashFiles('flake.lock') }}-${{ hashFiles('mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-${{ hashFiles('flake.lock') }}-
 
       - name: Install dependencies
         run: mix deps.get
