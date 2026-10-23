@@ -38,6 +38,8 @@
 # Large reference/import data not needed at runtime
 /priv/repo/data/wcvp/
 /priv/repo/data/reconciliation/
+# Local output of mix gallformers.wcvp.build_db (dump/sqlite); never read at runtime
+/priv/data/
 
 # Dev logs
 /priv/logs/
@@ -51,3 +53,10 @@
 /infra/
 /runbooks/
 /services/
+/.mull/
+
+# Local tooling state (Fly uploads the working directory, not just tracked files)
+/.worktrees/
+/.expert/
+/.direnv/
+/dev.log
