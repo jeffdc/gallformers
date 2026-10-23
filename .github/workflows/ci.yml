@@ -11,6 +11,11 @@ on:
       - 'test/**'
       - 'mix.exs'
       - 'mix.lock'
+      - 'flake.nix'
+      - 'flake.lock'
+      - 'Dockerfile'
+      - 'Dockerfile.preview'
+      - 'scripts/**'
       - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
@@ -22,12 +27,21 @@ on:
       - 'test/**'
       - 'mix.exs'
       - 'mix.lock'
+      - 'flake.nix'
+      - 'flake.lock'
+      - 'Dockerfile'
+      - 'Dockerfile.preview'
+      - 'scripts/**'
       - '.github/workflows/ci.yml'
   workflow_dispatch:
 
 concurrency:
   group: ci-postgres-${{ github.ref }}
   cancel-in-progress: true
+
+# Toolchain comes from the flake's dev shell (flake.nix), the same one used locally.
+# Steps run through `nix develop`; the shell is pre-built in its own step so a broken
+# shell fails clearly and doesn't skew step timings.
 
 jobs:
   phoenix:
@@ -53,15 +67,22 @@ jobs:
     env:
       MIX_ENV: test
       USER: postgres
+      # Point the dev shell's Postgres settings at the service container.
+      GALLFORMERS_PG_HOST: localhost
+      GALLFORMERS_PG_PORT: '5432'
+
+    defaults:
+      run:
+        shell: 'nix develop -c bash -e {0}'
 
     steps:
       - uses: actions/checkout@v5
 
-      - name: Setup Elixir
-        uses: erlef/setup-beam@v1
-        with:
-          elixir-version: '1.19'
-          otp-version: '28'
+      - uses: cachix/install-nix-action@v31
+
+      - name: Build dev shell
+        shell: bash
+        run: nix build --no-link .#devShells.x86_64-linux.default
 
       - name: Restore dependencies cache
         uses: actions/cache@v5
@@ -69,19 +90,22 @@ jobs:
           path: |
             deps
             _build
-          key: ${{ runner.os }}-mix-${{ hashFiles('mix.lock') }}
-          restore-keys: ${{ runner.os }}-mix-
+          key: ${{ runner.os }}-mix-${{ hashFiles('flake.lock') }}-${{ hashFiles('mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-${{ hashFiles('flake.lock') }}-
+
+      - name: Check Dockerfiles match the flake toolchain
+        run: scripts/check-toolchain
 
       - name: Install dependencies
         run: mix deps.get
 
       - name: Setup test database
         run: |
-          MIX_ENV=test mix ecto.create --quiet
-          MIX_ENV=test mix ecto.migrate --quiet
-          psql -U postgres -h localhost -d gallformers_test -f priv/repo/test_seeds.sql --quiet
-          createdb -U postgres -h localhost wcvp_test
-          psql -U postgres -h localhost -d wcvp_test -f priv/repo/wcvp_test_setup.sql --quiet
+          mix ecto.create --quiet
+          mix ecto.migrate --quiet
+          psql -U postgres -d gallformers_test -f priv/repo/test_seeds.sql --quiet
+          createdb -U postgres wcvp_test
+          psql -U postgres -d wcvp_test -f priv/repo/wcvp_test_setup.sql --quiet
 
       - name: Run precommit checks (format, compile, credo, migrations, tests, exclusion check)
         run: mix precommit
@@ -90,20 +114,18 @@ jobs:
     name: Assets
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        shell: 'nix develop -c bash -e {0}'
+
     steps:
       - uses: actions/checkout@v5
 
-      - name: Setup Elixir
-        uses: erlef/setup-beam@v1
-        with:
-          elixir-version: '1.19'
-          otp-version: '28'
+      - uses: cachix/install-nix-action@v31
 
-      - name: Setup Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: '22'
-          package-manager-cache: false
+      - name: Build dev shell
+        shell: bash
+        run: nix build --no-link .#devShells.x86_64-linux.default
 
       - name: Restore dependencies cache
         uses: actions/cache@v5
@@ -111,8 +133,8 @@ jobs:
           path: |
             deps
             _build
-          key: ${{ runner.os }}-mix-${{ hashFiles('mix.lock') }}
-          restore-keys: ${{ runner.os }}-mix-
+          key: ${{ runner.os }}-mix-${{ hashFiles('flake.lock') }}-${{ hashFiles('mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-${{ hashFiles('flake.lock') }}-
 
       - name: Install dependencies
         run: mix deps.get
