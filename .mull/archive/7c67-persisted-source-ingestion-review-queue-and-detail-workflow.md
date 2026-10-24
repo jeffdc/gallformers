@@ -1,7 +1,7 @@
 ---
-status: planned
+status: done
 created: 2026-04-21
-updated: 2026-09-13
+updated: 2026-10-15
 epic: source-ingestion
 relates: [fa48]
 blocks: [7fda]
@@ -120,3 +120,7 @@ Implement persisted, evidence-aware decisions: show exact source context, verifi
 Wire approved domain changes to 7fda's accepted-assertion/source-evidence boundary and explicit final-markdown publication using the existing SourcePublisher operation. Keep private source/bundle/intermediate artifacts private; only intentionally approved final markdown gets a public sources/ path. Workflow completion must not conceal unresolved approval or publication failures. Deployment/access verification is owned by 7fda, not certified by db32's closure.
 
 The separate gall/shared-taxon admin-safety design remains subject to 4dcd/2cb2 approval. Preserve duplicate-first and source-first review gating while rebasing its implementation on current contracts.
+
+
+
+**Closed 2026-10-15 (Jeff: "go with the proposals").** Superseded by the import contract (`294c`, `priv/import/`) and the Gallformers-side import plan (`e381`), which carries the requirements still valid from this plan (storage release gate, humans approve every database change, provenance in both directions, persisted review state). The old code is retired under the new matter "Retire the old source-ingestion system".

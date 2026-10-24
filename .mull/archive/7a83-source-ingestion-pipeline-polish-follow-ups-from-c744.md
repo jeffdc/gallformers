@@ -1,7 +1,7 @@
 ---
-status: raw
+status: done
 created: 2026-05-12
-updated: 2026-09-13
+updated: 2026-10-15
 epic: source-ingestion
 ---
 
@@ -85,3 +85,6 @@ These are explicitly out of scope per c744 and remain so:
 
 ce28 is being retired as superseded. Its schema/trait-vocabulary drift requirement is owned by item 1 of this matter, not a new parallel exporter: generate the shared vocabulary consumed by Python validation and prompts from the authoritative Gallformers values, and detect divergence in CI. Keep a single vocabulary source rather than independently maintained prompt enums or a second schema-generation convention. Producer evaluation lives in 9314; production import/review lives in 7fda/7c67.
 
+
+
+**Closed 2026-10-15 (Jeff: "go with the proposals").** Superseded by the import contract (`294c`, `priv/import/`) and the Gallformers-side import plan (`e381`), which carries the requirements still valid from this plan (storage release gate, humans approve every database change, provenance in both directions, persisted review state). The old code is retired under the new matter "Retire the old source-ingestion system".

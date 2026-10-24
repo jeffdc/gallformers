@@ -3,7 +3,7 @@ status: raw
 created: 2026-10-03
 updated: 2026-10-23
 epic: taxonomy
-relates: [8567, 47ae]
+relates: [8567]
 ---
 
 # Import interface: pipeline to Gallformers

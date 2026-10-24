@@ -1,7 +1,7 @@
 ---
-status: refined
+status: done
 created: 2026-03-22
-updated: 2026-09-13
+updated: 2026-10-15
 epic: source-ingestion
 relates: [7fda, 7c67]
 ---
@@ -140,3 +140,7 @@ The revised design must make explicit: proposed versus accepted values; exact ev
 No high-confidence auto-accept rule or silent conflict overwrite. Preserve existing curator conclusions and require a deliberate resolution when incoming evidence disagrees. Distinguish gall identity/determination, shared organism taxon edits, and source-supported host/trait assertions; show shared-edit impact if the proposed separation is adopted. Only accepted assertions become queryable domain provenance; private review artifacts are not a requirement to model every unaccepted claim as a permanent domain assertion.
 
 Reviewer decisions should yield explicit usable evaluation feedback for 9314, not hidden prompt changes inside UI behavior. 7c67 owns implementation; 7fda owns writeback and publication. This consolidation does not approve the taxonomy proposal or authorize a UI implementation.
+
+
+
+**Closed 2026-10-15 (Jeff: "go with the proposals").** Superseded by the import contract (`294c`, `priv/import/`) and the Gallformers-side import plan (`e381`), which carries the requirements still valid from this plan (storage release gate, humans approve every database change, provenance in both directions, persisted review state). The old code is retired under the new matter "Retire the old source-ingestion system".

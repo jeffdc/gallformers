@@ -1,7 +1,7 @@
 ---
-status: raw
+status: done
 created: 2026-09-11
-updated: 2026-09-13
+updated: 2026-10-15
 epic: source-ingestion
 ---
 
@@ -42,3 +42,6 @@ ce28 is being closed as superseded design context, not as completion of ingestio
 
 The current producer baseline (c744), 9314's representative 30+ document gold evaluation, and a successful production sample are distinct milestones; none establishes full-source completion. 4fef owns scanned-document capability, 9314 owns producer quality, fa48/7c67 own review design/implementation, and 7fda owns production integration and storage/publication release gates. Historical references to ce28 are not an active dependency. No batch run, taxonomy decision or scope exception is authorized by this consolidation.
 
+
+
+**Closed 2026-10-15 (Jeff: "go with the proposals").** Superseded by the import contract (`294c`, `priv/import/`) and the Gallformers-side import plan (`e381`), which carries the requirements still valid from this plan (storage release gate, humans approve every database change, provenance in both directions, persisted review state). The old code is retired under the new matter "Retire the old source-ingestion system".
