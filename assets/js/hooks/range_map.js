@@ -29,16 +29,20 @@
  *   countries: code (ISO alpha-2), name
  */
 
-import maplibregl from 'maplibre-gl'
+import * as maplibregl from 'maplibre-gl'
 import { Protocol } from 'pmtiles'
 
-// Register PMTiles protocol once globally
-let protocolRegistered = false
-function ensureProtocol() {
-  if (!protocolRegistered) {
+// Register the MapLibre worker URL and PMTiles protocol once globally.
+// The worker is built as its own file by the maplibre_worker esbuild profile
+// (config/config.exs). Its name never changes, so the version query keeps
+// browsers from using a worker cached from an older release.
+let globalsRegistered = false
+function ensureGlobals() {
+  if (!globalsRegistered) {
+    maplibregl.setWorkerUrl(`/assets/js/maplibre-gl-worker.js?v=${maplibregl.getVersion()}`)
     const protocol = new Protocol()
     maplibregl.addProtocol('pmtiles', protocol.tile)
-    protocolRegistered = true
+    globalsRegistered = true
   }
 }
 
@@ -134,7 +138,7 @@ function buildFillExpression(effectiveInRange, effectiveInherited, excludedRange
 
 const RangeMap = {
   mounted() {
-    ensureProtocol()
+    ensureGlobals()
 
     this.inRange = new Set(JSON.parse(this.el.dataset.inRange || '[]'))
     this.excludedRange = new Set(JSON.parse(this.el.dataset.excludedRange || '[]'))
@@ -230,6 +234,22 @@ const RangeMap = {
     }
   },
 
+  // MapLibre requires WebGL2; without it the Map constructor throws a
+  // GPUInitializationError. Show a message instead of a blank map.
+  createMap(options) {
+    try {
+      return new maplibregl.Map(options)
+    } catch (error) {
+      if (!(error instanceof maplibregl.GPUInitializationError)) throw error
+
+      const errorDiv = document.createElement('div')
+      errorDiv.className = 'absolute inset-0 flex items-center justify-center bg-gray-100'
+      errorDiv.innerHTML = '<span class="text-gray-500 text-sm">Map unavailable in this browser</span>'
+      this.el.appendChild(errorDiv)
+      return null
+    }
+  },
+
   initMap() {
     const container = this.el
 
@@ -237,7 +257,7 @@ const RangeMap = {
       this.inRange, this.excludedRange, this.inheritedRange
     )
 
-    this.map = new maplibregl.Map({
+    this.map = this.createMap({
       container,
       boxZoom: false,
       style: {
@@ -344,6 +364,7 @@ const RangeMap = {
       maxBounds: this.maxBounds,
       attributionControl: false
     })
+    if (!this.map) return
 
     // Default to world view; fitToRange will narrow once tiles load
     this.map.fitBounds(WORLD_BOUNDS, { padding: 20, animate: false })

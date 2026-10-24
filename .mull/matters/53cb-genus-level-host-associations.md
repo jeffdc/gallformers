@@ -1,10 +1,9 @@
 ---
 status: active
 created: 2026-03-03
-updated: 2026-09-13
+updated: 2026-10-23
 epic: cynipid
 relates: [67c9]
-blocks: [1121]
 ---
 
 # Genus-level host associations

@@ -10,11 +10,16 @@ COPY assets/package.json assets/package-lock.json ./
 RUN npm ci --omit=dev
 
 # Stage 1: Build Elixir release
-FROM hexpm/elixir:1.17.3-erlang-27.1.2-alpine-3.20.3 AS builder
+# Keep Elixir/OTP identical to CI and the dev toolchain (matter 9380).
+FROM hexpm/elixir:1.19.6-erlang-28.5.0.8-alpine-3.24.3 AS builder
 
 # Install build dependencies
-# vips-dev is needed to compile the vix NIF for image processing
-RUN apk add --no-cache build-base git python3 py3-pip vips-dev
+# vix (image processing NIF) is compiled against Alpine's libvips instead of
+# downloading precompiled binaries from GitHub: OTP >= 28.5.0.6 httpc rejects
+# GitHub's release redirects (headers > 10240 bytes), and vix/elixir_make don't
+# raise max_header_size. Needs vips-dev + pkgconf here and vips at runtime.
+RUN apk add --no-cache build-base git pkgconf vips-dev
+ENV VIX_COMPILATION_MODE=PLATFORM_PROVIDED_LIBVIPS
 
 WORKDIR /app
 
@@ -46,33 +51,39 @@ COPY rel rel
 # Copy runtime config
 COPY config/runtime.exs config/
 
-# Vendor the Python extractor dependencies into priv/python for release images.
-RUN python3 -m pip install --no-cache-dir --target /app/priv/python/vendor /app/priv/python
-
 # Compile first (needed for colocated hooks)
 RUN mix compile
 
 # Pull the pre-built node_modules from the assets stage.
 COPY --from=assets /assets/node_modules ./assets/node_modules
 
-# Build assets (esbuild + tailwind are installed via mix)
+# Tailwind has the same httpc/GitHub download problem as vix (see above), so
+# place the binary where the tailwind package looks for it (_build/tailwind-<target>);
+# it then skips its own download. Keep the version in sync with `config :tailwind`
+# in config/config.exs.
+ADD https://github.com/tailwindlabs/tailwindcss/releases/download/v4.1.12/tailwindcss-linux-x64-musl /app/_build/tailwind-linux-x64-musl
+RUN echo "a8a1926a2951a5da0684c568d612bc0a590600334d3a85d0e63ea90ac7ced2e5  /app/_build/tailwind-linux-x64-musl" | sha256sum -c - && \
+    chmod +x /app/_build/tailwind-linux-x64-musl
+
+# Build assets (esbuild is installed via mix from npm; tailwind is placed above)
 RUN mix assets.deploy
 
 # Build the release
 RUN mix release
 
 # Stage 2: Runtime
-FROM alpine:3.20 AS runtime
+# Must match the builder's Alpine version: ERTS links against its musl/OpenSSL/ncurses.
+FROM alpine:3.24.3 AS runtime
 
 # Runtime dependencies
-# python3 is needed for the PDF text extractor shipped under priv/python
 # vips is needed for image processing (resizing variants)
 # curl is needed for downloading data files from S3 on first boot
-RUN apk add --no-cache libstdc++ openssl ncurses-libs python3 su-exec vips curl
+RUN apk add --no-cache libstdc++ openssl ncurses-libs su-exec vips curl
 
 # Install Typst for PDF generation of identification keys
-ADD https://github.com/typst/typst/releases/download/v0.14.2/typst-x86_64-unknown-linux-musl.tar.xz /tmp/typst.tar.xz
-RUN tar -C /usr/local/bin -xf /tmp/typst.tar.xz --strip-components=1 typst-x86_64-unknown-linux-musl/typst && rm /tmp/typst.tar.xz
+ADD https://github.com/typst/typst/releases/download/v0.15.1/typst-x86_64-unknown-linux-musl.tar.xz /tmp/typst.tar.xz
+RUN echo "a6d077d0a95eed5a2eba715b2dae06be954f624ccbf85758a03f389ded33118c  /tmp/typst.tar.xz" | sha256sum -c - && \
+    tar -C /usr/local/bin -xf /tmp/typst.tar.xz --strip-components=1 typst-x86_64-unknown-linux-musl/typst && rm /tmp/typst.tar.xz
 
 WORKDIR /app
 

@@ -9,14 +9,6 @@ defmodule GallformersWeb.Admin.DashboardLiveTest do
 
   alias Gallformers.Accounts.Auth0User
 
-  setup do
-    cache_key = {Gallformers.SiteSettings, :cache}
-    previous = :persistent_term.get(cache_key, %{})
-    :persistent_term.put(cache_key, %{})
-    on_exit(fn -> :persistent_term.put(cache_key, previous) end)
-    :ok
-  end
-
   describe "Admin dashboard" do
     setup %{conn: conn} do
       # Create a mock user session for admin access (must be a User struct)

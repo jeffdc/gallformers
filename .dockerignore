@@ -10,19 +10,27 @@
 /doc/
 /test/
 /tmp/
-*.ez
+**/*.ez
 .elixir_ls
-erl_crash.dump
+**/erl_crash.dump
+
+# Dialyzer PLTs
+/priv/plts/
+
+# OS / Python caches
+**/.DS_Store
+**/__pycache__/
 
 # Assets rebuilt inside Docker
 /assets/node_modules/
 /priv/static/assets/
 /priv/static/cache_manifest.json
 
-# Legacy SQLite files (database is now Postgres, but exclude any stale files)
-*.sqlite
-*.sqlite-shm
-*.sqlite-wal
+# Legacy SQLite files (database is now Postgres, but exclude any stale files).
+# `**/` is required: a bare `*.sqlite` only matches the context root.
+**/*.sqlite
+**/*.sqlite-shm
+**/*.sqlite-wal
 
 # Volume-backed data files (served via symlink from /data volume)
 /priv/static/data/
@@ -30,6 +38,8 @@ erl_crash.dump
 # Large reference/import data not needed at runtime
 /priv/repo/data/wcvp/
 /priv/repo/data/reconciliation/
+# Local output of mix gallformers.wcvp.build_db (dump/sqlite); never read at runtime
+/priv/data/
 
 # Dev logs
 /priv/logs/
@@ -43,3 +53,10 @@ erl_crash.dump
 /infra/
 /runbooks/
 /services/
+/.mull/
+
+# Local tooling state (Fly uploads the working directory, not just tracked files)
+/.worktrees/
+/.expert/
+/.direnv/
+/dev.log

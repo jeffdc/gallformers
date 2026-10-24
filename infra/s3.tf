@@ -65,11 +65,12 @@ resource "aws_s3_bucket_cors_configuration" "images" {
   }
 }
 
-# Private bucket for source-ingestion uploads and pipeline artifacts.
+# Private bucket for non-public source material (planned: import batches
+# delivered by the ingestion pipeline).
 #
 # Access patterns:
-#   - source-ingestions/* - source uploads, intermediate artifacts, and assembled
-#     markdown before publication
+#   - source-ingestions/* - artifacts left by the retired source-ingestion
+#     system; nothing reads or writes them anymore
 
 resource "aws_s3_bucket" "private" {
   bucket = "gallformers-private"

@@ -14,6 +14,8 @@ config :gallformers, Gallformers.Repo,
   username: System.get_env("PGUSER", System.get_env("USER")),
   password: System.get_env("PGPASSWORD"),
   hostname: System.get_env("PGHOST", "localhost"),
+  # Explicit because ecto_sql defaults the port to 5432 before Postgrex reads PGPORT.
+  port: String.to_integer(System.get_env("PGPORT", "5432")),
   pool_size: 5,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true
@@ -22,7 +24,8 @@ config :gallformers, Gallformers.Repo.WCVP,
   database: "wcvp",
   username: System.get_env("PGUSER", System.get_env("USER")),
   password: System.get_env("PGPASSWORD"),
-  hostname: System.get_env("PGHOST", "localhost")
+  hostname: System.get_env("PGHOST", "localhost"),
+  port: String.to_integer(System.get_env("PGPORT", "5432"))
 
 # For development, we disable any cache and enable
 # debugging and code reloading.
@@ -39,6 +42,8 @@ config :gallformers, GallformersWeb.Endpoint,
   secret_key_base: "7FjN9MMQWSwTXLk2h88NQ/dHYWEpNTFJC8IdiQSJ1kiTAZnV+MZmhGHlJ208V46a",
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:gallformers, ~w(--sourcemap=inline --watch)]},
+    # One-shot build: the worker only changes when maplibre-gl is upgraded.
+    maplibre_worker: {Esbuild, :install_and_run, [:maplibre_worker, ~w()]},
     tailwind: {Tailwind, :install_and_run, [:gallformers, ~w(--watch)]}
   ]
 

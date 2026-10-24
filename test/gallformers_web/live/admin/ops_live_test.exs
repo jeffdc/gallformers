@@ -9,11 +9,6 @@ defmodule GallformersWeb.Admin.OpsLiveTest do
 
   alias Gallformers.Accounts.Auth0User
 
-  setup do
-    :persistent_term.put({Gallformers.SiteSettings, :cache}, %{})
-    on_exit(fn -> :persistent_term.put({Gallformers.SiteSettings, :cache}, %{}) end)
-  end
-
   defp operator_conn(conn) do
     user = %Auth0User{
       id: "auth0|operator-test",
@@ -108,9 +103,6 @@ defmodule GallformersWeb.Admin.OpsLiveTest do
       |> render_click()
 
       assert Gallformers.SiteSettings.read_only?() == true
-
-      # Reset immediately to avoid poisoning concurrent async tests via persistent_term
-      :persistent_term.put({Gallformers.SiteSettings, :cache}, %{})
     end
   end
 

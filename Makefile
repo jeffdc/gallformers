@@ -2,7 +2,7 @@
 #
 # Phoenix/LiveView development commands
 
-.PHONY: dev dev-cloudfront dev-lan test test-db test-prod-data test-prod-data-e2e test-prod-data-all download-db experiment-db ci preflight help deps assets setup clean check-db build run-local-release dump-schema preview preview-stop preview-destroy wcvp-restore wcvp-check check-full check-bg
+.PHONY: dev dev-cloudfront dev-lan test test-db test-prod-data test-prod-data-e2e test-prod-data-all download-db experiment-db ci preflight help deps assets setup clean check-db build run-local-release dump-schema preview preview-stop preview-destroy wcvp-restore wcvp-check check-full check-bg db-start db-stop db-status
 
 # Download production database for local dev
 # Downloads full pg_dump from private S3 bucket and restores into local Postgres
@@ -66,10 +66,21 @@ check-db:
 		echo ""; \
 		echo "ERROR: Dev database not found or has no species data"; \
 		echo "Set it up with:"; \
+		echo "  make db-start      (if Postgres isn't running)"; \
 		echo "  make download-db"; \
 		echo ""; \
 		exit 1; \
 	}
+
+# Dev Postgres 17 from the Nix dev shell (see scripts/dev-db and flake.nix)
+db-start:
+	@scripts/dev-db start
+
+db-stop:
+	@scripts/dev-db stop
+
+db-status:
+	@scripts/dev-db status
 
 # Dump database schema (Postgres SQL format)
 dump-schema:
@@ -133,7 +144,7 @@ run-local-release:
 		echo "Generating SECRET_KEY_BASE..."; \
 		export SECRET_KEY_BASE=$$(mix phx.gen.secret); \
 	fi; \
-	DATABASE_URL=$${DATABASE_URL:-postgres://localhost/gallformers_dev} \
+	DATABASE_URL=$${DATABASE_URL:-postgres://$${PGHOST:-localhost}:$${PGPORT:-5432}/gallformers_dev} \
 	PHX_HOST=localhost \
 	PORT=4000 \
 	_build/prod/rel/gallformers/bin/gallformers start
@@ -406,6 +417,9 @@ help:
 	@echo "  make clean             Clean build artifacts (node_modules, _build, deps)"
 	@echo ""
 	@echo "Database:"
+	@echo "  make db-start          Start the dev Postgres 17 (Nix dev shell; port \$$PGPORT)"
+	@echo "  make db-stop           Stop the dev Postgres"
+	@echo "  make db-status         Show whether the dev Postgres is running"
 	@echo "  make download-db       Download pg_dump from S3 and restore to local Postgres"
 	@echo "  make experiment-db     Clone gallformers_dev into a disposable experiment DB (re-run to reset)"
 	@echo "  make test-db           Rebuild test database (drop, create, migrate, seed)"

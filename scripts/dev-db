@@ -1,0 +1,99 @@
+#!/bin/sh
+# Dev Postgres 17 run from the Nix dev shell (flake.nix).
+#
+# Usage: scripts/dev-db start|stop|status   (or: make db-start / db-stop / db-status)
+#
+# Connection settings come from the dev shell: PGHOST, PGPORT and PGDATA, derived from
+# GALLFORMERS_PG_HOST / GALLFORMERS_PG_PORT / GALLFORMERS_PG_DATA. Override those in
+# .envrc.local. The server listens on TCP only at $PGHOST:$PGPORT (default
+# 127.0.0.1:54317, never 5432) with no Unix socket, so it can run alongside any other
+# Postgres on the machine.
+
+set -eu
+
+PG_MAJOR=17
+
+die() {
+  echo "dev-db: $*" >&2
+  exit 1
+}
+
+require_dev_shell() {
+  if [ -z "${PGDATA:-}" ] || [ -z "${PGPORT:-}" ] || [ -z "${PGHOST:-}" ]; then
+    die "PGDATA/PGPORT/PGHOST are not set. Run this inside the Nix dev shell (direnv allow, or nix develop)."
+  fi
+  command -v pg_ctl >/dev/null 2>&1 || die "pg_ctl not found. Run this inside the Nix dev shell."
+  server_major=$(pg_ctl --version | sed -E 's/[^0-9]*([0-9]+).*/\1/')
+  [ "$server_major" = "$PG_MAJOR" ] || die "expected Postgres $PG_MAJOR tools, found $(pg_ctl --version)."
+}
+
+running() {
+  [ -f "$PGDATA/PG_VERSION" ] && pg_ctl -D "$PGDATA" status >/dev/null 2>&1
+}
+
+port_in_use() {
+  lsof -nP -iTCP:"$PGPORT" -sTCP:LISTEN >/dev/null 2>&1
+}
+
+init_cluster() {
+  echo "Initializing Postgres $PG_MAJOR cluster in $PGDATA"
+  mkdir -p "$(dirname "$PGDATA")"
+  initdb -D "$PGDATA" --auth=trust --encoding=UTF8 --locale=en_US.UTF-8 >/dev/null
+}
+
+start() {
+  if [ -f "$PGDATA/PG_VERSION" ]; then
+    data_major=$(cat "$PGDATA/PG_VERSION")
+    [ "$data_major" = "$PG_MAJOR" ] ||
+      die "$PGDATA holds a Postgres $data_major cluster; expected $PG_MAJOR. Set GALLFORMERS_PG_DATA to another directory."
+  fi
+
+  if running; then
+    echo "Postgres already running on $PGHOST:$PGPORT ($PGDATA)"
+    return 0
+  fi
+
+  if port_in_use; then
+    die "port $PGPORT is already in use by another process. Pick a free port with
+  export GALLFORMERS_PG_PORT=<port>
+in .envrc.local, then run 'direnv reload'."
+  fi
+
+  [ -f "$PGDATA/PG_VERSION" ] || init_cluster
+
+  # TCP only: no Unix socket (avoids socket clashes and macOS's 103-byte socket path limit).
+  pg_ctl -D "$PGDATA" -l "$PGDATA/server.log" -w \
+    -o "-p $PGPORT -c listen_addresses='$PGHOST' -c unix_socket_directories=''" start >/dev/null
+  echo "Postgres $PG_MAJOR running on $PGHOST:$PGPORT"
+  echo "  data: $PGDATA"
+  echo "  log:  $PGDATA/server.log"
+}
+
+stop() {
+  if running; then
+    pg_ctl -D "$PGDATA" -m fast -w stop >/dev/null
+    echo "Postgres stopped"
+  else
+    echo "Postgres is not running"
+  fi
+}
+
+status() {
+  if running; then
+    echo "running on $PGHOST:$PGPORT"
+    echo "  data:    $PGDATA"
+    echo "  version: $(psql -d postgres -tAc 'show server_version')"
+  else
+    echo "not running (port $PGPORT, data $PGDATA)"
+    return 1
+  fi
+}
+
+require_dev_shell
+
+case "${1:-}" in
+  start) start ;;
+  stop) stop ;;
+  status) status ;;
+  *) die "usage: scripts/dev-db start|stop|status" ;;
+esac

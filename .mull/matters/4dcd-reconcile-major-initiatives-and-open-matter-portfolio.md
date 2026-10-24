@@ -1,8 +1,7 @@
 ---
 status: active
 created: 2026-09-10
-updated: 2026-09-13
-blocks: [1121]
+updated: 2026-10-23
 ---
 
 # Reconcile major initiatives and open matter portfolio

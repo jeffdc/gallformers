@@ -100,11 +100,12 @@ npm-debug.log
 # Request logs (development only, production uses /data/logs)
 /priv/logs/
 
-# Local source-ingestion artifacts and uploaded PDFs
-/priv/storage/
-
 # API compiled binaries
 api/bin/
+
+# direnv / nix-direnv cache and per-user overrides
+.direnv/
+.envrc.local
 
 # Environment secrets (copy .env.sample to .env)
 .env

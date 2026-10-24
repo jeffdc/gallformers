@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-10-03
-updated: 2026-10-15
+updated: 2026-10-23
 epic: taxonomy
-relates: [1121, 8567, 294c, ca20]
+relates: [8567, 294c, ca20]
 ---
 
 # Import interface: pipeline to Gallformers

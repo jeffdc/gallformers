@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-02-13
-updated: 2026-09-14
+updated: 2026-10-23
 epic: taxonomy
-relates: [e29c, 2cb2]
+relates: [2cb2]
 ---
 
 # Organism-to-organism interactions within galls
