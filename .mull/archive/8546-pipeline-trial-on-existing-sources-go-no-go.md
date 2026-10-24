@@ -1,17 +1,18 @@
 ---
-status: raw
+status: done
 created: 2026-10-06
-updated: 2026-10-23
+updated: 2026-10-24
 epic: taxonomy
 relates: [8567, 20e5]
-needs: [294c]
 ---
 
 # Pipeline trial on existing Sources (go/no-go)
 
 # Pipeline trial on existing Sources (go/no-go)
 
-Does LLM output reach an error rate no worse than a human transcriber, so the pipeline can feed Gallformers? Tested on existing Sources whose content the database already holds. On hold after five Sources (2026-10-15); next steps are being planned.
+Does LLM output reach an error rate no worse than a human transcriber, so the pipeline can feed Gallformers? Tested on existing Sources whose content the database already holds.
+
+**Decision (Jeff, 2026-10-24): go.** The pipeline feeds Gallformers. Cost and time miss their targets and are accepted for now. The untested Source kinds (a long scanned catalogue, a key) are covered in the backscan (`50ff`).
 
 ## Method
 

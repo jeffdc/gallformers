@@ -1,7 +1,7 @@
 ---
-status: raw
+status: dropped
 created: 2026-02-13
-updated: 2026-10-23
+updated: 2026-10-24
 epic: taxonomy
 relates: [2cb2]
 ---

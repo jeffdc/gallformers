@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-03-04
-updated: 2026-03-08
+updated: 2026-10-24
 epic: identification
-relates: [85c0, 53cb]
+relates: [85c0]
 ---
 
 # Browse/filter galls by host family
@@ -65,4 +65,3 @@ Every query only checks `== "Plant"` or `!= "Plant"`. The specific inducer types
 1. Fix `description` overload (above)
 2. Add family to the host filter dropdown on the ID page — extend the existing genus/section typeahead. Common names are critical for discoverability ("oak" → Fagaceae)
 3. Paginate large result sets — ~100/page with guidance to add more filters. Fixes the existing Quercus problem too
-

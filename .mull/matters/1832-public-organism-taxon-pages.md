@@ -1,9 +1,8 @@
 ---
 status: raw
 created: 2026-08-12
-updated: 2026-08-12
+updated: 2026-10-24
 epic: taxonomy
-needs: [2cb2]
 ---
 
 # Public organism taxon pages

@@ -1,10 +1,9 @@
 ---
 status: raw
 created: 2026-09-13
-updated: 2026-09-13
+updated: 2026-10-24
 epic: taxonomy
 relates: [8ba0]
-needs: [2cb2]
 ---
 
 # Map Gallformers taxa to iNaturalist taxon IDs
@@ -17,4 +16,3 @@ Rough intent:
 - Provide a basis for later iNaturalist integrations; observation and photo import are not part of this placeholder.
 
 Depends on the taxonomy/model shift tracked in 2cb2 and its resulting Gallformers taxon identity. Related broader integration ideas remain in 8ba0. Details and design are intentionally deferred; this is Raw, not an approved implementation plan.
-

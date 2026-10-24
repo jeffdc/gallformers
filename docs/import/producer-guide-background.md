@@ -61,6 +61,7 @@ Decided with Adam, 2026-10-17 (matter `20e5`).
 - **A "tentative" Host is a Fact like any other;** the single Observation is its evidence.
 - **Commentary that isn't a Fact** (summaries of the literature and of the state of knowledge, open hypotheses, pointers to people and resources) stays as page content, outside the Facts.
 - **Passages copied from published papers** belong to that paper, as its Source.
+- **A note is Gallformers' document for its Gall** (Jeff, 2026-10-24). It is shown whole; Facts are extracted from it with quotes, through the same pipeline as any Source, and commentary simply stays in the text. Notes migrate verbatim at release and are processed afterwards. This needs a Gallformers batch to be able to quote a document, not only carry statement text (`294c`).
 
 ## Evidence
 
@@ -85,7 +86,7 @@ Decided with Adam, 2026-10-17 (matter `20e5`).
 
 Built in Gallformers, not by producers. A batch that fails is reported, not imported.
 
-1. **The taxonomy batch is applied first,** and gall names resolve against the taxonomy with it applied: resolving against today's taxonomy alone would merge taxa the Source keeps apart.
+1. **The taxonomy batch is applied first,** and gall names resolve against the taxonomy with it applied: resolving against today's taxonomy alone would merge taxa the Source keeps apart. Until the taxonomy system is rebuilt (phase 2), "applied" means: every act is recorded, taxa the Source presents as new are created, and acts that disagree with Gallformers' taxonomy go to a curator instead of changing it (2026-10-24).
 2. **Every taxon name resolves** (current names, synonyms, `name_reading`; case, "var.", subgenus and hybrid sign normalised; abbreviations expanded from genera the document names, including genera printed in capitals; 19th-century "C. q. spongifica" names tried as the fused epithet *quercusspongifica*), or is flagged. **No fuzzy matching:** it joined different species.
 3. **Unresolved Host names are resolved before the gall batch,** as part of the taxonomy step (decided with Adam, 2026-10-17; `d585`). Gallformers holds plant synonymy, but POWO is unreliable for the names old gall Sources use. The importer collects the Host names it can't resolve; an admin resolves each (adds a synonym or the plant); only then does the gall batch import.
 4. **Every Gall resolves to one entry,** or goes to the admin queue. Ambiguous matches (e.g. a generation the Source never names) go with a proposed match and its reason. Undescribed Galls are matched to Gallformers' undescribed entries by genus, Host, and the descriptive words of the entry's name; one candidate is proposed for the admin to confirm, several are offered to pick from. Nothing ambiguous is applied automatically.

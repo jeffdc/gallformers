@@ -1,9 +1,8 @@
 ---
 status: raw
 created: 2026-03-10
-updated: 2026-03-10
+updated: 2026-10-24
 epic: admin
-relates: [91cf]
 ---
 
 # Common name import from external sources (POWO/GBIF/Wikidata)
@@ -25,4 +24,3 @@ Serves the same ends as 91cf (WCVP synonym import) — both improve alias covera
 ## Status
 
 Needs research into which source has the best coverage and API access. Not yet scoped.
-

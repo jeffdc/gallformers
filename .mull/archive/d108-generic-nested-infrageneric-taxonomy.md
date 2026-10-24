@@ -1,7 +1,7 @@
 ---
-status: planned
+status: dropped
 created: 2026-08-12
-updated: 2026-08-12
+updated: 2026-10-24
 epic: taxonomy
 blocks: [2cb2]
 ---

@@ -1,10 +1,9 @@
 ---
 status: raw
 created: 2026-10-06
-updated: 2026-10-23
+updated: 2026-10-24
 epic: taxonomy
 relates: [8567, e381, 20e5]
-blocks: [8546]
 ---
 
 # Import schema and validator (pipeline contract)
@@ -29,8 +28,9 @@ Applied to the contract and recorded in the decisions doc: season (when the Gall
 
 ## Remaining work
 
-- **Open with Adam:** aphid generation values (e.g. stem mother/fundatrix vs apterae, as in Floate 2010), until an aphid Source needs them or Jeff and Adam supply the list; whether recorded occurrences keep coordinates as written (left out for now).
+- **Generation groups** (`8567`, *Generation groups*): generation values come in groups mapped to taxa. When the groups are settled, `traits.json` lists each group's values, definitions and taxa, and the guide tells producers to choose from the group for the Inducer's taxon and to give a generation only when the Source shows a clearly different Gall (repeated broods that induce the same Gall are multivoltine). Aphid values chosen in `8567`; the provisional `generation` enum in `vocab/traits.schema.json` grows to match.
+- **Open with Adam:** whether recorded occurrences keep coordinates as written (left out for now).
 - **Vocabulary generator:** a mix task that writes the vocab files from the database, replacing the hand extraction.
 - **Schema descriptions:** a pass to remove negative phrasing and consumer-side notes (producers read them too).
 - **Golden regression set:** the five human-checked trial packages, re-run and diffed whenever the model or guide changes.
-
+- **Gallformers notes as documents** (`20e5`, 2026-10-24; needed when notes are processed, after release): a Gallformers batch may quote a document (the Gall's note) instead of only carrying statement text, and the validator checks those quotes; a section in `GALLFORMERS_STATEMENTS.md` on reading notes (commentary, ID tips and links to `unmapped`; copied passages cited to their paper).

@@ -1,7 +1,7 @@
 ---
-status: refined
+status: dropped
 created: 2026-03-10
-updated: 2026-07-28
+updated: 2026-10-24
 epic: admin
 relates: [e79e, e2cb]
 ---

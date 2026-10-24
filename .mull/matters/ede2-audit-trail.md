@@ -2,10 +2,9 @@
 status: raw
 effort: 5 days
 created: 2026-02-13
-updated: 2026-09-13
+updated: 2026-10-24
 epic: admin
-relates: [ec68, 5c56]
-needs: [ec68]
+relates: [ec68]
 ---
 
 # Audit trail

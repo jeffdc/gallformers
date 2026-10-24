@@ -1,7 +1,7 @@
 ---
-status: raw
+status: dropped
 created: 2026-08-12
-updated: 2026-09-14
+updated: 2026-10-24
 epic: taxonomy
 relates: [8ba0, 86e7, bf97]
 blocks: [1832, 3e8c, 0a58, e1d2]

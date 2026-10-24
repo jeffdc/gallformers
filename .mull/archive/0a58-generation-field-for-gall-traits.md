@@ -1,8 +1,8 @@
 ---
-status: planned
+status: dropped
 effort: 1-2 days
 created: 2026-02-13
-updated: 2026-08-12
+updated: 2026-10-24
 epic: gall-traits
 docs: ['']
 relates: [eb47]
@@ -222,4 +222,3 @@ The immediate plan is to add a structured `generation` field for cynipid agamic/
 ## Superseded ownership decision (2026-08-12)
 
 Matter `2cb2` established that gall morphology is a first-class entity separate from inducer taxa. Reproductive generation belongs to the gall record, not a `gall_traits` extension keyed by species. Do not implement this matter’s old `gall_traits.generation` migration independently. Its vocabulary/backfill remains valid: `(agamic)` → `agamic`, `(sexgen)` → `sexual`, null → unknown/not applicable. The field, filtering, display, and tests should be delivered within or after the `2cb2` gall-entity cutover. Seasonal generations, host phases, plant-part forms, rust stages, and infraspecific labels remain separate concepts.
-

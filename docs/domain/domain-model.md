@@ -75,7 +75,7 @@ Traits describe a Gall. Traits of the abstract Gall are Facts; the Traits of an 
 | **Alignment** | how it sits on the plant | drooping, erect, integral, leaning, supine |
 | **Walls** | its wall structure | false chamber, mycelium lining, ostiole, radiating-fibers, slit, spongy, thick, thin |
 | **Cells** | its larval chambers | monothalamous (one), polythalamous (many), free-rolling, not applicable |
-| **Season** | when it appears | Spring, Summer, Fall, Winter |
+| **Season** | when it forms and grows (not when it is seen, nor when the Inducer emerges) | Spring, Summer, Fall, Winter |
 
 **Place**, **Time**, and a **DNA Barcode** are Traits of an observed gall (see *Observations*).
 

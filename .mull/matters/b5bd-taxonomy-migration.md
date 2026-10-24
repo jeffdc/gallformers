@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-10-02
-updated: 2026-10-23
+updated: 2026-10-24
 epic: taxonomy
 relates: [8567]
 ---
@@ -12,26 +12,26 @@ How to move today's data and application onto the domain model ([`docs/domain/do
 
 ## Migration plan (draft, 2026-10-05)
 
-From starting the replacement system to running it in production. Covers **phase 1** (the gall system on today's taxonomy, released after the backscan); phase 2 (the taxonomy system) gets its own shorter plan later — see M8. Build order and design live in `8567`; import format in `e381`.
+From starting the replacement system to running it in production. Covers **phase 1** (a new back-end built whole on `taxogall`, replacing the old one in place: the gall system on new taxonomy storage, released after the backscan; `8567` *Build approach*); phase 2 (the taxonomy system) gets its own shorter plan later — see M8. Design lives in `8567`, the ordered punchlist in `50ff`, the import contract in `294c`.
 
 ### M0. Strategy decisions (settle first)
 
 - **Cutover style — agreed:** **one cutover in a maintenance window**, rehearsed many times on production copies — not a long-running dual-write. Scale is small (~10⁶ rows) and the maintenance-mode runbook exists (`runbooks/planned-maintenance.md`).
-- **Where the backscan runs — probably:** run it against a **staging copy** on the new system; record curator approvals there; at cutover, **replay the approved batches** into production after the data migration. Batches are portable files, so replay is deterministic. (The backscan of ~927 Sources takes weeks and can't happen inside a maintenance window.)
+- **Where the backscan runs — probably:** run it against a **staging copy** on the new system; record curator approvals there; at cutover, **replay the approved batches** into production after the data migration. Batches are portable files, so replay is deterministic. (The backscan of ~927 Sources takes weeks and can't happen inside a maintenance window.) **Replay must cover more than batch files** (2026-10-24): curators also decide things on staging outside the batches — which Gall an ambiguous match maps to, synonyms or plants added in the Host-name step (`d585`), dispute rulings, taxonomy-admin edits. Each must be captured and replayed, and import must be idempotent under Oban retries (`e381`).
 - **Changes on the live site meanwhile — agreed:** the data migration always runs from the latest production copy; a short **edit freeze** before cutover; new or changed Sources since the backscan get a final small backscan pass.
-- **Legacy Facts the backscan doesn't confirm — undecided:** investigate once the backscan produces the list; options include a legacy-data Source with curator review, or attribution to Gallformers.
-- **Today's stored gall ranges — decided:** leave ranges as alone as possible (`8567` rule 10). The potential range is computed from the Hosts; only **differences** from it are stored, as inclusion/exclusion Facts. Migration compares each Gall's stored range with its host union: regions in both are dropped (redundant); regions removed from the union become **exclusion** Facts attributed to Gallformers (today's curator removals); regions outside the union become **inclusion** Facts (attribution per the legacy-Facts decision).
+- **Legacy Facts the backscan doesn't confirm — undecided:** investigate once the backscan produces the list; options include a legacy-data Source with curator review, or attribution to Gallformers. Mechanism (2026-10-24, `9449` §6): the migration attributes every legacy Fact to one undated "Gallformers legacy data" Source, so the site works before the backscan and any real Source outranks it; this decides the mechanism, not the release-time disposition. Whichever is chosen must not manufacture a Source's support, and its date decides whether these Facts outrank the literature under the recency rule (`8567` Sources–Facts point 7).
+- **Today's stored gall ranges — decided:** leave ranges as alone as possible (`8567` rule 10). The potential range is computed from the Hosts; only **differences** from it are stored, as inclusion/exclusion Facts. Migration compares each Gall's stored range with its host union: regions in both are dropped (redundant); regions removed from the union become **exclusion** Facts attributed to Gallformers (today's curator removals); regions outside the union become **inclusion** Facts (attribution per the legacy-Facts decision). **Reopened (2026-10-24): a difference is not always a curator removal.** A curator could copy a host union into a stored range, and the copy keeps no record of where it came from; Hosts added and WCVP re-imports since then widen the union. The resulting drift would become exclusions and wrongly narrow ID-tool results. Classify differences before writing Facts (the range timestamps may help), and include drift cases in the M5 parity check.
 - **Rollback — agreed:** a full pre-cutover backup, a rehearsed restore, and a time limit after which we fix forward instead of rolling back.
 - **How migrations run in production — known:** schema migrations run automatically at boot (`Ecto.Migrator` in the supervision tree when `RUN_MIGRATIONS=true`, set by `docker-entrypoint.sh`; `lib/gallformers/application.ex`). **The data migration must not be a boot-time Ecto migration:** it is long-running, and boot would stall under Fly health checks and `HealthWatchdog`, risking restarts mid-migration. Run it as a separate, explicit step in the maintenance window (e.g. a release task on a one-off machine).
 
 ### M1. Foundations (build on `taxogall`; order per `8567`)
 
-- **First, de-risk the pipeline (reordered 2026-10-06):** import schema and validator (`294c`), the one-off pipeline-vs-database diff (`b119`), pipeline trial on existing Sources as a go/no-go (`8546`) — steps 1–3 of the M2 approach.
-- Taxonomy facade over today's tables (`36ca`): ancestry read model, the 14 references and raw `species_taxonomy` / sitemap queries routed through it, explicit `boundary` exports, the taxon-changed listener. Ships to main; timing floats, before Sources–Facts.
-- Taxon identity layer, built with the gall split: stable taxon IDs for plants (their species IDs), higher taxa and Inducers (new IDs above today's highest species ID), plus the crosswalk.
-- Sources–Facts layer and audit, acceptance tests first (`8567` step 2). Sources gain kind, authorship date (from `pubyear` for existing ones), and retraction status.
+- **First, de-risk the pipeline (reordered 2026-10-06) — done:** import schema and validator (`294c`, built), the one-off pipeline-vs-database diff (`b119`, done), pipeline trial on existing Sources (`8546`, go on 2026-10-24) — steps 1–3 of the M2 approach.
+- ~~Taxonomy facade over today's tables (`36ca`)~~ — dropped 2026-10-24 (`8567` *Build approach*). What it would have provided is built new: the ancestry read model, explicit `boundary` exports from the start, and the taxon-changed listener.
+- New taxonomy storage, built with the gall split: taxa, rank, placement, names and synonyms; stable taxon IDs for plants (their species IDs), higher taxa and Inducers (new IDs above today's highest species ID), plus the crosswalk. Filled by the skeleton migration (M2).
+- Sources–Facts layer and audit, acceptance tests first (`8567` step 4). Sources gain kind, authorship date (from `pubyear` for existing ones), and retraction status.
 - Gall system: Galls split from species; Traits, Relationships (15 types), qualifiers, aliases, and range as Facts; synchronous taxonomy-change listener.
-- Import: committed JSON Schema (`e381` v2), importer (bucket + Oban), curator upload wrapper.
+- Import: the contract (`294c`, format v3 in `priv/import/`), importer (bucket + Oban), curator upload wrapper (`e381`).
 - Prerequisite UI the backscan needs — minimal, per `8567` rule 12: **batch review with approve/deny**, unresolved-reference handling, retraction entry. Gallformers statements arrive as batches too (curator notes → LLM → batch), so no statement editor.
 - Audit (`ede2`): who changed what — needed before curators edit the new system.
 - Test infrastructure: rewrite `priv/repo/test_seeds.sql` for the new model; adapt the prod-data test targets (`make test-prod-data*`).
@@ -43,7 +43,7 @@ From starting the replacement system to running it in production. Covers **phase
 1. Run some high-value existing Sources through the pipeline → JSON.
 2. A one-off tool (`b119`) compares that JSON with the data stored today for the same species (where the species is on both sides; the pipeline may produce more).
 3. Iterate pipeline and diff until satisfied the pipeline produces accurate data (`8546`).
-4. Run **all** current Sources, including Gallformers ID Notes, through the pipeline → JSON.
+4. Run **all** current Sources through the pipeline → JSON. (Gallformers ID Notes excepted, 2026-10-24: they migrate verbatim and are processed after release, `20e5`.)
 5. Bulk-import the JSON into the new system.
 6. One-off sanity check, old database vs new: they should be similar, the new much better. Needs human judgement. (Possibly the same tool as step 2.)
 7. Not good enough → back to step 1, tweak the pipeline.
@@ -51,7 +51,7 @@ From starting the replacement system to running it in production. Covers **phase
 
 **What migrates directly** — what doesn't come out of Sources; certain so far:
 - **Gall entries as skeletons:** ID, name, Gallformers Code, URL, images, editorial data — so `/gall/:id`, Codes, and images survive, and batches can reference Galls by ID.
-- **Skeletal taxonomy, taken as accurate as currently defined** — no taxonomy changes during imports; old names in Sources resolve through synonymy (aliases). It **includes Inducer species**, which today exist only inside gall names (suffix mapping, agamic/sexgen merging).
+- **Skeletal taxonomy, taken as accurate as currently defined** — old names in Sources resolve through synonymy (aliases). During imports the tree changes only to add taxa a Source presents as new; every other taxonomic act is recorded as a Fact and flagged where it disagrees with the tree (decided 2026-10-24, `9449` §3). It **includes Inducer species**, which today exist only inside gall names (suffix mapping, agamic/sexgen merging).
 - **Hosts:** plants with their POWO ranges and genus placeholders.
 - **Range exceptions** (curator removals): Gallformers data — curatorial, with other Sources possible later.
 - **Sources as records** (bibliographic data; the page deep links in `species_source.externallink` unless the pipeline reproduces them).
@@ -66,30 +66,32 @@ What else migrates is open until step 6 shows what the pipeline doesn't reproduc
 - Taxonomy crosswalk for the legacy `/taxonomy/:id` redirect.
 - Traits → Facts, including generation from the name-suffix mapping (~900 mechanical, 47 curated — see *Name-suffix categorization*).
 - Hosts → *host of* Facts; existing community data → Relationship Facts.
-- Aliases: gall "scientific" aliases → taxon synonymy; gall common names → gall alias Facts.
+- Aliases: gall "scientific" aliases → taxon synonymy; gall common names → gall alias Facts. **Sort by meaning, not by field** (2026-10-24): the "scientific" ones are only mostly synonyms. Former undescribed-gall labels and informal codes are not synonyms, and in taxon synonymy they would feed import name resolution and cause silent wrong matches.
+- Galls named after an associate, not an Inducer (e.g. 1148 *Synergus lignicola*, named after an inquiline; the suffix list catches only 2419): audit rows named after inquiline genera for a missing *modified form of*.
 - Sources: existing records → Sources with kind, authorship date, license; record-level citations (`species_source`) → attributions on the legacy-data Source or the cited Source, per the M0 decision.
-- Source 58 ("Gallformers ID Notes", 1,323 Galls) → **Gallformers** statements: attributed to Gallformers, audit author unknown for legacy text.
+- Source 58 ("Gallformers ID Notes", 1,323 Galls) → **each Gall's note, verbatim** (2026-10-24, `20e5`): shown as "Notes on ID and Taxonomy", Gallformers' own document for that Gall; audit author unknown for legacy text. Facts are extracted from the notes after release through the normal pipeline, not at migration.
 - Gall ranges: diff each stored range against the Gall's host union (as of the migration); keep only the differences as inclusion/exclusion Facts. Expect the 232k rows to shrink to a small fraction — measure on the next inventory refresh.
 - Non-galls: hand-review all 120; don't migrate; record their IDs for redirects.
 - Images: attach to Gall entries (paths unchanged); parse the 5,365 iNat image URLs for observation IDs.
 - Keys: re-target each of the 4 keys' couplets to Galls or taxa.
-- Editorial carry-over: abundance, data-complete flags, name overrides, photo order.
+- Editorial carry-over: abundance, data-complete flags, name overrides, photo order. Also decide (2026-10-24): the default Source shown on a gall page (`species_source.useasdefault`), range-confirmed (44 galls), and `undescribed` (derivable from the Inducer link?).
 - Optional: iNat taxon IDs as external references (see *iNat correspondence*).
 
 ### M3. Application surface
 
-- Public pages: Gall, Host, genus / family / section / intermediate ranks, Source, place, browse.
+- Public pages: Gall, Host, genus / family / section / intermediate ranks, Source, place, browse — edited in place to read the new read models, reusing today's components.
 - ID tool: use the potential range with inclusion/exclusion Facts applied — effectively today's behavior; verify results don't change on a sample of real queries.
 - Global search and its name index (taxonomy read model).
 - Name builder (`86e7`): derived names with generation / Host / form qualifiers, overrides, uniqueness.
 - API v1/v2: traffic is trivial; minimal effort (keep it working or version it simply).
 - Admin — as few screens as possible (`8567` rule 12): taxonomy admin and reclassification, the batch review/retraction screens, and only what else proves unavoidable (e.g. images). Retire Gall/Host/gall–host/range/Source forms in favor of batches wherever possible.
-- Redirects: `/taxonomy/:id` via the crosswalk; the 120 non-gall URLs to a new **gall-lookalikes Article** (write it).
-- Derived outputs: sitemap, any markdown/AI-crawler rendering (`9737`), knowledge-base export (`2a27`).
+- Redirects: `/taxonomy/:id` via the crosswalk; the 120 non-gall URLs to a new **gall-lookalikes Article** (write it). **ID-tool bookmarks** (`id_live.ex`): `fa` holds an old `taxonomy` ID (higher taxa get new IDs, and old family IDs overlap plant IDs, so an old link could quietly resolve to a plant); `co`, `sh`, `fo`, `se` and the like hold trait-vocabulary IDs; `ng` shows non-galls, which aren't migrated; the v1 parameter mapping must keep working.
+- Public database snapshot (`db-snapshot.yml` publishes every table not on its exclusion list): exclude the new private tables — stored Source text, import packages, disputes, the admin queue.
+- Derived outputs: sitemap.
 
 ### M4. Pipeline and backscan
 
-- The pipeline workstream (`7fda`, `db6f`) produces `e381` v2 batches; Gallformers validates them.
+- The producer (`services/import-producer/`) produces `294c` packages; Gallformers validates and imports them (`e381`).
 - Trial batches end to end on staging: a few Sources of different kinds (paper, website, research data), including a correction and a retraction. (The go/no-go trial on existing Sources, `8546`, comes much earlier — before the build.)
 - Full backscan of every existing Source on staging; curators approve or deny batches; resolve unresolved references; track coverage (Facts confirmed, Facts with no Source support).
 - Disposition of legacy Facts the backscan didn't confirm (per M0).
@@ -100,7 +102,7 @@ What else migrates is open until step 6 shows what the pipeline doesn't reproduc
 - Verification suite:
   - counts reconcile (Galls, Hosts, Sources, images, Codes);
   - every old `/gall/:id`, `/host/:id`, Gallformers Code, and image path still resolves;
-  - `/taxonomy/:id` and non-gall redirects work;
+  - `/taxonomy/:id` and non-gall redirects work; old ID-tool bookmark URLs resolve to the same filters;
   - keys resolve;
   - ID tool and search parity on a sample of real queries;
   - API responses compatible;
@@ -122,9 +124,9 @@ What else migrates is open until step 6 shows what the pipeline doesn't reproduc
 
 ### M7. After release
 
-- Remove legacy code paths and tables (the old `species`-centric model) once stable; tighten remaining `boundary` exports.
+- Drop the old tables (the `species`-centric model) once stable. Legacy code is removed on `taxogall` as each piece is replaced, so little should remain by now.
 - Replace `docs/domain/general.md` and `admin-domain-reference.md`; update `CLAUDE.md`, admin onboarding, and runbooks that assume the old tables (e.g. `restore-deleted-gall.md`).
-- Close or reconcile related matters (`2cb2`, `86e7`, `e2cb`, `d108`, `1832`, `53cb`, `0a58`, `3e8c`, `5c56`).
+- Close or reconcile related matters (`86e7`, `1832`, `3e8c`; the after-release list in `50ff`). `2cb2`, `e2cb`, `d108`, `53cb`, `0a58` and `5c56` were dropped on 2026-10-24 as superseded by `8567`.
 
 ### M8. Phase 2 (later, own plan)
 
@@ -138,7 +140,7 @@ Anchored on Jeff's actual velocity, not bottom-up task counts: the early-2026 re
 
 | | Focused weeks |
 |---|---|
-| Phase 1 build — facade, Sources–Facts, gall split, importer, minimal screens, pages, ID tool, search, migration scripts | ~4–7 |
+| Phase 1 build — new taxonomy storage, Sources–Facts, gall split, importer, minimal screens, pages, ID tool, search, migration scripts | ~4–7 |
 | Rehearsal and cutover | ~1 |
 | Pipeline trust + backscan review (largely Jeff's time; can overlap the build) | ~2–4 |
 | **Phase 1 to production** | **~6–11** |
@@ -195,8 +197,8 @@ Parentheses in gall names (excluding the "Unknown (Family)" placeholder prefix) 
 | Category | Tokens | Count | Target in the new model |
 |---|---|---|---|
 | Cynipid generation | agamic, sexgen | 877 | Generation trait. Mechanical mapping. |
-| Seasonal generation | spring / summer / autumn / "summer and autumn" generation(s) | 22 | Generation trait with group-specific terms. "Summer and autumn generations" is one entry covering two generations. |
-| Rust spore stage | telial, aecial | 4 | Life-cycle stage; recommended: generation trait. Each stage is on a different host. |
+| Seasonal generation | spring / summer / autumn / "summer and autumn" generation(s) | 22 | Generation, seasonal group (`8567`, *Generation groups*). "Summer and autumn generations" induce one Gall: multivoltine, so one generation value, not two. |
+| Rust spore stage | telial, aecial | 4 | Generation, rust-stage group (`8567`). Each stage is on a different host. |
 | Host-scoped | "on Betula", "on Malus", "on Quercus lobata", "q-bicolor", … | 20 | Host relationships plus a host qualifier in the name. Two different situations; see below. |
 | Plant part / form | bud, leaf snap, capitulum, inflorescence, detachable bud, integral stem, leaf, midrib gall, deforming-pisiformis | 13 | Separate entries for one species (boundary case 4): plant-part/form trait plus a form qualifier in the name. |
 | Historical / infraspecific name | pacificus, texanus, australis, cerinus, decrescens, rydbergiana, saltatorius, perforans | 10 | Gall alias (former name). Some may be cryptic species; curator review. |
@@ -206,7 +208,7 @@ Parentheses in gall names (excluding the "Unknown (Family)" placeholder prefix) 
 **Findings**
 
 - **~900 of the 948 tokens map mechanically** (cynipid and seasonal generation terms). **47 gall names need a curator**; they're listed below.
-- **"On X" covers two biological situations.** Host-alternating life cycles (aphids: *Hamamelistes*, *Hormaphis*, *Eriosoma*, *Prociphilus*; heteroecious rusts: *Gymnosporangium*) are different life-cycle phases on alternate hosts, so they belong in the generation trait under a group-specific vocabulary. The same phase on different hosts (eriophyids, *Contarinia*, *Neuroterus* sexgen on *Q. douglasii* vs *Q. lobata*) is a separate entry distinguished by host. **Recommended: treat host-alternating phases as generation — awaiting Jeff's confirmation.**
+- **"On X" covers two biological situations.** Host-alternating life cycles (aphids: *Hamamelistes*, *Hormaphis*, *Eriosoma*, *Prociphilus*; heteroecious rusts: *Gymnosporangium*) are different life-cycle phases on alternate hosts, so they belong in the generation trait under a group-specific vocabulary. The same phase on different hosts (eriophyids, *Contarinia*, *Neuroterus* sexgen on *Q. douglasii* vs *Q. lobata*) is a separate entry distinguished by host. **Decided (Jeff, 2026-10-23): host-alternating phases are generations,** in group-specific vocabularies (`8567`, *Generation groups*). The aphid entries map to fundatrix (primary host) and exules (secondary host).
 - **The name builder needs qualifiers** (requirement for `86e7`). Names are unique, and one inducer + generation can have several entries, so a derived name adds a generation, then a host, then a form qualifier as needed.
 
 **Curation list** (production copy, 2026-10-02). Handling is a proposal; each row needs a curator decision.
@@ -229,18 +231,18 @@ Parentheses in gall names (excluding the "Unknown (Family)" placeholder prefix) 
 | 5512 | Contarinia partheniicola (on Parthenium incanum) | Host-scoped | same phase, different host → separate entry; host relationship + host qualifier in name |
 | 3248 | Eriophyes cerasicrumena (on Prunus americana) | Host-scoped | same phase, different host → separate entry; host relationship + host qualifier in name |
 | 633 | Eriophyes cerasicrumena (on Prunus serotina) | Host-scoped | same phase, different host → separate entry; host relationship + host qualifier in name |
-| 2688 | Eriosoma lanigerum (on Malus) | Host-scoped | life-cycle phase on an alternate host → generation trait (recommended); host relationship |
-| 4089 | Eriosoma lanigerum (on Ulmus) | Host-scoped | life-cycle phase on an alternate host → generation trait (recommended); host relationship |
-| 5578 | Gymnosporangium nidus-avis (on Juniper) | Host-scoped | life-cycle phase on an alternate host → generation trait (recommended); host relationship |
-| 2960 | Gymnosporangium sabinae (on Pyrus) | Host-scoped | life-cycle phase on an alternate host → generation trait (recommended); host relationship |
-| 2255 | Hamamelistes spinosus (on Betula) | Host-scoped | life-cycle phase on an alternate host → generation trait (recommended); host relationship |
-| 1005 | Hamamelistes spinosus (on Hamamelis) | Host-scoped | life-cycle phase on an alternate host → generation trait (recommended); host relationship |
-| 3981 | Hormaphis cornu (on Betula) | Host-scoped | life-cycle phase on an alternate host → generation trait (recommended); host relationship |
-| 3979 | Hormaphis cornu (on Hamamelis) | Host-scoped | life-cycle phase on an alternate host → generation trait (recommended); host relationship |
+| 2688 | Eriosoma lanigerum (on Malus) | Host-scoped | life-cycle phase on an alternate host → generation; host relationship |
+| 4089 | Eriosoma lanigerum (on Ulmus) | Host-scoped | life-cycle phase on an alternate host → generation; host relationship |
+| 5578 | Gymnosporangium nidus-avis (on Juniper) | Host-scoped | life-cycle phase on an alternate host → generation; host relationship |
+| 2960 | Gymnosporangium sabinae (on Pyrus) | Host-scoped | life-cycle phase on an alternate host → generation; host relationship |
+| 2255 | Hamamelistes spinosus (on Betula) | Host-scoped | life-cycle phase on an alternate host → generation; host relationship |
+| 1005 | Hamamelistes spinosus (on Hamamelis) | Host-scoped | life-cycle phase on an alternate host → generation; host relationship |
+| 3981 | Hormaphis cornu (on Betula) | Host-scoped | life-cycle phase on an alternate host → generation; host relationship |
+| 3979 | Hormaphis cornu (on Hamamelis) | Host-scoped | life-cycle phase on an alternate host → generation; host relationship |
 | 1340 | Neuroterus quercusbatatus (agamic) (q-bicolor) | Host-scoped | same phase, different host → separate entry; host relationship + host qualifier in name |
 | 1339 | Neuroterus quercusbatatus (sexgen) (on Quercus bicolor) | Host-scoped | same phase, different host → separate entry; host relationship + host qualifier in name |
 | 5095 | Phytoplasma pruni (on Trillium) | Host-scoped | same phase, different host → separate entry; host relationship + host qualifier in name |
-| 4092 | Prociphilus caryae (on Amelanchier) | Host-scoped | life-cycle phase on an alternate host → generation trait (recommended); host relationship |
+| 4092 | Prociphilus caryae (on Amelanchier) | Host-scoped | life-cycle phase on an alternate host → generation; host relationship |
 | 5120 | Pseudomonas savastanoi (pv nerii) | Pathovar | pathovar is part of the taxon name → infraspecific taxon in Gallformers' taxonomy |
 | 6613 | Acalitus pundamariae (inflorescence) | Plant part / form | separate entry for one species → plant-part/form trait + form qualifier in name |
 | 6612 | Acalitus pundamariae (leaf) | Plant part / form | separate entry for one species → plant-part/form trait + form qualifier in name |
@@ -256,10 +258,10 @@ Parentheses in gall names (excluding the "Unknown (Family)" placeholder prefix) 
 | 2047 | Tanaostigmodes howardii (integral stem) | Plant part / form | separate entry for one species → plant-part/form trait + form qualifier in name |
 | 1519 | Unknown (Cynipidae) q-alba-(deforming-pisiformis) | Plant part / form | separate entry for one species → plant-part/form trait + form qualifier in name |
 | 2419 | Periclistus pirata (altering Diplolepis gall) | Relationship | inquiline-modified gall → *modified form of* relationship to the Diplolepis gall |
-| 1247 | Cronartium quercuum (telial) | Rust spore stage | rust life-cycle stage → generation trait (recommended) |
-| 6002 | Gymnosporangium floriforme (aecial) | Rust spore stage | rust life-cycle stage → generation trait (recommended) |
-| 6460 | Gymnosporangium floriforme (telial) | Rust spore stage | rust life-cycle stage → generation trait (recommended) |
-| 778 | Gymnosporangium juniperi-virginianae (telial) | Rust spore stage | rust life-cycle stage → generation trait (recommended) |
+| 1247 | Cronartium quercuum (telial) | Rust spore stage | rust life-cycle stage → generation |
+| 6002 | Gymnosporangium floriforme (aecial) | Rust spore stage | rust life-cycle stage → generation |
+| 6460 | Gymnosporangium floriforme (telial) | Rust spore stage | rust life-cycle stage → generation |
+| 778 | Gymnosporangium juniperi-virginianae (telial) | Rust spore stage | rust life-cycle stage → generation |
 
 ## Data inventory (2026-10-02)
 

@@ -1,8 +1,8 @@
 ---
-status: refined
+status: dropped
 effort: 5-7 days
 created: 2026-02-16
-updated: 2026-08-12
+updated: 2026-10-24
 epic: taxonomy
 relates: [ede2, 3e8c]
 blocks: [f49a]

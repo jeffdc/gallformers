@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-02-14
-updated: 2026-03-17
+updated: 2026-10-24
 epic: gall-traits
-relates: [85c0, 0a58]
+relates: [85c0]
 ---
 
 # GallOnt trait vocabulary integration
@@ -72,4 +72,3 @@ Key insight: The glossary serves as curation reference (definitions + photos hel
 - The glossary (F2) is the highest-value, lowest-effort entry point and does not require DB changes.
 - F1 (ontology IDs) is the gate for most feature and exploratory work.
 - One parent matter (this one) spawns child matters per work item when execution begins.
-

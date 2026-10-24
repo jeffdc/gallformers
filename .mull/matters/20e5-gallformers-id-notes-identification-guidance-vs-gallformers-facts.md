@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-10-11
-updated: 2026-10-23
+updated: 2026-10-24
 epic: taxonomy
-relates: [8546, 294c]
+relates: [294c]
 ---
 
 # Gallformers ID Notes: identification guidance vs Gallformers Facts
@@ -36,7 +36,17 @@ The earlier questions (look-alikes as a concept; remarks as statements or page c
 
 Recorded in `docs/import/producer-guide-background.md`, "Gallformers ID Notes".
 
+## Decision: how notes are handled (Jeff, 2026-10-24)
+
+- **A note is Gallformers' document for its Gall.** It stays whole and is shown on the Gall page as "Notes on ID and Taxonomy"; it is never cut down or rewritten to its commentary. Facts are extracted from it with quotes, like any Source document, so commentary, ID tips and links simply stay in the text (they go to `unmapped`, as a paper's background does).
+- **At release, notes migrate verbatim** as each Gall's general note, unprocessed. They are not part of the pre-release backscan.
+- **After release, they are processed through the normal pipeline**, not a bespoke tool: the note becomes `document.json`, the producer writes a Gallformers gall batch quoting it, and it is validated, reviewed and approved like any batch. This is the same path `8567` rule 12 plans for all curator knowledge, so nothing here is throwaway.
+- **Going forward,** a curator edits the note and the edit is re-extracted. Each note version carries its edit date, so new statements are dated; only the legacy notes have no date.
+
 ## Remaining work
 
-- Convert the notes: split each into statements of Fact (imported as Gallformers statements), commentary (page content) and copied passages (attributed to their paper).
-
+- **Contract (`294c`):** allow a Gallformers batch to quote a document (its note) instead of only statement text, so every extracted Fact points at its sentence and the validator checks it; a section in `GALLFORMERS_STATEMENTS.md` on reading notes (commentary and links to `unmapped`, copied passages cited to their paper).
+- **Generator:** write a Gall's note into `document.json`.
+- **Note editing** in the new admin (a note editor, not a statement editor).
+- **Process the legacy notes** after release, in batches.
+- **Decide the date** the legacy notes' statements get: the notes carry none (`species_source` has no timestamps), and a date at processing would outrank all the literature under the recency rule (`8567` Sources–Facts point 7). Their legacy author stays unknown, never invented. Not needed until processing starts.

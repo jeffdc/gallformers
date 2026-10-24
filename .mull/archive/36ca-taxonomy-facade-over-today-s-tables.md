@@ -1,7 +1,7 @@
 ---
-status: planned
+status: dropped
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-24
 epic: taxonomy
 relates: [8567]
 ---
@@ -81,3 +81,7 @@ Before any change, capture golden outputs from the unchanged code against the ex
 
 **Not yet reviewed in depth** with Jeff (the 2026-10-06 review reordered the plan first). Re-check line references against main before starting; the code may have moved.
 
+
+## Dropped (Jeff, 2026-10-24)
+
+Not needed: the new back-end is built whole on `taxogall` and replaces the old one in place (`8567` *Build approach*). A facade over today's tables only pays off if old and new run side by side, and the plan has them meet only at cutover; it would refactor code the cutover deletes. What it would have provided (an ancestry read model, explicit `boundary` exports, the taxon-changed listener) is built new in `50ff` step 6. The coupling inventory in `8567` still shows what the rewrite replaces.

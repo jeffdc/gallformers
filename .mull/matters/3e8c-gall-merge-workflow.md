@@ -1,10 +1,8 @@
 ---
 status: raw
 created: 2026-08-12
-updated: 2026-09-13
+updated: 2026-10-24
 epic: taxonomy
-relates: [5c56]
-needs: [2cb2]
 ---
 
 # Gall merge workflow
