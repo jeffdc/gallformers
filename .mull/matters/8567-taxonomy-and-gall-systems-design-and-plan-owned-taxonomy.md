@@ -3,7 +3,7 @@ status: raw
 created: 2026-10-03
 updated: 2026-10-23
 epic: taxonomy
-relates: [b5bd, e381, 36ca, 294c, b119, 8546]
+relates: [b5bd, e381, 36ca, 294c, 8546]
 ---
 
 # Taxonomy and gall systems — design and plan (owned taxonomy)

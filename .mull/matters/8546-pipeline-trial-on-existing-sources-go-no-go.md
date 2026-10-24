@@ -1,10 +1,10 @@
 ---
 status: raw
 created: 2026-10-06
-updated: 2026-10-15
+updated: 2026-10-23
 epic: taxonomy
-relates: [8567, ca20, 20e5]
-needs: [294c, b119]
+relates: [8567, 20e5]
+needs: [294c]
 ---
 
 # Pipeline trial on existing Sources (go/no-go)
@@ -53,4 +53,3 @@ Does LLM output reach an error rate no worse than a human transcriber, so the pi
 A long scanned catalogue (Gagné 2008, ~$20) and a key (Felt 1917, 352 pp, may exceed one batch).
 
 Check pages (private): Ashmead https://claude.ai/artifact/Ns3bRDFP95sUKkT3NUzW1x · 1862 https://claude.ai/artifact/2ZtVyD8m1cjqoq9kXLCn1z · Floate https://claude.ai/artifact/LQ1sAQ6GFvC6csYnhCiiad · field guide https://claude.ai/artifact/LVcz9oNbpmdys2oMgrGq4h · web page https://claude.ai/artifact/CcjPZXZBZV58LsFNs9K81F
-

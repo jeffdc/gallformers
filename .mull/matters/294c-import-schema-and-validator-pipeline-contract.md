@@ -1,10 +1,10 @@
 ---
 status: raw
 created: 2026-10-06
-updated: 2026-10-15
+updated: 2026-10-23
 epic: taxonomy
-relates: [8567, e381, ca20, 20e5]
-blocks: [b119, 8546]
+relates: [8567, e381, 20e5]
+blocks: [8546]
 ---
 
 # Import schema and validator (pipeline contract)
@@ -30,4 +30,3 @@ The contract any producer follows to deliver a Source into Gallformers: format v
 - **Vocabulary generator:** a mix task that writes the vocab files from the database, replacing the hand extraction.
 - **Schema descriptions:** a pass to remove negative phrasing and consumer-side notes (producers read them too).
 - **Golden regression set:** the five human-checked trial packages, re-run and diffed whenever the model or guide changes.
-

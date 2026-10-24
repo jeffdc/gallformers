@@ -3,7 +3,7 @@ status: raw
 created: 2026-10-03
 updated: 2026-10-23
 epic: taxonomy
-relates: [8567, 294c, ca20]
+relates: [8567, 294c]
 ---
 
 # Import interface: pipeline to Gallformers
@@ -31,4 +31,3 @@ The Gallformers side of import: taking a package (contract `294c`, `priv/import/
 - Test the "no silent merges" gate (taxonomy batch applied before name resolution) once the importer exists.
 - Historical plant names (`d585`).
 - Retire the old source-ingestion system (new matter).
-
