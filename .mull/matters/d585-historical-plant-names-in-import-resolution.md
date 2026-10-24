@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-10-15
-updated: 2026-10-15
+updated: 2026-10-23
 epic: taxonomy
 ---
 
@@ -11,9 +11,15 @@ Old Sources name host plants by names no longer in use, and Gallformers may not 
 
 Why it matters: name resolution on import (`e381`) maps a Source's names to Gallformers entries through current names and synonyms. A historical plant name with no synonym entry leaves the Host unresolved, or worse, resolves to the wrong plant. Old Sources (about a quarter of all Sources are pre-1925) will hit this constantly.
 
-To decide: where historical plant synonyms come from (POWO's synonymy, other checklists, curated aliases), and whether plant names on import resolve through them automatically or go to the admin queue (as ambiguous Gall matches do).
-
-
-
 **Evidence from the 1862 dry run (2026-10-15):** after mechanical fixes (abbreviation expansion, capitalised headings), the only plant names Osten Sacken 1862 uses that still fail to resolve are historical ones: *Q. tinctoria* (now *Q. velutina*), *Q. obtusiloba* (now *Q. stellata*), *Q. prinos* and *Q. prinos* var. *bicolor*, *Q. virens* (now *Q. virginiana*). Every one of them is a Host in that Source.
+
+## Decision (Adam and Jeff, 2026-10-17)
+
+**Unresolved Host names are a precursor step of import, part of the taxonomy step.** Gallformers holds plant synonymy, but POWO is unreliable for the names old gall Sources use. The importer collects the Host names it can't resolve; an admin resolves each (adds a synonym or the plant); only then does the gall batch import.
+
+Recorded in `docs/import/producer-guide-background.md`, "What Gallformers does on import" (step 3), and in `e381`.
+
+## Remaining work
+
+- Build the step in the importer (`e381`): collect unresolved Host names per package, an admin screen to resolve each (add a synonym or the plant), and hold the gall batch until all are resolved.
 

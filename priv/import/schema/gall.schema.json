@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gallformers.org/schemas/import/v3/schema/gall.schema.json",
   "title": "Gallformers import — gall batch",
-  "description": "What a Source states about Galls: Relationships (including Hosts and Inducers), qualifiers, Traits, range adjustments, common names, and descriptions (quotes). Applied after the taxonomy batch from the same Source. Never contains taxonomic acts.",
+  "description": "What a Source states about Galls: Relationships (including Hosts and Inducers), qualifiers, Traits, range adjustments, recorded occurrences, common names, and descriptions (quotes). Applied after the taxonomy batch from the same Source. Never contains taxonomic acts.",
   "type": "object",
   "allOf": [{ "$ref": "common.schema.json#/$defs/envelope" }],
   "required": ["batch_type", "taxa", "galls", "facts"],
@@ -83,13 +83,14 @@
       "type": "object",
       "required": ["kind"],
       "properties": {
-        "kind": { "enum": ["relationship", "qualifier", "trait", "range", "alias", "description"] }
+        "kind": { "enum": ["relationship", "qualifier", "trait", "range", "occurrence", "alias", "description"] }
       },
       "allOf": [
         { "if": { "properties": { "kind": { "const": "relationship" } } }, "then": { "$ref": "#/$defs/relationship_fact" } },
         { "if": { "properties": { "kind": { "const": "qualifier" } } }, "then": { "$ref": "#/$defs/qualifier_fact" } },
         { "if": { "properties": { "kind": { "const": "trait" } } }, "then": { "$ref": "#/$defs/trait_fact" } },
         { "if": { "properties": { "kind": { "const": "range" } } }, "then": { "$ref": "#/$defs/range_fact" } },
+        { "if": { "properties": { "kind": { "const": "occurrence" } } }, "then": { "$ref": "#/$defs/occurrence_fact" } },
         { "if": { "properties": { "kind": { "const": "alias" } } }, "then": { "$ref": "#/$defs/alias_fact" } },
         { "if": { "properties": { "kind": { "const": "description" } } }, "then": { "$ref": "#/$defs/description_fact" } }
       ]
@@ -213,6 +214,23 @@
           "$ref": "#/$defs/controlled_value",
           "properties": { "value": { "$ref": "../vocab/place-codes.schema.json" } }
         }
+      },
+      "unevaluatedProperties": false
+    },
+
+    "occurrence_fact": {
+      "description": "A place where the Source states the Gall has been recorded, with when and at what stage when the Source gives them. One Fact per place. Feeds the range map and phenology; separate from range adjustments.",
+      "allOf": [{ "$ref": "#/$defs/fact_base" }],
+      "required": ["gall", "place"],
+      "properties": {
+        "kind": { "const": "occurrence" },
+        "gall": { "$ref": "common.schema.json#/$defs/gall_ref_id" },
+        "place": {
+          "$ref": "#/$defs/controlled_value",
+          "properties": { "value": { "$ref": "../vocab/place-codes.schema.json" } }
+        },
+        "when_as_written": { "type": "string", "minLength": 1, "description": "When the Gall was recorded, as the Source gives it (\"July 1961\", \"late summer\")." },
+        "stage_as_written": { "type": "string", "minLength": 1, "description": "The Gall's or Inducer's stage at the record, as the Source gives it (\"young\", \"mature, adults emerging\")." }
       },
       "unevaluatedProperties": false
     },

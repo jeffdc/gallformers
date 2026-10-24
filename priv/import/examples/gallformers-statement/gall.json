@@ -40,6 +40,16 @@
           { "provider": "inaturalist", "id": "123456790" }
         ]
       }]
+    },
+    {
+      "id": "f3", "stance": "confirm", "kind": "occurrence", "gall": "g1",
+      "place": { "value": "US-CA", "as_written": "Contra Costa County, California" },
+      "when_as_written": "July 2025",
+      "stage_as_written": "mature, with exit holes",
+      "evidence": [{
+        "statement": { "text": "Seen in Contra Costa County, California, in July 2025: mature galls with exit holes.", "stated_on": "2026-10-23" },
+        "observations": [{ "provider": "inaturalist", "id": "123456791" }]
+      }]
     }
   ]
 }

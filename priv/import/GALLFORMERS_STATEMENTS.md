@@ -9,6 +9,7 @@ How to write a batch of Gallformers' own statements: a curator's correction, con
   - `statement.stated_on`: its date (YYYY-MM-DD);
   - `observations` (optional): the Observations that support it, e.g. `{ "provider": "inaturalist", "id": "123456789" }`.
 - **Observations** appear only as cited evidence on a statement.
+- **A Host Gallformers added "tentatively"** from an Observation is a Fact like any other, not a hedged statement (`PRODUCER_GUIDE.md` rule 7): state it as `host_of`, with that Observation as its evidence.
 - Run `validate.py` on the batch file.
 
-Example: `examples/gallformers-statement/gall.json` (a range exclusion and a Host verified from Observations).
+Example: `examples/gallformers-statement/gall.json` (a range exclusion, a Host verified from Observations, and a recorded occurrence).

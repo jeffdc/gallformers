@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-10-11
-updated: 2026-10-11
+updated: 2026-10-23
 epic: taxonomy
 relates: [8546, 294c]
 ---
@@ -23,12 +23,20 @@ Rough text signals over all 1,323 notes (heuristic; one note often mixes kinds):
 | Remarks on the state of knowledge | "declared a synonym … however it is listed as valid in Thomas 2012"; "Little has been published …"; "This is Joyce Gross' gall type #2" | 140 taxonomic; 796 contain links |
 
 - **778 of the notes (59%) are on undescribed galls.** For those, Gallformers is often the only Source: the note is the gall's description.
-- **381 notes hedge** ("added tentatively as a host based on this unconfirmed observation") — today's data relies on tentative Hosts, while the contract keeps hedged statements out of Facts.
+- **381 notes hedge** ("added tentatively as a host based on this unconfirmed observation").
 
-Facts in the first kind fit the existing Gallformers-statements path (statement text + cited Observations). The other two aren't Facts about one Gall: identification guidance is about the difference between Galls and which Trait separates them; remarks are context about Sources, disputes and resources.
+## Decisions (Adam and Jeff, 2026-10-17)
 
-## Questions (shape first)
+The earlier questions (look-alikes as a concept; remarks as statements or page content; tentative Facts) are closed:
 
-1. Is identification guidance a domain concept — a Gall's look-alikes (another Gall + the Trait that separates them), usable by the ID tool — or free text on the page?
-2. Are remarks Gallformers statements (attributed, dated, under the recency rule) or page content outside the Facts system?
-3. Does Gallformers state tentative Facts?
+- **No look-alikes concept.** Look-alikes are inherent in a matching set of Traits.
+- **Gallformers' statements of Fact:** Hosts added from iNat Observations, including "tentative" ones (just Facts; the single Observation is their evidence); descriptions of undescribed Galls; where and when a Gall was seen (recorded occurrences, the new `occurrence` Fact kind); adjudications of conflicts between Sources, with a reason. These import as a Source: the notes become a document, then Gallformers statements per `priv/import/GALLFORMERS_STATEMENTS.md`.
+- **Commentary that isn't a Fact:** bigger-picture summaries of the literature and of the state of knowledge, open hypotheses, pointers to people and resources. Stays as page content, outside the Facts.
+- **Passages copied from published papers** belong to that paper as a Source.
+
+Recorded in `docs/import/producer-guide-background.md`, "Gallformers ID Notes".
+
+## Remaining work
+
+- Convert the notes: split each into statements of Fact (imported as Gallformers statements), commentary (page content) and copied passages (attributed to their paper).
+

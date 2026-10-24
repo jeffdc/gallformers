@@ -151,3 +151,49 @@ def test_taxonomic_act_unmapped_slot(revision, schema_errors):
         "evidence": [{"item": "#/texts/120", "quote": "Andricus exemplaris Smith & Jones, sp. nov.", "page": "12"}],
     }]  # fmt: skip
     assert schema_errors(revision) == []
+
+
+# -- 2026-10-23: recorded occurrences --------------------------------------------
+
+
+def occurrence(**fields):
+    return {
+        "id": "f99", "stance": "confirm", "kind": "occurrence", "gall": "g1",
+        "place": {"value": "US-CA", "as_written": "Mt. Diablo, California"},
+        "evidence": [{"item": "#/texts/42", "quote": "common on Q. lobata throughout the hills", "page": "58"}],
+        **fields,
+    }  # fmt: skip
+
+
+def test_occurrence_with_place_only(paper, schema_errors):
+    paper["facts"].append(occurrence())
+    assert schema_errors(paper) == []
+
+
+def test_occurrence_with_when_and_stage(paper, schema_errors):
+    paper["facts"].append(occurrence(when_as_written="July 1961", stage_as_written="mature, adults emerging"))
+    assert schema_errors(paper) == []
+
+
+def test_occurrence_needs_a_place(paper, schema_errors):
+    fact = occurrence()
+    del fact["place"]
+    paper["facts"].append(fact)
+    assert errors_mention(schema_errors(paper), "place")
+
+
+def test_occurrence_place_is_a_place_code(paper, schema_errors):
+    paper["facts"].append(occurrence(place={"value": "Mt. Diablo", "as_written": "Mt. Diablo"}))
+    assert errors_mention(schema_errors(paper), "place")
+
+
+def test_occurrence_when_and_stage_are_not_empty(paper, schema_errors):
+    paper["facts"].append(occurrence(when_as_written=""))
+    assert errors_mention(schema_errors(paper), "when_as_written")
+    paper["facts"][-1] = occurrence(stage_as_written="")
+    assert errors_mention(schema_errors(paper), "stage_as_written")
+
+
+def test_occurrence_takes_no_coordinates(paper, schema_errors):
+    paper["facts"].append(occurrence(coordinates="37.88 N, 121.91 W"))
+    assert errors_mention(schema_errors(paper), "facts/15", "coordinates")

@@ -178,8 +178,8 @@ A qualifier is its own Fact, pointing at a Relationship Fact in the same batch (
 - Traits: `detachable`, `plant_part`, `form`, `shape`, `color`, `texture`, `alignment`, `walls`, `cells`, `season`. Values come from `vocab/traits.schema.json`.
 - **A value's definition in `vocab/traits.json` decides whether it fits;** the value's name is shorthand for its definition. `traits.json` also maps common Source terms onto values.
 - A Gall can have several values of each Trait, one Fact per value; `detachable` has one value.
-- `season` is the time of year the Gall can be seen.
-- `detachable` is whether the Gall can be removed from the Host without cutting it out or destroying the surrounding tissue.
+- `season` is when the Gall forms and grows: not when it is seen or found, and not when the Inducer emerges (rearing and emergence dates don't count). `Winter` applies only where the Host grows in winter.
+- `detachable` is whether the Gall can be removed from the Host without cutting it out or destroying the surrounding tissue. `both` means it is ambiguous: the Gall bursts and drops later, part of it stays behind, or it rarely comes off without major agitation.
 - `texture` describes the surface.
 - `color` is what you see on the Gall, its covering (hairs, wool) included; a Gall can have several colours.
 - `plant_part`: the most precise location the Source supports. A usual location ("usually along the midrib") counts as the location. A leaf Gall with no side, vein or midrib stated is both `upper leaf` and `lower leaf`.
@@ -196,6 +196,16 @@ A Gall's range is computed from its Hosts' ranges, native and introduced. State 
 - `only`: the Source says the Gall occurs only in this place ("in Texas only"); one Fact per place.
 
 `place.value` is a code from `vocab/place-codes.schema.json`; find it by name in `vocab/places.json`.
+
+### Recorded occurrences
+
+An `occurrence` Fact states a place where the Source says the Gall has been recorded ("collected on Mt. Diablo in July", a field guide's "Range: California, Oregon"). One Fact per place:
+
+- `place`: the code of the place the Source names, or of the place that contains it, with the Source's words in `as_written` (`{ "value": "US-CA", "as_written": "Mt. Diablo" }`);
+- `when_as_written`: when it was recorded, as the Source gives it ("July 1961", "late summer"), if it does;
+- `stage_as_written`: the Gall's or Inducer's stage at the record, as the Source gives it ("young galls", "adults emerging"), if it does.
+
+Recorded occurrences are separate from range adjustments: state an adjustment only as "Range adjustments" describes.
 
 ### Common names
 

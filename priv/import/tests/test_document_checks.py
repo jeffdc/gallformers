@@ -179,6 +179,27 @@ def test_an_existing_gall_without_its_inducer_fact_is_a_warning(package, batch):
     assert named_inducer(problems(pkg, level="warning"))
 
 
+def occurrence(gall="g1"):
+    return {"id": "f9", "stance": "confirm", "kind": "occurrence", "gall": gall,
+            "place": {"value": "US-CA", "as_written": "throughout the hills"},
+            "evidence": [{"item": "#/texts/2", "quote": "Common on Q. lobata throughout the hills"}]}
+
+
+def test_occurrence_is_checked(package, batch):
+    b = copy.deepcopy(batch)
+    b["facts"].append(occurrence())
+    assert problems(package(gall=b)) == []
+    b["facts"][-1] = occurrence(gall="g7")
+    assert any("facts/4" in p and "g7" in p for p in problems(package(gall=b)))
+
+
+def test_an_occurrence_is_a_fact_about_a_new_gall(package, batch):
+    b = copy.deepcopy(batch)
+    b["galls"].append({"ref": "g2", "name_as_written": "x", "new": True, "identified_by": {"host": "t2"}})
+    b["facts"].append(occurrence(gall="g2"))
+    assert not any("no Facts" in p for p in problems(package(gall=b)))
+
+
 def test_inducer_fact_must_name_the_identified_inducer(package, batch):
     b = copy.deepcopy(batch)
     b["facts"][0]["subject"] = "t3"

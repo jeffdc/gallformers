@@ -12,7 +12,7 @@ One directory per Source:
 |---|---|---|
 | `document.json` | 1 Document | The Source converted to a [DoclingDocument](https://docling-project.github.io/docling/). Every quote in the batches points into it. |
 | `taxonomy.json` | 2 Taxonomy batch | Taxonomic acts the Source states: new names, placements, synonymies, splits, common names. Empty when it states none. |
-| `gall.json` | 3 Gall batch | Facts about Galls: Inducers, Hosts and other Relationships, Traits, range adjustments, common names, descriptions. |
+| `gall.json` | 3 Gall batch | Facts about Galls: Inducers, Hosts and other Relationships, Traits, range adjustments, recorded occurrences, common names, descriptions. |
 | — | 4 Validate | `validate.py` checks the shape, the controlled values, and that every quote is in its document item. |
 | `review.json` | 5 Review | A fresh reviewer checks every statement against the document and lists findings. |
 | (`review.json`) | 6 Respond | The producer agrees (and fixes) or disagrees with each finding. Disagreements go to a human at intake. |
@@ -64,5 +64,5 @@ uv run --with pytest --with "jsonschema>=4.18" --with "referencing>=0.30" pytest
 
 - **Rules:** `PRODUCER_GUIDE.md` (this directory).
 - **Why the rules are what they are, and what Gallformers does on import:** `docs/import/producer-guide-background.md`.
-- **Open questions** (season, detachable, recorded range, aphid generations, historical plant names) are listed at the end of that document.
+- **Open questions** (aphid generations, coordinates on recorded occurrences) are listed at the end of that document.
 - Work tracking: mull matters `294c` (this contract), `e381` (the Gallformers side), `8546` (the trial).

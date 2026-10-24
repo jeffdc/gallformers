@@ -1,6 +1,6 @@
 {
   "vocabulary": "traits",
-  "vocabulary_version": "2026-10-15",
+  "vocabulary_version": "2026-10-23",
   "description": "What each Trait value means, and how common Source terms map onto values. A value's definition decides whether it fits; the value is shorthand for its definition. Validate values against traits.schema.json.",
   "traits": {
     "generation": {
@@ -41,7 +41,7 @@
         },
         {
           "value": "both",
-          "definition": null
+          "definition": "Ambiguous: the Gall is neither clearly integral nor clearly detachable. For example, it bursts and drops later, part of it stays behind, or it rarely comes off without major agitation."
         },
         {
           "value": "unknown",
@@ -482,23 +482,23 @@
       ]
     },
     "season": {
-      "about": "The time of year the Gall can be seen.",
+      "about": "When the Gall forms and grows. Not when it is seen or found, and not when the Inducer emerges: rearing and emergence dates don't count.",
       "values": [
         {
           "value": "Spring",
-          "definition": null
+          "definition": "The Gall forms and grows in spring."
         },
         {
           "value": "Summer",
-          "definition": null
+          "definition": "The Gall forms and grows in summer."
         },
         {
           "value": "Fall",
-          "definition": null
+          "definition": "The Gall forms and grows in fall."
         },
         {
           "value": "Winter",
-          "definition": null
+          "definition": "The Gall forms and grows in winter. Applies only where the Host grows in winter."
         }
       ]
     }
