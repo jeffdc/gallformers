@@ -1,6 +1,6 @@
 """Fixtures for the validator tests.
 
-Run: uv run --with pytest --with "jsonschema>=4.18" --with "referencing>=0.30" pytest priv/import/tests
+Run: uv run --with pytest --with "jsonschema>=4.18" --with "referencing>=0.30" --with rfc3339-validator --with rfc3987 pytest priv/import/tests
 """
 
 import copy

@@ -49,7 +49,7 @@ The reference producer (`services/import-producer/`) does all of this with headl
 ```
 uv run priv/import/validate.py <package-dir>             # phase 4
 uv run priv/import/validate.py --review <package-dir>    # ready to deliver?
-python3 priv/import/validate.py <package-dir>            # without uv; needs jsonschema >= 4.18
+python3 priv/import/validate.py <package-dir>            # without uv; needs jsonschema >= 4.18, rfc3339-validator, rfc3987
 ```
 
 A package is **ready** when `--review` passes. It prints any disputed findings (for the human at intake) as warnings.
@@ -57,7 +57,7 @@ A package is **ready** when `--review` passes. It prints any disputed findings (
 Tests:
 
 ```
-uv run --with pytest --with "jsonschema>=4.18" --with "referencing>=0.30" pytest priv/import/tests
+uv run --with pytest --with "jsonschema>=4.18" --with "referencing>=0.30" --with rfc3339-validator --with rfc3987 pytest priv/import/tests
 ```
 
 ## Where things are decided

@@ -115,6 +115,19 @@ def test_cites_on_quote_evidence(paper, schema_errors):
     assert errors_mention(schema_errors(paper), "cites")
 
 
+# -- 2026-10-25: formats are checked, as Gallformers' importer checks them -------
+
+
+def test_malformed_url_is_rejected(paper, schema_errors):
+    paper["facts"][1]["evidence"][0]["url"] = "not a url"
+    assert errors_mention(schema_errors(paper), "facts/1/evidence/0/url")
+
+
+def test_malformed_produced_at_is_rejected(paper, schema_errors):
+    paper["produced_at"] = "yesterday"
+    assert errors_mention(schema_errors(paper), "produced_at")
+
+
 # -- 2026-10-15: additions from the trial ----------------------------------------
 
 

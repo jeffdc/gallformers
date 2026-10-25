@@ -13,7 +13,8 @@ config :gallformers,
 
 config :gallformers, Oban,
   repo: Gallformers.Repo,
-  queues: [default: 10, maintenance: 5],
+  # import: one package at a time (Gallformers.Import.Worker).
+  queues: [default: 10, maintenance: 5, import: 1],
   plugins: [
     {Oban.Plugins.Pruner, max_age: 7 * 24 * 60 * 60},
     Oban.Plugins.Reindexer,

@@ -221,7 +221,7 @@ Run `validate.py` on the package and fix every error it reports; warnings (e.g. 
 
 ```
 uv run priv/import/validate.py <package-dir>
-python3 priv/import/validate.py <package-dir>     # needs jsonschema >= 4.18
+python3 priv/import/validate.py <package-dir>     # needs jsonschema >= 4.18, rfc3339-validator, rfc3987
 ```
 
 It checks each batch against its schema, that `source.document.sha256` matches `document.json`, that every quote is found in its item, and that references, qualifiers, Inducers, descriptions and `new` Galls are consistent.

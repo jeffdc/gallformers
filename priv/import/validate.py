@@ -1,12 +1,12 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["jsonschema>=4.18", "referencing>=0.30"]
+# dependencies = ["jsonschema>=4.18", "referencing>=0.30", "rfc3339-validator", "rfc3987"]
 # ///
 """Validate a Gallformers import package (phase 4), and with --review, the readiness gate (phases 5 and 6).
 
 Usage:
     uv run priv/import/validate.py [--review] PATH [PATH ...]
-    python3 priv/import/validate.py [--review] PATH [PATH ...]   # needs jsonschema >= 4.18
+    python3 priv/import/validate.py [--review] PATH [PATH ...]   # needs jsonschema >= 4.18, rfc3339-validator, rfc3987
 
 PATH is a batch file (taxonomy.json / gall.json) or a package directory, in
 which case every taxonomy.json and gall.json in it is validated.
@@ -26,7 +26,7 @@ at intake, without failing.
 
 Exit status: 0 if everything checked is free of errors (warnings allowed), 1 otherwise.
 
-Tests: uv run --with pytest --with "jsonschema>=4.18" --with "referencing>=0.30" pytest priv/import/tests
+Tests: uv run --with pytest --with "jsonschema>=4.18" --with "referencing>=0.30" --with rfc3339-validator --with rfc3987 pytest priv/import/tests
 """
 
 import hashlib
