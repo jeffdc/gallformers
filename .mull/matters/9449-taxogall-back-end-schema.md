@@ -38,7 +38,7 @@ Read models (ID tool, search, pages, API) are published by `Catalog` and `Taxa`;
 
 - `source` gains: kind (`publication | website | database | unpublished | research_data | gallformers`), authors as written, authored date with precision (year / month / day) plus `as_written`, identifiers (DOI, URL, ISBN), license value plus `as_written`, retraction (`retracted_by` notice Source, date). Gallformers is one Source row (today's Source 58, ID kept).
 - `source_documents`: one per stored document — a Source's `document.json`, or one version of a Gall's Gallformers note (`gall_id`, version date). Private S3 key, sha256.
-- `document_items`: ref (`#/texts/42`), text, printed page. Quotes are checked and located against these. Never in the public snapshot.
+- `document_items`: ref (`#/texts/42`), text, PDF page from Docling provenance (`page_no`; the printed page is the evidence's `page`). Quotes are checked and located against these. Never in the public snapshot.
 - `facts`: `id`, `kind`, `standing` (`current | withdrawn | superseded | retracted | unsupported`), `slot`. Typed details live in tables owned by `Catalog` or `Taxa`, keyed by `fact_id`, unique on the kind's natural key. `slot` groups Facts that compete for one value (a Gall's detachable; a taxon's placement or accepted name); multi-valued kinds have none.
 - `attributions`: `fact_id`, `source_id`, stance (`confirm | deny`), `stated_on` (the Source's authored date; for Gallformers, the statement's date; nullable for undated legacy), `value_as_written` (for controlled values), `batch_id`, statement text (Gallformers), and for occurrences `when_as_written` / `stage_as_written`. One per (Fact, Source); a newer Gallformers statement replaces Gallformers' attribution (audit keeps the old).
 - `attribution_evidence`: one per quote — item, quote, stored span (computed by Gallformers), page, URL, `whole_item`, `cites`.
@@ -72,7 +72,7 @@ Where a null `stated_on` sorts is the parked date decision (`8567` Sources–Fac
 | Fact table | Columns | Natural key |
 |---|---|---|
 | `relationship_facts` | `type` (fixed list of 15), subject (taxon or Gall), object (taxon or Gall), `gall_context_id` | type + subject + object + context; check constraints per type's endpoint kinds |
-| `qualifier_facts` | `of_fact_id` (a Relationship), `qualifier`, `value` | of + qualifier + value |
+| `qualifier_facts` | `of_fact_id` (a Relationship), `qualifier`, `value` | of + qualifier + value; `lethality` in a slot (one value per Relationship) |
 | `trait_facts` | `gall_id`, `trait_value_id` | Gall + value; `detachable` in a slot |
 | `range_facts` | `gall_id`, `adjustment` (`include | exclude | only`), `place_id` | Gall + adjustment + place |
 | `occurrence_facts` | `gall_id`, `place_id` | Gall + place (when / stage on the attribution) |
@@ -159,7 +159,7 @@ Where a null `stated_on` sorts is the parked date decision (`8567` Sources–Fac
 - Create: `lib/gallformers/storage/private.ex` (private bucket get/put)
 - Test: `test/gallformers/sources/docling_test.exs`, `quote_locator_test.exs`
 
-**Behavior:** Storing a `document.json` creates a `source_documents` row (S3 key, sha256, kind `docling | note`, `gall_id` and version date for notes) and one `document_items` row per text, table and picture item (ref, text, printed page). Table text is rows of cells joined with " | ", a spanning cell once — the same reading `priv/import/validate.py` uses. `QuoteLocator.locate(item_text, quote)` returns the character span, matching after NFKC normalisation, soft-hyphen removal, whitespace collapsing, and line-break dehyphenation, as `validate.py` does.
+**Behavior:** Storing a `document.json` creates a `source_documents` row (S3 key, sha256, kind `docling | note`, `gall_id` and version date for notes) and one `document_items` row per text, table and picture item (ref, text, PDF page). **Done 2026-10-24.** Importer-created Sources must still fill the old NOT NULL `source` columns (`author`, `pubyear`, `link`, `citation`, `license`) until the old pages are gone (Task 13). Table text is rows of cells joined with " | ", a spanning cell once — the same reading `priv/import/validate.py` uses. `QuoteLocator.locate(item_text, quote)` returns the character span, matching after NFKC normalisation, soft-hyphen removal, whitespace collapsing, and line-break dehyphenation, as `validate.py` does.
 
 **Testing:** port the validator's document cases from `priv/import/tests/test_document_checks.py` (quote across a hyphenated line break and extra whitespace; table row quote; spanning cell; missing item; whole item with no text) and assert spans.
 
@@ -270,7 +270,9 @@ Where a null `stated_on` sorts is the parked date decision (`8567` Sources–Fac
 
 **Behavior:** As §5. Taxonomy batch: record every act (Task 7), create taxa the Source presents as new, flag disagreements. Gall batch: find or create Facts, diff attributions against the Source's existing ones (add, update, leave unchanged untouched, remove), recompute standings, enqueue conflicts, emit events, audit — one transaction per batch. Re-applying an applied `batch_id` is a no-op. Phase 6 disputes from `review.json` become queue items. Queue decisions are recorded with who and when.
 
-**Testing:** acceptance test *a re-import drops one Fact and leaves unchanged ones untouched* (assert no audit rows for unchanged attributions); re-applying a batch changes nothing; a taxonomy batch adding a new species makes its gall batch resolve; a disagreeing synonymy is flagged and the tree is unchanged; a same-date conflict lands in the queue.
+**Testing:** acceptance test *a re-import drops one Fact and leaves unchanged ones untouched* (assert no audit rows for unchanged attributions); re-applying a batch changes nothing; a taxonomy batch adding a new species makes its gall batch resolve; a disagreeing synonymy is flagged and the tree is unchanged; a same-date conflict lands in the queue; an older Gallformers statement arriving after a newer one on the same Fact does not replace it.
+
+**Notes (from Tasks 2–4):** `Facts.attribute/2` upserts regardless of date, so the diff decides when to call it (older Gallformers statements must not replace newer ones). Observations arrive per evidence item in the contract but are stored per attribution: flatten them. Gallformers statements pass `statement_text:` and `stated:`. Importer-created Sources must fill the old NOT NULL `source` columns until the old pages are gone.
 
 ### Task 14: Replay log
 
@@ -294,7 +296,7 @@ Where a null `stated_on` sorts is the parked date decision (`8567` Sources–Fac
 
 **Testing:** on a small fixture of old-model rows: counts reconcile; an agamic/sexgen pair yields one Inducer and two Galls; a placeholder's range rows land on its genus; the crosswalk maps an old family ID; running twice gives the same result.
 
-**Notes:** Run locally only with `MIX_ENV` set explicitly and against a copy — never `mix run` without it.
+**Notes:** Run locally only with `MIX_ENV` set explicitly and against a copy — never `mix run` without it. **`host_range` is still keyed by `species_id` (FK to `species`)**, but a genus taxon created from a placeholder has a new ID with no `species` row, so its moved range rows have nowhere to go. Re-key `host_range` to taxa (a `taxon_id` column beside `species_id`, or a new table) as part of this task, and point `Catalog.potential_range/1` at it. Run `Catalog.load_vocab/1` before creating Galls with a generation.
 
 ### Task 16: Data migration — legacy Facts, citations, notes, images
 
@@ -320,3 +322,29 @@ Where a null `stated_on` sorts is the parked date decision (`8567` Sources–Fac
 **Testing:** range classification cases (copy then widened union is drift, not exclusion); an alias marked "former label" never enters `taxon_names`; a missing decision stops the run naming the rows; the snapshot workflow's exclusion list contains every private table.
 
 **Notes:** The reports need a fresh production copy (`b5bd` M2 inventory refresh). The curation itself is Jeff's time, not code.
+
+**Also in this task (found in Task 14):** export the preview environment's `replay_log` and load it into production at cutover (a release function plus a `b5bd` M6 step); the migration's rebuild must never truncate `replay_log`. The snapshot exclusions cover `replay_log`, `carbonite_default` and its triggers. Replay keys taxa by accepted name + rank + kingdom, so the migration must report any duplicates of that key (replay stops on them), and keeps Gall species IDs and Source titles unchanged.
+
+
+## Status (2026-10-25)
+
+All 17 tasks are built on `taxogall` (uncommitted at the time of writing): `mix precommit` passes (2420 tests), `mix dialyzer` 0 errors. Changes made while building, beyond the design above:
+
+- **Context names:** `Facts`, `Taxa`, `Catalog`, `Import`, `Audit`, `CatalogMigration`; `Sources` extended in place.
+- **Audit:** `Audit.transaction/3` and `Audit.run_multi/3` (not a Multi-returning `multi/3`: Ecto's `Multi.new()` trips an OTP 28 Dialyzer opaque-type error). A second actor in one database transaction raises.
+- **`document_items.page_no`** is the PDF page; the printed page is the evidence's `page`.
+- **Standing:** partial dates compare as periods (nested periods tie); a conflict with no previous standing leaves the Fact `unsupported` until a curator decides; slot ties are queued as same-date conflicts and settled by a dated Gallformers statement.
+- **`lethality`** is single-valued per Relationship (slot).
+- **Validation** uses JSV (full Draft 2020-12); `validate.py` now checks `uri` and `date-time` formats too (`rfc3339-validator`, `rfc3987`).
+- **Legacy Facts** are written in chunks of 500 (one transaction would exhaust PostgreSQL's lock table).
+- **`host_range`** and `image` gained typed `taxon_id` / `gall_id` columns beside `species_id`; drop `species_id` when the old code goes.
+- **Public snapshot** (`db-snapshot.yml`, `priv/snapshot/`): built from a scratch restore, fails closed on unclassified tables; notes stay public through a `gall_notes` table, `legacy_citations` stay public.
+- **Replay carry-over:** `Release.export_replay_log/0` on preview, `Release.replay_log/1` on production after `Release.migrate_catalog/0` (strict); `b5bd` M6 updated.
+- **Test suite:** pool size now `schedulers_online * 2` (was a SQLite-era 5); four admin form test modules are `async: false` because their LiveViews react to site-wide PubSub.
+
+**Open decisions (Jeff):**
+- **Introduced range in the potential range.** The new potential range uses Hosts' native *and* introduced range (as the contract says); today's fallback uses native only, so Galls without a stored range gain introduced regions in the ID tool. Keep, or native only?
+- **`oban_jobs` / `oban_peers`** are no longer in the public snapshot (job arguments carry actor metadata). Keep private?
+
+**Next (50ff steps 8 and on):** the first run on a production copy — `make experiment-db`, then `MIX_ENV=dev mix gallformers.catalog.migrate --skip-pending --reports docs/plans/catalog`; check every reconciliation line; fill the four CSVs in `priv/catalog_migration/` (non-galls, range decisions, aliases, keys) and extend `name_suffixes.csv` from the unparsed / `needs_review` lists (incl. the aphid and rust life-cycle assignments); fix duplicate taxon keys; re-run strict and time it. Notes go to the real private bucket on a dev run unless `s3_enabled: false`. Then the public pages (step 9).
+

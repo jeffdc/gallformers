@@ -54,7 +54,7 @@ Domain language: `docs/domain/domain-model.md`. Design and rules: `8567`. Migrat
 3. **Finish the contract (`294c`):** vocabulary generator (mix task); schema-description wording pass; golden regression set of the five trial packages; generation groups into `traits.json`, the guide and the `generation` enum once the groups settle.
 4. ~~Taxonomy facade (`36ca`)~~ — dropped 2026-10-24 (`8567` *Build approach*).
 
-**New back-end** (schema: `9449`; built whole on `taxogall`; old domain code removed as each piece replaces it; the new test seeds in `priv/repo/test_seeds.sql` grow with it). Next: turn `9449` into an implementation plan, then TDD from the step 5 acceptance tests.
+**New back-end** (schema: `9449`; built whole on `taxogall`; old domain code removed as each piece replaces it; the new test seeds in `priv/repo/test_seeds.sql` grow with it). **Steps 5–8 built 2026-10-25** (all 17 tasks of `9449`'s plan; see its *Status*). Still open in step 8: the first run on a production copy and the curated decisions (`9449` *Status*, "Next").
 
 5. **Sources–Facts and audit** (`8567` step 4, `ede2`): acceptance tests first (two Sources confirming one Host; a denial in both orders; a superseded placement; a retraction; re-import dropping a Fact; a qualifier denied while its Relationship stands; a Gallformers override citing Observations; placements from different Sources that would form a cycle or rank inversion).
 6. **Taxonomy storage and gall system** (`8567` step 5): new taxonomy tables (taxa, rank, placement, names and synonyms, today's IDs) and crosswalk; ancestry read model; Galls separate from taxa; Traits, Relationships, qualifiers, aliases, range adjustments and recorded occurrences as Facts; generation groups schema; taxonomy-change listener; read models for ID tool, search, pages and API; `boundary` exports from the start.
@@ -75,6 +75,9 @@ Domain language: `docs/domain/domain-model.md`. Design and rules: `8567`. Migrat
 15. **Phase 2 (`b5bd` M8):** the taxonomy system, its own plan.
 
 ## Open decisions
+
+- Potential range: Hosts' native and introduced range (new, per the contract) or native only (today's fallback) (`9449` *Status*).
+- Public snapshot: keep `oban_jobs` / `oban_peers` private (`9449` *Status*).
 
 - Legacy Facts the backscan doesn't confirm (`b5bd` M0).
 - Gall range differences: curator removal vs drift since a host union was copied (`b5bd` M0, reopened).

@@ -114,13 +114,14 @@ What else migrates is open until step 6 shows what the pipeline doesn't reproduc
 
 1. Announce the window; start the edit freeze.
 2. Final small backscan pass for Sources added or changed since the backscan; approve.
-3. Full production backup to S3; verify it restores.
-4. Enable maintenance mode (`runbooks/planned-maintenance.md`).
-5. Deploy the release; schema migrations run automatically at boot.
-6. Run the data migration as a separate step (not at boot); replay approved batches.
-7. Run the verification suite against production.
-8. Smoke-test as a curator and as a visitor; lift maintenance mode.
-9. Watch errors, Oban queues, and traffic; apply the rollback criteria from M0.
+3. On preview, export the replay log to the private bucket: `bin/gallformers eval "Gallformers.Release.export_replay_log()"`; keep the key it prints. No preview decisions after this.
+4. Full production backup to S3; verify it restores.
+5. Enable maintenance mode (`runbooks/planned-maintenance.md`).
+6. Deploy the release; schema migrations run automatically at boot.
+7. Run the data migration as a separate step (not at boot): `Gallformers.Release.migrate_catalog()`, strict — it stops, writing nothing, on any pending curated decision or duplicate taxon key. Then replay preview's log: `Gallformers.Release.replay_log("<key from step 3>")`; it stops naming the first entry it cannot replay, and can be re-run after a fix.
+8. Run the verification suite against production.
+9. Smoke-test as a curator and as a visitor; lift maintenance mode.
+10. Watch errors, Oban queues, and traffic; apply the rollback criteria from M0.
 
 ### M7. After release
 
