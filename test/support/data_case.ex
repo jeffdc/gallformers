@@ -65,6 +65,28 @@ defmodule Gallformers.DataCase do
   end
 
   @doc """
+  The actor tests pass to audited operations: a system actor named `"test"`.
+
+  The audit trail records one actor per database transaction, and a test runs
+  in one sandbox transaction, so a test uses this actor for every audited
+  call (fixtures included). See `Gallformers.Audit`.
+  """
+  def test_actor, do: Gallformers.Audit.Actor.system("test")
+
+  @doc """
+  Records explicit audit metadata (`test_actor/0`, operation `"test.setup"`)
+  for the test's sandbox transaction, so fixtures can write to audited tables
+  directly. Use it as `setup :audit_test_metadata`.
+
+  Audited calls later in the test must also use `test_actor/0`; another actor
+  raises `Gallformers.Audit.ConflictError`.
+  """
+  def audit_test_metadata(_context) do
+    {:ok, :ok} = Gallformers.Audit.transaction(test_actor(), "test.setup", fn -> :ok end)
+    :ok
+  end
+
+  @doc """
   A helper that transforms changeset errors into a map of messages.
 
       assert {:error, changeset} = Accounts.create_user(%{password: "short"})

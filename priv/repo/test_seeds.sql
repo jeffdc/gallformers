@@ -246,3 +246,5 @@ SELECT setval('gallhost_id_seq', (SELECT MAX(id) FROM gallhost));
 SELECT setval('place_id_seq', (SELECT MAX(id) FROM place));
 SELECT setval('glossary_id_seq', (SELECT MAX(id) FROM glossary));
 SELECT setval('keys_id_seq', (SELECT MAX(id) FROM keys));
+-- Galls and taxa share entity_id_seq, which continues the species IDs.
+SELECT setval('entity_id_seq', (SELECT MAX(id) FROM species));
