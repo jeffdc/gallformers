@@ -248,3 +248,8 @@ SELECT setval('glossary_id_seq', (SELECT MAX(id) FROM glossary));
 SELECT setval('keys_id_seq', (SELECT MAX(id) FROM keys));
 -- Galls and taxa share entity_id_seq, which continues the species IDs.
 SELECT setval('entity_id_seq', (SELECT MAX(id) FROM species));
+
+-- Catalog vocabularies (trait_values, generation_values, ...) are not seeded
+-- here: tests load them from the contract with the real loader
+-- (Gallformers.CatalogFixtures.load_vocab!/0), so traits.json stays the one
+-- source of truth.
