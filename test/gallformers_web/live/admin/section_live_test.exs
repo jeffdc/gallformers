@@ -5,7 +5,11 @@ defmodule GallformersWeb.Admin.SectionLiveTest do
   Sections are now created/edited via the taxonomy form. The section admin page
   shows a typeahead picker at `/admin/section` and species mapping at `/admin/section/:id`.
   """
-  use GallformersWeb.ConnCase, async: true
+  # async: false because the page reloads its species from the database on every
+  # broadcast on the global "taxonomy" PubSub topic, and async tests broadcast there
+  # whenever they create a taxon. A reload still running when a test ends is killed
+  # mid-query by ExUnit's teardown (Postgrex logs "disconnected: client exited").
+  use GallformersWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
 
   alias Gallformers.Accounts.Auth0User

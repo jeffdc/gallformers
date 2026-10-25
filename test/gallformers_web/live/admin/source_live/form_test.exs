@@ -7,7 +7,12 @@ defmodule GallformersWeb.Admin.SourceLive.FormTest do
   - Form validation and submission
   - Navigation after create (should go to edit page, not list)
   """
-  use GallformersWeb.ConnCase, async: true
+  # async: false because the source index tests mount SourceLive.Index, which
+  # reloads from the database on every broadcast on the global "sources" PubSub
+  # topic, and async tests broadcast there whenever they create a source. A reload
+  # still running when a test ends is killed mid-query by ExUnit's teardown
+  # (Postgrex logs "disconnected: client exited").
+  use GallformersWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
 
   alias Gallformers.Accounts.Auth0User
@@ -123,6 +128,27 @@ defmodule GallformersWeb.Admin.SourceLive.FormTest do
       render_submit(view, "confirm_delete", %{"confirmation" => source.title})
 
       refute Sources.get_source(source.id)
+
+      # The delete's own "sources" broadcast makes the index reload once more;
+      # render/1 waits for that reload so the test doesn't end mid-query.
+      assert render(view) =~ "Source deleted successfully"
+    end
+  end
+
+  describe "index page live updates" do
+    setup %{conn: conn} do
+      {:ok, conn: setup_admin_session(conn)}
+    end
+
+    test "survives species-source mapping events, which share the sources topic", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/sources")
+
+      for event <- [:species_source_created, :species_source_updated, :species_source_deleted] do
+        send(view.pid, {event, %Gallformers.Species.SpeciesSource{}})
+      end
+
+      # render/1 raises if the LiveView has crashed.
+      assert render(view) =~ "Sources"
     end
   end
 end

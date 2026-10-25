@@ -10,7 +10,12 @@ defmodule GallformersWeb.Admin.GallLive.FormTest do
   - Rename modal
   - Dirty state tracking
   """
-  use GallformersWeb.ConnCase, async: true
+  # async: false because the gall index test mounts GallLive.Index, which reloads
+  # from the database on every broadcast on the global "species" PubSub topic, and
+  # async tests broadcast there whenever they create a species. A reload still
+  # running when a test ends is killed mid-query by ExUnit's teardown (Postgrex
+  # logs "disconnected: client exited").
+  use GallformersWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
   import Ecto.Query
 
@@ -683,6 +688,10 @@ defmodule GallformersWeb.Admin.GallLive.FormTest do
       render_submit(view, "confirm_delete", %{"confirmation" => gall.name})
 
       refute Gallformers.Species.get_species(gall.id)
+
+      # The delete's own "species" broadcast makes the index reload once more;
+      # render/1 waits for that reload so the test doesn't end mid-query.
+      assert render(view) =~ "Gall deleted successfully"
     end
   end
 

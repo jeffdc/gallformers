@@ -135,6 +135,13 @@ defmodule GallformersWeb.Admin.SourceLive.Index do
     {:noreply, load_sources(socket)}
   end
 
+  # Species-source mapping events share the "sources" topic but don't change
+  # the list of Sources.
+  def handle_info({event, _mapping}, socket)
+      when event in [:species_source_created, :species_source_updated, :species_source_deleted] do
+    {:noreply, socket}
+  end
+
   defp load_sources(socket) do
     sources =
       case socket.assigns.search_query do

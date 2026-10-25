@@ -10,7 +10,12 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
   - Rename modal
   - Dirty state tracking
   """
-  use GallformersWeb.ConnCase, async: true
+  # async: false because the host index tests mount HostLive.Index, which reloads
+  # from the database on every broadcast on the global "species" and "hosts"
+  # PubSub topics, and async tests broadcast there whenever they create a species.
+  # A reload still running when a test ends is killed mid-query by ExUnit's
+  # teardown (Postgrex logs "disconnected: client exited").
+  use GallformersWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
 
   alias Gallformers.Accounts.Auth0User
@@ -1055,6 +1060,10 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
       render_submit(view, "confirm_delete", %{"confirmation" => host.name})
 
       refute Gallformers.Species.get_species(host.id)
+
+      # The delete's own "species" broadcast makes the index reload once more;
+      # render/1 waits for that reload so the test doesn't end mid-query.
+      assert render(view) =~ "Host deleted successfully"
     end
   end
 

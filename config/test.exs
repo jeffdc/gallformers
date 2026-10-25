@@ -19,7 +19,12 @@ config :gallformers, Gallformers.Repo,
   hostname: System.get_env("PGHOST", "localhost"),
   # Explicit because ecto_sql defaults the port to 5432 before Postgrex reads PGPORT.
   port: String.to_integer(System.get_env("PGPORT", "5432")),
-  pool_size: 5,
+  # Every test holds one sandbox connection for its whole run, so the pool must
+  # cover every test that can run at once: ExUnit's default max_cases is
+  # schedulers_online * 2. A smaller pool makes tests queue for a connection,
+  # and under load DBConnection drops queued checkouts ("connection not
+  # available and request was dropped from queue").
+  pool_size: System.schedulers_online() * 2,
   pool: Ecto.Adapters.SQL.Sandbox
 
 # Use stub instead of real WCVP database for WCVP lookups in most tests
