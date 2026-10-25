@@ -1,0 +1,129 @@
+# The public database snapshot (.github/workflows/db-snapshot.yml):
+# every table in the database, as published (public) or not (private),
+# and every schema besides public (private-schema).
+#
+# The workflow restores the full backup into a scratch database, makes the
+# derived tables (priv/snapshot/public_snapshot.sql), drops each
+# private-schema (CASCADE, which also drops the audit triggers on public
+# tables) and each private table, refuses to publish if any table left is
+# not listed public or derived, dumps, and restore-tests the dump.
+#
+# test/gallformers/public_snapshot_test.exs fails while a table in the
+# database is missing here, so a new table cannot leak unnoticed: list it
+# in the migration's change.
+#
+# kind            name
+
+# The audit trail (ede2): history, editors, deleted rows.
+private-schema    carbonite_default
+
+# People, analytics, operations.
+private           users
+private           page_views
+private           daily_stats
+private           daily_page_stats
+private           daily_referrer_stats
+private           daily_device_stats
+private           daily_browser_stats
+private           site_settings
+private           schema_migrations
+private           oban_jobs
+private           oban_peers
+
+# Internal content.
+private           articles
+private           keys
+private           content_images
+
+# Stored Source text (9449 §2: never in the public snapshot).
+private           source_documents
+private           document_items
+
+# Import: packages, batches, the admin queue, disputes, the replay log.
+private           import_packages
+private           import_batches
+private           batch_statements
+private           batch_unmapped
+private           queue_items
+private           replay_log
+
+# Places and vocabularies.
+public            abundance
+public            place
+public            place_hierarchy
+public            alignment
+public            cells
+public            color
+public            form
+public            plant_part
+public            season
+public            shape
+public            texture
+public            walls
+public            glossary
+
+# Sources.
+public            source
+
+# Today's model (until it is dropped after release).
+public            species
+public            gall_traits
+public            host_traits
+public            alias
+public            alias_species
+public            taxonomy
+public            taxonomy_alias
+public            species_taxonomy
+public            species_source
+public            gallhost
+public            gall_range
+public            host_range
+public            image
+public            gall_alignment
+public            gall_cells
+public            gall_color
+public            gall_form
+public            gall_plant_part
+public            gall_season
+public            gall_shape
+public            gall_texture
+public            gall_walls
+
+# Facts.
+public            facts
+public            attributions
+public            attribution_evidence
+public            attribution_names
+public            attribution_observations
+
+# Taxa.
+public            taxa
+public            taxon_names
+public            taxon_common_names
+public            legacy_taxon_ids
+public            taxon_ancestry
+public            placement_facts
+public            name_facts
+public            synonymy_facts
+public            split_facts
+public            split_fact_daughters
+public            common_name_facts
+
+# The gall catalog.
+public            galls
+public            legacy_citations
+public            trait_values
+public            trait_term_mappings
+public            generation_groups
+public            generation_values
+public            generation_group_taxa
+public            relationship_facts
+public            qualifier_facts
+public            trait_facts
+public            range_facts
+public            occurrence_facts
+public            alias_facts
+public            description_facts
+
+# Made in the snapshot only (priv/snapshot/public_snapshot.sql).
+derived           gall_notes

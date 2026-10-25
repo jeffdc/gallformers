@@ -8,7 +8,25 @@ on:
 jobs:
   snapshot:
     runs-on: ubuntu-latest
+
+    # A scratch PostgreSQL to build and restore-test the public snapshot in.
+    services:
+      scratch:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: snapshot
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
+      # For priv/snapshot/: the table list and the derived-table script.
+      - uses: actions/checkout@v5
+
       - name: Install Fly CLI
         run: |
           curl -L https://fly.io/install.sh | sh
@@ -64,28 +82,79 @@ jobs:
           aws s3 cp gallformers-full.dump \
             s3://gallformers-full-backups/$(date +%Y-%m-%d)/gallformers.dump
 
-      - name: Public snapshot (excludes PII, analytics, internal content)
+      # The public snapshot is built from the full backup in the scratch
+      # database, never by dumping production with exclusions: dropping the
+      # audit schema there (CASCADE) also drops its triggers on the public
+      # tables, so the public dump restores on its own (ede2). What is
+      # private is listed in priv/snapshot/tables.txt; anything not listed
+      # public stops the job (fail closed).
+      - name: Public snapshot (built in the scratch database)
         env:
-          PGPASSWORD: ${{ secrets.PG_PASSWORD }}
+          PGHOST: localhost
+          PGPORT: '5433'
+          PGUSER: postgres
+          PGPASSWORD: snapshot
         run: |
-          pg_dump --format=custom --no-owner --no-acl \
-            -h localhost -p 15432 \
-            -U ${{ secrets.PG_USERNAME }} ${{ secrets.PG_DBNAME }} \
-            --exclude-table=articles \
-            --exclude-table=keys \
-            --exclude-table=content_images \
-            --exclude-table=daily_stats \
-            --exclude-table=daily_page_stats \
-            --exclude-table=daily_referrer_stats \
-            --exclude-table=daily_device_stats \
-            --exclude-table=daily_browser_stats \
-            --exclude-table=schema_migrations \
-            --exclude-table=users \
-            --exclude-table=page_views \
-            --exclude-table=site_settings \
-            > gallformers-public.dump
+          set -euo pipefail
+          LIST=priv/snapshot/tables.txt
 
+          createdb snapshot
+          pg_restore --no-owner --no-acl --exit-on-error -d snapshot gallformers-full.dump
+
+          # Public tables derived from private ones (Gallformers notes).
+          psql -v ON_ERROR_STOP=1 -d snapshot -f priv/snapshot/public_snapshot.sql
+
+          for schema in $(awk '$1 == "private-schema" {print $2}' "$LIST"); do
+            psql -v ON_ERROR_STOP=1 -d snapshot -c "DROP SCHEMA IF EXISTS \"$schema\" CASCADE"
+          done
+
+          for table in $(awk '$1 == "private" {print $2}' "$LIST"); do
+            psql -v ON_ERROR_STOP=1 -d snapshot -c "DROP TABLE IF EXISTS public.\"$table\" CASCADE"
+          done
+
+          # Fail closed: every table left must be listed public or derived,
+          # with no other schema and no trigger left.
+          awk '$1 == "public" || $1 == "derived" {print $2}' "$LIST" | sort > allowed.txt
+          psql -At -d snapshot -c "
+            SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm', 'f')" | sort > present.txt
+          UNLISTED=$(comm -23 present.txt allowed.txt)
+          if [ -n "$UNLISTED" ]; then
+            echo "Not listed public in $LIST (not published):"
+            echo "$UNLISTED"
+            exit 1
+          fi
+
+          OTHER=$(psql -At -d snapshot -c "
+            SELECT nspname FROM pg_namespace
+            WHERE nspname NOT IN ('public', 'information_schema') AND nspname NOT LIKE 'pg\_%'")
+          TRIGGERS=$(psql -At -d snapshot -c "SELECT tgname FROM pg_trigger WHERE NOT tgisinternal")
+          if [ -n "$OTHER$TRIGGERS" ]; then
+            echo "Left in the snapshot: schemas [$OTHER] triggers [$TRIGGERS]"
+            exit 1
+          fi
+
+          pg_dump --format=custom --no-owner --no-acl -d snapshot > gallformers-public.dump
           echo "Public dump size: $(du -h gallformers-public.dump | cut -f1)"
+
+      - name: Restore-test the public snapshot
+        env:
+          PGHOST: localhost
+          PGPORT: '5433'
+          PGUSER: postgres
+          PGPASSWORD: snapshot
+        run: |
+          set -euo pipefail
+          createdb verify
+          pg_restore --no-owner --no-acl --exit-on-error -d verify gallformers-public.dump
+
+          SPECIES_COUNT=$(psql -At -d verify -c "SELECT COUNT(*) FROM species")
+          NOTES_COUNT=$(psql -At -d verify -c "SELECT COUNT(*) FROM gall_notes")
+          if [ "$SPECIES_COUNT" -lt 5000 ]; then
+            echo "Restored public snapshot has only $SPECIES_COUNT species (expected 5000+)"
+            exit 1
+          fi
+          echo "Public snapshot restores on its own: $SPECIES_COUNT species, $NOTES_COUNT Gallformers notes"
 
       - name: Upload public snapshot
         env:
