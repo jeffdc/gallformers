@@ -110,6 +110,11 @@ config :gallformers, :images,
 # Private bucket (Sources' stored documents, import packages); never public
 config :gallformers, :private_storage, bucket: "gallformers-private"
 
+# "Taxon changed" listeners (`8567` rule 6), called inside each taxonomy
+# change's transaction. Registered here so Taxa never references its
+# listeners.
+config :gallformers, Gallformers.Taxa.Events, listeners: []
+
 # Configure Ueberauth for Auth0 authentication
 # Client ID and secret are set in runtime.exs from environment variables
 config :ueberauth, Ueberauth,

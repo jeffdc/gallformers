@@ -1,0 +1,611 @@
+defmodule Gallformers.Taxa do
+  @moduledoc """
+  Taxa: taxa at every rank, their names, rank and placement in the
+  editorial tree, the ancestry read model, and name resolution for import
+  (`9449` §3; rules in `8567`).
+
+  This is the new taxonomy storage. It lives beside today's
+  `Gallformers.Taxonomy` (old `taxonomy` tables) until the public pages are
+  re-pointed; nothing here reads the old tables.
+
+  ## The editorial tree (phase 1)
+
+  `taxa.parent_id` is the tree: the migrated skeleton plus curator edits,
+  audited, with no Facts. Every parent change goes through
+  `Gallformers.Taxa.Tree` (no cycles; a child ranks below its parent) and
+  rebuilds the moved subtree's rows in `Gallformers.Taxa.Ancestry`.
+
+  Moves and renames call the registered "taxon changed" listeners inside
+  their transaction (`Gallformers.Taxa.Events`, `8567` rule 6).
+
+  ## Taxonomic-act Facts
+
+  What Sources say about taxa (placements, names, synonymies, splits,
+  common names) is recorded as Facts by the `assert_*` functions
+  (`Gallformers.Taxa.ActFacts`). In phase 1 they are recorded only and
+  never move the editorial tree.
+
+  ## Writes
+
+  Every write is audited (`Gallformers.Audit`) as the given actor, and can
+  be nested inside an outer `Gallformers.Audit.transaction/3` with the same
+  actor (e.g. an import creating a taxon and linking a Gall to it).
+
+  Taxa knows nothing about Galls (`8567` rule 3): it depends on `Repo`,
+  `Audit` and `Facts` only.
+  """
+  use Boundary,
+    deps: [Gallformers.Audit, Gallformers.Facts, Gallformers.Repo],
+    exports: [
+      ActFacts,
+      ActFacts.CommonNameFact,
+      ActFacts.NameFact,
+      ActFacts.PlacementFact,
+      ActFacts.SplitFact,
+      ActFacts.SynonymyFact,
+      CommonName,
+      Event,
+      Events,
+      LegacyId,
+      NameNormalizer,
+      Rank,
+      Taxon,
+      TaxonName
+    ]
+
+  import Ecto.Query
+
+  alias Ecto.Changeset
+  alias Gallformers.Audit
+  alias Gallformers.Audit.Actor
+  alias Gallformers.Repo
+  alias Gallformers.Taxa.ActFacts
+  alias Gallformers.Taxa.ActFacts.CommonNameFact
+  alias Gallformers.Taxa.ActFacts.NameFact
+  alias Gallformers.Taxa.ActFacts.PlacementFact
+  alias Gallformers.Taxa.ActFacts.SplitFact
+  alias Gallformers.Taxa.ActFacts.SynonymyFact
+  alias Gallformers.Taxa.Ancestry
+  alias Gallformers.Taxa.CommonName
+  alias Gallformers.Taxa.Event
+  alias Gallformers.Taxa.Events
+  alias Gallformers.Taxa.LegacyId
+  alias Gallformers.Taxa.NameNormalizer
+  alias Gallformers.Taxa.Taxon
+  alias Gallformers.Taxa.TaxonName
+  alias Gallformers.Taxa.Tree
+
+  @type taxon_ref :: Taxon.t() | integer()
+
+  @type resolution :: {:ok, Taxon.t()} | {:ambiguous, [Taxon.t()]} | :none
+
+  # -- taxa --------------------------------------------------------------------
+
+  @doc """
+  Creates a taxon with its accepted name.
+
+  `attrs` (atom keys): `:rank`, `:origin` (`:curated | :powo`) and `:name`
+  are required; `:parent_id` (nil for a root), `:kingdom` (taken from the
+  parent when not given), the name's `:sensu` and `:authorship`, and `:id`
+  for a migrated plant keeping its species ID (otherwise the shared
+  sequence gives one).
+
+  The parent is checked by the tree validator (`Gallformers.Taxa.Tree`).
+  On error nothing is written and the changeset says why.
+  """
+  @spec create_taxon(Actor.t(), map()) :: {:ok, Taxon.t()} | {:error, Changeset.t()}
+  def create_taxon(%Actor{} = actor, attrs) when is_map(attrs) do
+    Audit.transaction(actor, "taxa.create_taxon", fn ->
+      Tree.lock()
+
+      changeset =
+        %Taxon{}
+        |> Taxon.create_changeset(attrs)
+        |> require_name(attrs)
+        |> inherit_kingdom()
+        |> Tree.validate_parent()
+
+      with {:ok, taxon} <- Repo.insert(changeset),
+           :ok <- Ancestry.add_leaf(taxon.id, taxon.parent_id),
+           {:ok, name} <- insert_name(taxon, :accepted, attrs) do
+        %{taxon | names: [name]}
+      else
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  defp require_name(changeset, attrs) do
+    case Map.get(attrs, :name) do
+      name when is_binary(name) and name != "" -> changeset
+      _ -> Changeset.add_error(changeset, :name, "can't be blank", validation: :required)
+    end
+  end
+
+  defp inherit_kingdom(changeset) do
+    parent_id = Changeset.get_field(changeset, :parent_id)
+
+    if Changeset.get_field(changeset, :kingdom) == nil and parent_id != nil do
+      case Repo.get(Taxon, parent_id) do
+        %Taxon{kingdom: kingdom} -> Changeset.put_change(changeset, :kingdom, kingdom)
+        nil -> changeset
+      end
+    else
+      changeset
+    end
+  end
+
+  defp insert_name(%Taxon{id: taxon_id}, status, attrs) do
+    %TaxonName{}
+    |> TaxonName.changeset(%{
+      taxon_id: taxon_id,
+      status: status,
+      name: Map.get(attrs, :name),
+      sensu: Map.get(attrs, :sensu),
+      authorship: Map.get(attrs, :authorship)
+    })
+    |> Repo.insert()
+  end
+
+  @doc "Gets a taxon by ID with its names, or nil."
+  @spec get_taxon(integer()) :: Taxon.t() | nil
+  def get_taxon(id), do: Taxon |> Repo.get(id) |> Repo.preload(names: names_order())
+
+  @doc "Gets a taxon by ID with its names, raising if there is none."
+  @spec get_taxon!(integer()) :: Taxon.t()
+  def get_taxon!(id), do: Taxon |> Repo.get!(id) |> Repo.preload(names: names_order())
+
+  # Accepted name first, then synonyms in the order added.
+  defp names_order, do: from(n in TaxonName, order_by: [n.status, n.id])
+
+  @doc "A taxon's accepted name."
+  @spec accepted_name(taxon_ref()) :: String.t()
+  def accepted_name(%Taxon{names: names}) when is_list(names) do
+    Enum.find_value(names, fn n -> n.status == :accepted && n.name end)
+  end
+
+  def accepted_name(taxon) do
+    Repo.one!(
+      from(n in TaxonName,
+        where: n.taxon_id == ^taxon_id(taxon) and n.status == :accepted,
+        select: n.name
+      )
+    )
+  end
+
+  # -- names -------------------------------------------------------------------
+
+  @doc """
+  Adds a synonym to a taxon. `opts`: `:sensu` (for a misapplied name, the
+  usage meant, as written) and `:authorship`.
+  """
+  @spec add_synonym(Actor.t(), taxon_ref(), String.t(), keyword()) ::
+          {:ok, TaxonName.t()} | {:error, Changeset.t()}
+  def add_synonym(%Actor{} = actor, taxon, name, opts \\ []) when is_binary(name) do
+    Audit.transaction(actor, "taxa.add_synonym", fn ->
+      %TaxonName{}
+      |> TaxonName.changeset(%{
+        taxon_id: taxon_id(taxon),
+        status: :synonym,
+        name: name,
+        sensu: opts[:sensu],
+        authorship: opts[:authorship]
+      })
+      |> Repo.insert()
+      |> unwrap_or_rollback()
+    end)
+  end
+
+  @doc """
+  Gives a taxon a new accepted name (an editorial rename). The old accepted
+  name stays as a synonym, so Sources using it still resolve; if the new name
+  is already one of the taxon's synonyms, that synonym is promoted. A new
+  name that only differs from the accepted one in form (case, spacing,
+  "var.") replaces it in place, keeping no synonym.
+
+  Calls the "taxon changed" listeners with a `:rename` event
+  (`Gallformers.Taxa.Events`); a listener's error rolls the rename back.
+  Renaming to the current accepted name changes nothing.
+  """
+  @spec rename(Actor.t(), taxon_ref(), String.t()) ::
+          {:ok, Taxon.t()} | {:error, Changeset.t() | Events.rejection()}
+  def rename(%Actor{} = actor, taxon, new_name) when is_binary(new_name) do
+    Audit.transaction(actor, "taxa.rename", fn ->
+      id = taxon_id(taxon)
+      new_name = String.trim(new_name)
+
+      accepted =
+        Repo.one!(
+          from(n in TaxonName,
+            where: n.taxon_id == ^id and n.status == :accepted,
+            lock: "FOR UPDATE"
+          )
+        )
+
+      cond do
+        accepted.name == new_name ->
+          :ok
+
+        accepted.normalized_name == NameNormalizer.normalize(new_name) ->
+          accepted
+          |> TaxonName.changeset(%{name: new_name})
+          |> Repo.update()
+          |> unwrap_or_rollback()
+
+          rename_event(id, accepted.name, new_name)
+
+        true ->
+          accepted
+          |> TaxonName.status_changeset(:synonym)
+          |> Repo.update()
+          |> unwrap_or_rollback()
+
+          promote_or_insert_name(id, new_name)
+          rename_event(id, accepted.name, new_name)
+      end
+
+      get_taxon!(id)
+    end)
+  end
+
+  defp promote_or_insert_name(taxon_id, name) do
+    normalized = NameNormalizer.normalize(name)
+
+    synonym =
+      Repo.one(
+        from(n in TaxonName,
+          where: n.taxon_id == ^taxon_id and n.normalized_name == ^normalized and is_nil(n.sensu)
+        )
+      )
+
+    (synonym || %TaxonName{})
+    |> TaxonName.changeset(%{taxon_id: taxon_id, name: name, status: :accepted})
+    |> Repo.insert_or_update()
+    |> unwrap_or_rollback()
+  end
+
+  defp rename_event(taxon_id, old_name, new_name) do
+    :ok =
+      Events.dispatch(%Event{
+        type: :rename,
+        taxon_id: taxon_id,
+        old_name: old_name,
+        new_name: new_name
+      })
+  end
+
+  @doc "Adds a common name to a taxon (held once per taxon, ignoring case)."
+  @spec add_common_name(Actor.t(), taxon_ref(), String.t()) ::
+          {:ok, CommonName.t()} | {:error, Changeset.t()}
+  def add_common_name(%Actor{} = actor, taxon, name) when is_binary(name) do
+    Audit.transaction(actor, "taxa.add_common_name", fn ->
+      %CommonName{}
+      |> CommonName.changeset(%{taxon_id: taxon_id(taxon), name: name})
+      |> Repo.insert()
+      |> unwrap_or_rollback()
+    end)
+  end
+
+  @doc "A taxon's common names, in the order added."
+  @spec list_common_names(taxon_ref()) :: [CommonName.t()]
+  def list_common_names(taxon) do
+    Repo.all(from(c in CommonName, where: c.taxon_id == ^taxon_id(taxon), order_by: c.id))
+  end
+
+  # -- legacy crosswalk --------------------------------------------------------
+
+  @doc """
+  Maps an identifier of the old model to `taxon` (`Gallformers.Taxa.LegacyId`
+  for the kinds). `legacy_name` is the old row's name as it was.
+  """
+  @spec add_legacy_id(Actor.t(), taxon_ref(), LegacyId.kind(), integer(), String.t() | nil) ::
+          {:ok, LegacyId.t()} | {:error, Changeset.t()}
+  def add_legacy_id(%Actor{} = actor, taxon, kind, legacy_id, legacy_name \\ nil) do
+    Audit.transaction(actor, "taxa.add_legacy_id", fn ->
+      %LegacyId{}
+      |> LegacyId.changeset(%{
+        taxon_id: taxon_id(taxon),
+        kind: kind,
+        legacy_id: legacy_id,
+        legacy_name: legacy_name
+      })
+      |> Repo.insert()
+      |> unwrap_or_rollback()
+    end)
+  end
+
+  @doc "The taxon an old identifier maps to, or nil."
+  @spec get_by_legacy_id(LegacyId.kind(), integer()) :: Taxon.t() | nil
+  def get_by_legacy_id(kind, legacy_id) do
+    Repo.one(
+      from(t in Taxon,
+        join: l in LegacyId,
+        on: l.taxon_id == t.id,
+        where: l.kind == ^kind and l.legacy_id == ^legacy_id
+      )
+    )
+  end
+
+  # -- the tree ----------------------------------------------------------------
+
+  @doc """
+  Moves `taxon` under `parent` (a taxon, an ID, or nil to make it a root),
+  through the tree validator, and rebuilds the moved subtree's ancestry.
+
+  A cycle or rank inversion is `{:error, changeset}` with the error on
+  `:parent_id` (`validation: :cycle | :rank_inversion`); nothing changes.
+
+  A move calls the "taxon changed" listeners with a `:move` event
+  (`Gallformers.Taxa.Events`); a listener's error rolls the move back and
+  returns `{:error, {:rejected, listener, reason}}`. Placing a taxon where
+  it already is changes nothing and calls no listener.
+  """
+  @spec place(Actor.t(), taxon_ref(), taxon_ref() | nil) ::
+          {:ok, Taxon.t()} | {:error, Changeset.t() | Events.rejection()}
+  def place(%Actor{} = actor, taxon, parent) do
+    Audit.transaction(actor, "taxa.place", fn ->
+      Tree.lock()
+
+      current = Repo.get!(Taxon, taxon_id(taxon))
+      parent_id = parent && taxon_id(parent)
+
+      changeset = current |> Taxon.parent_changeset(parent_id) |> Tree.validate_parent()
+
+      cond do
+        not changeset.valid? ->
+          Repo.rollback(changeset)
+
+        parent_id == current.parent_id ->
+          current
+
+        true ->
+          moved = changeset |> Repo.update() |> unwrap_or_rollback()
+          :ok = Ancestry.move_subtree(moved.id, parent_id)
+
+          :ok =
+            Events.dispatch(%Event{
+              type: :move,
+              taxon_id: moved.id,
+              from_parent_id: current.parent_id,
+              to_parent_id: parent_id
+            })
+
+          moved
+      end
+    end)
+  end
+
+  @doc "The taxa above `taxon`, nearest first."
+  @spec ancestors(taxon_ref()) :: [Taxon.t()]
+  def ancestors(taxon) do
+    from(t in Taxon,
+      join: a in Ancestry,
+      on: a.ancestor_id == t.id,
+      where: a.descendant_id == ^taxon_id(taxon) and a.depth > 0,
+      order_by: a.depth
+    )
+    |> Repo.all()
+  end
+
+  @doc "The taxa below `taxon`, nearest first."
+  @spec descendants(taxon_ref()) :: [Taxon.t()]
+  def descendants(taxon) do
+    from(t in Taxon,
+      join: a in Ancestry,
+      on: a.descendant_id == t.id,
+      where: a.ancestor_id == ^taxon_id(taxon) and a.depth > 0,
+      order_by: [a.depth, t.id]
+    )
+    |> Repo.all()
+  end
+
+  # -- taxonomic-act Facts -----------------------------------------------------
+
+  @doc """
+  Records a Source's stance on a placement: `key` is
+  `%{taxon_id, parent_id}`. Finds or creates the Fact (slot
+  `"taxon:<id>:placement"`), then attributes it with `attribution` (as
+  `Gallformers.Facts.attribute/2` takes it, without `:fact_id`). Recorded
+  only: the editorial tree does not move. See `Gallformers.Taxa.ActFacts`.
+  """
+  @spec assert_placement(Actor.t(), map(), map()) ::
+          {:ok, ActFacts.result()} | {:error, Changeset.t()}
+  def assert_placement(actor, key, attribution),
+    do: ActFacts.assert(PlacementFact, actor, key, attribution)
+
+  @doc """
+  Records a Source's stance on a name: `key` is `%{taxon_id, name, rank}`
+  (slot `"taxon:<id>:name"`). Give the Source's authorship as
+  `:authorship_as_written` in `attribution`. Recorded only.
+  """
+  @spec assert_name(Actor.t(), map(), map()) ::
+          {:ok, ActFacts.result()} | {:error, Changeset.t()}
+  def assert_name(actor, key, attribution),
+    do: ActFacts.assert(NameFact, actor, key, attribution)
+
+  @doc """
+  Records a Source's stance on a synonymy: `key` is
+  `%{name, accepted_taxon_id}` (the synonym as a name). Recorded only.
+  """
+  @spec assert_synonymy(Actor.t(), map(), map()) ::
+          {:ok, ActFacts.result()} | {:error, Changeset.t()}
+  def assert_synonymy(actor, key, attribution),
+    do: ActFacts.assert(SynonymyFact, actor, key, attribution)
+
+  @doc """
+  Records a Source's stance on a split: `key` is
+  `%{taxon_id, into_taxon_ids}` (two or more daughters, any order).
+  Recorded only.
+  """
+  @spec assert_split(Actor.t(), map(), map()) ::
+          {:ok, ActFacts.result()} | {:error, Changeset.t()}
+  def assert_split(actor, key, attribution),
+    do: ActFacts.assert(SplitFact, actor, key, attribution)
+
+  @doc """
+  Records a Source's stance on a common name: `key` is
+  `%{taxon_id, common_name}`. Recorded only.
+  """
+  @spec assert_common_name(Actor.t(), map(), map()) ::
+          {:ok, ActFacts.result()} | {:error, Changeset.t()}
+  def assert_common_name(actor, key, attribution),
+    do: ActFacts.assert(CommonNameFact, actor, key, attribution)
+
+  @act_kinds %{
+    name: NameFact,
+    placement: PlacementFact,
+    synonymy: SynonymyFact,
+    split: SplitFact,
+    common_name: CommonNameFact
+  }
+
+  @typedoc "A taxonomic act kind, as the import contract names it."
+  @type act_kind :: :name | :placement | :synonymy | :split | :common_name
+
+  @doc """
+  Records a Source's stance on an act of `kind` (`:name`, `:placement`,
+  `:synonymy`, `:split`, `:common_name`): the same as the `assert_*`
+  function of that kind.
+  """
+  @spec assert_act(act_kind(), Actor.t(), map(), map()) ::
+          {:ok, ActFacts.result()} | {:error, Changeset.t()}
+  def assert_act(kind, actor, key, attribution),
+    do: ActFacts.assert(Map.fetch!(@act_kinds, kind), actor, key, attribution)
+
+  @doc """
+  Finds the act Fact of `kind` with natural key `key` without writing:
+  `{:ok, fact_id}`, `{:ok, nil}` when there is none yet, or
+  `{:error, changeset}` when the key is invalid.
+  """
+  @spec find_act_fact(act_kind(), map()) :: {:ok, integer() | nil} | {:error, Changeset.t()}
+  def find_act_fact(kind, key) do
+    with {:ok, detail} <- ActFacts.find(Map.fetch!(@act_kinds, kind), key) do
+      {:ok, detail && detail.fact_id}
+    end
+  end
+
+  @doc "A taxon's placement Facts (with their Facts and standings), oldest first."
+  @spec list_placement_facts(taxon_ref()) :: [PlacementFact.t()]
+  def list_placement_facts(taxon), do: ActFacts.list_placement_facts(taxon_id(taxon))
+
+  # -- resolution --------------------------------------------------------------
+
+  @doc """
+  Resolves a name as a Source writes it to a taxon, matching accepted names
+  and synonyms through the normalized name (`Gallformers.Taxa.NameNormalizer`:
+  case, whitespace, "var.", subgenus in parentheses, hybrid sign). No fuzzy
+  matching.
+
+  Options:
+
+    * `:rank` — only taxa of this rank
+    * `:kingdom` — only taxa of this kingdom (e.g. `"Plantae"`)
+    * `:sensu` — match only misapplied names recorded with this sensu
+      (case-insensitive); without it, misapplied names are skipped
+
+  Returns `{:ok, taxon}` for one taxon, `{:ambiguous, taxa}` (by ID) for
+  several (names are not globally unique), or `:none`. Each returned taxon's
+  `matched_name` is the name that matched, so a match through a synonym can
+  be told from one through the accepted name.
+  """
+  @spec resolve_name(String.t(), keyword()) :: resolution()
+  def resolve_name(name, opts \\ []) when is_binary(name) do
+    normalized = NameNormalizer.normalize(name)
+
+    from(n in TaxonName,
+      join: t in assoc(n, :taxon),
+      where: n.normalized_name == ^normalized,
+      order_by: [t.id, n.status, n.id],
+      select: {t, n}
+    )
+    |> filter_rank(opts[:rank])
+    |> filter_kingdom(opts[:kingdom])
+    |> filter_sensu(opts[:sensu])
+    |> resolution()
+  end
+
+  defp resolution(query) do
+    query
+    |> Repo.all()
+    |> Enum.uniq_by(fn {taxon, _name} -> taxon.id end)
+    |> Enum.map(fn {taxon, name} -> %{taxon | matched_name: name} end)
+    |> case do
+      [] -> :none
+      [taxon] -> {:ok, taxon}
+      taxa -> {:ambiguous, taxa}
+    end
+  end
+
+  @doc """
+  Resolves a species epithet in any genus: the taxa with a binomial name
+  (accepted or synonym) whose second word is `epithet`, compared normalized.
+  Used for 19th-century oak-gall names whose genus has changed ("Cynips q.
+  spongifica" is today's epithet *quercusspongifica*, usually in another
+  genus). Options as `resolve_name/2`; `:rank` defaults to `:species`.
+  """
+  @spec resolve_epithet(String.t(), keyword()) :: resolution()
+  def resolve_epithet(epithet, opts \\ []) when is_binary(epithet) do
+    case NameNormalizer.normalize(epithet) |> String.split() do
+      [word] ->
+        from(n in TaxonName,
+          join: t in assoc(n, :taxon),
+          where:
+            fragment("split_part(?, ' ', 2)", n.normalized_name) == ^word and
+              fragment("split_part(?, ' ', 3)", n.normalized_name) == "",
+          order_by: [t.id, n.status, n.id],
+          select: {t, n}
+        )
+        |> filter_rank(Keyword.get(opts, :rank, :species))
+        |> filter_kingdom(opts[:kingdom])
+        |> filter_sensu(opts[:sensu])
+        |> resolution()
+
+      _ ->
+        :none
+    end
+  end
+
+  @doc """
+  The names among `names` that are names (accepted or synonym) of genus-rank
+  taxa, compared normalized, returned as given.
+  """
+  @spec genus_names([String.t()]) :: [String.t()]
+  def genus_names([]), do: []
+
+  def genus_names(names) when is_list(names) do
+    normalized = Map.new(names, &{&1, NameNormalizer.normalize(&1)})
+
+    found =
+      from(n in TaxonName,
+        join: t in assoc(n, :taxon),
+        where: t.rank == :genus and n.normalized_name in ^Enum.uniq(Map.values(normalized)),
+        distinct: true,
+        select: n.normalized_name
+      )
+      |> Repo.all()
+      |> MapSet.new()
+
+    Enum.filter(names, &MapSet.member?(found, normalized[&1]))
+  end
+
+  defp filter_rank(query, nil), do: query
+  defp filter_rank(query, rank), do: where(query, [_n, t], t.rank == ^rank)
+
+  defp filter_kingdom(query, nil), do: query
+  defp filter_kingdom(query, kingdom), do: where(query, [_n, t], t.kingdom == ^kingdom)
+
+  defp filter_sensu(query, nil), do: where(query, [n], is_nil(n.sensu))
+
+  defp filter_sensu(query, sensu) do
+    wanted = sensu |> String.trim() |> String.downcase()
+    where(query, [n], fragment("lower(trim(?))", n.sensu) == ^wanted)
+  end
+
+  # -- helpers -----------------------------------------------------------------
+
+  defp taxon_id(%Taxon{id: id}), do: id
+  defp taxon_id(id) when is_integer(id), do: id
+
+  defp unwrap_or_rollback({:ok, value}), do: value
+  defp unwrap_or_rollback({:error, changeset}), do: Repo.rollback(changeset)
+end
