@@ -49,6 +49,8 @@ defmodule Gallformers.MixProject do
       {:postgrex, ">= 0.0.0"},
       {:oban, "~> 2.20"},
       {:oban_web, "~> 2.11"},
+      # Audit trail (PostgreSQL triggers); 0.15.1+ is required for Ecto 3.13
+      {:carbonite, "~> 0.17.0"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_live_view, "~> 1.1.0"},
@@ -81,6 +83,8 @@ defmodule Gallformers.MixProject do
       {:image, "~> 0.54"},
       # CSV parsing for WCVP reconciliation
       {:nimble_csv, "~> 1.2"},
+      # JSON Schema (2020-12) validation of import packages (priv/import/schema)
+      {:jsv, "~> 0.26.1"},
       # User agent parsing for analytics
       {:browser, "~> 0.5.5"},
       # Structured JSON logging
