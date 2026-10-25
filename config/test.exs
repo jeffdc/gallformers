@@ -82,6 +82,9 @@ config :swoosh, :api_client, false
 # Disable real S3 calls in tests - functions return mock/empty data instead
 config :gallformers, s3_enabled: false
 
+# The private bucket is an in-memory stub in tests (test/support/private_storage_stub.ex)
+config :gallformers, :private_storage, adapter: Gallformers.Storage.PrivateStub
+
 # Print only warnings and errors during test
 config :logger, level: :warning
 

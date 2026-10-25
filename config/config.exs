@@ -107,6 +107,9 @@ config :gallformers, :images,
   # Presigned URL expiry (5 minutes)
   presign_expiry: 300
 
+# Private bucket (Sources' stored documents, import packages); never public
+config :gallformers, :private_storage, bucket: "gallformers-private"
+
 # Configure Ueberauth for Auth0 authentication
 # Client ID and secret are set in runtime.exs from environment variables
 config :ueberauth, Ueberauth,
