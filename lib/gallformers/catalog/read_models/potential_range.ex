@@ -9,7 +9,11 @@ defmodule Gallformers.Catalog.ReadModels.PotentialRange do
        the data migration re-keys a genus placeholder's rows to the genus
        taxon (`Gallformers.CatalogMigration`).
     2. Then its current range adjustments: `only` restricts it to those
-       places, `exclude` removes places, `include` adds places.
+       places, `exclude` removes places.
+
+  Nothing widens it: a Gall's range never leaves every one of its Hosts'
+  ranges. A place where a Source says the Gall occurs but none of its Hosts
+  grows is a recorded occurrence, which this range does not read.
 
   **Missing data is not absence.** A Gall with no Host range data (no Host,
   or Hosts without range rows) appears in every region, as today
@@ -54,7 +58,6 @@ defmodule Gallformers.Catalog.ReadModels.PotentialRange do
     end
     |> restrict(leaves(adjustments[:only]))
     |> exclude(leaves(adjustments[:exclude]))
-    |> include(leaves(adjustments[:include]))
     |> places()
   end
 
@@ -92,9 +95,6 @@ defmodule Gallformers.Catalog.ReadModels.PotentialRange do
     do: exclude(Enum.map(Places.list_places(), & &1.id), excluded)
 
   defp exclude(range, excluded), do: Enum.reject(range, &(&1 in excluded))
-
-  defp include(:everywhere, _included), do: :everywhere
-  defp include(range, included), do: Enum.uniq(range ++ included)
 
   defp places(:everywhere), do: :everywhere
 

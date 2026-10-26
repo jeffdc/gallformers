@@ -1,9 +1,9 @@
 ---
 status: raw
 created: 2026-10-24
-updated: 2026-10-25
+updated: 2026-10-26
 epic: taxonomy
-relates: [8567, 9449]
+relates: [8567, 9449, 3272]
 ---
 
 # Taxogall: program overview and punchlist
@@ -39,7 +39,7 @@ Domain language: `docs/domain/domain-model.md`. Design and rules: `8567`. Migrat
 | `ede2` | Audit trail (shared building block; to rewrite for the new tables) |
 | `f465` | Preview environment with production-like data (backscan staging, rehearsal timing) |
 
-**After release** (wait for the new model): `1832` organism taxon pages, `3e8c` gall merges, `e1d2` iNat taxon IDs, `439a` phenology (fed by recorded occurrences), `7cde` completeness scoring, `4389` notifications, `29dc` interoperability, `1374` DNA barcodes, `8ba0` iNat integration, `eb47` GallOnt vocabulary, `67c9` host-family filter, `74de` API v2, `32a5` mobile ID tool. Phase 2 work (no matters; superseded designs dropped 2026-10-24): authorship for curated taxa (plant authorship from WCVP), arbitrary-depth infrageneric ranks, taxon merges and splits with history, plant synonymy from POWO.
+**After release** (wait for the new model): `1832` organism taxon pages, `3e8c` gall merges, `e1d2` iNat taxon IDs, `439a` phenology (fed by recorded occurrences), `7cde` completeness scoring, `4389` notifications, `29dc` interoperability, `1374` DNA barcodes, `8ba0` iNat integration, `eb47` GallOnt vocabulary, `67c9` host-family filter, `74de` API v2, `32a5` mobile ID tool, `3272` gall records outside the Hosts' ranges become Host-range proposals. Phase 2 work (no matters; superseded designs dropped 2026-10-24): authorship for curated taxa (plant authorship from WCVP), arbitrary-depth infrageneric ranks, taxon merges and splits with history, plant synonymy from POWO.
 
 ## Punchlist (in order)
 
@@ -71,14 +71,13 @@ Domain language: `docs/domain/domain-model.md`. Design and rules: `8567`. Migrat
 11. **Backscan (`b5bd` M4)** on the preview environment (`f465`): trial batches end to end, including the kinds the trial didn't test (a long scanned catalogue such as Gagné 2008; a key such as Felt 1917, which may exceed one batch), then every existing Source except the Gallformers ID Notes (they migrate verbatim; `20e5`); curators approve; track coverage; decide legacy Facts the backscan doesn't confirm (M0).
 12. **Rehearsal (`b5bd` M5)** until boring, including timing on the preview environment (`f465`) and a rollback rehearsal.
 13. **Cutover (`b5bd` M6).**
-14. **After release (`b5bd` M7):** drop the old tables; replace `docs/domain/general.md` and `admin-domain-reference.md`; update `CLAUDE.md`, onboarding and runbooks; reconcile the after-release matters above. **Process the Gallformers notes** through the normal pipeline (`20e5`): note → `document.json` → Gallformers batch quoting it; needs the contract change in `294c` and the legacy-notes date decided.
+14. **After release (`b5bd` M7):** drop the old tables; replace `docs/domain/general.md` and `admin-domain-reference.md`; update `CLAUDE.md`, onboarding and runbooks; reconcile the after-release matters above. **Process the Gallformers notes** through the normal pipeline (`20e5`): note → `document.json` → Gallformers batch quoting it; needs the contract change in `294c` and the legacy-notes date decided. **Fix wrong Host ranges on the Host** (curator, editorial): stored gall ranges become no Facts (`b5bd` M0, option A), so cases where a curator widened a gall's range instead of its Host's now surface as Galls missing from regions — fix the Host.
 15. **Phase 2 (`b5bd` M8):** the taxonomy system, its own plan.
 
 ## Open decisions
 
 
 - Legacy Facts the backscan doesn't confirm (`b5bd` M0).
-- Gall range differences: curator removal vs drift since a host union was copied (`b5bd` M0, reopened).
 - The date of undated Gallformers statements (legacy range exclusions and legacy Facts before release; the legacy ID Notes once they are processed after release), which decides whether they outrank the literature (`8567` Sources–Facts point 7).
 - Generation groups: taxa mappings, multivoltine value names, taxon moves out of a group's subtree (`8567`). Details can wait until more of the system is built.
 - Rename handling A vs B; scope of the curated taxonomy; Traits that vary by Host (`8567`).

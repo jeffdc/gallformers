@@ -159,6 +159,13 @@ defmodule Gallformers.Import.ValidatorTest do
              )
     end
 
+    test "no include range adjustment: a place outside every Host's range is an occurrence" do
+      assert errors_mention?(
+               schema_errors(put(paper(), ["facts", 8, "adjustment"], "include")),
+               ["adjustment"]
+             )
+    end
+
     test "cites on quote evidence" do
       cites = ["facts", 1, "evidence", 0, "cites"]
       assert schema_errors(put(paper(), cites, %{"as_written" => "Kinsey 1923"})) == []

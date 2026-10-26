@@ -58,7 +58,8 @@ defmodule Gallformers.CatalogMigration do
   written as CSV by `Report.write_curation/2`) and apply the decisions in
   `priv/catalog_migration/` (`Gallformers.CatalogMigration.Curated`); step
   2 applies `taxon_merges.csv` and `kingdoms.csv`, which have no worksheet,
-  checked against today's taxonomy rows before anything is written. A
+  checked against today's taxonomy rows before anything is written (as
+  `range_decisions.csv` scopes are against today's places). A
   **strict** run (the default; production's, `Gallformers.Release`) stops
   with nothing written when a row needs a decision it does not have, or
   taxa share an accepted name, rank and kingdom (replay would stop on
@@ -175,6 +176,8 @@ defmodule Gallformers.CatalogMigration do
          {:ok, suffixes} <- NameSuffixes.load(path),
          {:ok, curated} <- load_curated(opts),
          {:ok, curated} <- check_taxa_decisions(curated),
+         {:ok, ranges} <- Ranges.check(curated.range_decisions),
+         curated = %{curated | range_decisions: ranges},
          {:ok, _counts} <- Catalog.load_vocab(actor),
          {:ok, generations} <- generations(suffixes),
          {:ok, {plan, curated_facts, report}} <-
@@ -187,7 +190,7 @@ defmodule Gallformers.CatalogMigration do
       transaction(actor, "catalog_migration.finish", fn ->
         advance_sequence!("species", "galls", "taxa")
 
-        # Curated inclusions and gall aliases are the legacy Source's too.
+        # Curated `only` range Facts and gall aliases are the legacy Source's too.
         by_legacy =
           for {_kind, _key, %{source_id: id}} = a <- curated_facts, id == plan.source_id, do: a
 

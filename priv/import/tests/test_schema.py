@@ -210,3 +210,12 @@ def test_occurrence_when_and_stage_are_not_empty(paper, schema_errors):
 def test_occurrence_takes_no_coordinates(paper, schema_errors):
     paper["facts"].append(occurrence(coordinates="37.88 N, 121.91 W"))
     assert errors_mention(schema_errors(paper), "facts/15", "coordinates")
+
+
+# -- 2026-10-26: a Gall's range never leaves its Hosts' ranges --------------------
+
+
+def test_range_include_adjustment_is_rejected(paper, schema_errors):
+    # A place where the Gall occurs but no Host grows is a recorded occurrence.
+    paper["facts"][8]["adjustment"] = "include"
+    assert errors_mention(schema_errors(paper), "adjustment")

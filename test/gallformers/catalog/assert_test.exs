@@ -476,11 +476,15 @@ defmodule Gallformers.Catalog.AssertTest do
         Catalog.assert_range(test_actor(), %{key | adjustment: "exclude"}, confirm(ctx.source))
 
       {:ok, other} =
-        Catalog.assert_range(test_actor(), %{key | adjustment: :include}, confirm(ctx.source))
+        Catalog.assert_range(
+          test_actor(),
+          %{key | place_id: place_id("CA-AB")},
+          confirm(ctx.source)
+        )
 
       assert same.fact.id == first.fact.id
       assert other.fact.id != first.fact.id
-      assert %Fact{kind: "gall_range", slot: nil} = first.fact
+      assert %Fact{kind: "gall_range"} = first.fact
       assert %RangeFact{adjustment: :exclude} = first.detail
 
       assert {:error, changeset} =
@@ -496,6 +500,63 @@ defmodule Gallformers.Catalog.AssertTest do
                Catalog.assert_range(test_actor(), %{key | place_id: -1}, confirm(ctx.source))
 
       assert %{place_id: ["does not exist"]} = errors_on(changeset)
+    end
+
+    test "has no include: a Gall's range never leaves its Hosts' ranges", ctx do
+      gall = gall_fixture()
+
+      for adjustment <- [:include, "include"] do
+        assert {:error, changeset} =
+                 Catalog.assert_range(
+                   test_actor(),
+                   %{gall_id: gall.id, adjustment: adjustment, place_id: place_id("RO-B")},
+                   confirm(ctx.source)
+                 )
+
+        assert %{adjustment: ["is invalid"]} = errors_on(changeset)
+      end
+    end
+
+    test "the database refuses an include row" do
+      assert_raise Postgrex.Error, ~r/range_facts_adjustment_check/, fn ->
+        Repo.query!(
+          "INSERT INTO range_facts (fact_id, gall_id, adjustment, place_id) VALUES ($1, $2, $3, $4)",
+          [-1, -1, "include", -1]
+        )
+      end
+    end
+
+    test "adjustments for one Gall and place share a slot: the newest statement wins", ctx do
+      gall = gall_fixture()
+      us_ca = place_id("US-CA")
+
+      {:ok, excluded} =
+        Catalog.assert_range(
+          test_actor(),
+          %{gall_id: gall.id, adjustment: :exclude, place_id: us_ca},
+          confirm(ctx.source)
+        )
+
+      {:ok, only} =
+        Catalog.assert_range(
+          test_actor(),
+          %{gall_id: gall.id, adjustment: :only, place_id: us_ca},
+          confirm(source_fixture("Revision", "1990"))
+        )
+
+      {:ok, elsewhere} =
+        Catalog.assert_range(
+          test_actor(),
+          %{gall_id: gall.id, adjustment: :exclude, place_id: place_id("CA-AB")},
+          confirm(ctx.source)
+        )
+
+      assert excluded.fact.slot == "gall:#{gall.id}:place:#{us_ca}"
+      assert only.fact.slot == excluded.fact.slot
+      assert elsewhere.fact.slot != excluded.fact.slot
+      assert standing(only.fact.id) == :current
+      assert standing(excluded.fact.id) == :superseded
+      assert standing(elsewhere.fact.id) == :current
     end
   end
 

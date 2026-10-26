@@ -50,21 +50,49 @@ defmodule Gallformers.CatalogMigration.Ranges do
 
   ## Decisions
 
-  `range_decisions.csv`: `gall_id, cause, decision, note`. `gall_id` may be
-  `*`: that decision applies to every Gall with the cause unless the Gall
-  has its own row.
+  `range_decisions.csv`: `gall_id, cause, decision, scope, note` (`scope`
+  and `note` optional). `gall_id` selects the Galls a row is for:
+
+    * a Gall ID — that Gall;
+    * `confirmed` — every Gall whose range a curator confirmed
+      (`gall_traits.range_confirmed`);
+    * `*` — every Gall.
+
+  `scope`, when given, is space-separated place codes (`US CA MX`, `MX-JAL`);
+  the row then decides only the cause's places within them (a place covers
+  the places below it: a country its subdivisions). Empty is every place.
+  An unknown code is an error naming the row (`check/1`, before anything is
+  written).
+
+  **Precedence.** For each Gall and cause, each place is decided by the
+  first row, in this order, whose scope covers it: the Gall's own row, then
+  the `confirmed` row (for a range-confirmed Gall), then the `*` row. A
+  place no row covers is pending. So a scoped `confirmed` row leaves its
+  other places to the `*` row.
 
     * `removed`, `host_added_later`, `host_range_widened`, `introduced`:
       `exclude` — one `exclude` range Fact per region, attributed to the
       Gallformers Source (curator removals; `b5bd` M0) with an undated
       statement — or `ignore` (drift: no Fact).
-    * `outside`: `include` — `include` Facts — or `ignore`.
+    * `outside`: `ignore` only. A Gall's range never leaves every one of
+      its Hosts' ranges, so a stored place outside them is not kept (a
+      place where a Source says the Gall occurs but no Host grows is a
+      recorded occurrence, not a range adjustment).
     * `no_host_range`: `only` — `only` Facts, keeping the stored range — or
-      `ignore` (the Gall then appears in every region).
+      `ignore` (the Gall then appears in every region). `only` narrows a
+      range its Hosts leave unknown (every region); it never widens one.
 
-  Inclusions and `only` are attributed to the "Gallformers legacy data"
-  Source, as every legacy Fact is (`9449` §6, the M0 mechanism). A
-  difference with no decision is pending (`Gallformers.CatalogMigration`).
+  An exclusion's statement says where it comes from: the range a curator
+  confirmed (a range-confirmed Gall) or the range curators stored. The
+  decision row's `note` is a curation record and stays in the decision
+  file, out of the statement. `only` Facts are attributed to the
+  "Gallformers legacy data" Source, as every legacy Fact is (`9449` §6, the
+  M0 mechanism). A difference with no decision is pending
+  (`Gallformers.CatalogMigration`).
+
+  The worksheet's `decided_by` column shows, per Gall and cause, which rows
+  decided which places (`<gall_id> [scope] <decision>: places`); its
+  `decision` and `note` are filled only when one row decided every place.
   """
 
   alias Gallformers.CatalogMigration.Curated
@@ -78,7 +106,7 @@ defmodule Gallformers.CatalogMigration.Ranges do
     "host_added_later" => ~w(exclude ignore),
     "host_range_widened" => ~w(exclude ignore),
     "introduced" => ~w(exclude ignore),
-    "outside" => ~w(include ignore),
+    "outside" => ~w(ignore),
     "no_host_range" => ~w(only ignore)
   }
 
@@ -87,28 +115,50 @@ defmodule Gallformers.CatalogMigration.Ranges do
     "host_added_later" => "ignore",
     "host_range_widened" => "ignore",
     "introduced" => "ignore",
-    "outside" => "include",
+    "outside" => "ignore",
     "no_host_range" => "only"
   }
 
   @causes ~w(removed host_added_later host_range_widened introduced outside no_host_range)
 
-  @columns ~w(gall_id name cause decision note suggested places place_count range_confirmed range_computed_at)
+  # Each place (`place_id`) with the leaf places below it (itself if a leaf).
+  @leaf_ctes """
+  WITH RECURSIVE down(place_id, leaf_id) AS (
+    SELECT id, id FROM place
+    UNION
+    SELECT d.place_id, ph.place_id FROM down d JOIN place_hierarchy ph ON ph.parent_id = d.leaf_id
+  ),
+  leaf AS (
+    SELECT d.place_id, d.leaf_id FROM down d
+    WHERE NOT EXISTS (SELECT 1 FROM place_hierarchy c WHERE c.parent_id = d.leaf_id)
+  )
+  """
 
+  @columns ~w(gall_id name cause decision note decided_by suggested places place_count range_confirmed range_computed_at)
+
+  @typedoc """
+  A decision row. `scope` is its place codes (`[]`: every place); `within`
+  the leaf place IDs they cover — `:all` for no scope, `nil` until `check/1`
+  resolves a scope.
+  """
   @type decision :: %{
-          gall_id: integer() | :any,
+          gall_id: integer() | :confirmed | :any,
           cause: String.t(),
           decision: String.t(),
-          note: String.t()
+          scope: [String.t()],
+          within: :all | MapSet.t(integer()) | nil,
+          note: String.t(),
+          line: pos_integer()
         }
 
-  @type decisions :: %{{integer() | :any, String.t()} => decision()}
+  @type decisions :: %{{integer() | :confirmed | :any, String.t()} => decision()}
 
-  @doc "Reads the decisions, by `{gall_id | :any, cause}`."
+  @doc "Reads the decisions, by `{gall_id | :confirmed | :any, cause}`."
   @spec load(String.t()) :: {:ok, decisions()} | {:error, String.t()}
   def load(path) do
-    with {:ok, rows} <- Curated.read(path, ~w(gall_id cause decision), ~w(note)),
+    with {:ok, rows} <- Curated.read(path, ~w(gall_id cause decision), ~w(scope note)),
          {:ok, parsed} <- Curated.parse_rows(path, rows, &parse/1) do
+      parsed = Enum.map(parsed, fn {line, decision} -> {line, %{decision | line: line}} end)
       Curated.index(path, parsed, &{&1.gall_id, &1.cause})
     end
   end
@@ -117,12 +167,73 @@ defmodule Gallformers.CatalogMigration.Ranges do
     with {:ok, id} <- gall_id(row["gall_id"]),
          {:ok, allowed} <- cause(row["cause"]),
          :ok <- decision(row["decision"], row["cause"], allowed) do
-      {:ok, %{gall_id: id, cause: row["cause"], decision: row["decision"], note: row["note"]}}
+      scope = String.split(row["scope"])
+
+      {:ok,
+       %{
+         gall_id: id,
+         cause: row["cause"],
+         decision: row["decision"],
+         scope: scope,
+         within: if(scope == [], do: :all),
+         note: row["note"],
+         line: 1
+       }}
     end
   end
 
   defp gall_id("*"), do: {:ok, :any}
-  defp gall_id(text), do: Curated.integer(text, "gall_id")
+  defp gall_id("confirmed"), do: {:ok, :confirmed}
+
+  defp gall_id(text) do
+    case Integer.parse(text) do
+      {n, ""} -> {:ok, n}
+      _ -> {:error, "gall_id must be a Gall ID, * or confirmed, got #{inspect(text)}"}
+    end
+  end
+
+  @doc """
+  Resolves each decision's scope against today's places: `within` becomes
+  the leaf place IDs its codes cover. An unknown code is
+  `{:error, "range_decisions.csv row N: ..."}`.
+  """
+  @spec check(decisions()) :: {:ok, decisions()} | {:error, String.t()}
+  def check(decisions) do
+    codes = decisions |> Map.values() |> Enum.flat_map(& &1.scope) |> Enum.uniq()
+    leaves = scope_leaves(codes)
+
+    decisions
+    |> Enum.sort_by(fn {_key, d} -> d.line end)
+    |> Enum.reduce_while({:ok, %{}}, fn {key, d}, {:ok, acc} ->
+      case Enum.reject(d.scope, &Map.has_key?(leaves, &1)) do
+        [] ->
+          {:cont, {:ok, Map.put(acc, key, %{d | within: within(d.scope, leaves)})}}
+
+        unknown ->
+          message = "scope has unknown place codes: #{Enum.join(unknown, " ")}"
+          {:halt, Curated.row_error(@input, d.line, message)}
+      end
+    end)
+  end
+
+  defp within([], _leaves), do: :all
+
+  defp within(scope, leaves),
+    do: Enum.reduce(scope, MapSet.new(), &MapSet.union(leaves[&1], &2))
+
+  # Place code → the leaf place IDs it covers, for the codes that exist.
+  defp scope_leaves([]), do: %{}
+
+  defp scope_leaves(codes) do
+    (@leaf_ctes <>
+       """
+       SELECT p.code, l.leaf_id FROM place p JOIN leaf l ON l.place_id = p.id
+       WHERE p.code = ANY($1::text[])
+       """)
+    |> Old.rows([codes])
+    |> Enum.group_by(& &1.code, & &1.leaf_id)
+    |> Map.new(fn {code, ids} -> {code, MapSet.new(ids)} end)
+  end
 
   defp cause(cause) do
     case Map.fetch(@decisions, cause) do
@@ -167,16 +278,23 @@ defmodule Gallformers.CatalogMigration.Ranges do
       |> Enum.group_by(&{&1.gall_id, &1.cause}, & &1.leaf_id)
       |> Enum.map(fn {{id, cause}, leaves} ->
         leaves = Enum.sort_by(leaves, &codes[&1])
-        decision = decisions[{id, cause}] || decisions[{:any, cause}]
+        traits = Map.get(traits, id, %{})
+        confirmed = traits[:range_confirmed] == true
+        {groups, undecided} = decide(decisions, id, cause, confirmed, leaves)
 
         %{
           gall_id: id,
           name: names[id],
           cause: cause,
           leaves: leaves,
-          decision: decision,
+          confirmed: confirmed,
+          groups:
+            Enum.map(groups, fn {d, ls} ->
+              %{decision: d, leaves: ls, places: Enum.map(ls, &codes[&1])}
+            end),
+          undecided: Enum.map(undecided, &codes[&1]),
           places: Enum.map(leaves, &codes[&1]),
-          traits: Map.get(traits, id, %{})
+          traits: traits
         }
       end)
       |> Enum.sort_by(&{&1.gall_id, Enum.find_index(@causes, fn c -> c == &1.cause end)})
@@ -219,15 +337,7 @@ defmodule Gallformers.CatalogMigration.Ranges do
   # $1 the migrated Gall IDs; $2, $3 plant species ID → Host taxon ID.
 
   @ctes """
-  WITH RECURSIVE down(place_id, leaf_id) AS (
-    SELECT id, id FROM place
-    UNION
-    SELECT d.place_id, ph.place_id FROM down d JOIN place_hierarchy ph ON ph.parent_id = d.leaf_id
-  ),
-  leaf AS (
-    SELECT d.place_id, d.leaf_id FROM down d
-    WHERE NOT EXISTS (SELECT 1 FROM place_hierarchy c WHERE c.parent_id = d.leaf_id)
-  ),
+  #{@leaf_ctes},
   hostmap AS (SELECT * FROM unnest($2::bigint[], $3::bigint[]) AS m(species_id, taxon_id)),
   stored AS (
     SELECT DISTINCT gr.species_id AS gall_id, l.leaf_id
@@ -327,16 +437,46 @@ defmodule Gallformers.CatalogMigration.Ranges do
 
   # -- decisions -------------------------------------------------------------------
 
-  defp assertions(rows, attribution) do
-    decided = for %{decision: %{decision: d}} = row <- rows, d != "ignore", do: row
+  # Each place goes to the first row covering it: the Gall's own, then
+  # `confirmed` (a range-confirmed Gall), then `*`. Returns the
+  # `{decision, leaves}` groups in that order and the leaves none covers.
+  defp decide(decisions, gall_id, cause, confirmed, leaves) do
+    candidates =
+      [
+        decisions[{gall_id, cause}],
+        if(confirmed, do: decisions[{:confirmed, cause}]),
+        decisions[{:any, cause}]
+      ]
+      |> Enum.reject(&is_nil/1)
 
-    {exclusions, others} = Enum.split_with(decided, &(&1.decision.decision == "exclude"))
+    {groups, rest} =
+      Enum.reduce(candidates, {[], leaves}, fn decision, {groups, rest} ->
+        case Enum.split_with(rest, &covers?(decision.within, &1)) do
+          {[], rest} -> {groups, rest}
+          {mine, rest} -> {[{decision, mine} | groups], rest}
+        end
+      end)
+
+    {Enum.reverse(groups), rest}
+  end
+
+  defp covers?(:all, _leaf), do: true
+  defp covers?(%MapSet{} = within, leaf), do: MapSet.member?(within, leaf)
+
+  defp assertions(rows, attribution) do
+    groups =
+      for row <- rows, %{decision: %{decision: d}} = group <- row.groups, d != "ignore" do
+        {row, group}
+      end
+
+    {exclusions, onlys} =
+      Enum.split_with(groups, fn {_row, group} -> group.decision.decision == "exclude" end)
 
     {excluded, unattributable} =
       case attribution.gallformers do
         nil ->
           missing =
-            for row <- exclusions do
+            for {row, _group} <- exclusions do
               {{row.gall_id, row.cause},
                "#{label(row)}: exclude needs the Gallformers Source, and there is none"}
             end
@@ -344,52 +484,77 @@ defmodule Gallformers.CatalogMigration.Ranges do
           {[], missing}
 
         gallformers ->
-          {Enum.flat_map(exclusions, &facts(&1, :exclude, exclusion(gallformers, &1))), []}
+          {Enum.flat_map(exclusions, fn {row, group} ->
+             facts(row, group, :exclude, exclusion(gallformers, row))
+           end), []}
       end
 
-    included =
-      Enum.flat_map(others, fn row ->
-        facts(row, String.to_existing_atom(row.decision.decision), attribution.legacy)
-      end)
+    # `only` (no_host_range) is the one other decision that makes Facts.
+    restricted =
+      Enum.flat_map(onlys, fn {row, group} -> facts(row, group, :only, attribution.legacy) end)
 
-    {excluded ++ included, unattributable}
+    {excluded ++ restricted, unattributable}
   end
 
-  defp facts(row, adjustment, attribution) do
-    for leaf <- row.leaves do
+  defp facts(row, group, adjustment, attribution) do
+    for leaf <- group.leaves do
       {:range, %{gall_id: row.gall_id, adjustment: adjustment, place_id: leaf}, attribution}
     end
   end
 
+  # The decision row's note is a curation record, not part of the statement.
   defp exclusion(gallformers, row) do
     text =
-      "Not in this Gall's range: the range Gallformers curators stored for it before the " <>
-        "catalog migration left this region out."
+      if row.confirmed,
+        do:
+          "Not in this Gall's range: a Gallformers curator confirmed its range before the " <>
+            "catalog migration, and the confirmed range left this region out.",
+        else:
+          "Not in this Gall's range: the range Gallformers curators stored for it before the " <>
+            "catalog migration left this region out."
 
-    %{
-      source_id: gallformers.id,
-      stance: :confirm,
-      stated: nil,
-      statement_text:
-        if(row.decision.note == "", do: text, else: text <> " " <> row.decision.note)
-    }
+    %{source_id: gallformers.id, stance: :confirm, stated: nil, statement_text: text}
   end
 
   defp pending(rows) do
-    for %{decision: nil} = row <- rows do
-      {{row.gall_id, row.cause}, "#{label(row)}: #{Enum.join(row.places, " ")}"}
+    for %{undecided: [_ | _] = places} = row <- rows do
+      {{row.gall_id, row.cause}, "#{label(row)}: #{Enum.join(places, " ")}"}
     end
   end
 
   defp label(row), do: "#{row.gall_id} #{row.name} #{row.cause}"
 
+  # The deciding row's decision and note when one row decided every place.
+  defp sole_decision(%{groups: [%{decision: decision}], undecided: []}), do: decision
+  defp sole_decision(_row), do: nil
+
+  defp decided_by(%{groups: []}), do: nil
+
+  defp decided_by(%{groups: groups, undecided: undecided}) do
+    split = length(groups) > 1 or undecided != []
+
+    parts =
+      for %{decision: d, places: places} <- groups do
+        scope = if d.scope == [], do: "", else: " [#{Enum.join(d.scope, " ")}]"
+        selector = %{any: "*", confirmed: "confirmed"}[d.gall_id] || d.gall_id
+        head = "#{selector}#{scope} #{d.decision}"
+        if split, do: "#{head}: #{Enum.join(places, " ")}", else: head
+      end
+
+    pending = if undecided == [], do: [], else: ["pending: #{Enum.join(undecided, " ")}"]
+    Enum.join(parts ++ pending, "; ")
+  end
+
   defp worksheet_row(row) do
+    decision = sole_decision(row)
+
     %{
       "gall_id" => row.gall_id,
       "name" => row.name,
       "cause" => row.cause,
-      "decision" => row.decision && row.decision.decision,
-      "note" => row.decision && row.decision.note,
+      "decision" => decision && decision.decision,
+      "note" => decision && decision.note,
+      "decided_by" => decided_by(row),
       "suggested" => @suggested[row.cause],
       "places" => row.places,
       "place_count" => length(row.places),
@@ -419,7 +584,6 @@ defmodule Gallformers.CatalogMigration.Ranges do
       )
     end)
     |> Report.count("Range Facts planned: exclude", Map.get(adjustments, :exclude, 0))
-    |> Report.count("Range Facts planned: include", Map.get(adjustments, :include, 0))
     |> Report.count("Range Facts planned: only", Map.get(adjustments, :only, 0))
   end
 end

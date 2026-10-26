@@ -47,7 +47,8 @@ The decisions behind the import contract in `priv/import/`, each with its reason
 - **Galls are catalog entries** (two generations are two entries), identified by Inducer, generation, Host, and plant part when two Galls of one Inducer share a Host.
 - **Species-level statements** attach to a Gall only when the Source ties them to a generation or the species has one Gall: copying a Fact to both generations would claim something about a generation the Source didn't describe. Statements about a group the Source then separates attach to each Gall.
 - **Hosts:** the species the Source lists (a genus Host only when it names none, since a genus widens the computed range). Galls found under a plant and an aphid's secondary hosts are not Hosts.
-- **Range** follows from the Hosts' native and introduced ranges, so a batch states only exceptions (include, exclude, only). Gallformers computes the rest.
+- **Range** follows from the Hosts' native and introduced ranges, so a batch states only exceptions (exclude, only). Gallformers computes the rest.
+- **No inclusions** (Jeff, 2026-10-26): a Gall's range never extends beyond its Hosts' ranges. A place where the Source says the Gall occurs but no Host grows is a statement about a Host's range, so the batch states it as a recorded occurrence; turning those into Host-range proposals is matter `3272`. When range adjustments for one place compete, the newest statement wins.
 - **Recorded occurrences** (decided with Adam, 2026-10-17): where a Source states a Gall has been recorded, and when and at what stage if it says, is a Fact (`occurrence`). It feeds the range map and the phenology tool, and stays separate from range adjustments. It does not store Observations: a Source (Gallformers included) states the Fact, and any Observations behind it are cited as evidence, as for any Source. Field guides' "Range" paragraphs, dropped until now, become occurrences.
 - **Descriptions are direct quotes only:** verifiable, and the Source's words stay its own. Any summary is Gallformers' own.
 - **Hyperparasitism** is derived by Gallformers from chains of `parasitoid_of`.
@@ -92,7 +93,7 @@ Built in Gallformers, not by producers. A batch that fails is reported, not impo
 4. **Every Gall resolves to one entry,** or goes to the admin queue. Ambiguous matches (e.g. a generation the Source never names) go with a proposed match and its reason. Undescribed Galls are matched to Gallformers' undescribed entries by genus, Host, and the descriptive words of the entry's name; one candidate is proposed for the admin to confirm, several are offered to pick from. Nothing ambiguous is applied automatically.
 5. **Disputed findings** from phase 6 appear in the intake view with the statement, its quote, the reviewer's reason and the producer's reason.
 6. **Supplied IDs** must agree with the names and descriptions they accompany.
-7. **Structural checks:** `host_of` subjects are plants; no acts on plant taxa (except gall-formers); Gallformers statement batches use `add` and statement evidence; `include` inside the Hosts' ranges is reported as redundant.
+7. **Structural checks:** `host_of` subjects are plants; no acts on plant taxa (except gall-formers); Gallformers statement batches use `add` and statement evidence.
 8. **Each quote's span** is recorded.
 
 ## Open (with Adam)

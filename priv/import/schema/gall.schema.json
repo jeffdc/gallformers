@@ -203,13 +203,13 @@
     },
 
     "range_fact": {
-      "description": "An adjustment to the Gall's potential range, which Gallformers computes from its Hosts (native and introduced ranges) and is never imported. include: the Gall occurs in a place where none of its Hosts grows. exclude: it does not occur in a place within them. only: it occurs only in this place (one Fact per place); Gallformers computes the exclusions.",
+      "description": "An adjustment to the Gall's potential range, which Gallformers computes from its Hosts (native and introduced ranges) and is never imported. exclude: the Gall does not occur in a place within its Hosts' ranges. only: it occurs only in this place (one Fact per place); Gallformers computes the exclusions. Nothing widens the range beyond the Hosts' ranges: a place where the Gall occurs but none of its Hosts grows is a recorded occurrence (occurrence_fact).",
       "allOf": [{ "$ref": "#/$defs/fact_base" }],
       "required": ["gall", "adjustment", "place"],
       "properties": {
         "kind": { "const": "range" },
         "gall": { "$ref": "common.schema.json#/$defs/gall_ref_id" },
-        "adjustment": { "enum": ["include", "exclude", "only"] },
+        "adjustment": { "enum": ["exclude", "only"] },
         "place": {
           "$ref": "#/$defs/controlled_value",
           "properties": { "value": { "$ref": "../vocab/place-codes.schema.json" } }

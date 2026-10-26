@@ -1,1 +1,10 @@
-gall_id,cause,decision,note
+gall_id,cause,decision,scope,note
+*,removed,ignore,,"Jeff 2026-10-26: option A — stored ranges are uncurated; range = the Hosts' union"
+*,host_added_later,ignore,,"Jeff 2026-10-26: option A — stored ranges are uncurated; range = the Hosts' union"
+*,host_range_widened,ignore,,"Jeff 2026-10-26: option A — stored ranges are uncurated; range = the Hosts' union"
+*,introduced,ignore,,"Jeff 2026-10-26: option A — stored ranges are uncurated; range = the Hosts' union. Jeff 2026-10-25: introduced range is critical and must be included if present, so a stored range that lacks a Host's introduced regions is not an exclusion"
+*,outside,ignore,,"Jeff 2026-10-26: option A — stored ranges are uncurated; range = the Hosts' union. A Gall's range never extends beyond its Hosts' ranges: a place where it occurs but no Host grows is a statement about a Host's range"
+*,no_host_range,ignore,,"Jeff 2026-10-26: option A — stored ranges are uncurated; range = the Hosts' union"
+confirmed,removed,exclude,US CA MX,"Jeff 2026-10-26: range-confirmed Gall — North-American differences kept"
+confirmed,host_added_later,exclude,US CA MX,"Jeff 2026-10-26: range-confirmed Gall — North-American differences kept"
+confirmed,host_range_widened,exclude,US CA MX,"Jeff 2026-10-26: range-confirmed Gall — North-American differences kept"

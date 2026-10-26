@@ -191,9 +191,10 @@ A qualifier is its own Fact, pointing at a Relationship Fact in the same batch (
 
 A Gall's range is computed from its Hosts' ranges, native and introduced. State only adjustments to it:
 
-- `include`: the Gall occurs in a place where none of its Hosts grows, natively or introduced;
 - `exclude`: the Source states the Gall does not occur in a place within its Hosts' ranges;
 - `only`: the Source says the Gall occurs only in this place ("in Texas only"); one Fact per place.
+
+A place where the Source says the Gall occurs but none of its Hosts grows is not an adjustment: state it as a recorded occurrence ("Recorded occurrences").
 
 `place.value` is a code from `vocab/place-codes.schema.json`; find it by name in `vocab/places.json`.
 

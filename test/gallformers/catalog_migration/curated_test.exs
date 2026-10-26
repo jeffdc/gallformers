@@ -243,7 +243,8 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
                {g.later, "host_added_later"} => {["CA-ON"], "ignore"},
                {g.widened, "host_range_widened"} => {["US-NY"], "ignore"},
                {g.introduced, "introduced"} => {["RO-B"], "ignore"},
-               {g.outside, "outside"} => {["BS"], "include"},
+               # A Gall's range never leaves its Hosts' ranges.
+               {g.outside, "outside"} => {["BS"], "ignore"},
                {g.none, "no_host_range"} => {["US-CA"], "only"}
              }
 
@@ -272,7 +273,7 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
       assert Catalog.get_gall(ctx.g.removed) == nil
     end
 
-    test "decisions become range Facts: exclusions by Gallformers, the rest by the legacy Source",
+    test "decisions become range Facts: exclusions by Gallformers, only by the legacy Source",
          ctx do
       gallformers = gallformers_source()
       g = ctx.g
@@ -286,7 +287,7 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
             "*,host_added_later,ignore,",
             "#{g.widened},host_range_widened,ignore,",
             "#{g.introduced},introduced,exclude,",
-            "#{g.outside},outside,include,",
+            "#{g.outside},outside,ignore,",
             "#{g.none},no_host_range,only,"
           ]
       )
@@ -299,24 +300,32 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
                range_facts(g.removed)
 
       assert source_id == gallformers.id
-      assert f.statement_text =~ "removed by a curator"
       assert codes(Catalog.potential_range(g.removed)) == ["US-CA", "US-TX"]
+
+      # The row's note is a curation record, not part of the statement.
+      refute f.statement_text =~ "removed by a curator"
+
+      assert f.statement_text ==
+               "Not in this Gall's range: the range Gallformers curators stored for it " <>
+                 "before the catalog migration left this region out."
 
       assert codes(Catalog.potential_range(g.later)) == ["CA-ON", "US-CA", "US-NY", "US-TX"]
       assert range_facts(g.later) == []
       assert codes(Catalog.potential_range(g.introduced)) == ["MX-JAL"]
 
-      assert [%{adjustment: "include", code: "BS", source_id: legacy_id}] = range_facts(g.outside)
-      assert legacy_id == legacy.id
-      assert "BS" in codes(Catalog.potential_range(g.outside))
+      # A stored place outside every Host's range is not kept.
+      assert range_facts(g.outside) == []
+      refute "BS" in codes(Catalog.potential_range(g.outside))
 
-      assert [%{adjustment: "only", code: "US-CA"}] = range_facts(g.none)
+      assert [%{adjustment: "only", code: "US-CA", source_id: legacy_id}] = range_facts(g.none)
+      assert legacy_id == legacy.id
       assert codes(Catalog.potential_range(g.none)) == ["US-CA"]
 
       assert range_facts(g.same) == []
 
-      # exclude US-NY, RO-B; include BS; only US-CA.
-      assert %{old: 4, new: 4} = Enum.find(report.reconciliation, &(&1.label =~ "Range Facts"))
+      # exclude US-NY, RO-B; only US-CA.
+      assert %{old: 3, new: 3} = Enum.find(report.reconciliation, &(&1.label =~ "Range Facts"))
+      refute Enum.any?(report.counts, fn {label, _n} -> label =~ "include" end)
     end
 
     test "a written worksheet, its decisions filled in, is a decision file", ctx do
@@ -343,7 +352,198 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
     end
 
     test "a decision the cause cannot take is an error naming the row", ctx do
-      curated!(ctx, :range_decisions, @seed_ranges ++ ["#{ctx.g.removed},removed,include,"])
+      curated!(ctx, :range_decisions, @seed_ranges ++ ["#{ctx.g.removed},removed,only,"])
+
+      assert {:error, message} = run(ctx)
+      assert message =~ "range_decisions.csv row 3"
+    end
+
+    test "include is no decision for any cause: a Gall's range never leaves its Hosts'", ctx do
+      for cause <-
+            ~w(removed host_added_later host_range_widened introduced outside no_host_range) do
+        curated!(ctx, :range_decisions, @seed_ranges ++ ["#{ctx.g.outside},#{cause},include,"])
+
+        assert {:error, message} = run(ctx)
+        assert message =~ "range_decisions.csv row 3"
+        assert message =~ ~s(got "include")
+      end
+    end
+  end
+
+  # -- range-confirmed Galls: scope and selectors ---------------------------------------
+
+  describe "range decisions by scope, for range-confirmed Galls" do
+    setup ctx do
+      place!(880_901, "US-TX", "Texas", "US")
+      place!(880_902, "US-NY", "New York", "US")
+      place!(880_903, "CA-ON", "Ontario", "CA")
+
+      quercus = ctx.old.quercus
+      wide = plant!(880_155, "Fixturquercus lata", quercus)
+      for code <- ~w(US-CA US-TX US-NY MX-JAL RO-B), do: host_range!(wide, code)
+      host_range!(wide, "CA-ON", distribution_type: "introduced")
+
+      copied = plant!(880_156, "Fixturquercus copiata", quercus)
+      for code <- ~w(US-CA US-NY), do: host_range!(copied, code)
+
+      southern = plant!(880_157, "Fixturquercus australis", quercus)
+      host_range!(southern, "MX-JAL")
+      host_range!(southern, "RO-B", distribution_type: "introduced")
+
+      gall = fn id, label, opts ->
+        gall!(id, "Andricus q-fixture-#{label}", 33, [undescribed: true] ++ opts)
+      end
+
+      # A curator confirmed this range. removed: MX-JAL, RO-B, US-NY;
+      # introduced: CA-ON; outside: BS, CA-AB.
+      confirmed = gall.(880_280, "confirmed", range_confirmed: true)
+      gallhost!(confirmed, wide)
+      for code <- ~w(US-CA US-TX CA-AB BS), do: gall_range!(confirmed, code)
+
+      # Confirmed, a copy of `copied`; `southern` came later.
+      # host_added_later: MX-JAL; introduced: RO-B.
+      later = gall.(880_281, "confirmed-later", range_confirmed: true)
+      gallhost!(later, copied)
+      gallhost!(later, southern)
+      for code <- ~w(US-CA US-NY), do: gall_range!(later, code)
+
+      # Unconfirmed. removed: MX-JAL, RO-B, US-NY, US-TX; introduced: CA-ON;
+      # outside: CA-AB.
+      unconfirmed = gall.(880_282, "unconfirmed", [])
+      gallhost!(unconfirmed, wide)
+      for code <- ~w(US-CA CA-AB), do: gall_range!(unconfirmed, code)
+
+      %{s: %{confirmed: confirmed, later: later, unconfirmed: unconfirmed}}
+    end
+
+    defp ranges!(ctx, rows) do
+      File.write!(
+        Path.join(ctx.dir, "range_decisions.csv"),
+        Enum.join(["gall_id,cause,decision,scope,note" | rows], "\n") <> "\n"
+      )
+    end
+
+    defp facts_by(gall_id), do: Enum.map(range_facts(gall_id), &{&1.adjustment, &1.code})
+
+    test "the shipped decisions (option A): only confirmed Galls keep North-American exclusions",
+         ctx do
+      gallformers = gallformers_source()
+      s = ctx.s
+
+      File.cp!(
+        Curated.default_path(:range_decisions),
+        Path.join(ctx.dir, "range_decisions.csv")
+      )
+
+      # Strict: every difference has a decision.
+      report = run!(ctx)
+      assert pending(report, "range_decisions.csv") == []
+
+      # Unconfirmed: its range is its Hosts' union, nothing else.
+      assert range_facts(s.unconfirmed) == []
+
+      assert codes(Catalog.potential_range(s.unconfirmed)) ==
+               ~w(CA-ON MX-JAL RO-B US-CA US-NY US-TX)
+
+      # Confirmed: exclusions inside US/CA/MX only — not RO-B, not the
+      # introduced CA-ON; BS and CA-AB, outside the Hosts' union, are not
+      # kept.
+      assert facts_by(s.confirmed) == [{"exclude", "MX-JAL"}, {"exclude", "US-NY"}]
+      assert facts_by(s.later) == [{"exclude", "MX-JAL"}]
+
+      for fact <- range_facts(s.confirmed) ++ range_facts(s.later) do
+        assert fact.source_id == gallformers.id
+        assert fact.stated_on == nil
+        assert fact.statement_text =~ "confirmed"
+        # The decision row's note stays in the decision file.
+        refute fact.statement_text =~ "Jeff"
+      end
+
+      assert codes(Catalog.potential_range(s.confirmed)) == ~w(CA-ON RO-B US-CA US-TX)
+      assert codes(Catalog.potential_range(s.later)) == ~w(RO-B US-CA US-NY)
+    end
+
+    test "an explicit row wins over a confirmed row, which wins over a * row", ctx do
+      gallformers_source()
+      s = ctx.s
+
+      ranges!(ctx, [
+        "*,removed,exclude,,",
+        "confirmed,removed,exclude,US CA MX,",
+        "#{s.confirmed},removed,ignore,MX,its own row",
+        "*,host_added_later,ignore,,",
+        "*,introduced,ignore,,",
+        "*,outside,ignore,,"
+      ])
+
+      report = run!(ctx)
+      assert report.pending == []
+
+      # MX-JAL: its own row (ignore); US-NY: the confirmed row (a country
+      # code covers its subdivisions); RO-B: the * row.
+      assert facts_by(s.confirmed) == [{"exclude", "RO-B"}, {"exclude", "US-NY"}]
+
+      # A confirmed row never applies to an unconfirmed Gall.
+      assert facts_by(s.unconfirmed) ==
+               for(code <- ~w(MX-JAL RO-B US-NY US-TX), do: {"exclude", code})
+
+      # No row for confirmed host_added_later, so the * row: ignore.
+      assert range_facts(s.later) == []
+
+      row =
+        Enum.find(
+          curation(report, "ranges"),
+          &(&1["gall_id"] == s.confirmed and &1["cause"] == "removed")
+        )
+
+      assert row["decision"] == nil
+
+      assert row["decided_by"] ==
+               "#{s.confirmed} [MX] ignore: MX-JAL; confirmed [US CA MX] exclude: US-NY; " <>
+                 "* exclude: RO-B"
+    end
+
+    test "places outside a row's scope fall to the next row, or stay pending", ctx do
+      gallformers_source()
+      s = ctx.s
+
+      ranges!(ctx, [
+        "confirmed,removed,exclude,US CA MX,",
+        "confirmed,host_added_later,exclude,MX-JAL,",
+        "*,introduced,ignore,,",
+        "*,outside,ignore,,"
+      ])
+
+      assert {:error, {:pending_decisions, report}} = run(ctx)
+
+      assert Enum.sort(pending(report, "range_decisions.csv")) ==
+               Enum.sort([{s.confirmed, "removed"}, {s.unconfirmed, "removed"}])
+
+      [detail] =
+        for %{key: {id, "removed"}, detail: detail} <- report.pending,
+            id == s.confirmed,
+            do: detail
+
+      assert detail =~ "RO-B"
+      refute detail =~ "US-NY"
+
+      run!(ctx, pending: :skip)
+      assert facts_by(s.confirmed) == [{"exclude", "MX-JAL"}, {"exclude", "US-NY"}]
+      assert facts_by(s.later) == [{"exclude", "MX-JAL"}]
+      assert range_facts(s.unconfirmed) == []
+    end
+
+    test "an unknown scope code is an error naming the row", ctx do
+      ranges!(ctx, ["*,introduced,ignore,,", "confirmed,removed,exclude,US ZZ-NOPE MX,"])
+
+      assert {:error, message} = run(ctx)
+      assert message =~ "range_decisions.csv row 3"
+      assert message =~ "ZZ-NOPE"
+      assert Catalog.get_gall(ctx.old.agamic) == nil
+    end
+
+    test "a gall_id that is no ID, * or confirmed is an error naming the row", ctx do
+      ranges!(ctx, ["*,introduced,ignore,,", "confirmd,removed,exclude,,"])
 
       assert {:error, message} = run(ctx)
       assert message =~ "range_decisions.csv row 3"
@@ -563,39 +763,6 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
     end
   end
 
-  # -- the replay log and duplicate taxon keys -----------------------------------------
-
-  test "the migration never empties the replay log", ctx do
-    entry = %{"taxon" => %{"name" => "X", "rank" => "species"}, "name" => "Y"}
-
-    {:ok, _} =
-      Gallformers.Audit.transaction(test_actor(), "test.replay_log", fn ->
-        Repo.insert_all("replay_log", [
-          %{
-            kind: "synonym_added",
-            key: entry,
-            payload: %{},
-            inserted_at: ~U[2026-01-01 00:00:00Z]
-          }
-        ])
-      end)
-
-    run!(ctx)
-
-    assert [%{kind: :synonym_added, key: ^entry}] = Import.list_replay_entries()
-  end
-
-  test "duplicate taxon keys stop a strict run; a lenient run reports them", ctx do
-    taxonomy!(880_030, "Fixturidae", "family", description: "Midge")
-    taxonomy!(880_031, "Fixturidae", "family", description: "Midge")
-
-    assert {:error, {:pending_decisions, report}} = run(ctx)
-    assert [%{name: "Fixturidae"}] = report.duplicates
-    assert Taxa.resolve_name("Fixturidae") == :none
-
-    assert [%{name: "Fixturidae"}] = run!(ctx, pending: :skip).duplicates
-  end
-
   # -- taxon merges --------------------------------------------------------------------
 
   defp problems(report, category),
@@ -788,5 +955,38 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
 
     assert {:ok, %{1140 => %{kingdom: "Chromista"}}} =
              Kingdoms.load(Curated.default_path(:kingdoms))
+  end
+
+  # -- the replay log and duplicate taxon keys -----------------------------------------
+
+  test "the migration never empties the replay log", ctx do
+    entry = %{"taxon" => %{"name" => "X", "rank" => "species"}, "name" => "Y"}
+
+    {:ok, _} =
+      Gallformers.Audit.transaction(test_actor(), "test.replay_log", fn ->
+        Repo.insert_all("replay_log", [
+          %{
+            kind: "synonym_added",
+            key: entry,
+            payload: %{},
+            inserted_at: ~U[2026-01-01 00:00:00Z]
+          }
+        ])
+      end)
+
+    run!(ctx)
+
+    assert [%{kind: :synonym_added, key: ^entry}] = Import.list_replay_entries()
+  end
+
+  test "duplicate taxon keys stop a strict run; a lenient run reports them", ctx do
+    taxonomy!(880_030, "Fixturidae", "family", description: "Midge")
+    taxonomy!(880_031, "Fixturidae", "family", description: "Midge")
+
+    assert {:error, {:pending_decisions, report}} = run(ctx)
+    assert [%{name: "Fixturidae"}] = report.duplicates
+    assert Taxa.resolve_name("Fixturidae") == :none
+
+    assert [%{name: "Fixturidae"}] = run!(ctx, pending: :skip).duplicates
   end
 end

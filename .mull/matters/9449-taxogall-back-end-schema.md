@@ -1,7 +1,7 @@
 ---
 status: planned
 created: 2026-10-24
-updated: 2026-10-24
+updated: 2026-10-26
 epic: taxonomy
 relates: [50ff, 8567]
 ---
@@ -74,13 +74,13 @@ Where a null `stated_on` sorts is the parked date decision (`8567` Sources–Fac
 | `relationship_facts` | `type` (fixed list of 15), subject (taxon or Gall), object (taxon or Gall), `gall_context_id` | type + subject + object + context; check constraints per type's endpoint kinds |
 | `qualifier_facts` | `of_fact_id` (a Relationship), `qualifier`, `value` | of + qualifier + value; `lethality` in a slot (one value per Relationship) |
 | `trait_facts` | `gall_id`, `trait_value_id` | Gall + value; `detachable` in a slot |
-| `range_facts` | `gall_id`, `adjustment` (`include | exclude | only`), `place_id` | Gall + adjustment + place |
+| `range_facts` | `gall_id`, `adjustment` (`exclude | only`; `include` removed 2026-10-26), `place_id` | Gall + adjustment + place; slot per Gall + place (newest statement wins) |
 | `occurrence_facts` | `gall_id`, `place_id` | Gall + place (when / stage on the attribution) |
 | `alias_facts` | `gall_id`, `name` | Gall + name |
 | `description_facts` | `gall_id` | one per Gall; each Source's attribution carries its quotes |
 
 - Vocabularies: `trait_values` (trait, value, definition), `trait_term_mappings`, `generation_groups`, `generation_values` (value, definition, name-qualifier text), `generation_group_taxa`. Relationship types: a code-level list (direction, inverse label, endpoint kinds) with a check constraint, changed only by migration.
-- Read models (async): potential range = host ranges of current `host_of` plants (a genus Host carries its former placeholder's range rows), with `only` / `exclude` / `include` applied; **an empty result means every region**. Current Inducer, Hosts, Traits for the ID tool and pages. Flags: alternate-generation mismatches; a generation outside its Inducer's groups.
+- Read models (async): potential range = host ranges of current `host_of` plants (a genus Host carries its former placeholder's range rows), with `only` / `exclude` applied (never widened beyond the Hosts' union); **an empty result means every region**. Current Inducer, Hosts, Traits for the ID tool and pages. Flags: alternate-generation mismatches; a generation outside its Inducer's groups.
 - A batch's `unmapped` entries stay in `Import`, not Facts.
 
 ## 5. Import (`Import`)
@@ -235,7 +235,7 @@ Where a null `stated_on` sorts is the parked date decision (`8567` Sources–Fac
 - Create: `lib/gallformers/catalog/read_models/potential_range.ex`, `gall_summary.ex`, `flags.ex`; Oban worker `catalog/read_models/refresh_worker.ex`
 - Test: `test/gallformers/catalog/read_models_test.exs`
 
-**Behavior:** Potential range = host ranges of the current `host_of` plants (a genus Host contributes its own range rows), then `only`, `exclude`, `include`; **empty means every region**. `GallSummary` gives current Inducer, Hosts and Traits per Gall. `Flags` reports alternate-generation mismatches and generations outside the Inducer's groups. Refreshed asynchronously on Fact and taxon changes.
+**Behavior:** Potential range = host ranges of the current `host_of` plants (a genus Host contributes its own range rows), then `only`, `exclude` (no `include`: removed 2026-10-26); **empty means every region**. `GallSummary` gives current Inducer, Hosts and Traits per Gall. `Flags` reports alternate-generation mismatches and generations outside the Inducer's groups. Refreshed asynchronously on Fact and taxon changes.
 
 **Testing:** acceptance test *a Gall with no range data appears in every region*; `exclude` removes a region; `only` keeps one; a withdrawn Host stops contributing; flag cases for both mismatch kinds.
 
@@ -347,4 +347,20 @@ All 17 tasks are built on `taxogall` (uncommitted at the time of writing): `mix 
 **Open decisions:** none (introduced range and the Oban tables decided 2026-10-25, above).
 
 **Next (50ff steps 8 and on):** the first run on a production copy — `make experiment-db`, then `MIX_ENV=dev mix gallformers.catalog.migrate --skip-pending --reports docs/plans/catalog`; check every reconciliation line; fill the four CSVs in `priv/catalog_migration/` (non-galls, range decisions, aliases, keys) and extend `name_suffixes.csv` from the unparsed / `needs_review` lists (incl. the aphid and rust life-cycle assignments); fix duplicate taxon keys; re-run strict and time it. Notes go to the real private bucket on a dev run unless `s3_enabled: false`. Then the public pages (step 9).
+
+
+## First rehearsal (2026-10-26)
+
+Run on `gallformers_taxogall`, a clone of `gallformers_dev` (data to 2026-10-23), after applying the new migrations: `MIX_ENV=dev PGDATABASE=gallformers_taxogall mix gallformers.catalog.migrate --skip-pending --reports docs/plans/catalog --no-s3` (`--no-s3` added so a rehearsal never writes to the real private bucket). About 3 minutes. Worksheets are in `docs/plans/catalog/` (local, gitignored).
+
+**Every reconciliation line balances.** 4,104 Galls; 2,582 plants; 1,515 higher taxa (102 placeholder genera crosswalked to their family); 1,083,689 host-range rows re-keyed (89,328 moved from 159 genus placeholders to their genus); 2,432 Inducer species created, 79 agamic/sexgen pairs merged; 45,169 legacy Facts; 6,871 citations; 1,325 notes; 7,716 images typed.
+
+**For Jeff to decide or curate:**
+- **Duplicate taxon key:** genus Phoradendron twice — old `taxonomy` 202 (under Santalaceae, the plant) and 985 (under "Santalaceae (gall)", the gall-forming mistletoe). In the new model they are one genus; the migration needs to map 985 onto 202's taxon.
+- **Non-galls:** 120 rows to mark `exclude` (or `migrate`) in `non_galls.csv`.
+- **Ranges:** 5,291 worksheet rows. `introduced` (1,642 Galls) is decided — `*,introduced,ignore` in `range_decisions.csv`, per the introduced-range decision. Left: `removed` (2,107 Galls, likely curator removals → exclude?), `host_added_later` (240 Galls, likely drift → ignore?), `host_range_widened` (12), `outside` (1,290 Galls, places beyond the Hosts' range → include?). `*` rows by cause are allowed. **Decided 2026-10-26 (option A, `b5bd` M0):** stored ranges are uncurated, so every cause is ignored; only the 34 range-confirmed Galls keep their North-American exclusions (`confirmed` rows with a `scope` column in `range_decisions.csv`). Inclusions are removed altogether: a Gall's range never extends beyond its Hosts' (`3272`).
+- **Aliases:** 2,829 gall "scientific" aliases to sort (synonym / former label / code / common name / drop); 1,124 common names applied automatically.
+- **Keys:** 2 links not to a Gall.
+- **Name suffixes:** 15 `needs_review` rows (cryptic-species checks, 2419's modified-form target, Prociphilus caryae's primary host, pathovar nerii, two multivoltine "summer and autumn generations"); 3 unparsed names: 4561 "(summer and autumn generation)" singular spelling, 6026 "Puccinia recondita species complex", 7161 "Aceria hibisci (Nalepa, 1906)" (authorship in the name).
+- **Other:** family Plasmodiophoridae has family type "Unknown", so no kingdom (Rhizaria/protist — set it); 120 `form: non-gall` Trait values (go away with the non-gall decisions); 4 citations and 2 notes on species that are neither Gall nor plant (not migrated).
 

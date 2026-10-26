@@ -220,8 +220,11 @@ defmodule Gallformers.Catalog do
 
   @doc """
   Records a Source's stance on a range adjustment: `key` is
-  `%{gall_id, adjustment, place_id}`, `adjustment` one of `:include`,
-  `:exclude`, `:only`.
+  `%{gall_id, adjustment, place_id}`, `adjustment` `:exclude` or `:only`.
+  The adjustments for one Gall and place compete in the slot
+  `"gall:<id>:place:<place_id>"`: the newest statement wins. Nothing widens
+  a Gall's range beyond its Hosts' ranges; a place where it occurs but no
+  Host grows is a recorded occurrence (`assert_occurrence/3`).
   """
   @spec assert_range(Actor.t(), map(), map()) ::
           {:ok, Assert.result()} | {:error, Changeset.t()}

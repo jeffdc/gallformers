@@ -172,11 +172,30 @@ defmodule Gallformers.Catalog.ReadModelsTest do
       assert codes(Catalog.potential_range(ctx.gall.id)) == ["MX-JAL"]
     end
 
-    test "include adds a region outside the Hosts' ranges", ctx do
+    test "never reaches a place outside every Host's range, even where a Source records it",
+         ctx do
       host!(ctx.california_oak, ctx.gall, confirm(ctx.source))
-      range!(ctx.gall, :include, "RO-B", confirm(ctx.source))
 
-      assert codes(Catalog.potential_range(ctx.gall.id)) == ["RO-B", "US-CA"]
+      {:ok, _} =
+        Catalog.assert_occurrence(
+          test_actor(),
+          %{gall_id: ctx.gall.id, place_id: place_id("RO-B")},
+          confirm(ctx.source)
+        )
+
+      assert codes(Catalog.potential_range(ctx.gall.id)) == ["US-CA"]
+    end
+
+    test "the newest of an exclude and an only for one place wins", ctx do
+      host!(ctx.california_oak, ctx.gall, confirm(ctx.source))
+      host!(ctx.canadian_oak, ctx.gall, confirm(ctx.source))
+
+      range!(ctx.gall, :exclude, "US-CA", confirm(ctx.source))
+      range!(ctx.gall, :only, "US-CA", confirm(source_fixture("Revision", "1990")))
+      assert codes(Catalog.potential_range(ctx.gall.id)) == ["US-CA"]
+
+      range!(ctx.gall, :exclude, "US-CA", confirm(source_fixture("Later", "2001")))
+      assert codes(Catalog.potential_range(ctx.gall.id)) == ["CA-AB"]
     end
 
     test "a withdrawn adjustment no longer applies", ctx do
