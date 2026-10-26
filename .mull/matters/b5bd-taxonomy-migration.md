@@ -104,7 +104,7 @@ What else migrates is open until step 6 shows what the pipeline doesn't reproduc
   - every old `/gall/:id`, `/host/:id`, Gallformers Code, and image path still resolves;
   - `/taxonomy/:id` and non-gall redirects work; old ID-tool bookmark URLs resolve to the same filters;
   - keys resolve;
-  - ID tool and search parity on a sample of real queries;
+  - ID tool and search parity on a sample of real queries (expected difference: the potential range now includes Hosts' introduced range, so Galls without a stored range gain introduced regions — decided 2026-10-25);
   - API responses compatible;
   - spot-check a set of well-known Galls by hand.
 - Time the migration to size the maintenance window.

@@ -335,6 +335,8 @@ All 17 tasks are built on `taxogall` (uncommitted at the time of writing): `mix 
 - **`document_items.page_no`** is the PDF page; the printed page is the evidence's `page`.
 - **Standing:** partial dates compare as periods (nested periods tie); a conflict with no previous standing leaves the Fact `unsupported` until a curator decides; slot ties are queued as same-date conflicts and settled by a dated Gallformers statement.
 - **`lethality`** is single-valued per Relationship (slot).
+- **`oban_jobs` / `oban_peers` are no longer published** in the public snapshot (Jeff, 2026-10-25): internal job bookkeeping whose arguments now carry the approving curator's name (`priv/snapshot/tables.txt`).
+- **Potential range includes introduced range** (Jeff, 2026-10-25: "introduced is critical and must be included if present"): the union of the Hosts' native *and* introduced ranges, as the contract says. Today's fallback for Galls without a stored range uses native only, so those Galls gain introduced regions in the ID tool — intended; the M5 parity check should expect it, not flag it.
 - **Validation** uses JSV (full Draft 2020-12); `validate.py` now checks `uri` and `date-time` formats too (`rfc3339-validator`, `rfc3987`).
 - **Legacy Facts** are written in chunks of 500 (one transaction would exhaust PostgreSQL's lock table).
 - **`host_range`** and `image` gained typed `taxon_id` / `gall_id` columns beside `species_id`; drop `species_id` when the old code goes.
@@ -342,9 +344,7 @@ All 17 tasks are built on `taxogall` (uncommitted at the time of writing): `mix 
 - **Replay carry-over:** `Release.export_replay_log/0` on preview, `Release.replay_log/1` on production after `Release.migrate_catalog/0` (strict); `b5bd` M6 updated.
 - **Test suite:** pool size now `schedulers_online * 2` (was a SQLite-era 5); four admin form test modules are `async: false` because their LiveViews react to site-wide PubSub.
 
-**Open decisions (Jeff):**
-- **Introduced range in the potential range.** The new potential range uses Hosts' native *and* introduced range (as the contract says); today's fallback uses native only, so Galls without a stored range gain introduced regions in the ID tool. Keep, or native only?
-- **`oban_jobs` / `oban_peers`** are no longer in the public snapshot (job arguments carry actor metadata). Keep private?
+**Open decisions:** none (introduced range and the Oban tables decided 2026-10-25, above).
 
 **Next (50ff steps 8 and on):** the first run on a production copy — `make experiment-db`, then `MIX_ENV=dev mix gallformers.catalog.migrate --skip-pending --reports docs/plans/catalog`; check every reconciliation line; fill the four CSVs in `priv/catalog_migration/` (non-galls, range decisions, aliases, keys) and extend `name_suffixes.csv` from the unparsed / `needs_review` lists (incl. the aphid and rust life-cycle assignments); fix duplicate taxon keys; re-run strict and time it. Notes go to the real private bucket on a dev run unless `s3_enabled: false`. Then the public pages (step 9).
 

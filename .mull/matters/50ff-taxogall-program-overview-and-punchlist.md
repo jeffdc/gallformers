@@ -1,7 +1,7 @@
 ---
 status: raw
 created: 2026-10-24
-updated: 2026-10-24
+updated: 2026-10-25
 epic: taxonomy
 relates: [8567, 9449]
 ---
@@ -76,8 +76,6 @@ Domain language: `docs/domain/domain-model.md`. Design and rules: `8567`. Migrat
 
 ## Open decisions
 
-- Potential range: Hosts' native and introduced range (new, per the contract) or native only (today's fallback) (`9449` *Status*).
-- Public snapshot: keep `oban_jobs` / `oban_peers` private (`9449` *Status*).
 
 - Legacy Facts the backscan doesn't confirm (`b5bd` M0).
 - Gall range differences: curator removal vs drift since a host union was copied (`b5bd` M0, reopened).
