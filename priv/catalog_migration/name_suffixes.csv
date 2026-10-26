@@ -5,19 +5,20 @@ token,spring generation,,,spring,false,Seasonal generation,generation (mechanica
 token,summer generation,,,summer,false,Seasonal generation,generation (mechanical)
 token,autumn generation,,,autumn,false,Seasonal generation,generation (mechanical)
 token,fall generation,,,autumn,false,Seasonal generation,generation (mechanical)
-token,summer and autumn generations,,,,true,Seasonal generation,"multivoltine: one Gall, so one generation value, not two; no value in the seasonal group fits yet"
+token,summer and autumn generations,,,summer,false,Seasonal generation,"multivoltine: the summer and autumn broods make one Gall, distinct from the spring gall, so one generation value (summer)"
+token,summer and autumn generation,,,summer,false,Seasonal generation,"multivoltine: the summer and autumn broods make one Gall, distinct from the spring gall, so one generation value (summer)"
 token,aecial,,,aecial,false,Rust spore stage,generation (mechanical)
 token,telial,,,telial,false,Rust spore stage,generation (mechanical)
-gall,3396,Cynips mellea (rydbergiana) (agamic),Cynips mellea,agamic,true,Historical / infraspecific name,parenthetical name → gall alias (former name); curator checks for a cryptic species
-gall,2128,Neuroterus quercicola (pacificus) (agamic),Neuroterus quercicola,agamic,true,Historical / infraspecific name,parenthetical name → gall alias (former name); curator checks for a cryptic species
-gall,3167,Neuroterus quercicola (pacificus) (sexgen) (on Quercus douglasii),Neuroterus quercicola,sexual,true,"Historical / infraspecific name, Host-scoped",parenthetical name → gall alias (former name); curator checks for a cryptic species; same phase on a different host → separate entry; host relationship + host qualifier in name
-gall,1996,Neuroterus quercicola (pacificus) (sexgen) (on Quercus lobata),Neuroterus quercicola,sexual,true,"Historical / infraspecific name, Host-scoped",parenthetical name → gall alias (former name); curator checks for a cryptic species; same phase on a different host → separate entry; host relationship + host qualifier in name
-gall,1720,Neuroterus saltatorius (agamic) (saltatorius),Neuroterus saltatorius,agamic,true,Historical / infraspecific name,parenthetical name → gall alias (former name); curator checks for a cryptic species
-gall,1076,Neuroterus saltatorius (australis) (agamic),Neuroterus saltatorius,agamic,true,Historical / infraspecific name,parenthetical name → gall alias (former name); curator checks for a cryptic species
-gall,2450,Neuroterus saltatorius (decrescens) (agamic),Neuroterus saltatorius,agamic,true,Historical / infraspecific name,parenthetical name → gall alias (former name); curator checks for a cryptic species
-gall,1109,Neuroterus saltatorius (texanus) (agamic),Neuroterus saltatorius,agamic,true,Historical / infraspecific name,parenthetical name → gall alias (former name); curator checks for a cryptic species
-gall,3168,Neuroterus vesicula (cerinus) (sexgen),Neuroterus vesicula,sexual,true,Historical / infraspecific name,parenthetical name → gall alias (former name); curator checks for a cryptic species
-gall,2915,Phylloxera caryaesepta (perforans),Phylloxera caryaesepta,,true,Historical / infraspecific name,parenthetical name → gall alias (former name); curator checks for a cryptic species
+gall,3396,Cynips mellea (rydbergiana) (agamic),Cynips mellea,agamic,false,Gall form,one species with several gall forms → separate Gall per form; form qualifier in name
+gall,2128,Neuroterus quercicola (pacificus) (agamic),Neuroterus quercicola,agamic,false,Gall form,one species with several gall forms → separate Gall per form; form qualifier in name
+gall,3167,Neuroterus quercicola (pacificus) (sexgen) (on Quercus douglasii),Neuroterus quercicola,sexual,false,"Gall form, Host-scoped",one species with several gall forms → separate Gall per form; form qualifier in name; same phase on a different host → separate entry; host relationship + host qualifier in name
+gall,1996,Neuroterus quercicola (pacificus) (sexgen) (on Quercus lobata),Neuroterus quercicola,sexual,false,"Gall form, Host-scoped",one species with several gall forms → separate Gall per form; form qualifier in name; same phase on a different host → separate entry; host relationship + host qualifier in name
+gall,1720,Neuroterus saltatorius (agamic) (saltatorius),Neuroterus saltatorius,agamic,false,Gall form,one species with four agamic forms and one sexgen → separate Gall per form; form qualifier in name
+gall,1076,Neuroterus saltatorius (australis) (agamic),Neuroterus saltatorius,agamic,false,Gall form,one species with four agamic forms and one sexgen → separate Gall per form; form qualifier in name
+gall,2450,Neuroterus saltatorius (decrescens) (agamic),Neuroterus saltatorius,agamic,false,Gall form,one species with four agamic forms and one sexgen → separate Gall per form; form qualifier in name
+gall,1109,Neuroterus saltatorius (texanus) (agamic),Neuroterus saltatorius,agamic,false,Gall form,one species with four agamic forms and one sexgen → separate Gall per form; form qualifier in name
+gall,3168,Neuroterus vesicula (cerinus) (sexgen),Neuroterus vesicula,sexual,false,Gall form,one species with several gall forms → separate Gall per form; form qualifier in name
+gall,2915,Phylloxera caryaesepta (perforans),Phylloxera caryaesepta,,false,Gall form,one species with several gall forms → separate Gall per form; form qualifier in name
 gall,6860,Colomerus tricaseri (on Empogona kirkii),Colomerus tricaseri,,false,Host-scoped,same phase on a different host → separate entry; host relationship + host qualifier in name
 gall,6862,Colomerus tricaseri (on Sericanthe andongensis),Colomerus tricaseri,,false,Host-scoped,same phase on a different host → separate entry; host relationship + host qualifier in name
 gall,2338,Contarinia partheniicola (on Ambrosia),Contarinia partheniicola,,false,Host-scoped,same phase on a different host → separate entry; host relationship + host qualifier in name
@@ -35,8 +36,8 @@ gall,3979,Hormaphis cornu (on Hamamelis),Hormaphis cornu,fundatrix,false,Host-sc
 gall,1340,Neuroterus quercusbatatus (agamic) (q-bicolor),Neuroterus quercusbatatus,agamic,false,Host-scoped,same phase on a different host → separate entry; host relationship + host qualifier in name
 gall,1339,Neuroterus quercusbatatus (sexgen) (on Quercus bicolor),Neuroterus quercusbatatus,sexual,false,Host-scoped,same phase on a different host → separate entry; host relationship + host qualifier in name
 gall,5095,Phytoplasma pruni (on Trillium),Phytoplasma pruni,,false,Host-scoped,same phase on a different host → separate entry; host relationship + host qualifier in name
-gall,4092,Prociphilus caryae (on Amelanchier),Prociphilus caryae,fundatrix,true,Host-scoped,life-cycle phase on an alternate host → generation (fundatrix if Amelanchier is the primary host — curator confirms); host relationship
-gall,5120,Pseudomonas savastanoi (pv nerii),Pseudomonas savastanoi,,true,Pathovar,"pathovar is part of the taxon name → infraspecific taxon; the contract has no pathovar rank yet, so the Inducer is the species for now"
+gall,4092,Prociphilus caryae (on Amelanchier),Prociphilus caryae,fundatrix,false,Host-scoped,life-cycle phase on an alternate host → generation (fundatrix: Amelanchier is the primary host); host relationship
+gall,5120,Pseudomonas savastanoi (pv nerii),Pseudomonas savastanoi,,false,Pathovar,"pathovar is part of the taxon name → infraspecific taxon; the contract has no pathovar rank yet, so the Inducer is the species for now"
 gall,6613,Acalitus pundamariae (inflorescence),Acalitus pundamariae,,false,Plant part / form,separate entry for one species → plant-part/form trait + form qualifier in name
 gall,6612,Acalitus pundamariae (leaf),Acalitus pundamariae,,false,Plant part / form,separate entry for one species → plant-part/form trait + form qualifier in name
 gall,4931,Andricus notholithocarpi (midrib gall),Andricus notholithocarpi,,false,Plant part / form,separate entry for one species → plant-part/form trait + form qualifier in name
@@ -50,7 +51,9 @@ gall,2888,Asphondylia solidaginis (leaf snap),Asphondylia solidaginis,,false,Pla
 gall,3235,Tanaostigmodes howardii (detachable bud),Tanaostigmodes howardii,,false,Plant part / form,separate entry for one species → plant-part/form trait + form qualifier in name
 gall,2047,Tanaostigmodes howardii (integral stem),Tanaostigmodes howardii,,false,Plant part / form,separate entry for one species → plant-part/form trait + form qualifier in name
 gall,1519,Unknown (Cynipidae) q-alba-(deforming-pisiformis),,,false,Plant part / form,separate entry for one species → plant-part/form trait + form qualifier in name; undescribed in a placeholder genus → Inducer link at the family
-gall,2419,Periclistus pirata (altering Diplolepis gall),Periclistus pirata,,true,Relationship,inquiline-modified gall → modified form of relationship to the Diplolepis gall (curator names it); the Inducer link stays as today's name has it
+gall,2419,Periclistus pirata (altering Diplolepis gall),Periclistus pirata,,false,Relationship,inquiline-modified gall; the modified form of relationship to its Diplolepis gall comes later from source import; the Inducer link stays as today's name has it
+gall,6026,Puccinia recondita species complex,Puccinia recondita,,false,Name text,not a binomial: the Inducer is the species; species complex stays in the Gall's name
+gall,7161,"Aceria hibisci (Nalepa, 1906)",Aceria hibisci,,false,Name text,authorship written into the name: the Inducer is the species
 gall,1247,Cronartium quercuum (telial),Cronartium quercuum,telial,false,Rust spore stage,rust life-cycle stage → generation
 gall,6002,Gymnosporangium floriforme (aecial),Gymnosporangium floriforme,aecial,false,Rust spore stage,rust life-cycle stage → generation
 gall,6460,Gymnosporangium floriforme (telial),Gymnosporangium floriforme,telial,false,Rust spore stage,rust life-cycle stage → generation

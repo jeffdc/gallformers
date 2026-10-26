@@ -21,8 +21,8 @@ defmodule Gallformers.CatalogMigration.NameSuffixesTest do
   end
 
   describe "the shipped mapping" do
-    test "holds b5bd's 47 curated gall names", %{mapping: mapping} do
-      assert map_size(mapping.galls) == 47
+    test "holds b5bd's 47 curated gall names and 2 curated non-binomials", %{mapping: mapping} do
+      assert map_size(mapping.galls) == 49
     end
 
     test "marks every row b5bd leaves to a curator for review", %{mapping: mapping} do
@@ -61,11 +61,19 @@ defmodule Gallformers.CatalogMigration.NameSuffixesTest do
                NameSuffixes.parse(m, 1, "Andricus foo (agamic) (sexgen)")
     end
 
-    test "a token needing review parses, with the reason", %{mapping: m} do
-      assert {:ok, %{base: "Andricus foo", generation: nil, review: review}} =
-               NameSuffixes.parse(m, 1, "Andricus foo (summer and autumn generations)")
+    test "summer and autumn broods are one summer generation", %{mapping: m} do
+      for token <- ["summer and autumn generations", "summer and autumn generation"] do
+        assert {:ok, %{base: "Andricus foo", generation: "summer", review: nil}} =
+                 NameSuffixes.parse(m, 1, "Andricus foo (#{token})")
+      end
+    end
 
-      assert review =~ "multivoltine"
+    test "a token needing review parses, with the reason", context do
+      path = write_csv!(context, "token,odd,,,,true,x,ask a curator\n")
+      {:ok, m} = NameSuffixes.load(path)
+
+      assert {:ok, %{base: "Andricus foo", generation: nil, review: "ask a curator"}} =
+               NameSuffixes.parse(m, 1, "Andricus foo (odd)")
     end
 
     test "a placeholder genus prefix is not a suffix", %{mapping: m} do
@@ -86,11 +94,30 @@ defmodule Gallformers.CatalogMigration.NameSuffixesTest do
                 }}
     end
 
-    test "a curated row needing review says why", %{mapping: m} do
-      assert {:ok, %{base: "Cynips mellea", generation: "agamic", review: review}} =
-               NameSuffixes.parse(m, 3396, "Cynips mellea (rydbergiana) (agamic)")
+    test "a curated row needing review says why", context do
+      path =
+        write_csv!(
+          context,
+          "gall,7,Andricus foo (bar),Andricus foo,agamic,true,x,ask a curator\n"
+        )
 
-      assert review =~ "cryptic species"
+      {:ok, m} = NameSuffixes.load(path)
+
+      assert {:ok, %{base: "Andricus foo", generation: "agamic", review: "ask a curator"}} =
+               NameSuffixes.parse(m, 7, "Andricus foo (bar)")
+    end
+
+    test "a gall form is its species' Gall, with no review", %{mapping: m} do
+      assert {:ok, %{base: "Cynips mellea", generation: "agamic", review: nil}} =
+               NameSuffixes.parse(m, 3396, "Cynips mellea (rydbergiana) (agamic)")
+    end
+
+    test "a curated row names the Inducer of a name that is not a binomial", %{mapping: m} do
+      assert {:ok, %{base: "Puccinia recondita", review: nil}} =
+               NameSuffixes.parse(m, 6026, "Puccinia recondita species complex")
+
+      assert {:ok, %{base: "Aceria hibisci", review: nil}} =
+               NameSuffixes.parse(m, 7161, "Aceria hibisci (Nalepa, 1906)")
     end
 
     test "a curated row for a name the gall no longer has is stale", %{mapping: m} do

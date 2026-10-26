@@ -346,7 +346,7 @@ All 17 tasks are built on `taxogall` (uncommitted at the time of writing): `mix 
 
 **Open decisions:** none (introduced range and the Oban tables decided 2026-10-25, above).
 
-**Next (50ff steps 8 and on):** the first run on a production copy — `make experiment-db`, then `MIX_ENV=dev mix gallformers.catalog.migrate --skip-pending --reports docs/plans/catalog`; check every reconciliation line; fill the four CSVs in `priv/catalog_migration/` (non-galls, range decisions, aliases, keys) and extend `name_suffixes.csv` from the unparsed / `needs_review` lists (incl. the aphid and rust life-cycle assignments); fix duplicate taxon keys; re-run strict and time it. Notes go to the real private bucket on a dev run unless `s3_enabled: false`. Then the public pages (step 9).
+**Next:** step 8 is done (see *First rehearsal* below: every curated decision is made and the strict run is clean). The public pages are next (`50ff` step 9); the prod-data test targets are re-pointed with them.
 
 
 ## First rehearsal (2026-10-26)
@@ -355,12 +355,14 @@ Run on `gallformers_taxogall`, a clone of `gallformers_dev` (data to 2026-10-23)
 
 **Every reconciliation line balances.** 4,104 Galls; 2,582 plants; 1,515 higher taxa (102 placeholder genera crosswalked to their family); 1,083,689 host-range rows re-keyed (89,328 moved from 159 genus placeholders to their genus); 2,432 Inducer species created, 79 agamic/sexgen pairs merged; 45,169 legacy Facts; 6,871 citations; 1,325 notes; 7,716 images typed.
 
-**For Jeff to decide or curate:**
-- **Duplicate taxon key:** genus Phoradendron twice — old `taxonomy` 202 (under Santalaceae, the plant) and 985 (under "Santalaceae (gall)", the gall-forming mistletoe). In the new model they are one genus; the migration needs to map 985 onto 202's taxon.
-- **Non-galls:** 120 rows to mark `exclude` (or `migrate`) in `non_galls.csv`.
-- **Ranges:** 5,291 worksheet rows. `introduced` (1,642 Galls) is decided — `*,introduced,ignore` in `range_decisions.csv`, per the introduced-range decision. Left: `removed` (2,107 Galls, likely curator removals → exclude?), `host_added_later` (240 Galls, likely drift → ignore?), `host_range_widened` (12), `outside` (1,290 Galls, places beyond the Hosts' range → include?). `*` rows by cause are allowed. **Decided 2026-10-26 (option A, `b5bd` M0):** stored ranges are uncurated, so every cause is ignored; only the 34 range-confirmed Galls keep their North-American exclusions (`confirmed` rows with a `scope` column in `range_decisions.csv`). Inclusions are removed altogether: a Gall's range never extends beyond its Hosts' (`3272`).
-- **Aliases:** 2,829 gall "scientific" aliases to sort (synonym / former label / code / common name / drop); 1,124 common names applied automatically.
-- **Keys:** 2 links not to a Gall.
-- **Name suffixes:** 15 `needs_review` rows (cryptic-species checks, 2419's modified-form target, Prociphilus caryae's primary host, pathovar nerii, two multivoltine "summer and autumn generations"); 3 unparsed names: 4561 "(summer and autumn generation)" singular spelling, 6026 "Puccinia recondita species complex", 7161 "Aceria hibisci (Nalepa, 1906)" (authorship in the name).
-- **Other:** family Plasmodiophoridae has family type "Unknown", so no kingdom (Rhizaria/protist — set it); 120 `form: non-gall` Trait values (go away with the non-gall decisions); 4 citations and 2 notes on species that are neither Gall nor plant (not migrated).
+**Curated decisions (Jeff, 2026-10-26), all made; the strict run now passes with 0 pending, 0 duplicate taxon keys, 0 needs-review and 0 unparsed names:**
+- **Taxon merges** (`taxon_merges.csv`): "Santalaceae (gall)" and its Phoradendron (985) merge into the plant family and genus (202).
+- **Kingdom** (`kingdoms.csv`): Plasmodiophoridae → Chromista.
+- **Non-galls** (`non_galls.csv`): all 128 excluded — every scale and tar fungus, and every other row flagged non-gall, for now (revisit only if Adam comes back with a different answer).
+- **Ranges** (`range_decisions.csv`): option A (`b5bd` M0) — stored ranges are uncurated, so every cause is ignored; only the range-confirmed Galls keep their North-American exclusions (324 Facts on 18 Galls). No inclusions: a Gall's range never extends beyond its Hosts' (`3272`).
+- **Aliases** (`aliases.csv`): gall "scientific" aliases are synonyms of the species-level Inducer, former labels on undescribed galls, or dropped when blank or identical; plant scientific aliases are plant synonyms. Synonyms are stored without a trailing generation tag or author citation. The 25 old names on Galls of two different species are valid old names of each: a synonym of both Inducers. Names are unique per taxon only, so an import matching such a name gets an ambiguous resolution and goes to the admin queue. One exception: on undescribed gall 541 *Contarinia negundifolia* is a former label.
+- **Keys** (`keys.csv`): the two Populus midge key links to species that no longer exist are dropped; the lead text stays.
+- **Name suffixes** (`name_suffixes.csv`): parenthetical names such as *Neuroterus saltatorius* (australis / texanus / decrescens / saltatorius) (agamic) are gall forms of one species — one Inducer, a separate Gall per form, the form kept in the Gall's displayed name (also *N. quercicola* (pacificus), *N. vesicula* (cerinus), *Phylloxera caryaesepta* (perforans), *Cynips mellea* (rydbergiana)). "Summer and autumn generation(s)" is one multivoltine Gall with the generation `summer`. *Prociphilus caryae* on *Amelanchier* is fundatrix. *Pseudomonas savastanoi* pv nerii is the species for now. *Periclistus pirata*'s modified-form link to its *Diplolepis* gall comes later from source import. 6026 and 7161 name *Puccinia recondita* and *Aceria hibisci*.
+
+**Result:** 3,976 Galls (128 non-galls excluded); 2,407 synonyms, 79 former labels, 361 gall alias Facts; 324 range Facts; 43,876 legacy Facts. The derived names of a species' several gall forms coincide ("*N. saltatorius* (agamic)"); each Gall keeps today's name as its displayed name, so the form needs a home before names are rebuilt (`86e7`).
 
