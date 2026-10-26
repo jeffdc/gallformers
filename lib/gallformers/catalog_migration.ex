@@ -32,8 +32,10 @@ defmodule Gallformers.CatalogMigration do
 
     1. `Gallformers.CatalogMigration.NonGalls` — the gall rows not to
        migrate (`non_galls.csv`).
-    2. `Gallformers.CatalogMigration.Taxa` — higher taxa, plants, genus
-       placeholders, `host_range` re-keyed by taxon.
+    2. `Gallformers.CatalogMigration.Taxa` — higher taxa (rows kept twice
+       merged, `taxon_merges.csv`; family kingdoms a curator set,
+       `kingdoms.csv`), plants, genus placeholders, `host_range` re-keyed
+       by taxon.
     3. `Gallformers.CatalogMigration.Galls` — Inducer taxa from gall names
        (`priv/catalog_migration/name_suffixes.csv`), Galls.
     4. `Gallformers.CatalogMigration.Citations` — other Sources' record-level
@@ -54,7 +56,9 @@ defmodule Gallformers.CatalogMigration do
 
   Steps 1 and 8–10 report what needs a curator (worksheets in the report,
   written as CSV by `Report.write_curation/2`) and apply the decisions in
-  `priv/catalog_migration/` (`Gallformers.CatalogMigration.Curated`). A
+  `priv/catalog_migration/` (`Gallformers.CatalogMigration.Curated`); step
+  2 applies `taxon_merges.csv` and `kingdoms.csv`, which have no worksheet,
+  checked against today's taxonomy rows before anything is written. A
   **strict** run (the default; production's, `Gallformers.Release`) stops
   with nothing written when a row needs a decision it does not have, or
   taxa share an accepted name, rank and kingdom (replay would stop on
@@ -85,6 +89,7 @@ defmodule Gallformers.CatalogMigration do
   alias Gallformers.CatalogMigration.Galls
   alias Gallformers.CatalogMigration.Images
   alias Gallformers.CatalogMigration.Keys
+  alias Gallformers.CatalogMigration.Kingdoms
   alias Gallformers.CatalogMigration.LegacyFacts
   alias Gallformers.CatalogMigration.NameSuffixes
   alias Gallformers.CatalogMigration.NonGalls
@@ -93,6 +98,7 @@ defmodule Gallformers.CatalogMigration do
   alias Gallformers.CatalogMigration.Ranges
   alias Gallformers.CatalogMigration.Report
   alias Gallformers.CatalogMigration.Taxa, as: MigrationTaxa
+  alias Gallformers.CatalogMigration.TaxonMerges
   alias Gallformers.Repo
   alias Gallformers.Sources
   alias Gallformers.Taxa.NameNormalizer
@@ -145,8 +151,8 @@ defmodule Gallformers.CatalogMigration do
       `"catalog_migration"`)
     * `:name_suffixes` — the name-suffix mapping file (default the shipped
       one)
-    * `:non_galls`, `:range_decisions`, `:aliases`, `:keys` — the curated
-      decision files (`Gallformers.CatalogMigration.Curated`; default the
+    * `:non_galls`, `:range_decisions`, `:aliases`, `:keys`,
+      `:taxon_merges`, `:kingdoms` — the curated decision files (`Gallformers.CatalogMigration.Curated`; default the
       shipped ones)
     * `:pending` — `:fail` (the default, and the only mode for production)
       stops the run, writing nothing, when a curated row needs a decision
@@ -168,6 +174,7 @@ defmodule Gallformers.CatalogMigration do
     with {:ok, mode} <- pending_mode(opts),
          {:ok, suffixes} <- NameSuffixes.load(path),
          {:ok, curated} <- load_curated(opts),
+         {:ok, curated} <- check_taxa_decisions(curated),
          {:ok, _counts} <- Catalog.load_vocab(actor),
          {:ok, generations} <- generations(suffixes),
          {:ok, {plan, curated_facts, report}} <-
@@ -205,7 +212,9 @@ defmodule Gallformers.CatalogMigration do
       non_galls: &NonGalls.load/1,
       range_decisions: &Ranges.load/1,
       aliases: &Aliases.load/1,
-      keys: &Keys.load/1
+      keys: &Keys.load/1,
+      taxon_merges: &TaxonMerges.load/1,
+      kingdoms: &Kingdoms.load/1
     ]
 
     Enum.reduce_while(loaders, {:ok, %{}}, fn {input, load}, {:ok, acc} ->
@@ -216,6 +225,23 @@ defmodule Gallformers.CatalogMigration do
         {:error, message} -> {:halt, {:error, message}}
       end
     end)
+  end
+
+  # The merges and kingdoms checked against today's taxonomy rows, before
+  # anything is written: `curated.taxa` for the taxa step.
+  defp check_taxa_decisions(curated) do
+    rows = Map.new(Old.taxonomy(), &{&1.id, &1})
+
+    with {:ok, merges, merges_stale} <- TaxonMerges.check(curated.taxon_merges, rows),
+         {:ok, kingdoms, kingdoms_stale} <- Kingdoms.check(curated.kingdoms, rows, merges) do
+      taxa = %{
+        merges: merges,
+        kingdoms: kingdoms,
+        stale: [{"taxon_merges.csv", merges_stale}, {"kingdoms.csv", kingdoms_stale}]
+      }
+
+      {:ok, Map.put(curated, :taxa, taxa)}
+    end
   end
 
   @doc false
@@ -263,7 +289,7 @@ defmodule Gallformers.CatalogMigration do
 
     report = %Report{}
     {excluded, report} = NonGalls.run(curated.non_galls, report)
-    {taxa, report} = MigrationTaxa.run(actor, report)
+    {taxa, report} = MigrationTaxa.run(actor, curated.taxa, report)
     {galls, report} = Galls.run(actor, suffixes, generations, taxa, report, excluded)
 
     gall_ids = Map.new(galls, &{&1.id, true})

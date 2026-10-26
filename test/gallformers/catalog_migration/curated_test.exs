@@ -18,8 +18,11 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
   alias Gallformers.Catalog
   alias Gallformers.Catalog.Gall
   alias Gallformers.CatalogMigration
+  alias Gallformers.CatalogMigration.Curated
+  alias Gallformers.CatalogMigration.Kingdoms
   alias Gallformers.CatalogMigration.Old
   alias Gallformers.CatalogMigration.Report
+  alias Gallformers.CatalogMigration.TaxonMerges
   alias Gallformers.Import
   alias Gallformers.Taxa
 
@@ -27,7 +30,9 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
     non_galls: {"non_galls.csv", "gall_id,name,decision,note"},
     range_decisions: {"range_decisions.csv", "gall_id,cause,decision,note"},
     aliases: {"aliases.csv", "owner,owner_id,alias_id,name,type,decision,target,note"},
-    keys: {"keys.csv", "key,couplet,lead,species_id,decision,target_gall_id,note"}
+    keys: {"keys.csv", "key,couplet,lead,species_id,decision,target_gall_id,note"},
+    taxon_merges: {"taxon_merges.csv", "old_taxonomy_id,into_old_taxonomy_id,note"},
+    kingdoms: {"kingdoms.csv", "old_taxonomy_id,kingdom,note"}
   }
 
   # The seeds' Gall 101 has an introduced-only host region outside its
@@ -41,7 +46,10 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
 
     ctx = %{old: old_catalog_fixture(), dir: dir}
     curated!(ctx, :range_decisions, @seed_ranges)
-    for input <- [:non_galls, :aliases, :keys], do: curated!(ctx, input, [])
+
+    for input <- [:non_galls, :aliases, :keys, :taxon_merges, :kingdoms],
+        do: curated!(ctx, input, [])
+
     ctx
   end
 
@@ -586,5 +594,199 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
     assert Taxa.resolve_name("Fixturidae") == :none
 
     assert [%{name: "Fixturidae"}] = run!(ctx, pending: :skip).duplicates
+  end
+
+  # -- taxon merges --------------------------------------------------------------------
+
+  defp problems(report, category),
+    do: for(%{category: ^category, detail: detail} <- report.problems, do: detail)
+
+  defp higher_taxa(report),
+    do: Enum.find(report.reconciliation, &(&1.label == "Higher taxa (taxonomy rows)"))
+
+  describe "taxon merges" do
+    setup do
+      %{s: gall_family_fixture()}
+    end
+
+    defp merge_rows(s) do
+      [
+        "#{s.gall_family},#{s.family},one family (gall-forming mistletoe)",
+        "#{s.gall_genus},#{s.genus},one genus"
+      ]
+    end
+
+    test "without a merge, the twice-kept genus is a duplicate taxon key", ctx do
+      assert {:error, {:pending_decisions, report}} = run(ctx)
+
+      assert [%{name: "Fixturphoradendron", rank: :genus, kingdom: "Plantae"}] =
+               report.duplicates
+    end
+
+    test "a merged family and genus are no taxa of their own: they map onto their targets",
+         ctx do
+      s = ctx.s
+      curated!(ctx, :taxon_merges, merge_rows(s))
+
+      report = run!(ctx)
+      assert report.duplicates == []
+      assert report.pending == []
+
+      family = Taxa.get_by_legacy_id(:taxonomy, s.family)
+      genus = Taxa.get_by_legacy_id(:taxonomy, s.genus)
+      assert {Taxa.accepted_name(family), family.rank} == {"Fixtursantalaceae", :family}
+      assert {Taxa.accepted_name(genus), genus.parent_id} == {"Fixturphoradendron", family.id}
+
+      # Old IDs and bookmarks of the merged rows resolve to the targets.
+      assert Taxa.get_by_legacy_id(:taxonomy, s.gall_family).id == family.id
+      assert Taxa.get_by_legacy_id(:taxonomy, s.gall_genus).id == genus.id
+      assert Taxa.get_by_legacy_id(:taxonomy, s.placeholder).id == family.id
+      assert Taxa.resolve_name("Fixtursantalaceae (gall)") == :none
+
+      # Both keep kingdom Plantae.
+      assert {family.kingdom, genus.kingdom} == {"Plantae", "Plantae"}
+
+      # Children attach to the targets: the section, the Galls' Inducer links.
+      section = Taxa.get_by_legacy_id(:taxonomy, s.section)
+      assert {Taxa.accepted_name(section), section.parent_id} == {"Fixturvillosae", genus.id}
+
+      inducer = Taxa.get_by_legacy_id(:gall_inducer, s.gall)
+
+      assert {Taxa.accepted_name(inducer), inducer.parent_id, inducer.kingdom} ==
+               {"Fixturphoradendron serotinum", genus.id, "Plantae"}
+
+      assert Taxa.get_by_legacy_id(:gall_inducer, s.undescribed).id == family.id
+      assert Taxa.get_taxon!(s.plant).parent_id == genus.id
+
+      assert {"merged into another taxon (taxon_merges.csv)", 2} in higher_taxa(report).accounted
+      assert Enum.reject(report.reconciliation, &Report.balanced?/1) == []
+      assert problems(report, "taxon_merges.csv") == []
+    end
+
+    test "a merge across ranks is an error naming the row; nothing is written", ctx do
+      s = ctx.s
+      curated!(ctx, :taxon_merges, ["#{s.gall_family},#{s.genus},"])
+
+      assert {:error, message} = run(ctx)
+      assert message =~ "taxon_merges.csv row 2"
+      assert message =~ "rank"
+      assert Catalog.get_gall(ctx.old.agamic) == nil
+    end
+
+    test "a merge into itself or into a merged row is an error naming the row", ctx do
+      s = ctx.s
+      curated!(ctx, :taxon_merges, ["#{s.gall_genus},#{s.gall_genus},"])
+      assert {:error, message} = run(ctx)
+      assert message =~ "taxon_merges.csv row 2"
+
+      curated!(ctx, :taxon_merges, merge_rows(s) ++ ["#{s.section},#{s.gall_genus},"])
+      assert {:error, message} = run(ctx)
+      assert message =~ "taxon_merges.csv row 4"
+    end
+
+    test "rows naming unknown taxonomy rows are reported, not used", ctx do
+      s = ctx.s
+
+      curated!(
+        ctx,
+        :taxon_merges,
+        merge_rows(s) ++ ["999990,#{s.family},", "#{s.section},999991,"]
+      )
+
+      report = run!(ctx)
+
+      assert problems(report, "taxon_merges.csv") == [
+               "999990 into #{s.family}: 999990 is not a taxonomy row; the merge is not used",
+               "#{s.section} into 999991: 999991 is not a taxonomy row; the merge is not used"
+             ]
+
+      assert Taxa.get_by_legacy_id(:taxonomy, s.section).rank == :section
+    end
+
+    test "a merged family's kingdom decision is reported, not used", ctx do
+      s = ctx.s
+      curated!(ctx, :taxon_merges, merge_rows(s))
+      curated!(ctx, :kingdoms, ["#{s.gall_family},Fungi,"])
+
+      report = run!(ctx)
+
+      assert [detail] = problems(report, "kingdoms.csv")
+      assert detail =~ "#{s.gall_family}"
+      assert Taxa.get_by_legacy_id(:taxonomy, s.gall_family).kingdom == "Plantae"
+    end
+  end
+
+  # -- kingdoms ------------------------------------------------------------------------
+
+  describe "kingdoms" do
+    setup do
+      %{k: kingdomless_family_fixture()}
+    end
+
+    defp no_kingdom(report, family_id) do
+      for detail <- problems(report, "taxonomy"),
+          detail =~ "#{family_id}" and detail =~ "has no kingdom",
+          do: detail
+    end
+
+    test "a family whose type gives none has no kingdom, reported", ctx do
+      report = run!(ctx)
+
+      assert [_] = no_kingdom(report, ctx.k.family)
+      assert Taxa.get_by_legacy_id(:taxonomy, ctx.k.family).kingdom == nil
+    end
+
+    test "a kingdom decision applies to the family and everything below it", ctx do
+      k = ctx.k
+      curated!(ctx, :kingdoms, ["#{k.family},Chromista,phylum Cercozoa"])
+
+      report = run!(ctx)
+
+      assert no_kingdom(report, k.family) == []
+      family = Taxa.get_by_legacy_id(:taxonomy, k.family)
+      genus = Taxa.get_by_legacy_id(:taxonomy, k.genus)
+      inducer = Taxa.get_by_legacy_id(:gall_inducer, k.gall)
+
+      assert {family.kingdom, family.origin} == {"Chromista", :curated}
+      assert genus.kingdom == "Chromista"
+
+      assert {Taxa.accepted_name(inducer), inducer.kingdom} ==
+               {"Fixturphora brassicae", "Chromista"}
+
+      assert problems(report, "kingdoms.csv") == []
+    end
+
+    test "an unknown kingdom is an error naming the row", ctx do
+      curated!(ctx, :kingdoms, ["#{ctx.k.family},Protista,"])
+
+      assert {:error, message} = run(ctx)
+      assert message =~ "kingdoms.csv row 2"
+    end
+
+    test "a kingdom on a row that is not a family is an error naming the row", ctx do
+      curated!(ctx, :kingdoms, ["#{ctx.k.family},Chromista,", "#{ctx.k.genus},Chromista,"])
+
+      assert {:error, message} = run(ctx)
+      assert message =~ "kingdoms.csv row 3"
+    end
+
+    test "rows naming unknown taxonomy rows are reported, not used", ctx do
+      curated!(ctx, :kingdoms, ["999992,Fungi,"])
+
+      report = run!(ctx)
+
+      assert [detail] = problems(report, "kingdoms.csv")
+      assert detail =~ "999992"
+    end
+  end
+
+  test "the shipped merge and kingdom decisions load" do
+    assert {:ok, merges} = TaxonMerges.load(Curated.default_path(:taxon_merges))
+
+    assert merges |> Map.values() |> Enum.map(&{&1.old_id, &1.into_id}) |> Enum.sort() ==
+             [{984, 23}, {985, 202}]
+
+    assert {:ok, %{1140 => %{kingdom: "Chromista"}}} =
+             Kingdoms.load(Curated.default_path(:kingdoms))
   end
 end

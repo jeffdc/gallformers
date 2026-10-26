@@ -299,4 +299,68 @@ defmodule Gallformers.OldModelFixtures do
       no_inducer: no_inducer
     }
   end
+
+  @doc """
+  A gall-forming plant family kept twice, as today's Santalaceae is (a plant
+  family and a "Plant (gall forming)" family of the same name with " (gall)"):
+
+    * Fixtursantalaceae (Plant) > Fixturphoradendron, with the plant
+      Fixturphoradendron leucarpum.
+    * Fixtursantalaceae (gall) (Plant (gall forming)) > Fixturphoradendron
+      (again) > section Fixturvillosae, and the placeholder genus
+      "Unknown (Fixtursantalaceae (gall))"; the gall Fixturphoradendron
+      serotinum on the second genus, an undescribed gall in the placeholder.
+  """
+  def gall_family_fixture do
+    family = taxonomy!(880_040, "Fixtursantalaceae", "family", description: "Plant")
+    genus = taxonomy!(880_041, "Fixturphoradendron", "genus", parent: family)
+
+    gall_family =
+      taxonomy!(880_042, "Fixtursantalaceae (gall)", "family",
+        description: "Plant (gall forming)"
+      )
+
+    gall_genus = taxonomy!(880_043, "Fixturphoradendron", "genus", parent: gall_family)
+
+    placeholder =
+      taxonomy!(880_044, "Unknown (Fixtursantalaceae (gall))", "genus",
+        parent: gall_family,
+        placeholder: true
+      )
+
+    section = taxonomy!(880_045, "Fixturvillosae", "section", parent: gall_genus)
+
+    plant = plant!(880_160, "Fixturphoradendron leucarpum", genus)
+    gall = gall!(880_270, "Fixturphoradendron serotinum", gall_genus)
+
+    undescribed =
+      gall!(880_271, "Unknown (Fixtursantalaceae (gall)) fixture-broom", placeholder,
+        undescribed: true
+      )
+
+    %{
+      family: family,
+      genus: genus,
+      gall_family: gall_family,
+      gall_genus: gall_genus,
+      placeholder: placeholder,
+      section: section,
+      plant: plant,
+      gall: gall,
+      undescribed: undescribed
+    }
+  end
+
+  @doc """
+  A family whose type gives no kingdom (`"Unknown"`), as today's
+  Plasmodiophoridae: Fixturphoridae > Fixturphora, with the gall
+  Fixturphora brassicae.
+  """
+  def kingdomless_family_fixture do
+    family = taxonomy!(880_050, "Fixturphoridae", "family", description: "Unknown")
+    genus = taxonomy!(880_051, "Fixturphora", "genus", parent: family)
+    gall = gall!(880_272, "Fixturphora brassicae", genus)
+
+    %{family: family, genus: genus, gall: gall}
+  end
 end

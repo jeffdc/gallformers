@@ -2,8 +2,9 @@ defmodule Gallformers.CatalogMigration.Curated do
   @moduledoc """
   The data migration's curated inputs (`9449` Task 17): CSV files in
   `priv/catalog_migration/` holding a curator's decisions —
-  `non_galls.csv`, `range_decisions.csv`, `aliases.csv`, `keys.csv` — and
-  the worksheets the migration writes for filling them
+  `non_galls.csv`, `range_decisions.csv`, `aliases.csv`, `keys.csv`,
+  `taxon_merges.csv`, `kingdoms.csv` — and the worksheets the migration
+  writes for filling the first four
   (`Gallformers.CatalogMigration.Report.write_curation/2`).
 
   Columns are found by their header, so a worksheet with extra columns can
@@ -13,9 +14,9 @@ defmodule Gallformers.CatalogMigration.Curated do
 
   alias NimbleCSV.RFC4180, as: CSV
 
-  @inputs [:non_galls, :range_decisions, :aliases, :keys]
+  @inputs [:non_galls, :range_decisions, :aliases, :keys, :taxon_merges, :kingdoms]
 
-  @type input :: :non_galls | :range_decisions | :aliases | :keys
+  @type input :: :non_galls | :range_decisions | :aliases | :keys | :taxon_merges | :kingdoms
 
   @typedoc "A row as a map of column → trimmed text, with its line number (the header is 1)."
   @type row :: {pos_integer(), %{String.t() => String.t()}}

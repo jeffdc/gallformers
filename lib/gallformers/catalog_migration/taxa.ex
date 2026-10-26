@@ -7,10 +7,17 @@ defmodule Gallformers.CatalogMigration.Taxa do
       from `entity_id_seq`, under its parent's taxon, with a `:taxonomy`
       crosswalk entry (`legacy_taxon_ids`). Families take their kingdom from
       their description (the old "type": Plant → Plantae, Wasp → Animalia,
-      Fungus → Fungi, ...); everything below inherits it. Taxa in Plantae
-      are `:powo`, the rest `:curated`. Intermediate ranks the contract does
-      not have (Infrafamily, Supertribe, Infratribe) are skipped, their
-      children attached to the nearest taxon above, and reported.
+      Fungus → Fungi, ...), or from `kingdoms.csv`
+      (`Gallformers.CatalogMigration.Kingdoms`) where a curator set it;
+      everything below inherits it. Taxa in Plantae are `:powo`, the rest
+      `:curated`. Intermediate ranks the contract does not have
+      (Infrafamily, Supertribe, Infratribe) are skipped, their children
+      attached to the nearest taxon above, and reported.
+    * **Merged rows** (`taxon_merges.csv`,
+      `Gallformers.CatalogMigration.TaxonMerges`) — a row kept twice today
+      becomes no taxon of its own: its crosswalk entry points at the taxon
+      of the row it merges into, and what is below it attaches there. It
+      is placed after that row.
     * **Placeholders** — a placeholder genus ("Unknown (Cynipidae)") is no
       taxon: its crosswalk entry points at its family, and the "Unknown"
       family (with its "Unknown (Unknown)" genus) is no taxon at all.
@@ -71,8 +78,21 @@ defmodule Gallformers.CatalogMigration.Taxa do
           plants: %{integer() => integer() | nil}
         }
 
+  @typedoc """
+  The curated decisions on taxonomy rows, checked against today's rows:
+  `merges` (merged old ID → the old ID it merges into), `kingdoms` (old
+  family ID → kingdom) and `stale` (rows not used, as report lines by
+  decision file).
+  """
+  @type decisions :: %{
+          merges: %{integer() => integer()},
+          kingdoms: %{integer() => String.t()},
+          stale: [{String.t(), [String.t()]}]
+        }
+
   @doc """
-  Builds the higher taxa and plants and re-keys `host_range`, as `actor`.
+  Builds the higher taxa and plants and re-keys `host_range`, as `actor`,
+  applying the curated `decisions`.
 
   Returns the crosswalk the later steps use: `rows` (old taxonomy rows by
   ID), `anchors` (old taxonomy ID → the taxon its children and species
@@ -80,9 +100,9 @@ defmodule Gallformers.CatalogMigration.Taxa do
   `plants` (plant species ID → taxon ID; a genus placeholder → its genus
   taxon, or nil).
   """
-  @spec run(Gallformers.Audit.Actor.t(), Report.t()) :: {t(), Report.t()}
-  def run(actor, report) do
-    {ctx, report} = higher_taxa(actor, report)
+  @spec run(Gallformers.Audit.Actor.t(), decisions(), Report.t()) :: {t(), Report.t()}
+  def run(actor, decisions, report) do
+    {ctx, report} = higher_taxa(actor, decisions, report)
     {ctx, report} = plants(actor, ctx, report)
     report = rekey_host_range(ctx, report)
     {ctx, report}
@@ -90,14 +110,17 @@ defmodule Gallformers.CatalogMigration.Taxa do
 
   # -- higher taxa ---------------------------------------------------------------
 
-  defp higher_taxa(actor, report) do
+  defp higher_taxa(actor, decisions, report) do
     rows = Old.taxonomy()
     by_id = Map.new(rows, &{&1.id, &1})
-    ordered = top_down(rows)
+    ordered = top_down(rows, decisions.merges)
 
     acc = %{
       ctx: %{rows: by_id, anchors: %{}, taxa: %{}, plants: %{}},
+      merges: decisions.merges,
+      kingdoms: decisions.kingdoms,
       created: 0,
+      merged: 0,
       placeholders: 0,
       unknown: 0,
       skipped: [],
@@ -112,6 +135,7 @@ defmodule Gallformers.CatalogMigration.Taxa do
     report =
       report
       |> Report.reconcile("Higher taxa (taxonomy rows)", length(rows), acc.created, [
+        {"merged into another taxon (taxon_merges.csv)", acc.merged},
         {"placeholder genera (crosswalk to their family)", acc.placeholders},
         {"Unknown families", acc.unknown},
         {"skipped intermediate ranks", length(acc.skipped)},
@@ -121,22 +145,69 @@ defmodule Gallformers.CatalogMigration.Taxa do
       |> Report.problems("taxonomy", Enum.reverse(acc.problems))
       |> Report.problems("unreachable taxonomy row", unreached)
 
+    report =
+      Enum.reduce(decisions.stale, report, fn {input, details}, report ->
+        Report.problems(report, input, details)
+      end)
+
     {acc.ctx, report}
   end
 
-  # Parents before children; siblings by name, then ID.
-  defp top_down(rows) do
+  # Parents before children; siblings by name, then ID. A merged row (with
+  # everything below it) waits until the row it merges into is placed.
+  defp top_down(rows, merges) do
     children = Enum.group_by(rows, & &1.parent_id)
-    walk(Map.get(children, nil, []), children)
+    state = %{out: [], placed: MapSet.new(), deferred: []}
+
+    Map.get(children, nil, [])
+    |> walk(children, merges, state)
+    |> retry_deferred(children, merges)
+    |> Map.fetch!(:out)
+    |> Enum.reverse()
   end
 
-  defp walk(level, children) do
-    Enum.flat_map(Enum.sort_by(level, &{&1.name, &1.id}), fn row ->
-      [row | walk(Map.get(children, row.id, []), children)]
+  defp walk(level, children, merges, state) do
+    level
+    |> Enum.sort_by(&{&1.name, &1.id})
+    |> Enum.reduce(state, fn row, state ->
+      into = merges[row.id]
+
+      if into && not MapSet.member?(state.placed, into) do
+        %{state | deferred: [row | state.deferred]}
+      else
+        state = %{state | out: [row | state.out], placed: MapSet.put(state.placed, row.id)}
+        walk(Map.get(children, row.id, []), children, merges, state)
+      end
     end)
   end
 
+  # Rows still waiting when nothing more can be placed are left unreached.
+  defp retry_deferred(%{deferred: []} = state, _children, _merges), do: state
+
+  defp retry_deferred(state, children, merges) do
+    next = walk(state.deferred, children, merges, %{state | deferred: []})
+
+    if length(next.deferred) < length(state.deferred),
+      do: retry_deferred(next, children, merges),
+      else: next
+  end
+
   defp place_row(actor, row, acc) do
+    case acc.merges[row.id] do
+      nil -> place_own(actor, row, acc)
+      into -> merge_row(actor, row, into, acc)
+    end
+  end
+
+  # The taxon of the row it merges into (placed first) stands for it.
+  defp merge_row(actor, row, into, acc) do
+    taxon = acc.ctx.anchors[into]
+    legacy_id!(actor, taxon, :taxonomy, row.id, row.name)
+
+    acc |> anchor(row.id, taxon) |> Map.update!(:merged, &(&1 + 1))
+  end
+
+  defp place_own(actor, row, acc) do
     parent_anchor = row.parent_id && acc.ctx.anchors[row.parent_id]
 
     case classify(row) do
@@ -159,24 +230,30 @@ defmodule Gallformers.CatalogMigration.Taxa do
     end
   end
 
-  defp classify(%{type: "family"} = row) do
+  @doc """
+  What an old `taxonomy` row becomes: a taxon of a rank, the Unknown family
+  or a placeholder genus (no taxon), or nothing (`{:skip, reason}`).
+  """
+  @spec classify(map()) ::
+          {:rank, Rank.t()} | :unknown_family | :placeholder_genus | {:skip, String.t()}
+  def classify(%{type: "family"} = row) do
     if row.is_placeholder or String.trim(row.name) == "Unknown",
       do: :unknown_family,
       else: {:rank, :family}
   end
 
-  defp classify(%{type: "genus", is_placeholder: true}), do: :placeholder_genus
-  defp classify(%{type: "genus"}), do: {:rank, :genus}
-  defp classify(%{type: "section"}), do: {:rank, :section}
+  def classify(%{type: "genus", is_placeholder: true}), do: :placeholder_genus
+  def classify(%{type: "genus"}), do: {:rank, :genus}
+  def classify(%{type: "section"}), do: {:rank, :section}
 
-  defp classify(%{type: "intermediate", rank: rank}) do
+  def classify(%{type: "intermediate", rank: rank}) do
     case Map.fetch(@intermediate_ranks, rank) do
       {:ok, rank} -> {:rank, rank}
       :error -> {:skip, "rank #{inspect(rank)} is not in the contract's rank list"}
     end
   end
 
-  defp classify(%{type: type}), do: {:skip, "type #{inspect(type)} is not a taxon"}
+  def classify(%{type: type}), do: {:skip, "type #{inspect(type)} is not a taxon"}
 
   defp create_higher(actor, row, rank, parent_anchor, acc) do
     {parent, acc} = valid_parent(row, rank, parent_anchor, acc)
@@ -227,6 +304,10 @@ defmodule Gallformers.CatalogMigration.Taxa do
   defp climb(rank, id, taxa) do
     if Rank.below?(rank, taxa[id].rank), do: id, else: climb(rank, taxa[id].parent, taxa)
   end
+
+  # A curator's kingdom (kingdoms.csv) wins over the family type.
+  defp family_kingdom(%{id: id}, %{kingdoms: kingdoms} = acc) when is_map_key(kingdoms, id),
+    do: {kingdoms[id], acc}
 
   defp family_kingdom(row, acc) do
     description = String.trim(row.description || "")
@@ -409,5 +490,7 @@ defmodule Gallformers.CatalogMigration.Taxa do
     end
   end
 
-  defp row_label(row), do: "#{row.type} #{row.id} #{row.name}"
+  @doc "An old `taxonomy` row for the report: `\"family 30 Cynipidae\"`."
+  @spec row_label(map()) :: String.t()
+  def row_label(row), do: "#{row.type} #{row.id} #{row.name}"
 end

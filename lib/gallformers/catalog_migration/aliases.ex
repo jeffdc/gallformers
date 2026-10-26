@@ -244,13 +244,39 @@ defmodule Gallformers.CatalogMigration.Aliases do
     {planned, Enum.reverse(assertions)}
   end
 
+  @doc """
+  The name a "scientific" alias is stored under as a taxon synonym (alias
+  rule 1, Jeff 2026-10-26): trimmed, without a trailing parenthesised tag
+  ("(agamic)", "(Bassett)", "(Ashmead, 1881)") or trailing author words
+  ("Gillette", "C.H.Mull."). A subgenus between genus and epithet,
+  infraspecific ranks and lowercase third words are kept.
+  """
+  @spec synonym_name(String.t()) :: String.t()
+  def synonym_name(alias_name), do: alias_name |> String.trim() |> strip_trailing()
+
+  defp strip_trailing(name) do
+    stripped =
+      name
+      |> String.replace(~r/\s*\([^()]*\)\s*$/u, "")
+      |> String.replace(~r/^(\S+\s+\S+.*?)(?:\s+\p{Lu}\S*)+$/u, "\\1")
+
+    if stripped == name, do: name, else: strip_trailing(stripped)
+  end
+
   defp apply_row(_actor, %{action: {:pending, why}}, seen, assertions, _legacy),
     do: {"pending: #{why}", seen, assertions}
 
   defp apply_row(_actor, %{action: :drop}, seen, assertions, _legacy),
     do: {"dropped", seen, assertions}
 
-  defp apply_row(actor, %{action: {:synonym, taxon_id}, name: name}, seen, assertions, _legacy) do
+  defp apply_row(
+         actor,
+         %{action: {:synonym, taxon_id}, name: alias_name},
+         seen,
+         assertions,
+         _legacy
+       ) do
+    name = synonym_name(alias_name)
     key = {:synonym, taxon_id, NameNormalizer.normalize(name)}
 
     cond do
@@ -261,7 +287,7 @@ defmodule Gallformers.CatalogMigration.Aliases do
         {"already a name of #{Taxa.accepted_name(taxon_id)}", MapSet.put(seen, key), assertions}
 
       true ->
-        {:ok, _name} = Taxa.add_synonym(actor, taxon_id, String.trim(name))
+        {:ok, _name} = Taxa.add_synonym(actor, taxon_id, name)
         {"synonym of #{Taxa.accepted_name(taxon_id)}", MapSet.put(seen, key), assertions}
     end
   end
