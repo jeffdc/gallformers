@@ -72,10 +72,10 @@ defmodule Gallformers.Import.ResolverTest do
     end
 
     test "the rank filters" do
-      genus = taxon_fixture(name: "Andricus", rank: :genus)
-      taxon_fixture(name: "Andricus", rank: :subgenus)
+      genus = taxon_fixture(name: "Fixturicus", rank: :genus)
+      taxon_fixture(name: "Fixturicus", rank: :subgenus)
 
-      %{"t1" => s} = resolve(gall_batch([taxon("t1", "Andricus", "genus")]))
+      %{"t1" => s} = resolve(gall_batch([taxon("t1", "Fixturicus", "genus")]))
       assert s.resolution == :resolved
       assert s.taxon_id == genus.id
     end

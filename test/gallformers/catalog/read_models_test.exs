@@ -16,6 +16,7 @@ defmodule Gallformers.Catalog.ReadModelsTest do
 
   alias Gallformers.Catalog
   alias Gallformers.Catalog.ReadModels.GallSummary
+  alias Gallformers.Catalog.ReadModels.PotentialRange
 
   defp codes(:everywhere), do: :everywhere
   defp codes(places), do: places |> Enum.map(& &1.code) |> Enum.sort()
@@ -118,6 +119,66 @@ defmodule Gallformers.Catalog.ReadModelsTest do
       assert codes(Catalog.potential_range(ctx.gall.id)) == ["MX-JAL"]
     end
 
+    test "a genus Host with no rows of its own takes its species' ranges (803b decision 8)",
+         ctx do
+      genus = plant_fixture(rank: :genus, name: "Fixturquercus")
+      section = plant_fixture(rank: :section, name: "Fixturlobatae", parent: genus)
+      alba = plant_fixture(name: "Fixturquercus alba", parent: genus)
+      rubra = plant_fixture(name: "Fixturquercus rubra", parent: section)
+      host_range_fixture(alba, [{"US-CA", "exact"}])
+      host_range_fixture(rubra, [{"CA", "country"}, {"RO-B", "exact", "introduced"}])
+      host!(genus, ctx.gall, confirm(ctx.source))
+
+      assert codes(Catalog.potential_range(ctx.gall.id)) == ["CA-AB", "RO-B", "US-CA"]
+    end
+
+    test "a genus Host's own rows and its species' ranges are one union", ctx do
+      genus = plant_fixture(rank: :genus, name: "Fixturquercus")
+      host_range_fixture(genus, [{"MX-JAL", "exact"}])
+      alba = plant_fixture(name: "Fixturquercus alba", parent: genus)
+      host_range_fixture(alba, [{"US-CA", "exact"}])
+      host!(genus, ctx.gall, confirm(ctx.source))
+
+      assert codes(Catalog.potential_range(ctx.gall.id)) == ["MX-JAL", "US-CA"]
+    end
+
+    test "an exclude still removes a place from a genus Host's species' ranges", ctx do
+      genus = plant_fixture(rank: :genus, name: "Fixturquercus")
+      alba = plant_fixture(name: "Fixturquercus alba", parent: genus)
+      host_range_fixture(alba, [{"US-CA", "exact"}, {"CA", "country"}])
+      host!(genus, ctx.gall, confirm(ctx.source))
+      range!(ctx.gall, :exclude, "CA-AB", confirm(ctx.source))
+
+      assert codes(Catalog.potential_range(ctx.gall.id)) == ["US-CA"]
+    end
+
+    test "a species Host reads only its own rows, not those of taxa below it", ctx do
+      alba = plant_fixture(name: "Fixturquercus alba")
+      host_range_fixture(alba, [{"US-CA", "exact"}])
+
+      variety =
+        plant_fixture(name: "Fixturquercus alba var. fixtura", rank: :variety, parent: alba)
+
+      host_range_fixture(variety, [{"MX-JAL", "exact"}])
+      host!(alba, ctx.gall, confirm(ctx.source))
+
+      assert codes(Catalog.potential_range(ctx.gall.id)) == ["US-CA"]
+    end
+
+    test "for many Galls at once, a genus Host's range is its species' too", ctx do
+      genus = plant_fixture(rank: :genus, name: "Fixturquercus")
+      alba = plant_fixture(name: "Fixturquercus alba", parent: genus)
+      host_range_fixture(alba, [{"US-CA", "exact"}])
+      host!(genus, ctx.gall, confirm(ctx.source))
+      on_species = gall_fixture()
+      host!(ctx.canadian_oak, on_species, confirm(ctx.source))
+
+      ranges = PotentialRange.for_galls([ctx.gall.id, on_species.id])
+
+      assert codes(ranges[ctx.gall.id]) == ["US-CA"]
+      assert codes(ranges[on_species.id]) == ["CA-AB"]
+    end
+
     test "reads host ranges by taxon: a genus Host carries its former placeholder's rows", ctx do
       # The data migration re-keys a genus placeholder's ("Quercus spp.") rows
       # to the genus taxon, which has a new ID and no `species` row; the
@@ -216,6 +277,39 @@ defmodule Gallformers.Catalog.ReadModelsTest do
       assert "CA-AB" in range
       assert "BS" in range
       refute "US-CA" in range
+    end
+
+    test "for many Galls at once is each Gall's own range", ctx do
+      both = ctx.gall
+      host!(ctx.california_oak, both, confirm(ctx.source))
+      host!(ctx.canadian_oak, both, confirm(ctx.source))
+
+      excluded = gall_fixture()
+      host!(ctx.california_oak, excluded, confirm(ctx.source))
+      host!(ctx.canadian_oak, excluded, confirm(ctx.source))
+      range!(excluded, :exclude, "CA", confirm(ctx.source))
+
+      only = gall_fixture()
+      range!(only, :only, "MX-JAL", confirm(ctx.source))
+
+      everywhere_but = gall_fixture()
+      range!(everywhere_but, :exclude, "US-CA", confirm(ctx.source))
+
+      nowhere_known = gall_fixture()
+      host!(plant_fixture(), nowhere_known, confirm(ctx.source))
+
+      ids = Enum.map([both, excluded, only, everywhere_but, nowhere_known], & &1.id)
+      ranges = PotentialRange.for_galls(ids ++ [both.id])
+
+      assert Map.keys(ranges) |> Enum.sort() == Enum.sort(ids)
+      for id <- ids, do: assert(ranges[id] == Catalog.potential_range(id))
+
+      assert codes(ranges[both.id]) == ["CA-AB", "US-CA"]
+      assert codes(ranges[excluded.id]) == ["US-CA"]
+      assert codes(ranges[only.id]) == ["MX-JAL"]
+      refute "US-CA" in codes(ranges[everywhere_but.id])
+      assert ranges[nowhere_known.id] == :everywhere
+      assert PotentialRange.for_galls([]) == %{}
     end
   end
 
@@ -323,6 +417,18 @@ defmodule Gallformers.Catalog.ReadModelsTest do
 
   # -- flags -------------------------------------------------------------------
 
+  # The flags on this test's Galls: the converted seeds' Galls (which keep
+  # their species IDs) have generation pairs of their own.
+  defp own(flags) do
+    seeded =
+      MapSet.new(Repo.all(from(s in "species", where: s.taxoncode == "gall", select: s.id)))
+
+    Enum.reject(flags, fn flag -> Enum.any?(flag_galls(flag), &MapSet.member?(seeded, &1)) end)
+  end
+
+  defp flag_galls(%{gall_ids: ids}), do: ids
+  defp flag_galls(%{gall_id: id}), do: [id]
+
   describe "alternate-generation flags" do
     setup %{source: source} do
       load_vocab!()
@@ -336,7 +442,7 @@ defmodule Gallformers.Catalog.ReadModelsTest do
     end
 
     test "two generations of one species-level Inducer with no link are flagged", ctx do
-      assert [flag] = Catalog.alternate_generation_flags()
+      assert [flag] = own(Catalog.alternate_generation_flags())
       assert flag.kind == :unlinked_generations
       assert flag.inducer_id == ctx.wasp.id
       assert Enum.sort(flag.gall_ids) == Enum.sort([ctx.agamic.id, ctx.sexual.id])
@@ -344,7 +450,7 @@ defmodule Gallformers.Catalog.ReadModelsTest do
 
     test "linked generations are not flagged", ctx do
       alternate!(ctx.agamic, ctx.sexual, ctx.source)
-      assert Catalog.alternate_generation_flags() == []
+      assert own(Catalog.alternate_generation_flags()) == []
     end
 
     test "a withdrawn link no longer counts", ctx do
@@ -361,7 +467,7 @@ defmodule Gallformers.Catalog.ReadModelsTest do
           deny(source_fixture("Revision", "1990"))
         )
 
-      assert [%{kind: :unlinked_generations}] = Catalog.alternate_generation_flags()
+      assert [%{kind: :unlinked_generations}] = own(Catalog.alternate_generation_flags())
     end
 
     test "a genus-level Inducer's Galls are not compared", ctx do
@@ -371,7 +477,7 @@ defmodule Gallformers.Catalog.ReadModelsTest do
       inducer!(genus, a, ctx.source)
       inducer!(genus, b, ctx.source)
 
-      assert [%{inducer_id: inducer_id}] = Catalog.alternate_generation_flags()
+      assert [%{inducer_id: inducer_id}] = own(Catalog.alternate_generation_flags())
       assert inducer_id == ctx.wasp.id
     end
 
@@ -382,7 +488,7 @@ defmodule Gallformers.Catalog.ReadModelsTest do
       alternate!(ctx.agamic, ctx.sexual, ctx.source)
       %{fact: link} = alternate!(ctx.agamic, other_sexual, ctx.source)
 
-      assert [flag] = Catalog.alternate_generation_flags()
+      assert [flag] = own(Catalog.alternate_generation_flags())
       assert flag.kind == :linked_inducers_differ
       assert flag.fact_id == link.id
       assert flag.gall_ids == [ctx.agamic.id, other_sexual.id]
@@ -404,14 +510,14 @@ defmodule Gallformers.Catalog.ReadModelsTest do
 
     test "a generation in the group of the Inducer's nearest mapped ancestor is fine", ctx do
       map_group!("heterogony", ctx.cynipini)
-      assert Catalog.generation_group_flags() == []
+      assert own(Catalog.generation_group_flags()) == []
     end
 
     test "a deeper mapping overrides a higher one", ctx do
       map_group!("heterogony", ctx.cynipini)
       map_group!("seasonal", ctx.andricus)
 
-      assert [flag] = Catalog.generation_group_flags()
+      assert [flag] = own(Catalog.generation_group_flags())
       assert flag.kind == :generation_outside_groups
       assert flag.reason == :other_group
       assert flag.gall_id == ctx.gall.id
@@ -426,11 +532,11 @@ defmodule Gallformers.Catalog.ReadModelsTest do
       inducer!(cynipidae, family_gall, ctx.source)
       map_group!("heterogony", ctx.cynipini)
 
-      assert Catalog.generation_group_flags() == []
+      assert own(Catalog.generation_group_flags()) == []
     end
 
     test "a generation with no group mapped for its Inducer is flagged", ctx do
-      assert [%{reason: :no_groups, gall_id: gall_id}] = Catalog.generation_group_flags()
+      assert [%{reason: :no_groups, gall_id: gall_id}] = own(Catalog.generation_group_flags())
       assert gall_id == ctx.gall.id
     end
   end

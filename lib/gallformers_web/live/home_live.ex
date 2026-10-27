@@ -10,15 +10,14 @@ defmodule GallformersWeb.HomeLive do
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.{Galls, Images, Sources}
-  alias Gallformers.Plants
+  alias Gallformers.{Catalog, Images, Sources, Taxa}
 
   @impl true
   def mount(_params, _session, socket) do
     # Only fetch data when connected to avoid fetching twice
     {random_gall, stats} =
       if connected?(socket) do
-        {Galls.random_gall(), fetch_stats()}
+        {Catalog.random_gall(), fetch_stats()}
       else
         {nil, %{galls: 0, hosts: 0, sources: 0, images: 0}}
       end
@@ -42,8 +41,8 @@ defmodule GallformersWeb.HomeLive do
 
   defp fetch_stats do
     %{
-      galls: Galls.count_galls(),
-      hosts: Plants.count_hosts(),
+      galls: Catalog.count_galls(),
+      hosts: Taxa.count_plants(),
       sources: Sources.count_sources(),
       images: Images.count_images()
     }
@@ -74,7 +73,7 @@ defmodule GallformersWeb.HomeLive do
   def handle_event("search_host", %{"value" => query}, socket) do
     results =
       if String.length(query) >= 2 do
-        Plants.search_hosts(query, 50)
+        Taxa.search_plants(query, 50)
       else
         []
       end
@@ -84,10 +83,11 @@ defmodule GallformersWeb.HomeLive do
 
   @impl true
   def handle_event("select_host", %{"id" => id_str}, socket) do
-    host = Plants.get_host(String.to_integer(id_str))
-
     # On home page, selecting a host immediately navigates to ID page
-    {:noreply, push_navigate(socket, to: ~p"/id?h=#{host.name}")}
+    case host_name(socket.assigns.host_results, String.to_integer(id_str)) do
+      nil -> {:noreply, socket}
+      name -> {:noreply, push_navigate(socket, to: ~p"/id?h=#{name}")}
+    end
   end
 
   @impl true
@@ -110,6 +110,14 @@ defmodule GallformersWeb.HomeLive do
       end
 
     {:noreply, push_navigate(socket, to: path)}
+  end
+
+  # The chosen plant's accepted name, from the results shown.
+  defp host_name(results, id) do
+    case Enum.find(results, &(&1.id == id)) do
+      %{name: name} -> name
+      nil -> nil
+    end
   end
 
   defp format_host_display(%{name: name, aliases: aliases}) when is_list(aliases) do

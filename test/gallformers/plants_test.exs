@@ -356,7 +356,7 @@ defmodule Gallformers.PlantsTest do
 
       assert {:ok, _updated} = Plants.update_host_with_associations(species, params)
 
-      places = Ranges.get_places_for_host(species.id)
+      places = species.id |> Ranges.get_places_for_host_with_precision() |> Enum.map(& &1.code)
       assert place.code in places
     end
 

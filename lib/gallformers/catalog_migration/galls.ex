@@ -30,6 +30,11 @@ defmodule Gallformers.CatalogMigration.Galls do
   generation's qualifier ("Andricus foo (agamic)") — and today's name is kept
   as `name_override` wherever it differs, so every name shown stays as it is.
   A gall with no Inducer keeps today's name as its derived name.
+
+  Each Gall's `default_source_id` — the Source its page leads with (`803b`
+  decision 3) — is the Source of its `species_source` row marked
+  `useasdefault`, its Gallformers note or a citation alike. A gall with
+  several such rows keeps the lowest row's and is reported.
   """
 
   alias Gallformers.Catalog
@@ -73,6 +78,8 @@ defmodule Gallformers.CatalogMigration.Galls do
   def run(actor, suffixes, generations, taxa, report, excluded \\ MapSet.new()) do
     links = Old.links("gall")
     {skipped, rows} = Enum.split_with(Old.galls(), &MapSet.member?(excluded, &1.id))
+    defaults = default_sources()
+    default_of = Map.new(defaults.by_species, fn {id, [first | _]} -> {id, first.source_id} end)
 
     read = Enum.map(rows, &read_gall(&1, suffixes, Map.get(links, &1.id), taxa))
     inducers = create_inducers(actor, read, taxa)
@@ -85,7 +92,7 @@ defmodule Gallformers.CatalogMigration.Galls do
           do:
             MigrationTaxa.legacy_id!(actor, inducer_id, :gall_inducer, gall.row.id, gall.row.name)
 
-        create_gall!(actor, gall, inducer_name, generations)
+        create_gall!(actor, gall, inducer_name, generations, default_of[gall.row.id])
 
         %{
           id: gall.row.id,
@@ -96,7 +103,27 @@ defmodule Gallformers.CatalogMigration.Galls do
         }
       end
 
-    {galls, report(report, read, galls, inducers, length(skipped))}
+    report =
+      report
+      |> report(read, galls, inducers, length(skipped))
+      |> report_defaults(defaults, read)
+
+    {galls, report}
+  end
+
+  # Today's default descriptions (`species_source.useasdefault`), a citation
+  # or the Gallformers note alike, by species: each species' rows in
+  # `species_source` ID order (the lowest is kept).
+  defp default_sources do
+    rows =
+      Old.rows("""
+      SELECT ss.id, ss.species_id, ss.source_id, src.kind = 'gallformers' AS note
+      FROM species_source ss JOIN source src ON src.id = ss.source_id
+      WHERE ss.useasdefault
+      ORDER BY ss.id
+      """)
+
+    %{rows: rows, by_species: Enum.group_by(rows, & &1.species_id)}
   end
 
   # -- reading a gall row ----------------------------------------------------------
@@ -196,7 +223,7 @@ defmodule Gallformers.CatalogMigration.Galls do
 
   # -- Galls -----------------------------------------------------------------------
 
-  defp create_gall!(actor, gall, inducer_name, generations) do
+  defp create_gall!(actor, gall, inducer_name, generations, default_source_id) do
     row = gall.row
     name = String.trim(row.name)
     derived = derived_name(inducer_name, gall.generation, generations) || name
@@ -208,7 +235,8 @@ defmodule Gallformers.CatalogMigration.Galls do
       gallformers_code: blank_nil(row.gallformers_code),
       generation_value_id: gall.generation && Map.fetch!(generations, gall.generation).id,
       abundance_id: row.abundance_id,
-      datacomplete: row.datacomplete
+      datacomplete: row.datacomplete,
+      default_source_id: default_source_id
     }
 
     case Catalog.create_gall(actor, attrs) do
@@ -278,6 +306,40 @@ defmodule Gallformers.CatalogMigration.Galls do
       "gall without a genus link (no Inducer)",
       for(%{target: {:none, :no_genus}, row: row} <- read, do: "#{row.id} #{row.name}")
     )
+  end
+
+  defp report_defaults(report, defaults, read) do
+    names = Map.new(read, &{&1.row.id, &1.row.name})
+
+    {on_galls, elsewhere} =
+      Enum.split_with(defaults.rows, &Map.has_key?(names, &1.species_id))
+
+    kept = for {id, [first | _]} <- defaults.by_species, Map.has_key?(names, id), do: first
+
+    several =
+      for {id, [first | _] = rows} <- Enum.sort(defaults.by_species),
+          Map.has_key?(names, id),
+          length(rows) > 1 do
+        ids = Enum.map_join(rows, ", ", & &1.id)
+        "#{id} #{names[id]}: species_source #{ids} (#{first.id} kept)"
+      end
+
+    report
+    |> Report.reconcile(
+      "Default Sources (species_source useasdefault)",
+      length(defaults.rows),
+      Old.count("SELECT count(*) FROM galls WHERE default_source_id IS NOT NULL"),
+      [
+        {"on species that are not Galls", length(elsewhere)},
+        {"further defaults of a Gall (the lowest species_source ID kept)",
+         length(on_galls) - length(kept)}
+      ]
+    )
+    |> Report.count(
+      "Galls whose default Source is their Gallformers note",
+      Enum.count(kept, & &1.note)
+    )
+    |> Report.problems("Gall with several default Sources", several)
   end
 
   defp none_reason({:none, why}), do: why

@@ -15,10 +15,8 @@ defmodule Gallformers.Species do
       Gallformers.TextMatch
     ],
     dirty_xrefs: [
-      Gallformers.Galls,
       Gallformers.Galls.GallTraits,
-      Gallformers.Images,
-      Gallformers.Plants
+      Gallformers.Images
     ],
     exports: :all
 
@@ -26,14 +24,6 @@ defmodule Gallformers.Species do
 
   alias Gallformers.Repo
   alias Gallformers.Species.{Abundance, Alias, Species}
-
-  @doc """
-  Returns all species.
-  """
-  @spec list_species() :: [Species.t()]
-  def list_species do
-    Repo.all(Species)
-  end
 
   @doc """
   Gets a single species by ID.
@@ -49,64 +39,6 @@ defmodule Gallformers.Species do
   @spec get_species!(integer()) :: Species.t()
   def get_species!(id) do
     Repo.get!(Species, id)
-  end
-
-  @doc """
-  Returns species info for a list of IDs.
-
-  Returns a list of maps with :id, :name, and :taxoncode, ordered by name.
-  """
-  @spec list_species_by_ids([integer()]) :: [map()]
-  def list_species_by_ids(species_ids) when is_list(species_ids) do
-    from(s in Species,
-      where: s.id in ^species_ids,
-      order_by: s.name,
-      select: %{
-        id: s.id,
-        name: s.name,
-        taxoncode: s.taxoncode,
-        genus_placeholder: s.genus_placeholder
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Enriches a list of species maps with common names and host/gall counts.
-
-  Takes a list of maps with at least :id, :name, :taxoncode keys.
-  Returns the same list with :common_name and :count added to each.
-
-  Uses batch queries to avoid N+1 (3 queries total regardless of list size).
-  """
-  @spec enrich_with_common_names_and_counts([map()]) :: [map()]
-  def enrich_with_common_names_and_counts([]), do: []
-
-  def enrich_with_common_names_and_counts(species_list) do
-    species_ids = Enum.map(species_list, & &1.id)
-
-    # Batch fetch all aliases (1 query)
-    aliases_map = get_aliases_for_species_batch(species_ids)
-
-    # Separate galls from hosts for counting
-    {galls, hosts} = Enum.split_with(species_list, fn s -> s.taxoncode == "gall" end)
-    gall_ids = Enum.map(galls, & &1.id)
-    host_ids = Enum.map(hosts, & &1.id)
-
-    # Batch fetch counts (2 queries)
-    host_counts = Gallformers.Galls.get_host_counts_for_galls(gall_ids)
-    gall_counts = Gallformers.Plants.get_gall_counts_for_hosts(host_ids)
-
-    counts = Map.merge(host_counts, gall_counts)
-
-    Enum.map(species_list, fn species ->
-      aliases = Map.get(aliases_map, species.id, [])
-      common_alias = Enum.find(aliases, fn a -> a.type == "common" end)
-
-      species
-      |> Map.put(:common_name, common_alias && common_alias.name)
-      |> Map.put(:count, Map.get(counts, species.id, 0))
-    end)
   end
 
   @doc """
@@ -129,46 +61,11 @@ defmodule Gallformers.Species do
   end
 
   @doc """
-  Gets aliases for multiple species in a single query (batch version).
-
-  Returns a map of species_id => [%{id, name, type, description}].
-  """
-  @spec get_aliases_for_species_batch([integer()]) :: %{integer() => [map()]}
-  def get_aliases_for_species_batch([]), do: %{}
-
-  def get_aliases_for_species_batch(species_ids) do
-    from(a in Alias,
-      join: als in "alias_species",
-      on: als.alias_id == a.id,
-      where: als.species_id in ^species_ids,
-      select: %{
-        species_id: als.species_id,
-        id: a.id,
-        name: a.name,
-        type: a.type,
-        description: a.description
-      }
-    )
-    |> Repo.all()
-    |> Enum.group_by(& &1.species_id, fn row ->
-      %{id: row.id, name: row.name, type: row.type, description: row.description}
-    end)
-  end
-
-  @doc """
   Returns all abundance options.
   """
   @spec list_abundances() :: [Abundance.t()]
   def list_abundances do
     Repo.all(Abundance)
-  end
-
-  @doc """
-  Gets an abundance by ID.
-  """
-  @spec get_abundance(integer()) :: Abundance.t() | nil
-  def get_abundance(id) do
-    Repo.get(Abundance, id)
   end
 
   # ============================================
@@ -231,17 +128,6 @@ defmodule Gallformers.Species do
       )
     end)
     |> Repo.all()
-  end
-
-  @doc """
-  Searches species using ILIKE for substring matches.
-
-  Use this directly when you specifically need ILIKE matching
-  (e.g., searching for a substring in the middle of a name).
-  """
-  @spec search_species_like(String.t(), integer()) :: [map()]
-  def search_species_like(query, limit \\ 100) when is_binary(query) do
-    search_species_like_impl(query, limit)
   end
 
   @doc """

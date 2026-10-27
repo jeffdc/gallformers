@@ -51,36 +51,23 @@ defmodule Gallformers.SpeciesTest do
     end
   end
 
-  describe "list_species/0" do
-    test "returns all seeded species" do
-      species = Species.list_species()
-      # 9 plants + 6 galls = 15 species
-      assert length(species) == 15
-    end
-  end
-
-  describe "list_galls/0" do
-    test "returns only gall species with correct fields" do
-      galls = Galls.list_galls()
-      assert length(galls) == 6
+  describe "list_galls_paginated/2" do
+    test "returns only gall species, ordered by name" do
+      galls = Galls.list_galls_paginated(20, 0)
+      assert length(galls) == 11
       assert Enum.all?(galls, &(&1.taxoncode == "gall")) == true
-    end
 
-    test "returns galls ordered by name" do
-      galls = Galls.list_galls()
       names = Enum.map(galls, & &1.name)
       assert names == Enum.sort(names)
     end
-  end
 
-  describe "list_galls_paginated/2" do
     test "returns limited number of galls" do
       galls = Galls.list_galls_paginated(3, 0)
       assert length(galls) == 3
     end
 
     test "respects offset parameter" do
-      # 6 galls total, page size 3
+      # 11 galls total, page size 3
       first_page = Galls.list_galls_paginated(3, 0)
       second_page = Galls.list_galls_paginated(3, 3)
 
@@ -95,11 +82,7 @@ defmodule Gallformers.SpeciesTest do
 
   describe "count_galls/0" do
     test "returns count matching seeded galls" do
-      assert Galls.count_galls() == 6
-    end
-
-    test "count matches length of list_galls" do
-      assert Galls.count_galls() == length(Galls.list_galls())
+      assert Galls.count_galls() == 11
     end
   end
 
@@ -137,17 +120,6 @@ defmodule Gallformers.SpeciesTest do
     end
   end
 
-  describe "get_gall_by_name/1" do
-    test "returns nil for non-existent name" do
-      assert nil == Galls.get_gall_by_name("Nonexistent species name xyz")
-    end
-
-    test "returns gall for valid name" do
-      gall = Galls.get_gall_by_name("Amphibolips confluenta")
-      assert gall.id == 101
-    end
-  end
-
   describe "get_aliases_for_species/1" do
     test "returns empty list for non-existent species" do
       assert Species.get_aliases_for_species(999_999_999) == []
@@ -162,16 +134,11 @@ defmodule Gallformers.SpeciesTest do
     end
   end
 
-  describe "random_gall/0" do
-    test "returns nil when no galls have images" do
-      # No images seeded, so random_gall should return nil
-      assert Galls.random_gall() == nil
-    end
-  end
-
   describe "get_default_gall_images/0" do
-    test "returns empty list when no images are seeded" do
-      assert Galls.get_default_gall_images() == []
+    test "returns the first image of each gall that has one" do
+      assert Galls.get_default_gall_images() == [
+               %{path: "gall/300/300_seed_original.jpg", species_id: 300}
+             ]
     end
   end
 
@@ -181,12 +148,6 @@ defmodule Gallformers.SpeciesTest do
       assert length(abundances) == 3
       names = Enum.map(abundances, & &1.abundance) |> Enum.sort()
       assert names == ["common", "rare", "uncommon"]
-    end
-  end
-
-  describe "get_abundance/1" do
-    test "returns nil for non-existent abundance" do
-      assert nil == Species.get_abundance(999_999_999)
     end
   end
 

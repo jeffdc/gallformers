@@ -1,72 +1,69 @@
 defmodule GallformersWeb.IntermediateLive do
   @moduledoc """
-  LiveView for the public intermediate taxonomy browse page.
+  LiveView for the public pages of the ranks between family and genus
+  (subfamily, tribe, subtribe).
 
-  Displays an intermediate rank (subfamily, tribe, etc.) with its
-  breadcrumb lineage and list of children (genera and sub-intermediates).
+  Displays the taxon (`Gallformers.Taxa.get_by_name/2`, its rank from the
+  route) with its breadcrumb lineage, its children (genera and lower
+  intermediate ranks) with their gall and host counts, and the Galls
+  placed at the taxon itself. Data through `GallformersWeb.RankPage`.
+  Routes for ranks the taxonomy no longer has (infratribe, supertribe,
+  infrafamily) find nothing.
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.Taxonomy
+  alias Gallformers.Taxa
+  alias Gallformers.Taxa.Rank
+  alias GallformersWeb.LineageBreadcrumb
+  alias GallformersWeb.RankPage
+  alias GallformersWeb.RankPageComponents
   alias GallformersWeb.TaxonomyURL
 
   @impl true
   def mount(%{"name" => name}, _session, socket) do
-    if TaxonomyURL.numeric?(name) do
-      redirect_by_id(socket, name)
-    else
-      expected_rank =
-        socket.assigns.live_action
-        |> Atom.to_string()
-        |> String.capitalize()
+    rank = socket.assigns.live_action
 
-      case Taxonomy.get_taxonomy_by_name(name, "intermediate") do
-        %{rank: ^expected_rank} = taxonomy ->
-          load_intermediate(socket, taxonomy)
+    lookup =
+      if rank in Rank.all(),
+        do: RankPage.lookup(name, rank),
+        else: {:ok, []}
 
-        _ ->
-          {:ok, assign_not_found(socket, "Taxonomy not found")}
-      end
+    case lookup do
+      {:redirect, path} -> {:ok, push_navigate(socket, to: path, replace: true)}
+      {:ok, []} -> {:ok, assign_not_found(socket, "Taxonomy not found")}
+      {:ok, [taxon | _]} -> {:ok, load_intermediate(socket, taxon.id, name, rank)}
     end
   end
 
-  defp redirect_by_id(socket, id_str) do
-    case Taxonomy.get_taxonomy(String.to_integer(id_str)) do
-      %{type: "intermediate"} = taxonomy ->
-        case TaxonomyURL.public_path(taxonomy) do
-          nil -> {:ok, assign_not_found(socket, "Taxonomy not found")}
-          path -> {:ok, push_navigate(socket, to: path, replace: true)}
-        end
+  defp load_intermediate(socket, id, name, rank) do
+    rank_label = rank |> Atom.to_string() |> String.capitalize()
+    children = RankPage.children(id)
 
-      _ ->
-        {:ok, assign_not_found(socket, "Taxonomy not found")}
-    end
-  end
+    lineage =
+      id
+      |> Taxa.lineage()
+      |> Enum.reject(&(&1.taxon_id == id))
+      |> LineageBreadcrumb.from_lineage()
 
-  defp load_intermediate(socket, taxonomy) do
-    path = Taxonomy.get_taxonomy_path(taxonomy.id)
-    lineage = Taxonomy.lineage_from_path(path)
-    children = Taxonomy.list_children_with_counts(taxonomy.id)
-
-    {:ok,
-     assign(socket,
-       page_title: "#{taxonomy.rank}: #{taxonomy.name}",
-       page_description:
-         "#{taxonomy.name} - A taxonomic #{String.downcase(taxonomy.rank || "group")} documented on Gallformers.",
-       page_url: TaxonomyURL.public_path(taxonomy),
-       page_image: nil,
-       page_json_ld: nil,
-       page_noindex: false,
-       taxonomy: taxonomy,
-       lineage: lineage,
-       children: children,
-       filtered_children: children,
-       total_children_count: length(children),
-       search_query: "",
-       sort_by: :name,
-       sort_dir: :asc,
-       error: nil
-     )}
+    assign(socket,
+      page_title: "#{rank_label}: #{name}",
+      page_description:
+        "#{name} - A taxonomic #{String.downcase(rank_label)} documented on Gallformers.",
+      page_url: TaxonomyURL.public_path(%{rank: rank, name: name}),
+      page_image: nil,
+      page_json_ld: nil,
+      page_noindex: false,
+      taxonomy: %{id: id, name: name, rank: rank_label, description: RankPage.description(id)},
+      lineage: lineage,
+      children: children,
+      filtered_children: children,
+      total_children_count: length(children),
+      galls: RankPage.galls_of_inducers([id]),
+      search_query: "",
+      sort_by: :name,
+      sort_dir: :asc,
+      error: nil
+    )
   end
 
   defp assign_not_found(socket, error) do
@@ -82,6 +79,7 @@ defmodule GallformersWeb.IntermediateLive do
       children: [],
       filtered_children: [],
       total_children_count: 0,
+      galls: [],
       search_query: "",
       sort_by: :name,
       sort_dir: :asc,
@@ -89,57 +87,27 @@ defmodule GallformersWeb.IntermediateLive do
     )
   end
 
-  defp child_url(child), do: TaxonomyURL.public_path(child)
-
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
     {:noreply,
-     socket
-     |> assign(:search_query, query)
-     |> filter_children()}
+     assign(socket,
+       search_query: query,
+       filtered_children: RankPage.filter_children(socket.assigns.children, query)
+     )}
   end
 
   @impl true
   def handle_event("sort", %{"column" => column}, socket)
-      when column in ["name", "type", "species_count"] do
-    column_atom = String.to_atom(column)
+      when column in ["name", "type", "gall_count", "host_count"] do
+    {sort_by, sort_dir} =
+      RankPage.toggle_sort(
+        socket.assigns.sort_by,
+        socket.assigns.sort_dir,
+        String.to_existing_atom(column)
+      )
 
-    {new_sort_by, new_sort_dir} =
-      if socket.assigns.sort_by == column_atom do
-        new_dir = if socket.assigns.sort_dir == :asc, do: :desc, else: :asc
-        {column_atom, new_dir}
-      else
-        {column_atom, :asc}
-      end
-
-    {:noreply, assign(socket, sort_by: new_sort_by, sort_dir: new_sort_dir)}
+    {:noreply, assign(socket, sort_by: sort_by, sort_dir: sort_dir)}
   end
-
-  defp filter_children(socket) do
-    query = String.downcase(socket.assigns.search_query)
-
-    filtered =
-      if query == "" do
-        socket.assigns.children
-      else
-        Enum.filter(socket.assigns.children, fn c ->
-          String.contains?(String.downcase(c.name), query) ||
-            (c.description && String.contains?(String.downcase(c.description), query)) ||
-            (c.rank && String.contains?(String.downcase(c.rank), query))
-        end)
-      end
-
-    assign(socket, :filtered_children, filtered)
-  end
-
-  defp sorted_children(children, sort_by, sort_dir) do
-    sorted = Enum.sort_by(children, &sort_key(&1, sort_by))
-    if sort_dir == :desc, do: Enum.reverse(sorted), else: sorted
-  end
-
-  defp sort_key(child, :type), do: String.downcase(child.rank || child.type || "")
-  defp sort_key(child, :species_count), do: child.species_count
-  defp sort_key(child, _), do: String.downcase(child.name || "")
 
   @impl true
   def render(assigns) do
@@ -157,24 +125,19 @@ defmodule GallformersWeb.IntermediateLive do
                   <span class="text-lg font-normal text-gray-600">{@taxonomy.rank}:</span>
                   {@taxonomy.name}
                 </h1>
-                <.link
-                  :if={@current_user}
-                  href={~p"/admin/taxonomy/#{@taxonomy.id}"}
-                  class="text-gray-400 hover:text-gf-maroon"
-                  title="Edit in admin"
-                >
-                  <.icon name="ph-pencil-simple" class="h-5 w-5" />
-                </.link>
               </div>
+              <p
+                :if={@taxonomy.description not in [nil, ""]}
+                class="text-gray-600 mb-2"
+              >
+                {@taxonomy.description}
+              </p>
 
               <%!-- Breadcrumb --%>
               <.taxonomy_breadcrumb
-                family={@lineage && @lineage.family}
-                intermediates={
-                  if @lineage,
-                    do: Enum.reject(@lineage.intermediates, &(&1.id == @taxonomy.id)),
-                    else: []
-                }
+                :if={@lineage}
+                family={@lineage.family}
+                intermediates={@lineage.intermediates}
               />
             </div>
 
@@ -226,21 +189,38 @@ defmodule GallformersWeb.IntermediateLive do
                           <th
                             class="sortable text-center"
                             phx-click="sort"
-                            phx-value-column="species_count"
+                            phx-value-column="gall_count"
                           >
-                            Species
-                            <span :if={@sort_by == :species_count} class="ml-1">
+                            Galls
+                            <span :if={@sort_by == :gall_count} class="ml-1">
+                              {if @sort_dir == :asc, do: "↑", else: "↓"}
+                            </span>
+                          </th>
+                          <th
+                            class="sortable text-center"
+                            phx-click="sort"
+                            phx-value-column="host_count"
+                          >
+                            Hosts
+                            <span :if={@sort_by == :host_count} class="ml-1">
                               {if @sort_dir == :asc, do: "↑", else: "↓"}
                             </span>
                           </th>
                         </tr>
                       </thead>
                       <tbody>
-                        <tr :for={child <- sorted_children(@filtered_children, @sort_by, @sort_dir)}>
+                        <tr :for={
+                          child <- RankPage.sort_children(@filtered_children, @sort_by, @sort_dir)
+                        }>
                           <td>
-                            <.link href={child_url(child)} class="hover:underline font-medium">
-                              <.taxon_name name={child.name} rank={child.type} />
+                            <.link
+                              :if={child.url}
+                              href={child.url}
+                              class="hover:underline font-medium"
+                            >
+                              <.taxon_name name={child.name} rank={child.rank} />
                             </.link>
+                            <.taxon_name :if={!child.url} name={child.name} rank={child.rank} />
                             <span
                               :if={child.description not in [nil, ""]}
                               class="text-gray-500 text-sm ml-1"
@@ -249,13 +229,10 @@ defmodule GallformersWeb.IntermediateLive do
                             </span>
                           </td>
                           <td class="text-center">
-                            <span class="text-sm text-gray-600">
-                              {child.rank || child.type}
-                            </span>
+                            <span class="text-sm text-gray-600">{child.rank}</span>
                           </td>
-                          <td class="text-center text-gray-600">
-                            {child.species_count}
-                          </td>
+                          <td class="text-center text-gray-600">{child.gall_count}</td>
+                          <td class="text-center text-gray-600">{child.host_count}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -273,6 +250,20 @@ defmodule GallformersWeb.IntermediateLive do
               <% else %>
                 <p class="text-gray-500 italic">No children found.</p>
               <% end %>
+            </div>
+
+            <%!-- Galls placed at this rank itself --%>
+            <div :if={@galls != []} class="mt-6">
+              <h2 class="text-lg font-semibold text-gray-800 mb-3">
+                Galls placed in this {String.downcase(@taxonomy.rank)} ({length(@galls)})
+              </h2>
+              <RankPageComponents.species_table
+                id="intermediate-galls"
+                rows={@galls}
+                url_prefix="/gall/"
+                name_header="Gall"
+                count_header="Number of Hosts"
+              />
             </div>
           <% end %>
         <% end %>

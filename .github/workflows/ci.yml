@@ -106,6 +106,7 @@ jobs:
           psql -U postgres -d gallformers_test -f priv/repo/test_seeds.sql --quiet
           createdb -U postgres wcvp_test
           psql -U postgres -d wcvp_test -f priv/repo/wcvp_test_setup.sql --quiet
+          mix gallformers.catalog.migrate --curated test/support/fixtures/catalog_migration --no-s3
 
       - name: Run precommit checks (format, compile, credo, migrations, tests, exclusion check)
         run: mix precommit

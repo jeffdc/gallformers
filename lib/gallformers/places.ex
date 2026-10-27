@@ -392,6 +392,35 @@ defmodule Gallformers.Places do
   end
 
   @doc """
+  Each place's leaf descendants (itself, for a leaf), by place ID, in one
+  query: `batch_leaf_descendant_ids/1` kept apart per place. Unknown IDs are
+  left out.
+  """
+  @spec leaf_descendant_ids_by_place([integer()]) :: %{integer() => [integer()]}
+  def leaf_descendant_ids_by_place([]), do: %{}
+
+  def leaf_descendant_ids_by_place(place_ids) when is_list(place_ids) do
+    {:ok, %{rows: rows}} =
+      Repo.query(
+        """
+        WITH RECURSIVE descendants(root, id) AS (
+          SELECT id, id FROM place WHERE id = ANY($1::bigint[])
+          UNION
+          SELECT d.root, ph.place_id
+          FROM place_hierarchy ph
+          JOIN descendants d ON ph.parent_id = d.id
+        )
+        SELECT d.root, d.id FROM descendants d
+        WHERE NOT EXISTS (SELECT 1 FROM place_hierarchy c WHERE c.parent_id = d.id)
+        ORDER BY d.root, d.id
+        """,
+        [Enum.uniq(place_ids)]
+      )
+
+    Enum.group_by(rows, fn [root, _id] -> root end, fn [_root, id] -> id end)
+  end
+
+  @doc """
   Returns the ancestor places for a given place, ordered from root to immediate parent.
   Does not include the place itself.
   """

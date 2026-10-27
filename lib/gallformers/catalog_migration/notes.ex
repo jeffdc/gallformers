@@ -9,9 +9,10 @@ defmodule Gallformers.CatalogMigration.Notes do
   after release can quote it. Nothing is extracted now. Empty notes, and
   notes on species that are not Galls, are reported and not migrated.
 
-  Today's `useasdefault` and `externallink` on these rows are counted for
-  the open decision on the default description (`b5bd` M2); the note
-  documents do not carry them.
+  Today's `useasdefault` and `externallink` on these rows are counted; the
+  note documents do not carry them. A note marked `useasdefault` makes the
+  Gallformers Source its Gall's `default_source_id`
+  (`Gallformers.CatalogMigration.Galls`; `803b` decision 3).
   """
 
   alias Gallformers.CatalogMigration.Old

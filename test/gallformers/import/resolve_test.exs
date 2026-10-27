@@ -7,7 +7,6 @@ defmodule Gallformers.Import.ResolveTest do
   """
   use Gallformers.DataCase, async: true
 
-  import Gallformers.CatalogFixtures, only: [plant_fixture: 1]
   import Gallformers.ImportFixtures
   import Gallformers.TaxaFixtures
 
@@ -44,7 +43,10 @@ defmodule Gallformers.Import.ResolveTest do
   setup do
     wasp = taxon_fixture(name: "Andricus quercuscalifornicus", kingdom: "Animalia")
     torymus = taxon_fixture(name: "Torymus", rank: :genus, kingdom: "Animalia")
-    velutina = plant_fixture(name: "Quercus velutina")
+    # The converted seeds' plant (species 3); another of this name would make
+    # the Host name ambiguous.
+    velutina = Taxa.get_taxon!(3)
+    assert Taxa.accepted_name(velutina) == "Quercus velutina"
     %{wasp: wasp, torymus: torymus, velutina: velutina}
   end
 

@@ -2,7 +2,8 @@ defmodule GallformersWeb.E2ECase do
   @moduledoc """
   Test case for E2E browser tests using Playwright.
 
-  All E2E tests run against a production data copy and exercise the full
+  All E2E tests run against a converted production data copy (old tables
+  plus the new back-end the public pages read) and exercise the full
   browser stack (LiveView, Phoenix, Ecto) in a real browser via Playwright.
   Writes use the Ecto sandbox so they roll back automatically.
 
@@ -12,9 +13,12 @@ defmodule GallformersWeb.E2ECase do
 
       make e2e-setup
 
-  Load production data into the test database:
+  Load converted production data into the test database:
 
-      make load-prod-data-test
+      make load-prod-data-test                              # download + convert
+      make load-prod-data-test PROD_DATA_DB=gallformers_taxogall  # clone a converted copy
+
+  Every `make e2e*` target takes the same `PROD_DATA_DB`.
 
   ## Running E2E Tests
 
@@ -50,9 +54,7 @@ defmodule GallformersWeb.E2ECase do
 
   use ExUnit.CaseTemplate
 
-  import Ecto.Query
-
-  @min_species_count 1000
+  @min_gall_count 1000
 
   using do
     quote do
@@ -82,20 +84,18 @@ defmodule GallformersWeb.E2ECase do
   end
 
   setup_all context do
-    # Verify production data is loaded
+    # Verify converted production data is loaded
     pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Gallformers.Repo, shared: true)
-
-    count =
-      Gallformers.Repo.one(from s in "species", select: count(s.id))
-
+    count = Gallformers.Catalog.count_galls()
     Ecto.Adapters.SQL.Sandbox.stop_owner(pid)
 
-    if count < @min_species_count do
+    if count < @min_gall_count do
       raise """
-      E2E tests require production data (found #{count} species, need >= #{@min_species_count}).
+      E2E tests require converted production data (found #{count} Galls, need >= #{@min_gall_count}).
 
       Run `make e2e` which loads production data automatically,
-      or `make load-prod-data-test` to load it manually.
+      or `make load-prod-data-test` to load it manually
+      (`PROD_DATA_DB=gallformers_taxogall` clones an already converted copy).
       """
     end
 

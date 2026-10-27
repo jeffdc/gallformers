@@ -4,7 +4,13 @@ defmodule GallformersWeb.AboutControllerTest do
   """
   use GallformersWeb.ConnCase, async: true
 
+  import Gallformers.CatalogFixtures
+
   alias Gallformers.Accounts
+  alias Gallformers.Catalog
+  alias Gallformers.Images
+  alias Gallformers.Sources
+  alias Gallformers.Taxa
 
   # Helper to generate unique auth0 IDs
   defp unique_auth0_id, do: "auth0|test-#{System.unique_integer([:positive])}"
@@ -42,6 +48,33 @@ defmodule GallformersWeb.AboutControllerTest do
       html = html_response(conn, 200)
 
       assert html =~ "Stats" or html =~ "galls" or html =~ "hosts"
+    end
+
+    test "site statistics count the new back-end's Galls and plants", %{conn: conn} do
+      gall_fixture()
+      plant_fixture()
+
+      conn = get(conn, ~p"/about")
+      html = html_response(conn, 200)
+      galls = Catalog.gall_counts()
+      plants = Taxa.plant_counts()
+
+      assert conn.assigns.stats == %{
+               galls: galls.galls,
+               undescribed: galls.undescribed,
+               gall_families: galls.families,
+               gall_genera: galls.genera,
+               hosts: plants.plants,
+               host_families: plants.families,
+               host_genera: plants.genera,
+               sources: Sources.count_sources(),
+               images: Images.count_images()
+             }
+
+      assert html =~ "#{galls.galls} gallformers across #{galls.families} families"
+      assert html =~ "#{galls.undescribed} are undescribed"
+      assert html =~ "#{plants.plants} hosts across #{plants.families} families"
+      assert html =~ "#{Images.count_images()} images"
     end
 
     test "displays administrators section heading", %{conn: conn} do

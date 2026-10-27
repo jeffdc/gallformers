@@ -15,7 +15,6 @@ defmodule Gallformers.Galls do
       Gallformers.ChangesetHelpers,
       Gallformers.SchemaFields,
       Gallformers.Species,
-      Gallformers.TaxonName,
       Gallformers.Taxonomy,
       Gallformers.FilterFields,
       Gallformers.Images,
@@ -44,36 +43,24 @@ defmodule Gallformers.Galls do
   alias Gallformers.Places.Place
   alias Gallformers.Repo
   alias Gallformers.Species.{Abundance, Species}
-  alias Gallformers.TaxonName
-  alias Gallformers.Taxonomy.TreeBuilder
-
-  @topic "galls"
 
   # ============================================
   # Identification (filter pipeline)
   # ============================================
 
+  # The old ID tool's filter, kept for `mix gallformers.catalog.id_parity`.
   defdelegate filter_galls(filters \\ %{}), to: Identification
-  defdelegate count_filtered_galls(filters \\ %{}), to: Identification
-  defdelegate get_hosts_for_filters(filters \\ %{}), to: Identification
-  defdelegate get_filter_options(), to: Identification
-  defdelegate get_summary_data(gall_ids), to: Identification
-  defdelegate leaf_plant_part_ids(), to: Identification
 
   # =====================================================================
   # Host associations — delegated to Galls.HostAssociations
   # =====================================================================
 
   defdelegate get_hosts_for_gall(gall_species_id), to: HostAssociations
-  defdelegate get_hosts_for_galls(gall_species_ids), to: HostAssociations
-  defdelegate get_host_counts_for_galls(gall_species_ids), to: HostAssociations
   defdelegate get_host_species_ids_for_gall(gall_species_id), to: HostAssociations
-  defdelegate only_placeholder_hosts?(hosts), to: HostAssociations
   defdelegate create_gall_host(attrs), to: HostAssociations
   defdelegate add_host_to_gall(gall_species_id, host_species_id), to: HostAssociations
   defdelegate remove_host_from_gall(host_relation_id), to: HostAssociations
   defdelegate delete_gall_host(id), to: HostAssociations
-  defdelegate get_gall_host(id), to: HostAssociations
 
   defdelegate save_gall_host_changes(gall_id, hosts_to_add, hosts_to_remove),
     to: HostAssociations
@@ -91,164 +78,8 @@ defmodule Gallformers.Galls do
               to: HostAssociations
 
   # ============================================
-  # Explore Tree
-  # ============================================
-
-  @doc """
-  Returns a hierarchical tree of gall species organized by Family → Genus → Species.
-
-  ## Options
-  - `:key_style` - `:short` for `f-123` format (default), `:long` for `family-123` format
-  """
-  @spec get_galls_tree(keyword()) :: [map()]
-  def get_galls_tree(opts \\ []) do
-    fetch_gall_tree_data(false)
-    |> TreeBuilder.build_tree("/gall/", opts)
-  end
-
-  @doc """
-  Returns a hierarchical tree of undescribed gall species.
-
-  ## Options
-  - `:key_style` - `:short` for `f-123` format (default), `:long` for `family-123` format
-  """
-  @spec get_undescribed_tree(keyword()) :: [map()]
-  def get_undescribed_tree(opts \\ []) do
-    fetch_gall_tree_data(true)
-    |> TreeBuilder.build_tree("/gall/", opts)
-  end
-
-  defp fetch_gall_tree_data(undescribed_only) do
-    # Use recursive CTE to walk from genus up through any intermediate ranks
-    # (subfamily, tribe, etc.) to find the ancestor family. A direct parent_id
-    # join only works when genus is an immediate child of family.
-    {:ok, %{rows: rows}} =
-      Repo.query(
-        """
-        WITH RECURSIVE genus_to_family AS (
-          SELECT g.id AS genus_id, g.name AS genus_name, g.description AS genus_description,
-                 g.parent_id AS current_parent_id
-          FROM taxonomy g
-          WHERE g.type = 'genus'
-
-          UNION ALL
-
-          SELECT gf.genus_id, gf.genus_name, gf.genus_description, t.parent_id
-          FROM genus_to_family gf
-          JOIN taxonomy t ON t.id = gf.current_parent_id
-          WHERE t.type != 'family'
-        )
-        SELECT f.id, f.name, f.description,
-               gf.genus_id, gf.genus_name, gf.genus_description,
-               s.id, s.name, gt.undescribed
-        FROM genus_to_family gf
-        JOIN taxonomy f ON f.id = gf.current_parent_id AND f.type = 'family'
-        JOIN species_taxonomy st ON st.taxonomy_id = gf.genus_id
-        JOIN species s ON s.id = st.species_id AND s.taxoncode = 'gall'
-        JOIN gall_traits gt ON gt.species_id = s.id
-        WHERE f.description != 'Plant'
-          AND ($1::boolean = false OR gt.undescribed = true)
-        ORDER BY f.name, gf.genus_name, s.name
-        """,
-        [if(undescribed_only, do: true, else: false)]
-      )
-
-    Enum.map(rows, fn [fid, fname, fdesc, gid, gname, gdesc, sid, sname, undescribed] ->
-      %{
-        family_id: fid,
-        family_name: fname,
-        family_description: fdesc,
-        genus_id: gid,
-        genus_name: gname,
-        genus_description: gdesc,
-        species_id: sid,
-        species_name: sname,
-        undescribed: undescribed == true
-      }
-    end)
-  end
-
-  # ============================================
   # Query Functions
   # ============================================
-
-  @doc """
-  Returns a random gall with its first image (lowest sort_order).
-
-  Used on the home page to show a featured gall. Returns a map with:
-    - id: species ID
-    - name: species name
-    - undescribed: whether the gall is undescribed
-    - image_url: full CloudFront URL
-    - image_creator: photographer credit
-    - image_license: license name
-
-  Returns `nil` if no galls with images are found.
-  """
-  @spec random_gall() :: map() | nil
-  def random_gall do
-    # Subquery to find the minimum sort_order for each species
-    min_sort_query =
-      from i in Image,
-        group_by: i.species_id,
-        select: %{species_id: i.species_id, min_sort: min(i.sort_order)}
-
-    query =
-      from s in Species,
-        join: gt in GallTraits,
-        on: gt.species_id == s.id,
-        join: ms in subquery(min_sort_query),
-        on: ms.species_id == s.id,
-        join: i in Image,
-        on: i.species_id == s.id and i.sort_order == ms.min_sort,
-        where: s.taxoncode == "gall",
-        order_by: fragment("RANDOM()"),
-        limit: 1,
-        select: %{
-          id: s.id,
-          name: s.name,
-          undescribed: gt.undescribed,
-          image_path: i.path,
-          image_creator: i.creator,
-          image_license: i.license,
-          image_sourcelink: i.sourcelink,
-          image_licenselink: i.licenselink
-        }
-
-    case Repo.one(query) do
-      nil ->
-        nil
-
-      result ->
-        Map.put(result, :image_url, Image.base_url() <> "/" <> result.image_path)
-    end
-  end
-
-  @doc """
-  Returns all gall species ordered by name.
-  """
-  @spec list_galls() :: [map()]
-  def list_galls do
-    from(s in Species,
-      left_join: gt in GallTraits,
-      on: gt.species_id == s.id,
-      left_join: a in Abundance,
-      on: s.abundance_id == a.id,
-      where: s.taxoncode == "gall",
-      order_by: s.name,
-      select: %{
-        id: s.id,
-        name: s.name,
-        taxoncode: s.taxoncode,
-        datacomplete: s.datacomplete,
-        abundance_id: s.abundance_id,
-        abundance_name: a.abundance,
-        detachable: gt.detachable,
-        undescribed: gt.undescribed
-      }
-    )
-    |> Repo.all()
-  end
 
   @doc """
   Returns paginated gall species.
@@ -291,20 +122,6 @@ defmodule Gallformers.Galls do
   end
 
   @doc """
-  Gets the count of galls that are undescribed.
-  """
-  @spec count_undescribed_galls() :: integer()
-  def count_undescribed_galls do
-    from(s in Species,
-      join: gt in GallTraits,
-      on: gt.species_id == s.id,
-      where: gt.undescribed == true,
-      select: count(s.id)
-    )
-    |> Repo.one()
-  end
-
-  @doc """
   Gets a gall by species ID with all related data.
   """
   @spec get_gall(integer()) :: map() | nil
@@ -336,32 +153,6 @@ defmodule Gallformers.Galls do
   end
 
   @doc """
-  Gets a gall by species name.
-  """
-  @spec get_gall_by_name(String.t()) :: map() | nil
-  def get_gall_by_name(name) do
-    query =
-      from s in Species,
-        left_join: gt in GallTraits,
-        on: gt.species_id == s.id,
-        left_join: a in Abundance,
-        on: s.abundance_id == a.id,
-        where: s.name == ^name and s.taxoncode == "gall",
-        select: %{
-          id: s.id,
-          name: s.name,
-          taxoncode: s.taxoncode,
-          datacomplete: s.datacomplete,
-          abundance_id: s.abundance_id,
-          abundance_name: a.abundance,
-          detachable: gt.detachable,
-          undescribed: gt.undescribed
-        }
-
-    Repo.one(query)
-  end
-
-  @doc """
   Gets default images for all gall species (used by ID tool).
 
   Returns the first image (by sort_order) for each gall species.
@@ -384,35 +175,6 @@ defmodule Gallformers.Galls do
       }
     )
     |> Repo.all()
-  end
-
-  @doc """
-  Returns related galls - other galls that share the same genus and species name prefix.
-
-  For a gall like "Callirhytis seminator leaf gall", this finds other galls starting with
-  "Callirhytis seminator " (note the trailing space to ensure it's not a prefix match
-  of a different species like "Callirhytis seminatoris").
-
-  Returns a list of maps with :id and :name keys, excluding the passed-in gall.
-  """
-  @spec get_related_galls(map()) :: [map()]
-  def get_related_galls(gall) when is_map(gall) do
-    parsed = TaxonName.parse(gall.name || "")
-
-    if parsed.epithet do
-      prefix = "#{parsed.genus} #{parsed.epithet} "
-
-      from(s in Species,
-        where: fragment("? LIKE ?", s.name, ^"#{prefix}%"),
-        where: s.id != ^gall.id,
-        where: s.taxoncode == "gall",
-        order_by: s.name,
-        select: %{id: s.id, name: s.name}
-      )
-      |> Repo.all()
-    else
-      []
-    end
   end
 
   # ============================================
@@ -529,64 +291,6 @@ defmodule Gallformers.Galls do
       select: %{id: s.id, field: field(s, ^field)}
     )
     |> Repo.all()
-  end
-
-  @doc """
-  Gets filter values for multiple gall species in bulk (batch version).
-
-  Returns a map of species_id => %{colors: [...], shapes: [...], ...}.
-  Runs 9 queries total instead of 9 per species.
-  """
-  @spec get_gall_filter_values_batch([integer()]) :: %{integer() => map()}
-  def get_gall_filter_values_batch([]), do: %{}
-
-  def get_gall_filter_values_batch(species_ids) do
-    # Fetch all filter values in 9 bulk queries
-    colors = get_filter_values_batch(species_ids, "gall_color", :color_id, Color, :color)
-    walls = get_filter_values_batch(species_ids, "gall_walls", :walls_id, Walls, :walls)
-    cells = get_filter_values_batch(species_ids, "gall_cells", :cells_id, Cells, :cells)
-    shapes = get_filter_values_batch(species_ids, "gall_shape", :shape_id, Shape, :shape)
-
-    textures =
-      get_filter_values_batch(species_ids, "gall_texture", :texture_id, Texture, :texture)
-
-    alignments =
-      get_filter_values_batch(species_ids, "gall_alignment", :alignment_id, Alignment, :alignment)
-
-    plant_parts =
-      get_filter_values_batch(species_ids, "gall_plant_part", :plant_part_id, PlantPart, :part)
-
-    forms = get_filter_values_batch(species_ids, "gall_form", :form_id, Form, :form)
-    seasons = get_filter_values_batch(species_ids, "gall_season", :season_id, Season, :season)
-
-    # Combine into per-species maps
-    species_ids
-    |> Enum.map(fn id ->
-      {id,
-       %{
-         colors: Map.get(colors, id, []),
-         walls: Map.get(walls, id, []),
-         cells: Map.get(cells, id, []),
-         shapes: Map.get(shapes, id, []),
-         textures: Map.get(textures, id, []),
-         alignments: Map.get(alignments, id, []),
-         plant_parts: Map.get(plant_parts, id, []),
-         forms: Map.get(forms, id, []),
-         seasons: Map.get(seasons, id, [])
-       }}
-    end)
-    |> Enum.into(%{})
-  end
-
-  defp get_filter_values_batch(species_ids, join_table, fk_col, schema, field) do
-    from(j in join_table,
-      join: s in ^schema,
-      on: field(j, ^fk_col) == s.id,
-      where: j.species_id in ^species_ids,
-      select: {j.species_id, field(s, ^field)}
-    )
-    |> Repo.all()
-    |> Enum.group_by(fn {species_id, _val} -> species_id end, fn {_id, val} -> val end)
   end
 
   @doc """
@@ -1201,17 +905,6 @@ defmodule Gallformers.Galls do
     |> Repo.insert()
   end
 
-  @doc """
-  Deletes gall_traits record for a species.
-
-  Called during species deletion cascade to clean up filter associations.
-  """
-  @spec delete_gall_traits(integer()) :: {non_neg_integer(), nil}
-  def delete_gall_traits(species_id) do
-    from(gt in GallTraits, where: gt.species_id == ^species_id)
-    |> Repo.delete_all()
-  end
-
   # ============================================
   # Composite Save Operations
   # ============================================
@@ -1420,26 +1113,5 @@ defmodule Gallformers.Galls do
     for host <- to_add do
       HostAssociations.add_host_to_gall(species_id, host.host_species_id)
     end
-  end
-
-  # ============================================
-  # PubSub
-  # ============================================
-
-  @doc """
-  Subscribes to gall changes.
-  """
-  @spec subscribe() :: :ok | {:error, term()}
-  def subscribe do
-    Phoenix.PubSub.subscribe(Gallformers.PubSub, @topic)
-  end
-
-  @doc """
-  Broadcasts a gall change event.
-  """
-  @spec broadcast_change(map(), atom()) :: {:ok, map()}
-  def broadcast_change(gall, event) do
-    Phoenix.PubSub.broadcast(Gallformers.PubSub, @topic, {event, gall})
-    {:ok, gall}
   end
 end

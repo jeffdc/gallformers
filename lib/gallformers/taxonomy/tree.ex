@@ -8,11 +8,10 @@ defmodule Gallformers.Taxonomy.Tree do
 
   require Logger
   import Ecto.Query
-  alias Gallformers.Galls.GallHost
   alias Gallformers.Repo
   alias Gallformers.Species.Species
   alias Gallformers.TaxonName
-  alias Gallformers.Taxonomy.{Family, Lineage, Section, Taxonomy}
+  alias Gallformers.Taxonomy.{Lineage, Taxonomy}
 
   # =====================================================================
   # CRUD
@@ -231,15 +230,6 @@ defmodule Gallformers.Taxonomy.Tree do
     |> broadcast(:taxonomy_updated)
   end
 
-  @doc """
-  Deletes a taxonomy entry.
-  """
-  @spec delete_taxonomy(Taxonomy.t()) :: {:ok, Taxonomy.t()} | {:error, Ecto.Changeset.t()}
-  def delete_taxonomy(%Taxonomy{} = taxonomy) do
-    Repo.delete(taxonomy)
-    |> broadcast(:taxonomy_deleted)
-  end
-
   # =====================================================================
   # Lookups
   # =====================================================================
@@ -261,77 +251,12 @@ defmodule Gallformers.Taxonomy.Tree do
   end
 
   @doc """
-  Returns a `%Family{}` domain struct for the given taxonomy ID, or nil.
-  """
-  @spec get_family(integer()) :: Family.t() | nil
-  def get_family(id) do
-    case Repo.get(Taxonomy, id) do
-      %Taxonomy{type: "family"} = t ->
-        %Family{id: t.id, name: t.name, description: t.description}
-
-      _ ->
-        nil
-    end
-  end
-
-  @doc """
-  Returns a `%Lineage{}` for a genus, including its parent family.
-  """
-  @spec get_genus_lineage(integer()) :: {:ok, Lineage.t()} | {:error, :not_found}
-  def get_genus_lineage(id) do
-    case Repo.get(Taxonomy, id) do
-      %Taxonomy{type: "genus"} ->
-        path = get_taxonomy_path(id)
-        {:ok, Lineage.from_path(path)}
-
-      _ ->
-        {:error, :not_found}
-    end
-  end
-
-  @doc """
-  Returns a `%Lineage{}` for a section, including its parent genus and grandparent family.
-  """
-  @spec get_section_lineage(integer()) :: {:ok, Lineage.t()} | {:error, :not_found}
-  def get_section_lineage(id) do
-    case Repo.get(Taxonomy, id) do
-      %Taxonomy{type: "section", parent_id: genus_id} = section when not is_nil(genus_id) ->
-        # Get the full path from the genus up to the root (includes intermediates)
-        genus_path = get_taxonomy_path(genus_id)
-        lineage = Lineage.from_path(genus_path)
-
-        section_struct = %Section{
-          id: section.id,
-          name: section.name,
-          description: section.description
-        }
-
-        {:ok, %{lineage | section: section_struct}}
-
-      _ ->
-        {:error, :not_found}
-    end
-  end
-
-  @doc """
   Gets a taxonomy by name and type.
   """
   @spec get_taxonomy_by_name(String.t(), String.t()) :: Taxonomy.t() | nil
   def get_taxonomy_by_name(name, type) do
     from(t in Taxonomy,
       where: t.name == ^name and t.type == ^type,
-      limit: 1
-    )
-    |> Repo.one()
-  end
-
-  @doc """
-  Finds the first taxonomy matching a name (for URL parameter lookups).
-  """
-  @spec find_taxonomy_by_name(String.t()) :: Taxonomy.t() | nil
-  def find_taxonomy_by_name(name) when is_binary(name) do
-    from(t in Taxonomy,
-      where: t.name == ^name,
       limit: 1
     )
     |> Repo.one()
@@ -435,19 +360,6 @@ defmodule Gallformers.Taxonomy.Tree do
   # =====================================================================
   # Hierarchy
   # =====================================================================
-
-  @doc """
-  Gets the parent taxonomy for a given taxonomy ID.
-  """
-  @spec get_parent(integer()) :: Taxonomy.t() | nil
-  def get_parent(taxonomy_id) do
-    from(t in Taxonomy,
-      join: child in Taxonomy,
-      on: child.parent_id == t.id,
-      where: child.id == ^taxonomy_id
-    )
-    |> Repo.one()
-  end
 
   @doc """
   Gets all children of a taxonomy.
@@ -594,15 +506,6 @@ defmodule Gallformers.Taxonomy.Tree do
   # =====================================================================
   # Lists
   # =====================================================================
-
-  @doc """
-  Returns all non-placeholder taxonomies.
-  """
-  @spec list_taxonomies() :: [Taxonomy.t()]
-  def list_taxonomies do
-    from(t in Taxonomy, where: t.is_placeholder == false)
-    |> Repo.all()
-  end
 
   @doc """
   Returns all taxonomies of a specific type.
@@ -753,65 +656,6 @@ defmodule Gallformers.Taxonomy.Tree do
       end
 
     Repo.one(query)
-  end
-
-  @doc """
-  Counts distinct families that have species of the given taxoncode.
-  """
-  @spec count_families_for_taxoncode(String.t()) :: integer()
-  def count_families_for_taxoncode(taxoncode) do
-    query = """
-    WITH RECURSIVE genus_to_family AS (
-      SELECT st.taxonomy_id AS genus_id, g.parent_id AS current_parent_id, g.type AS current_type
-      FROM species_taxonomy st
-      JOIN taxonomy g ON st.taxonomy_id = g.id AND g.type = 'genus'
-      JOIN species s ON st.species_id = s.id AND s.taxoncode = $1
-
-      UNION ALL
-
-      SELECT gf.genus_id, t.parent_id, t.type
-      FROM genus_to_family gf
-      JOIN taxonomy t ON t.id = gf.current_parent_id
-      WHERE gf.current_type != 'family'
-    )
-    SELECT COUNT(DISTINCT f.name)
-    FROM genus_to_family gf
-    JOIN taxonomy f ON f.id = gf.current_parent_id AND f.type = 'family'
-    WHERE gf.current_type != 'family'
-    """
-
-    case Repo.query(query, [taxoncode]) do
-      {:ok, %{rows: [[count]]}} -> count
-      {:error, _} -> 0
-    end
-  end
-
-  @doc """
-  Counts distinct genera that have species of the given taxoncode.
-  """
-  @spec count_genera_for_taxoncode(String.t()) :: integer()
-  def count_genera_for_taxoncode(taxoncode) do
-    from(s in Species,
-      join: st in "species_taxonomy",
-      on: st.species_id == s.id,
-      join: g in Taxonomy,
-      on: st.taxonomy_id == g.id,
-      where: s.taxoncode == ^taxoncode and g.type == "genus",
-      select: count(g.name, :distinct)
-    )
-    |> Repo.one()
-  end
-
-  @doc """
-  Lists all genera that are direct children of a family.
-  """
-  @spec list_child_genera(integer()) :: [Taxonomy.t()]
-  def list_child_genera(family_id) do
-    from(t in Taxonomy,
-      where: t.parent_id == ^family_id and t.type == "genus",
-      order_by: t.name
-    )
-    |> Repo.all()
   end
 
   @doc """
@@ -1002,18 +846,6 @@ defmodule Gallformers.Taxonomy.Tree do
   # =====================================================================
 
   @doc """
-  Gets the "Unknown" placeholder genus for a given parent family.
-  Returns nil if not found.
-  """
-  @spec get_unknown_placeholder(integer()) :: Taxonomy.t() | nil
-  def get_unknown_placeholder(parent_id) do
-    from(t in Taxonomy,
-      where: t.is_placeholder == true and t.type == "genus" and t.parent_id == ^parent_id
-    )
-    |> Repo.one()
-  end
-
-  @doc """
   Finds or creates an "Unknown (Family)" placeholder genus under the given family.
 
   Used for undescribed galls where the genus is not known.
@@ -1121,210 +953,6 @@ defmodule Gallformers.Taxonomy.Tree do
   end
 
   def move_genera([], _old_family_id, _new_family_id), do: {:error, :no_genera_selected}
-
-  # =====================================================================
-  # Cross-domain Taxonomy Queries
-  # =====================================================================
-
-  @doc """
-  Lists genera from the opposite domain associated with species in a genus.
-
-  For a gall genus this returns host genera; for a plant genus it returns
-  gall-former genera. Each result includes the focal species IDs so genus
-  pages can filter their species table without another query.
-  """
-  @spec list_associated_genera(integer(), String.t()) :: [map()]
-  def list_associated_genera(genus_id, "gall") do
-    do_list_associated_genera(genus_id, "gall", :gall_species_id, :host_species_id)
-  end
-
-  def list_associated_genera(genus_id, "plant") do
-    do_list_associated_genera(genus_id, "plant", :host_species_id, :gall_species_id)
-  end
-
-  defp do_list_associated_genera(genus_id, taxoncode, focal_key, related_key) do
-    from(focal_link in "species_taxonomy",
-      join: focal in Species,
-      on: focal.id == focal_link.species_id and focal.taxoncode == ^taxoncode,
-      join: association in GallHost,
-      on: field(association, ^focal_key) == focal.id,
-      join: related_link in "species_taxonomy",
-      on: related_link.species_id == field(association, ^related_key),
-      join: related in Taxonomy,
-      on: related.id == related_link.taxonomy_id and related.type == "genus",
-      where: focal_link.taxonomy_id == ^genus_id,
-      group_by: [related.id, related.name],
-      order_by: related.name,
-      select: %{
-        id: related.id,
-        name: related.name,
-        focal_species_count: count(field(association, ^focal_key), :distinct),
-        association_count: count(association.id, :distinct),
-        focal_species_ids:
-          fragment(
-            "array_agg(DISTINCT ? ORDER BY ?)",
-            field(association, ^focal_key),
-            field(association, ^focal_key)
-          )
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Lists families for galls that occur on a given host.
-  """
-  @spec list_gall_families_for_host(integer()) :: [map()]
-  def list_gall_families_for_host(host_id) do
-    # Use CTE to walk from gall genera up to their ancestor families,
-    # handling intermediate ranks in the parent chain.
-    query = """
-    WITH RECURSIVE genus_to_family AS (
-      SELECT st.taxonomy_id as genus_id, t.parent_id as current_parent_id, t.type as current_type
-      FROM species_taxonomy st
-      JOIN taxonomy t ON st.taxonomy_id = t.id AND t.type = 'genus'
-      JOIN species s ON st.species_id = s.id AND s.taxoncode = 'gall'
-      JOIN gallhost h ON h.gall_species_id = s.id
-      WHERE h.host_species_id = $1::bigint
-
-      UNION ALL
-
-      SELECT gf.genus_id, t.parent_id, t.type
-      FROM genus_to_family gf
-      JOIN taxonomy t ON t.id = gf.current_parent_id
-      WHERE gf.current_type != 'family'
-    )
-    SELECT DISTINCT f.id, f.name
-    FROM genus_to_family gf
-    JOIN taxonomy f ON f.id = gf.current_parent_id AND f.type = 'family'
-    WHERE gf.current_type != 'family'
-    ORDER BY f.name
-    """
-
-    case Repo.query(query, [host_id]) do
-      {:ok, %{rows: rows}} ->
-        Enum.map(rows, fn [id, name] -> %{id: id, name: name} end)
-
-      {:error, _} ->
-        []
-    end
-  end
-
-  @doc """
-  Lists families for galls that occur on hosts in a given host genus/section.
-  """
-  @spec list_gall_families_for_host_genus(integer()) :: [map()]
-  def list_gall_families_for_host_genus(host_genus_id) do
-    # Use CTE to walk from gall genera up to their ancestor families,
-    # handling intermediate ranks in the parent chain.
-    query = """
-    WITH RECURSIVE genus_to_family AS (
-      SELECT galler_st.taxonomy_id as genus_id, gt.parent_id as current_parent_id, gt.type as current_type
-      FROM species_taxonomy host_st
-      JOIN gallhost h ON h.host_species_id = host_st.species_id
-      JOIN species s ON h.gall_species_id = s.id AND s.taxoncode = 'gall'
-      JOIN species_taxonomy galler_st ON galler_st.species_id = s.id
-      JOIN taxonomy gt ON galler_st.taxonomy_id = gt.id AND gt.type = 'genus'
-      WHERE host_st.taxonomy_id = $1::bigint
-
-      UNION ALL
-
-      SELECT gf.genus_id, t.parent_id, t.type
-      FROM genus_to_family gf
-      JOIN taxonomy t ON t.id = gf.current_parent_id
-      WHERE gf.current_type != 'family'
-    )
-    SELECT DISTINCT f.id, f.name
-    FROM genus_to_family gf
-    JOIN taxonomy f ON f.id = gf.current_parent_id AND f.type = 'family'
-    WHERE gf.current_type != 'family'
-    ORDER BY f.name
-    """
-
-    case Repo.query(query, [host_genus_id]) do
-      {:ok, %{rows: rows}} ->
-        Enum.map(rows, fn [id, name] -> %{id: id, name: name} end)
-
-      {:error, _} ->
-        []
-    end
-  end
-
-  @doc """
-  Lists all sections with their parent genus and species count.
-  """
-  @spec list_sections_with_details() :: [map()]
-  def list_sections_with_details do
-    from(s in Taxonomy,
-      left_join: g in Taxonomy,
-      on: s.parent_id == g.id,
-      left_join: st in "species_taxonomy",
-      on: st.taxonomy_id == s.id,
-      where: s.type == "section",
-      group_by: [s.id, s.name, s.type, s.description, g.id, g.name],
-      order_by: [g.name, s.name],
-      select: %{
-        id: s.id,
-        name: s.name,
-        type: s.type,
-        description: s.description,
-        genus_id: g.id,
-        genus_name: g.name,
-        species_count: count(st.species_id)
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Lists children of a taxonomy node with species counts.
-
-  For intermediate nodes, returns child intermediates and genera with
-  the count of species under each. Used by the public intermediate browse page.
-  """
-  @spec list_children_with_counts(integer()) :: [map()]
-  def list_children_with_counts(parent_id) do
-    query = """
-    WITH RECURSIVE descendants AS (
-      -- Base: direct children of each child
-      SELECT child.id AS child_id, child.id AS descendant_id, child.type AS descendant_type
-      FROM taxonomy child
-      WHERE child.parent_id = $1::bigint
-
-      UNION ALL
-
-      -- Recurse: walk down the tree from each child
-      SELECT d.child_id, t.id, t.type
-      FROM descendants d
-      INNER JOIN taxonomy t ON t.parent_id = d.descendant_id
-    )
-    SELECT t.id, t.name, t.type, t.rank, t.description,
-           COUNT(DISTINCT st.species_id) as species_count
-    FROM taxonomy t
-    LEFT JOIN descendants d ON d.child_id = t.id AND d.descendant_type = 'genus'
-    LEFT JOIN species_taxonomy st ON st.taxonomy_id = d.descendant_id
-    WHERE t.parent_id = $1::bigint
-    GROUP BY t.id, t.name, t.type, t.rank, t.description
-    ORDER BY t.type, t.name
-    """
-
-    case Repo.query(query, [parent_id]) do
-      {:ok, %{rows: rows}} ->
-        Enum.map(rows, fn [id, name, type, rank, description, species_count] ->
-          %{
-            id: id,
-            name: name,
-            type: type,
-            rank: rank,
-            description: description,
-            species_count: species_count
-          }
-        end)
-
-      {:error, _} ->
-        []
-    end
-  end
 
   # =====================================================================
   # Private Helpers

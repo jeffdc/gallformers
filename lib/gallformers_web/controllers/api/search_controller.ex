@@ -13,7 +13,11 @@ defmodule GallformersWeb.API.SearchController do
 
   operation(:search,
     summary: "Global search",
-    description: "Performs a global search across all entity types",
+    description:
+      "Performs a global search across all entity types. Galls are found by name, " <>
+        "alias or their inducer's names (including synonyms); hosts and taxonomy " <>
+        "entries by accepted name, synonym or common name. Host IDs are unchanged; " <>
+        "taxonomy IDs are the new taxon IDs.",
     parameters: [
       q: [in: :query, type: :string, description: "Search query", required: true]
     ],

@@ -22,6 +22,13 @@ defmodule Gallformers.Facts do
   actor, e.g. by `Catalog` creating a Fact and its details and attributing
   it in one transaction.
 
+  ## Events
+
+  After storing recomputed standings, the write calls the registered
+  "Facts changed" listeners with the Facts whose standing changed
+  (`Gallformers.Facts.Events`), inside its transaction: how the Catalog's
+  read models hear about changes without Facts depending on the Catalog.
+
   ## Concurrency
 
   Attribution writes lock the Facts they recompute (the Fact and its slot
@@ -35,6 +42,7 @@ defmodule Gallformers.Facts do
       Attribution,
       AttributionName,
       AttributionObservation,
+      Events,
       Evidence,
       Fact,
       Standing,
@@ -49,6 +57,7 @@ defmodule Gallformers.Facts do
   alias Gallformers.Facts.Attribution
   alias Gallformers.Facts.AttributionName
   alias Gallformers.Facts.AttributionObservation
+  alias Gallformers.Facts.Events
   alias Gallformers.Facts.Evidence
   alias Gallformers.Facts.Fact
   alias Gallformers.Facts.Standing
@@ -101,6 +110,24 @@ defmodule Gallformers.Facts do
       preload: ^Keyword.keys(@children)
     )
     |> Repo.all()
+  end
+
+  @doc """
+  The attributions of the Facts among `fact_ids`, by Fact ID, each oldest
+  first with its evidence, names and Observations (as `list_attributions/1`).
+  A Fact with none is absent from the map.
+  """
+  @spec list_attributions_for_facts([integer()]) :: %{integer() => [Attribution.t()]}
+  def list_attributions_for_facts([]), do: %{}
+
+  def list_attributions_for_facts(fact_ids) when is_list(fact_ids) do
+    from(a in Attribution,
+      where: a.fact_id in ^fact_ids,
+      order_by: a.id,
+      preload: ^Keyword.keys(@children)
+    )
+    |> Repo.all()
+    |> Enum.group_by(& &1.fact_id)
   end
 
   # -- Attributions ------------------------------------------------------------
@@ -380,19 +407,27 @@ defmodule Gallformers.Facts do
         {Map.merge(all_standings, standings), all_conflicts ++ conflicts}
       end)
 
-    store_standings(facts, standings)
+    case store_standings(facts, standings) do
+      [] -> :ok
+      changed -> Events.dispatch(changed)
+    end
+
     conflicts
   end
 
+  # Stores the standings that changed; returns those Facts' IDs.
   defp store_standings(facts, standings) do
     now = DateTime.utc_now(:second)
 
-    facts
-    |> Enum.reject(fn fact -> Map.fetch!(standings, fact.id) == fact.standing end)
+    changed = Enum.reject(facts, fn fact -> Map.fetch!(standings, fact.id) == fact.standing end)
+
+    changed
     |> Enum.group_by(&Map.fetch!(standings, &1.id), & &1.id)
     |> Enum.each(fn {standing, ids} ->
       from(f in Fact, where: f.id in ^ids)
       |> Repo.update_all(set: [standing: standing, updated_at: now])
     end)
+
+    Enum.map(changed, & &1.id)
   end
 end

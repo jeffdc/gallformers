@@ -1,10 +1,13 @@
 defmodule Gallformers.ProdDataCase do
   @moduledoc """
-  Case template for tests that run against a copy of the production database.
+  Case template for tests that run against a converted copy of the
+  production database: the old tables plus the new back-end the catalog
+  migration fills from them.
 
-  These tests validate data integrity and exercise write paths (reclassify,
-  cascade delete, genus rename) against real data. All writes use the Ecto
-  sandbox so they roll back automatically.
+  These tests check the new back-end's invariants on real data and
+  exercise the old admin's write paths (reclassify, cascade delete, genus
+  rename) against it. All writes use the Ecto sandbox so they roll back
+  automatically.
 
   ## Usage
 
@@ -12,21 +15,19 @@ defmodule Gallformers.ProdDataCase do
 
   Tests using this case template are excluded by default. Run them with:
 
-      make test-prod-data
+      make test-prod-data                                  # download + convert
+      make test-prod-data PROD_DATA_DB=gallformers_taxogall  # clone a converted copy
 
-  which copies the local dev database to the test path and includes the
-  `:prod_data` tag.
-
-  NOTE: Like DataCase, async: true is NOT supported with SQLite.
+  Either way the copy is loaded into `gallformers_test` (the source
+  database is only read, as a template), the `:prod_data` tests run, and the
+  test database is rebuilt from the seeds afterwards.
   """
 
   use ExUnit.CaseTemplate
 
   alias Ecto.Adapters.SQL.Sandbox
 
-  import Ecto.Query
-
-  @min_species_count 1000
+  @min_gall_count 1000
 
   using do
     quote do
@@ -40,17 +41,16 @@ defmodule Gallformers.ProdDataCase do
 
   setup_all _tags do
     pid = Sandbox.start_owner!(Gallformers.Repo, shared: true)
-
-    count =
-      Gallformers.Repo.one(from s in "species", select: count(s.id))
-
+    count = Gallformers.Catalog.count_galls()
     Sandbox.stop_owner(pid)
 
-    if count < @min_species_count do
+    if count < @min_gall_count do
       raise """
-      Prod data tests require a real database (found #{count} species, need >= #{@min_species_count}).
+      Prod data tests require a converted production copy (found #{count} Galls, need >= #{@min_gall_count}).
 
-      Run `make test-prod-data` which copies priv/gallformers.sqlite to the test DB.
+      Run `make test-prod-data`, which loads and converts the latest backup,
+      or `make test-prod-data PROD_DATA_DB=gallformers_taxogall` to clone a
+      converted copy.
       """
     end
 
@@ -59,10 +59,10 @@ defmodule Gallformers.ProdDataCase do
 
   setup tags do
     if tags[:async] do
-      raise "async: true is not supported with SQLite. Use async: false (the default)."
+      raise "async: true is not supported for prod data tests. Use async: false (the default)."
     end
 
-    pid = Sandbox.start_owner!(Gallformers.Repo, shared: not tags[:async])
+    pid = Sandbox.start_owner!(Gallformers.Repo, shared: true)
     on_exit(fn -> Sandbox.stop_owner(pid) end)
 
     :ok
@@ -71,7 +71,7 @@ defmodule Gallformers.ProdDataCase do
   @doc """
   Returns the count of rows for the given schema module.
 
-      assert data_count(Gallformers.Taxonomy.Taxonomy) > 500
+      assert data_count(Gallformers.Taxa.Taxon) > 500
   """
   def data_count(schema) do
     Gallformers.Repo.aggregate(schema, :count)

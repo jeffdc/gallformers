@@ -95,13 +95,27 @@ defmodule Gallformers.Catalog.Vocab.Loader do
     end)
   end
 
-  defp upsert_trait_values(%{"traits" => traits}) do
-    rows =
-      for {trait, %{"values" => values}} <- traits,
-          trait in TraitValue.traits(),
-          %{"value" => value} = entry <- values do
-        %{trait: trait, value: value, definition: entry["definition"]}
-      end
+  @doc """
+  The Trait values the contract's `traits.json` (at `path`) lists, as
+  `load/2` stores them in `trait_values`: `%{trait, value, definition}`.
+  """
+  @spec contract_trait_values(String.t()) :: [
+          %{trait: String.t(), value: String.t(), definition: String.t() | nil}
+        ]
+  def contract_trait_values(path \\ traits_path()) do
+    path |> File.read!() |> Jason.decode!() |> trait_value_rows()
+  end
+
+  defp trait_value_rows(%{"traits" => traits}) do
+    for {trait, %{"values" => values}} <- traits,
+        trait in TraitValue.traits(),
+        %{"value" => value} = entry <- values do
+      %{trait: trait, value: value, definition: entry["definition"]}
+    end
+  end
+
+  defp upsert_trait_values(contract) do
+    rows = trait_value_rows(contract)
 
     on_conflict =
       from(t in TraitValue,

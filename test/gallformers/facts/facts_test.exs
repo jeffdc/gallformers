@@ -69,7 +69,7 @@ defmodule Gallformers.FactsTest do
   defp standing(fact), do: Facts.get_fact!(fact.id).standing
 
   defp changes_for(table) do
-    Repo.all(from c in Carbonite.Change, where: c.table_name == ^table, order_by: c.id)
+    Repo.all(from c in test_audit_changes(), where: c.table_name == ^table, order_by: c.id)
   end
 
   defp stored_item(ref) do
@@ -194,10 +194,10 @@ defmodule Gallformers.FactsTest do
       }
 
       attribute!(fact, source, attrs)
-      before = Repo.aggregate(Carbonite.Change, :count)
+      before = Repo.aggregate(test_audit_changes(), :count)
 
       attribute!(fact, source, attrs)
-      assert Repo.aggregate(Carbonite.Change, :count) == before
+      assert Repo.aggregate(test_audit_changes(), :count) == before
     end
 
     test "a same-date disagreement is returned as a conflict and the Fact keeps its standing" do
@@ -228,6 +228,31 @@ defmodule Gallformers.FactsTest do
       assert standing(newer) == :current
       assert standing(older) == :superseded
       assert standing(elsewhere) == :current
+    end
+  end
+
+  describe "list_attributions_for_facts/1" do
+    test "the attributions of several Facts, by Fact ID, each oldest first" do
+      one = fact_fixture()
+      two = fact_fixture()
+      none = fact_fixture()
+      older = source_fixture("Older", "1923")
+      newer = source_fixture("Newer", "1950")
+
+      attribute!(one, older, %{stance: :confirm})
+      attribute!(one, newer, %{stance: :deny})
+      attribute!(two, newer, %{stance: :confirm})
+
+      assert %{} = by_fact = Facts.list_attributions_for_facts([one.id, two.id, none.id])
+      assert Map.keys(by_fact) |> Enum.sort() == [one.id, two.id]
+
+      assert Enum.map(by_fact[one.id], &{&1.source_id, &1.stance}) == [
+               {older.id, :confirm},
+               {newer.id, :deny}
+             ]
+
+      assert [%Attribution{evidence: [], names: [], observations: []}] = by_fact[two.id]
+      assert Facts.list_attributions_for_facts([]) == %{}
     end
   end
 

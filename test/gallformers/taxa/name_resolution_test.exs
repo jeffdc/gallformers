@@ -173,9 +173,11 @@ defmodule Gallformers.Taxa.NameResolutionTest do
       taxon_fixture(name: "Quercus", rank: :genus, kingdom: "Plantae", origin: :powo)
       genus = taxon_fixture(name: "Disholcaspis", rank: :genus)
       {:ok, _} = Taxa.add_synonym(test_actor(), genus, "Holcaspis")
-      taxon_fixture(name: "Andricus foo")
+      # A species' first word is no genus name (the converted seeds have a
+      # genus Andricus, so this uses a genus the tree does not have)
+      taxon_fixture(name: "Nogenusia foo")
 
-      assert Enum.sort(Taxa.genus_names(["Quercus", "QUERCUS", "Holcaspis", "Andricus", "The"])) ==
+      assert Enum.sort(Taxa.genus_names(["Quercus", "QUERCUS", "Holcaspis", "Nogenusia", "The"])) ==
                ["Holcaspis", "QUERCUS", "Quercus"]
 
       assert Taxa.genus_names([]) == []

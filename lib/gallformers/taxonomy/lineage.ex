@@ -14,7 +14,6 @@ defmodule Gallformers.Taxonomy.Lineage do
   Lineage models where the species sits in the tree (structured data with IDs).
   """
 
-  alias Gallformers.TaxonName
   alias Gallformers.Taxonomy.{Family, Genus, Intermediate, Section}
   alias Gallformers.Taxonomy.Taxonomy, as: TaxonomySchema
 
@@ -52,43 +51,6 @@ defmodule Gallformers.Taxonomy.Lineage do
   def new_genus(genus_name) do
     %__MODULE__{
       genus: %Genus{name: genus_name}
-    }
-  end
-
-  @doc """
-  Build a Lineage from the result maps returned by SpeciesLink queries.
-
-  Used by `get_taxonomy_for_species` and similar query functions to convert
-  their raw query results into a Lineage.
-  """
-  @spec from_query_result(map(), map() | nil) :: t()
-  def from_query_result(genus_result, section_result \\ nil) do
-    family =
-      if genus_result[:family_id] do
-        %Family{
-          id: genus_result.family_id,
-          name: genus_result.family,
-          description: genus_result[:family_description]
-        }
-      end
-
-    section =
-      if section_result && section_result[:section_id] do
-        %Section{
-          id: section_result.section_id,
-          name: section_result.section,
-          description: section_result[:section_description]
-        }
-      end
-
-    %__MODULE__{
-      genus: %Genus{
-        id: genus_result.genus_id,
-        name: genus_result.genus,
-        description: genus_result[:genus_description]
-      },
-      family: family,
-      section: section
     }
   end
 
@@ -148,19 +110,4 @@ defmodule Gallformers.Taxonomy.Lineage do
   @spec resolved?(t()) :: boolean()
   def resolved?(%__MODULE__{genus: %Genus{id: nil}}), do: false
   def resolved?(%__MODULE__{}), do: true
-
-  @doc "Is the genus a placeholder 'Unknown (Family)' name?"
-  @spec placeholder_genus?(t()) :: boolean()
-  def placeholder_genus?(%__MODULE__{genus: %Genus{name: name}}),
-    do: TaxonName.unknown_genus?(name)
-
-  @doc "Does this lineage include a section?"
-  @spec has_section?(t()) :: boolean()
-  def has_section?(%__MODULE__{section: nil}), do: false
-  def has_section?(%__MODULE__{}), do: true
-
-  @doc "Parse the species_name into a TaxonName struct."
-  @spec parsed_name(t()) :: TaxonName.t() | nil
-  def parsed_name(%__MODULE__{species_name: nil}), do: nil
-  def parsed_name(%__MODULE__{species_name: name}), do: TaxonName.parse(name)
 end

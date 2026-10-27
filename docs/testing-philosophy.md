@@ -19,7 +19,7 @@ Tests use Ecto's SQL Sandbox with PostgreSQL. Tests can run with `async: true` w
 | Plug | `test/gallformers_web/plugs/` | `make test` | Analytics, caching, CORS middleware |
 | Integration | `test/gallformers_web/integration_test.exs` | `make test` | Full page load flows, navigation, PubSub |
 | E2E (browser) | `test/e2e/` | `make e2e` | Real browser tests via Playwright (Firefox). Requires prod data. Excluded by default. |
-| Prod data | `test/prod_data/` | `make test-prod-data` | Validates against real production DB copy. Excluded by default. |
+| Prod data | `test/prod_data/` | `make test-prod-data` | Validates against a converted production DB copy (`PROD_DATA_DB=gallformers_taxogall` clones an already converted one). Excluded by default. |
 | Prod data E2E | `test/prod_data/e2e/` | `make test-prod-data-e2e` | Browser tests against real production data. Excluded by default. |
 
 **Support files** (`test/support/`): `DataCase` (Ecto sandbox), `ConnCase` (HTTP), `E2ECase` (Playwright, prod data), `ProdDataCase` (real DB validation).

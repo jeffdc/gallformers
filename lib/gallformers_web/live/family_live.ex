@@ -1,63 +1,49 @@
 defmodule GallformersWeb.FamilyLive do
   @moduledoc """
-  LiveView for the public family browse page.
+  LiveView for the public family page.
 
-  Displays a family with its direct children (genera and intermediate ranks)
-  in a sortable, filterable table with species counts.
+  Displays a family (`Gallformers.Taxa.get_by_name/2`) with its direct
+  children (genera and intermediate ranks) in a sortable, filterable table
+  with the Galls whose Inducer is under each and the host plants in each,
+  and the Galls placed at the family itself (undescribed Galls whose
+  Inducer is the family). Data through `GallformersWeb.RankPage`.
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.Taxonomy
+  alias GallformersWeb.RankPage
+  alias GallformersWeb.RankPageComponents
   alias GallformersWeb.TaxonomyURL
 
   @impl true
   def mount(%{"name" => name}, _session, socket) do
-    if TaxonomyURL.numeric?(name) do
-      redirect_by_id(socket, name)
-    else
-      case Taxonomy.get_taxonomy_by_name(name, "family") do
-        nil ->
-          {:ok, assign_not_found(socket, "Family not found")}
-
-        taxonomy ->
-          load_family(socket, taxonomy)
-      end
+    case RankPage.lookup(name, :family) do
+      {:redirect, path} -> {:ok, push_navigate(socket, to: path, replace: true)}
+      {:ok, []} -> {:ok, assign_not_found(socket, "Family not found")}
+      {:ok, [family | _]} -> {:ok, load_family(socket, family.id, name)}
     end
   end
 
-  defp redirect_by_id(socket, id_str) do
-    case Taxonomy.get_taxonomy(String.to_integer(id_str)) do
-      %{type: "family"} = taxonomy ->
-        case TaxonomyURL.public_path(taxonomy) do
-          nil -> {:ok, assign_not_found(socket, "Family not found")}
-          path -> {:ok, push_navigate(socket, to: path, replace: true)}
-        end
+  defp load_family(socket, id, name) do
+    children = RankPage.children(id)
+    galls = RankPage.galls_of_inducers([id])
 
-      _ ->
-        {:ok, assign_not_found(socket, "Family not found")}
-    end
-  end
-
-  defp load_family(socket, taxonomy) do
-    children = Taxonomy.list_children_with_counts(taxonomy.id)
-
-    {:ok,
-     assign(socket,
-       page_title: taxonomy.name,
-       page_description: "#{taxonomy.name} - A taxonomic family documented on Gallformers.",
-       page_url: TaxonomyURL.public_path(taxonomy),
-       page_image: nil,
-       page_json_ld: nil,
-       page_noindex: false,
-       taxonomy: taxonomy,
-       children: children,
-       filtered_children: children,
-       total_children_count: length(children),
-       search_query: "",
-       sort_by: :name,
-       sort_dir: :asc,
-       error: nil
-     )}
+    assign(socket,
+      page_title: name,
+      page_description: "#{name} - A taxonomic family documented on Gallformers.",
+      page_url: TaxonomyURL.public_path(%{rank: :family, name: name}),
+      page_image: nil,
+      page_json_ld: nil,
+      page_noindex: false,
+      taxonomy: %{id: id, name: name, description: RankPage.description(id)},
+      children: children,
+      filtered_children: children,
+      total_children_count: length(children),
+      galls: galls,
+      search_query: "",
+      sort_by: :name,
+      sort_dir: :asc,
+      error: nil
+    )
   end
 
   defp assign_not_found(socket, error) do
@@ -72,6 +58,7 @@ defmodule GallformersWeb.FamilyLive do
       children: [],
       filtered_children: [],
       total_children_count: 0,
+      galls: [],
       search_query: "",
       sort_by: :name,
       sort_dir: :asc,
@@ -79,57 +66,27 @@ defmodule GallformersWeb.FamilyLive do
     )
   end
 
-  defp child_url(child), do: TaxonomyURL.public_path(child)
-
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
     {:noreply,
-     socket
-     |> assign(:search_query, query)
-     |> filter_children()}
+     assign(socket,
+       search_query: query,
+       filtered_children: RankPage.filter_children(socket.assigns.children, query)
+     )}
   end
 
   @impl true
   def handle_event("sort", %{"column" => column}, socket)
-      when column in ["name", "type", "species_count"] do
-    column_atom = String.to_atom(column)
+      when column in ["name", "type", "gall_count", "host_count"] do
+    {sort_by, sort_dir} =
+      RankPage.toggle_sort(
+        socket.assigns.sort_by,
+        socket.assigns.sort_dir,
+        String.to_existing_atom(column)
+      )
 
-    {new_sort_by, new_sort_dir} =
-      if socket.assigns.sort_by == column_atom do
-        new_dir = if socket.assigns.sort_dir == :asc, do: :desc, else: :asc
-        {column_atom, new_dir}
-      else
-        {column_atom, :asc}
-      end
-
-    {:noreply, assign(socket, sort_by: new_sort_by, sort_dir: new_sort_dir)}
+    {:noreply, assign(socket, sort_by: sort_by, sort_dir: sort_dir)}
   end
-
-  defp filter_children(socket) do
-    query = String.downcase(socket.assigns.search_query)
-
-    filtered =
-      if query == "" do
-        socket.assigns.children
-      else
-        Enum.filter(socket.assigns.children, fn c ->
-          String.contains?(String.downcase(c.name), query) ||
-            (c.description && String.contains?(String.downcase(c.description), query)) ||
-            (c.rank && String.contains?(String.downcase(c.rank), query))
-        end)
-      end
-
-    assign(socket, :filtered_children, filtered)
-  end
-
-  defp sorted_children(children, sort_by, sort_dir) do
-    sorted = Enum.sort_by(children, &sort_key(&1, sort_by))
-    if sort_dir == :desc, do: Enum.reverse(sorted), else: sorted
-  end
-
-  defp sort_key(child, :type), do: String.downcase(child.rank || child.type || "")
-  defp sort_key(child, :species_count), do: child.species_count
-  defp sort_key(child, _), do: String.downcase(child.name || "")
 
   @impl true
   def render(assigns) do
@@ -147,14 +104,6 @@ defmodule GallformersWeb.FamilyLive do
                   <span class="text-lg font-normal text-gray-600">Family:</span>
                   {@taxonomy.name}
                 </h1>
-                <.link
-                  :if={@current_user}
-                  href={~p"/admin/taxonomy/#{@taxonomy.id}"}
-                  class="text-gray-400 hover:text-gf-maroon"
-                  title="Edit in admin"
-                >
-                  <.icon name="ph-pencil-simple" class="h-5 w-5" />
-                </.link>
               </div>
               <p
                 :if={@taxonomy.description not in [nil, ""]}
@@ -212,21 +161,38 @@ defmodule GallformersWeb.FamilyLive do
                           <th
                             class="sortable text-center"
                             phx-click="sort"
-                            phx-value-column="species_count"
+                            phx-value-column="gall_count"
                           >
-                            Species
-                            <span :if={@sort_by == :species_count} class="ml-1">
+                            Galls
+                            <span :if={@sort_by == :gall_count} class="ml-1">
+                              {if @sort_dir == :asc, do: "↑", else: "↓"}
+                            </span>
+                          </th>
+                          <th
+                            class="sortable text-center"
+                            phx-click="sort"
+                            phx-value-column="host_count"
+                          >
+                            Hosts
+                            <span :if={@sort_by == :host_count} class="ml-1">
                               {if @sort_dir == :asc, do: "↑", else: "↓"}
                             </span>
                           </th>
                         </tr>
                       </thead>
                       <tbody>
-                        <tr :for={child <- sorted_children(@filtered_children, @sort_by, @sort_dir)}>
+                        <tr :for={
+                          child <- RankPage.sort_children(@filtered_children, @sort_by, @sort_dir)
+                        }>
                           <td>
-                            <.link href={child_url(child)} class="hover:underline font-medium">
-                              <.taxon_name name={child.name} rank={child.type} />
+                            <.link
+                              :if={child.url}
+                              href={child.url}
+                              class="hover:underline font-medium"
+                            >
+                              <.taxon_name name={child.name} rank={child.rank} />
                             </.link>
+                            <.taxon_name :if={!child.url} name={child.name} rank={child.rank} />
                             <span
                               :if={child.description not in [nil, ""]}
                               class="text-gray-500 text-sm ml-1"
@@ -235,13 +201,10 @@ defmodule GallformersWeb.FamilyLive do
                             </span>
                           </td>
                           <td class="text-center">
-                            <span class="text-sm text-gray-600">
-                              {child.rank || child.type}
-                            </span>
+                            <span class="text-sm text-gray-600">{child.rank}</span>
                           </td>
-                          <td class="text-center text-gray-600">
-                            {child.species_count}
-                          </td>
+                          <td class="text-center text-gray-600">{child.gall_count}</td>
+                          <td class="text-center text-gray-600">{child.host_count}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -259,6 +222,20 @@ defmodule GallformersWeb.FamilyLive do
               <% else %>
                 <p class="text-gray-500 italic">No children found.</p>
               <% end %>
+            </div>
+
+            <%!-- Galls placed at the family itself --%>
+            <div :if={@galls != []} class="mt-6">
+              <h2 class="text-lg font-semibold text-gray-800 mb-3">
+                Galls placed in this family ({length(@galls)})
+              </h2>
+              <RankPageComponents.species_table
+                id="family-galls"
+                rows={@galls}
+                url_prefix="/gall/"
+                name_header="Gall"
+                count_header="Number of Hosts"
+              />
             </div>
           <% end %>
         <% end %>

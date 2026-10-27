@@ -1,0 +1,4 @@
+owner,owner_id,alias_id,name,type,decision,target,note
+gall,300,5,Callirhytis seedii,scientific,synonym,,seeds: a synonym of the Gall's species-level Inducer
+plant,10,7,Lithocarpus densiflorus,scientific,synonym,,seeds: a synonym of the host plant
+gall,304,9,q-seed-code,scientific,code,,seeds: the undescribed Gall's informal code

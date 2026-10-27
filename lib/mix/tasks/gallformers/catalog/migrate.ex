@@ -7,7 +7,8 @@ defmodule Mix.Tasks.Gallformers.Catalog.Migrate do
   reconciled, duplicate taxon keys, gall names needing review or not read,
   curated decisions pending).
 
-  Run it only against a **copy** of production (`make experiment-db`), with
+  Run it only against a **copy** of production (`make experiment-db`) or the
+  test database (`make test-db` converts the test seeds with it), with
   `MIX_ENV` set explicitly; the task refuses to run without it. It rebuilds
   the new tables in one transaction and never touches `replay_log` or the
   old tables (except rewriting the keys' couplets as `keys.csv` decides),
@@ -19,6 +20,7 @@ defmodule Mix.Tasks.Gallformers.Catalog.Migrate do
       MIX_ENV=dev mix gallformers.catalog.migrate
       MIX_ENV=dev mix gallformers.catalog.migrate --skip-pending --reports docs/plans/catalog --no-s3
       MIX_ENV=dev mix gallformers.catalog.migrate --name-suffixes path/to/name_suffixes.csv
+      MIX_ENV=test mix gallformers.catalog.migrate --curated test/support/fixtures/catalog_migration --no-s3
 
   ## Options
 
@@ -33,6 +35,14 @@ defmodule Mix.Tasks.Gallformers.Catalog.Migrate do
       of stopping the run. For runs before curation is done; the production
       run (`Gallformers.Release.migrate_catalog/0`) is always strict.
     * `--name-suffixes PATH` — another name-suffix mapping file.
+    * `--curated DIR` — read the curated inputs (`non_galls.csv`,
+      `range_decisions.csv`, `aliases.csv`, `keys.csv`, `taxon_merges.csv`,
+      `kingdoms.csv`) and `name_suffixes.csv` from `DIR` instead; a file
+      missing there is read from `priv/catalog_migration/` as usual
+      (`--name-suffixes` wins over `DIR/name_suffixes.csv`). `make test-db`
+      uses it to convert the test seeds with their own decisions
+      (`test/support/fixtures/catalog_migration/`): the shipped files hold
+      production IDs.
     * `--no-s3` — store nothing in S3 (rehearsals on a local copy): the
       Gallformers notes are not uploaded to the real private bucket.
 
@@ -42,6 +52,8 @@ defmodule Mix.Tasks.Gallformers.Catalog.Migrate do
   use Mix.Task
 
   alias Gallformers.CatalogMigration
+  alias Gallformers.CatalogMigration.Curated
+  alias Gallformers.CatalogMigration.NameSuffixes
   alias Gallformers.CatalogMigration.Report
 
   @shortdoc "Rebuilds the new catalog tables from today's (run against a copy)"
@@ -52,6 +64,7 @@ defmodule Mix.Tasks.Gallformers.Catalog.Migrate do
       OptionParser.parse!(args,
         strict: [
           name_suffixes: :string,
+          curated: :string,
           reports: :string,
           skip_pending: :boolean,
           no_s3: :boolean
@@ -68,9 +81,11 @@ defmodule Mix.Tasks.Gallformers.Catalog.Migrate do
     :ok = configure_storage(opts)
     Mix.Task.run("app.start")
 
+    curated = if dir = opts[:curated], do: curated_paths(dir), else: []
+
     run_opts =
       [pending: if(opts[:skip_pending], do: :skip, else: :fail)] ++
-        Keyword.take(opts, [:name_suffixes])
+        Keyword.merge(curated, Keyword.take(opts, [:name_suffixes]))
 
     case CatalogMigration.run(run_opts) do
       {:ok, report} ->
@@ -92,12 +107,43 @@ defmodule Mix.Tasks.Gallformers.Catalog.Migrate do
   @doc """
   With `no_s3: true`, turns S3 off for this run (`s3_enabled: false`), so a
   rehearsal stores nothing in the real private bucket; Gallformers notes
-  are still written to the database.
+  are still written to the database (their text is the note document's
+  item). The private bucket goes through its S3 adapter, which S3 turned
+  off makes a no-op, whatever adapter is configured: `MIX_ENV=test`
+  configures the in-memory stub, which exists only in a test run.
   """
   @spec configure_storage(keyword()) :: :ok
   def configure_storage(opts) do
-    if opts[:no_s3], do: Application.put_env(:gallformers, :s3_enabled, false)
+    if opts[:no_s3] do
+      Application.put_env(:gallformers, :s3_enabled, false)
+
+      private = Application.get_env(:gallformers, :private_storage, [])
+
+      Application.put_env(
+        :gallformers,
+        :private_storage,
+        Keyword.put(private, :adapter, Gallformers.Storage.Private.S3Adapter)
+      )
+    end
+
     :ok
+  end
+
+  @doc """
+  The input files `--curated DIR` names, as `CatalogMigration.run/1`
+  options: each curated input and `:name_suffixes` read from
+  `DIR/<input>.csv` when that file exists, else the shipped file.
+  """
+  @spec curated_paths(String.t()) :: keyword(String.t())
+  def curated_paths(dir) do
+    shipped =
+      [name_suffixes: NameSuffixes.default_path()] ++
+        for input <- Curated.inputs(), do: {input, Curated.default_path(input)}
+
+    for {input, default} <- shipped do
+      path = Path.join(dir, "#{input}.csv")
+      {input, if(File.exists?(path), do: path, else: default)}
+    end
   end
 
   defp print(report, dir) do

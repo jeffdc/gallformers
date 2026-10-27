@@ -72,6 +72,14 @@ defmodule Gallformers.Sources do
     Repo.get(Source, id)
   end
 
+  @doc "The Sources with IDs among `ids`, by ID (unknown IDs are left out)."
+  @spec list_sources_by_id([integer()]) :: [Source.t()]
+  def list_sources_by_id([]), do: []
+
+  def list_sources_by_id(ids) when is_list(ids) do
+    Repo.all(from(s in Source, where: s.id in ^ids, order_by: s.id))
+  end
+
   @doc """
   Gets a source by ID, raising if not found.
   """
@@ -172,18 +180,6 @@ defmodule Gallformers.Sources do
       }
     )
     |> Repo.all()
-  end
-
-  @doc """
-  Gets the count of species associated with a source.
-  """
-  @spec count_species_for_source(integer()) :: integer()
-  def count_species_for_source(source_id) do
-    from(ss in SpeciesSource,
-      where: ss.source_id == ^source_id,
-      select: count(ss.id)
-    )
-    |> Repo.one()
   end
 
   # Admin functions
@@ -424,14 +420,6 @@ defmodule Gallformers.Sources do
   end
 
   @doc """
-  Gets a species-source mapping by ID.
-  """
-  @spec get_species_source(integer()) :: SpeciesSource.t() | nil
-  def get_species_source(id) do
-    Repo.get(SpeciesSource, id)
-  end
-
-  @doc """
   Gets a species-source mapping by ID, raising if not found.
   """
   @spec get_species_source!(integer()) :: SpeciesSource.t()
@@ -571,17 +559,6 @@ defmodule Gallformers.Sources do
   @spec has_sources?(integer()) :: boolean()
   def has_sources?(species_id) do
     from(ss in SpeciesSource, where: ss.species_id == ^species_id)
-    |> Repo.exists?()
-  end
-
-  @doc """
-  Checks if a species is already linked to a source.
-  """
-  @spec species_source_exists?(integer(), integer()) :: boolean()
-  def species_source_exists?(species_id, source_id) do
-    from(ss in SpeciesSource,
-      where: ss.species_id == ^species_id and ss.source_id == ^source_id
-    )
     |> Repo.exists?()
   end
 
@@ -768,6 +745,48 @@ defmodule Gallformers.Sources do
       order_by: [desc_nulls_last: d.version_date, desc: d.id]
     )
     |> Repo.all()
+  end
+
+  @doc """
+  The IDs of the Galls with a note of Source `source_id` (Gallformers notes
+  are the Gallformers Source's), by ID.
+  """
+  @spec list_noted_gall_ids(integer()) :: [integer()]
+  def list_noted_gall_ids(source_id) when is_integer(source_id) do
+    from(d in SourceDocument,
+      where: d.kind == :note and d.source_id == ^source_id and not is_nil(d.gall_id),
+      distinct: true,
+      order_by: d.gall_id,
+      select: d.gall_id
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  The text of each Gall's newest note of Source `source_id` (newest as
+  `list_gall_notes/1` orders them; its items joined by blank lines), by Gall
+  ID, in two queries.
+  """
+  @spec newest_note_texts(integer()) :: %{integer() => String.t()}
+  def newest_note_texts(source_id) when is_integer(source_id) do
+    newest =
+      from(d in SourceDocument,
+        where: d.kind == :note and d.source_id == ^source_id and not is_nil(d.gall_id),
+        distinct: d.gall_id,
+        order_by: [d.gall_id, desc_nulls_last: d.version_date, desc: d.id],
+        select: {d.id, d.gall_id}
+      )
+      |> Repo.all()
+      |> Map.new()
+
+    from(i in DocumentItem,
+      where: i.source_document_id in ^Map.keys(newest),
+      order_by: [i.source_document_id, i.position],
+      select: {i.source_document_id, i.text}
+    )
+    |> Repo.all()
+    |> Enum.group_by(&Map.fetch!(newest, elem(&1, 0)), &elem(&1, 1))
+    |> Map.new(fn {gall_id, texts} -> {gall_id, Enum.join(texts, "\n\n")} end)
   end
 
   @doc "A stored document's items in reading order."

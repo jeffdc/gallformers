@@ -162,6 +162,7 @@ test-db:
 	@psql -d gallformers_test -f priv/repo/test_seeds.sql --quiet
 	@createdb wcvp_test 2>/dev/null || true
 	@psql -d wcvp_test -f priv/repo/wcvp_test_setup.sql --quiet
+	@MIX_ENV=test mix gallformers.catalog.migrate --curated test/support/fixtures/catalog_migration --no-s3
 	@echo "Test database ready"
 
 # Run JS unit tests (hooks, etc.)
@@ -172,9 +173,24 @@ test-js: assets/node_modules
 test: test-db test-js
 	mix test
 
-# Load production data into the test database from the daily pg_dump backup
-# Requires AWS credentials (same as download-db)
+# Load converted production data into the test database. The prod-data and
+# E2E tests read the new back-end, so the copy must have been through the
+# migrations and the catalog migration.
+#   PROD_DATA_DB=<db>  clone an already converted copy, e.g.
+#                      `make test-prod-data PROD_DATA_DB=gallformers_taxogall`.
+#                      The source is only read (as a template); it must have no
+#                      other connections (stop a dev server using it first).
+#   (unset)            restore the daily pg_dump backup (AWS credentials, same
+#                      as download-db), apply the migrations and run the
+#                      catalog migration on it (dev config: the real WCVP).
+PROD_DATA_DB ?=
+
 load-prod-data-test:
+ifneq ($(strip $(PROD_DATA_DB)),)
+	@echo "Cloning $(PROD_DATA_DB) into gallformers_test..."
+	@MIX_ENV=test mix ecto.drop --quiet 2>/dev/null || true
+	createdb -T $(PROD_DATA_DB) gallformers_test
+else
 	@echo "Loading production data into test database..."
 	@if [ ! -f /tmp/gallformers.dump ]; then \
 		echo "Downloading latest backup..."; \
@@ -186,12 +202,17 @@ load-prod-data-test:
 	@MIX_ENV=test mix ecto.drop --quiet 2>/dev/null || true
 	@MIX_ENV=test mix ecto.create --quiet
 	@pg_restore --no-owner --no-acl -d gallformers_test /tmp/gallformers.dump || true
+	@echo "Converting it to the new back-end (migrations, then the catalog migration)..."
+	PGDATABASE=gallformers_test MIX_ENV=dev mix ecto.migrate
+	PGDATABASE=gallformers_test MIX_ENV=dev mix gallformers.catalog.migrate --no-s3
+endif
 	@echo "Production data loaded into gallformers_test"
 
-# Run context-level tests against production data (no browser)
-# Validates data integrity and exercises write paths against real data
-# All writes use Ecto sandbox (rolled back automatically)
-# Requires AWS credentials for downloading the backup
+# Run context-level tests against converted production data (no browser)
+# Checks the new back-end's invariants and exercises the old admin's write
+# paths against real data. All writes use Ecto sandbox (rolled back automatically)
+# Needs AWS credentials for the backup, unless PROD_DATA_DB names a converted
+# copy to clone: make test-prod-data PROD_DATA_DB=gallformers_taxogall
 test-prod-data: load-prod-data-test
 	@echo "Running prod data context tests..."
 	@mix test test/prod_data/invariants_test.exs test/prod_data/write_operations_test.exs --include prod_data; \
@@ -220,8 +241,10 @@ test-check-exclusions:
 # =============================================================================
 # E2E Testing (Playwright)
 # =============================================================================
-# E2E tests run against a production data copy in a real Firefox browser.
-# All tests are excluded from regular test runs. Use these targets to run them.
+# E2E tests run against a converted production data copy in a real Firefox
+# browser. All tests are excluded from regular test runs. Use these targets to
+# run them; each takes PROD_DATA_DB (see load-prod-data-test), e.g.
+#   make e2e PROD_DATA_DB=gallformers_taxogall
 # See test/support/e2e_case.ex for documentation on writing E2E tests.
 
 .PHONY: e2e e2e-public e2e-search e2e-browse e2e-admin e2e-auth e2e-setup e2e-headed e2e-slow e2e-changed

@@ -67,7 +67,8 @@ make ci                 # Full CI check (same as GitHub Actions)
 
 Tests use a separate PostgreSQL database (`gallformers_test`) built from:
 - Ecto migrations - Schema only (no production data)
-- `priv/repo/test_seeds.sql` - Minimal seed data for tests
+- `priv/repo/test_seeds.sql` - Minimal seed data for tests, in today's tables
+- The catalog migration (`mix gallformers.catalog.migrate --curated test/support/fixtures/catalog_migration`) - fills the new back-end's tables from those seeds, with the seeds' own curated decisions
 
 `make test` rebuilds this automatically. Use `make test-db` to rebuild manually.
 

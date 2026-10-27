@@ -1,28 +1,56 @@
 defmodule GallformersWeb.E2E.BrowseTest do
   @moduledoc """
-  E2E tests for browsing species, hosts, and galls.
+  E2E tests for browsing Galls and hosts.
   These verify that detail pages load and navigation works.
+
+  Test data comes from `Gallformers.Catalog` and `Gallformers.Taxa`, the
+  back-end the public pages read.
   """
   use GallformersWeb.E2ECase
 
-  alias Gallformers.Plants
+  alias Gallformers.Catalog
+  alias Gallformers.Catalog.ReadModels.GallPage
+  alias Gallformers.Taxa
 
   @moduletag :e2e
   @moduletag :e2e_browse
 
+  # How many Galls to look through for one with a species Host.
+  @gall_sample 200
+
+  # The Gall page shows the display name without its generation qualifier
+  # (" (agamic)"), which becomes a glossary tooltip; every other part of the
+  # name comes before the first " (".
+  defp base_name(name), do: name |> String.split(" (") |> hd()
+
+  defp first_gall_page do
+    [id | _] = Catalog.list_gall_ids()
+    {:ok, %GallPage{} = page} = Catalog.gall_page(id)
+    page
+  end
+
+  # A Gall with a species-rank Host (linked to `/host/:id`) and that Host.
+  defp gall_with_species_host do
+    Catalog.list_gall_ids()
+    |> Enum.take(@gall_sample)
+    |> Enum.find_value(fn id ->
+      {:ok, page} = Catalog.gall_page(id)
+
+      case Enum.find(page.hosts, &match?(%{link: {:host, _}}, &1)) do
+        nil -> nil
+        host -> {page, host}
+      end
+    end)
+  end
+
   describe "gall detail page" do
     test "loads for valid gall ID", %{conn: conn} do
-      # Get a valid gall ID from the database
-      galls = Gallformers.Galls.list_galls()
+      gall = first_gall_page()
 
-      if length(galls) > 0 do
-        gall = hd(galls)
-
-        conn
-        |> visit("/gall/#{gall.id}")
-        # Page uses h2 for the species name, wrapped in em tags
-        |> assert_has("h2 em", text: gall.name)
-      end
+      conn
+      |> visit("/gall/#{gall.id}")
+      # Page uses h2 for the Gall's name, wrapped in em tags
+      |> assert_has("h2 em", text: base_name(gall.name))
     end
 
     test "shows 404 for invalid gall ID", %{conn: conn} do
@@ -35,17 +63,12 @@ defmodule GallformersWeb.E2E.BrowseTest do
 
   describe "host detail page" do
     test "loads for valid host ID", %{conn: conn} do
-      # Get a valid host ID from the database
-      hosts = Plants.list_hosts()
+      [id | _] = Taxa.list_plant_ids()
+      {:ok, host} = Taxa.host_page(id)
 
-      if length(hosts) > 0 do
-        host = hd(hosts)
-
-        conn
-        |> visit("/host/#{host.id}")
-        # Page uses h2 for the species name, wrapped in em tags
-        |> assert_has("h2 em", text: host.name)
-      end
+      conn
+      |> visit("/host/#{id}")
+      |> assert_has("h2", text: host.name)
     end
 
     test "shows 404 for invalid host ID", %{conn: conn} do
@@ -58,26 +81,15 @@ defmodule GallformersWeb.E2E.BrowseTest do
 
   describe "navigation between gall and host" do
     test "can navigate from gall to host", %{conn: conn} do
-      # Find a gall that has associated hosts
-      galls = Gallformers.Galls.list_galls()
+      pair = gall_with_species_host()
+      assert pair, "Need a Gall with a species Host among the first #{@gall_sample} Galls"
+      {gall, host} = pair
 
-      gall_with_host =
-        Enum.find(galls, fn g ->
-          length(Gallformers.Galls.get_hosts_for_gall(g.id)) > 0
-        end)
-
-      if gall_with_host do
-        hosts = Gallformers.Galls.get_hosts_for_gall(gall_with_host.id)
-        host = hd(hosts)
-        # Note: get_hosts_for_gall returns maps with :host_name key, not :name
-        host_name = host.host_name
-
-        conn
-        |> visit("/gall/#{gall_with_host.id}")
-        # Find and click link to host
-        |> click_link(host_name)
-        |> assert_has("h2 em", text: host_name)
-      end
+      conn
+      |> visit("/gall/#{gall.id}")
+      # Find and click link to host
+      |> click_link(host.name)
+      |> assert_has("h2", text: host.name)
     end
   end
 end

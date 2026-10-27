@@ -5,7 +5,8 @@ defmodule Gallformers.Import.ReplayTest do
   database freshly filled by the data migration gives the same result.
 
   Not async: packages create Sources (unique titles), the Gallformers Source
-  is unique, and the test wipes the new tables inside its sandbox.
+  is unique, and the test wipes the new tables inside its sandbox (first the
+  converted seeds' rows, so its own seed stands for the data migration).
   """
   use Gallformers.DataCase, async: false
 
@@ -164,8 +165,8 @@ defmodule Gallformers.Import.ReplayTest do
                  qualifier_facts relationship_facts trait_facts range_facts occurrence_facts
                  alias_facts description_facts placement_facts name_facts synonymy_facts
                  split_facts common_name_facts facts import_batches import_packages
-                 document_items source_documents galls taxon_ancestry taxon_common_names
-                 legacy_taxon_ids taxon_names taxa)
+                 document_items source_documents legacy_citations galls generation_group_taxa
+                 taxon_ancestry taxon_common_names legacy_taxon_ids taxon_names taxa)
 
   defp wipe!(source_ids_before) do
     for table <- @new_tables, do: Repo.query!("DELETE FROM #{table}")
@@ -287,6 +288,9 @@ defmodule Gallformers.Import.ReplayTest do
     gallformers_source()
     source_ids_before = Repo.all(from s in "source", select: s.id)
 
+    # The seed below stands for the data migration: start without the
+    # converted seeds' rows.
+    wipe!(source_ids_before)
     backscan!(seed!())
     before = snapshot()
     entries = Import.list_replay_entries()
@@ -348,6 +352,7 @@ defmodule Gallformers.Import.ReplayTest do
       %{quercus: quercus, cynipini: cynipini, andricus: andricus}
     end
 
+    wipe!(Repo.all(from s in "source", select: s.id))
     t = seed_tree.()
 
     {:ok, _} =

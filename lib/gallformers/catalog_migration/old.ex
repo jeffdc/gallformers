@@ -65,7 +65,9 @@ defmodule Gallformers.CatalogMigration.Old do
   @spec plants() :: [map()]
   def plants do
     rows("""
-    SELECT id, name, genus_placeholder FROM species
+    SELECT id, name, genus_placeholder, COALESCE(datacomplete, false) AS datacomplete,
+           abundance_id
+    FROM species
     WHERE taxoncode = 'plant' ORDER BY id
     """)
   end

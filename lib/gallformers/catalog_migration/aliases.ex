@@ -10,11 +10,12 @@ defmodule Gallformers.CatalogMigration.Aliases do
       by default the owner's taxon (a Gall's species-level Inducer, a
       plant, a genus placeholder's genus, a higher taxon); `target` names
       another taxon by its accepted name.
-    * `common_name` — on a Gall, a gall alias Fact (common names of Galls
-      are the Catalog's); on a plant or higher taxon, a common name of the
-      taxon (`Gallformers.Taxa.add_common_name/3`).
+    * `common_name` — on a Gall, a gall alias Fact of kind `common_name`
+      (common names of Galls are the Catalog's); on a plant or higher
+      taxon, a common name of the taxon (`Gallformers.Taxa.add_common_name/3`).
     * `former_label`, `code` — a Gall's former label or informal code: a
-      gall alias Fact, **never** a taxon name. Only Galls have them.
+      gall alias Fact of that kind, **never** a taxon name. Only Galls have
+      them.
     * `drop` — not migrated.
 
   Gall alias Facts are legacy Facts, attributed to the "Gallformers legacy
@@ -192,7 +193,7 @@ defmodule Gallformers.CatalogMigration.Aliases do
   end
 
   # What a decision does to a row: {:synonym | :common_name, taxon_id},
-  # {:alias_fact, gall_id}, :drop, {:pending, why}.
+  # {:alias_fact, gall_id, kind}, :drop, {:pending, why}.
   defp action(_row, nil, _galls, _taxa), do: {:pending, "needs a decision"}
   defp action(_row, %{decision: "drop"}, _galls, _taxa), do: :drop
 
@@ -205,7 +206,7 @@ defmodule Gallformers.CatalogMigration.Aliases do
 
   defp action(%{owner: "gall", owner_id: id}, %{decision: meaning}, _galls, _taxa)
        when meaning in ~w(common_name former_label code),
-       do: {:alias_fact, id}
+       do: {:alias_fact, id, meaning}
 
   defp action(row, %{decision: "common_name"}, _galls, taxa),
     do: {:common_name, owner_taxon(row, taxa)}
@@ -309,14 +310,20 @@ defmodule Gallformers.CatalogMigration.Aliases do
     end
   end
 
-  defp apply_row(_actor, %{action: {:alias_fact, gall_id}, name: name}, seen, assertions, legacy) do
+  defp apply_row(
+         _actor,
+         %{action: {:alias_fact, gall_id, kind}, name: name},
+         seen,
+         assertions,
+         legacy
+       ) do
     key = {:alias, gall_id, String.downcase(String.trim(name))}
 
     if MapSet.member?(seen, key) do
       {"gall alias (already added)", seen, assertions}
     else
-      fact = {:alias, %{gall_id: gall_id, name: String.trim(name)}, legacy}
-      {"gall alias", MapSet.put(seen, key), [fact | assertions]}
+      fact = {:alias, %{gall_id: gall_id, name: String.trim(name), kind: kind}, legacy}
+      {"gall alias (#{kind})", MapSet.put(seen, key), [fact | assertions]}
     end
   end
 

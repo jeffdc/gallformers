@@ -4,7 +4,7 @@ defmodule Gallformers.TaxonomyTest do
   """
   use Gallformers.DataCase, async: true
 
-  alias Gallformers.{Galls, Repo}
+  alias Gallformers.Repo
   alias Gallformers.Species.Alias
   alias Gallformers.Species.Species
   alias Gallformers.Taxonomy
@@ -636,39 +636,6 @@ defmodule Gallformers.TaxonomyTest do
       # After linking a species, it should no longer be in the empty list
       empty_ids_after = Taxonomy.empty_unknown_genus_ids()
       refute unknown_genus.id in empty_ids_after
-    end
-
-    test "search_genera_and_sections filters empty Unknown genera by default" do
-      # Create family with empty Unknown genus
-      {:ok, _family} =
-        Taxonomy.create_taxonomy(%{
-          name: "TestSearchFilterFamily",
-          type: "family",
-          description: "Scale"
-        })
-
-      # Search for "Unknown" - should not find empty Unknown genera
-      results = Taxonomy.search_genera_and_sections("Unknown", 100)
-      empty_unknown_results = Enum.filter(results, &(&1.name == "Unknown" && &1.type == "genus"))
-
-      # All Unknown genera in results should have species (not empty)
-      for result <- empty_unknown_results do
-        species_count =
-          Repo.one(
-            from(st in "species_taxonomy",
-              where: st.taxonomy_id == ^result.id,
-              select: count()
-            )
-          )
-
-        assert species_count > 0, "Found empty Unknown genus #{result.id} in search results"
-      end
-
-      # With include_empty_unknown: true, should find all Unknown genera
-      results_all =
-        Taxonomy.search_genera_and_sections("Unknown", 100, include_empty_unknown: true)
-
-      assert length(results_all) >= length(results)
     end
 
     test "move_genera updates parent_id for selected genera" do
@@ -1563,112 +1530,6 @@ defmodule Gallformers.TaxonomyTest do
       assert impact.species_count == 0
       assert impact.has_impact == false
     end
-
-    test "search_genera_and_sections filters by taxoncode when provided" do
-      # Create a family
-      {:ok, family} =
-        Taxonomy.create_taxonomy(%{
-          name: "TestTaxoncodeFamily",
-          type: "family",
-          description: "Test family"
-        })
-
-      # Create two genera
-      {:ok, plant_genus} =
-        Taxonomy.create_taxonomy(%{
-          name: "Plantgenus",
-          type: "genus",
-          description: "Plant genus",
-          parent_id: family.id
-        })
-
-      {:ok, gall_genus} =
-        Taxonomy.create_taxonomy(%{
-          name: "Gallgenus",
-          type: "genus",
-          description: "Gall genus",
-          parent_id: family.id
-        })
-
-      # Create plant species linked to plant genus
-      {:ok, plant_species} =
-        Repo.insert(%Species{
-          name: "Plantgenus alba",
-          taxoncode: "plant",
-          datacomplete: false
-        })
-
-      Taxonomy.link_species_to_taxonomy(plant_species.id, plant_genus.id)
-
-      # Create gall species linked to gall genus
-      {:ok, gall_species} =
-        Repo.insert(%Species{
-          name: "Gallgenus nigra",
-          taxoncode: "gall",
-          datacomplete: false
-        })
-
-      Taxonomy.link_species_to_taxonomy(gall_species.id, gall_genus.id)
-
-      # Search for plant genus with taxoncode: "plant" - should find it
-      results_plant = Taxonomy.search_genera_and_sections("plant", 100, taxoncode: "plant")
-      plant_names = Enum.map(results_plant, & &1.name)
-      assert "Plantgenus" in plant_names
-
-      # Search for plant genus with taxoncode: "gall" - should NOT find it
-      results_plant_as_gall =
-        Taxonomy.search_genera_and_sections("plant", 100, taxoncode: "gall")
-
-      plant_as_gall_names = Enum.map(results_plant_as_gall, & &1.name)
-      refute "Plantgenus" in plant_as_gall_names
-
-      # Search for gall genus with taxoncode: "gall" - should find it
-      results_gall = Taxonomy.search_genera_and_sections("gall", 100, taxoncode: "gall")
-      gall_names = Enum.map(results_gall, & &1.name)
-      assert "Gallgenus" in gall_names
-
-      # Search for gall genus with taxoncode: "plant" - should NOT find it
-      results_gall_as_plant = Taxonomy.search_genera_and_sections("gall", 100, taxoncode: "plant")
-      gall_as_plant_names = Enum.map(results_gall_as_plant, & &1.name)
-      refute "Gallgenus" in gall_as_plant_names
-    end
-
-    test "search_genera_and_sections matches common names in description" do
-      {:ok, family} =
-        Taxonomy.create_taxonomy(%{
-          name: "TestCommonNameFamily",
-          type: "family",
-          description: "Test family"
-        })
-
-      {:ok, genus} =
-        Taxonomy.create_taxonomy(%{
-          name: "Quercustestgenus",
-          type: "genus",
-          description: "Oak",
-          parent_id: family.id
-        })
-
-      # Create a species so the genus isn't filtered as empty
-      {:ok, species} =
-        Repo.insert(%Species{
-          name: "Quercustestgenus alba",
-          taxoncode: "plant",
-          datacomplete: false
-        })
-
-      Taxonomy.link_species_to_taxonomy(species.id, genus.id)
-
-      # Search by common name should find the genus
-      results = Taxonomy.search_genera_and_sections("oak", 100)
-      names = Enum.map(results, & &1.name)
-      assert "Quercustestgenus" in names
-
-      # Search by scientific name still works
-      results = Taxonomy.search_genera_and_sections("quercustest", 100)
-      names = Enum.map(results, & &1.name)
-      assert "Quercustestgenus" in names
-    end
   end
 
   describe "delete_taxonomy_cascade/1" do
@@ -2427,12 +2288,6 @@ defmodule Gallformers.TaxonomyTest do
       lineage = Lineage.new_genus("Newgenus")
       assert lineage.intermediates == []
     end
-
-    test "from_query_result has intermediates: []" do
-      result = %{genus_id: 1, genus: "Andricus", family_id: 2, family: "Cynipidae"}
-      lineage = Lineage.from_query_result(result)
-      assert lineage.intermediates == []
-    end
   end
 
   describe "query changes for intermediates" do
@@ -2465,24 +2320,6 @@ defmodule Gallformers.TaxonomyTest do
       assert lineage.intermediates == []
     end
 
-    test "get_genus_lineage with intermediates in chain" do
-      # Genus 33 (Andricus) is under Cynipini → Cynipinae → Cynipidae
-      {:ok, lineage} = Taxonomy.get_genus_lineage(33)
-
-      assert lineage.family.name == "Cynipidae"
-      assert lineage.genus.name == "Andricus"
-      assert length(lineage.intermediates) == 2
-    end
-
-    test "get_genus_lineage without intermediates" do
-      # Genus 10 (GenusAlpha) is directly under FamilyAlpha
-      {:ok, lineage} = Taxonomy.get_genus_lineage(10)
-
-      assert lineage.family.name == "FamilyAlpha"
-      assert lineage.genus.name == "GenusAlpha"
-      assert lineage.intermediates == []
-    end
-
     test "build_taxonomy_from_genus with intermediates" do
       genus = Repo.get_by!(TaxonomySchema, name: "Andricus")
       lineage = Tree.build_taxonomy_from_genus(genus)
@@ -2490,25 +2327,6 @@ defmodule Gallformers.TaxonomyTest do
       assert lineage.family.name == "Cynipidae"
       assert lineage.genus.name == "Andricus"
       assert length(lineage.intermediates) == 2
-    end
-
-    test "get_taxonomy_for_species_batch resolves family correctly through intermediates" do
-      result = Taxonomy.get_taxonomy_for_species_batch([200, 201, 6])
-
-      assert result[200].genus == "Andricus"
-      assert result[200].family == "Cynipidae"
-      assert result[201].genus == "Cynips"
-      assert result[201].family == "Cynipidae"
-      assert result[6].genus == "GenusAlpha"
-      assert result[6].family == "FamilyAlpha"
-    end
-
-    test "get_species_ids_for_family finds species through intermediates" do
-      # Family 30 (Cynipidae) has genera under intermediates
-      species_ids = Taxonomy.get_species_ids_for_family(30)
-
-      assert 200 in species_ids
-      assert 201 in species_ids
     end
 
     test "list_genera_for_select resolves family through intermediates" do
@@ -2523,37 +2341,6 @@ defmodule Gallformers.TaxonomyTest do
       results = Taxonomy.search_genera("Andri")
 
       assert [%{name: "Andricus", family_name: "Cynipidae"}] = results
-    end
-  end
-
-  describe "search integration for intermediates" do
-    # Uses seed data: Cynipinae (subfamily, id=31), Cynipini (tribe, id=32)
-
-    test "search_genera_and_sections includes intermediates" do
-      results = Taxonomy.search_genera_and_sections("Cynip")
-
-      intermediate_results = Enum.filter(results, &(&1.type == "intermediate"))
-      assert length(intermediate_results) >= 1
-
-      cynipinae = Enum.find(intermediate_results, &(&1.name == "Cynipinae"))
-      assert cynipinae != nil
-      assert cynipinae.rank == "Subfamily"
-    end
-
-    test "search_genera_and_sections returns rank field for intermediates" do
-      results = Taxonomy.search_genera_and_sections("Cynipini")
-      tribe = Enum.find(results, &(&1.name == "Cynipini"))
-      assert tribe != nil
-      assert tribe.rank == "Tribe"
-      assert tribe.type == "intermediate"
-    end
-
-    test "search_genera_and_sections rank is nil for genus and section" do
-      results = Taxonomy.search_genera_and_sections("GenusAlpha")
-      genus = Enum.find(results, &(&1.name == "GenusAlpha"))
-      assert genus != nil
-      assert genus.rank == nil
-      assert genus.type == "genus"
     end
   end
 
@@ -2679,8 +2466,9 @@ defmodule Gallformers.TaxonomyTest do
       tribe = Taxonomy.get_taxonomy!(32)
       impact = Taxonomy.get_deletion_impact(tribe)
 
+      # Cynipini has Andricus (33), Cynips (34) and Neuroterus (36)
       assert impact.taxonomy.id == 32
-      assert impact.children_count == 2
+      assert impact.children_count == 3
       assert impact.has_impact != nil
     end
   end
@@ -2738,30 +2526,6 @@ defmodule Gallformers.TaxonomyTest do
       types = children |> Enum.map(& &1.type) |> Enum.uniq() |> Enum.sort()
       assert "genus" in types
       assert "intermediate" in types
-    end
-  end
-
-  describe "list_children_with_counts/1" do
-    test "returns children of an intermediate with species counts" do
-      # Cynipini (tribe, id=32) has children Andricus (33) and Cynips (34)
-      children = Taxonomy.list_children_with_counts(32)
-      assert length(children) == 2
-
-      andricus = Enum.find(children, &(&1.name == "Andricus"))
-      assert andricus.type == "genus"
-      # Andricus has species 200 (Andricus crystallinus) in test seeds
-      assert andricus.species_count == 1
-
-      cynips = Enum.find(children, &(&1.name == "Cynips"))
-      assert cynips.type == "genus"
-      assert cynips.species_count == 1
-    end
-
-    test "returns intermediates and genera as children of a family" do
-      # Cynipidae (id=30) has Cynipinae (intermediate) and Unknown (genus) as direct children
-      children = Taxonomy.list_children_with_counts(30)
-      types = Enum.map(children, & &1.type)
-      assert "intermediate" in types || "genus" in types
     end
   end
 
@@ -2849,47 +2613,6 @@ defmodule Gallformers.TaxonomyTest do
     end
   end
 
-  describe "count_families_for_taxoncode/1 with intermediate ranks" do
-    setup do
-      {:ok, family} =
-        Taxonomy.create_taxonomy(%{name: "CountTestFamily", type: "family", description: "Gall"})
-
-      {:ok, subfamily} =
-        Taxonomy.create_taxonomy(%{
-          name: "CountTestSubfam",
-          type: "intermediate",
-          rank: "Subfamily",
-          parent_id: family.id
-        })
-
-      {:ok, genus} =
-        Taxonomy.create_taxonomy(%{
-          name: "Counttestgenus",
-          type: "genus",
-          description: "test",
-          parent_id: subfamily.id
-        })
-
-      {:ok, gall} =
-        Repo.insert(%Species{
-          name: "Counttestgenus countspecies",
-          taxoncode: "gall",
-          datacomplete: false,
-          abundance_id: 1
-        })
-
-      Repo.insert_all("species_taxonomy", [%{species_id: gall.id, taxonomy_id: genus.id}])
-
-      %{family: family, genus: genus, gall: gall}
-    end
-
-    test "counts families reachable through intermediate ranks" do
-      count = Taxonomy.count_families_for_taxoncode("gall")
-      # Our test family should be counted even though its genus routes through a subfamily
-      assert count >= 1
-    end
-  end
-
   describe "list_sections_for_family_tree/1 with intermediate ranks" do
     setup do
       {:ok, family} =
@@ -2930,103 +2653,5 @@ defmodule Gallformers.TaxonomyTest do
 
       assert section.id in section_ids
     end
-  end
-
-  describe "list_associated_genera/2" do
-    test "lists host genera associated with species in a gall genus" do
-      fixture = create_associated_genera_fixture()
-      host_genus_id = fixture.host_genus.id
-      host_genus_name = fixture.host_genus.name
-
-      assert [
-               %{
-                 id: ^host_genus_id,
-                 name: ^host_genus_name,
-                 focal_species_count: 2,
-                 association_count: 3,
-                 focal_species_ids: gall_ids
-               }
-             ] = Taxonomy.list_associated_genera(fixture.gall_genus.id, "gall")
-
-      assert gall_ids == Enum.sort([fixture.gall_one.id, fixture.gall_two.id])
-    end
-
-    test "lists gall genera associated with species in a host genus" do
-      fixture = create_associated_genera_fixture()
-      gall_genus_id = fixture.gall_genus.id
-      gall_genus_name = fixture.gall_genus.name
-
-      assert [
-               %{
-                 id: ^gall_genus_id,
-                 name: ^gall_genus_name,
-                 focal_species_count: 2,
-                 association_count: 3,
-                 focal_species_ids: host_ids
-               }
-             ] = Taxonomy.list_associated_genera(fixture.host_genus.id, "plant")
-
-      assert host_ids == Enum.sort([fixture.host_one.id, fixture.host_two.id])
-    end
-  end
-
-  defp create_associated_genera_fixture do
-    {:ok, gall_family} =
-      Taxonomy.create_taxonomy(%{
-        name: "AssociatedGallFamily",
-        description: "Wasp",
-        type: "family"
-      })
-
-    {:ok, host_family} =
-      Taxonomy.create_taxonomy(%{
-        name: "AssociatedHostFamily",
-        description: "Plant",
-        type: "family"
-      })
-
-    {:ok, gall_genus} =
-      Taxonomy.create_taxonomy(%{
-        name: "AssociatedGallGenus",
-        type: "genus",
-        parent_id: gall_family.id
-      })
-
-    {:ok, host_genus} =
-      Taxonomy.create_taxonomy(%{
-        name: "AssociatedHostGenus",
-        type: "genus",
-        parent_id: host_family.id
-      })
-
-    gall_one = Repo.insert!(%Species{name: "AssociatedGallGenus one", taxoncode: "gall"})
-    gall_two = Repo.insert!(%Species{name: "AssociatedGallGenus two", taxoncode: "gall"})
-    host_one = Repo.insert!(%Species{name: "AssociatedHostGenus one", taxoncode: "plant"})
-    host_two = Repo.insert!(%Species{name: "AssociatedHostGenus two", taxoncode: "plant"})
-
-    for species <- [gall_one, gall_two] do
-      {:ok, _} = Taxonomy.link_species_to_taxonomy(species.id, gall_genus.id)
-    end
-
-    for species <- [host_one, host_two] do
-      {:ok, _} = Taxonomy.link_species_to_taxonomy(species.id, host_genus.id)
-    end
-
-    for {gall, host} <- [{gall_one, host_one}, {gall_one, host_two}, {gall_two, host_one}] do
-      {:ok, _} =
-        Galls.create_gall_host(%{
-          gall_species_id: gall.id,
-          host_species_id: host.id
-        })
-    end
-
-    %{
-      gall_genus: gall_genus,
-      host_genus: host_genus,
-      gall_one: gall_one,
-      gall_two: gall_two,
-      host_one: host_one,
-      host_two: host_two
-    }
   end
 end

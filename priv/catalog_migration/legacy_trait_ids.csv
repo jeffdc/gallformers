@@ -1,0 +1,103 @@
+table,old_id,trait,value
+alignment,1,alignment,erect
+alignment,2,alignment,drooping
+alignment,3,alignment,supine
+alignment,4,alignment,integral
+alignment,5,alignment,leaning
+cells,1,cells,monothalamous
+cells,4,cells,polythalamous
+cells,5,cells,free-rolling
+cells,6,cells,not applicable
+color,1,color,brown
+color,2,color,gray
+color,3,color,orange
+color,4,color,pink
+color,5,color,red
+color,6,color,white
+color,7,color,yellow
+color,8,color,green
+color,9,color,black
+color,10,color,purple
+color,11,color,tan
+color,12,color,UV
+form,2,form,witches broom
+form,3,form,leaf edge roll
+form,4,form,leaf curl
+form,5,form,leaf blister
+form,6,form,leaf edge fold
+form,7,form,scale
+form,8,form,rust
+form,9,form,tapered swelling
+form,10,form,abrupt swelling
+form,11,form,hidden cell
+form,12,form,stem club
+form,13,form,oak apple
+form,14,form,leaf spot
+form,15,form,pocket
+form,16,form,modified capitulum
+form,17,form,leaf snap
+form,18,form,pip
+form,19,form,plum
+form,20,form,bullet
+form,21,form,jacket
+form,22,form,hat
+form,23,form,wig
+plant_part,1,plant_part,bud
+plant_part,2,plant_part,petiole
+plant_part,3,plant_part,underground (roots+)
+plant_part,4,plant_part,upper leaf
+plant_part,5,plant_part,lower leaf
+plant_part,6,plant_part,leaf midrib
+plant_part,7,plant_part,on leaf veins
+plant_part,8,plant_part,between leaf veins
+plant_part,9,plant_part,at leaf vein angles
+plant_part,10,plant_part,flower
+plant_part,11,plant_part,fruit
+plant_part,12,plant_part,stem
+plant_part,13,plant_part,leaf edge
+season,1,season,Spring
+season,2,season,Summer
+season,3,season,Fall
+season,4,season,Winter
+shape,2,shape,conical
+shape,3,shape,globular
+shape,4,shape,linear
+shape,5,shape,sphere
+shape,6,shape,tuft
+shape,7,shape,spindle
+shape,8,shape,hemispherical
+shape,9,shape,cluster
+shape,10,shape,rosette
+shape,11,shape,numerous
+shape,12,shape,spangle/button
+shape,13,shape,cup
+shape,14,shape,cylindrical
+texture,2,texture,pubescent
+texture,3,texture,stiff
+texture,4,texture,woolly
+texture,5,texture,honeydew
+texture,6,texture,bumpy
+texture,8,texture,areola
+texture,9,texture,glaucous
+texture,10,texture,hairy
+texture,11,texture,hairless
+texture,12,texture,resinous dots
+texture,13,texture,erineum
+texture,14,texture,leafy
+texture,15,texture,mottled
+texture,16,texture,succulent
+texture,17,texture,spiky/thorny
+texture,18,texture,wrinkly
+texture,19,texture,ribbed
+texture,20,texture,spotted
+texture,21,texture,ruptured/split
+texture,22,texture,mealy
+texture,23,texture,striped
+walls,1,walls,thin
+walls,2,walls,thick
+walls,4,walls,false chamber
+walls,5,walls,radiating-fibers
+walls,6,walls,spongy
+walls,7,walls,mycelium lining
+walls,8,walls,slit
+walls,9,walls,ostiole

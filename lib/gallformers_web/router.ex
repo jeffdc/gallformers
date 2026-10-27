@@ -23,6 +23,11 @@ defmodule GallformersWeb.Router do
     plug OpenApiSpex.Plug.PutApiSpec, module: GallformersWeb.ApiSpec
   end
 
+  # Old /gall/:id and /host/:id URLs of records that became no page (301).
+  pipeline :legacy_entity_redirects do
+    plug GallformersWeb.Plugs.LegacyEntityRedirect
+  end
+
   pipeline :admin do
     plug GallformersWeb.Plugs.RequireAdmin
     plug GallformersWeb.Plugs.EnforceReadOnly
@@ -160,7 +165,7 @@ defmodule GallformersWeb.Router do
 
   # Public routes
   scope "/", GallformersWeb do
-    pipe_through :browser
+    pipe_through [:browser, :legacy_entity_redirects]
 
     # Controller-rendered pages (no WebSocket needed)
     get "/about", AboutController, :show

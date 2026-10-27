@@ -2,37 +2,25 @@ defmodule GallformersWeb.SectionLive do
   @moduledoc """
   LiveView for the taxonomic section listing page.
 
-  Displays a section (a subdivision within genus for certain plant genera)
-  with its list of species.
+  Displays a section (a subdivision within a genus for certain plant
+  genera, `Gallformers.Taxa.get_by_name/2`) with its breadcrumb lineage
+  and its plants, each with the number of Galls on it. Data through
+  `GallformersWeb.RankPage`.
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.Species
-  alias Gallformers.Taxonomy
+  alias Gallformers.Taxa
+  alias GallformersWeb.LineageBreadcrumb
+  alias GallformersWeb.RankPage
+  alias GallformersWeb.RankPageComponents
   alias GallformersWeb.TaxonomyURL
 
   @impl true
   def mount(%{"name" => name}, _session, socket) do
-    if TaxonomyURL.numeric?(name) do
-      redirect_by_id(socket, name)
-    else
-      case Taxonomy.get_taxonomy_by_name(name, "section") do
-        nil ->
-          {:ok, assign_section_not_found(socket)}
-
-        %{id: section_id} ->
-          load_section(socket, section_id)
-      end
-    end
-  end
-
-  defp redirect_by_id(socket, id_str) do
-    case Taxonomy.get_taxonomy(String.to_integer(id_str)) do
-      %{type: "section"} = taxonomy ->
-        {:ok, push_navigate(socket, to: TaxonomyURL.public_path(taxonomy), replace: true)}
-
-      _ ->
-        {:ok, assign_section_not_found(socket)}
+    case RankPage.lookup(name, :section) do
+      {:redirect, path} -> {:ok, push_navigate(socket, to: path, replace: true)}
+      {:ok, []} -> {:ok, assign_section_not_found(socket)}
+      {:ok, [section | _]} -> {:ok, load_section(socket, section.id, name)}
     end
   end
 
@@ -44,41 +32,38 @@ defmodule GallformersWeb.SectionLive do
       page_image: nil,
       page_json_ld: nil,
       page_noindex: true,
-      lineage: nil,
+      section: nil,
       error: "Section not found"
     )
   end
 
-  defp load_section(socket, section_id) do
-    case Taxonomy.get_section_lineage(section_id) do
-      {:ok, lineage} ->
-        # Get enriched species for this section
-        species =
-          Taxonomy.get_species_for_section(section_id)
-          |> Species.enrich_with_common_names_and_counts()
+  defp load_section(socket, id, name) do
+    species = RankPage.host_rows(id)
 
-        {:ok,
-         assign(socket,
-           page_title: "Section #{lineage.section.name}",
-           page_description:
-             "#{lineage.section.name} - A taxonomic section documented on Gallformers with #{length(species)} species.",
-           page_url: TaxonomyURL.public_path(%{type: "section", name: lineage.section.name}),
-           page_image: nil,
-           page_json_ld: nil,
-           page_noindex: false,
-           lineage: lineage,
-           species: species,
-           search_query: "",
-           sort_by: :name,
-           sort_dir: :asc,
-           filtered_species: species,
-           total_species_count: length(species),
-           error: nil
-         )}
+    lineage =
+      id
+      |> Taxa.lineage()
+      |> Enum.reject(&(&1.taxon_id == id))
+      |> LineageBreadcrumb.from_lineage()
 
-      {:error, :not_found} ->
-        {:ok, assign_section_not_found(socket)}
-    end
+    assign(socket,
+      page_title: "Section #{name}",
+      page_description:
+        "#{name} - A taxonomic section documented on Gallformers with #{length(species)} species.",
+      page_url: TaxonomyURL.public_path(%{rank: :section, name: name}),
+      page_image: nil,
+      page_json_ld: nil,
+      page_noindex: false,
+      section: %{id: id, name: name, description: RankPage.description(id)},
+      lineage: lineage,
+      species: species,
+      search_query: "",
+      sort_by: :name,
+      sort_dir: :asc,
+      filtered_species: species,
+      total_species_count: length(species),
+      error: nil
+    )
   end
 
   defp format_full_name(name, description) do
@@ -92,55 +77,23 @@ defmodule GallformersWeb.SectionLive do
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
     {:noreply,
-     socket
-     |> assign(:search_query, query)
-     |> filter_species()}
+     assign(socket,
+       search_query: query,
+       filtered_species: RankPage.filter_rows(socket.assigns.species, query)
+     )}
   end
 
   @impl true
   def handle_event("sort", %{"column" => column}, socket)
       when column in ["name", "common_name", "count"] do
-    column_atom = String.to_atom(column)
+    {sort_by, sort_dir} =
+      RankPage.toggle_sort(
+        socket.assigns.sort_by,
+        socket.assigns.sort_dir,
+        String.to_existing_atom(column)
+      )
 
-    {new_sort_by, new_sort_dir} =
-      if socket.assigns.sort_by == column_atom do
-        new_dir = if socket.assigns.sort_dir == :asc, do: :desc, else: :asc
-        {column_atom, new_dir}
-      else
-        {column_atom, :asc}
-      end
-
-    {:noreply, assign(socket, sort_by: new_sort_by, sort_dir: new_sort_dir)}
-  end
-
-  defp filter_species(socket) do
-    query = String.downcase(socket.assigns.search_query)
-
-    filtered =
-      if query == "" do
-        socket.assigns.species
-      else
-        Enum.filter(socket.assigns.species, fn s ->
-          String.contains?(String.downcase(s.name), query) ||
-            (s.common_name && String.contains?(String.downcase(s.common_name), query))
-        end)
-      end
-
-    assign(socket, :filtered_species, filtered)
-  end
-
-  defp sorted_species(species, sort_by, sort_dir) do
-    sorted =
-      Enum.sort_by(species, fn s ->
-        case sort_by do
-          :name -> String.downcase(s.name || "")
-          :common_name -> String.downcase(s.common_name || "zzz")
-          :count -> s.count
-          _ -> String.downcase(s.name || "")
-        end
-      end)
-
-    if sort_dir == :desc, do: Enum.reverse(sorted), else: sorted
+    {:noreply, assign(socket, sort_by: sort_by, sort_dir: sort_dir)}
   end
 
   @impl true
@@ -151,120 +104,71 @@ defmodule GallformersWeb.SectionLive do
         <%= if @error do %>
           <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{@error}</div>
         <% else %>
-          <%= if @lineage do %>
-            <%!-- Header --%>
-            <div class="mb-6">
-              <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-2">
-                  <h1 class="text-2xl font-bold text-gf-maroon">
-                    Section {format_full_name(@lineage.section.name, @lineage.section.description)}
-                  </h1>
-                  <.link
-                    :if={@current_user}
-                    href={~p"/admin/taxonomy/#{@lineage.section.id}"}
-                    class="text-gray-400 hover:text-gf-maroon"
-                    title="Edit in admin"
-                  >
-                    <.icon name="ph-pencil-simple" class="h-5 w-5" />
-                  </.link>
-                </div>
+          <%!-- Header --%>
+          <div class="mb-6">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <h1 class="text-2xl font-bold text-gf-maroon">
+                  Section {format_full_name(@section.name, @section.description)}
+                </h1>
+              </div>
+            </div>
+
+            <.taxonomy_breadcrumb
+              :if={@lineage}
+              family={@lineage.family}
+              intermediates={@lineage.intermediates}
+              genus={@lineage.genus}
+            />
+          </div>
+
+          <%!-- Species list --%>
+          <div class="mt-6">
+            <%= if @total_species_count > 0 do %>
+              <h2 class="text-lg font-semibold text-gray-800 mb-3">
+                Species ({@total_species_count})
+              </h2>
+
+              <%!-- Search box --%>
+              <div class="mb-4 max-w-md">
+                <form phx-change="search" phx-submit="search" id="section-search-form">
+                  <.search_input
+                    id="section-search"
+                    name="query"
+                    value={@search_query}
+                    placeholder="Filter by species or common name..."
+                    phx-debounce="300"
+                  />
+                </form>
               </div>
 
-              <.taxonomy_breadcrumb
-                family={@lineage.family}
-                intermediates={@lineage.intermediates}
-                genus={@lineage.genus}
-              />
-            </div>
-
-            <%!-- Species list --%>
-            <div class="mt-6">
-              <%= if @total_species_count > 0 do %>
-                <h2 class="text-lg font-semibold text-gray-800 mb-3">
-                  Species ({@total_species_count})
-                </h2>
-
-                <%!-- Search box --%>
-                <div class="mb-4 max-w-md">
-                  <form phx-change="search" phx-submit="search" id="section-search-form">
-                    <.search_input
-                      id="section-search"
-                      name="query"
-                      value={@search_query}
-                      placeholder="Filter by species or common name..."
-                      phx-debounce="300"
-                    />
-                  </form>
+              <%= if Enum.empty?(@filtered_species) do %>
+                <div class="bg-gray-50 rounded-lg p-8 text-center text-gray-600">
+                  <p>No species found matching "{@search_query}"</p>
                 </div>
-
-                <%= if Enum.empty?(@filtered_species) do %>
-                  <div class="bg-gray-50 rounded-lg p-8 text-center text-gray-600">
-                    <p>No species found matching "{@search_query}"</p>
-                  </div>
-                <% else %>
-                  <div class="bg-white rounded border border-gray-200 overflow-hidden">
-                    <table class="gf-table">
-                      <thead>
-                        <tr>
-                          <th class="sortable" phx-click="sort" phx-value-column="name">
-                            Species Name
-                            <span :if={@sort_by == :name} class="ml-1">
-                              {if @sort_dir == :asc, do: "↑", else: "↓"}
-                            </span>
-                          </th>
-                          <th
-                            class="sortable text-center"
-                            phx-click="sort"
-                            phx-value-column="common_name"
-                          >
-                            Common Name
-                            <span :if={@sort_by == :common_name} class="ml-1">
-                              {if @sort_dir == :asc, do: "↑", else: "↓"}
-                            </span>
-                          </th>
-                          <th class="sortable text-center" phx-click="sort" phx-value-column="count">
-                            Number of Galls
-                            <span :if={@sort_by == :count} class="ml-1">
-                              {if @sort_dir == :asc, do: "↑", else: "↓"}
-                            </span>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr :for={species <- sorted_species(@filtered_species, @sort_by, @sort_dir)}>
-                          <td>
-                            <%!-- Sections are for hosts (plants) --%>
-                            <.link href={"/host/#{species.id}"} class="hover:underline">
-                              <.taxon_name name={species.name} />
-                            </.link>
-                          </td>
-                          <td class="text-center">{species.common_name}</td>
-                          <td class="text-center text-gray-600">
-                            {species.count}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <%!-- Filter status message --%>
-                  <div class="mt-4 text-sm text-gray-500">
-                    <%= if @search_query != "" do %>
-                      Filtering {length(@filtered_species)} of {@total_species_count} species
-                    <% else %>
-                      Showing {length(@filtered_species)} species
-                    <% end %>
-                  </div>
-                <% end %>
               <% else %>
-                <p class="text-gray-500 italic">No species found for this section.</p>
+                <RankPageComponents.species_table
+                  id="section-species"
+                  rows={@filtered_species}
+                  url_prefix="/host/"
+                  count_header="Number of Galls"
+                  sort_by={@sort_by}
+                  sort_dir={@sort_dir}
+                />
+
+                <%!-- Filter status message --%>
+                <div class="mt-4 text-sm text-gray-500">
+                  <%= if @search_query != "" do %>
+                    Filtering {length(@filtered_species)} of {@total_species_count} species
+                  <% else %>
+                    Showing {length(@filtered_species)} species
+                  <% end %>
+                </div>
               <% end %>
-            </div>
-          <% else %>
-            <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-              Section not found.
-            </div>
-          <% end %>
+            <% else %>
+              <p class="text-gray-500 italic">No species found for this section.</p>
+            <% end %>
+          </div>
         <% end %>
       </div>
     </Layouts.app>

@@ -42,7 +42,7 @@ defmodule GallformersWeb.Admin.GallLive.FormTest do
 
   # Helper to find any gall for testing - fails explicitly if no data
   defp require_gall do
-    case Galls.list_galls() do
+    case Galls.list_galls_paginated(1, 0) do
       [gall | _] -> gall
       [] -> flunk("No gall found in test database - ensure test fixtures exist")
     end
@@ -50,7 +50,7 @@ defmodule GallformersWeb.Admin.GallLive.FormTest do
 
   # Helper to find any host for testing - fails explicitly if no data
   defp require_host do
-    case Plants.list_hosts() do
+    case Plants.list_hosts_paginated(1, 0) do
       [host | _] -> host
       [] -> flunk("No host found in test database - ensure test fixtures exist")
     end

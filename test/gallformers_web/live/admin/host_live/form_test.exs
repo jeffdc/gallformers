@@ -42,7 +42,7 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
 
   # Helper to find any host for testing - fails explicitly if no data
   defp require_host do
-    case Plants.list_hosts() do
+    case Plants.list_hosts_paginated(1, 0) do
       [host | _] -> host
       [] -> flunk("No host found in test database - ensure test fixtures exist")
     end
@@ -971,7 +971,7 @@ defmodule GallformersWeb.Admin.HostLive.FormTest do
 
       render_click(view, "save", %{"species" => %{}})
 
-      host = Plants.get_host_by_name("GenusAlpha mappedrangehost")
+      host = Repo.get_by(Species, name: "GenusAlpha mappedrangehost", taxoncode: "plant")
       assert host != nil
 
       place_codes =

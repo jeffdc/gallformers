@@ -4,11 +4,37 @@ defmodule GallformersWeb.IDLive do
 
   Allows users to filter galls by various characteristics (host, genus, plant part,
   color, shape, etc.) with URL-based state preservation for back/forward navigation.
+
+  Reads `Gallformers.Catalog.identify/1` (one query over the stored per-Gall
+  lookup table) and the `Gallformers.Taxa` typeaheads (`803b` §3, Task 10).
+
+  ## URLs and old bookmarks
+
+  URLs carry readable values: the host's name (`h`), the host genus or
+  section's name and rank (`g`, `gt`), each Trait's values (`co=red`,
+  `lo=upper leaf,lower leaf`) and the Inducer family's name (`fa`).
+
+  Old bookmarks keep working:
+
+    * integer Trait parameters are rows of the old vocabulary tables,
+      translated through `Gallformers.Catalog.legacy_trait_values/0`;
+    * an integer `fa` is an old taxonomy ID, translated through the legacy
+      crosswalk (`Gallformers.Taxa.get_by_legacy_id/2`); an unknown ID is
+      ignored, never matched to another taxon;
+    * `h` matches a plant's accepted name or a synonym, so a renamed plant's
+      old name still selects it;
+    * `ng` (show non-galls) is ignored: non-galls are not in the catalog;
+    * V1 parameter names (`hostOrTaxon`, `color`, ...) are mapped as before.
+
+  An unknown Trait value or ID is dropped.
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.{Galls, Places, Taxonomy}
-  alias Gallformers.Plants
+  alias Gallformers.Catalog
+  alias Gallformers.Galls.Summary
+  alias Gallformers.Places
+  alias Gallformers.Taxa
+  alias Gallformers.Taxa.Rank
   alias GallformersWeb.Live.ContinentScope
 
   # URL parameter keys (short codes for compact URLs)
@@ -18,21 +44,35 @@ defmodule GallformersWeb.IDLive do
     genus_type: "gt",
     locations: "lo",
     location_logic: "lol",
-    color: "co",
-    shape: "sh",
     textures: "te",
     texture_logic: "tel",
-    alignment: "al",
     detachable: "de",
     place: "pl",
     family: "fa",
-    form: "fo",
-    walls: "wa",
-    cells: "ce",
-    season: "se",
-    undescribed: "un",
-    show_non_galls: "ng"
+    undescribed: "un"
   }
+
+  # Single-value Trait filters: filter key => {URL param, Trait}
+  @single_traits [
+    color: {"co", "color"},
+    shape: {"sh", "shape"},
+    alignment: {"al", "alignment"},
+    form: {"fo", "form"},
+    walls: {"wa", "walls"},
+    cells: {"ce", "cells"},
+    season: {"se", "season"}
+  ]
+
+  # Multi-value Trait filters: filter key => {URL param, Trait}
+  @multi_traits [
+    plant_parts: {"lo", "plant_part"},
+    textures: {"te", "texture"}
+  ]
+
+  @trait_params Enum.map(@single_traits ++ @multi_traits, fn {_key, {param, _}} -> param end)
+
+  # Host genus / section ranks, in the order a name without a rank is tried
+  @group_ranks [:genus, :subgenus, :section]
 
   # Special marker for "leaf (anywhere)" virtual location option
   @leaf_anywhere_id "leaf_anywhere"
@@ -57,11 +97,10 @@ defmodule GallformersWeb.IDLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    filter_options = Galls.get_filter_options()
-
-    # Add "leaf (anywhere)" virtual option to plant_parts, sorted alphabetically
-    plant_parts_with_virtual = add_leaf_anywhere_option(filter_options.plant_parts)
-    filter_options = Map.put(filter_options, :plant_parts, plant_parts_with_virtual)
+    trait_values =
+      Map.new(Catalog.identify_options(), fn {trait, values} ->
+        {trait, Enum.map(values, & &1.value)}
+      end)
 
     {:ok,
      assign(socket,
@@ -72,7 +111,9 @@ defmodule GallformersWeb.IDLive do
        page_image: nil,
        page_json_ld: nil,
        page_noindex: true,
-       filter_options: filter_options,
+       trait_values: trait_values,
+       plant_part_options: plant_part_options(trait_values),
+       texture_options: value_options(Map.get(trait_values, "texture", [])),
        families: [],
        # Current filter selections
        filters: default_filters(),
@@ -107,7 +148,7 @@ defmodule GallformersWeb.IDLive do
   def handle_params(params, _uri, socket) do
     # Normalize V1 param names to V2 for backwards compatibility
     params = normalize_v1_params(params)
-    filters = parse_url_params(params)
+    filters = parse_url_params(params, socket.assigns.trait_values)
     socket = apply_url_filters(socket, filters, params)
     {:noreply, socket}
   end
@@ -157,54 +198,93 @@ defmodule GallformersWeb.IDLive do
   end
 
   # Parse URL parameters into filter map
-  defp parse_url_params(params) do
+  defp parse_url_params(params, trait_values) do
+    legacy = legacy_trait_values(params)
+
+    single =
+      Map.new(@single_traits, fn {key, {param, trait}} ->
+        {key, parse_trait_value(params[param], trait, trait_values, legacy)}
+      end)
+
+    multi =
+      Map.new(@multi_traits, fn {key, {param, trait}} ->
+        {key, parse_trait_values(params[param], trait, trait_values, legacy)}
+      end)
+
     %{
-      plant_parts: parse_list(params[@url_params.locations]),
       plant_part_logic: parse_logic(params[@url_params.location_logic]),
-      color: parse_int(params[@url_params.color]),
-      shape: parse_int(params[@url_params.shape]),
-      textures: parse_list(params[@url_params.textures]),
       texture_logic: parse_logic(params[@url_params.texture_logic]),
-      alignment: parse_int(params[@url_params.alignment]),
       detachable: parse_detachable(params[@url_params.detachable]),
-      place: params[@url_params.place],
-      family: parse_int(params[@url_params.family]),
-      form: parse_int(params[@url_params.form]),
-      walls: parse_int(params[@url_params.walls]),
-      cells: parse_int(params[@url_params.cells]),
-      season: parse_int(params[@url_params.season]),
-      undescribed: params[@url_params.undescribed] == "1",
-      show_non_galls: params[@url_params.show_non_galls] != "0"
+      place: blank_to_nil(params[@url_params.place]),
+      family: parse_family(params[@url_params.family]),
+      undescribed: params[@url_params.undescribed] == "1"
     }
+    |> Map.merge(single)
+    |> Map.merge(multi)
   end
 
   defp parse_logic("and"), do: :and
   defp parse_logic(_), do: :or
 
-  defp parse_list(nil), do: []
+  defp blank_to_nil(value) when value in [nil, ""], do: nil
+  defp blank_to_nil(value), do: value
 
-  defp parse_list(str) when is_binary(str) do
-    str
-    |> String.split(",")
-    |> Enum.map(&parse_list_item/1)
-    |> Enum.reject(&is_nil/1)
-  end
+  # The old vocabulary tables' row IDs, read only when a Trait parameter holds one.
+  defp legacy_trait_values(params) do
+    old_ids? =
+      Enum.any?(@trait_params, fn param ->
+        params
+        |> Map.get(param, "")
+        |> to_string()
+        |> String.split(",")
+        |> Enum.any?(&integer_token?/1)
+      end)
 
-  # Parse list item - handles integers and special string markers like "leaf_anywhere"
-  defp parse_list_item(@leaf_anywhere_id), do: @leaf_anywhere_id
-
-  defp parse_list_item(str) do
-    parse_int(str)
-  end
-
-  defp parse_int(nil), do: nil
-  defp parse_int(""), do: nil
-
-  defp parse_int(str) when is_binary(str) do
-    case Integer.parse(str) do
-      {int, ""} -> int
-      _ -> nil
+    with true <- old_ids?, {:ok, values} <- Catalog.legacy_trait_values() do
+      values
+    else
+      _ -> %{}
     end
+  end
+
+  defp integer_token?(token), do: match?({_, ""}, Integer.parse(token))
+
+  defp parse_trait_value(raw, trait, trait_values, legacy) do
+    case blank_to_nil(raw) do
+      nil -> nil
+      token -> trait_value(token, trait, trait_values, legacy)
+    end
+  end
+
+  defp parse_trait_values(raw, trait, trait_values, legacy) do
+    case blank_to_nil(raw) do
+      nil ->
+        []
+
+      str ->
+        str
+        |> String.split(",")
+        |> Enum.map(&list_item(&1, trait, trait_values, legacy))
+        |> Enum.reject(&is_nil/1)
+        |> Enum.uniq()
+    end
+  end
+
+  defp list_item(@leaf_anywhere_id, "plant_part", _trait_values, _legacy), do: @leaf_anywhere_id
+
+  defp list_item(token, trait, trait_values, legacy),
+    do: trait_value(token, trait, trait_values, legacy)
+
+  # A token's Trait value: a value of the vocabulary, or an old row ID
+  # translated through the legacy file; anything else is nil.
+  defp trait_value(token, trait, trait_values, legacy) do
+    value =
+      case Integer.parse(token) do
+        {old_id, ""} -> get_in(legacy, [{trait, old_id}, :value])
+        _ -> token
+      end
+
+    if value in Map.get(trait_values, trait, []), do: value
   end
 
   # Parse detachable param - converts V1 integer values to V2 strings for backwards compatibility
@@ -217,6 +297,30 @@ defmodule GallformersWeb.IDLive do
   # V2 string values pass through
   defp parse_detachable(val) when val in ["unknown", "integral", "detachable", "both"], do: val
   defp parse_detachable(_), do: nil
+
+  # The Inducer family: a name, or an old taxonomy ID through the legacy crosswalk.
+  defp parse_family(raw) do
+    case blank_to_nil(raw) do
+      nil ->
+        nil
+
+      value ->
+        case Integer.parse(value) do
+          {old_id, ""} -> family_ref(Taxa.get_by_legacy_id(:taxonomy, old_id))
+          _ -> family_by_name(value)
+        end
+    end
+  end
+
+  defp family_by_name(name) do
+    case Enum.reject(Taxa.get_by_name(name, :family), &(&1.kingdom == "Plantae")) do
+      [taxon] -> family_ref(taxon)
+      _ -> nil
+    end
+  end
+
+  defp family_ref(nil), do: nil
+  defp family_ref(taxon), do: %{id: taxon.id, name: Taxa.accepted_name(taxon)}
 
   # Apply filters from URL and load host/genus if specified
   defp apply_url_filters(socket, filters, params) do
@@ -254,7 +358,7 @@ defmodule GallformersWeb.IDLive do
     case decode_url_param(params[@url_params.host]) do
       nil -> nil
       "" -> nil
-      name -> Plants.get_host_by_name(name)
+      name -> find_plant(name)
     end
   end
 
@@ -262,37 +366,90 @@ defmodule GallformersWeb.IDLive do
     case decode_url_param(params[@url_params.genus]) do
       nil -> nil
       "" -> nil
-      name -> find_genus_by_name(name, params)
-    end
-  end
-
-  defp find_genus_by_name(name, params) do
-    genus_type = decode_url_param(params[@url_params.genus_type]) || "genus"
-
-    case Taxonomy.get_taxonomy_by_name(name, genus_type) do
-      nil -> Taxonomy.find_taxonomy_by_name(name)
-      tax -> tax
+      name -> find_group(name, decode_url_param(params[@url_params.genus_type]))
     end
   end
 
   defp decode_url_param(nil), do: nil
   defp decode_url_param(value), do: URI.decode(value)
 
+  # A plant (Plantae at species rank or below) by accepted name or synonym.
+  defp find_plant(name) do
+    name
+    |> plant_taxa(kingdom: "Plantae")
+    |> Enum.filter(&(&1.rank in Rank.species_and_below()))
+    |> pick_taxon()
+    |> host_ref()
+  end
+
+  # A plant genus, subgenus or section by name, trying `type`'s rank first.
+  defp find_group(name, type) do
+    preferred = Enum.filter(@group_ranks, &(to_string(&1) == type))
+
+    (preferred ++ (@group_ranks -- preferred))
+    |> Enum.find_value(&pick_taxon(plant_taxa(name, rank: &1, kingdom: "Plantae")))
+    |> group_ref()
+  end
+
+  defp plant_taxa(name, opts) do
+    case Taxa.resolve_name(name, opts) do
+      {:ok, taxon} -> [taxon]
+      {:ambiguous, taxa} -> taxa
+      :none -> []
+    end
+  end
+
+  # One taxon, or the one matched by its accepted name among several.
+  defp pick_taxon([taxon]), do: taxon
+
+  defp pick_taxon(taxa) do
+    case Enum.filter(taxa, &(&1.matched_name.status == :accepted)) do
+      [taxon] -> taxon
+      _ -> nil
+    end
+  end
+
+  # A plant taxon by ID, as the host picker shows it, or nil.
+  defp get_plant(id) do
+    case Taxa.get_taxon(id) do
+      %{kingdom: "Plantae", rank: rank} = taxon ->
+        if rank in Rank.species_and_below(), do: host_ref(taxon)
+
+      _ ->
+        nil
+    end
+  end
+
+  # A plant genus, subgenus or section by ID, as the genus picker shows it, or nil.
+  defp get_group(id) do
+    case Taxa.get_taxon(id) do
+      %{kingdom: "Plantae", rank: rank} = taxon when rank in @group_ranks -> group_ref(taxon)
+      _ -> nil
+    end
+  end
+
+  defp host_ref(nil), do: nil
+
+  defp host_ref(taxon),
+    do: %{id: taxon.id, name: Taxa.accepted_name(taxon), datacomplete: taxon.datacomplete}
+
+  defp group_ref(nil), do: nil
+
+  defp group_ref(taxon) do
+    description =
+      case Map.get(Taxa.common_names([taxon.id]), taxon.id, []) do
+        [] -> nil
+        names -> Enum.join(names, ", ")
+      end
+
+    %{id: taxon.id, name: Taxa.accepted_name(taxon), rank: taxon.rank, description: description}
+  end
+
   # Load families relevant to the current host/genus selection
   defp load_families_for_selection(nil, nil), do: []
-
-  defp load_families_for_selection(host, nil) do
-    Taxonomy.list_gall_families_for_host(host.id)
-  end
-
-  defp load_families_for_selection(nil, genus) do
-    Taxonomy.list_gall_families_for_host_genus(genus.id)
-  end
-
-  defp load_families_for_selection(host, _genus) do
-    # When both are selected, get families for host (genus family should be in there)
-    Taxonomy.list_gall_families_for_host(host.id)
-  end
+  # When both are selected, the host's families (the genus's are among them)
+  defp load_families_for_selection(%{id: id}, _genus), do: Catalog.gall_families_for_hosts([id])
+  defp load_families_for_selection(nil, %{id: id}), do: Catalog.gall_families_for_hosts([id])
 
   defp default_filters do
     %{
@@ -310,8 +467,7 @@ defmodule GallformersWeb.IDLive do
       walls: nil,
       cells: nil,
       season: nil,
-      undescribed: false,
-      show_non_galls: true
+      undescribed: false
     }
   end
 
@@ -321,7 +477,7 @@ defmodule GallformersWeb.IDLive do
   def handle_event("search_host", %{"value" => query}, socket) do
     results =
       if String.length(query) >= 2 do
-        Plants.search_hosts(query, 50)
+        Taxa.search_plants(query, 50)
       else
         []
       end
@@ -339,8 +495,7 @@ defmodule GallformersWeb.IDLive do
 
   @impl true
   def handle_event("select_host", %{"id" => id_str}, socket) do
-    host_id = String.to_integer(id_str)
-    host = Plants.get_host(host_id)
+    host = get_plant(String.to_integer(id_str))
 
     socket =
       socket
@@ -373,7 +528,7 @@ defmodule GallformersWeb.IDLive do
     results =
       if String.length(query) >= 2 do
         # Only show plant genera/sections for host plant filter
-        Taxonomy.search_genera_and_sections(query, 10, taxoncode: "plant")
+        Taxa.search_genera_and_sections(query, 10, kingdom: "Plantae")
       else
         []
       end
@@ -391,8 +546,7 @@ defmodule GallformersWeb.IDLive do
 
   @impl true
   def handle_event("select_genus", %{"id" => id_str}, socket) do
-    genus_id = String.to_integer(id_str)
-    genus = Taxonomy.get_taxonomy(genus_id)
+    genus = get_group(String.to_integer(id_str))
 
     socket =
       socket
@@ -438,19 +592,9 @@ defmodule GallformersWeb.IDLive do
 
   @impl true
   def handle_event("plant_part_select", %{"id" => id}, socket) do
-    plant_part_id = parse_plant_part_id(id)
-    plant_parts = socket.assigns.filters.plant_parts
-
-    new_plant_parts =
-      if plant_part_id in plant_parts do
-        plant_parts
-      else
-        [plant_part_id | plant_parts]
-      end
-
     socket =
       socket
-      |> update_filter(:plant_parts, new_plant_parts)
+      |> select_option(:plant_parts, id, socket.assigns.plant_part_options)
       |> assign(plant_part_query: "")
       |> push_filter_patch()
 
@@ -459,8 +603,7 @@ defmodule GallformersWeb.IDLive do
 
   @impl true
   def handle_event("plant_part_remove", %{"id" => id}, socket) do
-    plant_part_id = parse_plant_part_id(id)
-    new_plant_parts = List.delete(socket.assigns.filters.plant_parts, plant_part_id)
+    new_plant_parts = List.delete(socket.assigns.filters.plant_parts, id)
 
     socket =
       socket
@@ -499,19 +642,9 @@ defmodule GallformersWeb.IDLive do
 
   @impl true
   def handle_event("texture_select", %{"id" => id}, socket) do
-    texture_id = String.to_integer(id)
-    textures = socket.assigns.filters.textures
-
-    new_textures =
-      if texture_id in textures do
-        textures
-      else
-        [texture_id | textures]
-      end
-
     socket =
       socket
-      |> update_filter(:textures, new_textures)
+      |> select_option(:textures, id, socket.assigns.texture_options)
       |> assign(texture_query: "")
       |> push_filter_patch()
 
@@ -520,8 +653,7 @@ defmodule GallformersWeb.IDLive do
 
   @impl true
   def handle_event("texture_remove", %{"id" => id}, socket) do
-    texture_id = String.to_integer(id)
-    new_textures = List.delete(socket.assigns.filters.textures, texture_id)
+    new_textures = List.delete(socket.assigns.filters.textures, id)
 
     socket =
       socket
@@ -567,26 +699,17 @@ defmodule GallformersWeb.IDLive do
     {:noreply, socket}
   end
 
-  # Valid filter keys from @url_params
-  @valid_filter_keys ~w(host genus genus_type locations color shape textures alignment detachable place family form walls cells season undescribed show_non_galls)
+  @single_trait_filters Enum.map(@single_traits, fn {key, _} -> to_string(key) end)
+  @valid_filter_keys ~w(detachable family undescribed) ++ @single_trait_filters
 
   @impl true
   def handle_event("change_filter", %{"filter" => filter, "value" => value}, socket)
       when filter in @valid_filter_keys do
-    filter_key = String.to_atom(filter)
-
-    parsed_value =
-      case filter_key do
-        :show_non_galls -> value == "true"
-        :undescribed -> value == "true"
-        :detachable -> if value == "", do: nil, else: value
-        :place -> if value == "", do: nil, else: value
-        _ -> if value == "", do: nil, else: String.to_integer(value)
-      end
+    filter_key = String.to_existing_atom(filter)
 
     socket =
       socket
-      |> update_filter(filter_key, parsed_value)
+      |> update_filter(filter_key, filter_value(filter_key, value, socket.assigns))
       |> push_filter_patch()
 
     {:noreply, socket}
@@ -678,6 +801,31 @@ defmodule GallformersWeb.IDLive do
     {:noreply, assign(socket, name_filter: "", filtered_results: socket.assigns.results)}
   end
 
+  # The value a "change_filter" event sets: a Trait value of the vocabulary,
+  # one of the host's families, or a detachable value.
+  defp filter_value(:undescribed, value, _assigns), do: value == "true"
+  defp filter_value(:detachable, value, _assigns), do: parse_detachable(value)
+
+  defp filter_value(:family, value, assigns) do
+    Enum.find(assigns.families, &(to_string(&1.id) == value))
+  end
+
+  defp filter_value(key, value, assigns) do
+    {_param, trait} = Keyword.fetch!(@single_traits, key)
+    if value in Map.get(assigns.trait_values, trait, []), do: value
+  end
+
+  # Adds an option of a multi-select to its filter, if it is one of the options.
+  defp select_option(socket, key, id, options) do
+    selected = Map.fetch!(socket.assigns.filters, key)
+
+    if id in selected or not Enum.any?(options, &(&1.id == id)) do
+      socket
+    else
+      update_filter(socket, key, [id | selected])
+    end
+  end
+
   defp update_filter(socket, key, value) do
     filters = Map.put(socket.assigns.filters, key, value)
     assign(socket, filters: filters)
@@ -690,55 +838,41 @@ defmodule GallformersWeb.IDLive do
   end
 
   defp build_url_params(socket) do
-    params = %{}
     filters = socket.assigns.filters
 
     params =
-      if socket.assigns.selected_host do
-        Map.put(params, @url_params.host, socket.assigns.selected_host.name)
-      else
-        params
-      end
+      %{}
+      |> maybe_add_param(@url_params.host, socket.assigns.selected_host, & &1.name)
+      |> maybe_add_param(@url_params.genus, socket.assigns.selected_genus, & &1.name)
+      |> maybe_add_param(
+        @url_params.genus_type,
+        socket.assigns.selected_genus,
+        &to_string(&1.rank)
+      )
+      |> maybe_add_logic_param(@url_params.location_logic, filters.plant_part_logic)
+      |> maybe_add_logic_param(@url_params.texture_logic, filters.texture_logic)
+      |> maybe_add_param(@url_params.detachable, filters.detachable)
+      |> maybe_add_param(@url_params.place, filters.place)
+      |> maybe_add_param(@url_params.family, filters.family, & &1.name)
 
     params =
-      if socket.assigns.selected_genus do
-        params
-        |> Map.put(@url_params.genus, socket.assigns.selected_genus.name)
-        |> Map.put(@url_params.genus_type, socket.assigns.selected_genus.type)
-      else
-        params
-      end
-
-    params = maybe_add_list_param(params, @url_params.locations, filters.plant_parts)
-    params = maybe_add_logic_param(params, @url_params.location_logic, filters.plant_part_logic)
-    params = maybe_add_param(params, @url_params.color, filters.color)
-    params = maybe_add_param(params, @url_params.shape, filters.shape)
-    params = maybe_add_list_param(params, @url_params.textures, filters.textures)
-    params = maybe_add_logic_param(params, @url_params.texture_logic, filters.texture_logic)
-    params = maybe_add_param(params, @url_params.alignment, filters.alignment)
-    params = maybe_add_param(params, @url_params.detachable, filters.detachable)
-    params = maybe_add_param(params, @url_params.place, filters.place)
-    params = maybe_add_param(params, @url_params.family, filters.family)
-    params = maybe_add_param(params, @url_params.form, filters.form)
-    params = maybe_add_param(params, @url_params.walls, filters.walls)
-    params = maybe_add_param(params, @url_params.cells, filters.cells)
-    params = maybe_add_param(params, @url_params.season, filters.season)
+      Enum.reduce(@single_traits, params, fn {key, {param, _trait}}, acc ->
+        maybe_add_param(acc, param, Map.fetch!(filters, key))
+      end)
 
     params =
-      if filters.undescribed,
-        do: Map.put(params, @url_params.undescribed, "1"),
-        else: params
+      Enum.reduce(@multi_traits, params, fn {key, {param, _trait}}, acc ->
+        maybe_add_list_param(acc, param, Map.fetch!(filters, key))
+      end)
 
-    params =
-      if filters.show_non_galls,
-        do: params,
-        else: Map.put(params, @url_params.show_non_galls, "0")
-
-    params
+    if filters.undescribed,
+      do: Map.put(params, @url_params.undescribed, "1"),
+      else: params
   end
 
-  defp maybe_add_param(params, _key, nil), do: params
-  defp maybe_add_param(params, key, value), do: Map.put(params, key, value)
+  defp maybe_add_param(params, key, value, fun \\ & &1)
+  defp maybe_add_param(params, _key, nil, _fun), do: params
+  defp maybe_add_param(params, key, value, fun), do: Map.put(params, key, fun.(value))
 
   # Only add logic param if it's :and (since :or is default)
   defp maybe_add_logic_param(params, _key, :or), do: params
@@ -760,17 +894,20 @@ defmodule GallformersWeb.IDLive do
   end
 
   defp load_results(socket) do
-    filter_params = build_filter_params(socket)
-    results = Galls.filter_galls(filter_params)
+    filters = identify_filters(socket)
+    results = Catalog.identify(filters)
 
-    # Generate summaries for galls without images
-    summaries = generate_summaries_for_imageless(results)
+    # Summaries for galls without images
+    summaries =
+      for gall <- results, is_nil(gall.image_url), into: %{} do
+        {gall.id, Summary.generate(Summary.from_traits(gall.traits), mode: :medium)}
+      end
 
     # When results are empty and a place/region filter is active, check if
     # galls exist without the geographic filter so we can hint to the user.
     unscoped_count =
-      if results == [] && filter_params[:place_codes] != nil do
-        Galls.count_filtered_galls(%{filter_params | place_codes: nil})
+      if results == [] && filters.place_codes != nil do
+        Catalog.count_identified(%{filters | place_codes: nil})
       else
         0
       end
@@ -778,16 +915,7 @@ defmodule GallformersWeb.IDLive do
     name_filter = socket.assigns.name_filter
     filtered_results = apply_name_filter(results, name_filter)
 
-    if socket.assigns.filters == default_filters() do
-      assign(socket,
-        results: results,
-        filtered_results: filtered_results,
-        summaries: summaries,
-        total_count: length(results),
-        name_filter: name_filter,
-        unscoped_count: unscoped_count
-      )
-    else
+    socket =
       assign(socket,
         results: results,
         filtered_results: filtered_results,
@@ -795,7 +923,10 @@ defmodule GallformersWeb.IDLive do
         name_filter: name_filter,
         unscoped_count: unscoped_count
       )
-    end
+
+    if socket.assigns.filters == default_filters(),
+      do: assign(socket, total_count: length(results)),
+      else: socket
   end
 
   defp apply_name_filter(results, ""), do: results
@@ -805,32 +936,9 @@ defmodule GallformersWeb.IDLive do
     Enum.filter(results, &String.contains?(String.downcase(&1.name), term))
   end
 
-  defp generate_summaries_for_imageless(results) do
-    # Find galls without images
-    gall_ids_without_images =
-      results
-      |> Enum.filter(&is_nil(&1.image_url))
-      |> Enum.map(& &1.gall_id)
-
-    if Enum.empty?(gall_ids_without_images) do
-      %{}
-    else
-      # Fetch summary data and generate summaries
-      summary_data = Galls.get_summary_data(gall_ids_without_images)
-
-      summary_data
-      |> Enum.map(fn {gall_id, filters} ->
-        {gall_id, Galls.Summary.generate(filters, mode: :medium)}
-      end)
-      |> Enum.into(%{})
-    end
-  end
-
-  defp build_filter_params(socket) do
+  # The page's selections as `Gallformers.Catalog.identify/1` filters.
+  defp identify_filters(socket) do
     filters = socket.assigns.filters
-
-    # Expand "leaf (anywhere)" to actual leaf plant part IDs
-    expanded_plant_parts = expand_plant_part_ids(filters.plant_parts)
 
     # Use explicit place if selected, otherwise fall back to continent scope
     place_codes =
@@ -840,61 +948,49 @@ defmodule GallformersWeb.IDLive do
         true -> nil
       end
 
+    single =
+      for {key, {_param, trait}} <- @single_traits,
+          value = Map.fetch!(filters, key),
+          into: %{},
+          do: {trait, [value]}
+
+    traits =
+      Map.merge(single, %{
+        "plant_part" => expand_plant_parts(filters.plant_parts, socket.assigns.trait_values),
+        "texture" => filters.textures
+      })
+
     %{
-      host_ids: wrap_in_list(socket.assigns.selected_host, & &1.id),
-      genus_id: maybe_get(socket.assigns.selected_genus, :id),
-      plant_part_ids: non_empty_list(expanded_plant_parts),
-      plant_part_logic: filters.plant_part_logic,
-      color_ids: wrap_value(filters.color),
-      shape_ids: wrap_value(filters.shape),
-      texture_ids: non_empty_list(filters.textures),
-      texture_logic: filters.texture_logic,
-      alignment_ids: wrap_value(filters.alignment),
-      detachable: parse_detachable(filters.detachable),
-      place_codes: place_codes,
-      family_id: filters.family,
-      form_ids: wrap_value(filters.form),
-      walls_ids: wrap_value(filters.walls),
-      cells_ids: wrap_value(filters.cells),
-      season_ids: wrap_value(filters.season),
+      host_id: socket.assigns.selected_host && socket.assigns.selected_host.id,
+      host_group_id: socket.assigns.selected_genus && socket.assigns.selected_genus.id,
+      inducer_family_id: filters.family && filters.family.id,
+      traits: traits,
+      trait_logic: %{"plant_part" => filters.plant_part_logic, "texture" => filters.texture_logic},
+      detachable: filters.detachable,
       undescribed: filters.undescribed,
-      exclude_non_galls: !filters.show_non_galls
+      place_codes: place_codes
     }
   end
 
-  defp wrap_in_list(nil, _fun), do: nil
-  defp wrap_in_list(value, fun), do: [fun.(value)]
+  # The plant part options: each value, and "leaf (anywhere)", by label.
+  defp plant_part_options(trait_values) do
+    virtual_option = %{id: @leaf_anywhere_id, label: "leaf (anywhere)"}
 
-  defp wrap_value(nil), do: nil
-  defp wrap_value(value), do: [value]
-
-  defp maybe_get(nil, _key), do: nil
-  defp maybe_get(map, key), do: Map.get(map, key)
-
-  defp non_empty_list([]), do: nil
-  defp non_empty_list(list), do: list
-
-  # Add "leaf (anywhere)" virtual option to locations list, sorted alphabetically
-  defp add_leaf_anywhere_option(plant_parts) do
-    virtual_option = %{id: @leaf_anywhere_id, part: "leaf (anywhere)"}
-
-    [virtual_option | plant_parts]
-    |> Enum.sort_by(& &1.part)
+    [virtual_option | value_options(Map.get(trait_values, "plant_part", []))]
+    |> Enum.sort_by(& &1.label)
   end
 
-  # Parse plant part ID - handles both integer IDs and "leaf_anywhere" string
-  defp parse_plant_part_id(@leaf_anywhere_id), do: @leaf_anywhere_id
-  defp parse_plant_part_id(id) when is_binary(id), do: String.to_integer(id)
-  defp parse_plant_part_id(id) when is_integer(id), do: id
+  defp value_options(values), do: Enum.map(values, &%{id: &1, label: &1})
 
-  # Expand plant part IDs, replacing "leaf_anywhere" marker with actual leaf plant part IDs
-  defp expand_plant_part_ids(plant_part_ids) do
-    if @leaf_anywhere_id in plant_part_ids do
-      leaf_ids = Galls.leaf_plant_part_ids()
-      other_ids = Enum.reject(plant_part_ids, &(&1 == @leaf_anywhere_id))
-      Enum.uniq(leaf_ids ++ other_ids)
+  # Expand "leaf (anywhere)" to every plant part value naming a leaf
+  defp expand_plant_parts(plant_parts, trait_values) do
+    if @leaf_anywhere_id in plant_parts do
+      leaf_values =
+        trait_values |> Map.get("plant_part", []) |> Enum.filter(&String.contains?(&1, "leaf"))
+
+      Enum.uniq(leaf_values ++ List.delete(plant_parts, @leaf_anywhere_id))
     else
-      plant_part_ids
+      plant_parts
     end
   end
 
@@ -909,13 +1005,19 @@ defmodule GallformersWeb.IDLive do
   defp format_host_display(%{name: name}), do: name
 
   # Helper for formatting genus display
-  defp format_genus_display(%{name: name, type: type, description: desc}) do
-    type_label = if type == "section", do: " [Section]", else: ""
-    desc_text = if desc && desc != "", do: " - #{desc}", else: ""
-    "#{name}#{type_label}#{desc_text}"
+  defp format_genus_display(%{name: name, rank: rank, description: desc}) do
+    desc_text = if desc in [nil, ""], do: "", else: " - #{desc}"
+    "#{name}#{rank_label(rank)}#{desc_text}"
   end
 
   defp format_genus_display(%{name: name}), do: name
+
+  defp rank_label(:section), do: " [Section]"
+  defp rank_label(:subgenus), do: " [Subgenus]"
+  defp rank_label(_rank), do: ""
+
+  defp trait_options(trait_values, trait),
+    do: Enum.map(Map.get(trait_values, trait, []), &{&1, &1})
 
   @impl true
   def render(assigns) do
@@ -970,9 +1072,9 @@ defmodule GallformersWeb.IDLive do
                 display_fn={&format_genus_display/1}
               >
                 <:result :let={genus}>
-                  <.taxon_name name={genus.name} rank="genus" />
-                  <span :if={genus.type == "section"} class="ml-1 text-xs text-gray-500">
-                    [Section]
+                  <.taxon_name name={genus.name} rank={to_string(genus.rank)} />
+                  <span :if={rank_label(genus.rank) != ""} class="ml-1 text-xs text-gray-500">
+                    {String.trim(rank_label(genus.rank))}
                   </span>
                   <span :if={genus.description} class="block text-xs text-gray-500 truncate">
                     {genus.description}
@@ -995,9 +1097,9 @@ defmodule GallformersWeb.IDLive do
                 name="plant_part"
                 label="Plant Part(s):"
                 placeholder="Plant Parts"
-                options={@filter_options.plant_parts}
+                options={@plant_part_options}
                 selected={@filters.plant_parts}
-                option_label={:part}
+                option_label={:label}
                 query={@plant_part_query}
                 focused={@plant_part_focused}
               />
@@ -1034,7 +1136,7 @@ defmodule GallformersWeb.IDLive do
                 group_key={:group}
               />
             </div>
-            <.family_filter families={@families} value={@filters.family} />
+            <.family_filter families={@families} value={@filters.family && @filters.family.id} />
           </div>
 
           <%!-- Advanced Filters Toggle and Clear --%>
@@ -1058,16 +1160,22 @@ defmodule GallformersWeb.IDLive do
             </p>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-              <.season_filter options={@filter_options.seasons} value={@filters.season} />
+              <.trait_filter
+                filter="season"
+                label="Season (forms and grows)"
+                prompt="Any Season"
+                options={trait_options(@trait_values, "season")}
+                value={@filters.season}
+              />
               <div>
                 <.multi_select_typeahead
                   id="textures"
                   name="texture"
                   label="Texture(s):"
                   placeholder="Textures"
-                  options={@filter_options.textures}
+                  options={@texture_options}
                   selected={@filters.textures}
-                  option_label={:texture}
+                  option_label={:label}
                   query={@texture_query}
                   focused={@texture_focused}
                 />
@@ -1077,16 +1185,51 @@ defmodule GallformersWeb.IDLive do
                   toggle_event="toggle_texture_logic"
                 />
               </div>
-              <.alignment_filter options={@filter_options.alignments} value={@filters.alignment} />
-              <.form_filter options={@filter_options.forms} value={@filters.form} />
-              <.walls_filter options={@filter_options.walls} value={@filters.walls} />
-              <.cells_filter options={@filter_options.cells} value={@filters.cells} />
-              <.shape_filter options={@filter_options.shapes} value={@filters.shape} />
-              <.color_filter options={@filter_options.colors} value={@filters.color} />
+              <.trait_filter
+                filter="alignment"
+                label="Alignment"
+                prompt="Any Alignment"
+                options={trait_options(@trait_values, "alignment")}
+                value={@filters.alignment}
+              />
+              <.trait_filter
+                filter="form"
+                label="Form"
+                prompt="Any Form"
+                options={trait_options(@trait_values, "form")}
+                value={@filters.form}
+              />
+              <.trait_filter
+                filter="walls"
+                label="Walls"
+                prompt="Any Walls"
+                options={trait_options(@trait_values, "walls")}
+                value={@filters.walls}
+              />
+              <.trait_filter
+                filter="cells"
+                label="Cells"
+                prompt="Any Cells"
+                options={trait_options(@trait_values, "cells")}
+                value={@filters.cells}
+              />
+              <.trait_filter
+                filter="shape"
+                label="Shape"
+                prompt="Any Shape"
+                options={trait_options(@trait_values, "shape")}
+                value={@filters.shape}
+              />
+              <.trait_filter
+                filter="color"
+                label="Color"
+                prompt="Any Color"
+                options={trait_options(@trait_values, "color")}
+                value={@filters.color}
+              />
             </div>
 
             <div class="mt-3 flex flex-wrap gap-6">
-              <.show_non_galls_filter value={@filters.show_non_galls} />
               <.undescribed_filter value={@filters.undescribed} />
             </div>
           </div>
@@ -1103,7 +1246,6 @@ defmodule GallformersWeb.IDLive do
           name_filter={@name_filter}
           has_selection={@selected_host != nil or @selected_genus != nil}
           selected_host={@selected_host}
-          show_non_galls={@filters.show_non_galls}
           unscoped_count={@unscoped_count}
           continent_name={@continent_name}
         />
@@ -1176,157 +1318,25 @@ defmodule GallformersWeb.IDLive do
     """
   end
 
-  # Component: Color Filter
+  # Component: a single-value Trait filter (a select of the Trait's values)
+  attr :filter, :string, required: true
+  attr :label, :string, required: true
+  attr :prompt, :string, required: true
   attr :options, :list, required: true
-  attr :value, :integer, required: true
+  attr :value, :string, required: true
 
-  defp color_filter(assigns) do
+  defp trait_filter(assigns) do
     ~H"""
-    <form phx-change="change_filter" phx-value-filter="color">
+    <form phx-change="change_filter" phx-value-filter={@filter}>
       <.input
         type="select"
         name="value"
-        label="Color"
-        prompt="Any Color"
-        options={Enum.map(@options, &{&1.color, &1.id})}
+        label={@label}
+        prompt={@prompt}
+        options={@options}
         value={@value}
       />
     </form>
-    """
-  end
-
-  # Component: Shape Filter
-  attr :options, :list, required: true
-  attr :value, :integer, required: true
-
-  defp shape_filter(assigns) do
-    ~H"""
-    <form phx-change="change_filter" phx-value-filter="shape">
-      <.input
-        type="select"
-        name="value"
-        label="Shape"
-        prompt="Any Shape"
-        options={Enum.map(@options, &{&1.shape, &1.id})}
-        value={@value}
-      />
-    </form>
-    """
-  end
-
-  # Component: Alignment Filter
-  attr :options, :list, required: true
-  attr :value, :integer, required: true
-
-  defp alignment_filter(assigns) do
-    ~H"""
-    <form phx-change="change_filter" phx-value-filter="alignment">
-      <.input
-        type="select"
-        name="value"
-        label="Alignment"
-        prompt="Any Alignment"
-        options={Enum.map(@options, &{&1.alignment, &1.id})}
-        value={@value}
-      />
-    </form>
-    """
-  end
-
-  # Component: Form Filter
-  attr :options, :list, required: true
-  attr :value, :integer, required: true
-
-  defp form_filter(assigns) do
-    filtered_options = Enum.reject(assigns.options, &(&1.form == "non-gall"))
-    assigns = assign(assigns, :filtered_options, filtered_options)
-
-    ~H"""
-    <form phx-change="change_filter" phx-value-filter="form">
-      <.input
-        type="select"
-        name="value"
-        label="Form"
-        prompt="Any Form"
-        options={Enum.map(@filtered_options, &{&1.form, &1.id})}
-        value={@value}
-      />
-    </form>
-    """
-  end
-
-  # Component: Walls Filter
-  attr :options, :list, required: true
-  attr :value, :integer, required: true
-
-  defp walls_filter(assigns) do
-    ~H"""
-    <form phx-change="change_filter" phx-value-filter="walls">
-      <.input
-        type="select"
-        name="value"
-        label="Walls"
-        prompt="Any Walls"
-        options={Enum.map(@options, &{&1.walls, &1.id})}
-        value={@value}
-      />
-    </form>
-    """
-  end
-
-  # Component: Cells Filter
-  attr :options, :list, required: true
-  attr :value, :integer, required: true
-
-  defp cells_filter(assigns) do
-    ~H"""
-    <form phx-change="change_filter" phx-value-filter="cells">
-      <.input
-        type="select"
-        name="value"
-        label="Cells"
-        prompt="Any Cells"
-        options={Enum.map(@options, &{&1.cells, &1.id})}
-        value={@value}
-      />
-    </form>
-    """
-  end
-
-  # Component: Season Filter
-  attr :options, :list, required: true
-  attr :value, :integer, required: true
-
-  defp season_filter(assigns) do
-    ~H"""
-    <form phx-change="change_filter" phx-value-filter="season">
-      <.input
-        type="select"
-        name="value"
-        label="Season"
-        prompt="Any Season"
-        options={Enum.map(@options, &{&1.season, &1.id})}
-        value={@value}
-      />
-    </form>
-    """
-  end
-
-  # Component: Show Non-Galls Filter
-  attr :value, :boolean, required: true
-
-  defp show_non_galls_filter(assigns) do
-    ~H"""
-    <div class="mb-2">
-      <form phx-change="change_filter" phx-value-filter="show_non_galls">
-        <.input
-          type="checkbox"
-          name="value"
-          checked={@value}
-          label="Show Non-Galls"
-        />
-      </form>
-    </div>
     """
   end
 
@@ -1356,7 +1366,6 @@ defmodule GallformersWeb.IDLive do
   attr :total_count, :integer, required: true
   attr :filter_count, :integer, required: true
   attr :name_filter, :string, required: true
-  attr :show_non_galls, :boolean, required: true
   attr :unscoped_count, :integer, required: true
   attr :continent_name, :string, default: nil
 
@@ -1383,7 +1392,7 @@ defmodule GallformersWeb.IDLive do
             <span :if={@filter_count != @total_count}>
               (<span class="font-semibold">{@total_count}</span> unfiltered)
             </span>
-            {if @show_non_galls, do: "species", else: "galls"}
+            galls
           </p>
           <div :if={@filter_count > 0} class="relative">
             <input
@@ -1433,7 +1442,7 @@ defmodule GallformersWeb.IDLive do
           </div>
         <% else %>
           <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            <.gall_card :for={gall <- @results} gall={gall} summary={@summaries[gall.gall_id]} />
+            <.gall_card :for={gall <- @results} gall={gall} summary={@summaries[gall.id]} />
           </div>
           <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm">
             <p>
@@ -1477,40 +1486,12 @@ defmodule GallformersWeb.IDLive do
           </p>
         </div>
       </.link>
-      <div
-        :if={
-          @gall.undescribed || @gall.non_gall || @gall[:place_match] == :country_level ||
-            @gall[:place_match] == :genus_placeholder
-        }
-        class="flex flex-wrap gap-1 px-2 pb-2"
-      >
+      <div :if={@gall.undescribed} class="flex flex-wrap gap-1 px-2 pb-2">
         <span
-          :if={@gall.undescribed}
           class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700 cursor-help"
           title="This species has not yet been formally described in scientific literature."
         >
           Undescribed
-        </span>
-        <span
-          :if={@gall.non_gall}
-          class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-amber-100 text-amber-700 cursor-help"
-          title="This is not a true gall but a different type of plant growth or damage caused by an organism that is often mistaken for a gall."
-        >
-          Non-gall
-        </span>
-        <span
-          :if={@gall[:place_match] == :country_level}
-          class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-700 cursor-help"
-          title="This gall occurs on hosts with country-level range records — state-level data unavailable for your selected region."
-        >
-          Country-level
-        </span>
-        <span
-          :if={@gall[:place_match] == :genus_placeholder}
-          class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700 cursor-help"
-          title="Matched genus host; range unverified — this gall is recorded as occurring on additional unidentified members of the host genus, but the range data needed to confirm the region was not available."
-        >
-          Genus-level match
         </span>
       </div>
     </div>

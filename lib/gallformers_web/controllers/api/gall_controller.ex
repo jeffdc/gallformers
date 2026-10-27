@@ -1,15 +1,29 @@
 defmodule GallformersWeb.API.GallController do
   @moduledoc """
-  API controller for gall endpoints.
+  API controller for gall endpoints, read from the gall catalog
+  (`Gallformers.Catalog`). Gall IDs are unchanged from the old model.
   """
 
   use GallformersWeb, :controller
   use OpenApiSpex.ControllerSpecs
 
-  alias Gallformers.{Galls, Ranges, Search, Sources, Species}
+  alias Gallformers.Catalog
   alias Gallformers.Images
   alias Gallformers.Images.Image
   alias GallformersWeb.Schemas
+
+  # Each response field holding a Trait's values, with the Trait it holds.
+  @trait_fields [
+    colors: "color",
+    shapes: "shape",
+    textures: "texture",
+    plant_parts: "plant_part",
+    alignments: "alignment",
+    walls: "walls",
+    cells: "cells",
+    seasons: "season",
+    forms: "form"
+  ]
 
   tags(["Galls"])
 
@@ -17,7 +31,12 @@ defmodule GallformersWeb.API.GallController do
     summary: "List galls",
     description: "Lists all galls with optional search and pagination",
     parameters: [
-      q: [in: :query, type: :string, description: "Search query"],
+      q: [
+        in: :query,
+        type: :string,
+        description:
+          "Search query: every word in the gall's name, one of its aliases, or a name of its inducer"
+      ],
       limit: [in: :query, type: :integer, description: "Maximum number of results"],
       offset: [in: :query, type: :integer, description: "Number of results to skip"]
     ],
@@ -33,31 +52,12 @@ defmodule GallformersWeb.API.GallController do
   def index(conn, params) do
     limit = parse_int(params["limit"])
     offset = parse_int(params["offset"]) || 0
-    query = params["q"]
 
-    {galls, total} =
-      case {query, limit} do
-        {nil, nil} ->
-          all = Galls.list_galls()
-          {galls_with_aliases(all), length(all)}
-
-        {nil, limit} ->
-          total = Galls.count_galls()
-          paginated = Galls.list_galls_paginated(limit, offset)
-          {galls_with_aliases(paginated), total}
-
-        {query, nil} ->
-          results = Search.search_galls(query)
-          {galls_with_aliases(results), length(results)}
-
-        {query, limit} ->
-          total = Search.count_search_galls(query)
-          results = Search.search_galls_paginated(query, limit, offset)
-          {galls_with_aliases(results), total}
-      end
+    %{entries: galls, total: total} =
+      Catalog.paginate_galls(q: params["q"], limit: limit, offset: offset)
 
     json(conn, %{
-      data: galls,
+      data: Enum.map(galls, &gall_to_map/1),
       total: total,
       limit: limit,
       offset: offset
@@ -72,6 +72,7 @@ defmodule GallformersWeb.API.GallController do
     ],
     responses: [
       ok: {"Gall details", "application/json", Schemas.Gall},
+      bad_request: {"Invalid ID", "application/json", Schemas.Error},
       not_found: {"Gall not found", "application/json", Schemas.Error}
     ]
   )
@@ -81,78 +82,47 @@ defmodule GallformersWeb.API.GallController do
   Gets a single gall by ID with full details.
   """
   def show(conn, %{"id" => id}) do
-    case parse_int(id) do
-      nil ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "Invalid gall ID"})
-
-      id ->
-        case Galls.get_gall(id) do
-          nil ->
-            conn
-            |> put_status(:not_found)
-            |> json(%{error: "Gall not found"})
-
-          gall ->
-            json(conn, gall_to_full_response(gall))
-        end
+    with {:ok, id} <- parse_id(id),
+         {:ok, gall} <- fetch(Catalog.gall_details(id)) do
+      json(conn, gall_to_full_response(gall))
+    else
+      {:error, :invalid_id} -> error(conn, :bad_request, "Invalid gall ID")
+      {:error, :not_found} -> error(conn, :not_found, "Gall not found")
     end
   end
 
   operation(:images,
     summary: "Get gall images",
-    description: "Returns all images for a gall species",
+    description: "Returns all images for a gall",
     parameters: [
-      id: [in: :path, type: :integer, description: "Gall species ID", required: true]
+      id: [in: :path, type: :integer, description: "Gall ID", required: true]
     ],
     responses: [
       ok:
         {"List of images", "application/json",
-         %OpenApiSpex.Schema{type: :array, items: Schemas.Image}}
+         %OpenApiSpex.Schema{type: :array, items: Schemas.Image}},
+      bad_request: {"Invalid ID", "application/json", Schemas.Error}
     ]
   )
 
   @doc """
   GET /api/v2/galls/:id/images
-  Returns all images for a gall species.
+  Returns all images for a gall.
   """
   def images(conn, %{"id" => id}) do
-    case parse_int(id) do
-      nil ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "Invalid species ID"})
-
-      id ->
-        images = Images.list_images_for_species(id)
-        base_url = Image.base_url()
-
-        response =
-          Enum.map(images, fn img ->
-            %{
-              id: img.id,
-              path: img.path,
-              url: "#{base_url}/#{img.path}",
-              default: Image.default?(img),
-              creator: img.creator,
-              attribution: img.attribution,
-              sourcelink: img.sourcelink,
-              license: img.license,
-              licenselink: img.licenselink,
-              caption: img.caption
-            }
-          end)
-
-        json(conn, response)
+    case parse_id(id) do
+      {:ok, id} -> json(conn, id |> Images.list_images_for_gall() |> Enum.map(&image_to_map/1))
+      {:error, :invalid_id} -> error(conn, :bad_request, "Invalid gall ID")
     end
   end
 
   operation(:sources,
     summary: "Get gall sources",
-    description: "Returns all scientific sources/references for a gall species",
+    description:
+      "Returns a gall's sources: its Gallformers note (the newest) and its citations, " <>
+        "its default source first, then the note, then the rest by title",
     parameters: [
-      id: [in: :path, type: :integer, description: "Gall species ID", required: true]
+      id: [in: :path, type: :integer, description: "Gall ID", required: true]
     ],
     responses: [
       ok:
@@ -165,13 +135,11 @@ defmodule GallformersWeb.API.GallController do
 
   @doc """
   GET /api/v2/galls/:id/sources
-  Returns all scientific sources for a gall species.
+  Returns a gall's Gallformers note and its citations.
   """
   def sources(conn, %{"id" => id}) do
     with {:ok, id} <- parse_id(id),
-         {:ok, _gall} <- fetch_gall(id) do
-      sources = Sources.get_sources_for_species(id)
-
+         {:ok, sources} <- fetch(Catalog.list_gall_sources(id)) do
       response =
         Enum.map(sources, fn s ->
           %{
@@ -188,85 +156,77 @@ defmodule GallformersWeb.API.GallController do
 
       json(conn, response)
     else
-      {:error, :invalid_id} ->
-        conn |> put_status(:bad_request) |> json(%{error: "Invalid gall ID"})
-
-      {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "Gall not found"})
+      {:error, :invalid_id} -> error(conn, :bad_request, "Invalid gall ID")
+      {:error, :not_found} -> error(conn, :not_found, "Gall not found")
     end
   end
 
   # Private functions
 
-  defp galls_with_aliases(galls) do
-    ids = Enum.map(galls, & &1.id)
-    alias_map = Species.get_aliases_for_species_batch(ids)
-
-    Enum.map(galls, fn gall ->
-      aliases = Map.get(alias_map, gall.id, [])
-
-      %{
-        id: gall.id,
-        name: gall.name,
-        datacomplete: gall.datacomplete,
-        abundance_id: gall.abundance_id,
-        abundance: gall.abundance_name,
-        detachable: gall.detachable,
-        undescribed: gall.undescribed,
-        aliases: Enum.map(aliases, &alias_to_map/1)
-      }
-    end)
-  end
-
-  defp gall_to_full_response(gall) do
-    aliases = Species.get_aliases_for_species(gall.id)
-    hosts = Galls.get_hosts_for_gall(gall.id)
-    filter_fields = Galls.get_gall_filter_values(gall.id)
-    places = Ranges.get_gall_range_codes(gall.id)
-
+  defp gall_to_map(gall) do
     %{
       id: gall.id,
+      gall_id: gall.id,
       name: gall.name,
       datacomplete: gall.datacomplete,
       abundance_id: gall.abundance_id,
-      abundance: gall.abundance_name,
+      abundance: gall.abundance,
       detachable: gall.detachable,
       undescribed: gall.undescribed,
-      aliases: Enum.map(aliases, &alias_to_map/1),
-      hosts: Enum.map(hosts, fn h -> %{id: h.host_species_id, name: h.host_name} end),
-      colors: filter_fields.colors,
-      shapes: filter_fields.shapes,
-      textures: filter_fields.textures,
-      plant_parts: filter_fields.plant_parts,
-      alignments: filter_fields.alignments,
-      walls: filter_fields.walls,
-      cells: filter_fields.cells,
-      seasons: filter_fields.seasons,
-      forms: filter_fields.forms,
-      places: places
+      aliases: gall.aliases
     }
   end
 
-  defp alias_to_map(a) do
+  defp gall_to_full_response(gall) do
+    traits =
+      Map.new(@trait_fields, fn {field, trait} ->
+        values = Map.get(gall.traits, trait, [])
+        {field, Enum.map(values, &%{id: &1.id, field: &1.value, description: &1.definition})}
+      end)
+
+    gall
+    |> gall_to_map()
+    |> Map.merge(traits)
+    |> Map.merge(%{hosts: gall.hosts, places: range_codes(gall.id)})
+  end
+
+  # The place codes of the Gall's potential range; none when its range is
+  # everywhere (no Host range data: missing data is not absence).
+  defp range_codes(gall_id) do
+    case Catalog.potential_range(gall_id) do
+      :everywhere -> []
+      places -> Enum.map(places, & &1.code)
+    end
+  end
+
+  defp image_to_map(img) do
     %{
-      id: a.id,
-      name: a.name,
-      type: a.type,
-      description: a.description
+      id: img.id,
+      path: img.path,
+      url: "#{Image.base_url()}/#{img.path}",
+      default: Image.default?(img),
+      creator: img.creator,
+      attribution: img.attribution,
+      sourcelink: img.sourcelink,
+      license: img.license,
+      licenselink: img.licenselink,
+      caption: img.caption
     }
+  end
+
+  defp fetch({:ok, value}), do: {:ok, value}
+  defp fetch(:not_found), do: {:error, :not_found}
+
+  defp error(conn, status, message) do
+    conn
+    |> put_status(status)
+    |> json(%{error: message})
   end
 
   defp parse_id(id) do
     case parse_int(id) do
       nil -> {:error, :invalid_id}
       id -> {:ok, id}
-    end
-  end
-
-  defp fetch_gall(id) do
-    case Galls.get_gall(id) do
-      nil -> {:error, :not_found}
-      gall -> {:ok, gall}
     end
   end
 

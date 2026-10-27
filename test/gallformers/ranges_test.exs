@@ -1,7 +1,6 @@
 defmodule Gallformers.RangesTest do
   use Gallformers.DataCase, async: true
 
-  alias Gallformers.Galls.GallHost
   alias Gallformers.Places
   alias Gallformers.Places.Place
   alias Gallformers.Ranges
@@ -9,11 +8,19 @@ defmodule Gallformers.RangesTest do
   alias Gallformers.Repo
   alias Gallformers.Species.Species
 
+  # A host's range codes.
+  defp host_codes(host_id),
+    do: host_id |> Ranges.get_places_for_host_with_precision() |> Enum.map(& &1.code)
+
+  # A gall's curated gall_range place IDs.
+  defp gall_range_place_ids(gall_id),
+    do: gall_id |> Ranges.get_gall_range_with_precision() |> Enum.map(& &1.place_id)
+
   describe "precision-aware range queries" do
-    test "get_places_for_host/1 returns both exact and country-level codes" do
+    test "get_places_for_host_with_precision/1 returns exact and country-level codes" do
       # M. arvensis (id=8) has exact ranges in CA-AB and US-CA,
       # plus a country-level range for US
-      codes = Ranges.get_places_for_host(8)
+      codes = host_codes(8)
       assert "CA-AB" in codes
       assert "US-CA" in codes
       assert "US" in codes
@@ -25,25 +32,6 @@ defmodule Gallformers.RangesTest do
       ca_entry = Enum.find(results, &(&1.code == "US-CA"))
       assert us_entry.precision == "country"
       assert ca_entry.precision == "exact"
-    end
-
-    test "host_covers_place?/2 returns true for exact match" do
-      # M. arvensis (8) has exact range in California (US-CA)
-      california = Places.get_place_by_code("US-CA")
-      assert Ranges.host_covers_place?(8, california.id) == true
-    end
-
-    test "host_covers_place?/2 returns true when ancestor has range" do
-      # M. arvensis (8) has country-level range for US
-      # So any US state should be covered
-      california = Places.get_place_by_code("US-CA")
-      assert Ranges.host_covers_place?(8, california.id) == true
-    end
-
-    test "host_covers_place?/2 returns false for unrelated place" do
-      # T. alpinus (6) only has exact range in California
-      alberta = Places.get_place_by_code("CA-AB")
-      refute Ranges.host_covers_place?(6, alberta.id)
     end
   end
 
@@ -79,7 +67,7 @@ defmodule Gallformers.RangesTest do
     test "add_place_to_host/3 accepts precision parameter" do
       bahamas = Places.get_place_by_code("BS")
       {:ok, _} = Ranges.add_place_to_host(6, bahamas.id, "exact")
-      codes = Ranges.get_places_for_host(6)
+      codes = host_codes(6)
       assert "BS" in codes
     end
 
@@ -119,40 +107,66 @@ defmodule Gallformers.RangesTest do
     end
   end
 
+  describe "get_display_range_for_taxa/1" do
+    # Seeds converted by the catalog migration: plant taxon 10 (Notholithocarpus
+    # densiflorus) is native in US-CA and introduced in RO-B; its genus carries
+    # its former placeholder's country-level row for Mexico (MX-JAL).
+    defp genus_taxon_id, do: Gallformers.Taxa.get_by_legacy_id(:taxonomy, 41).id
+
+    defp sorted(%Ranges.DisplayRange{} = range) do
+      %{
+        in_range: Enum.sort(range.in_range),
+        inherited_range: Enum.sort(range.inherited_range),
+        introduced_range: Enum.sort(range.introduced_range)
+      }
+    end
+
+    test "splits a taxon's host_range rows by precision, marking introduced places" do
+      assert sorted(Ranges.get_display_range_for_taxa([10])) == %{
+               in_range: ["RO-B", "US-CA"],
+               inherited_range: [],
+               introduced_range: ["RO-B"]
+             }
+    end
+
+    test "reads rows by taxon: a genus carries its former placeholder's country-level row" do
+      assert sorted(Ranges.get_display_range_for_taxa([genus_taxon_id()])) == %{
+               in_range: [],
+               inherited_range: ["MX-JAL"],
+               introduced_range: []
+             }
+    end
+
+    test "is the union of several taxa's ranges" do
+      assert sorted(Ranges.get_display_range_for_taxa([10, genus_taxon_id()])) == %{
+               in_range: ["RO-B", "US-CA"],
+               inherited_range: ["MX-JAL"],
+               introduced_range: ["RO-B"]
+             }
+    end
+
+    test "no taxa, or taxa without rows, give an empty range" do
+      empty = %Ranges.DisplayRange{}
+      assert Ranges.get_display_range_for_taxa([]) == empty
+      assert Ranges.get_display_range_for_taxa([1]) == empty
+    end
+  end
+
+  describe "get_places_for_taxa/1" do
+    # The same converted seeds as get_display_range_for_taxa/1 above.
+    test "each taxon's host_range place codes as stored, sorted, by taxon ID" do
+      genus_id = Gallformers.Taxa.get_by_legacy_id(:taxonomy, 41).id
+
+      assert Ranges.get_places_for_taxa([10, genus_id, 1]) == %{
+               10 => ["RO-B", "US-CA"],
+               genus_id => ["MX"]
+             }
+
+      assert Ranges.get_places_for_taxa([]) == %{}
+    end
+  end
+
   describe "display range computation" do
-    test "get_display_range_for_gall returns DisplayRange struct" do
-      result = Ranges.get_display_range_for_gall(100)
-      assert %Ranges.DisplayRange{} = result
-    end
-
-    test "get_display_range_for_gall reads from gall_range table" do
-      # Gall 100 has gall_range entries: US-CA (exact), CA-AB (exact), US (country)
-      # MX-JAL is NOT in gall_range (exclusion is implicit)
-      result = Ranges.get_display_range_for_gall(100)
-
-      exact_set = MapSet.new(result.in_range)
-      inherited_set = MapSet.new(result.inherited_range)
-
-      # No overlap between exact and inherited
-      assert MapSet.disjoint?(exact_set, inherited_set) == true
-
-      # MX-JAL is NOT in range (not in gall_range table)
-      refute "MX-JAL" in result.in_range
-      refute "MX-JAL" in result.inherited_range
-
-      # Exact entries from gall_range
-      assert "US-CA" in result.in_range
-      assert "CA-AB" in result.in_range
-    end
-
-    test "get_display_range_for_host returns DisplayRange" do
-      result = Ranges.get_display_range_for_host(8)
-      assert %Ranges.DisplayRange{} = result
-      # Host 8 has exact entries for CA-AB and US-CA
-      assert "CA-AB" in result.in_range
-      assert "US-CA" in result.in_range
-    end
-
     test "compute_display_range passes through all codes" do
       # Host 6 only has US-CA exact
       ranges = Ranges.get_places_for_host_with_precision(6)
@@ -246,17 +260,6 @@ defmodule Gallformers.RangesTest do
       assert result.introduced_range == []
     end
 
-    test "get_display_range_for_host returns introduced_range" do
-      # Host 7 (T. serpyllum) has US-CA native + BS introduced
-      result = Ranges.get_display_range_for_host(7)
-      assert %Ranges.DisplayRange{} = result
-      assert is_list(result.introduced_range)
-      # BS (Bahamas) is introduced for host 7
-      assert "BS" in result.introduced_range
-      # US-CA is native, should not be in introduced_range
-      refute "US-CA" in result.introduced_range
-    end
-
     test "get_host_ranges_with_precision_for_species_ids includes distribution_type" do
       results = Ranges.get_host_ranges_with_precision_for_species_ids([7])
       assert length(results) > 0
@@ -300,32 +303,6 @@ defmodule Gallformers.RangesTest do
       assert MapSet.member?(codes, "MX-JAL") == true
       assert MapSet.member?(codes, "US-CA") == true
       refute MapSet.member?(codes, "MX")
-    end
-  end
-
-  describe "gall range queries" do
-    test "get_places_for_gall returns curated gall range" do
-      # Gall 100 gall_range: US-CA, CA-AB, US (country)
-      places = Ranges.get_places_for_gall(100)
-      assert is_list(places)
-      assert "US-CA" in places
-      assert "CA-AB" in places
-      assert "US" in places
-    end
-
-    test "get_places_for_galls returns grouped results" do
-      result = Ranges.get_places_for_galls([100, 101])
-      assert is_map(result)
-      assert is_list(result[100])
-      assert "US-CA" in result[100]
-      assert is_list(result[101])
-      assert "US-CA" in result[101]
-    end
-
-    test "get_places_for_gall with no gall_range returns empty list" do
-      # Gall 102 has no gall_range entries
-      places = Ranges.get_places_for_gall(102)
-      assert places == []
     end
   end
 
@@ -502,7 +479,7 @@ defmodule Gallformers.RangesTest do
       assert {:added, 3} = result
 
       # Verify it was added
-      codes = Ranges.get_places_for_host(6)
+      codes = host_codes(6)
       assert "MX-JAL" in codes
 
       # Toggle off
@@ -510,7 +487,7 @@ defmodule Gallformers.RangesTest do
       assert {:removed, 3} = result
 
       # Verify it was removed
-      codes = Ranges.get_places_for_host(6)
+      codes = host_codes(6)
       refute "MX-JAL" in codes
     end
   end
@@ -551,18 +528,18 @@ defmodule Gallformers.RangesTest do
       alberta = Places.get_place_by_code("CA-AB")
 
       # Gall 100 has 3 entries: US-CA, CA-AB, US (country)
-      assert length(Ranges.get_gall_range_place_ids(100)) == 3
+      assert length(gall_range_place_ids(100)) == 3
 
       # Replace with just US-CA
       {:ok, :ok} = Ranges.set_gall_range(100, [{california.id, "exact"}])
 
-      ids = Ranges.get_gall_range_place_ids(100)
+      ids = gall_range_place_ids(100)
       assert ids == [california.id]
 
       # Replace with both US-CA and CA-AB
       {:ok, :ok} = Ranges.set_gall_range(100, [{california.id, "exact"}, {alberta.id, "exact"}])
 
-      ids = Ranges.get_gall_range_place_ids(100)
+      ids = gall_range_place_ids(100)
       assert length(ids) == 2
       assert california.id in ids
       assert alberta.id in ids
@@ -579,7 +556,7 @@ defmodule Gallformers.RangesTest do
 
     test "clears all entries when given empty list" do
       {:ok, :ok} = Ranges.set_gall_range(100, [])
-      assert Ranges.get_gall_range_place_ids(100) == []
+      assert gall_range_place_ids(100) == []
     end
   end
 
@@ -590,15 +567,6 @@ defmodule Gallformers.RangesTest do
       assert "CA-AB" in codes
       # MX-JAL is NOT in gall_range (was excluded in old system)
       refute "MX-JAL" in codes
-    end
-
-    test "get_gall_range_place_ids returns place IDs" do
-      ids = Ranges.get_gall_range_place_ids(100)
-      assert is_list(ids)
-      # US-CA
-      assert 2 in ids
-      # CA-AB
-      assert 1 in ids
     end
 
     test "get_gall_range_with_precision returns precision metadata" do
@@ -612,110 +580,6 @@ defmodule Gallformers.RangesTest do
     test "get_gall_range_codes returns empty for gall without range" do
       # Gall 102 has no hosts, so no gall_range entries
       assert Ranges.get_gall_range_codes(102) == []
-    end
-  end
-
-  describe "gall range host fallback" do
-    setup do
-      # Create a gall with hosts but NO curated gall_range entries.
-      # Host A has native range in US-CA and introduced range in CA-AB.
-      # Host B has native range in MX-JAL.
-      # Expected fallback: union of native ranges only = US-CA + MX-JAL.
-      california = Repo.get_by!(Place, code: "US-CA")
-      alberta = Repo.get_by!(Place, code: "CA-AB")
-      jalisco = Repo.get_by!(Place, code: "MX-JAL")
-
-      gall =
-        Repo.insert!(%Species{
-          name: "Fallback Test Gall",
-          taxoncode: "gall",
-          datacomplete: false
-        })
-
-      host_a =
-        Repo.insert!(%Species{
-          name: "Fallback Host A",
-          taxoncode: "plant",
-          datacomplete: false
-        })
-
-      host_b =
-        Repo.insert!(%Species{
-          name: "Fallback Host B",
-          taxoncode: "plant",
-          datacomplete: false
-        })
-
-      # Link hosts to gall
-      Repo.insert!(%GallHost{host_species_id: host_a.id, gall_species_id: gall.id})
-      Repo.insert!(%GallHost{host_species_id: host_b.id, gall_species_id: gall.id})
-
-      # Host A: native in US-CA, introduced in CA-AB
-      Repo.insert!(%HostRange{
-        species_id: host_a.id,
-        place_id: california.id,
-        precision: "exact",
-        distribution_type: "native"
-      })
-
-      Repo.insert!(%HostRange{
-        species_id: host_a.id,
-        place_id: alberta.id,
-        precision: "exact",
-        distribution_type: "introduced"
-      })
-
-      # Host B: native in MX-JAL
-      Repo.insert!(%HostRange{
-        species_id: host_b.id,
-        place_id: jalisco.id,
-        precision: "exact",
-        distribution_type: "native"
-      })
-
-      %{gall: gall, host_a: host_a, host_b: host_b}
-    end
-
-    test "falls back to union of hosts' native ranges when gall has no curated range", %{
-      gall: gall
-    } do
-      result = Ranges.get_display_range_for_gall(gall.id)
-      assert %Ranges.DisplayRange{} = result
-
-      all_codes = result.in_range ++ result.inherited_range
-
-      # Native ranges from both hosts
-      assert "US-CA" in all_codes
-      assert "MX-JAL" in all_codes
-
-      # Introduced range (CA-AB) must NOT appear
-      refute "CA-AB" in all_codes
-    end
-
-    test "uses curated gall_range when it exists, ignoring host fallback", %{gall: gall} do
-      # Add a curated gall_range entry for just CA-AB
-      alberta = Repo.get_by!(Place, code: "CA-AB")
-      Ranges.set_gall_range(gall.id, [{alberta.id, "exact"}])
-
-      result = Ranges.get_display_range_for_gall(gall.id)
-
-      # Should use curated range, not host fallback
-      assert "CA-AB" in result.in_range
-      refute "US-CA" in result.in_range
-      refute "MX-JAL" in result.in_range
-    end
-
-    test "returns empty range for gall with no hosts and no curated range" do
-      gall =
-        Repo.insert!(%Species{
-          name: "Lonely Gall",
-          taxoncode: "gall",
-          datacomplete: false
-        })
-
-      result = Ranges.get_display_range_for_gall(gall.id)
-      assert result.in_range == []
-      assert result.inherited_range == []
     end
   end
 end

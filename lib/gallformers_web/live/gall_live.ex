@@ -1,25 +1,24 @@
 defmodule GallformersWeb.GallLive do
   @moduledoc """
-  LiveView for the gall/species detail page.
+  LiveView for the Gall detail page.
 
-  Displays detailed information about a gall species including morphology,
-  hosts, images, range map, and sources.
+  Displays a Gall from `Gallformers.Catalog.gall_page/1`: its Inducer's
+  taxonomy, Hosts, Traits, images, range map, names and Sources (the
+  Gallformers note and the legacy citations).
   """
   use GallformersWeb, :live_view
 
   alias Gallformers.{
+    Catalog,
     Galls,
     Glossaries,
     Markdown,
-    Places,
-    Ranges,
-    Sources,
-    Species,
-    Taxonomy
+    Places
   }
 
-  alias Gallformers.Images
+  alias Gallformers.Catalog.ReadModels.GallPage
   alias Gallformers.Images.Image
+  alias GallformersWeb.LineageBreadcrumb
   alias GallformersWeb.SEO
 
   @aliases_page_size 10
@@ -31,12 +30,6 @@ defmodule GallformersWeb.GallLive do
     "detachable" => "Detachable",
     "both" => "Both"
   }
-
-  # Gallformers Notes source ID (same as V1)
-  @gallformers_notes_source_id 58
-
-  # Regex to extract generation qualifier from species names like "Callirhytis furva (agamic)"
-  @generation_re ~r/^(.+?)\s+\((agamic|sexgen|sexual)\)$/
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -74,8 +67,8 @@ defmodule GallformersWeb.GallLive do
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
   defp load_gall(socket, gall_id) do
-    case Galls.get_gall(gall_id) do
-      nil ->
+    case Catalog.gall_page(gall_id) do
+      :not_found ->
         {:ok,
          assign(socket,
            page_title: "Gall Not Found",
@@ -89,42 +82,26 @@ defmodule GallformersWeb.GallLive do
            error: "Gall not found"
          )}
 
-      gall ->
-        hosts = Galls.get_hosts_for_gall(gall_id) |> Enum.sort_by(& &1.host_name)
+      {:ok, %GallPage{} = gall} ->
+        images = format_images(gall.images)
 
-        only_placeholder_hosts? = Galls.only_placeholder_hosts?(hosts)
+        {range, inherited_range, introduced_range} =
+          case gall.display_range do
+            :everywhere -> {[], [], []}
+            range -> {range.in_range, range.inherited_range, range.introduced_range}
+          end
 
-        images = Images.list_images_for_species(gall_id) |> format_images()
-        sources = Sources.get_sources_for_species(gall_id)
-        aliases = Species.get_aliases_for_species(gall_id)
-        taxonomy = get_taxonomy_info(gall_id)
-        range_data = Ranges.get_display_range_for_gall(gall_id)
-        range = range_data.in_range
-        inherited_range = range_data.inherited_range
-        range_bounds = Places.get_bounds_for_codes(range ++ inherited_range)
-        gall_filters = Galls.get_gall_filter_values(gall_id)
-        related_galls = Galls.get_related_galls(gall)
-
-        # Parse generation qualifier (agamic/sexgen/sexual) and fetch glossary definition
+        # Parse the generation qualifier off the name and fetch its definition
         {base_name, generation_term, glossary_word, generation_definition} =
-          parse_generation_term(gall.name)
+          parse_generation_term(gall.name, gall.generation)
 
-        # Separate common names from scientific synonyms
-        common_names = Enum.filter(aliases, &(&1.type == "common"))
-        scientific_aliases = Enum.filter(aliases, &(&1.type != "common"))
-
-        gallformers_code = gall.gallformers_code
-
-        # Check if Gallformers notes exist for this species
-        gallformers_notes = Enum.find(sources, fn s -> s.id == @gallformers_notes_source_id end)
-        has_gallformers_notes = gallformers_notes != nil
+        note = Enum.find(gall.sources, & &1.note?)
 
         # Build SEO data
         page_url = "/gall/#{gall_id}"
 
-        # Generate SEO description using gall filter data
-        summary_filters = Galls.Summary.from_db_filters(gall_filters, gall.detachable)
-        page_description = Galls.Summary.for_seo(gall.name, summary_filters)
+        page_description =
+          Galls.Summary.for_seo(gall.name, Galls.Summary.from_traits(gall.traits))
 
         page_image =
           case images do
@@ -143,24 +120,25 @@ defmodule GallformersWeb.GallLive do
            page_image: page_image,
            page_json_ld: json_ld,
            page_noindex: false,
-           gall: Map.merge(gall, %{hosts: hosts, aliases: aliases}),
+           gall: gall,
            base_name: base_name,
            generation_term: generation_term,
            glossary_word: glossary_word,
            generation_definition: generation_definition,
-           gall_filters: gall_filters,
            images: images,
-           sources: sources,
-           taxonomy: taxonomy,
+           sources: gall.sources,
+           taxonomy: breadcrumb(gall.inducers),
            range: range,
            inherited_range: inherited_range,
-           range_bounds: range_bounds,
-           only_placeholder_hosts?: only_placeholder_hosts?,
-           related_galls: related_galls,
-           common_names: common_names,
-           scientific_aliases: scientific_aliases,
-           gallformers_code: gallformers_code,
-           has_gallformers_notes: has_gallformers_notes,
+           introduced_range: introduced_range,
+           range_bounds: Places.get_bounds_for_codes(range ++ inherited_range),
+           range_unknown?: gall.display_range == :everywhere,
+           related_galls: gall.related_galls,
+           common_names: gall.common_names,
+           name_rows: name_rows(gall),
+           gallformers_code: gall.gallformers_code,
+           has_gallformers_notes: note != nil,
+           note_source_id: note && note.id,
            notes_alert_dismissed: false,
            aliases_page: 1,
            aliases_page_size: @aliases_page_size,
@@ -171,6 +149,33 @@ defmodule GallformersWeb.GallLive do
          )}
     end
   end
+
+  # The taxonomy breadcrumb from the (first) Inducer's lineage.
+  defp breadcrumb([]), do: nil
+  defp breadcrumb([%{lineage: lineage} | _]), do: LineageBreadcrumb.from_lineage(lineage)
+
+  # The names table: the Inducer's synonyms, then the Gall's former labels
+  # and codes (never common names, which are listed apart).
+  defp name_rows(gall) do
+    synonyms =
+      for s <- gall.synonyms do
+        type = if s.sensu, do: "misapplied", else: "synonym"
+        %{name: s.name, type: type, notes: s.sensu, label?: false}
+      end
+
+    labels =
+      for l <- gall.labels do
+        %{name: l.name, type: label_type(l.kind), notes: nil, label?: true}
+      end
+
+    synonyms ++ labels
+  end
+
+  defp label_type(:former_label), do: "former label"
+  defp label_type(:code), do: "code"
+
+  defp host_href(%{link: {:host, id}}), do: "/host/#{id}"
+  defp host_href(%{link: {rank, name}}), do: "/#{rank}/#{name}"
 
   defp build_species_json_ld(gall, url, description, image) do
     json_ld = %{
@@ -185,10 +190,6 @@ defmodule GallformersWeb.GallLive do
     json_ld = if image, do: Map.put(json_ld, "image", image), else: json_ld
 
     Jason.encode!(json_ld)
-  end
-
-  defp get_taxonomy_info(species_id) do
-    Taxonomy.get_taxonomy_for_species(species_id)
   end
 
   defp format_images(images) do
@@ -208,23 +209,34 @@ defmodule GallformersWeb.GallLive do
     end)
   end
 
-  defp get_detachable_display(value), do: Map.get(@detachable_values, value, "")
-  defp format_fields(fields), do: Enum.map_join(fields, ", ", & &1.field)
-
-  # Parses generation qualifier from species name and fetches glossary definition.
-  # Returns {base_name, term, glossary_word, definition} or {full_name, nil, nil, nil}.
-  defp parse_generation_term(name) do
-    case Regex.run(@generation_re, name) do
-      [_full, base_name, term] ->
-        # "sexgen" and "sexual" both refer to the glossary entry "sexgen"
-        glossary_word = if term == "sexual", do: "sexgen", else: term
-        defs = Glossaries.get_definitions([glossary_word])
-        {base_name, term, glossary_word, Map.get(defs, glossary_word)}
-
-      _ ->
-        {name, nil, nil, nil}
+  defp detachable_display(traits) do
+    case Map.get(traits, "detachable", []) do
+      [value | _] -> Map.get(@detachable_values, value, "")
+      [] -> ""
     end
   end
+
+  defp trait_display(traits, trait), do: traits |> Map.get(trait, []) |> Enum.join(", ")
+
+  # Splits the generation qualifier (e.g. "agamic", "sexgen") off the Gall's
+  # name and gives its definition: the vocabulary's, else the glossary entry
+  # named by the qualifier. Returns {base_name, term, glossary_word,
+  # definition}, or {name, nil, nil, nil} when the name carries none.
+  defp parse_generation_term(name, %{name_qualifier: qualifier} = generation)
+       when is_binary(qualifier) do
+    suffix = " (#{qualifier})"
+
+    if String.ends_with?(name, suffix) do
+      definition =
+        generation.definition || Map.get(Glossaries.get_definitions([qualifier]), qualifier)
+
+      {String.replace_suffix(name, suffix, ""), qualifier, qualifier, definition}
+    else
+      {name, nil, nil, nil}
+    end
+  end
+
+  defp parse_generation_term(name, _generation), do: {name, nil, nil, nil}
 
   @impl true
   def handle_event("dismiss_notes_alert", _params, socket) do
@@ -248,7 +260,7 @@ defmodule GallformersWeb.GallLive do
 
   @impl true
   def handle_event("aliases_page", %{"page" => page}, socket) do
-    aliases = socket.assigns.gall.aliases
+    aliases = socket.assigns.name_rows
     page = max(1, min(page, aliases_total_pages(aliases, socket.assigns.aliases_page_size)))
     {:noreply, assign(socket, aliases_page: page)}
   end
@@ -314,15 +326,15 @@ defmodule GallformersWeb.GallLive do
   end
 
   defp visible_sources(sources, _expanded?) do
-    # Always include Gallformers Notes (id 58) if it exists
-    gallformers_notes = Enum.find(sources, &(&1.id == @gallformers_notes_source_id))
+    # Always include the Gallformers note if there is one
+    gallformers_notes = Enum.find(sources, & &1.note?)
 
     case gallformers_notes do
       nil ->
         Enum.take(sources, @sources_initial_limit)
 
       _ ->
-        other_sources = Enum.reject(sources, &(&1.id == @gallformers_notes_source_id))
+        other_sources = Enum.reject(sources, & &1.note?)
         # Take 7 other sources + Gallformers Notes = 8 total
         limited_sources = Enum.take(other_sources, @sources_initial_limit - 1)
         # Maintain original order by sorting by position in original list
@@ -376,7 +388,7 @@ defmodule GallformersWeb.GallLive do
               </div>
 
               <div
-                :if={@gall.undescribed && @gallformers_code}
+                :if={@gall.undescribed? && @gallformers_code}
                 class="bg-amber-50 border border-amber-200 rounded-lg p-4"
               >
                 <p class="text-red-600 font-medium mb-2">
@@ -414,7 +426,7 @@ defmodule GallformersWeb.GallLive do
               </div>
 
               <div
-                :if={!@gall.undescribed && @gallformers_code}
+                :if={!@gall.undescribed? && @gallformers_code}
                 class="text-sm text-gray-600"
               >
                 Formerly tracked as undescribed —
@@ -436,16 +448,16 @@ defmodule GallformersWeb.GallLive do
                   genus={@taxonomy.genus}
                 />
 
-                <div :if={@gall.hosts && length(@gall.hosts) > 0} class="flex items-center gap-1">
+                <div :if={@gall.hosts != []} class="flex items-center gap-1">
                   <div>
                     <strong>Hosts:</strong>
                     <span :for={{host, idx} <- Enum.with_index(@gall.hosts)}>
                       {if idx > 0, do: " / "}<.link
-                        href={"/host/#{host.host_species_id}"}
+                        href={host_href(host)}
                         class="hover:underline"
                       ><.taxon_name
-                          name={host.host_name}
-                          genus_placeholder={host[:genus_placeholder] == true}
+                          name={host.name}
+                          genus_placeholder={host.rank == :genus}
                         /></.link>
                     </span>
                   </div>
@@ -462,22 +474,26 @@ defmodule GallformersWeb.GallLive do
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-x-4">
                   <div class="space-y-1">
                     <div>
-                      <strong>Detachable:</strong> {get_detachable_display(@gall.detachable)}
+                      <strong>Detachable:</strong> {detachable_display(@gall.traits)}
                     </div>
-                    <div><strong>Color:</strong> {format_fields(@gall_filters.colors)}</div>
-                    <div><strong>Texture:</strong> {format_fields(@gall_filters.textures)}</div>
-                    <div><strong>Abundance:</strong> {@gall.abundance_name || ""}</div>
+                    <div><strong>Color:</strong> {trait_display(@gall.traits, "color")}</div>
+                    <div><strong>Texture:</strong> {trait_display(@gall.traits, "texture")}</div>
+                    <div><strong>Abundance:</strong> {@gall.abundance || ""}</div>
                   </div>
                   <div class="space-y-1">
-                    <div><strong>Shape:</strong> {format_fields(@gall_filters.shapes)}</div>
-                    <div><strong>Season:</strong> {format_fields(@gall_filters.seasons)}</div>
-                    <div><strong>Alignment:</strong> {format_fields(@gall_filters.alignments)}</div>
-                    <div><strong>Walls:</strong> {format_fields(@gall_filters.walls)}</div>
+                    <div><strong>Shape:</strong> {trait_display(@gall.traits, "shape")}</div>
+                    <div><strong>Season:</strong> {trait_display(@gall.traits, "season")}</div>
+                    <div>
+                      <strong>Alignment:</strong> {trait_display(@gall.traits, "alignment")}
+                    </div>
+                    <div><strong>Walls:</strong> {trait_display(@gall.traits, "walls")}</div>
                   </div>
                   <div class="space-y-1">
-                    <div><strong>Location:</strong> {format_fields(@gall_filters.plant_parts)}</div>
-                    <div><strong>Form:</strong> {format_fields(@gall_filters.forms)}</div>
-                    <div><strong>Cells:</strong> {format_fields(@gall_filters.cells)}</div>
+                    <div>
+                      <strong>Location:</strong> {trait_display(@gall.traits, "plant_part")}
+                    </div>
+                    <div><strong>Form:</strong> {trait_display(@gall.traits, "form")}</div>
+                    <div><strong>Cells:</strong> {trait_display(@gall.traits, "cells")}</div>
                   </div>
                 </div>
               </div>
@@ -486,36 +502,31 @@ defmodule GallformersWeb.GallLive do
                 <div class="flex items-center gap-1">
                   <strong>Possible Range:</strong>
                   <.info_tip content="The gall's range is computed from the range of all hosts that the gall occurs on. In some cases we have evidence that the gall does not occur across the full range of the hosts and we will remove these places from the range. For undescribed species we will show the expected range based on hosts plus where the galls have been observed." />
-                  <.link
-                    :if={@current_user && !@gall.range_confirmed}
-                    href={~p"/admin/gallhost?id=#{@gall.id}"}
-                    class="inline-flex items-center gap-1 text-xs text-amber-500 hover:text-amber-700"
-                    title="Range not yet confirmed — click to review"
-                  >
-                    <.icon name="ph-warning" class="h-3.5 w-3.5" />
-                    <span>Needs review</span>
-                  </.link>
                 </div>
                 <p
-                  :if={@only_placeholder_hosts?}
+                  :if={@range_unknown?}
                   class="text-sm text-gray-600 italic mt-1"
                 >
-                  Range unknown — only genus-level host data available.
+                  Range unknown — no host range data available.
                 </p>
-                <.alert :if={not @only_placeholder_hosts?} variant="info" class="mt-1 mb-2">
+                <.alert :if={not @range_unknown?} variant="info" class="mt-1 mb-2">
                   Not an occurrence map: this shows where this gall's hosts grow. In most cases the
                   gall has not been documented throughout this area.
                 </.alert>
                 <.range_map
-                  :if={not @only_placeholder_hosts?}
+                  :if={not @range_unknown?}
                   id="gall-range-map"
                   class="min-h-[250px] h-[300px]"
                   in_range={@range}
                   inherited_range={@inherited_range}
+                  introduced_range={@introduced_range}
                   bounds={@range_bounds}
                   navigable
                 />
-                <div :if={not @only_placeholder_hosts? and @inherited_range != []} class="mt-1">
+                <div
+                  :if={not @range_unknown? and (@inherited_range != [] or @introduced_range != [])}
+                  class="mt-1"
+                >
                   <.range_map_legend mode={:public} />
                 </div>
               </div>
@@ -523,13 +534,13 @@ defmodule GallformersWeb.GallLive do
               <div :if={length(@common_names) > 0} class="mt-4">
                 <p>
                   <strong>Common Name(s):</strong>
-                  {Enum.map_join(@common_names, ", ", & &1.name)}
+                  {Enum.join(@common_names, ", ")}
                 </p>
               </div>
 
-              <div :if={length(@scientific_aliases) > 0} class="mt-4">
+              <div :if={length(@name_rows) > 0} class="mt-4">
                 <h3 class="font-semibold text-gray-800 mb-2">
-                  Synonymy ({length(@scientific_aliases)})
+                  Synonymy ({length(@name_rows)})
                 </h3>
                 <div class="bg-white rounded border border-gray-200 overflow-hidden">
                   <table class="gf-table gf-table-compact">
@@ -541,21 +552,22 @@ defmodule GallformersWeb.GallLive do
                       </tr>
                     </thead>
                     <tbody>
-                      <tr :for={
-                        a <- paginated_aliases(@scientific_aliases, @aliases_page, @aliases_page_size)
-                      }>
-                        <td><.taxon_name name={a.name} /></td>
-                        <td class="text-gray-600">{a.type || "—"}</td>
-                        <td class="text-gray-600">{a.description || "—"}</td>
+                      <tr :for={a <- paginated_aliases(@name_rows, @aliases_page, @aliases_page_size)}>
+                        <td>
+                          <span :if={a.label?}>{a.name}</span>
+                          <.taxon_name :if={not a.label?} name={a.name} />
+                        </td>
+                        <td class="text-gray-600">{a.type}</td>
+                        <td class="text-gray-600">{a.notes || "—"}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
                 <.pagination
-                  :if={aliases_total_pages(@scientific_aliases, @aliases_page_size) > 1}
+                  :if={aliases_total_pages(@name_rows, @aliases_page_size) > 1}
                   page={@aliases_page}
-                  total_pages={aliases_total_pages(@scientific_aliases, @aliases_page_size)}
-                  total_items={length(@scientific_aliases)}
+                  total_pages={aliases_total_pages(@name_rows, @aliases_page_size)}
+                  total_items={length(@name_rows)}
                   page_size={@aliases_page_size}
                   on_page_change={fn page -> JS.push("aliases_page", value: %{page: page}) end}
                   class="mt-4"
@@ -591,7 +603,7 @@ defmodule GallformersWeb.GallLive do
           <div
             :if={
               @has_gallformers_notes && !@notes_alert_dismissed &&
-                !(@selected_source && @selected_source.id == 58)
+                !(@selected_source && @selected_source.note?)
             }
             class="flex items-center gap-3 p-3 mb-4 bg-gf-sky-blue border border-blue-300 rounded text-sm text-gray-700"
             role="alert"
@@ -605,7 +617,7 @@ defmodule GallformersWeb.GallLive do
             <button
               type="button"
               phx-click="show_source_detail"
-              phx-value-id="58"
+              phx-value-id={@note_source_id}
               class="px-3 py-1 text-sm bg-white border border-blue-400 text-blue-700 hover:bg-blue-50 rounded whitespace-nowrap"
             >
               Show notes
@@ -635,11 +647,11 @@ defmodule GallformersWeb.GallLive do
             <div class="space-y-2">
               <div
                 :for={source <- visible_sources(@sources, @sources_expanded)}
-                class={"p-3 rounded border bg-white #{if source.id == 58, do: "border-blue-200 border-l-4 border-l-blue-400", else: "border-gray-200"}"}
+                class={"p-3 rounded border bg-white #{if source.note?, do: "border-blue-200 border-l-4 border-l-blue-400", else: "border-gray-200"}"}
               >
                 <div>
                   <.icon
-                    :if={source.id == 58}
+                    :if={source.note?}
                     name="ph-info"
                     class="h-5 w-5 text-blue-500 inline-block align-text-bottom mr-1"
                   />
@@ -683,7 +695,7 @@ defmodule GallformersWeb.GallLive do
                   </.link>
                 </div>
                 <button
-                  :if={source.description}
+                  :if={source.description not in [nil, ""]}
                   type="button"
                   phx-click="show_source_detail"
                   phx-value-id={source.id}
@@ -724,7 +736,7 @@ defmodule GallformersWeb.GallLive do
             <p class="italic">No further information available for this species.</p>
           <% end %>
 
-          <.see_also name={@gall.name} type={:gall} undescribed={@gall.undescribed} />
+          <.see_also name={@gall.name} type={:gall} undescribed={@gall.undescribed?} />
 
           <.record_metadata inserted_at={@gall.inserted_at} updated_at={@gall.updated_at} />
         <% else %>
@@ -773,7 +785,7 @@ defmodule GallformersWeb.GallLive do
               {if @selected_source.pubyear, do: " (#{@selected_source.pubyear})"}
             </div>
             <div
-              :if={@selected_source.description}
+              :if={@selected_source.description not in [nil, ""]}
               class={"prose #{prose_size_class(@modal_font_size)} max-w-none"}
             >
               {Phoenix.HTML.raw(Markdown.render!(@selected_source.description))}

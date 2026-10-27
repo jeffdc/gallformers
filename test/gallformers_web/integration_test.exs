@@ -6,8 +6,8 @@ defmodule GallformersWeb.IntegrationTest do
   import Phoenix.LiveViewTest
 
   alias Gallformers.Accounts.Auth0User
-  alias Gallformers.Galls
-  alias Gallformers.Plants
+  alias Gallformers.Catalog
+  alias Gallformers.Taxa
 
   describe "Public page load flows" do
     test "home page loads successfully", %{conn: conn} do
@@ -68,23 +68,21 @@ defmodule GallformersWeb.IntegrationTest do
 
   describe "Entity page load flows" do
     test "gall page loads for valid ID", %{conn: conn} do
-      galls = Galls.list_galls()
+      [id | _] = Catalog.list_gall_ids()
+      {:ok, gall} = Catalog.gall_page(id)
 
-      if length(galls) > 0 do
-        gall = hd(galls)
-        {:ok, _view, html} = live(conn, ~p"/gall/#{gall.id}")
-        assert html =~ gall.name
-      end
+      {:ok, view, _html} = live(conn, ~p"/gall/#{id}")
+      # The page title carries the full display name (the heading drops a
+      # generation qualifier).
+      assert page_title(view) =~ gall.name
     end
 
     test "host page loads for valid ID", %{conn: conn} do
-      hosts = Plants.list_hosts()
+      [id | _] = Taxa.list_plant_ids()
+      {:ok, host} = Taxa.host_page(id)
 
-      if length(hosts) > 0 do
-        host = hd(hosts)
-        {:ok, _view, html} = live(conn, ~p"/host/#{host.id}")
-        assert html =~ host.name
-      end
+      {:ok, _view, html} = live(conn, ~p"/host/#{id}")
+      assert html =~ host.name
     end
 
     test "gall page handles invalid ID gracefully", %{conn: conn} do
@@ -116,24 +114,20 @@ defmodule GallformersWeb.IntegrationTest do
     end
 
     test "can navigate from gall to host", %{conn: conn} do
-      galls = Galls.list_galls()
+      {gall_id, host_id} =
+        Enum.find_value(Catalog.list_gall_ids(), fn id ->
+          {:ok, gall} = Catalog.gall_page(id)
 
-      gall_with_host =
-        Enum.find(galls, fn g ->
-          length(Galls.get_hosts_for_gall(g.id)) > 0
+          Enum.find_value(gall.hosts, fn
+            %{link: {:host, host_id}} -> {id, host_id}
+            _host -> nil
+          end)
         end)
 
-      if gall_with_host do
-        {:ok, view, _html} = live(conn, ~p"/gall/#{gall_with_host.id}")
+      {:ok, view, _html} = live(conn, ~p"/gall/#{gall_id}")
 
-        # Find and click host link - this navigates to a different page
-        # Verify the link exists and points to a host page
-        if has_element?(view, "a[href*='/host/']") do
-          # The link should contain a valid host path
-          html = render(view)
-          assert html =~ ~r/href="\/host\/\d+"/
-        end
-      end
+      # The Gall page links its species Host to the host page.
+      assert has_element?(view, ~s(a[href="/host/#{host_id}"]))
     end
 
     test "search results navigate to correct pages", %{conn: conn} do

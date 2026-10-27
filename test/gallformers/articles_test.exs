@@ -21,6 +21,13 @@ defmodule Gallformers.ArticlesTest do
 
   @invalid_attrs %{title: nil, author: nil, content: nil}
 
+  # These tests own the articles table: the converted test database holds
+  # the catalog migration's placeholder Article (gall-lookalikes).
+  setup do
+    Repo.delete_all(Article)
+    :ok
+  end
+
   defp create_article(attrs \\ %{}) do
     {:ok, article} = Articles.create_article(Map.merge(@valid_attrs, attrs))
     article

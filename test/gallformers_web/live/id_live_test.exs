@@ -1,411 +1,570 @@
 defmodule GallformersWeb.IDLiveTest do
   @moduledoc """
-  LiveView tests for the ID tool page.
+  LiveView tests for the ID tool page, which reads `Gallformers.Catalog.identify/1`
+  (the stored per-Gall lookup table) and the `Gallformers.Taxa` typeaheads.
+
+  Uses the converted seeds (`priv/repo/test_seeds.sql`): plant 10
+  Notholithocarpus densiflorus (genus Notholithocarpus, old taxonomy 41;
+  synonym Lithocarpus densiflorus; common name tanoak; data-complete) is the
+  Host of Galls 300–304, whose Inducers are in Cynipidae (old taxonomy 30);
+  Gall 300 has an image, Gall 304 is undescribed. Genus GenusAlpha (old
+  taxonomy 10) holds the plants of Galls 100 (Andricus quercuscalifornicus,
+  integral) and 101 (Amphibolips confluenta), both in California only.
+  Galls with Traits are made in the tests.
   """
   # async: true is required because LiveView processes run separately and
   # need to access the database through the same connection as the test
   use GallformersWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 
-  alias Gallformers.Plants
+  # Reading the seeds, converted, is much of what this module tests.
+  # credo:disable-for-this-file Gallformers.Credo.Checks.TestQuality.TestsOwnTheirData
+
+  import Gallformers.CatalogFixtures
+  import Gallformers.DataCase, only: [test_actor: 0]
+  import Gallformers.TaxaFixtures
+
+  alias Gallformers.Catalog
+  alias Gallformers.Taxa
+
+  @host "Notholithocarpus densiflorus"
+  @host_path "/id?h=Notholithocarpus+densiflorus"
+
+  # The query of the URL the page last patched to, decoded.
+  defp patched_query(view) do
+    view
+    |> assert_patch()
+    |> URI.parse()
+    |> Map.get(:query)
+    |> Kernel.||("")
+    |> URI.decode_query()
+  end
+
+  defp show_advanced(view) do
+    view |> element("button[phx-click='toggle_advanced']") |> render_click()
+    view
+  end
+
+  # The /gall/:id links the page shows.
+  defp gall_links(view) do
+    view
+    |> render()
+    |> then(&Regex.scan(~r{href="/gall/(\d+)"}, &1))
+    |> Enum.map(fn [_, id] -> String.to_integer(id) end)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  defp cynipidae, do: Taxa.get_by_legacy_id(:taxonomy, 30)
+
+  # A Gall on plant 10 with an Inducer outside Cynipidae and Traits, so the
+  # Trait and family filters have something to tell apart.
+  defp traited_gall_fixture do
+    source = source_fixture("Weld", "1959")
+    family = taxon_fixture(rank: :family, name: "Fixtidae", kingdom: "Animalia")
+    genus = taxon_fixture(rank: :genus, name: "Fixtus", parent: family, kingdom: "Animalia")
+    wasp = taxon_fixture(name: "Fixtus rubens", parent: genus, kingdom: "Animalia")
+    gall = gall_fixture(name: "Fixtus rubens gall")
+
+    relationships = [
+      %{type: "inducer_of", subject_taxon_id: wasp.id, object_gall_id: gall.id},
+      %{type: "host_of", subject_taxon_id: 10, object_gall_id: gall.id}
+    ]
+
+    for key <- relationships do
+      {:ok, _} = Catalog.assert_relationship(test_actor(), key, confirm(source))
+    end
+
+    traits = [
+      {"color", "red"},
+      {"plant_part", "upper leaf"},
+      {"plant_part", "lower leaf"},
+      {"texture", "hairy"},
+      {"season", "Spring"},
+      {"detachable", "integral"}
+    ]
+
+    for {trait, value} <- traits do
+      {:ok, _} =
+        Catalog.assert_trait(
+          test_actor(),
+          %{gall_id: gall.id, trait: trait, value: value},
+          confirm(source)
+        )
+    end
+
+    :ok = Catalog.refresh_gall_index([gall.id])
+    %{gall: gall, family: family}
+  end
 
   describe "ID Tool page rendering" do
-    test "renders ID tool page", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/id")
+    test "renders the host and genus pickers", %{conn: conn} do
+      {:ok, view, html} = live(conn, ~p"/id")
 
-      # Should show host/genus pickers
-      assert html =~ "Host" or html =~ "Genus"
+      assert html =~ "Host Plant Species:"
+      assert html =~ "Host Plant Genus / Section:"
+      assert has_element?(view, "#host-picker-input[data-typeahead-input]")
+      assert has_element?(view, "#genus-picker-input[data-typeahead-input]")
     end
 
     test "shows instruction message when no selection", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/id")
 
       assert html =~ "Select a Host Plant or Plant Genus/Section"
+      refute html =~ "Filter by name"
     end
 
-    test "has host search input", %{conn: conn} do
+    test "sets the page title", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/id")
 
-      assert has_element?(view, "#host-picker-input[data-typeahead-input]")
-    end
-
-    test "has genus search input", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/id")
-
-      assert has_element?(view, "#genus-picker-input[data-typeahead-input]")
+      assert page_title(view) =~ "ID Tool"
     end
   end
 
   describe "Host typeahead" do
-    test "search_host event returns results", %{conn: conn} do
+    test "finds plants by name, synonym and common name", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/id")
 
-      hosts = Plants.list_hosts()
-
-      if length(hosts) > 0 do
-        # Search for part of first host's name
-        search_term = String.slice(hd(hosts).name, 0, 4)
-
-        render_click(view, "search_host", %{"value" => search_term})
-
-        # Results should appear
-        html = render(view)
-        assert html =~ search_term or html =~ "select_host"
+      for query <- ["Notholith", "Lithocarpus", "tanoak"] do
+        html = render_click(view, "search_host", %{"value" => query})
+        assert html =~ "Notholithocarpus densiflorus (Lithocarpus densiflorus, tanoak)"
       end
     end
 
-    test "select_host event selects host and shows filters", %{conn: conn} do
-      hosts = Plants.list_hosts()
+    test "does not offer gall inducers or genera", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/id")
 
-      if length(hosts) > 0 do
-        host = hd(hosts)
-        {:ok, view, _html} = live(conn, ~p"/id?h=#{URI.encode(host.name)}")
-
-        # With host selected, filters should be visible
-        html = render(view)
-        assert html =~ "Location" or html =~ "Detachable" or html =~ "Region"
-      end
+      html = render_click(view, "search_host", %{"value" => "Andricus"})
+      refute html =~ "phx-value-id"
     end
 
-    test "clear_host event clears selection", %{conn: conn} do
-      hosts = Plants.list_hosts()
+    test "selecting a host writes its name to the URL and shows the filters", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/id")
 
-      if length(hosts) > 0 do
-        host = hd(hosts)
-        {:ok, view, _html} = live(conn, ~p"/id?h=#{URI.encode(host.name)}")
+      render_click(view, "select_host", %{"id" => "10"})
 
-        # Clear the host
-        view
-        |> element("button[phx-click='clear_host']")
-        |> render_click()
+      assert patched_query(view) == %{"h" => @host}
+      assert render(view) =~ "Detachable"
+    end
 
-        # URL should be updated
-        html = render(view)
-        assert html =~ "Select a Host" or html =~ "Search hosts"
-      end
+    test "clearing the host clears the selection", %{conn: conn} do
+      {:ok, view, _html} = live(conn, @host_path)
+
+      view |> element("button[phx-click='clear_host']") |> render_click()
+
+      assert patched_query(view) == %{}
+      assert render(view) =~ "Select a Host Plant or Plant Genus/Section"
     end
   end
 
-  describe "URL parameter handling" do
-    test "host parameter loads host from URL", %{conn: conn} do
-      hosts = Plants.list_hosts()
+  describe "Genus typeahead" do
+    test "finds plant genera with their common names, not gall genera", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/id")
 
-      if length(hosts) > 0 do
-        host = hd(hosts)
-        {:ok, _view, html} = live(conn, ~p"/id?h=#{URI.encode(host.name)}")
+      html = render_click(view, "search_genus", %{"value" => "Notho"})
+      assert html =~ "Notholithocarpus"
+      assert html =~ "Tanoaks"
 
-        # Host should be displayed as selected
-        assert html =~ host.name
-      end
+      html = render_click(view, "search_genus", %{"value" => "Andricus"})
+      refute html =~ "phx-value-id"
     end
 
-    test "location parameter persists in URL", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/id?lo=1")
+    test "selecting a genus writes its name and rank to the URL", %{conn: conn} do
+      genus = Taxa.get_by_legacy_id(:taxonomy, 41)
+      {:ok, view, _html} = live(conn, ~p"/id")
 
-      # Page should load without error
-      assert is_binary(html)
-    end
+      render_click(view, "select_genus", %{"id" => to_string(genus.id)})
 
-    test "multiple parameters work together", %{conn: conn} do
-      hosts = Plants.list_hosts()
-
-      if length(hosts) > 0 do
-        host = hd(hosts)
-        # Combine multiple parameters
-        {:ok, _view, html} = live(conn, ~p"/id?h=#{URI.encode(host.name)}&lo=1&de=integral")
-
-        assert is_binary(html)
-      end
+      assert patched_query(view) == %{"g" => "Notholithocarpus", "gt" => "genus"}
+      assert gall_links(view) == [300, 301, 302, 303, 304]
     end
   end
 
-  describe "Filter events" do
-    setup %{conn: conn} do
-      hosts = Plants.list_hosts()
+  describe "URL parameters" do
+    test "a host name selects the host and lists its Galls", %{conn: conn} do
+      {:ok, view, html} = live(conn, @host_path)
 
-      if length(hosts) > 0 do
-        host = hd(hosts)
-        {:ok, conn: conn, host: host}
-      else
-        {:ok, conn: conn, host: nil}
-      end
+      assert html =~ "Selected: #{@host}"
+      assert gall_links(view) == [300, 301, 302, 303, 304]
     end
 
-    test "change_filter event updates filter value", %{conn: conn, host: host} do
-      if host do
-        {:ok, view, _html} = live(conn, ~p"/id?h=#{URI.encode(host.name)}")
+    test "a host's former name (a synonym) still selects it", %{conn: conn} do
+      {:ok, view, html} = live(conn, "/id?h=Lithocarpus+densiflorus")
 
-        # Change detachable filter
+      assert html =~ "Selected: #{@host}"
+      assert gall_links(view) == [300, 301, 302, 303, 304]
+    end
+
+    test "an unknown host name selects nothing", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/id?h=Nonexistus+plantus")
+
+      assert html =~ "Select a Host Plant or Plant Genus/Section"
+    end
+
+    test "a genus name selects the genus, its Galls on the genus itself too", %{conn: conn} do
+      {:ok, view, html} = live(conn, "/id?g=Notholithocarpus&gt=genus")
+
+      assert html =~ "Selected: Notholithocarpus - Tanoaks"
+      assert gall_links(view) == [300, 301, 302, 303, 304]
+    end
+
+    test "a section name with gt=section selects the section", %{conn: conn} do
+      genus = Taxa.get_by_legacy_id(:taxonomy, 41)
+      section = plant_fixture(rank: :section, name: "Fixtsection", parent: genus)
+      plant = plant_fixture(name: "Fixtsection plantus", parent: section)
+      gall = gall_fixture(name: "Fixtsection gall")
+      source = source_fixture("Weld", "1959")
+
+      {:ok, _} =
+        Catalog.assert_relationship(
+          test_actor(),
+          %{type: "host_of", subject_taxon_id: plant.id, object_gall_id: gall.id},
+          confirm(source)
+        )
+
+      {:ok, view, html} = live(conn, "/id?g=Fixtsection&gt=section")
+
+      assert html =~ "Selected: Fixtsection [Section]"
+      assert gall_links(view) == [gall.id]
+    end
+
+    test "the host's incomplete-data warning shows for an incomplete host", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/id?h=Thymus+alpinus")
+      assert html =~ "This host does not yet have all known galls added"
+
+      {:ok, _view, html} = live(conn, @host_path)
+      refute html =~ "This host does not yet have all known galls added"
+    end
+
+    test "the family filter lists the Inducer families of the host's Galls", %{conn: conn} do
+      %{family: family} = traited_gall_fixture()
+      {:ok, view, _html} = live(conn, @host_path)
+
+      assert has_element?(
+               view,
+               "form[phx-value-filter='family'] option[value='#{cynipidae().id}']",
+               "Cynipidae"
+             )
+
+      assert has_element?(
+               view,
+               "form[phx-value-filter='family'] option[value='#{family.id}']",
+               "Fixtidae"
+             )
+    end
+  end
+
+  describe "Trait filters" do
+    setup do
+      traited_gall_fixture()
+    end
+
+    test "a Trait value in the URL filters the Galls and is selected", %{conn: conn, gall: gall} do
+      {:ok, view, _html} = live(conn, @host_path <> "&co=red")
+
+      assert gall_links(view) == [gall.id]
+
+      assert view
+             |> show_advanced()
+             |> has_element?("form[phx-value-filter='color'] option[selected][value='red']")
+    end
+
+    test "a filter change writes readable Trait values to the URL", %{conn: conn} do
+      {:ok, view, _html} = live(conn, @host_path)
+
+      view
+      |> show_advanced()
+      |> element("form[phx-value-filter='color']")
+      |> render_change(%{"value" => "red"})
+
+      assert %{"co" => "red"} = patched_query(view)
+
+      render_click(view, "plant_part_select", %{"id" => "upper leaf"})
+      assert %{"co" => "red", "lo" => "upper leaf"} = patched_query(view)
+    end
+
+    test "plant parts match any value, or all of them", %{conn: conn, gall: gall} do
+      {:ok, view, _html} = live(conn, @host_path <> "&lo=upper+leaf,stem")
+      assert gall_links(view) == [gall.id]
+
+      {:ok, view, _html} = live(conn, @host_path <> "&lo=upper+leaf,stem&lol=and")
+      assert gall_links(view) == []
+
+      {:ok, view, _html} = live(conn, @host_path <> "&lo=upper+leaf,lower+leaf&lol=and")
+      assert gall_links(view) == [gall.id]
+    end
+
+    test "leaf (anywhere) matches any leaf plant part", %{conn: conn, gall: gall} do
+      {:ok, view, html} = live(conn, @host_path <> "&lo=leaf_anywhere")
+
+      assert html =~ "leaf (anywhere)"
+      assert gall_links(view) == [gall.id]
+    end
+
+    test "textures, season and detachable", %{conn: conn, gall: gall} do
+      {:ok, view, _html} = live(conn, @host_path <> "&te=hairy&se=Spring&de=integral")
+      assert gall_links(view) == [gall.id]
+
+      {:ok, view, _html} = live(conn, @host_path <> "&se=Fall")
+      assert gall_links(view) == []
+    end
+
+    test "an unknown Trait value is dropped", %{conn: conn} do
+      {:ok, view, _html} = live(conn, @host_path <> "&co=chartreuse")
+
+      assert length(gall_links(view)) == 6
+    end
+
+    test "an imageless Gall's card shows a summary of its Traits", %{conn: conn} do
+      {:ok, _view, html} = live(conn, @host_path <> "&co=red")
+
+      assert html =~ "A red, hairy gall found on the lower leaf/upper leaf in Spring."
+    end
+
+    test "the season filter is labelled by when the Gall forms and grows", %{conn: conn} do
+      {:ok, view, _html} = live(conn, @host_path)
+
+      html = view |> element("button[phx-click='toggle_advanced']") |> render_click()
+
+      assert html =~ "Season (forms and grows)"
+      refute html =~ "Show Non-Galls"
+    end
+  end
+
+  describe "the family filter" do
+    setup do
+      traited_gall_fixture()
+    end
+
+    test "filters to the Galls whose Inducer is in the family, written by name", %{
+      conn: conn,
+      gall: gall,
+      family: family
+    } do
+      {:ok, view, _html} = live(conn, @host_path)
+
+      view
+      |> element("form[phx-value-filter='family']")
+      |> render_change(%{"value" => to_string(family.id)})
+
+      assert %{"fa" => "Fixtidae"} = patched_query(view)
+      assert gall_links(view) == [gall.id]
+    end
+
+    test "a family name in the URL selects it", %{conn: conn} do
+      {:ok, view, _html} = live(conn, @host_path <> "&fa=Cynipidae")
+
+      assert gall_links(view) == [300, 301, 302, 303, 304]
+
+      assert has_element?(
+               view,
+               "form[phx-value-filter='family'] option[selected][value='#{cynipidae().id}']"
+             )
+    end
+  end
+
+  describe "old bookmarks" do
+    setup do
+      traited_gall_fixture()
+    end
+
+    test "integer Trait IDs and an old family ID restore the same filters", %{
+      conn: conn,
+      gall: gall
+    } do
+      # co=5 red, lo=4 upper leaf, te=10 hairy, se=1 Spring; fa=30 Cynipidae.
+      {:ok, old, _html} = live(conn, @host_path <> "&co=5&lo=4,5&lol=and&te=10&se=1")
+
+      {:ok, new, _html} =
+        live(conn, @host_path <> "&co=red&lo=upper+leaf,lower+leaf&lol=and&te=hairy&se=Spring")
+
+      assert gall_links(old) == [gall.id]
+      assert gall_links(old) == gall_links(new)
+
+      old
+      |> element("form[phx-value-filter='detachable']")
+      |> render_change(%{"value" => "integral"})
+
+      assert patched_query(old) == %{
+               "h" => @host,
+               "co" => "red",
+               "lo" => "upper leaf,lower leaf",
+               "lol" => "and",
+               "te" => "hairy",
+               "se" => "Spring",
+               "de" => "integral"
+             }
+    end
+
+    test "an old family ID selects its family", %{conn: conn} do
+      {:ok, view, _html} = live(conn, @host_path <> "&fa=30")
+
+      assert gall_links(view) == [300, 301, 302, 303, 304]
+
+      view
+      |> element("form[phx-value-filter='detachable']")
+      |> render_change(%{"value" => "both"})
+
+      assert %{"fa" => "Cynipidae"} = patched_query(view)
+    end
+
+    test "an unknown old family ID is ignored", %{conn: conn, gall: gall} do
+      {:ok, view, _html} = live(conn, @host_path <> "&fa=999999")
+
+      assert gall_links(view) == Enum.sort([gall.id, 300, 301, 302, 303, 304])
+
+      view
+      |> element("form[phx-value-filter='detachable']")
+      |> render_change(%{"value" => "both"})
+
+      refute Map.has_key?(patched_query(view), "fa")
+    end
+
+    test "an unknown old Trait ID is ignored", %{conn: conn} do
+      {:ok, view, _html} = live(conn, @host_path <> "&co=999")
+
+      assert length(gall_links(view)) == 6
+    end
+
+    test "ng (show non-galls) is harmless", %{conn: conn} do
+      for ng <- ["0", "1"] do
+        {:ok, view, _html} = live(conn, @host_path <> "&ng=#{ng}")
+        assert length(gall_links(view)) == 6
+
         view
         |> element("form[phx-value-filter='detachable']")
-        |> render_change(%{"value" => "integral"})
+        |> render_change(%{"value" => "both"})
 
-        # Check the filter is reflected in the rendered view by looking for
-        # the selected value in the form or checking the URL contains the filter
-        html = render(view)
-        # The detachable filter should show "integral" as selected
-        assert html =~ "integral" or html =~ "de=integral"
-      end
-    end
-
-    test "location_select event adds location to filter", %{conn: conn, host: host} do
-      if host do
-        {:ok, view, _html} = live(conn, ~p"/id?h=#{URI.encode(host.name)}")
-
-        # This would need to interact with the plant part multi-select
-        # Just verify the page renders without error
-        html = render(view)
-        assert html =~ "Plant Part" or html =~ "plant part"
-      end
-    end
-
-    test "toggle_advanced shows advanced filters", %{conn: conn, host: host} do
-      if host do
-        {:ok, view, _html} = live(conn, ~p"/id?h=#{URI.encode(host.name)}")
-
-        # Click toggle advanced
-        view
-        |> element("button[phx-click='toggle_advanced']")
-        |> render_click()
-
-        html = render(view)
-        # Advanced filters should be visible
-        assert html =~ "Season" or html =~ "Texture" or html =~ "Alignment" or
-                 html =~ "Hide Advanced"
-      end
-    end
-
-    test "clear_all event resets filters but preserves host selection", %{conn: conn, host: host} do
-      if host do
-        # Start with a host and some filters
-        {:ok, view, _html} = live(conn, ~p"/id?h=#{URI.encode(host.name)}&de=integral&lo=1")
-
-        # Click clear all
-        view
-        |> element("button[phx-click='clear_all']")
-        |> render_click()
-
-        # Host should still be selected, but filters cleared
-        html = render(view)
-        assert html =~ host.name
-        refute html =~ "de=integral"
+        refute Map.has_key?(patched_query(view), "ng")
       end
     end
   end
 
-  describe "Results display" do
-    test "shows results when host selected", %{conn: conn} do
-      hosts = Plants.list_hosts()
-
-      # Find a host with galls
-      host_with_galls =
-        Enum.find(hosts, fn h ->
-          length(Plants.get_galls_for_host(h.id)) > 0
-        end)
-
-      if host_with_galls do
-        {:ok, _view, html} = live(conn, ~p"/id?h=#{URI.encode(host_with_galls.name)}")
-
-        # Should show results
-        assert html =~ "Showing" or html =~ "galls" or html =~ "no galls"
-      end
+  describe "V1 URLs" do
+    setup do
+      traited_gall_fixture()
     end
 
-    test "result cards link to gall pages", %{conn: conn} do
-      hosts = Plants.list_hosts()
+    test "a V1 host URL selects the host", %{conn: conn} do
+      {:ok, view, html} = live(conn, "/id?hostOrTaxon=#{URI.encode(@host)}&type=host")
 
-      host_with_galls =
-        Enum.find(hosts, fn h ->
-          length(Plants.get_galls_for_host(h.id)) > 0
-        end)
-
-      if host_with_galls do
-        {:ok, view, _html} = live(conn, ~p"/id?h=#{URI.encode(host_with_galls.name)}")
-
-        # Should have links to gall pages
-        assert has_element?(view, "a[href*='/gall/']")
-      end
+      assert html =~ "Selected: #{@host}"
+      assert length(gall_links(view)) == 6
     end
 
-    test "shows incomplete host warning when applicable", %{conn: conn} do
-      hosts = Plants.list_hosts()
+    test "a V1 URL without type is a host", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/id?hostOrTaxon=#{URI.encode(@host)}")
 
-      # Find an incomplete host
-      incomplete_host = Enum.find(hosts, fn h -> h.datacomplete == false end)
-
-      if incomplete_host do
-        {:ok, _view, html} = live(conn, ~p"/id?h=#{URI.encode(incomplete_host.name)}")
-
-        # Should show warning about incomplete data
-        assert html =~ "incomplete" or html =~ "not yet have all"
-      end
+      assert html =~ "Selected: #{@host}"
     end
 
-    test "shows troubleshooting link when no results", %{conn: conn} do
-      hosts = Plants.list_hosts()
+    test "a V1 genus URL selects the genus", %{conn: conn} do
+      {:ok, _view, html} = live(conn, "/id?hostOrTaxon=Notholithocarpus&type=genus")
 
-      if length(hosts) > 0 do
-        # Use filters that likely produce no results
-        host = hd(hosts)
-
-        {:ok, _view, html} =
-          live(
-            conn,
-            ~p"/id?h=#{URI.encode(host.name)}&de=integral&lo=1,2,3,4,5&co=99&sh=99"
-          )
-
-        # If no results, should show troubleshooting link
-        if html =~ "no galls" do
-          assert html =~ "troubleshooting" or html =~ "altering your filter"
-        end
-      end
-    end
-  end
-
-  describe "V1 backwards compatibility" do
-    setup %{conn: conn} do
-      # Create a genus taxonomy entry for V1 genus URL tests
-      genus =
-        Gallformers.Repo.insert!(%Gallformers.Taxonomy.Taxonomy{
-          name: "Quercus",
-          type: "genus",
-          description: "Oaks"
-        })
-
-      section =
-        Gallformers.Repo.insert!(%Gallformers.Taxonomy.Taxonomy{
-          name: "Quercus",
-          type: "section",
-          parent_id: genus.id,
-          description: "Section Quercus"
-        })
-
-      {:ok, conn: conn, genus: genus, section: section}
+      assert html =~ "Selected: Notholithocarpus - Tanoaks"
     end
 
-    test "V1 host URL loads host correctly", %{conn: conn} do
-      hosts = Plants.list_hosts()
+    test "a V1 section URL selects the section", %{conn: conn} do
+      genus = Taxa.get_by_legacy_id(:taxonomy, 41)
+      plant_fixture(rank: :section, name: "Fixtvone", parent: genus)
 
-      if length(hosts) > 0 do
-        host = hd(hosts)
+      {:ok, _view, html} = live(conn, "/id?hostOrTaxon=Fixtvone&type=section")
 
-        {:ok, _view, html} =
-          live(conn, "/id?hostOrTaxon=#{URI.encode(host.name)}&type=host")
-
-        assert html =~ host.name
-      end
+      assert html =~ "Selected: Fixtvone [Section]"
     end
 
-    test "V1 genus URL loads genus correctly", %{conn: conn, genus: genus} do
+    test "V1 filter names with old IDs restore the filters", %{conn: conn, gall: gall} do
+      url =
+        "/id?hostOrTaxon=#{URI.encode(@host)}&type=host" <>
+          "&color=5&locations=4&textures=10&season=1&family=30&detachable=1&undescribed=false"
+
+      {:ok, view, _html} = live(conn, url)
+      assert gall_links(view) == []
+
+      url = String.replace(url, "family=30", "family=")
+      {:ok, view, _html} = live(conn, url)
+      assert gall_links(view) == [gall.id]
+    end
+
+    test "a V1 URL with empty filter params loads without error", %{conn: conn} do
+      url =
+        "/id?hostOrTaxon=#{URI.encode(@host)}&type=host" <>
+          "&detachable=&alignment=&cells=&color=&locations=" <>
+          "&season=&shape=&textures=&walls=&form=&undescribed=false&place="
+
+      {:ok, view, html} = live(conn, url)
+      assert html =~ "Selected: #{@host}"
+      assert length(gall_links(view)) == 6
+    end
+
+    test "V1 undescribed=true shows only undescribed Galls", %{conn: conn} do
+      {:ok, view, _html} =
+        live(conn, "/id?hostOrTaxon=#{URI.encode(@host)}&type=host&undescribed=true")
+
+      assert gall_links(view) == [304]
+    end
+
+    test "a V1 place name is resolved to the place", %{conn: conn} do
       {:ok, _view, html} =
-        live(conn, "/id?hostOrTaxon=#{URI.encode(genus.name)}&type=genus")
+        live(conn, "/id?hostOrTaxon=#{URI.encode(@host)}&type=host&place=California")
 
-      # Genus should be displayed as selected
-      assert html =~ genus.name
-    end
-
-    test "V1 section URL loads section correctly", %{conn: conn, section: section} do
-      {:ok, _view, html} =
-        live(conn, "/id?hostOrTaxon=#{URI.encode(section.name)}&type=section")
-
-      assert html =~ section.name
-    end
-
-    test "V1 URL with empty filter params loads without error", %{conn: conn} do
-      hosts = Plants.list_hosts()
-
-      if length(hosts) > 0 do
-        host = hd(hosts)
-
-        # Mimics V1 URL with all empty filter params
-        url =
-          "/id?hostOrTaxon=#{URI.encode(host.name)}&type=host" <>
-            "&detachable=&alignment=&cells=&color=&locations=" <>
-            "&season=&shape=&textures=&walls=&form=&undescribed=false&place="
-
-        {:ok, _view, html} = live(conn, url)
-        assert html =~ host.name
-      end
-    end
-
-    test "V1 undescribed=true maps to V2 format", %{conn: conn} do
-      hosts = Plants.list_hosts()
-
-      if length(hosts) > 0 do
-        host = hd(hosts)
-
-        {:ok, view, _html} =
-          live(conn, "/id?hostOrTaxon=#{URI.encode(host.name)}&type=host&undescribed=true")
-
-        # The undescribed filter should be active (mapped from "true" to "1")
-        html = render(view)
-        assert html =~ "un=1" or html =~ "undescribed"
-      end
-    end
-
-    test "V1 URL without type defaults to host lookup", %{conn: conn} do
-      hosts = Plants.list_hosts()
-
-      if length(hosts) > 0 do
-        host = hd(hosts)
-
-        {:ok, _view, html} =
-          live(conn, "/id?hostOrTaxon=#{URI.encode(host.name)}")
-
-        assert html =~ host.name
-      end
-    end
-
-    test "V1 place name is resolved to place code in typeahead", %{conn: conn} do
-      hosts = Plants.list_hosts()
-
-      if length(hosts) > 0 do
-        host = hd(hosts)
-
-        # V1 used place names ("California"); V2 uses ISO 3166-2 codes ("US-CA")
-        {:ok, _view, html} =
-          live(conn, "/id?hostOrTaxon=#{URI.encode(host.name)}&type=host&place=California")
-
-        # The typeahead should show California as the selected place
-        assert html =~ "California"
-        assert html =~ "Selected: California"
-      end
+      assert html =~ "Selected: California"
     end
   end
 
   describe "grouped place search" do
     test "place search returns countries and subdivisions with groups", %{conn: conn} do
-      hosts = Plants.list_hosts()
+      {:ok, view, _html} = live(conn, @host_path)
 
-      if length(hosts) > 0 do
-        host = hd(hosts)
-        {:ok, view, _html} = live(conn, "/id?hostOrTaxon=#{URI.encode(host.name)}&type=host")
+      # Push the search event directly (phx-debounce prevents keyup testing)
+      html = render_hook(view, "search_place", %{"value" => "ca"})
 
-        # Push the search event directly (phx-debounce prevents keyup testing)
-        html = render_hook(view, "search_place", %{"value" => "ca"})
+      assert html =~ "Countries"
+      assert html =~ "Canada"
+      assert html =~ "States &amp; Provinces"
+      assert html =~ "California"
+    end
+  end
 
-        assert html =~ "Countries"
-        assert html =~ "Canada"
-        assert html =~ "States &amp; Provinces"
-        assert html =~ "California"
-      end
+  describe "results" do
+    test "cards link to the Gall pages, with the image and the undescribed tag", %{conn: conn} do
+      {:ok, view, html} = live(conn, @host_path)
+
+      assert has_element?(view, "a[href='/gall/300'] img[src*='300_seed_small']")
+      assert has_element?(view, "a[href='/gall/301'] img[src*='noimage']")
+      assert html =~ "Undescribed"
+      refute html =~ "Non-gall"
+      assert html =~ "galls"
+    end
+
+    test "clear_all resets the filters but keeps the host", %{conn: conn} do
+      {:ok, view, _html} = live(conn, @host_path <> "&de=integral")
+
+      view |> element("button[phx-click='clear_all']") |> render_click()
+
+      assert patched_query(view) == %{"h" => @host}
+      assert render(view) =~ "Selected: #{@host}"
+    end
+
+    test "a filter matching nothing shows the troubleshooting link", %{conn: conn} do
+      {:ok, view, html} = live(conn, @host_path <> "&co=red&de=both")
+
+      assert gall_links(view) == []
+      assert html =~ "There are no galls that match your filter"
+      assert html =~ "altering your filter choices"
     end
   end
 
   describe "Name filter" do
     test "filter_by_name narrows displayed results", %{conn: conn} do
       # GenusAlpha has galls 100 (Andricus) and 101 (Amphibolips) via seed data
-      {:ok, view, _html} = live(conn, ~p"/id?g=GenusAlpha&gt=genus")
+      {:ok, view, html} = live(conn, ~p"/id?g=GenusAlpha&gt=genus")
 
-      # Both galls should be visible initially
-      html = render(view)
       assert html =~ "Andricus"
       assert html =~ "Amphibolips"
 
-      # Type in the name filter
       html = render_keyup(view, "filter_by_name", %{"value" => "Andricus"})
 
-      # Only Andricus should remain
       assert html =~ "Andricus"
       refute html =~ "Amphibolips"
     end
@@ -422,10 +581,7 @@ defmodule GallformersWeb.IDLiveTest do
     test "clear_name_filter restores all results", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/id?g=GenusAlpha&gt=genus")
 
-      # Filter down
       render_keyup(view, "filter_by_name", %{"value" => "Andricus"})
-
-      # Clear
       html = render_click(view, "clear_name_filter")
 
       assert html =~ "Andricus"
@@ -437,35 +593,24 @@ defmodule GallformersWeb.IDLiveTest do
 
       html = render_keyup(view, "filter_by_name", %{"value" => "Andricus"})
 
-      # Should show "Showing 1 of 2 galls"
       assert html =~ "Showing"
       assert html =~ ">1<"
       assert html =~ "of 2"
     end
 
-    test "name filter input not shown when no results", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/id")
-
-      # No selection means no results, so no filter input
-      refute html =~ "Filter by name"
-    end
-
     test "name filter persists when structured filter changes", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/id?g=GenusAlpha&gt=genus")
 
-      # Apply name filter — only Andricus should be visible
       render_keyup(view, "filter_by_name", %{"value" => "Andricus"})
 
-      # Change a structured filter (detachable=integral matches gall 100, Andricus)
+      # detachable=integral matches gall 100, Andricus
       view
       |> element("form[phx-value-filter='detachable']")
       |> render_change(%{"value" => "integral"})
 
       html = render(view)
 
-      # Name filter value should be preserved in the input
       assert html =~ ~s(value="Andricus")
-      # Andricus matches both the name filter and the detachable=integral filter
       assert html =~ "Andricus"
     end
   end
@@ -474,38 +619,23 @@ defmodule GallformersWeb.IDLiveTest do
     test "shows hint when region filter produces zero results but other regions have galls", %{
       conn: conn
     } do
-      # GenusAlpha has galls 100 and 101 in North America (via California host ranges).
-      # Selecting Europe as region should produce 0 results with a hint.
-      {:ok, view, _html} = live(conn, ~p"/id?g=GenusAlpha&gt=genus")
-
-      # Verify galls exist without region filter
-      html = render(view)
+      # GenusAlpha's galls are in North America (California host ranges).
+      {:ok, view, html} = live(conn, ~p"/id?g=GenusAlpha&gt=genus")
       assert html =~ "Showing"
 
-      # Set region to Europe — GenusAlpha has no galls there
       html = render_click(view, "change_region", %{"code" => "XE"})
 
-      # Should show a hint about galls existing in other regions
       assert html =~ "other regions"
+      assert html =~ "<strong>2</strong>"
     end
 
     test "does not show hint when no region filter is active and results are empty", %{
       conn: conn
     } do
-      # Use impossible filter combination to get 0 results without region scope
-      {:ok, _view, html} =
-        live(conn, ~p"/id?g=GenusAlpha&gt=genus&de=integral&co=99&sh=99")
+      {:ok, _view, html} = live(conn, ~p"/id?g=GenusAlpha&gt=genus&de=integral&co=red")
 
-      # Should show the normal "no galls match" message, not the region hint
+      assert html =~ "There are no galls that match your filter"
       refute html =~ "other regions"
-    end
-  end
-
-  describe "Page title" do
-    test "sets appropriate page title", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/id")
-
-      assert page_title(view) =~ "ID Tool" or page_title(view) =~ "Gallformers"
     end
   end
 end

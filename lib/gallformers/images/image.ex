@@ -26,7 +26,9 @@ defmodule Gallformers.Images.Image do
           sourcelink: String.t() | nil,
           uploader: String.t() | nil,
           lastchangedby: String.t() | nil,
-          caption: String.t() | nil
+          caption: String.t() | nil,
+          gall_id: integer() | nil,
+          taxon_id: integer() | nil
         }
 
   schema "image" do
@@ -40,6 +42,10 @@ defmodule Gallformers.Images.Image do
     field :uploader, :string
     field :lastchangedby, :string
     field :caption, :string
+    # The typed reference (a Gall or a taxon, at most one), filled by the
+    # catalog data migration beside `species_id`; read-only here.
+    field :gall_id, :integer
+    field :taxon_id, :integer
 
     belongs_to :species, Gallformers.Species.Species
     belongs_to :source, Gallformers.Sources.Source

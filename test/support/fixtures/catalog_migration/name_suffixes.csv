@@ -1,0 +1,12 @@
+kind,key,name,inducer,generation,needs_review,category,handling
+token,agamic,,,agamic,false,Cynipid generation,generation (mechanical)
+token,sexgen,,,sexual,false,Cynipid generation,generation (mechanical)
+token,spring generation,,,spring,false,Seasonal generation,generation (mechanical)
+token,summer generation,,,summer,false,Seasonal generation,generation (mechanical)
+token,autumn generation,,,autumn,false,Seasonal generation,generation (mechanical)
+token,fall generation,,,autumn,false,Seasonal generation,generation (mechanical)
+token,summer and autumn generations,,,summer,false,Seasonal generation,"multivoltine: the summer and autumn broods make one Gall, distinct from the spring gall, so one generation value (summer)"
+token,summer and autumn generation,,,summer,false,Seasonal generation,"multivoltine: the summer and autumn broods make one Gall, distinct from the spring gall, so one generation value (summer)"
+token,aecial,,,aecial,false,Rust spore stage,generation (mechanical)
+token,telial,,,telial,false,Rust spore stage,generation (mechanical)
+gall,302,Neuroterus seedatorius (australis) (agamic),Neuroterus seedatorius,agamic,false,Gall form,one species with several gall forms → separate Gall per form; form qualifier in name

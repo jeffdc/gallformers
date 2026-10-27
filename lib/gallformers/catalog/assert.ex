@@ -1,7 +1,8 @@
 defmodule Gallformers.Catalog.Assert do
   @moduledoc """
   Asserting a gall Fact (`9449` §4): find the Fact by its kind's natural key
-  or create it with its details, then record a Source's stance on it with
+  (setting any property outside the key the assert gives, where the kind
+  has one: `c:update_existing/2`) or create it with its details, then record a Source's stance on it with
   `Gallformers.Facts.attribute/2` — all in one transaction, as one actor.
   On error nothing is written (no Fact is left behind) and the changeset
   says why.
@@ -51,7 +52,15 @@ defmodule Gallformers.Catalog.Assert do
   @doc "A query for the stored details with the same natural key."
   @callback existing_query(detail()) :: Ecto.Query.t()
 
-  @optional_callbacks prepare: 1
+  @doc """
+  The change to make to the stored details found by the natural key, for
+  properties outside the key that the assert sets (e.g. an alias's kind),
+  or nil to leave them. `asserted` is the assert's validated changeset.
+  """
+  @callback update_existing(existing :: detail(), asserted :: Changeset.t()) ::
+              Changeset.t() | nil
+
+  @optional_callbacks prepare: 1, update_existing: 2
 
   @doc """
   Asserts a Fact of kind `module`: finds or creates it by the natural key in
@@ -72,7 +81,12 @@ defmodule Gallformers.Catalog.Assert do
       key = changeset |> Changeset.apply_action(:insert) |> ok_or_rollback()
 
       lock(module.kind(), module.natural_key(key))
-      detail = Repo.one(module.existing_query(key)) || create(module, actor, changeset, key)
+
+      detail =
+        case Repo.one(module.existing_query(key)) do
+          nil -> create(module, actor, changeset, key)
+          existing -> update_existing(module, existing, changeset)
+        end
 
       %{attribution: attribution, conflicts: conflicts} =
         actor
@@ -118,6 +132,15 @@ defmodule Gallformers.Catalog.Assert do
     |> Changeset.put_change(:fact_id, fact.id)
     |> Repo.insert()
     |> ok_or_rollback()
+  end
+
+  defp update_existing(module, existing, asserted) do
+    with true <- function_exported?(module, :update_existing, 2),
+         %Changeset{} = update <- module.update_existing(existing, asserted) do
+      update |> Repo.update() |> ok_or_rollback()
+    else
+      _unchanged -> existing
+    end
   end
 
   defp lock(kind, natural_key) do

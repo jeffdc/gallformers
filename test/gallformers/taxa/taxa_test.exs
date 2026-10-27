@@ -70,6 +70,43 @@ defmodule Gallformers.TaxaTest do
     end
   end
 
+  describe "lineage/1" do
+    test "the taxon and its ancestors, root first, each with rank and accepted name" do
+      family = taxon_fixture(rank: :family, name: "Cynipidae")
+      tribe = taxon_fixture(rank: :tribe, name: "Cynipini", parent: family)
+      genus = taxon_fixture(rank: :genus, name: "Andricus", parent: tribe)
+      species = taxon_fixture(name: "Andricus foo", parent: genus)
+      {:ok, _} = Taxa.rename(test_actor(), genus, "Andricus renamed")
+
+      assert Taxa.lineage(species.id) == [
+               %{taxon_id: family.id, name: "Cynipidae", rank: :family},
+               %{taxon_id: tribe.id, name: "Cynipini", rank: :tribe},
+               %{taxon_id: genus.id, name: "Andricus renamed", rank: :genus},
+               %{taxon_id: species.id, name: "Andricus foo", rank: :species}
+             ]
+    end
+
+    test "a root taxon's lineage is itself" do
+      root = taxon_fixture(rank: :family, name: "Rootidae")
+      assert Taxa.lineage(root) == [%{taxon_id: root.id, name: "Rootidae", rank: :family}]
+    end
+  end
+
+  describe "list_synonyms/1" do
+    test "a taxon's synonyms in the order added, not its accepted name" do
+      taxon = taxon_fixture(name: "Andricus foo")
+      {:ok, _} = Taxa.add_synonym(test_actor(), taxon, "Callirhytis foo")
+      {:ok, _} = Taxa.add_synonym(test_actor(), taxon, "Cynips foo", sensu: "O. S. non Harris")
+
+      assert Enum.map(Taxa.list_synonyms(taxon.id), &{&1.name, &1.sensu}) == [
+               {"Callirhytis foo", nil},
+               {"Cynips foo", "O. S. non Harris"}
+             ]
+
+      assert Taxa.list_synonyms(taxon_fixture()) == []
+    end
+  end
+
   describe "add_common_name/3" do
     test "adds a common name, once per taxon whatever the case" do
       taxon = taxon_fixture(name: "Pemphigus populitransversus")

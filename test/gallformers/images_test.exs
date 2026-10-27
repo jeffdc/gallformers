@@ -290,4 +290,63 @@ defmodule Gallformers.ImagesTest do
       assert updated.source_id == pub_source.id
     end
   end
+
+  # Seeds converted by the catalog migration: image 1 is Gall 300's, image 2
+  # plant taxon 10's (`image.gall_id` / `image.taxon_id`).
+  describe "images by their typed reference" do
+    defp image!(attrs) do
+      defaults = %{path: "gall/x/#{System.unique_integer([:positive])}_original.jpg"}
+      {1, [%{id: id}]} = Repo.insert_all("image", [Map.merge(defaults, attrs)], returning: [:id])
+      id
+    end
+
+    test "list_images_for_gall/1 reads image.gall_id, by sort order" do
+      later = image!(%{species_id: 300, gall_id: 300, sort_order: 5})
+
+      assert Enum.map(Images.list_images_for_gall(300), & &1.id) == [1, later]
+      assert Images.list_images_for_gall(301) == []
+    end
+
+    test "list_images_for_gall/1 ignores an image of the species ID with no Gall reference" do
+      image!(%{species_id: 301})
+
+      assert Images.list_images_for_gall(301) == []
+    end
+
+    test "default_image_ids_for_galls/1 gives each Gall's first image by sort order" do
+      earlier = image!(%{species_id: 301, gall_id: 301, sort_order: 2})
+      _later = image!(%{species_id: 301, gall_id: 301, sort_order: 3})
+      _tied_later_id = image!(%{species_id: 301, gall_id: 301, sort_order: 2})
+
+      assert Images.default_image_ids_for_galls([300, 301, 302]) == %{300 => 1, 301 => earlier}
+      assert Images.default_image_ids_for_galls([]) == %{}
+    end
+
+    test "count_images/0 counts the images of Galls and taxa only" do
+      before = Images.count_images()
+
+      image!(%{species_id: 300, gall_id: 300})
+      image!(%{species_id: 10, taxon_id: 10})
+      # An image left on an excluded non-gall: no Gall, no taxon.
+      image!(%{species_id: 301})
+
+      assert Images.count_images() == before + 2
+    end
+
+    test "list_images_for_taxon/1 reads image.taxon_id" do
+      assert [%{id: 2, gall_id: nil, taxon_id: 10}] = Images.list_images_for_taxon(10)
+      assert Images.list_images_for_taxon(1) == []
+    end
+
+    test "list_images_for_source/1 orders by Gall display name and taxon name" do
+      # Its species row (301) sorts after 300's; its Gall's shown name first.
+      first = Gallformers.CatalogFixtures.gall_fixture(name: "Zzz", name_override: "Aaa gall")
+
+      taxon = image!(%{species_id: 10, taxon_id: 10, source_id: 59})
+      agamic = image!(%{species_id: 300, gall_id: 300, source_id: 59})
+      overridden = image!(%{species_id: 301, gall_id: first.id, source_id: 59})
+
+      assert Enum.map(Images.list_images_for_source(59), & &1.id) == [overridden, agamic, taxon]
+    end
+  end
 end

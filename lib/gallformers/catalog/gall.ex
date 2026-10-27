@@ -10,6 +10,9 @@ defmodule Gallformers.Catalog.Gall do
       where set. The name shown (`display_name/1`) is unique.
     * `gallformers_code`, `abundance_id`, `datacomplete` — editorial
       carry-overs from today's gall rows.
+    * `default_source_id` — the Source the Gall page leads with (`803b`
+      decision 3): today's default description (`useasdefault`), a
+      citation or the Gallformers note alike. Editorial, nullable.
 
   Everything Sources state about a Gall (its Inducer, Hosts, Traits, …) is a
   Fact (`Gallformers.Catalog.Facts`).
@@ -28,6 +31,7 @@ defmodule Gallformers.Catalog.Gall do
           name_override: String.t() | nil,
           abundance_id: integer() | nil,
           datacomplete: boolean(),
+          default_source_id: integer() | nil,
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
@@ -38,6 +42,8 @@ defmodule Gallformers.Catalog.Gall do
     field :name_override, :string
     field :abundance_id, :integer
     field :datacomplete, :boolean, default: false
+    # A foreign key to `source`; Sources are known by ID here.
+    field :default_source_id, :integer
 
     belongs_to :generation_value, GenerationValue
 
@@ -50,7 +56,8 @@ defmodule Gallformers.Catalog.Gall do
     :name,
     :name_override,
     :abundance_id,
-    :datacomplete
+    :datacomplete,
+    :default_source_id
   ]
 
   @doc """
@@ -68,6 +75,7 @@ defmodule Gallformers.Catalog.Gall do
     |> unique_constraint(:gallformers_code, name: :galls_gallformers_code_index)
     |> foreign_key_constraint(:generation_value_id)
     |> foreign_key_constraint(:abundance_id)
+    |> foreign_key_constraint(:default_source_id)
   end
 
   defp trim(value) when is_binary(value), do: String.trim(value)

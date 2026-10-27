@@ -104,6 +104,22 @@ defmodule Gallformers.PlacesTest do
       assert california.id in ids
       assert bahamas.id in ids
     end
+
+    test "leaf_descendant_ids_by_place/1 gives each place's leaf descendants" do
+      [us, xn, california, bahamas] = Enum.map(~w(US XN US-CA BS), &Places.get_place_by_code/1)
+
+      by_place = Places.leaf_descendant_ids_by_place([us.id, xn.id, california.id, bahamas.id])
+
+      assert Enum.sort(by_place[us.id]) == Enum.sort(Places.leaf_descendant_ids(us.id))
+      assert Enum.sort(by_place[xn.id]) == Enum.sort(Places.leaf_descendant_ids(xn.id))
+      assert by_place[california.id] == [california.id]
+      assert by_place[bahamas.id] == [bahamas.id]
+    end
+
+    test "leaf_descendant_ids_by_place/1 leaves out unknown places" do
+      assert Places.leaf_descendant_ids_by_place([]) == %{}
+      assert Places.leaf_descendant_ids_by_place([-1]) == %{}
+    end
   end
 
   describe "search_places_grouped/2" do

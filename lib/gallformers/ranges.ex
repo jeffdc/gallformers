@@ -6,9 +6,10 @@ defmodule Gallformers.Ranges do
   - **Host ranges** (host_range table): Where host plants exist geographically
   - **Gall ranges** (gall_range table): Curated stored range for gall species
 
-  Gall range resolution: curated `gall_range` entries are the source of truth.
-  When a gall has no curated range, falls back to the union of its hosts'
-  native ranges (introduced excluded). See `get_display_range_for_gall/1`.
+  A Gall's range on the new back-end is `Gallformers.Catalog.potential_range/1`
+  (its Hosts' ranges, read by `host_range.taxon_id`); its map split comes
+  from `get_display_range_for_taxa/1`. The old admin still reads and writes
+  `gall_range`.
 
   See `docs/architecture/range-system.md` for the full range system architecture.
   """
@@ -28,61 +29,10 @@ defmodule Gallformers.Ranges do
   alias Gallformers.Places.Place
   alias Gallformers.Ranges.{DisplayRange, GallRange, HostRange}
   alias Gallformers.Repo
-  alias Gallformers.Species.Species
 
   # ============================================
   # Host Range Queries
   # ============================================
-
-  @doc """
-  Gets hosts (plant species) for a Place with their aliases.
-  """
-  def get_hosts_for_place(place_id) do
-    from(s in Species,
-      join: hr in HostRange,
-      on: hr.species_id == s.id,
-      # No AliasSpecies schema exists; Alias uses "alias_species" as join_through
-      left_join: als in "alias_species",
-      on: als.species_id == s.id,
-      left_join: a in "alias",
-      on: a.id == als.alias_id,
-      where: hr.place_id == ^place_id and s.taxoncode == "plant",
-      group_by: [s.id, s.name],
-      order_by: s.name,
-      select: %{
-        id: s.id,
-        name: s.name,
-        aliases: fragment("string_agg(?, ', ')", a.name)
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets place codes for a host species (range data).
-  """
-  @spec get_places_for_host(integer()) :: [String.t()]
-  def get_places_for_host(host_species_id) do
-    from(hr in HostRange,
-      join: p in Place,
-      on: hr.place_id == p.id,
-      where: hr.species_id == ^host_species_id,
-      select: p.code
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets place IDs (not codes) for a host species.
-  """
-  @spec get_place_ids_for_host(integer()) :: [integer()]
-  def get_place_ids_for_host(host_species_id) do
-    from(hr in HostRange,
-      where: hr.species_id == ^host_species_id,
-      select: hr.place_id
-    )
-    |> Repo.all()
-  end
 
   @doc """
   Gets place codes, precision, and distribution type for a host species.
@@ -101,64 +51,6 @@ defmodule Gallformers.Ranges do
       }
     )
     |> Repo.all()
-  end
-
-  @doc """
-  Checks whether a host species covers a given place, accounting for hierarchy.
-
-  A host covers a place if there's a host_range row for that place or any
-  of its ancestors (e.g., country-level range covers all subdivisions).
-  """
-  @spec host_covers_place?(integer(), integer()) :: boolean()
-  def host_covers_place?(host_species_id, place_id) do
-    ancestor_ids = Places.ancestor_ids(place_id)
-
-    from(hr in HostRange,
-      where: hr.species_id == ^host_species_id,
-      where: hr.place_id in ^ancestor_ids,
-      select: count()
-    )
-    |> Repo.one()
-    |> Kernel.>(0)
-  end
-
-  @doc """
-  Gets place codes for a list of host species IDs.
-
-  Returns the union of all places where any of the hosts occur.
-  Used for computing gall range from a local/pending list of hosts.
-  """
-  @spec get_places_for_host_species_ids([integer()]) :: [String.t()]
-  def get_places_for_host_species_ids([]), do: []
-
-  def get_places_for_host_species_ids(host_species_ids) do
-    from(p in Place,
-      join: hr in HostRange,
-      on: hr.place_id == p.id,
-      where: hr.species_id in ^host_species_ids,
-      distinct: true,
-      select: p.code
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets places for multiple hosts in a single query, grouped by host species ID.
-
-  Returns a map of species_id => [place_code].
-  """
-  @spec get_places_for_hosts([integer()]) :: %{integer() => [String.t()]}
-  def get_places_for_hosts([]), do: %{}
-
-  def get_places_for_hosts(host_species_ids) do
-    from(hr in HostRange,
-      join: p in Place,
-      on: hr.place_id == p.id,
-      where: hr.species_id in ^host_species_ids,
-      select: {hr.species_id, p.code}
-    )
-    |> Repo.all()
-    |> Enum.group_by(fn {id, _code} -> id end, fn {_id, code} -> code end)
   end
 
   # ============================================
@@ -187,20 +79,6 @@ defmodule Gallformers.Ranges do
       |> Repo.insert(on_conflict: :nothing)
 
     result
-  end
-
-  @doc """
-  Removes a place from a host's range.
-  """
-  @spec remove_place_from_host(integer(), integer()) :: {:ok, non_neg_integer()}
-  def remove_place_from_host(host_species_id, place_id) do
-    {count, _} =
-      from(hr in HostRange,
-        where: hr.species_id == ^host_species_id and hr.place_id == ^place_id
-      )
-      |> Repo.delete_all()
-
-    {:ok, count}
   end
 
   @doc """
@@ -266,33 +144,6 @@ defmodule Gallformers.Ranges do
   # ============================================
   # Gall Range Queries (from gall_range table)
   # ============================================
-
-  @doc """
-  Gets place codes for a gall species from the curated gall_range table.
-  """
-  @spec get_places_for_gall(integer()) :: [String.t()]
-  def get_places_for_gall(gall_species_id) do
-    get_gall_range_codes(gall_species_id)
-  end
-
-  @doc """
-  Gets place codes for multiple gall species in a single query (batch version).
-
-  Returns a map of gall_species_id => [place_codes].
-  """
-  @spec get_places_for_galls([integer()]) :: %{integer() => [String.t()]}
-  def get_places_for_galls([]), do: %{}
-
-  def get_places_for_galls(gall_species_ids) do
-    from(gr in GallRange,
-      join: p in Place,
-      on: gr.place_id == p.id,
-      where: gr.species_id in ^gall_species_ids,
-      select: {gr.species_id, p.code}
-    )
-    |> Repo.all()
-    |> Enum.group_by(fn {gall_id, _code} -> gall_id end, fn {_gall_id, code} -> code end)
-  end
 
   @doc """
   Gets host ranges with precision for a list of host species IDs.
@@ -449,42 +300,50 @@ defmodule Gallformers.Ranges do
   end
 
   @doc """
-  Gets the full range display data for a gall from the curated gall_range table,
-  expanding country-level ranges to leaf descendant codes for map display.
-
-  Returns `%{in_range: [codes], inherited_range: [codes]}`.
-  - `in_range`: exact subdivision codes
-  - `inherited_range`: leaf codes expanded from country-level ranges
+  Gets the display range of plant taxa: the union of their `host_range` rows,
+  read by `host_range.taxon_id` (the new taxa key the catalog data migration
+  fills; a genus taxon carries its former genus placeholder's rows), split
+  for the map as `compute_display_range/2` with introduced places marked.
   """
-  @spec get_display_range_for_gall(integer()) :: DisplayRange.t()
-  def get_display_range_for_gall(gall_species_id) do
-    gall_ranges = get_gall_range_with_precision(gall_species_id)
+  @spec get_display_range_for_taxa([integer()]) :: DisplayRange.t()
+  def get_display_range_for_taxa([]), do: %DisplayRange{}
 
-    if gall_ranges == [] do
-      # No curated range — fall back to union of hosts' native ranges
-      host_ids = get_host_species_ids_for_gall(gall_species_id)
-      native_ranges = get_native_host_ranges_with_precision(host_ids)
-      compute_display_range(native_ranges)
-    else
-      {exact_codes, inherited_codes} = split_by_precision(gall_ranges)
-      exact_set = MapSet.new(exact_codes)
-
-      %DisplayRange{
-        in_range: exact_codes,
-        inherited_range: Enum.reject(inherited_codes, &MapSet.member?(exact_set, &1))
+  def get_display_range_for_taxa(taxon_ids) when is_list(taxon_ids) do
+    from(hr in HostRange,
+      join: p in Place,
+      on: hr.place_id == p.id,
+      where: hr.taxon_id in ^taxon_ids,
+      distinct: true,
+      select: %{
+        code: p.code,
+        precision: hr.precision,
+        place_id: p.id,
+        distribution_type: hr.distribution_type
       }
-    end
+    )
+    |> Repo.all()
+    |> compute_display_range(with_introduced: true)
   end
 
   @doc """
-  Gets display range data for a host species, expanding country-level ranges.
-
-  Returns `%{in_range: [codes], inherited_range: [codes]}`.
+  The place codes of plant taxa's `host_range` rows as stored (a
+  country-level row is its country's code), by `host_range.taxon_id`, each
+  taxon's codes sorted; taxa without rows are left out.
   """
-  @spec get_display_range_for_host(integer()) :: DisplayRange.t()
-  def get_display_range_for_host(host_species_id) do
-    host_ranges = get_places_for_host_with_precision(host_species_id)
-    compute_display_range(host_ranges, with_introduced: true)
+  @spec get_places_for_taxa([integer()]) :: %{integer() => [String.t()]}
+  def get_places_for_taxa([]), do: %{}
+
+  def get_places_for_taxa(taxon_ids) when is_list(taxon_ids) do
+    from(hr in HostRange,
+      join: p in Place,
+      on: hr.place_id == p.id,
+      where: hr.taxon_id in ^taxon_ids,
+      distinct: true,
+      order_by: [hr.taxon_id, p.code],
+      select: {hr.taxon_id, p.code}
+    )
+    |> Repo.all()
+    |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
   end
 
   # Splits host ranges into exact leaf codes and inherited leaf codes.
@@ -528,18 +387,6 @@ defmodule Gallformers.Ranges do
       on: gr.place_id == p.id,
       where: gr.species_id == ^gall_species_id,
       select: %{code: p.code, precision: gr.precision, place_id: p.id}
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets gall range place IDs for a gall species.
-  """
-  @spec get_gall_range_place_ids(integer()) :: [integer()]
-  def get_gall_range_place_ids(gall_species_id) do
-    from(gr in GallRange,
-      where: gr.species_id == ^gall_species_id,
-      select: gr.place_id
     )
     |> Repo.all()
   end
@@ -605,30 +452,6 @@ defmodule Gallformers.Ranges do
   # ============================================
   # Private helpers
   # ============================================
-
-  # Queries the gallhost table directly (string table name) to avoid a
-  # circular dependency on the Galls context.
-  defp get_host_species_ids_for_gall(gall_species_id) do
-    from(gh in "gallhost",
-      where: gh.gall_species_id == ^gall_species_id,
-      select: gh.host_species_id
-    )
-    |> Repo.all()
-  end
-
-  defp get_native_host_ranges_with_precision([]), do: []
-
-  defp get_native_host_ranges_with_precision(host_species_ids) do
-    from(hr in HostRange,
-      join: p in Place,
-      on: hr.place_id == p.id,
-      where: hr.species_id in ^host_species_ids,
-      where: hr.distribution_type == "native",
-      distinct: true,
-      select: %{code: p.code, precision: hr.precision, place_id: p.id}
-    )
-    |> Repo.all()
-  end
 
   # Deduplicates entries by place_id. Multiple TDWG botanical regions can map to
   # the same ISO place code (219 cases), so WCVP sync can produce the same

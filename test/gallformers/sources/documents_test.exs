@@ -29,11 +29,7 @@ defmodule Gallformers.Sources.DocumentsTest do
   defp sha256(bytes), do: :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
 
   defp changes_for(table) do
-    Repo.all(
-      from c in Carbonite.Change,
-        where: c.table_name == ^table,
-        preload: :transaction
-    )
+    Repo.all(from c in test_audit_changes(), where: c.table_name == ^table, preload: :transaction)
   end
 
   describe "store_document/3" do

@@ -17,7 +17,6 @@ defmodule Gallformers.Plants do
       Gallformers.Taxonomy,
       Gallformers.Places,
       Gallformers.Ranges,
-      Gallformers.Galls,
       Gallformers.TextMatch,
       Gallformers.Wcvp
     ],
@@ -25,14 +24,12 @@ defmodule Gallformers.Plants do
 
   import Ecto.Query
 
-  alias Gallformers.Galls.{GallHost, GallTraits}
   alias Gallformers.Places
   alias Gallformers.Plants.HostTraits
   alias Gallformers.Ranges
   alias Gallformers.Repo
-  alias Gallformers.Species.{Abundance, Species}
+  alias Gallformers.Species.Species
   alias Gallformers.Taxonomy
-  alias Gallformers.Taxonomy.TreeBuilder
   alias Gallformers.TextMatch
   alias Gallformers.Wcvp
 
@@ -43,88 +40,8 @@ defmodule Gallformers.Plants do
   end
 
   # ============================================
-  # Explore Tree
-  # ============================================
-
-  @doc """
-  Returns a hierarchical tree of host species organized by Family → Genus → Species.
-
-  ## Options
-  - `:key_style` - `:short` for `f-123` format (default), `:long` for `family-123` format
-  """
-  @spec get_hosts_tree(keyword()) :: [map()]
-  def get_hosts_tree(opts \\ []) do
-    fetch_host_tree_data()
-    |> TreeBuilder.build_tree("/host/", opts)
-  end
-
-  defp fetch_host_tree_data do
-    # Use recursive CTE to walk from genus up through any intermediate ranks
-    # (subfamily, tribe, etc.) to find the ancestor family. A direct parent_id
-    # join only works when genus is an immediate child of family.
-    {:ok, %{rows: rows}} =
-      Repo.query("""
-      WITH RECURSIVE genus_to_family AS (
-        SELECT g.id AS genus_id, g.name AS genus_name, g.description AS genus_description,
-               g.parent_id AS current_parent_id
-        FROM taxonomy g
-        WHERE g.type = 'genus'
-
-        UNION ALL
-
-        SELECT gf.genus_id, gf.genus_name, gf.genus_description, t.parent_id
-        FROM genus_to_family gf
-        JOIN taxonomy t ON t.id = gf.current_parent_id
-        WHERE t.type != 'family'
-      )
-      SELECT f.id, f.name, f.description,
-             gf.genus_id, gf.genus_name, gf.genus_description,
-             s.id, s.name, s.genus_placeholder
-      FROM genus_to_family gf
-      JOIN taxonomy f ON f.id = gf.current_parent_id AND f.type = 'family'
-      JOIN species_taxonomy st ON st.taxonomy_id = gf.genus_id
-      JOIN species s ON s.id = st.species_id AND s.taxoncode = 'plant'
-      WHERE f.description = 'Plant'
-      ORDER BY f.name, gf.genus_name, s.name
-      """)
-
-    Enum.map(rows, fn [fid, fname, fdesc, gid, gname, gdesc, sid, sname, sph] ->
-      %{
-        family_id: fid,
-        family_name: fname,
-        family_description: fdesc,
-        genus_id: gid,
-        genus_name: gname,
-        genus_description: gdesc,
-        species_id: sid,
-        species_name: sname,
-        species_genus_placeholder: sph,
-        undescribed: false
-      }
-    end)
-  end
-
-  # ============================================
   # Query Functions
   # ============================================
-
-  @doc """
-  Returns all host (plant) species ordered by name.
-  """
-  @spec list_hosts() :: [map()]
-  def list_hosts do
-    from(s in Species,
-      where: s.taxoncode == "plant",
-      order_by: s.name,
-      select: %{
-        id: s.id,
-        name: s.name,
-        taxoncode: s.taxoncode,
-        datacomplete: s.datacomplete
-      }
-    )
-    |> Repo.all()
-  end
 
   @doc """
   Returns paginated host species.
@@ -154,47 +71,6 @@ defmodule Gallformers.Plants do
     from(s in Species,
       where: s.taxoncode == "plant",
       select: count(s.id)
-    )
-    |> Repo.one()
-  end
-
-  @doc """
-  Gets a host species by ID.
-  """
-  @spec get_host(integer()) :: map() | nil
-  def get_host(id) do
-    from(s in Species,
-      left_join: a in Abundance,
-      on: s.abundance_id == a.id,
-      where: s.id == ^id and s.taxoncode == "plant",
-      select: %{
-        id: s.id,
-        name: s.name,
-        taxoncode: s.taxoncode,
-        datacomplete: s.datacomplete,
-        genus_placeholder: s.genus_placeholder,
-        abundance_id: s.abundance_id,
-        abundance_name: a.abundance,
-        inserted_at: s.inserted_at,
-        updated_at: s.updated_at
-      }
-    )
-    |> Repo.one()
-  end
-
-  @doc """
-  Gets a host species by name.
-  """
-  @spec get_host_by_name(String.t()) :: map() | nil
-  def get_host_by_name(name) do
-    from(s in Species,
-      where: s.name == ^name and s.taxoncode == "plant",
-      select: %{
-        id: s.id,
-        name: s.name,
-        taxoncode: s.taxoncode,
-        datacomplete: s.datacomplete
-      }
     )
     |> Repo.one()
   end
@@ -367,27 +243,6 @@ defmodule Gallformers.Plants do
     |> Repo.one()
   end
 
-  @doc """
-  Returns a host with all related data for admin editing.
-  """
-  @spec get_host_for_edit(integer()) :: map() | nil
-  def get_host_for_edit(id) do
-    host = get_host(id)
-
-    if host do
-      taxonomy = Taxonomy.get_taxonomy_for_species(id)
-      places = Ranges.get_places_for_host(id)
-      aliases = get_aliases_for_host(id)
-
-      host
-      |> Map.put(:taxonomy, taxonomy)
-      |> Map.put(:places, places)
-      |> Map.put(:aliases, aliases)
-    else
-      nil
-    end
-  end
-
   # ============================================
   # Host Traits
   # ============================================
@@ -518,15 +373,6 @@ defmodule Gallformers.Plants do
   @spec subscribe() :: :ok | {:error, term()}
   def subscribe do
     Phoenix.PubSub.subscribe(Gallformers.PubSub, @topic)
-  end
-
-  @doc """
-  Broadcasts a host change event.
-  """
-  @spec broadcast_change(map(), atom()) :: {:ok, map()}
-  def broadcast_change(host, event) do
-    Phoenix.PubSub.broadcast(Gallformers.PubSub, @topic, {event, host})
-    {:ok, host}
   end
 
   defp broadcast({:ok, host}, event) do
@@ -730,20 +576,6 @@ defmodule Gallformers.Plants do
   # ============================================
 
   @doc """
-  Gets aliases for a host species (names only).
-  """
-  @spec get_aliases_for_host(integer()) :: [String.t()]
-  def get_aliases_for_host(host_id) do
-    from(a in "alias",
-      join: als in "alias_species",
-      on: als.alias_id == a.id,
-      where: als.species_id == ^host_id,
-      select: a.name
-    )
-    |> Repo.all()
-  end
-
-  @doc """
   Gets aliases for a host with full details (id, name, type).
   """
   @spec get_aliases_for_host_full(integer()) :: [map()]
@@ -765,16 +597,6 @@ defmodule Gallformers.Plants do
           {:ok, Gallformers.Species.Alias.t()} | {:error, Ecto.Changeset.t()}
   def create_alias_for_host(host_id, alias_attrs) do
     Gallformers.Species.create_alias_for_species(host_id, alias_attrs)
-  end
-
-  @doc """
-  Removes an alias from a host.
-  Delegates to Species.remove_alias_from_species/2.
-  """
-  @spec remove_alias_from_host(integer(), integer()) ::
-          {:ok, map()} | {:error, Ecto.Changeset.t()}
-  def remove_alias_from_host(host_id, alias_id) do
-    Gallformers.Species.remove_alias_from_species(host_id, alias_id)
   end
 
   # ============================================
@@ -1308,50 +1130,5 @@ defmodule Gallformers.Plants do
       end)
 
     (native ++ introduced) |> Enum.reject(fn {id, _, _} -> is_nil(id) end)
-  end
-
-  # =====================================================================
-  # Gall associations — "what galls form on this host?"
-  # =====================================================================
-
-  @doc """
-  Gets all galls for a host species.
-
-  Returns a list of maps with gall info.
-  """
-  @spec get_galls_for_host(integer()) :: [map()]
-  def get_galls_for_host(host_species_id) do
-    from(h in GallHost,
-      join: s in Species,
-      on: h.gall_species_id == s.id,
-      left_join: gt in GallTraits,
-      on: gt.species_id == s.id,
-      where: h.host_species_id == ^host_species_id,
-      select: %{
-        id: s.id,
-        name: s.name,
-        undescribed: gt.undescribed,
-        datacomplete: s.datacomplete
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Gets gall counts for multiple host species in a single query (batch version).
-
-  Returns a map of host_species_id => count of galls.
-  """
-  @spec get_gall_counts_for_hosts([integer()]) :: %{integer() => integer()}
-  def get_gall_counts_for_hosts([]), do: %{}
-
-  def get_gall_counts_for_hosts(host_species_ids) do
-    from(h in GallHost,
-      where: h.host_species_id in ^host_species_ids,
-      group_by: h.host_species_id,
-      select: {h.host_species_id, count(h.id)}
-    )
-    |> Repo.all()
-    |> Enum.into(%{})
   end
 end

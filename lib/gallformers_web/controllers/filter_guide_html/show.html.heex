@@ -12,6 +12,7 @@
       <.jump_link href="#detachable">Detachable</.jump_link>
       <.jump_link href="#forms">Forms</.jump_link>
       <.jump_link href="#plant_part">Plant Part</.jump_link>
+      <.jump_link href="#season">Season</.jump_link>
       <.jump_link href="#shape">Shape</.jump_link>
       <.jump_link href="#texture">Texture</.jump_link>
       <.jump_link href="#walls">Walls</.jump_link>
@@ -33,31 +34,13 @@
         note="If multiple larvae are found in one space, these may be inquilines rather than gall-inducers."
       />
 
-      <%!-- Detachable (hardcoded values) --%>
-      <section id="detachable">
-        <h2 class="text-xl font-semibold text-gf-maroon mb-3 border-b border-gray-200 pb-2">
-          Detachable
-        </h2>
-        <dl class="space-y-2">
-          <div>
-            <dt class="inline font-medium text-gray-900">Yes</dt>
-            <dd class="inline text-gray-700">
-              – the gall could be removed from the plant without destroying the tissue it's attached to (detachable).
-            </dd>
-          </div>
-          <div>
-            <dt class="inline font-medium text-gray-900">No</dt>
-            <dd class="inline text-gray-700">
-              – the gall could only be removed from the plant by destroying the tissue it's attached to (integral).
-            </dd>
-          </div>
-        </dl>
-        <p class="mt-3 text-sm text-gray-600 italic">
-          Note: Galls that have detachable parts but leave some galled tissue behind (more than a scar
-          or blister), are only detachable in some parts of the season, or may be detachable or not, are
-          included in both terms.
-        </p>
-      </section>
+      <%!-- Detachable --%>
+      <.filter_section
+        id="detachable"
+        title="Detachable"
+        items={sort_by_field(@filter_fields.detachable)}
+        note="Filtering for integral or detachable also finds the galls recorded as both."
+      />
 
       <%!-- Forms --%>
       <.filter_section id="forms" title="Forms" items={sort_by_field(@filter_fields.form)} />
@@ -67,6 +50,14 @@
         id="plant_part"
         title="Plant Part"
         items={sort_by_field(@filter_fields.plant_part)}
+      />
+
+      <%!-- Season --%>
+      <.filter_section
+        id="season"
+        title="Season"
+        items={@filter_fields.season}
+        note="When the gall forms and grows. Not when it is seen or found, and not when the inducer emerges."
       />
 
       <%!-- Shape --%>

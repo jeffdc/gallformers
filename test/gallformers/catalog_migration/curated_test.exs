@@ -15,6 +15,8 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
   import Gallformers.CatalogFixtures, only: [gallformers_source: 0]
   import Gallformers.OldModelFixtures
 
+  alias Gallformers.Articles
+  alias Gallformers.Articles.Article
   alias Gallformers.Catalog
   alias Gallformers.Catalog.Gall
   alias Gallformers.CatalogMigration
@@ -35,9 +37,10 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
     kingdoms: {"kingdoms.csv", "old_taxonomy_id,kingdom,note"}
   }
 
-  # The seeds' Gall 101 has an introduced-only host region outside its
-  # stored range; every run here decides it.
-  @seed_ranges ["101,introduced,ignore,"]
+  # The seeds' own decisions, as `make test-db` converts them (Gall 101's
+  # introduced-only host region, Gall 300's scientific alias): every decision
+  # file here starts with them, so the seeds' rows are never pending.
+  @seed_decisions Path.expand("../../support/fixtures/catalog_migration", __DIR__)
 
   setup do
     dir = Path.join(System.tmp_dir!(), "curated_test_#{System.unique_integer([:positive])}")
@@ -45,17 +48,17 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
     on_exit(fn -> File.rm_rf(dir) end)
 
     ctx = %{old: old_catalog_fixture(), dir: dir}
-    curated!(ctx, :range_decisions, @seed_ranges)
-
-    for input <- [:non_galls, :aliases, :keys, :taxon_merges, :kingdoms],
-        do: curated!(ctx, input, [])
-
+    for input <- Map.keys(@files), do: curated!(ctx, input, [])
     ctx
   end
 
   defp curated!(ctx, input, rows) do
     {file, header} = Map.fetch!(@files, input)
-    File.write!(Path.join(ctx.dir, file), Enum.join([header | rows], "\n") <> "\n")
+
+    [^header | seeds] =
+      @seed_decisions |> Path.join(file) |> File.read!() |> String.split("\n", trim: true)
+
+    File.write!(Path.join(ctx.dir, file), Enum.join([header | seeds ++ rows], "\n") <> "\n")
   end
 
   defp run(ctx, opts \\ []) do
@@ -117,11 +120,58 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
       assert Enum.reject(report.reconciliation, &Report.balanced?/1) == []
     end
 
+    test "an excluded non-gall's old URL redirects to the gall-lookalikes Article", ctx do
+      curated!(ctx, :non_galls, ["#{ctx.lookalike},Fixturella lookalike,exclude,lookalike"])
+
+      report = run!(ctx)
+
+      assert Enum.filter([ctx.lookalike, ctx.old.agamic], &Catalog.non_gall?/1) ==
+               [ctx.lookalike]
+
+      entry =
+        Enum.find(
+          report.reconciliation,
+          &(&1.label == "Non-gall URLs (→ the gall-lookalikes Article)")
+        )
+
+      assert {entry.old, entry.new} == {1, 1}
+
+      # A second run rebuilds the rows, not adding to them.
+      run!(ctx)
+
+      assert Repo.all(from(r in "non_gall_redirects", select: {r.species_id, r.name})) ==
+               [{ctx.lookalike, "Fixturella lookalike"}]
+    end
+
+    test "the gall-lookalikes Article is created, published, only when missing", ctx do
+      curated!(ctx, :non_galls, ["#{ctx.lookalike},Fixturella lookalike,exclude,lookalike"])
+      Repo.delete_all(from(a in Article, where: a.slug == "gall-lookalikes"))
+
+      report = run!(ctx)
+
+      assert %Article{is_published: true, content: placeholder} =
+               Articles.get_article_by_slug("gall-lookalikes")
+
+      assert placeholder =~ "look like galls"
+      assert {"gall-lookalikes Article created", 1} in report.counts
+
+      {:ok, _} =
+        Articles.update_article(Articles.get_article_by_slug("gall-lookalikes"), %{
+          content: "Written by the curators."
+        })
+
+      report = run!(ctx)
+
+      assert Articles.get_article_by_slug("gall-lookalikes").content == "Written by the curators."
+      assert {"gall-lookalikes Article created", 0} in report.counts
+    end
+
     test "a non-gall marked migrate is migrated", ctx do
       curated!(ctx, :non_galls, ["#{ctx.lookalike},Fixturella lookalike,migrate,"])
 
       assert run!(ctx).pending == []
       assert %Gall{} = Catalog.get_gall(ctx.lookalike)
+      refute Catalog.non_gall?(ctx.lookalike)
     end
 
     test "an unknown decision is an error naming the row", ctx do
@@ -278,19 +328,14 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
       gallformers = gallformers_source()
       g = ctx.g
 
-      curated!(
-        ctx,
-        :range_decisions,
-        @seed_ranges ++
-          [
-            "#{g.removed},removed,exclude,removed by a curator",
-            "*,host_added_later,ignore,",
-            "#{g.widened},host_range_widened,ignore,",
-            "#{g.introduced},introduced,exclude,",
-            "#{g.outside},outside,ignore,",
-            "#{g.none},no_host_range,only,"
-          ]
-      )
+      curated!(ctx, :range_decisions, [
+        "#{g.removed},removed,exclude,removed by a curator",
+        "*,host_added_later,ignore,",
+        "#{g.widened},host_range_widened,ignore,",
+        "#{g.introduced},introduced,exclude,",
+        "#{g.outside},outside,ignore,",
+        "#{g.none},no_host_range,only,"
+      ])
 
       report = run!(ctx)
       assert report.pending == []
@@ -352,7 +397,7 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
     end
 
     test "a decision the cause cannot take is an error naming the row", ctx do
-      curated!(ctx, :range_decisions, @seed_ranges ++ ["#{ctx.g.removed},removed,only,"])
+      curated!(ctx, :range_decisions, ["#{ctx.g.removed},removed,only,"])
 
       assert {:error, message} = run(ctx)
       assert message =~ "range_decisions.csv row 3"
@@ -361,7 +406,7 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
     test "include is no decision for any cause: a Gall's range never leaves its Hosts'", ctx do
       for cause <-
             ~w(removed host_added_later host_range_widened introduced outside no_host_range) do
-        curated!(ctx, :range_decisions, @seed_ranges ++ ["#{ctx.g.outside},#{cause},include,"])
+        curated!(ctx, :range_decisions, ["#{ctx.g.outside},#{cause},include,"])
 
         assert {:error, message} = run(ctx)
         assert message =~ "range_decisions.csv row 3"
@@ -567,7 +612,7 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
 
     defp alias_facts do
       Old.rows("""
-      SELECT af.gall_id, af.name, a.source_id
+      SELECT af.gall_id, af.name, af.kind, a.source_id
       FROM alias_facts af JOIN attributions a ON a.fact_id = af.fact_id
       ORDER BY af.gall_id, af.name
       """)
@@ -630,11 +675,36 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
 
       legacy = Gallformers.Sources.get_source_by_title("Gallformers legacy data").id
 
+      # The seeds' gall aliases too (Galls 100, 300 and 304). The decision
+      # is the alias Fact's kind.
       assert [
-               %{gall_id: 100, name: "Oak Apple Gall Wasp", source_id: ^legacy},
-               %{gall_id: agamic, name: "Fixture apple gall", source_id: ^legacy},
-               %{gall_id: sexgen, name: "FXQ-12", source_id: ^legacy},
-               %{gall_id: undescribed, name: "q-alba-old-label", source_id: ^legacy}
+               %{
+                 gall_id: 100,
+                 name: "Oak Apple Gall Wasp",
+                 kind: "common_name",
+                 source_id: ^legacy
+               },
+               %{gall_id: 300, name: "seed oak apple", kind: "common_name", source_id: ^legacy},
+               %{
+                 gall_id: 304,
+                 name: "Andricus q-seed-old-label",
+                 kind: "former_label",
+                 source_id: ^legacy
+               },
+               %{gall_id: 304, name: "q-seed-code", kind: "code", source_id: ^legacy},
+               %{
+                 gall_id: agamic,
+                 name: "Fixture apple gall",
+                 kind: "common_name",
+                 source_id: ^legacy
+               },
+               %{gall_id: sexgen, name: "FXQ-12", kind: "code", source_id: ^legacy},
+               %{
+                 gall_id: undescribed,
+                 name: "q-alba-old-label",
+                 kind: "former_label",
+                 source_id: ^legacy
+               }
              ] = alias_facts()
 
       assert {agamic, sexgen, undescribed} == {o.agamic, o.sexgen, o.undescribed}
@@ -642,7 +712,7 @@ defmodule Gallformers.CatalogMigration.CuratedTest do
       assert "Fixture oak" in Enum.map(Taxa.list_common_names(o.alba), & &1.name)
       assert "White Oak" in Enum.map(Taxa.list_common_names(1), & &1.name)
 
-      assert %{old: 4, new: 4} =
+      assert %{old: 7, new: 7} =
                Enum.find(report.reconciliation, &(&1.label =~ "Gall alias Facts"))
     end
 

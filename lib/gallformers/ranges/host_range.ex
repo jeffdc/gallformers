@@ -23,6 +23,9 @@ defmodule Gallformers.Ranges.HostRange do
     belongs_to :place, Gallformers.Places.Place
     field :precision, :string, default: "exact"
     field :distribution_type, :string, default: "native"
+    # The plant taxon the row belongs to, filled by the catalog data
+    # migration beside `species_id`; read-only here.
+    field :taxon_id, :integer
   end
 
   @impl Gallformers.SchemaFields

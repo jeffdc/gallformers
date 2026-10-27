@@ -6,7 +6,7 @@ defmodule GallformersWeb.API.SourceController do
   use GallformersWeb, :controller
   use OpenApiSpex.ControllerSpecs
 
-  alias Gallformers.Sources
+  alias Gallformers.{Catalog, Sources}
   alias GallformersWeb.Schemas
 
   tags(["Sources"])
@@ -74,7 +74,10 @@ defmodule GallformersWeb.API.SourceController do
 
   operation(:show,
     summary: "Get a source",
-    description: "Gets a single source by ID with its species",
+    description:
+      "Gets a single source by ID with the galls it speaks of (`species`): those it cites, " <>
+        "has a Gallformers note on, or is the source of a fact about. Each gall's " <>
+        "`description` is the citation's text or the note's, when there is one.",
     parameters: [
       id: [in: :path, type: :integer, description: "Source ID", required: true]
     ],
@@ -103,7 +106,7 @@ defmodule GallformersWeb.API.SourceController do
             |> json(%{error: "Source not found"})
 
           source ->
-            species = Sources.get_species_for_source(id)
+            galls = id |> Catalog.list_galls_for_source() |> Catalog.add_citations(id)
 
             json(conn, %{
               id: source.id,
@@ -114,13 +117,13 @@ defmodule GallformersWeb.API.SourceController do
               citation: source.citation,
               datacomplete: source.datacomplete,
               species:
-                Enum.map(species, fn s ->
+                Enum.map(galls, fn g ->
                   %{
-                    id: s.id,
-                    name: s.name,
-                    taxoncode: s.taxoncode,
-                    description: s.description,
-                    externallink: s.externallink
+                    id: g.id,
+                    name: g.name,
+                    taxoncode: "gall",
+                    description: g.description,
+                    externallink: g.externallink
                   }
                 end)
             })

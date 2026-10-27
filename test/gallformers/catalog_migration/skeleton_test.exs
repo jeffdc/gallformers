@@ -170,6 +170,22 @@ defmodule Gallformers.CatalogMigration.SkeletonTest do
     refute Taxa.get_taxon(ctx.old.spp)
   end
 
+  test "plants keep their data-complete flag and abundance, reconciled in the report", ctx do
+    report = run!()
+
+    alba = Taxa.get_taxon!(ctx.old.alba)
+    rubra = Taxa.get_taxon!(ctx.old.rubra)
+
+    assert {alba.datacomplete, alba.abundance_id} == {true, 2}
+    assert {rubra.datacomplete, rubra.abundance_id} == {false, nil}
+
+    for label <- ["Data-complete plants", "Plants with an abundance"] do
+      assert %{} = entry = Enum.find(report.reconciliation, &(&1.label == label)), label
+      assert Report.balanced?(entry), label
+      assert entry.new >= 1, label
+    end
+  end
+
   test "a placeholder's range rows land on its genus", ctx do
     run!()
 
@@ -191,6 +207,24 @@ defmodule Gallformers.CatalogMigration.SkeletonTest do
              ])
   end
 
+  test "a genus placeholder's species ID maps to its genus, for its old /host/:id URL", ctx do
+    report = run!()
+
+    genus = taxon_named("Fixturquercus", :genus)
+    assert Taxa.get_by_legacy_id(:genus_placeholder, ctx.old.spp).id == genus.id
+    assert Taxa.get_by_legacy_id(:genus_placeholder, ctx.old.alba) == nil
+
+    entry =
+      Enum.find(
+        report.reconciliation,
+        &(&1.label == "Genus placeholder URLs (→ their genus page)")
+      )
+
+    # Every placeholder here has a genus: all of them are mapped.
+    assert entry.new == entry.old
+    assert entry.new >= 1
+  end
+
   test "the crosswalk maps old taxonomy IDs", ctx do
     run!()
 
@@ -207,6 +241,65 @@ defmodule Gallformers.CatalogMigration.SkeletonTest do
     assert Taxa.get_by_legacy_id(:taxonomy, 35).id == cynipidae.id
     assert Taxa.get_by_legacy_id(:taxonomy, ctx.old.unknown_family) == nil
     assert Taxa.get_by_legacy_id(:taxonomy, ctx.old.unknown_genus) == nil
+  end
+
+  test "descriptions below family become common names; family types and placeholders' do not" do
+    family = taxonomy!(880_060, "Fixturulmaceae", "family", description: "Plant")
+
+    genus =
+      taxonomy!(880_061, "Fixturulmus", "genus", parent: family, description: " Fixture elms ")
+
+    section =
+      taxonomy!(880_062, "Fixturulmus sect. Fixturae", "section",
+        parent: genus,
+        description: "Fixture field elms"
+      )
+
+    blank = taxonomy!(880_063, "Fixturceltis", "genus", parent: family, description: "  ")
+
+    tribe =
+      taxonomy!(880_064, "Fixturini", "intermediate",
+        rank: "Tribe",
+        parent: 31,
+        description: "Fixture gall wasps"
+      )
+
+    taxonomy!(880_065, "Unknown (Fixturini)", "genus",
+      parent: 30,
+      placeholder: true,
+      description: "Placeholder genus for undescribed species"
+    )
+
+    report = run!()
+
+    names = fn old_id ->
+      :taxonomy
+      |> Taxa.get_by_legacy_id(old_id)
+      |> Taxa.list_common_names()
+      |> Enum.map(& &1.name)
+    end
+
+    assert names.(genus) == ["Fixture elms"]
+    assert names.(section) == ["Fixture field elms"]
+    assert names.(tribe) == ["Fixture gall wasps"]
+    assert names.(blank) == []
+    assert names.(family) == []
+    # The placeholder's crosswalk entry is its family, which gets no name from it.
+    assert names.(30) == []
+
+    entry =
+      Enum.find(
+        report.reconciliation,
+        &(&1.label == "Taxonomy descriptions below family (→ common names)")
+      )
+
+    assert entry.old == entry.new + Enum.sum(Enum.map(entry.accounted, &elem(&1, 1)))
+    assert entry.new >= 3
+
+    assert {"placeholder genera (no taxon)", placeholders} =
+             List.keyfind(entry.accounted, "placeholder genera (no taxon)", 0)
+
+    assert placeholders >= 1
   end
 
   test "species rows that are neither galls nor plants are reported, not migrated" do

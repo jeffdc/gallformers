@@ -6,6 +6,9 @@ defmodule GallformersWeb.TaxonomyURL do
   section, intermediate) should call through this module. This ensures
   the URL scheme is defined in one place and is changeable in one place.
   """
+  alias Gallformers.Taxa
+  alias Gallformers.Taxa.Taxon
+  alias Gallformers.Taxa.TreeBuilder
 
   @doc """
   Returns the public URL path for a taxonomy record, or nil if the
@@ -34,7 +37,23 @@ defmodule GallformersWeb.TaxonomyURL do
       when rank not in [nil, ""],
       do: "/#{String.downcase(rank)}/#{URI.encode(name)}"
 
+  # A taxon (`Gallformers.Taxa`): its rank is an atom.
+  def public_path(%{rank: rank, name: name}) when is_atom(rank),
+    do: TreeBuilder.rank_path(rank, name)
+
   def public_path(_), do: nil
+
+  @doc """
+  The old taxonomy ID in a numeric rank-page URL (`/genus/33`), mapped to
+  its taxon's page through the crosswalk
+  (`Gallformers.Taxa.get_by_legacy_id/2`), or nil.
+  """
+  @spec legacy_path(String.t()) :: String.t() | nil
+  def legacy_path(id_str) do
+    with %Taxon{} = taxon <- Taxa.get_by_legacy_id(:taxonomy, String.to_integer(id_str)) do
+      public_path(%{rank: taxon.rank, name: Taxa.accepted_name(taxon)})
+    end
+  end
 
   @doc """
   Returns true if the string looks like a numeric ID (digits only).

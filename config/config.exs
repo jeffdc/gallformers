@@ -14,7 +14,9 @@ config :gallformers,
 config :gallformers, Oban,
   repo: Gallformers.Repo,
   # import: one package at a time (Gallformers.Import.Worker).
-  queues: [default: 10, maintenance: 5, import: 1],
+  # catalog: the ID tool's lookup-table refreshes
+  # (Gallformers.Catalog.ReadModels.GallIndexWorker).
+  queues: [default: 10, maintenance: 5, import: 1, catalog: 5],
   plugins: [
     {Oban.Plugins.Pruner, max_age: 7 * 24 * 60 * 60},
     Oban.Plugins.Reindexer,
@@ -115,6 +117,11 @@ config :gallformers, :private_storage, bucket: "gallformers-private"
 # change's transaction. Registered here so Taxa never references its
 # listeners.
 config :gallformers, Gallformers.Taxa.Events, listeners: [Gallformers.Catalog.TaxonListener]
+
+# "Facts changed" listeners, called inside each attribution write's
+# transaction with the Facts whose standing changed. Registered here so
+# Facts never references its listeners.
+config :gallformers, Gallformers.Facts.Events, listeners: [Gallformers.Catalog.FactListener]
 
 # Configure Ueberauth for Auth0 authentication
 # Client ID and secret are set in runtime.exs from environment variables

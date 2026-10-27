@@ -29,16 +29,8 @@ defmodule Gallformers.Images do
   alias Gallformers.Storage.Images, as: ImageStorage
   alias Gallformers.TextMatch
 
-  # Accepted MIME types for upload
-  @accepted_types ~w(image/jpeg image/png image/jpg)
   @species_variant_sizes [small: 300, medium: 800, large: 1200, xlarge: 2000]
   @species_variant_names [:original | Keyword.keys(@species_variant_sizes)]
-
-  @doc """
-  Returns the list of accepted MIME types for image upload.
-  """
-  @spec accepted_types() :: [String.t()]
-  def accepted_types, do: @accepted_types
 
   @doc """
   Returns the configured species image variant sizes.
@@ -68,6 +60,52 @@ defmodule Gallformers.Images do
       preload: [source: src]
     )
     |> Repo.all()
+  end
+
+  @doc """
+  Gets a Gall's images (by `image.gall_id`, the typed reference the catalog
+  data migration fills), ordered by sort_order.
+  """
+  @spec list_images_for_gall(integer()) :: [ImageSchema.t()]
+  def list_images_for_gall(gall_id) when is_integer(gall_id) do
+    gall_id |> images_by(:gall_id) |> Repo.all()
+  end
+
+  @doc """
+  Gets a taxon's images (by `image.taxon_id`, the typed reference the
+  catalog data migration fills), ordered by sort_order.
+  """
+  @spec list_images_for_taxon(integer()) :: [ImageSchema.t()]
+  def list_images_for_taxon(taxon_id) when is_integer(taxon_id) do
+    taxon_id |> images_by(:taxon_id) |> Repo.all()
+  end
+
+  @doc """
+  Each Gall's default image ID (its first by sort_order, as
+  `list_images_for_gall/1` orders them), by Gall ID, in one query. Galls
+  without images are left out.
+  """
+  @spec default_image_ids_for_galls([integer()]) :: %{integer() => integer()}
+  def default_image_ids_for_galls([]), do: %{}
+
+  def default_image_ids_for_galls(gall_ids) when is_list(gall_ids) do
+    from(i in ImageSchema,
+      where: i.gall_id in ^gall_ids,
+      distinct: i.gall_id,
+      order_by: [asc: i.gall_id, asc: i.sort_order, asc: i.id],
+      select: {i.gall_id, i.id}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
+  defp images_by(id, field) do
+    from(i in ImageSchema,
+      left_join: src in assoc(i, :source),
+      where: field(i, ^field) == ^id,
+      order_by: [asc: i.sort_order, asc: i.id],
+      preload: [source: src]
+    )
   end
 
   @doc """
@@ -267,38 +305,6 @@ defmodule Gallformers.Images do
   end
 
   @doc """
-  Deletes multiple images by IDs for a species.
-  """
-  @spec delete_images(integer(), [integer()]) :: {:ok, integer()} | {:error, term()}
-  def delete_images(species_id, image_ids) when is_list(image_ids) do
-    images =
-      from(i in ImageSchema,
-        where: i.species_id == ^species_id and i.id in ^image_ids
-      )
-      |> Repo.all()
-
-    # Delete from S3 first
-    s3_results =
-      images
-      |> Enum.map(fn image ->
-        ImageStorage.delete_content_image(image.path, species_variant_names())
-      end)
-      |> Enum.filter(fn result -> result != :ok end)
-
-    if s3_results == [] do
-      {count, _} =
-        from(i in ImageSchema,
-          where: i.species_id == ^species_id and i.id in ^image_ids
-        )
-        |> Repo.delete_all()
-
-      {:ok, count}
-    else
-      {:error, {:s3_errors, s3_results}}
-    end
-  end
-
-  @doc """
   Reorders images for a species.
 
   Takes a list of image IDs in the desired order. Persists the sort_order
@@ -347,47 +353,41 @@ defmodule Gallformers.Images do
   # =============================================================================
 
   @doc """
-  Gets all images for a source, ordered by species name.
+  Gets all images for a source, ordered by the name of what each shows: its
+  Gall's display name or its taxon's accepted name.
+
+  Reads the `galls` and `taxon_names` tables by name: the Catalog and Taxa
+  call this context, so it cannot depend on them.
   """
   @spec list_images_for_source(integer()) :: [ImageSchema.t()]
   def list_images_for_source(source_id) do
     from(i in ImageSchema,
       join: src in assoc(i, :source),
-      left_join: sp in Species,
-      on: i.species_id == sp.id,
+      left_join: g in "galls",
+      on: g.id == i.gall_id,
+      left_join: n in "taxon_names",
+      on: n.taxon_id == i.taxon_id and n.status == "accepted",
       where: i.source_id == ^source_id,
-      order_by: [asc: sp.name, asc: i.id],
+      order_by: [
+        asc: fragment("COALESCE(?, ?, ?)", g.name_override, g.name, n.name),
+        asc: i.id
+      ],
       preload: [source: src]
     )
     |> Repo.all()
   end
 
   @doc """
-  Returns the total count of images in the database.
+  Returns the count of images of Galls and taxa (`gall_id` or `taxon_id`
+  set); images left on excluded non-galls have neither and are not counted.
   """
   @spec count_images() :: integer()
   def count_images do
-    from(i in ImageSchema, select: count(i.id))
-    |> Repo.one()
-  end
-
-  @doc """
-  Lists all species that have images, with their image counts.
-  """
-  @spec list_species_with_images() :: [map()]
-  def list_species_with_images do
     from(i in ImageSchema,
-      join: s in Species,
-      on: i.species_id == s.id,
-      group_by: [s.id, s.name],
-      select: %{
-        species_id: s.id,
-        species_name: s.name,
-        image_count: count(i.id)
-      },
-      order_by: s.name
+      where: not is_nil(i.gall_id) or not is_nil(i.taxon_id),
+      select: count(i.id)
     )
-    |> Repo.all()
+    |> Repo.one()
   end
 
   @doc """

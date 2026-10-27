@@ -62,6 +62,14 @@ defmodule Gallformers.CatalogMigration.LegacyFacts do
 
   @type plan :: %{source_id: integer(), assertions: [assertion()]}
 
+  @doc """
+  The old Trait vocabulary tables: `{trait, table, value column}`, each
+  table's rows matched to the Trait's values by name (its join table is
+  `gall_<table>`).
+  """
+  @spec trait_tables() :: [{String.t(), String.t(), String.t()}]
+  def trait_tables, do: @trait_tables
+
   @doc "The legacy Source's title."
   @spec title() :: String.t()
   def title, do: @title

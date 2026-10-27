@@ -13,8 +13,9 @@ Use `Oban` for durable, retryable, or scheduled background work. Reserve plain `
 
 Tests use a **separate PostgreSQL test database** (`gallformers_test`) that is:
 - **Schema-only**: Created via Ecto migrations (no production data)
-- **Minimal seed data**: Loaded from `priv/repo/test_seeds.sql` with just enough data for tests
-- **Rebuilt fresh**: `make test` rebuilds the test DB before each run
+- **Minimal seed data**: Loaded from `priv/repo/test_seeds.sql` with just enough data for tests. The seeds fill the old tables; the catalog migration (`mix gallformers.catalog.migrate --curated test/support/fixtures/catalog_migration --no-s3`) then converts them into the new tables (Galls, taxa, Facts), so both exist. Add a test case by adding old-style seed rows; their curated decisions go in `test/support/fixtures/catalog_migration/`.
+- **Rebuilt fresh**: `make test` rebuilds the test DB before each run (CI runs the same steps)
+- **Higher-taxon IDs are not stable** in the converted data: look taxa up with `Gallformers.Taxa.get_by_legacy_id/2`, not by hard-coded ID. Gall and plant IDs keep their seed IDs.
 
 ```bash
 make test-db               # Rebuild test database manually (rarely needed)
@@ -38,6 +39,7 @@ See **[CODING_STANDARDS.md](./CODING_STANDARDS.md)** for details as needed.
 
 - **[docs/domain/domain-model.md](docs/domain/domain-model.md)** records the **domain language** being discovered for the redesign (galls, organisms, Sources, Observations). It is about the domain, not software, and is **not yet implemented**. The software design draft lives in matter `8567`.
 - **The current code and database** follow [docs/domain/general.md](docs/domain/general.md) and [docs/domain/admin-domain-reference.md](docs/domain/admin-domain-reference.md) ("everything is a species") until the taxonomy migration (matter `8567`).
+- **On the `taxogall` branch** the new back-end lives beside the old one: `Catalog`, `Taxa`, `Facts`, `Import`, `Audit` and the extended `Sources` (schema in matter `9449`, program punchlist in `50ff`). Public pages are being re-pointed onto it one at a time (matter `803b`); the old admin still writes the old tables until it is replaced.
 - Don't use the target model to explain current code, or the current docs to design new work.
 
 ## Work Tracking & Planning

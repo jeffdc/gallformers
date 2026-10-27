@@ -49,19 +49,6 @@ defmodule Gallformers.GallsIdentificationTest do
     })
   end
 
-  describe "get_summary_data/1" do
-    test "returns filter data for given gall_ids" do
-      # Empty list returns empty map
-      assert Galls.get_summary_data([]) == %{}
-    end
-
-    test "returns map keyed by gall_id with filter values" do
-      # Test with non-existent IDs should return empty map
-      result = Galls.get_summary_data([99_999, 99_998])
-      assert result == %{} or is_map(result)
-    end
-  end
-
   describe "filter_galls genus+place interaction" do
     test "genus + place returns galls that occur in the place and have hosts in the genus" do
       # Gall 100 is on T. alpinus (GenusAlpha) AND M. arvensis (GenusBeta).
@@ -367,7 +354,7 @@ defmodule Gallformers.GallsIdentificationTest do
     end
   end
 
-  describe "count_filtered_galls/1" do
+  describe "filter_galls genus and family filters" do
     test "respects genus filter" do
       # Create two galls with hosts in different genera
       genus_a = create_taxonomy("TestGenusA", "genus")
@@ -387,9 +374,9 @@ defmodule Gallformers.GallsIdentificationTest do
       create_gall_traits(gall_b.id)
       create_gall_host(gall_b.id, host_b.id)
 
-      # count_filtered_galls with genus_a should only count gall_a
-      count = Galls.count_filtered_galls(%{genus_id: genus_a.id})
-      assert count == 1, "expected 1 gall for genus_a, got #{count}"
+      # filter_galls with genus_a should only find gall_a
+      ids = Enum.map(Galls.filter_galls(%{genus_id: genus_a.id}), & &1.id)
+      assert ids == [gall_a.id], "expected only gall_a for genus_a, got #{inspect(ids)}"
     end
 
     test "respects family filter" do
@@ -405,8 +392,8 @@ defmodule Gallformers.GallsIdentificationTest do
       create_gall_traits(other_gall.id)
       # No taxonomy link for other_gall
 
-      count = Galls.count_filtered_galls(%{family_id: family.id})
-      assert count == 1, "expected 1 gall for family, got #{count}"
+      ids = Enum.map(Galls.filter_galls(%{family_id: family.id}), & &1.id)
+      assert ids == [gall.id], "expected only the gall in the family, got #{inspect(ids)}"
     end
   end
 

@@ -8,8 +8,9 @@ defmodule Gallformers.CatalogMigration.NonGalls do
 
     * `exclude` — not migrated: no Gall, so nothing hangs off it (Hosts,
       Traits, citations, notes and images are reported as not on a Gall).
-      The file is the record of the excluded IDs, for the redirect of their
-      old `/gall/:id` URLs to the gall-lookalikes Article (`b5bd` M3).
+      Each is recorded in `non_gall_redirects`
+      (`Gallformers.Catalog.NonGallRedirect`), for the redirect of its old
+      `/gall/:id` URL to the gall-lookalikes Article (`b5bd` M3).
     * `migrate` — migrated like any gall row (it is a gall after all).
 
   Any gall row may be excluded, flagged or not. A flagged row with no
@@ -17,6 +18,8 @@ defmodule Gallformers.CatalogMigration.NonGalls do
   The worksheet (`"non_galls"`) lists every flagged or decided row.
   """
 
+  alias Gallformers.Audit.Actor
+  alias Gallformers.Catalog
   alias Gallformers.CatalogMigration.Curated
   alias Gallformers.CatalogMigration.Old
   alias Gallformers.CatalogMigration.Report
@@ -55,10 +58,13 @@ defmodule Gallformers.CatalogMigration.NonGalls do
 
   @doc """
   The gall rows not to migrate (the decided exclusions), with the worksheet,
-  pending rows and counts added to the report.
+  pending rows and counts added to the report. Each exclusion is recorded,
+  as `actor`, for the redirect of its old URL
+  (`Gallformers.Catalog.insert_non_gall_redirects/2`).
   """
-  @spec run(%{integer() => decision()}, Report.t()) :: {MapSet.t(integer()), Report.t()}
-  def run(decisions, report) do
+  @spec run(Actor.t(), %{integer() => decision()}, Report.t()) ::
+          {MapSet.t(integer()), Report.t()}
+  def run(actor, decisions, report) do
     flagged = flagged()
     flagged_ids = MapSet.new(flagged, & &1.id)
     names = galls_named(Enum.uniq(Map.keys(decisions) ++ Enum.map(flagged, & &1.id)))
@@ -94,12 +100,23 @@ defmodule Gallformers.CatalogMigration.NonGalls do
         problem
       end
 
+    {:ok, redirects} =
+      Catalog.insert_non_gall_redirects(
+        actor,
+        for(id <- Enum.sort(excluded), do: %{species_id: id, name: names[id]})
+      )
+
     report =
       report
       |> Report.curation("non_galls", @columns, rows)
       |> Report.pending(@input, pending)
       |> Report.count("Gall rows with the form non-gall", length(flagged))
       |> Report.count("Gall rows excluded as non-galls (non_galls.csv)", MapSet.size(excluded))
+      |> Report.reconcile(
+        "Non-gall URLs (→ the gall-lookalikes Article)",
+        MapSet.size(excluded),
+        redirects
+      )
       |> Report.problems("non_galls.csv", stale)
 
     {excluded, report}

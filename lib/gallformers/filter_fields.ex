@@ -100,15 +100,6 @@ defmodule Gallformers.FilterFields do
   end
 
   @doc """
-  Gets a single item by id for the given filter type.
-  Returns nil if not found.
-  """
-  def get(filter_type, id) when filter_type in @filter_types do
-    schema = schema_for(filter_type)
-    Repo.get(schema, id)
-  end
-
-  @doc """
   Creates a new item for the given filter type.
   """
   def create(filter_type, attrs) when filter_type in @filter_types do

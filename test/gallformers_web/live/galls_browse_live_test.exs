@@ -1,10 +1,22 @@
 defmodule GallformersWeb.GallsBrowseLiveTest do
   @moduledoc """
-  LiveView tests for the public Galls browse page at /galls.
+  LiveView tests for the public Galls browse page at /galls, which reads
+  `Gallformers.Catalog.gall_tree/0` and `undescribed_gall_tree/0`.
+
+  Uses the converted seeds (`priv/repo/test_seeds.sql`): Cynipidae (old
+  taxonomy 30) holds Andricus, Cynips and Neuroterus with their Galls; Gall
+  304 is undescribed (its Inducer is the genus Andricus).
   """
   use GallformersWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
+
+  # Reading the seeds, converted, is most of what this module tests.
+  # credo:disable-for-this-file Gallformers.Credo.Checks.TestQuality.TestsOwnTheirData
+
+  alias Gallformers.Taxa
+
+  defp family_key(old_id), do: "f-#{Taxa.get_by_legacy_id(:taxonomy, old_id).id}"
 
   describe "/galls page" do
     test "renders the galls browse page with tree", %{conn: conn} do
@@ -24,10 +36,26 @@ defmodule GallformersWeb.GallsBrowseLiveTest do
 
       html =
         view
-        |> element(~s{button[phx-click="toggle_node"][phx-value-key="f-30"]})
+        |> element(~s{button[phx-click="toggle_node"][phx-value-key="#{family_key(30)}"]})
         |> render_click()
 
       assert html =~ "Andricus"
+      assert html =~ "Neuroterus"
+    end
+
+    test "lists each Gall of a generation pair under its Inducer's genus", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/galls")
+
+      html =
+        view
+        |> element(~s{button[phx-click="expand_all"]})
+        |> render_click()
+
+      assert html =~ "Andricus seedii (agamic)"
+      assert html =~ "Andricus seedii (sexgen)"
+      assert has_element?(view, ~s{a[href="/gall/300"]})
+      assert has_element?(view, ~s{a[href="/gall/301"]})
+      refute html =~ "Andricus quercuscalifornicus"
     end
 
     test "search filters the tree", %{conn: conn} do
@@ -86,15 +114,20 @@ defmodule GallformersWeb.GallsBrowseLiveTest do
     test "can switch to undescribed view", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/galls")
 
-      # Click the undescribed toggle
+      view
+      |> element(~s{button[phx-click="toggle_undescribed"]})
+      |> render_click()
+
+      assert has_element?(view, "[data-active-view=undescribed]")
+
       html =
         view
-        |> element(~s{button[phx-click="toggle_undescribed"]})
+        |> element(~s{button[phx-click="expand_all"]})
         |> render_click()
 
-      # Should show undescribed galls
-      # Callirhytis quercuspunctata (id 102) is marked undescribed in test seeds
-      assert html =~ "undescribed" or has_element?(view, "[data-active-view=undescribed]")
+      # Gall 304's Inducer is the genus Andricus; 300's is a species
+      assert html =~ "Andricus n-densiflorus-seed-gall"
+      refute html =~ "Andricus seedii (agamic)"
     end
 
     test "can switch back to described view", %{conn: conn} do

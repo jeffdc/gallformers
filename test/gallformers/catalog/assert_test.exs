@@ -27,7 +27,7 @@ defmodule Gallformers.Catalog.AssertTest do
   defp standing(fact_id), do: Facts.get_fact!(fact_id).standing
 
   defp changes_for(table) do
-    Repo.all(from c in Carbonite.Change, where: c.table_name == ^table, order_by: c.id)
+    Repo.all(from c in test_audit_changes(), where: c.table_name == ^table, order_by: c.id)
   end
 
   defp next_entity_id do
@@ -581,6 +581,80 @@ defmodule Gallformers.Catalog.AssertTest do
       assert same.fact.id == first.fact.id
       assert %Fact{kind: "gall_alias"} = first.fact
       assert %AliasFact{name: "Oak apple"} = same.detail
+    end
+
+    test "is a common name unless its kind is given", ctx do
+      gall = gall_fixture()
+      key = %{gall_id: gall.id}
+
+      {:ok, common} =
+        Catalog.assert_alias(test_actor(), Map.put(key, :name, "Oak apple"), confirm(ctx.source))
+
+      {:ok, label} =
+        Catalog.assert_alias(
+          test_actor(),
+          Map.merge(key, %{name: "Andricus q-old-label", kind: :former_label}),
+          confirm(ctx.source)
+        )
+
+      {:ok, code} =
+        Catalog.assert_alias(
+          test_actor(),
+          Map.merge(key, %{name: "q-old-code", kind: "code"}),
+          confirm(ctx.source)
+        )
+
+      assert {common.detail.kind, label.detail.kind, code.detail.kind} ==
+               {:common_name, :former_label, :code}
+
+      assert Repo.get_by!(AliasFact, fact_id: label.fact.id).kind == :former_label
+    end
+
+    test "a kind outside the list is invalid", ctx do
+      gall = gall_fixture()
+
+      assert {:error, changeset} =
+               Catalog.assert_alias(
+                 test_actor(),
+                 %{gall_id: gall.id, name: "Oak apple", kind: "nickname"},
+                 confirm(ctx.source)
+               )
+
+      assert %{kind: ["is invalid"]} = errors_on(changeset)
+    end
+
+    test "re-asserting with another kind changes the Fact's kind, audited; without one keeps it",
+         ctx do
+      gall = gall_fixture()
+
+      {:ok, first} =
+        Catalog.assert_alias(
+          test_actor(),
+          %{gall_id: gall.id, name: "Andricus q-old-label"},
+          confirm(ctx.source)
+        )
+
+      {:ok, relabelled} =
+        Catalog.assert_alias(
+          test_actor(),
+          %{gall_id: gall.id, name: "andricus Q-old-label", kind: :former_label},
+          confirm(source_fixture("B", "1970"))
+        )
+
+      assert relabelled.fact.id == first.fact.id
+      assert relabelled.detail.kind == :former_label
+
+      {:ok, unchanged} =
+        Catalog.assert_alias(
+          test_actor(),
+          %{gall_id: gall.id, name: "Andricus q-old-label"},
+          confirm(source_fixture("C", "1980"))
+        )
+
+      assert unchanged.detail.kind == :former_label
+      assert Repo.get_by!(AliasFact, fact_id: first.fact.id).kind == :former_label
+
+      assert [%{op: :insert}, %{op: :update, changed: ["kind"]}] = changes_for("alias_facts")
     end
   end
 

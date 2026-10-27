@@ -125,7 +125,15 @@ defmodule Gallformers.PublicSnapshotTest do
 
     Repo.query!(File.read!(@script))
 
-    assert Repo.query!("SELECT gall_id, source_id, version_date, text FROM gall_notes").rows ==
-             [[gall.id, gallformers.id, nil, "Look for the red rim."]]
+    # Every note, the converted seeds' (Galls 300 and 301, Source 58) too; no
+    # paper text.
+    assert Repo.query!(
+             "SELECT gall_id, source_id, version_date, text FROM gall_notes ORDER BY gall_id"
+           ).rows ==
+             [
+               [300, 58, nil, "The seed note: a round, detachable gall on the leaf underside."],
+               [301, 58, nil, "The sexgen seed note: a tiny gall on the catkins."],
+               [gall.id, gallformers.id, nil, "Look for the red rim."]
+             ]
   end
 end

@@ -2,22 +2,19 @@ defmodule GallformersWeb.SitemapController do
   @moduledoc """
   Controller for generating sitemap.xml.
 
-  Generates a comprehensive sitemap including all public pages:
+  Generates a comprehensive sitemap including all public pages, read
+  through the contexts:
   - Static pages (home, about, glossary, etc.)
-  - All gall species pages
-  - All host plant pages
-  - All family pages
-  - All genus pages
-  - All section pages
-  - All place pages
-  - All source pages
+  - Every Gall page (`Gallformers.Catalog`)
+  - Every plant page (`Gallformers.Taxa`)
+  - Every rank page: family, intermediate ranks, genus, section
+    (`Gallformers.Taxa`, through `GallformersWeb.TaxonomyURL`)
+  - Every place page (`Gallformers.Places`)
+  - Every Source page (`Gallformers.Sources`)
   """
   use GallformersWeb, :controller
 
-  import Ecto.Query
-
-  alias Gallformers.Repo
-  alias Gallformers.Species.Species
+  alias Gallformers.{Catalog, Places, Sources, Taxa}
   alias GallformersWeb.TaxonomyURL
 
   @base_url "https://gallformers.org"
@@ -37,10 +34,7 @@ defmodule GallformersWeb.SitemapController do
     static_urls() ++
       gall_urls() ++
       host_urls() ++
-      family_urls() ++
-      genus_urls() ++
-      section_urls() ++
-      intermediate_urls() ++
+      rank_urls() ++
       place_urls() ++
       source_urls()
   end
@@ -60,102 +54,42 @@ defmodule GallformersWeb.SitemapController do
     ]
   end
 
-  # All gall species pages
+  # Every Gall page
   defp gall_urls do
-    from(s in Species,
-      where: s.taxoncode == "gall",
-      select: s.id
-    )
-    |> Repo.all()
-    |> Enum.map(fn id ->
+    for id <- Catalog.list_gall_ids() do
       %{loc: "#{@base_url}/gall/#{id}", changefreq: "weekly", priority: "0.8"}
-    end)
+    end
   end
 
-  # All host plant pages
+  # Every plant (Host) page
   defp host_urls do
-    from(s in Species,
-      where: s.taxoncode == "plant",
-      select: s.id
-    )
-    |> Repo.all()
-    |> Enum.map(fn id ->
+    for id <- Taxa.list_plant_ids() do
       %{loc: "#{@base_url}/host/#{id}", changefreq: "weekly", priority: "0.7"}
-    end)
+    end
   end
 
-  # All family pages
-  defp family_urls do
-    from(t in "taxonomy",
-      where: t.type == "family",
-      select: t.name
-    )
-    |> Repo.all()
-    |> Enum.map(fn name ->
-      %{loc: "#{@base_url}/family/#{name}", changefreq: "monthly", priority: "0.6"}
-    end)
+  # Every rank page: family, subfamily, tribe, subtribe, genus, section
+  defp rank_urls do
+    for page <- Taxa.list_rank_pages(), path = TaxonomyURL.public_path(page), path != nil do
+      %{loc: "#{@base_url}#{path}", changefreq: "monthly", priority: rank_priority(page.rank)}
+    end
   end
 
-  # All genus pages
-  defp genus_urls do
-    from(t in "taxonomy",
-      where: t.type == "genus",
-      select: t.name
-    )
-    |> Repo.all()
-    |> Enum.map(fn name ->
-      %{loc: "#{@base_url}/genus/#{name}", changefreq: "monthly", priority: "0.6"}
-    end)
-  end
+  defp rank_priority(rank) when rank in [:family, :genus], do: "0.6"
+  defp rank_priority(_rank), do: "0.5"
 
-  # All section pages
-  defp section_urls do
-    from(t in "taxonomy",
-      where: t.type == "section",
-      select: t.name
-    )
-    |> Repo.all()
-    |> Enum.map(fn name ->
-      %{loc: "#{@base_url}/section/#{name}", changefreq: "monthly", priority: "0.5"}
-    end)
-  end
-
-  # All intermediate taxonomy pages (subfamily, tribe, etc.)
-  defp intermediate_urls do
-    from(t in "taxonomy",
-      where: t.type == "intermediate",
-      select: {t.name, t.rank}
-    )
-    |> Repo.all()
-    |> Enum.map(fn {name, rank} ->
-      case TaxonomyURL.public_path(%{type: "intermediate", rank: rank, name: name}) do
-        nil -> nil
-        path -> %{loc: "#{@base_url}#{path}", changefreq: "monthly", priority: "0.5"}
-      end
-    end)
-    |> Enum.reject(&is_nil/1)
-  end
-
-  # All place pages
+  # Every place page
   defp place_urls do
-    from(p in "place",
-      select: p.code
-    )
-    |> Repo.all()
-    |> Enum.map(fn code ->
-      %{loc: "#{@base_url}/place/#{code}", changefreq: "monthly", priority: "0.5"}
-    end)
+    for place <- Places.list_all_places() do
+      %{loc: "#{@base_url}/place/#{place.code}", changefreq: "monthly", priority: "0.5"}
+    end
   end
 
-  # All source pages
+  # Every Source page
   defp source_urls do
-    from(s in "source",
-      select: s.id
-    )
-    |> Repo.all()
-    |> Enum.map(fn id ->
-      %{loc: "#{@base_url}/source/#{id}", changefreq: "monthly", priority: "0.5"}
-    end)
+    for source <- Sources.list_sources() do
+      %{loc: "#{@base_url}/source/#{source.id}", changefreq: "monthly", priority: "0.5"}
+    end
   end
 
   defp render_sitemap(urls) do

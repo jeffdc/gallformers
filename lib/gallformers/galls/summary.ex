@@ -89,50 +89,35 @@ defmodule Gallformers.Galls.Summary do
     end
   end
 
+  # The summary's keys for the Traits a Gall's Trait Facts state.
+  @trait_keys %{
+    "shape" => :shapes,
+    "color" => :colors,
+    "texture" => :textures,
+    "plant_part" => :plant_parts,
+    "season" => :seasons,
+    "alignment" => :alignments,
+    "walls" => :walls,
+    "cells" => :cells,
+    "form" => :forms
+  }
+
   @doc """
-  Converts database filter format to summary generator format.
-
-  Database format (from Galls.get_gall_filter_values/1):
-    %{colors: [%{id: 1, field: "red"}], shapes: [...], ...}
-
-  Summary format:
-    %{colors: ["red"], shapes: [...], detachable: "detachable", ...}
-
-  ## Parameters
-    - `db_filters` - Map from Galls.get_gall_filter_values/1
-    - `detachable` - Integer from gall.detachable (0=unknown, 1=integral, 2=detachable, 3=both)
+  Converts a Gall's Traits by Trait (`Gallformers.Catalog.ReadModels.GallSummary`'s
+  `traits`, e.g. `%{"color" => ["red"], "detachable" => ["integral"]}`) to
+  summary format. A `detachable` of `"unknown"` is none.
   """
-  @spec from_db_filters(map() | nil, integer()) :: map()
-  def from_db_filters(nil, _detachable), do: %{}
-
-  def from_db_filters(db_filters, detachable) do
-    %{
-      shapes: extract_field_values(db_filters[:shapes]),
-      colors: extract_field_values(db_filters[:colors]),
-      textures: extract_field_values(db_filters[:textures]),
-      plant_parts: extract_field_values(db_filters[:plant_parts]),
-      seasons: extract_field_values(db_filters[:seasons]),
-      alignments: extract_field_values(db_filters[:alignments]),
-      walls: extract_field_values(db_filters[:walls]),
-      cells: extract_field_values(db_filters[:cells]),
-      forms: extract_field_values(db_filters[:forms]),
-      detachable: detachable_to_string(detachable)
-    }
+  @spec from_traits(%{String.t() => [String.t()]}) :: map()
+  def from_traits(traits) when is_map(traits) do
+    @trait_keys
+    |> Map.new(fn {trait, key} -> {key, Map.get(traits, trait, [])} end)
+    |> Map.put(:detachable, detachable_from_traits(Map.get(traits, "detachable", [])))
   end
 
+  defp detachable_from_traits([value | _]) when value != "unknown", do: value
+  defp detachable_from_traits(_), do: nil
+
   # Private functions
-
-  defp extract_field_values(nil), do: []
-  defp extract_field_values(list), do: Enum.map(list, & &1.field)
-
-  # Handle integers (legacy V1 data)
-  defp detachable_to_string(0), do: nil
-  defp detachable_to_string(1), do: "integral"
-  defp detachable_to_string(2), do: "detachable"
-  defp detachable_to_string(3), do: "both"
-  # Handle strings (V2 data) - pass through unchanged
-  defp detachable_to_string(s) when is_binary(s), do: s
-  defp detachable_to_string(_), do: nil
 
   defp determine_form_noun(filters) do
     forms = get_values(filters, :forms)

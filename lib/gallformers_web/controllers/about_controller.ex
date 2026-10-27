@@ -1,8 +1,7 @@
 defmodule GallformersWeb.AboutController do
   use GallformersWeb, :controller
 
-  alias Gallformers.{Accounts, Galls, Sources, Taxonomy, Version}
-  alias Gallformers.Plants
+  alias Gallformers.{Accounts, Catalog, Images, Sources, Taxa, Version}
 
   def show(conn, _params) do
     stats = get_site_stats()
@@ -26,16 +25,22 @@ defmodule GallformersWeb.AboutController do
     |> render(:show)
   end
 
+  # Galls and the families and genera of their Inducers; plants and the
+  # families and genera holding them.
   defp get_site_stats do
+    galls = Catalog.gall_counts()
+    plants = Taxa.plant_counts()
+
     %{
-      galls: Galls.count_galls(),
-      hosts: Plants.count_hosts(),
+      galls: galls.galls,
+      undescribed: galls.undescribed,
+      gall_families: galls.families,
+      gall_genera: galls.genera,
+      hosts: plants.plants,
+      host_families: plants.families,
+      host_genera: plants.genera,
       sources: Sources.count_sources(),
-      gall_families: Taxonomy.count_families_for_taxoncode("gall"),
-      gall_genera: Taxonomy.count_genera_for_taxoncode("gall"),
-      host_families: Taxonomy.count_families_for_taxoncode("plant"),
-      host_genera: Taxonomy.count_genera_for_taxoncode("plant"),
-      undescribed: Galls.count_undescribed_galls()
+      images: Images.count_images()
     }
   end
 end

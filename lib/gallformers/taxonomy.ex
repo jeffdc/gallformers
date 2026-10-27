@@ -29,9 +29,7 @@ defmodule Gallformers.Taxonomy do
   defdelegate change_taxonomy(taxonomy, attrs \\ %{}), to: Tree
   defdelegate create_taxonomy(attrs \\ %{}), to: Tree
   defdelegate create_intermediate(attrs), to: Tree
-  defdelegate list_children_with_counts(parent_id), to: Tree
   defdelegate update_taxonomy(taxonomy, attrs), to: Tree
-  defdelegate delete_taxonomy(taxonomy), to: Tree
 
   # =====================================================================
   # Delegated to Taxonomy.Tree — Lookups
@@ -39,11 +37,7 @@ defmodule Gallformers.Taxonomy do
 
   defdelegate get_taxonomy(id), to: Tree
   defdelegate get_taxonomy!(id), to: Tree
-  defdelegate get_family(id), to: Tree
-  defdelegate get_genus_lineage(id), to: Tree
-  defdelegate get_section_lineage(id), to: Tree
   defdelegate get_taxonomy_by_name(name, type), to: Tree
-  defdelegate get_genera_by_name(name), to: Tree
   defdelegate get_taxonomies_batch(ids), to: Tree
   defdelegate resolve_taxonomy_from_name(name), to: Tree
 
@@ -51,24 +45,17 @@ defmodule Gallformers.Taxonomy do
   # Delegated to Taxonomy.Tree — Hierarchy
   # =====================================================================
 
-  defdelegate get_parent(id), to: Tree
   defdelegate get_children(id), to: Tree
-  defdelegate get_children_for_parents(ids), to: Tree
   defdelegate get_taxonomy_path(id), to: Tree
 
   # =====================================================================
   # Delegated to Taxonomy.Tree — Lists
   # =====================================================================
 
-  defdelegate list_taxonomies(), to: Tree
   defdelegate list_taxonomies_by_type(type), to: Tree
   defdelegate list_taxonomies_with_parent(type \\ nil, opts \\ []), to: Tree
   defdelegate list_taxonomies_with_parent_paginated(type, limit, offset, opts \\ []), to: Tree
   defdelegate count_taxonomies(type \\ nil, opts \\ []), to: Tree
-  defdelegate count_families_for_taxoncode(taxoncode), to: Tree
-  defdelegate count_genera_for_taxoncode(taxoncode), to: Tree
-  defdelegate list_child_genera(family_id), to: Tree
-  defdelegate list_child_sections(genus_id), to: Tree
   defdelegate list_sections_for_family_tree(family_id), to: Tree
   defdelegate list_sections_for_genus(genus_id), to: Tree
   defdelegate list_families_for_select(filter \\ :all), to: Tree
@@ -79,7 +66,6 @@ defmodule Gallformers.Taxonomy do
   # Delegated to Taxonomy.Tree — Unknown/Placeholder Management
   # =====================================================================
 
-  defdelegate get_unknown_placeholder(parent_id), to: Tree
   defdelegate find_or_create_unknown_genus(family_id), to: Tree
   defdelegate empty_unknown_genus_ids(), to: Tree
 
@@ -107,33 +93,19 @@ defmodule Gallformers.Taxonomy do
   defdelegate extract_epithet(name), to: TaxonName, as: :epithet
 
   # =====================================================================
-  # Lineage delegates
-  # =====================================================================
-
-  alias Gallformers.Taxonomy.Lineage
-
-  defdelegate lineage_from_path(path_nodes), to: Lineage, as: :from_path
-  defdelegate placeholder_genus?(lineage), to: Lineage
-
-  defdelegate find_taxonomy_by_name(name), to: Tree
-
-  # =====================================================================
   # Delegated to Taxonomy.SpeciesLink — Species-Taxonomy Linkage
   # =====================================================================
 
-  defdelegate extract_genus_from_name(name), to: SpeciesLink
   defdelegate link_species_to_taxonomy(species_id, taxonomy_id), to: SpeciesLink
 
   defdelegate place_species_in_tree(species_id, lineage, opts \\ []), to: SpeciesLink
 
-  defdelegate create_genus_for_species(genus_name, family_id, species_id), to: SpeciesLink
   defdelegate update_species_genus(species_id, new_genus_id), to: SpeciesLink
 
   # =====================================================================
   # Delegated to Taxonomy.SpeciesLink — Taxonomy Resolution
   # =====================================================================
 
-  defdelegate get_taxonomy_from_species_name(name), to: SpeciesLink
   defdelegate lookup_taxonomy_for_new_species(name), to: SpeciesLink
   defdelegate resolve_taxonomy_for_species(taxonomy, family_ids), to: SpeciesLink
   defdelegate resolve_genus_id(genus, family), to: SpeciesLink
@@ -143,13 +115,7 @@ defmodule Gallformers.Taxonomy do
   # =====================================================================
 
   defdelegate get_taxonomy_for_species(species_id), to: SpeciesLink
-  defdelegate get_taxonomy_for_species_batch(species_ids), to: SpeciesLink
-  defdelegate get_species_ids_for_genus(genus_id), to: SpeciesLink
-  defdelegate get_species_ids_for_genera(genus_ids), to: SpeciesLink
-  defdelegate get_species_ids_for_family(family_id), to: SpeciesLink
-  defdelegate get_species_ids_for_taxonomies(taxonomy_ids), to: SpeciesLink
   defdelegate get_species_for_section(section_id), to: SpeciesLink
-  defdelegate count_species_for_taxonomies(taxonomy_ids), to: SpeciesLink
   defdelegate update_section_species(section_id, species_ids), to: SpeciesLink
 
   # =====================================================================
@@ -160,8 +126,6 @@ defmodule Gallformers.Taxonomy do
 
   defdelegate reassign_species_taxonomy(species_id, new_genus_id, opts \\ []),
     to: Reclassification
-
-  defdelegate rename_species(species_id, new_name, add_alias?), to: Reclassification
 
   @doc """
   Renames a species for a genus change, optionally adding an alias for the old name.
@@ -183,7 +147,6 @@ defmodule Gallformers.Taxonomy do
 
   defdelegate search_families(query, opts \\ []), to: Search
   defdelegate search_genera(query, family_id \\ nil, opts \\ []), to: Search
-  defdelegate search_genera_and_sections(query, limit \\ 20, opts \\ []), to: Search
   defdelegate search_taxonomies(query, type \\ nil, limit \\ 50), to: Search
   defdelegate search_sections(query), to: Search
 
@@ -193,15 +156,6 @@ defmodule Gallformers.Taxonomy do
 
   defdelegate get_deletion_impact(taxonomy), to: Reclassification
   defdelegate delete_taxonomy_cascade(taxonomy), to: Reclassification
-
-  # =====================================================================
-  # Delegated to Taxonomy.Tree — Cross-domain Queries
-  # =====================================================================
-
-  defdelegate list_associated_genera(genus_id, taxoncode), to: Tree
-  defdelegate list_gall_families_for_host(host_id), to: Tree
-  defdelegate list_gall_families_for_host_genus(host_genus_id), to: Tree
-  defdelegate list_sections_with_details(), to: Tree
 
   # =====================================================================
   # PubSub

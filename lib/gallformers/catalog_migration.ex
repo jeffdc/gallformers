@@ -31,11 +31,13 @@ defmodule Gallformers.CatalogMigration do
   ## Steps
 
     1. `Gallformers.CatalogMigration.NonGalls` — the gall rows not to
-       migrate (`non_galls.csv`).
+       migrate (`non_galls.csv`), recorded for their old URLs' redirect to
+       the gall-lookalikes Article, which
+       `Gallformers.CatalogMigration.LookalikesArticle` creates when missing.
     2. `Gallformers.CatalogMigration.Taxa` — higher taxa (rows kept twice
        merged, `taxon_merges.csv`; family kingdoms a curator set,
-       `kingdoms.csv`), plants, genus placeholders, `host_range` re-keyed
-       by taxon.
+       `kingdoms.csv`), plants, genus placeholders (crosswalked to their
+       genus for their old URLs), `host_range` re-keyed by taxon.
     3. `Gallformers.CatalogMigration.Galls` — Inducer taxa from gall names
        (`priv/catalog_migration/name_suffixes.csv`), Galls.
     4. `Gallformers.CatalogMigration.Citations` — other Sources' record-level
@@ -51,6 +53,10 @@ defmodule Gallformers.CatalogMigration do
        into synonyms, common names, gall aliases (`aliases.csv`).
     10. `Gallformers.CatalogMigration.Keys` — key couplets re-targeted
         (`keys.csv`).
+    11. The ID tool's lookup table (`Gallformers.Catalog.rebuild_gall_index/0`),
+        rebuilt from all of the above. During the run no lookup-table
+        refresh is enqueued (`Gallformers.Catalog.without_gall_index_refresh/1`):
+        production runs it without Oban.
 
   ## Curated decisions
 
@@ -73,13 +79,14 @@ defmodule Gallformers.CatalogMigration do
   """
   use Boundary,
     deps: [
+      Gallformers.Articles,
       Gallformers.Audit,
       Gallformers.Catalog,
       Gallformers.Repo,
       Gallformers.Sources,
       Gallformers.Taxa
     ],
-    exports: [NameSuffixes, Report]
+    exports: [NameSuffixes, Report, TraitIdExport]
 
   alias Gallformers.Audit
   alias Gallformers.Audit.Actor
@@ -92,6 +99,7 @@ defmodule Gallformers.CatalogMigration do
   alias Gallformers.CatalogMigration.Keys
   alias Gallformers.CatalogMigration.Kingdoms
   alias Gallformers.CatalogMigration.LegacyFacts
+  alias Gallformers.CatalogMigration.LookalikesArticle
   alias Gallformers.CatalogMigration.NameSuffixes
   alias Gallformers.CatalogMigration.NonGalls
   alias Gallformers.CatalogMigration.Notes
@@ -135,6 +143,7 @@ defmodule Gallformers.CatalogMigration do
     "DELETE FROM import_batches",
     "DELETE FROM import_packages",
     "DELETE FROM legacy_citations",
+    "DELETE FROM non_gall_redirects",
     "DELETE FROM source_documents WHERE kind = 'note'",
     "DELETE FROM galls",
     "DELETE FROM generation_group_taxa",
@@ -169,6 +178,12 @@ defmodule Gallformers.CatalogMigration do
   @spec run(keyword()) ::
           {:ok, Report.t()} | {:error, {:pending_decisions, Report.t()}} | {:error, term()}
   def run(opts \\ []) do
+    # The ID tool's lookup table is rebuilt once at the end, not refreshed
+    # per Fact (production runs this without Oban).
+    Catalog.without_gall_index_refresh(fn -> migrate(opts) end)
+  end
+
+  defp migrate(opts) do
     actor = Keyword.get_lazy(opts, :actor, fn -> Actor.system("catalog_migration") end)
     path = Keyword.get_lazy(opts, :name_suffixes, &NameSuffixes.default_path/0)
 
@@ -198,8 +213,21 @@ defmodule Gallformers.CatalogMigration do
         |> then(&LegacyFacts.reconcile(%{plan | assertions: plan.assertions ++ by_legacy}, &1))
         |> then(&Ranges.reconcile(curated_facts, &1))
         |> then(&Aliases.reconcile(curated_facts, &1))
+        |> rebuild_gall_index()
       end)
     end
+  end
+
+  # Step 11: the ID tool's lookup table, from everything above.
+  defp rebuild_gall_index(report) do
+    :ok = Catalog.rebuild_gall_index()
+
+    Report.reconcile(
+      report,
+      "Galls in the ID tool's lookup table (gall_index)",
+      Old.count("SELECT count(*) FROM galls"),
+      Old.count("SELECT count(*) FROM gall_index")
+    )
   end
 
   defp pending_mode(opts) do
@@ -291,7 +319,8 @@ defmodule Gallformers.CatalogMigration do
     advance_sequence!("species")
 
     report = %Report{}
-    {excluded, report} = NonGalls.run(curated.non_galls, report)
+    {excluded, report} = NonGalls.run(actor, curated.non_galls, report)
+    report = LookalikesArticle.run(report)
     {taxa, report} = MigrationTaxa.run(actor, curated.taxa, report)
     {galls, report} = Galls.run(actor, suffixes, generations, taxa, report, excluded)
 

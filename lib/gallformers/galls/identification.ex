@@ -1,25 +1,16 @@
 defmodule Gallformers.Galls.Identification do
   @moduledoc """
-  Composable filter pipeline for gall identification.
+  Composable filter pipeline for gall identification over the old species
+  tables.
 
-  Internal module of the Galls context — provides the filter engine used by
-  the ID tool. All public access goes through `Gallformers.Galls`.
+  The ID tool reads `Gallformers.Catalog.identify/1` now; this filter is
+  kept only for `mix gallformers.catalog.id_parity`, which compares the two
+  until the cutover. All public access goes through `Gallformers.Galls`.
   """
 
   import Ecto.Query
 
-  alias Gallformers.FilterFields.{
-    Alignment,
-    Cells,
-    Color,
-    Form,
-    PlantPart,
-    Season,
-    Shape,
-    Texture,
-    Walls
-  }
-
+  alias Gallformers.FilterFields.Form
   alias Gallformers.Galls
   alias Gallformers.Galls.{GallHost, GallTraits}
   alias Gallformers.Images.Image
@@ -28,24 +19,6 @@ defmodule Gallformers.Galls.Identification do
   alias Gallformers.Repo
   alias Gallformers.Species.Species, as: SpeciesSchema
   alias Gallformers.Taxonomy.Tree
-
-  @doc """
-  Returns all filter field options for the ID tool.
-  """
-  @spec get_filter_options() :: map()
-  def get_filter_options do
-    %{
-      alignments: Repo.all(from(a in Alignment, order_by: a.alignment)),
-      cells: Repo.all(from(c in Cells, order_by: c.cells)),
-      colors: Repo.all(from(c in Color, order_by: c.color)),
-      forms: Repo.all(from(f in Form, order_by: f.form)),
-      plant_parts: Repo.all(from(pp in PlantPart, order_by: pp.part)),
-      seasons: Repo.all(from(s in Season, order_by: s.season)),
-      shapes: Repo.all(from(s in Shape, order_by: s.shape)),
-      textures: Repo.all(from(t in Texture, order_by: t.texture)),
-      walls: Repo.all(from(w in Walls, order_by: w.walls))
-    }
-  end
 
   @doc """
   Filters galls based on the provided criteria.
@@ -98,113 +71,7 @@ defmodule Gallformers.Galls.Identification do
     |> attach_place_match(filters[:place_codes])
   end
 
-  @doc """
-  Returns the count of galls matching the filters.
-  """
-  @spec count_filtered_galls(map()) :: integer()
-  def count_filtered_galls(filters \\ %{}) do
-    base_query()
-    |> apply_host_filter(filters[:host_ids])
-    |> apply_genus_filter(filters[:genus_id])
-    |> apply_family_filter(filters[:family_id])
-    |> apply_plant_part_filter(filters[:plant_part_ids], filters[:plant_part_logic] || :or)
-    |> apply_color_filter(filters[:color_ids])
-    |> apply_shape_filter(filters[:shape_ids])
-    |> apply_texture_filter(filters[:texture_ids], filters[:texture_logic] || :or)
-    |> apply_alignment_filter(filters[:alignment_ids])
-    |> apply_cells_filter(filters[:cells_ids])
-    |> apply_walls_filter(filters[:walls_ids])
-    |> apply_form_filter(filters[:form_ids])
-    |> apply_season_filter(filters[:season_ids])
-    |> apply_detachable_filter(filters[:detachable])
-    |> apply_place_filter(filters[:place_codes], filters[:host_ids], filters[:genus_id])
-    |> apply_undescribed_filter(filters[:undescribed])
-    |> apply_exclude_non_gall_filter(filters[:exclude_non_galls])
-    |> select([s, gt], count(s.id, :distinct))
-    |> Repo.one()
-  end
-
-  @doc """
-  Gets hosts that have galls matching the filters.
-
-  Used to show which hosts are available based on current filter selections.
-  """
-  @spec get_hosts_for_filters(map()) :: [map()]
-  def get_hosts_for_filters(filters \\ %{}) do
-    gall_ids =
-      base_query()
-      |> apply_plant_part_filter(filters[:plant_part_ids], filters[:plant_part_logic] || :or)
-      |> apply_color_filter(filters[:color_ids])
-      |> apply_shape_filter(filters[:shape_ids])
-      |> apply_texture_filter(filters[:texture_ids], filters[:texture_logic] || :or)
-      |> apply_alignment_filter(filters[:alignment_ids])
-      |> apply_cells_filter(filters[:cells_ids])
-      |> apply_walls_filter(filters[:walls_ids])
-      |> apply_form_filter(filters[:form_ids])
-      |> apply_season_filter(filters[:season_ids])
-      |> apply_detachable_filter(filters[:detachable])
-      |> apply_place_filter(filters[:place_codes], nil, nil)
-      |> select([s, gt], s.id)
-      |> Repo.all()
-
-    if Enum.empty?(gall_ids) do
-      []
-    else
-      from(h in GallHost,
-        join: host_species in SpeciesSchema,
-        on: h.host_species_id == host_species.id,
-        where: h.gall_species_id in ^gall_ids,
-        group_by: [host_species.id, host_species.name],
-        order_by: host_species.name,
-        select: %{
-          id: host_species.id,
-          name: host_species.name,
-          count: count(h.id)
-        }
-      )
-      |> Repo.all()
-    end
-  end
-
-  @doc """
-  Fetches filter data for multiple galls by gall_id, for summary generation.
-
-  Returns a map of gall_id => filter_data.
-  """
-  @spec get_summary_data([integer()]) :: %{integer() => map()}
-  def get_summary_data([]), do: %{}
-
-  def get_summary_data(gall_ids) when is_list(gall_ids) do
-    gall_ids
-    |> Enum.map(fn gall_id ->
-      filters = Galls.get_gall_filter_values(gall_id)
-      detachable = get_gall_detachable(gall_id)
-      summary_data = Galls.Summary.from_db_filters(filters, detachable)
-      {gall_id, summary_data}
-    end)
-    |> Enum.into(%{})
-  end
-
-  @doc """
-  Returns location IDs for all locations containing "leaf" in their name.
-  Used for the "leaf (anywhere)" virtual filter option.
-  """
-  @spec leaf_plant_part_ids() :: [integer()]
-  def leaf_plant_part_ids do
-    from(pp in PlantPart,
-      where: like(pp.part, "%leaf%"),
-      select: pp.id
-    )
-    |> Repo.all()
-  end
-
   # Private helpers
-
-  defp get_gall_detachable(species_id) do
-    from(gt in GallTraits, where: gt.species_id == ^species_id, select: gt.detachable)
-    |> Repo.one()
-    |> Kernel.||("unknown")
-  end
 
   defp base_query do
     from s in SpeciesSchema,
@@ -457,8 +324,8 @@ defmodule Gallformers.Galls.Identification do
         distinct: true
       )
 
-    # Galls with NO gall_range entries that fall back to host native ranges.
-    # Mirrors Ranges.get_display_range_for_gall/1 fallback behavior.
+    # Galls with NO gall_range entries that fall back to host native ranges
+    # (the old gall page's range fallback).
     galls_with_any_range = from(gr in "gall_range", select: gr.species_id, distinct: true)
 
     galls_with_host_fallback =

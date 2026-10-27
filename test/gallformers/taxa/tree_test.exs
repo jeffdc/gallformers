@@ -13,7 +13,7 @@ defmodule Gallformers.Taxa.TreeTest do
   alias Gallformers.Taxa.TaxonName
 
   defp changes_for(table) do
-    Repo.all(from c in Carbonite.Change, where: c.table_name == ^table, order_by: c.id)
+    Repo.all(from c in test_audit_changes(), where: c.table_name == ^table, order_by: c.id)
   end
 
   defp parent_id(taxon), do: Taxa.get_taxon!(taxon.id).parent_id

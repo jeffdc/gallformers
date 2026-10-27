@@ -236,6 +236,9 @@ defmodule Gallformers.Import.ApplyGall do
     end
   end
 
+  # The contract's alias Facts are common names: no kind given, so a new
+  # alias is a common name and one already held (a former label, a code)
+  # keeps its kind.
   defp key_and_extra(%{"kind" => "alias"} = f, refs) do
     with {:ok, gall_id} <- gall(refs, f["gall"]) do
       {:ok, :alias, %{gall_id: gall_id, name: f["name"]}, %{}}

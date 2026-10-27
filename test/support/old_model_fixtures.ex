@@ -33,9 +33,17 @@ defmodule Gallformers.OldModelFixtures do
     id
   end
 
-  @doc "A plant `species` row linked to `taxonomy_ids`. `opts`: `:placeholder`."
+  @doc """
+  A plant `species` row linked to `taxonomy_ids`. `opts`: `:placeholder`,
+  `:datacomplete`, `:abundance_id`.
+  """
   def plant!(id, name, taxonomy_ids, opts \\ []) do
-    species!(id, name, "plant", genus_placeholder: Keyword.get(opts, :placeholder, false))
+    species!(id, name, "plant",
+      genus_placeholder: Keyword.get(opts, :placeholder, false),
+      datacomplete: Keyword.get(opts, :datacomplete, false),
+      abundance_id: opts[:abundance_id]
+    )
+
     Enum.each(List.wrap(taxonomy_ids), &link!(id, &1))
     id
   end
@@ -243,7 +251,8 @@ defmodule Gallformers.OldModelFixtures do
     * Fagaceae (plants) > Quercus > section Lobatae, with Quercus fixturalba
       (genus link), Quercus fixturrubra (genus and section links) and the
       genus placeholder "Quercus spp."; ranges for fixturalba (US-CA) and the
-      placeholder (MX-JAL, CA-AB).
+      placeholder (MX-JAL, CA-AB). Fixturalba is data-complete and
+      uncommon (abundance 2); fixturrubra neither.
     * Andricus (seeded, under Cynipini, Cynipinae, Cynipidae): the pair
       Andricus fixtura (agamic) / (sexgen), an undescribed gall, and a name
       with an unknown suffix.
@@ -261,7 +270,7 @@ defmodule Gallformers.OldModelFixtures do
     unknown_genus =
       taxonomy!(880_021, "Unknown", "genus", parent: unknown_family, placeholder: true)
 
-    alba = plant!(880_101, "Fixturquercus alba", quercus)
+    alba = plant!(880_101, "Fixturquercus alba", quercus, datacomplete: true, abundance_id: 2)
     rubra = plant!(880_102, "Fixturquercus rubra", [quercus, lobatae])
     spp = plant!(880_103, "Fixturquercus spp", quercus, placeholder: true)
 

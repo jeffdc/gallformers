@@ -9,6 +9,11 @@ defmodule GallformersWeb.TaxonomyRedirectTest do
   use GallformersWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
+  import Gallformers.DataCase, only: [test_actor: 0]
+  import Gallformers.OldModelFixtures, only: [taxonomy!: 3]
+  import Gallformers.TaxaFixtures
+
+  alias Gallformers.Taxa
 
   describe "family ID redirect" do
     test "redirects /family/:id to /family/:name", %{conn: conn} do
@@ -88,6 +93,32 @@ defmodule GallformersWeb.TaxonomyRedirectTest do
 
     test "returns 404 for nonexistent /taxonomy/:id", %{conn: conn} do
       conn = get(conn, "/taxonomy/99999")
+      assert conn.status == 404
+    end
+
+    test "returns 404 for a non-numeric /taxonomy/:id", %{conn: conn} do
+      conn = get(conn, "/taxonomy/abc")
+      assert conn.status == 404
+    end
+
+    test "follows the crosswalk (legacy_taxon_ids), not the old taxonomy table", %{conn: conn} do
+      genus = taxon_fixture(rank: :genus, name: "Fixturcrosswalka")
+      {:ok, _} = Taxa.add_legacy_id(test_actor(), genus, :taxonomy, 990_033, "Fixturcrosswalka")
+
+      conn = get(conn, "/taxonomy/990033")
+      assert redirected_to(conn, 301) == "/genus/Fixturcrosswalka"
+    end
+
+    test "a placeholder genus redirects to the family its crosswalk entry names", %{conn: conn} do
+      # "Unknown" (35), Cynipidae's placeholder genus, is no taxon of its own.
+      conn = get(conn, "/taxonomy/35")
+      assert redirected_to(conn, 301) == "/family/Cynipidae"
+    end
+
+    test "an old taxonomy row without a crosswalk entry is not found", %{conn: conn} do
+      taxonomy!(990_034, "Fixturunmapped", "genus")
+
+      conn = get(conn, "/taxonomy/990034")
       assert conn.status == 404
     end
   end

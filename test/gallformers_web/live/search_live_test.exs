@@ -173,6 +173,43 @@ defmodule GallformersWeb.SearchLiveTest do
         assert html =~ "result" or html =~ "Found"
       end
     end
+
+    test "a synonym finds its host, shown by accepted name with its other names", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/globalsearch?q=Lithocarpus")
+
+      assert has_element?(
+               view,
+               "#results-table a[href='/host/10']",
+               "Notholithocarpus densiflorus"
+             )
+
+      assert render(view) =~ "(Lithocarpus densiflorus, tanoak)"
+    end
+
+    test "a Gall's alias finds it, linking to the Gall page", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/globalsearch?q=apple+gall+wasp")
+
+      assert has_element?(view, "#results-table a[href='/gall/100']")
+      assert render(view) =~ "Oak Apple Gall Wasp"
+    end
+
+    test "a higher taxon links to its rank page, with its parent", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/globalsearch?q=Cynipini")
+
+      assert has_element?(
+               view,
+               "#results-table a[href='/tribe/Cynipini']",
+               "Tribe Cynipini - Subfamily Cynipinae"
+             )
+
+      {:ok, view, _html} = live(conn, ~p"/globalsearch?q=Notholithocarpus")
+
+      assert has_element?(
+               view,
+               "#results-table a[href='/genus/Notholithocarpus']",
+               "Genus Notholithocarpus - Family Fagaceae"
+             )
+    end
   end
 
   describe "region filter visibility" do
@@ -195,6 +232,18 @@ defmodule GallformersWeb.SearchLiveTest do
 
       assert html =~ "No results"
       refute html =~ "region filter"
+    end
+
+    test "a region filter keeps Galls found everywhere and drops Galls elsewhere", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/globalsearch?q=quercus")
+      render_click(view, "change_region", %{"code" => "XE"})
+
+      # 102 Callirhytis quercuspunctata: no Host range, everywhere.
+      assert has_element?(view, "#results-table a[href='/gall/102']")
+      # 103 Cynips quercusfolii: Romania only.
+      assert has_element?(view, "#results-table a[href='/gall/103']")
+      # 100 Andricus quercuscalifornicus: North America only.
+      refute has_element?(view, "#results-table a[href='/gall/100']")
     end
 
     test "region scope bar uses amber styling when filter is active", %{conn: conn} do

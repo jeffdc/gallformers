@@ -18,15 +18,15 @@ defmodule Gallformers.Catalog do
 
   ## Read models
 
-  The potential range, Gall summaries and flags
+  The potential range, Gall summaries, pages and flags
   (`Gallformers.Catalog.ReadModels`) are computed on read from current
-  Facts, `host_range` and `Gallformers.Taxa`. The plan (`9449` §4) has them
-  rebuilt asynchronously; they are not materialized yet because on-read
-  queries are simple and always fresh, and nothing reads them at volume
-  until the public pages are re-pointed. When the ID tool or search needs
-  them in bulk, materialize them (tables refreshed by an Oban worker on
-  Fact and taxon changes — standing changes in `Gallformers.Facts`, events
-  in the listener) behind these same functions.
+  Facts, `host_range` and `Gallformers.Taxa`. What the ID tool and search
+  read in bulk is stored: `gall_index`
+  (`Gallformers.Catalog.ReadModels.GallIndex`), one row per Gall computed
+  from those read models, refreshed by an Oban job when a Gall's Facts
+  change standing (`Gallformers.Catalog.FactListener`, through
+  `Gallformers.Facts.Events`) or its taxa move or are renamed
+  (`Gallformers.Catalog.TaxonListener`).
 
   ## Writes
 
@@ -38,10 +38,13 @@ defmodule Gallformers.Catalog do
     deps: [
       Gallformers.Audit,
       Gallformers.Facts,
+      Gallformers.Images,
       Gallformers.Places,
+      Gallformers.Ranges,
       Gallformers.Repo,
       Gallformers.Sources,
-      Gallformers.Taxa
+      Gallformers.Taxa,
+      Gallformers.TextMatch
     ],
     exports: [
       Assert,
@@ -52,8 +55,11 @@ defmodule Gallformers.Catalog do
       Facts.RangeFact,
       Facts.RelationshipFact,
       Facts.TraitFact,
+      FactListener,
       Gall,
       LegacyCitation,
+      LegacyTraitIds,
+      ReadModels.GallPage,
       ReadModels.GallSummary,
       RelationshipTypes,
       TaxonListener,
@@ -78,15 +84,24 @@ defmodule Gallformers.Catalog do
   alias Gallformers.Catalog.Facts.RelationshipFact
   alias Gallformers.Catalog.Facts.TraitFact
   alias Gallformers.Catalog.Gall
+  alias Gallformers.Catalog.Identify
   alias Gallformers.Catalog.LegacyCitation
+  alias Gallformers.Catalog.LegacyTraitIds
+  alias Gallformers.Catalog.NonGallRedirect
+  alias Gallformers.Catalog.ReadModels.Browse
+  alias Gallformers.Catalog.ReadModels.Current
   alias Gallformers.Catalog.ReadModels.Flags
+  alias Gallformers.Catalog.ReadModels.GallIndex
+  alias Gallformers.Catalog.ReadModels.GallPage
   alias Gallformers.Catalog.ReadModels.GallSummary
   alias Gallformers.Catalog.ReadModels.PotentialRange
   alias Gallformers.Catalog.Vocab.GenerationGroup
   alias Gallformers.Catalog.Vocab.GenerationValue
   alias Gallformers.Catalog.Vocab.Loader
   alias Gallformers.Catalog.Vocab.TraitValue
+  alias Gallformers.Ranges.DisplayRange
   alias Gallformers.Repo
+  alias Gallformers.Sources
 
   # -- vocabularies ------------------------------------------------------------
 
@@ -106,6 +121,22 @@ defmodule Gallformers.Catalog do
   @spec get_trait_value(String.t(), String.t()) :: TraitValue.t() | nil
   def get_trait_value(trait, value), do: Repo.get_by(TraitValue, trait: trait, value: value)
 
+  @doc """
+  The Trait values the import contract's `traits.json` lists (what
+  `load_vocab/1` stores), as `%{trait, value, definition}`: for matching
+  old vocabulary by name where `trait_values` is not loaded.
+  """
+  @spec contract_trait_values() :: [map()]
+  def contract_trait_values, do: Loader.contract_trait_values()
+
+  @doc """
+  Old ID-tool bookmarks' Trait IDs: each old vocabulary table and row ID's
+  Trait value, read from `legacy_trait_ids.csv`
+  (`Gallformers.Catalog.LegacyTraitIds`; the shipped file by default).
+  """
+  @spec legacy_trait_values(String.t()) :: {:ok, LegacyTraitIds.values()} | {:error, String.t()}
+  def legacy_trait_values(path \\ LegacyTraitIds.default_path()), do: LegacyTraitIds.read(path)
+
   @doc "The generation groups, by name, with their values in order."
   @spec list_generation_groups() :: [GenerationGroup.t()]
   def list_generation_groups do
@@ -123,7 +154,8 @@ defmodule Gallformers.Catalog do
   @doc """
   Creates a Gall (`Gallformers.Catalog.Gall`). `attrs` (atom keys): `:name`
   (required), `:name_override`, `:gallformers_code`,
-  `:generation_value_id`, `:abundance_id`, `:datacomplete`, and `:id` for a
+  `:generation_value_id`, `:abundance_id`, `:datacomplete`,
+  `:default_source_id` (the Source the Gall page leads with), and `:id` for a
   migrated Gall keeping its species ID (otherwise the shared sequence gives
   one).
   """
@@ -179,6 +211,17 @@ defmodule Gallformers.Catalog do
       )
     )
   end
+
+  # -- old URLs (`Gallformers.Catalog.NonGallRedirect`) -------------------------
+
+  @doc "Records the old gall IDs excluded as non-galls (maps of `:species_id`, `:name`)."
+  @spec insert_non_gall_redirects(Actor.t(), [map()]) ::
+          {:ok, non_neg_integer()} | {:error, term()}
+  defdelegate insert_non_gall_redirects(actor, rows), to: NonGallRedirect, as: :insert_all
+
+  @doc "Whether `id` is an old gall ID excluded as a non-gall (its URL goes to the lookalikes Article)."
+  @spec non_gall?(integer()) :: boolean()
+  defdelegate non_gall?(id), to: NonGallRedirect
 
   # -- gall Facts --------------------------------------------------------------
   #
@@ -241,7 +284,12 @@ defmodule Gallformers.Catalog do
   def assert_occurrence(actor, key, attribution),
     do: Assert.assert(OccurrenceFact, actor, key, attribution)
 
-  @doc "Records a Source's stance on a common name: `key` is `%{gall_id, name}`."
+  @doc """
+  Records a Source's stance on a gall alias: `key` is `%{gall_id, name}`
+  (the natural key) and optionally `:kind` — `:common_name` (the default
+  for a new alias), `:former_label` or `:code`. A kind given sets it on an
+  alias already held; none leaves the held one's kind.
+  """
   @spec assert_alias(Actor.t(), map(), map()) ::
           {:ok, Assert.result()} | {:error, Changeset.t()}
   def assert_alias(actor, key, attribution),
@@ -315,12 +363,32 @@ defmodule Gallformers.Catalog do
   def potential_range(gall_id), do: PotentialRange.for_gall(gall_id)
 
   @doc """
+  A Gall's range as the map shows it: `:everywhere` when its potential range
+  is (`potential_range/1`), else the potential range's places split for
+  colouring — exact, country-level (inherited) and introduced — as its
+  current Hosts' `host_range` rows give them
+  (`Gallformers.Catalog.ReadModels.PotentialRange.for_display/1`). The
+  places shown are always the potential range's: this is a presentation of
+  it, never a second definition.
+  """
+  @spec display_range(integer()) :: :everywhere | DisplayRange.t()
+  def display_range(gall_id) when is_integer(gall_id), do: PotentialRange.for_display(gall_id)
+
+  @doc """
   A Gall's current Inducer, Hosts and Traits
   (`Gallformers.Catalog.ReadModels.GallSummary`). Raises if there is no such
   Gall.
   """
   @spec gall_summary(integer()) :: GallSummary.t()
   def gall_summary(gall_id), do: GallSummary.for_gall(gall_id)
+
+  @doc """
+  Everything the Gall page shows of Gall `id`
+  (`Gallformers.Catalog.ReadModels.GallPage`), or `:not_found` when there is
+  no such Gall.
+  """
+  @spec gall_page(integer()) :: {:ok, GallPage.t()} | :not_found
+  def gall_page(id) when is_integer(id), do: GallPage.for_gall(id)
 
   @doc """
   The summaries of the Galls whose current Inducer is one of `taxon_ids`,
@@ -330,10 +398,227 @@ defmodule Gallformers.Catalog do
   def list_gall_summaries_by_inducer(taxon_ids) when is_list(taxon_ids),
     do: GallSummary.for_related("inducer_of", taxon_ids)
 
+  @typedoc "A Gall as a list on a page shows it: its ID, the name shown and completeness."
+  @type gall_card :: %{id: integer(), name: String.t(), datacomplete: boolean()}
+
+  @doc """
+  The Galls with a current Host among `taxon_ids` (the Host page), each
+  once, by the name shown. A genus Host's Galls are listed for the genus's
+  ID only, not for its species.
+  """
+  @spec list_galls_for_hosts([integer()]) :: [gall_card()]
+  def list_galls_for_hosts([]), do: []
+
+  def list_galls_for_hosts(taxon_ids) when is_list(taxon_ids) do
+    from(r in Current.relationships("host_of"),
+      where: r.subject_taxon_id in ^taxon_ids,
+      select: r.object_gall_id
+    )
+    |> gall_cards()
+  end
+
+  @doc """
+  The Galls whose current Inducer is one of `taxon_ids` (a genus page gives
+  its subtree, `Gallformers.Taxa.subtree_ids/1`), each once, by the name
+  shown.
+  """
+  @spec list_galls_for_inducers([integer()]) :: [gall_card()]
+  def list_galls_for_inducers([]), do: []
+
+  def list_galls_for_inducers(taxon_ids) when is_list(taxon_ids) do
+    from(r in Current.relationships("inducer_of"),
+      where: r.subject_taxon_id in ^taxon_ids,
+      select: r.object_gall_id
+    )
+    |> gall_cards()
+  end
+
+  @doc """
+  The Galls Source `source_id` speaks of (the Source page), each once, by
+  the name shown: those it cites (legacy citations), those current Facts it
+  attributes are about, and those with a note of it (the Gallformers
+  Source's notes).
+  """
+  @spec list_galls_for_source(integer()) :: [gall_card()]
+  def list_galls_for_source(source_id) when is_integer(source_id) do
+    from(c in LegacyCitation, where: c.source_id == ^source_id, select: c.gall_id)
+    |> union_all(^Current.gall_ids_attributed_by(source_id))
+    |> gall_cards(Sources.list_noted_gall_ids(source_id))
+  end
+
+  # The Galls whose IDs `gall_ids` (a query) selects or `more_ids` lists, as
+  # cards by name.
+  defp gall_cards(gall_ids, more_ids \\ []) do
+    from(g in Gall,
+      where: g.id in subquery(gall_ids) or g.id in ^more_ids,
+      select: %{
+        id: g.id,
+        name: fragment("COALESCE(?, ?)", g.name_override, g.name),
+        datacomplete: g.datacomplete
+      }
+    )
+    |> Repo.all()
+    |> Enum.sort_by(&{&1.name, &1.id})
+  end
+
+  # Site-wide counts, the random Gall, the sitemap (`Gallformers.Catalog.ReadModels.Site`).
+
+  @doc "How many Galls there are."
+  @spec count_galls() :: non_neg_integer()
+  defdelegate count_galls(), to: Gallformers.Catalog.ReadModels.Site
+
+  @doc "Galls, undescribed Galls, and the families and genera of their current Inducers, counted."
+  @spec gall_counts() :: Gallformers.Catalog.ReadModels.Site.gall_counts()
+  defdelegate gall_counts(), to: Gallformers.Catalog.ReadModels.Site
+
+  @doc "A random Gall with an image, with the image's URL and credits, or nil."
+  @spec random_gall() :: Gallformers.Catalog.ReadModels.Site.random_gall() | nil
+  defdelegate random_gall(), to: Gallformers.Catalog.ReadModels.Site
+
+  @doc "Every Gall's ID, ascending."
+  @spec list_gall_ids() :: [integer()]
+  defdelegate list_gall_ids(), to: Gallformers.Catalog.ReadModels.Site
+
+  # API v2 (`Gallformers.Catalog.ReadModels.Api`).
+
+  @doc """
+  A page of Gall rows (ID, name shown, editorial fields, `detachable`,
+  `undescribed`, `aliases`; `Gallformers.Catalog.ReadModels.Api`), by the
+  name shown, with the `total` in all. Options: `:q` (found as
+  `search_galls/2` finds Galls), `:limit` (nil for all), `:offset`.
+  """
+  @spec paginate_galls(keyword()) :: %{
+          entries: [Gallformers.Catalog.ReadModels.Api.row()],
+          total: non_neg_integer()
+        }
+  defdelegate paginate_galls(opts), to: Gallformers.Catalog.ReadModels.Api
+
+  @doc "Gall `id`'s row with its current Hosts and Trait values, or `:not_found`."
+  @spec gall_details(integer()) ::
+          {:ok, Gallformers.Catalog.ReadModels.Api.details()} | :not_found
+  defdelegate gall_details(id), to: Gallformers.Catalog.ReadModels.Api
+
+  @doc "Gall `id`'s Sources as its page lists them (note and legacy citations), or `:not_found`."
+  @spec list_gall_sources(integer()) :: {:ok, [GallPage.source()]} | :not_found
+  defdelegate list_gall_sources(id), to: Gallformers.Catalog.ReadModels.Api
+
+  @doc "Gall cards with whether each Gall is `undescribed` (no current species-rank Inducer)."
+  @spec add_undescribed([map()]) :: [map()]
+  defdelegate add_undescribed(cards), to: Gallformers.Catalog.ReadModels.Api
+
+  @doc """
+  Gall cards (`list_galls_for_source/1`) with Source `source_id`'s legacy
+  citation of each (`description`, `externallink`), or its newest note's
+  text as `description`.
+  """
+  @spec add_citations([map()], integer()) :: [map()]
+  defdelegate add_citations(cards, source_id), to: Gallformers.Catalog.ReadModels.Api
+
+  # Rank pages and the Galls browse tree (`Gallformers.Catalog.ReadModels.Browse`).
+
+  @doc """
+  The Galls browse tree: Inducer family → genus → Galls, by name, in the
+  `Gallformers.Taxa.TreeBuilder` shape (`Gallformers.Catalog.ReadModels.Browse`).
+  """
+  @spec gall_tree() :: [map()]
+  defdelegate gall_tree(), to: Browse
+
+  @doc "The Galls browse tree of the undescribed Galls (Inducer above species)."
+  @spec undescribed_gall_tree() :: [map()]
+  defdelegate undescribed_gall_tree(), to: Browse
+
+  @doc "How many Galls have a current Inducer in each taxon's subtree, by taxon ID."
+  @spec count_galls_under([integer()]) :: %{integer() => non_neg_integer()}
+  defdelegate count_galls_under(taxon_ids), to: Browse
+
+  @doc """
+  Gall cards (`list_galls_for_inducers/1`, ...) with their first common
+  name (`:common_name`) and number of current Hosts (`:host_count`).
+  """
+  @spec add_gall_details([gall_card()]) :: [map()]
+  defdelegate add_gall_details(cards), to: Browse
+
+  @doc "How many Galls have a current Host Fact on each taxon, by taxon ID."
+  @spec count_galls_for_hosts([integer()]) :: %{integer() => non_neg_integer()}
+  defdelegate count_galls_for_hosts(taxon_ids), to: Browse
+
+  @doc """
+  The genera of the current Hosts of the Galls `gall_ids`, by name, each
+  with the Galls on it (the genus page's host-genus filter).
+  """
+  @spec host_genera_of_galls([integer()]) :: [Browse.related_genus()]
+  defdelegate host_genera_of_galls(gall_ids), to: Browse
+
+  @doc """
+  The genera of the current Inducers of the Galls on `host_ids`, by name,
+  each with the hosts it has Galls on (the genus page's gall-former filter).
+  """
+  @spec inducer_genera_on_hosts([integer()]) :: [Browse.related_genus()]
+  defdelegate inducer_genera_on_hosts(host_ids), to: Browse
+
   @doc "The summaries of the Galls with a current Host among `taxon_ids`, by Gall ID."
   @spec list_gall_summaries_by_host([integer()]) :: [GallSummary.t()]
   def list_gall_summaries_by_host(taxon_ids) when is_list(taxon_ids),
     do: GallSummary.for_related("host_of", taxon_ids)
+
+  # The ID tool (`Gallformers.Catalog.Identify`, over `gall_index`).
+
+  @doc """
+  The Galls matching the ID tool's `filters`, by name, each with its
+  default image and current Traits (`Gallformers.Catalog.Identify` lists
+  the filters).
+  """
+  @spec identify(Identify.filters()) :: [Identify.result()]
+  defdelegate identify(filters), to: Identify
+
+  @doc "How many Galls match the ID tool's `filters` (`identify/1`)."
+  @spec count_identified(Identify.filters()) :: non_neg_integer()
+  defdelegate count_identified(filters), to: Identify
+
+  @doc "The ID tool's Trait options: each Trait's values, by Trait, each list by value."
+  @spec identify_options() :: %{String.t() => [TraitValue.t()]}
+  defdelegate identify_options(), to: Identify, as: :options
+
+  @doc """
+  The families of the current Inducers of the Galls with a current Host in
+  the subtree of one of `taxon_ids` (a Host, or a Host genus or section),
+  by name: the ID tool's family choices.
+  """
+  @spec gall_families_for_hosts([integer()]) :: [Identify.family()]
+  defdelegate gall_families_for_hosts(taxon_ids), to: Identify
+
+  @doc """
+  The Galls whose display name, a current alias Fact, or a name (accepted
+  or synonym) of their current species-rank Inducer holds every word of
+  `query`, by display name, each with its `aliases` and `undescribed` flag
+  (`Gallformers.Catalog.ReadModels.Search`, the global search). Options:
+  `:place_ids` keeps the Galls whose potential range has one of those
+  places, and every Gall found everywhere.
+  """
+  @spec search_galls(String.t(), keyword()) :: [Gallformers.Catalog.ReadModels.Search.hit()]
+  defdelegate search_galls(query, opts \\ []),
+    to: Gallformers.Catalog.ReadModels.Search,
+    as: :galls
+
+  # The ID tool's lookup table (`Gallformers.Catalog.ReadModels.GallIndex`).
+
+  @doc """
+  Recomputes the ID tool's lookup-table rows of the Galls among `gall_ids`
+  now. Changes to Facts and taxa refresh them through Oban by themselves.
+  """
+  @spec refresh_gall_index([integer()]) :: :ok
+  defdelegate refresh_gall_index(gall_ids), to: GallIndex, as: :refresh
+
+  @doc "Recomputes every Gall's row of the ID tool's lookup table (the data migration's last step)."
+  @spec rebuild_gall_index() :: :ok
+  defdelegate rebuild_gall_index(), to: GallIndex, as: :rebuild_all
+
+  @doc """
+  Runs `fun` with lookup-table refreshes off for this process, returning
+  its result: for bulk writes followed by `rebuild_gall_index/0`.
+  """
+  @spec without_gall_index_refresh((-> result)) :: result when result: var
+  defdelegate without_gall_index_refresh(fun), to: GallIndex, as: :without_refresh
 
   @doc """
   Alternate-generation mismatches across the catalog

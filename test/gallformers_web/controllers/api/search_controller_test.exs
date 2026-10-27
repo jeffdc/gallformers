@@ -1,8 +1,66 @@
 defmodule GallformersWeb.API.SearchControllerTest do
   @moduledoc """
-  API tests for search endpoint.
+  API tests for search endpoint. Galls, hosts and taxa come from the new
+  back-end (`803b` Task 11) in the response shape the endpoint always had;
+  taxon IDs are the new taxon IDs.
   """
   use GallformersWeb.ConnCase
+
+  import OpenApiSpex.TestAssertions
+
+  defp search(conn, query) do
+    conn = get(conn, ~p"/api/v2/search?#{%{q: query}}")
+    assert_operation_response(conn, "GallformersWeb.API.SearchController.search")
+    json_response(conn, 200)
+  end
+
+  describe "GET /api/v2/search response shapes" do
+    test "a gall keeps its fields", %{conn: conn} do
+      gall =
+        conn
+        |> search("Andricus quercuscalifornicus")
+        |> Map.fetch!("galls")
+        |> Enum.find(&(&1["id"] == 100))
+
+      assert Map.keys(gall) |> Enum.sort() ==
+               ~w(aliases id match_score name type undescribed)
+
+      assert %{"name" => "Andricus quercuscalifornicus", "type" => "gall"} = gall
+      assert "Oak Apple Gall Wasp" in gall["aliases"]
+    end
+
+    test "a host keeps its fields; a synonym finds it", %{conn: conn} do
+      assert [host] = search(conn, "Lithocarpus")["hosts"]
+
+      assert Map.keys(host) |> Enum.sort() ==
+               ~w(aliases genus_placeholder id match_score name type)
+
+      assert %{
+               "id" => 10,
+               "name" => "Notholithocarpus densiflorus",
+               "type" => "host",
+               "genus_placeholder" => false,
+               "aliases" => ["Lithocarpus densiflorus", "tanoak"]
+             } = host
+    end
+
+    test "a taxon keeps its fields, with the new taxon ID", %{conn: conn} do
+      tribe = search(conn, "Cynipini")["taxonomy"] |> Enum.find(&(&1["name"] == "Cynipini"))
+
+      assert Map.keys(tribe) |> Enum.sort() ==
+               ~w(description id match_score name parent_name parent_rank parent_type rank type)
+
+      assert %{
+               "type" => "intermediate",
+               "rank" => "Tribe",
+               "parent_name" => "Cynipinae",
+               "parent_type" => "intermediate",
+               "parent_rank" => "Subfamily"
+             } = tribe
+
+      assert tribe["id"] == hd(Gallformers.Taxa.get_by_name("Cynipini", :tribe)).id
+    end
+  end
 
   describe "GET /api/v2/search" do
     test "returns search results with all categories", %{conn: conn} do

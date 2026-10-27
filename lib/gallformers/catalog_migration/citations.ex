@@ -4,7 +4,9 @@ defmodule Gallformers.CatalogMigration.Citations do
   the Gallformers Source) as legacy citations of their Galls (`9449` §6,
   Task 16; `Gallformers.Catalog.LegacyCitation`): the Source, narrative,
   `useasdefault` and deep link, kept for the Gall page until the backscan
-  attributes their Facts. They are not Facts. Citations of plants have no
+  attributes their Facts. They are not Facts. (Which Source a Gall's page
+  leads with is the Gall's `default_source_id`, set from `useasdefault` by
+  `Gallformers.CatalogMigration.Galls`; the citation keeps the flag.) Citations of plants have no
   Gall to go to and are reported.
   """
 

@@ -34,44 +34,6 @@ defmodule Gallformers.Galls.HostAssociations do
   end
 
   @doc """
-  Returns true when every host in the given list is flagged as a genus-level
-  placeholder (e.g. "Quercus spp").
-
-  Takes the host maps produced by `get_hosts_for_gall/1` so callers that have
-  already loaded hosts don't pay for a second DB round trip. Returns false for
-  an empty list.
-  """
-  @spec only_placeholder_hosts?([map()]) :: boolean()
-  def only_placeholder_hosts?(hosts) when is_list(hosts) do
-    hosts != [] and Enum.all?(hosts, & &1.genus_placeholder)
-  end
-
-  @doc """
-  Gets hosts for multiple gall species in a single query (batch version).
-
-  Returns a map of gall_species_id => [%{host_species_id, host_name}].
-  """
-  @spec get_hosts_for_galls([integer()]) :: %{integer() => [map()]}
-  def get_hosts_for_galls([]), do: %{}
-
-  def get_hosts_for_galls(gall_species_ids) do
-    from(h in GallHost,
-      join: s in Species,
-      on: h.host_species_id == s.id,
-      where: h.gall_species_id in ^gall_species_ids,
-      select: %{
-        gall_species_id: h.gall_species_id,
-        host_species_id: s.id,
-        host_name: s.name
-      }
-    )
-    |> Repo.all()
-    |> Enum.group_by(& &1.gall_species_id, fn row ->
-      %{host_species_id: row.host_species_id, host_name: row.host_name}
-    end)
-  end
-
-  @doc """
   Gets host counts for multiple gall species in a single query (batch version).
 
   Returns a map of gall_species_id => count of hosts.
@@ -158,12 +120,6 @@ defmodule Gallformers.Galls.HostAssociations do
       gall_host -> Repo.delete(gall_host)
     end
   end
-
-  @doc """
-  Gets a gall-host relationship by ID.
-  """
-  @spec get_gall_host(integer()) :: GallHost.t() | nil
-  def get_gall_host(id), do: Repo.get(GallHost, id)
 
   @doc """
   Saves all gall-host mapping changes in a single transaction.

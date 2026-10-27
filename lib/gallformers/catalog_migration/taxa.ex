@@ -12,7 +12,10 @@ defmodule Gallformers.CatalogMigration.Taxa do
       everything below inherits it. Taxa in Plantae are `:powo`, the rest
       `:curated`. Intermediate ranks the contract does not have
       (Infrafamily, Supertribe, Infratribe) are skipped, their children
-      attached to the nearest taxon above, and reported.
+      attached to the nearest taxon above, and reported. The description of
+      a genus, section or intermediate rank (mostly a common name, "Elms")
+      becomes a common name of its taxon; a family's (its old type) is
+      dropped (`803b` decision 7).
     * **Merged rows** (`taxon_merges.csv`,
       `Gallformers.CatalogMigration.TaxonMerges`) — a row kept twice today
       becomes no taxon of its own: its crosswalk entry points at the taxon
@@ -23,9 +26,11 @@ defmodule Gallformers.CatalogMigration.Taxa do
       family (with its "Unknown (Unknown)" genus) is no taxon at all.
     * **Plants** — each plant `species` row becomes a species-rank (or
       variety, subspecies, form, by its name) taxon keeping its ID, origin
-      `:powo`, kingdom Plantae, under its section or else its genus.
+      `:powo`, kingdom Plantae, under its section or else its genus, with
+      its editorial `datacomplete` and `abundance_id` (`803b` decision 6).
     * **Genus placeholder plants** ("Quercus spp.") become no taxon; they
-      stand for their genus taxon.
+      stand for their genus taxon, with a `:genus_placeholder` crosswalk
+      entry (their species ID → the genus) for their old `/host/:id` URLs.
     * **`host_range`** is re-keyed by `taxon_id`: a plant's rows to its own
       ID, a genus placeholder's rows to its genus taxon.
 
@@ -123,6 +128,7 @@ defmodule Gallformers.CatalogMigration.Taxa do
       merged: 0,
       placeholders: 0,
       unknown: 0,
+      common_names: 0,
       skipped: [],
       problems: []
     }
@@ -141,6 +147,7 @@ defmodule Gallformers.CatalogMigration.Taxa do
         {"skipped intermediate ranks", length(acc.skipped)},
         {"unreachable from a root", length(unreached)}
       ])
+      |> reconcile_descriptions(rows, acc)
       |> Report.problems("unmapped rank", Enum.reverse(acc.skipped))
       |> Report.problems("taxonomy", Enum.reverse(acc.problems))
       |> Report.problems("unreachable taxonomy row", unreached)
@@ -274,11 +281,61 @@ defmodule Gallformers.CatalogMigration.Taxa do
       })
 
     legacy_id!(actor, taxon.id, :taxonomy, row.id, row.name)
+    acc = common_name_from_description(actor, row, taxon.id, acc)
 
     acc
     |> anchor(row.id, taxon.id)
     |> put_taxon(taxon.id, %{name: name, rank: rank, kingdom: kingdom, parent: parent})
     |> Map.update!(:created, &(&1 + 1))
+  end
+
+  # A genus, section or intermediate rank's description is a common name
+  # ("Elms"); a family's is its old type, dropped (`803b` decision 7).
+  defp common_name_from_description(actor, row, taxon_id, acc) do
+    if described?(row) do
+      case Taxa.add_common_name(actor, taxon_id, String.trim(row.description)) do
+        {:ok, _} ->
+          Map.update!(acc, :common_names, &(&1 + 1))
+
+        {:error, changeset} ->
+          raise "could not add common name for #{row_label(row)}: #{inspect(changeset.errors)}"
+      end
+    else
+      acc
+    end
+  end
+
+  # A non-blank description on a row below family: a common name to carry.
+  defp described?(%{type: "family"}), do: false
+  defp described?(row), do: String.trim(row.description || "") != ""
+
+  # The described rows (`described?/1`) and what became of their descriptions.
+  defp reconcile_descriptions(report, rows, acc) do
+    described = Enum.filter(rows, &described?/1)
+    dropped = Enum.frequencies_by(described, &description_fate(&1, acc))
+
+    Report.reconcile(
+      report,
+      "Taxonomy descriptions below family (→ common names)",
+      length(described),
+      acc.common_names,
+      [
+        {"placeholder genera (no taxon)", Map.get(dropped, :placeholder, 0)},
+        {"merged into another taxon (taxon_merges.csv)", Map.get(dropped, :merged, 0)},
+        {"skipped intermediate ranks", Map.get(dropped, :skipped, 0)},
+        {"unreachable from a root", Map.get(dropped, :unreached, 0)}
+      ]
+    )
+  end
+
+  defp description_fate(row, acc) do
+    cond do
+      not Map.has_key?(acc.ctx.anchors, row.id) -> :unreached
+      Map.has_key?(acc.merges, row.id) -> :merged
+      classify(row) == :placeholder_genus -> :placeholder
+      match?({:skip, _}, classify(row)) -> :skipped
+      true -> :named
+    end
   end
 
   # The nearest taxon above that ranks above `rank`; a rank inversion in
@@ -334,7 +391,7 @@ defmodule Gallformers.CatalogMigration.Taxa do
     acc =
       Enum.reduce(rows, %{ctx: ctx, created: 0, placeholders: 0, unplaced: [], rootless: []}, fn
         %{genus_placeholder: true} = plant, acc ->
-          placeholder(plant, links, acc)
+          placeholder(actor, plant, links, acc)
 
         plant, acc ->
           plant!(actor, plant, links, acc)
@@ -351,11 +408,37 @@ defmodule Gallformers.CatalogMigration.Taxa do
         acc.placeholders,
         [{"without a genus", length(acc.unplaced)}]
       )
+      |> Report.reconcile(
+        "Genus placeholder URLs (→ their genus page)",
+        length(placeholders),
+        Old.count("SELECT count(*) FROM legacy_taxon_ids WHERE kind = 'genus_placeholder'"),
+        [{"without a genus", length(acc.unplaced)}]
+      )
+      |> reconcile_flag("Data-complete plants", rows, & &1.datacomplete, "datacomplete")
+      |> reconcile_flag(
+        "Plants with an abundance",
+        rows,
+        &(&1.abundance_id != nil),
+        "abundance_id IS NOT NULL"
+      )
       |> Report.problems("plant without a genus (a root taxon)", Enum.reverse(acc.rootless))
       |> Report.problems("genus placeholder without a genus", Enum.reverse(acc.unplaced))
       |> Report.problems("species row neither gall nor plant (not migrated)", neither())
 
     {acc.ctx, report}
+  end
+
+  # A plant editorial flag (`803b` decision 6): the plant rows holding it
+  # against the taxa holding it (`taxa_condition`); a genus placeholder's is
+  # lost with it.
+  defp reconcile_flag(report, label, rows, held?, taxa_condition) do
+    held = Enum.filter(rows, held?)
+    on_placeholders = Enum.count(held, & &1.genus_placeholder)
+    taxa = Old.count("SELECT count(*) FROM taxa WHERE #{taxa_condition}")
+
+    Report.reconcile(report, label, length(held), taxa, [
+      {"on genus placeholders (no taxon)", on_placeholders}
+    ])
   end
 
   defp neither do
@@ -368,15 +451,18 @@ defmodule Gallformers.CatalogMigration.Taxa do
     end
   end
 
-  defp placeholder(plant, links, acc) do
+  defp placeholder(actor, plant, links, acc) do
     genus = get_in(links, [plant.id, :genus])
     taxon = genus && acc.ctx.anchors[genus]
 
     acc = put_in(acc, [:ctx, :plants, plant.id], taxon)
 
-    if taxon,
-      do: Map.update!(acc, :placeholders, &(&1 + 1)),
-      else: Map.update!(acc, :unplaced, &["#{plant.id} #{plant.name}" | &1])
+    if taxon do
+      legacy_id!(actor, taxon, :genus_placeholder, plant.id, plant.name)
+      Map.update!(acc, :placeholders, &(&1 + 1))
+    else
+      Map.update!(acc, :unplaced, &["#{plant.id} #{plant.name}" | &1])
+    end
   end
 
   defp plant!(actor, plant, links, acc) do
@@ -391,7 +477,9 @@ defmodule Gallformers.CatalogMigration.Taxa do
       origin: :powo,
       name: name,
       parent_id: parent,
-      kingdom: "Plantae"
+      kingdom: "Plantae",
+      datacomplete: plant.datacomplete,
+      abundance_id: plant.abundance_id
     })
 
     acc =

@@ -35,18 +35,14 @@ defmodule GallformersWeb.RedirectController do
   end
 
   @doc """
-  Redirects old /taxonomy/:id URLs to name-based routes.
-
-  Maps each taxonomy type to its canonical URL:
-  - family → /family/:name
-  - genus → /genus/:name
-  - section → /section/:name
-  - intermediate → /:rank/:name (e.g., /subfamily/Cynipinae)
+  Redirects old /taxonomy/:id URLs (old taxonomy IDs) to the rank page of
+  the taxon the crosswalk maps them to (`TaxonomyURL.legacy_path/1`):
+  /family/:name, /genus/:name, /section/:name or /:rank/:name (e.g.
+  /subfamily/Cynipinae). An ID the crosswalk does not know is not found.
   """
   def taxonomy(conn, %{"id" => id_str}) do
-    with {id, ""} <- Integer.parse(id_str),
-         %{} = taxonomy <- Gallformers.Taxonomy.get_taxonomy(id),
-         path when is_binary(path) <- TaxonomyURL.public_path(taxonomy) do
+    with {_id, ""} <- Integer.parse(id_str),
+         path when is_binary(path) <- TaxonomyURL.legacy_path(id_str) do
       conn
       |> put_status(:moved_permanently)
       |> redirect(to: path)

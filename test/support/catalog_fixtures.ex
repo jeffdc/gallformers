@@ -6,12 +6,14 @@ defmodule Gallformers.CatalogFixtures do
 
   ## Vocabularies in tests
 
-  The test database has no Catalog vocabulary rows: `priv/repo/test_seeds.sql`
-  does not copy `traits.json`, so the contract stays the one source of truth
-  and the loader itself is what tests exercise. A test that needs Trait or
-  generation values calls `load_vocab!/0` in its setup. The vocabulary
+  `priv/repo/test_seeds.sql` does not copy `traits.json`, so the contract
+  stays the one source of truth: the test database's vocabulary rows are the
+  ones the catalog migration loaded with the real loader when `make test-db`
+  converted the seeds. A test that needs Trait or generation values still
+  calls `load_vocab!/0` in its setup (it then writes nothing). The vocabulary
   tables are unique on their values, so such test modules are not async
-  (concurrent loads would wait on each other inside their sandboxes).
+  (concurrent loads that write would wait on each other inside their
+  sandboxes).
   """
 
   import Ecto.Query, only: [from: 2]

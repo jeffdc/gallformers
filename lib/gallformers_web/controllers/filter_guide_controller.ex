@@ -1,20 +1,34 @@
 defmodule GallformersWeb.FilterGuideController do
   use GallformersWeb, :controller
 
-  alias Gallformers.FilterFields
+  alias Gallformers.Catalog
+
+  # The Traits the guide explains, as its sections name them.
+  @traits %{
+    "alignment" => :alignment,
+    "cells" => :cells,
+    "detachable" => :detachable,
+    "form" => :form,
+    "plant_part" => :plant_part,
+    "season" => :season,
+    "shape" => :shape,
+    "texture" => :texture,
+    "walls" => :walls
+  }
 
   def show(conn, _params) do
+    # Each Trait's values with their definitions, from the contract
+    # vocabulary; a value without a definition ("unknown") is no filter term.
+    empty = Map.new(Map.values(@traits), &{&1, []})
+
     filter_fields =
-      for type <- [:alignment, :cells, :form, :plant_part, :shape, :texture, :walls],
-          into: %{} do
-        field_name = FilterFields.field_name_for(type)
-
-        items =
-          FilterFields.list_all(type)
-          |> Enum.map(&%{field: Map.get(&1, field_name), description: &1.description})
-
-        {type, items}
-      end
+      Catalog.list_trait_values()
+      |> Enum.filter(&(Map.has_key?(@traits, &1.trait) and &1.definition != nil))
+      |> Enum.group_by(
+        &Map.fetch!(@traits, &1.trait),
+        &%{field: &1.value, description: &1.definition}
+      )
+      |> then(&Map.merge(empty, &1))
 
     conn
     |> assign(:page_title, "Filter Guide")

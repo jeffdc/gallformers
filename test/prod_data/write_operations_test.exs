@@ -54,6 +54,15 @@ defmodule Gallformers.ProdData.WriteOperationsTest do
     )
   end
 
+  defp species_ids_for_genus(genus_id) do
+    Repo.all(
+      from(st in "species_taxonomy",
+        where: st.taxonomy_id == ^genus_id,
+        select: st.species_id
+      )
+    )
+  end
+
   defp get_genus_id_for_species(species_id) do
     Repo.one(
       from(st in "species_taxonomy",
@@ -445,7 +454,7 @@ defmodule Gallformers.ProdData.WriteOperationsTest do
         raise "No genus with 2+ species found for rename cascade test"
       end
 
-      species_ids = Taxonomy.get_species_ids_for_genus(genus_with_species.id)
+      species_ids = species_ids_for_genus(genus_with_species.id)
 
       old_species_names =
         Repo.all(from(s in Species, where: s.id in ^species_ids, select: {s.id, s.name}))
@@ -623,7 +632,7 @@ defmodule Gallformers.ProdData.WriteOperationsTest do
         IO.puts("SKIP: No genus with 1-5 species found")
       else
         # Record what exists before deletion
-        species_ids = Taxonomy.get_species_ids_for_genus(genus.id)
+        species_ids = species_ids_for_genus(genus.id)
         assert length(species_ids) > 0
 
         alias_ids_before =
@@ -705,7 +714,7 @@ defmodule Gallformers.ProdData.WriteOperationsTest do
       else
         # Get predicted impact
         impact = Taxonomy.get_deletion_impact(genus)
-        species_ids = Taxonomy.get_species_ids_for_genus(genus.id)
+        species_ids = species_ids_for_genus(genus.id)
 
         # Actually delete
         {:ok, actual} = Taxonomy.delete_taxonomy_cascade(genus)
@@ -875,7 +884,7 @@ defmodule Gallformers.ProdData.WriteOperationsTest do
 
       assert genus, "Need a genus with species"
 
-      species_ids = Taxonomy.get_species_ids_for_genus(genus.id)
+      species_ids = species_ids_for_genus(genus.id)
       [first_species | _] = Repo.all(from(s in Species, where: s.id in ^species_ids))
 
       new_genus_name = "Collisiontest#{System.unique_integer([:positive])}"
@@ -921,7 +930,7 @@ defmodule Gallformers.ProdData.WriteOperationsTest do
 
       assert genus, "Need a genus with 2+ species"
 
-      species_ids = Taxonomy.get_species_ids_for_genus(genus.id)
+      species_ids = species_ids_for_genus(genus.id)
 
       all_species =
         Repo.all(from(s in Species, where: s.id in ^species_ids, order_by: s.name))

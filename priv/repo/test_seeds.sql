@@ -186,8 +186,8 @@ INSERT INTO taxonomy (id, name, description, type, rank, parent_id, is_placehold
   (30, 'Cynipidae', 'Wasp', 'family', NULL, NULL, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
   (31, 'Cynipinae', NULL, 'intermediate', 'Subfamily', 30, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
   (32, 'Cynipini', NULL, 'intermediate', 'Tribe', 31, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
-  (33, 'Andricus', 'test genus under tribe', 'genus', NULL, 32, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
-  (34, 'Cynips', 'test genus under tribe', 'genus', NULL, 32, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (33, 'Andricus', NULL, 'genus', NULL, 32, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (34, 'Cynips', '', 'genus', NULL, 32, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
   (35, 'Unknown', NULL, 'genus', NULL, 30, true, '2026-01-01T00:00:00', '2026-01-01T00:00:00');
 
 -- Species under intermediate-parented genera
@@ -202,6 +202,131 @@ INSERT INTO gall_traits (species_id, detachable, undescribed) VALUES
 INSERT INTO species_taxonomy (species_id, taxonomy_id) VALUES
   (200, 33),  -- A. crystallinus → Andricus (under Cynipini tribe)
   (201, 34);  -- C. quercus → Cynips (under Cynipini tribe)
+
+-- =============================================================================
+-- Cases for the pages on the new back-end
+-- =============================================================================
+-- `make test-db` converts every old table here into the new ones with the
+-- catalog migration (`mix gallformers.catalog.migrate --curated
+-- test/support/fixtures/catalog_migration`); these rows exist for the cases
+-- the new pages show. The curated decisions they need are in that directory
+-- (the gall form's name_suffixes.csv row, the scientific alias's aliases.csv
+-- row). test/gallformers/catalog_migration/test_seeds_test.exs checks the
+-- conversion.
+
+-- A real host genus and family, and the genus Neuroterus under Cynipini.
+-- The genus's description is a common name (the migration makes it one of
+-- its taxon); the family's is its old type (dropped).
+INSERT INTO taxonomy (id, name, description, type, rank, parent_id, is_placeholder, inserted_at, updated_at) VALUES
+  (36, 'Neuroterus', NULL, 'genus', NULL, 32, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (40, 'Fagaceae', 'Plant', 'family', NULL, NULL, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (41, 'Notholithocarpus', 'Tanoaks', 'genus', NULL, 40, false, '2026-01-01T00:00:00', '2026-01-01T00:00:00');
+
+-- The host, native in California and introduced in Bucharest; data-complete
+-- and common (editorial flags the migration carries onto its taxon)
+INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id, inserted_at, updated_at) VALUES
+  (10, 'Notholithocarpus densiflorus', 'plant', true, 1, '2026-01-01T00:00:00', '2026-01-01T00:00:00');
+
+INSERT INTO species_taxonomy (species_id, taxonomy_id) VALUES
+  (10, 41);
+
+INSERT INTO host_range (species_id, place_id, precision, distribution_type) VALUES
+  (10, 2, 'exact', 'native'),        -- US-CA
+  (10, 4, 'exact', 'introduced');    -- RO-B
+
+-- A genus placeholder plant ("Notholithocarpus spp"): the migration makes it
+-- no taxon; its gallhost becomes a genus-level Host (the genus taxon) and its
+-- host_range row moves to the genus. Its range is Mexico, country-level.
+INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id, genus_placeholder, inserted_at, updated_at) VALUES
+  (11, 'Notholithocarpus spp', 'plant', false, 1, true, '2026-01-01T00:00:00', '2026-01-01T00:00:00');
+
+INSERT INTO species_taxonomy (species_id, taxonomy_id) VALUES
+  (11, 41);
+
+INSERT INTO host_range (species_id, place_id, precision, distribution_type) VALUES
+  (11, 904, 'country', 'native');    -- MX
+
+-- 300/301: an agamic/sexgen pair of one species (one Inducer, two Galls)
+-- 302/303: gall forms of one species; 302's name is read by its curated
+--          name_suffixes.csv row (the form "(australis)" is no generation)
+-- 304: an undescribed gall in a real genus (its Inducer is the genus)
+INSERT INTO species (id, name, taxoncode, datacomplete, abundance_id, inserted_at, updated_at) VALUES
+  (300, 'Andricus seedii (agamic)', 'gall', true, 1, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (301, 'Andricus seedii (sexgen)', 'gall', false, 2, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (302, 'Neuroterus seedatorius (australis) (agamic)', 'gall', false, 1, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (303, 'Neuroterus seedatorius (sexgen)', 'gall', false, 2, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (304, 'Andricus n-densiflorus-seed-gall', 'gall', false, 3, '2026-01-01T00:00:00', '2026-01-01T00:00:00');
+
+INSERT INTO gall_traits (species_id, detachable, undescribed, gallformers_code) VALUES
+  (300, 'detachable', false, NULL),
+  (301, 'integral', false, NULL),
+  (302, 'detachable', false, NULL),
+  (303, 'integral', false, NULL),
+  (304, 'integral', true, 'n-densiflorus-seed-gall');
+
+INSERT INTO species_taxonomy (species_id, taxonomy_id) VALUES
+  (300, 33), (301, 33), (304, 33),  -- → Andricus
+  (302, 36), (303, 36);             -- → Neuroterus
+
+INSERT INTO gallhost (id, host_species_id, gall_species_id, inserted_at, updated_at) VALUES
+  (5, 10, 300, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (6, 10, 301, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (7, 10, 302, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (8, 10, 303, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (9, 10, 304, '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (10, 11, 304, '2026-01-01T00:00:00', '2026-01-01T00:00:00');  -- the genus placeholder
+
+-- Gall 300's aliases: a common name (a gall alias Fact) and a scientific
+-- name (a synonym of its Inducer, as the test aliases.csv decides)
+INSERT INTO alias (id, name, type, description, inserted_at, updated_at) VALUES
+  (4, 'seed oak apple', 'common', '', '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (5, 'Callirhytis seedii', 'scientific', '', '2026-01-01T00:00:00', '2026-01-01T00:00:00');
+
+INSERT INTO alias_species (alias_id, species_id) VALUES
+  (4, 300),
+  (5, 300);
+
+-- The host's aliases: a common name (a common name of its taxon) and a
+-- scientific name (a synonym of its taxon, as the test aliases.csv decides)
+INSERT INTO alias (id, name, type, description, inserted_at, updated_at) VALUES
+  (6, 'tanoak', 'common', '', '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (7, 'Lithocarpus densiflorus', 'scientific', '', '2026-01-01T00:00:00', '2026-01-01T00:00:00');
+
+INSERT INTO alias_species (alias_id, species_id) VALUES
+  (6, 10),
+  (7, 10);
+
+-- Gall 304's former label (a former_undescribed alias: a former_label alias
+-- Fact) and informal code (a scientific alias the test aliases.csv decides
+-- is a code): shown in the Gall page's names table, never as common names
+INSERT INTO alias (id, name, type, description, inserted_at, updated_at) VALUES
+  (8, 'Andricus q-seed-old-label', 'former_undescribed', '', '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (9, 'q-seed-code', 'scientific', '', '2026-01-01T00:00:00', '2026-01-01T00:00:00');
+
+INSERT INTO alias_species (alias_id, species_id) VALUES
+  (8, 304),
+  (9, 304);
+
+-- Sources: 58 is the Gallformers Source (its species_source rows are the
+-- Gallformers ID Notes); 59 a publication cited on Gall 300. Gall 300's
+-- default description (useasdefault) is the citation, Gall 301's its note:
+-- the migration makes each the Gall's default_source_id
+INSERT INTO source (id, title, author, pubyear, link, citation, license, kind, inserted_at, updated_at) VALUES
+  (58, 'Gallformers ID Notes', 'Gallformers Contributors', '2020', 'https://gallformers.org',
+   'Gallformers ID Notes.', 'Public Domain / CC0', 'gallformers', '2026-01-01T00:00:00', '2026-01-01T00:00:00'),
+  (59, 'Cynipid galls of the seed slope', 'Weld, L. H.', '1957', 'https://example.com/seed-slope',
+   'Weld, L. H. 1957. Cynipid galls of the seed slope.', 'Public Domain / Copyright Expired',
+   'publication', '2026-01-01T00:00:00', '2026-01-01T00:00:00');
+
+INSERT INTO species_source (id, species_id, source_id, description, useasdefault, externallink) VALUES
+  (1, 300, 58, 'The seed note: a round, detachable gall on the leaf underside.', false, ''),
+  (2, 300, 59, 'The seed citation: Weld describes the agamic gall.', true, 'https://example.com/seed-slope#p12'),
+  (3, 301, 58, 'The sexgen seed note: a tiny gall on the catkins.', true, '');
+
+-- An image on a gall and one on its host
+INSERT INTO image (id, path, species_id, creator, license) VALUES
+  (1, 'gall/300/300_seed_original.jpg', 300, 'Seed Photographer', 'CC-BY'),
+  (2, 'gall/10/10_seed_original.jpg', 10, 'Seed Photographer', 'CC-BY');
 
 -- =============================================================================
 -- Glossary
@@ -246,10 +371,14 @@ SELECT setval('gallhost_id_seq', (SELECT MAX(id) FROM gallhost));
 SELECT setval('place_id_seq', (SELECT MAX(id) FROM place));
 SELECT setval('glossary_id_seq', (SELECT MAX(id) FROM glossary));
 SELECT setval('keys_id_seq', (SELECT MAX(id) FROM keys));
--- Galls and taxa share entity_id_seq, which continues the species IDs.
+SELECT setval('source_id_seq', (SELECT MAX(id) FROM source));
+SELECT setval('species_source_id_seq', (SELECT MAX(id) FROM species_source));
+SELECT setval('image_id_seq', (SELECT MAX(id) FROM image));
+-- Galls and taxa share entity_id_seq, which continues the species IDs (the
+-- catalog migration moves it on past the taxa it creates).
 SELECT setval('entity_id_seq', (SELECT MAX(id) FROM species));
 
 -- Catalog vocabularies (trait_values, generation_values, ...) are not seeded
--- here: tests load them from the contract with the real loader
--- (Gallformers.CatalogFixtures.load_vocab!/0), so traits.json stays the one
--- source of truth.
+-- here: the catalog migration that `make test-db` runs after this file loads
+-- them from the contract with the real loader (Catalog.load_vocab/1), so
+-- traits.json stays the one source of truth.

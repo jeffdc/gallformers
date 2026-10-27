@@ -1,10 +1,22 @@
 defmodule GallformersWeb.HostsBrowseLiveTest do
   @moduledoc """
-  LiveView tests for the public Hosts browse page at /hosts.
+  LiveView tests for the public Hosts browse page at /hosts, which reads
+  `Gallformers.Taxa.plant_tree/0`.
+
+  Uses the converted seeds (`priv/repo/test_seeds.sql`): FamilyAlpha (old
+  taxonomy 20) > GenusAlpha with two plants; Fagaceae >
+  Notholithocarpus > plant 10.
   """
   use GallformersWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
+
+  # Reading the seeds, converted, is most of what this module tests.
+  # credo:disable-for-this-file Gallformers.Credo.Checks.TestQuality.TestsOwnTheirData
+
+  alias Gallformers.Taxa
+
+  defp family_key(old_id), do: "f-#{Taxa.get_by_legacy_id(:taxonomy, old_id).id}"
 
   describe "/hosts page" do
     test "renders the hosts browse page with tree", %{conn: conn} do
@@ -25,10 +37,22 @@ defmodule GallformersWeb.HostsBrowseLiveTest do
 
       html =
         view
-        |> element(~s{button[phx-click="toggle_node"][phx-value-key="f-20"]})
+        |> element(~s{button[phx-click="toggle_node"][phx-value-key="#{family_key(20)}"]})
         |> render_click()
 
       assert html =~ "GenusAlpha"
+    end
+
+    test "plants link to their Host pages", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/hosts")
+
+      html =
+        view
+        |> element(~s{button[phx-click="expand_all"]})
+        |> render_click()
+
+      assert html =~ "Notholithocarpus densiflorus"
+      assert has_element?(view, ~s{a[href="/host/10"]})
     end
 
     test "search filters the tree", %{conn: conn} do

@@ -21,7 +21,7 @@ defmodule Gallformers.Catalog.VocabTest do
 
   defp contract(file), do: @vocab_dir |> Path.join(file) |> File.read!() |> Jason.decode!()
 
-  defp audit_change_count, do: Repo.aggregate(Carbonite.Change, :count)
+  defp audit_change_count, do: Repo.aggregate(test_audit_changes(), :count)
 
   describe "Relationship types" do
     test "match the contract's three endpoint groups" do
@@ -158,8 +158,10 @@ defmodule Gallformers.Catalog.VocabTest do
     end
 
     test "is idempotent: loading again writes nothing" do
-      {:ok, first} = Catalog.load_vocab(test_actor())
-      assert first.trait_values > 0
+      # The converted seeds already hold the vocabularies (the catalog
+      # migration loads them), so this first load may write nothing either.
+      {:ok, _first} = Catalog.load_vocab(test_actor())
+      assert Repo.aggregate(TraitValue, :count) > 0
 
       counts =
         for t <- [TraitValue, TraitTermMapping, GenerationGroup, GenerationValue],

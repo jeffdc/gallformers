@@ -113,6 +113,31 @@ defmodule Gallformers.CatalogMigration.LegacyTest do
     assert Enum.reject(report.reconciliation, &Report.balanced?/1) == []
   end
 
+  test "the ID tool's lookup table is rebuilt at the end, one row per Gall, no job enqueued",
+       ctx do
+    Oban.Testing.with_testing_mode(:manual, fn ->
+      report = run!()
+
+      refute Repo.exists?(
+               from(j in Oban.Job,
+                 where: j.worker == "Gallformers.Catalog.ReadModels.GallIndexWorker"
+               )
+             )
+
+      gall_ids = Repo.all(from(g in Catalog.Gall, select: g.id))
+      rows = Repo.all(from(r in "gall_index", select: {r.gall_id, r.host_taxon_ids}))
+
+      assert Enum.sort(Enum.map(rows, &elem(&1, 0))) == Enum.sort(gall_ids)
+
+      hosts = Map.new(rows)[ctx.old.agamic]
+      assert ctx.old.alba in hosts
+      assert length(hosts) == 2
+
+      assert %{old: n, new: n} =
+               Enum.find(report.reconciliation, &(&1.label =~ "lookup table"))
+    end)
+  end
+
   test "a real Source's later denial withdraws a legacy Host", ctx do
     run!()
 
@@ -169,6 +194,45 @@ defmodule Gallformers.CatalogMigration.LegacyTest do
              {weld.id, "Galls on the stems.", true, "https://example.com/weld#p12"}
 
     refute Repo.exists?(from(a in "attributions", where: a.source_id == ^weld.id))
+  end
+
+  test "each Gall's default Source is today's useasdefault row, its note or a citation", ctx do
+    gallformers = gallformers_source()
+    weld = source_fixture("Weld", "1959")
+    felt = source_fixture("Felt", "1940")
+
+    species_source!(ctx.old.agamic, gallformers.id, "The note.", useasdefault: true)
+    species_source!(ctx.old.agamic, weld.id, "Weld on the agamic gall.")
+    # Two defaults: the lowest species_source ID is kept.
+    species_source!(ctx.old.sexgen, felt.id, "Felt on the sexual gall.", useasdefault: true)
+    species_source!(ctx.old.sexgen, weld.id, "Weld on the sexual gall.", useasdefault: true)
+    # A plant's has no Gall to go to.
+    species_source!(ctx.old.alba, weld.id, "Weld on the oak.", useasdefault: true)
+
+    report = run!()
+
+    assert Catalog.get_gall!(ctx.old.agamic).default_source_id == gallformers.id
+    assert Catalog.get_gall!(ctx.old.sexgen).default_source_id == felt.id
+    assert Catalog.get_gall!(ctx.old.in_family).default_source_id == nil
+
+    defaults = Enum.find(report.reconciliation, &(&1.label =~ "Default Sources"))
+    assert Report.balanced?(defaults) == true
+    assert {"on species that are not Galls", 1} in defaults.accounted
+
+    assert {"further defaults of a Gall (the lowest species_source ID kept)", 1} in defaults.accounted
+
+    # With the seeds' Galls 300 and 301, whose Source 58 is no longer the
+    # Gallformers Source here (`gallformers_source/0` takes its place).
+    assert defaults.new == 4
+    assert {"Galls whose default Source is their Gallformers note", 1} in report.counts
+
+    assert [detail] =
+             for(
+               %{category: "Gall with several default Sources", detail: d} <- report.problems,
+               do: d
+             )
+
+    assert detail =~ "#{ctx.old.sexgen}"
   end
 
   test "image paths are unchanged and each image gets its typed reference", ctx do

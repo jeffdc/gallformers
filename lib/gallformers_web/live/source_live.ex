@@ -2,12 +2,12 @@ defmodule GallformersWeb.SourceLive do
   @moduledoc """
   LiveView for the source/reference detail page.
 
-  Displays detailed information about a scientific source including
-  metadata and connected species.
+  Displays a scientific source's metadata, its images and the Galls it
+  speaks of (`Gallformers.Catalog.list_galls_for_source/1`).
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.{Images, Sources}
+  alias Gallformers.{Catalog, Images, Sources}
   alias Gallformers.Images.Image
 
   @page_size 20
@@ -49,8 +49,7 @@ defmodule GallformersWeb.SourceLive do
          )}
 
       source ->
-        # Get connected species and images
-        species = Sources.get_species_for_source(source_id) |> Enum.sort_by(& &1.name)
+        galls = Catalog.list_galls_for_source(source_id)
         images = Images.list_images_for_source(source_id) |> format_images()
         author_text = if source.author, do: " by #{source.author}", else: ""
 
@@ -70,7 +69,7 @@ defmodule GallformersWeb.SourceLive do
            page_json_ld: nil,
            page_noindex: false,
            source: source,
-           species: species,
+           galls: galls,
            images: images,
            current_page: 1,
            page_size: @page_size,
@@ -81,7 +80,7 @@ defmodule GallformersWeb.SourceLive do
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
-    page = max(1, min(page, total_pages(socket.assigns.species, socket.assigns.page_size)))
+    page = max(1, min(page, total_pages(socket.assigns.galls, socket.assigns.page_size)))
     {:noreply, assign(socket, current_page: page)}
   end
 
@@ -111,20 +110,19 @@ defmodule GallformersWeb.SourceLive do
         sourcelink: img.sourcelink,
         uploader: img.uploader,
         lastchangedby: img.lastchangedby,
-        caption: img.caption,
-        species_id: img.species_id
+        caption: img.caption
       }
     end)
   end
 
-  defp paginated_species(species, current_page, page_size) do
-    species
+  defp paginated_galls(galls, current_page, page_size) do
+    galls
     |> Enum.drop((current_page - 1) * page_size)
     |> Enum.take(page_size)
   end
 
-  defp total_pages(species, page_size) do
-    max(1, ceil(length(species) / page_size))
+  defp total_pages(galls, page_size) do
+    max(1, ceil(length(galls) / page_size))
   end
 
   @impl true
@@ -214,48 +212,44 @@ defmodule GallformersWeb.SourceLive do
               </div>
             </div>
 
-            <%!-- Connected Species --%>
+            <%!-- Connected Galls --%>
             <div class="mt-8">
               <h2 class="text-lg font-semibold text-gray-800 mb-3">
-                Connected Species ({length(@species)})
+                Connected Galls ({length(@galls)})
               </h2>
-              <%= if length(@species) > 0 do %>
+              <%= if @galls != [] do %>
                 <div class="bg-white rounded border border-gray-200 overflow-hidden">
                   <table class="gf-table gf-table-compact">
                     <thead>
                       <tr>
-                        <th>Species Name</th>
-                        <th>Type</th>
+                        <th>Gall</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr :for={species <- paginated_species(@species, @current_page, @page_size)}>
+                      <tr :for={gall <- paginated_galls(@galls, @current_page, @page_size)}>
                         <td>
                           <.link
-                            href={"#{if species.taxoncode == "gall", do: "/gall", else: "/host"}/#{species.id}?source=#{@source.id}"}
+                            href={"/gall/#{gall.id}?source=#{@source.id}"}
                             class="hover:underline"
                           >
-                            <.taxon_name name={species.name} />
+                            <.taxon_name name={gall.name} />
                           </.link>
-                        </td>
-                        <td class="text-gray-600">
-                          {if species.taxoncode == "gall", do: "Gall", else: "Host"}
                         </td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
                 <.pagination
-                  :if={total_pages(@species, @page_size) > 1}
+                  :if={total_pages(@galls, @page_size) > 1}
                   page={@current_page}
-                  total_pages={total_pages(@species, @page_size)}
-                  total_items={length(@species)}
+                  total_pages={total_pages(@galls, @page_size)}
+                  total_items={length(@galls)}
                   page_size={@page_size}
                   on_page_change={fn page -> JS.push("page", value: %{page: page}) end}
                   class="mt-4"
                 />
               <% else %>
-                <p class="text-gray-500 italic">No species connected to this source.</p>
+                <p class="text-gray-500 italic">No galls connected to this source.</p>
               <% end %>
             </div>
 

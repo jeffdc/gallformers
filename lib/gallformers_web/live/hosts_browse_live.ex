@@ -1,18 +1,19 @@
 defmodule GallformersWeb.HostsBrowseLive do
   @moduledoc """
-  Browse host plant species organized by Family > Genus > Species.
+  Browse host plants organized by Family > Genus > plant
+  (`Gallformers.Taxa.plant_tree/0`).
 
   Uses a tree UI with search filtering and smart expand.
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.Plants
+  alias Gallformers.Taxa
   alias GallformersWeb.BrowseHelpers
   alias GallformersWeb.TreeComponents
 
   @impl true
   def mount(_params, _session, socket) do
-    tree = Plants.get_hosts_tree()
+    tree = Taxa.plant_tree()
 
     {:ok,
      assign(socket,

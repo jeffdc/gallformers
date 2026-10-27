@@ -1,14 +1,15 @@
 defmodule GallformersWeb.API.HostController do
   @moduledoc """
-  API controller for host endpoints.
+  API controller for host endpoints. Hosts are plant taxa at species rank or
+  below (`Gallformers.Taxa`), with their IDs unchanged from the old model;
+  the galls on them are the catalog's (`Gallformers.Catalog`).
   """
 
   use GallformersWeb, :controller
   use OpenApiSpex.ControllerSpecs
 
-  alias Gallformers.Images
+  alias Gallformers.{Catalog, Images, Ranges, Taxa}
   alias Gallformers.Images.Image
-  alias Gallformers.{Plants, Ranges, Search}
   alias GallformersWeb.Schemas
 
   tags(["Hosts"])
@@ -17,10 +18,18 @@ defmodule GallformersWeb.API.HostController do
     summary: "List hosts",
     description: "Lists all hosts with optional search and pagination",
     parameters: [
-      q: [in: :query, type: :string, description: "Search query"],
+      q: [
+        in: :query,
+        type: :string,
+        description: "Search query: every word in the plant's name, a synonym or a common name"
+      ],
       limit: [in: :query, type: :integer, description: "Maximum number of results"],
       offset: [in: :query, type: :integer, description: "Number of results to skip"],
-      simple: [in: :query, type: :boolean, description: "Return simplified response"]
+      simple: [
+        in: :query,
+        type: :boolean,
+        description: "Return simplified response (with each host's place codes)"
+      ]
     ],
     responses: [
       ok: {"List of hosts", "application/json", Schemas.HostListResponse}
@@ -35,32 +44,12 @@ defmodule GallformersWeb.API.HostController do
   def index(conn, params) do
     limit = parse_int(params["limit"])
     offset = parse_int(params["offset"]) || 0
-    query = params["q"]
-    simple = params["simple"] == "true"
 
-    {hosts, total} =
-      case {query, limit} do
-        {nil, nil} ->
-          all = Plants.list_hosts()
-          {all, length(all)}
-
-        {nil, limit} ->
-          total = Plants.count_hosts()
-          paginated = Plants.list_hosts_paginated(limit, offset)
-          {paginated, total}
-
-        {query, nil} ->
-          results = Search.search_hosts(query)
-          {results, length(results)}
-
-        {query, limit} ->
-          total = Search.count_search_hosts(query)
-          results = Search.search_hosts_paginated(query, limit, offset)
-          {results, total}
-      end
+    %{entries: hosts, total: total} =
+      Taxa.paginate_plants(q: params["q"], limit: limit, offset: offset)
 
     response =
-      if simple do
+      if params["simple"] == "true" do
         hosts_with_places(hosts)
       else
         Enum.map(hosts, &host_to_response/1)
@@ -83,6 +72,7 @@ defmodule GallformersWeb.API.HostController do
     ],
     responses: [
       ok: {"Host details", "application/json", Schemas.HostResponse},
+      bad_request: {"Invalid ID", "application/json", Schemas.Error},
       not_found: {"Host not found", "application/json", Schemas.Error}
     ]
   )
@@ -92,12 +82,9 @@ defmodule GallformersWeb.API.HostController do
   Gets a single host by ID with full details.
   """
   def show(conn, %{"id" => id} = params) do
-    simple = params["simple"] == "true"
-
     with {:ok, id} <- parse_id(id),
          {:ok, host} <- fetch_host(id) do
-      response = build_host_response(host, simple)
-      json(conn, response)
+      json(conn, build_host_response(host, params["simple"] == "true"))
     else
       {:error, :invalid_id} -> bad_request(conn, "Invalid host ID")
       {:error, :not_found} -> not_found(conn, "Host not found")
@@ -106,9 +93,9 @@ defmodule GallformersWeb.API.HostController do
 
   operation(:images,
     summary: "Get host images",
-    description: "Returns all images for a host plant species",
+    description: "Returns all images for a host plant",
     parameters: [
-      id: [in: :path, type: :integer, description: "Host species ID", required: true]
+      id: [in: :path, type: :integer, description: "Host ID", required: true]
     ],
     responses: [
       ok:
@@ -121,16 +108,15 @@ defmodule GallformersWeb.API.HostController do
 
   @doc """
   GET /api/v2/hosts/:id/images
-  Returns all images for a host plant species.
+  Returns all images for a host plant.
   """
   def images(conn, %{"id" => id}) do
     with {:ok, id} <- parse_id(id),
          {:ok, _host} <- fetch_host(id) do
-      images = Images.list_images_for_species(id)
       base_url = Image.base_url()
 
       response =
-        Enum.map(images, fn img ->
+        Enum.map(Images.list_images_for_taxon(id), fn img ->
           %{
             id: img.id,
             path: img.path,
@@ -156,7 +142,7 @@ defmodule GallformersWeb.API.HostController do
     summary: "Get galls for a host",
     description: "Returns all galls that form on a host plant",
     parameters: [
-      id: [in: :path, type: :integer, description: "Host species ID", required: true]
+      id: [in: :path, type: :integer, description: "Host ID", required: true]
     ],
     responses: [
       ok:
@@ -174,16 +160,9 @@ defmodule GallformersWeb.API.HostController do
   def galls(conn, %{"id" => id}) do
     with {:ok, id} <- parse_id(id),
          {:ok, _host} <- fetch_host(id) do
-      galls = Plants.get_galls_for_host(id)
-
       response =
-        Enum.map(galls, fn g ->
-          %{
-            id: g.id,
-            name: g.name,
-            undescribed: g.undescribed,
-            datacomplete: g.datacomplete
-          }
+        Enum.map(galls_on(id), fn g ->
+          %{id: g.id, name: g.name, undescribed: g.undescribed, datacomplete: g.datacomplete}
         end)
 
       json(conn, response)
@@ -201,9 +180,9 @@ defmodule GallformersWeb.API.HostController do
   end
 
   defp fetch_host(id) do
-    case Plants.get_host(id) do
-      nil -> {:error, :not_found}
-      host -> {:ok, host}
+    case Taxa.host_page(id) do
+      {:ok, host} -> {:ok, host}
+      :not_found -> {:error, :not_found}
     end
   end
 
@@ -224,57 +203,34 @@ defmodule GallformersWeb.API.HostController do
 
   # Private functions
 
+  defp galls_on(host_id),
+    do: [host_id] |> Catalog.list_galls_for_hosts() |> Catalog.add_undescribed()
+
   defp host_to_response(host) do
     %{
       id: host.id,
       name: host.name,
-      taxoncode: host.taxoncode,
+      taxoncode: "plant",
       datacomplete: host.datacomplete
     }
   end
 
   defp hosts_with_places(hosts) do
-    ids = Enum.map(hosts, & &1.id)
-    places_map = Ranges.get_places_for_hosts(ids)
+    places_map = hosts |> Enum.map(& &1.id) |> Ranges.get_places_for_taxa()
 
     Enum.map(hosts, fn host ->
-      %{
-        id: host.id,
-        name: host.name,
-        taxoncode: host.taxoncode,
-        datacomplete: host.datacomplete,
-        places: Map.get(places_map, host.id, [])
-      }
+      host |> host_to_response() |> Map.put(:places, Map.get(places_map, host.id, []))
     end)
   end
 
   defp host_to_simple_response(host) do
-    places = Ranges.get_places_for_host(host.id)
-
-    %{
-      id: host.id,
-      name: host.name,
-      taxoncode: host.taxoncode,
-      datacomplete: host.datacomplete,
-      places: places
-    }
+    places = [host.id] |> Ranges.get_places_for_taxa() |> Map.get(host.id, [])
+    host |> host_to_response() |> Map.put(:places, places)
   end
 
   defp host_to_full_response(host) do
-    places = Ranges.get_places_for_host(host.id)
-    galls = Plants.get_galls_for_host(host.id)
-
-    %{
-      id: host.id,
-      name: host.name,
-      taxoncode: host.taxoncode,
-      datacomplete: host.datacomplete,
-      places: places,
-      galls:
-        Enum.map(galls, fn g ->
-          %{id: g.id, name: g.name, undescribed: g.undescribed}
-        end)
-    }
+    galls = Enum.map(galls_on(host.id), &%{id: &1.id, name: &1.name, undescribed: &1.undescribed})
+    host |> host_to_simple_response() |> Map.put(:galls, galls)
   end
 
   defp parse_int(nil), do: nil

@@ -10,6 +10,9 @@ defmodule Gallformers.Taxa.LegacyId do
     * `:gall_inducer` — `legacy_id` is an old gall `species.id`, mapped to
       that row's Inducer taxon; an agamic/sexgen pair maps both rows to one
       Inducer.
+    * `:genus_placeholder` — `legacy_id` is an old genus placeholder plant's
+      `species.id` ("Quercus spp"), which became no taxon, mapped to its
+      genus taxon (its old `/host/:id` URL redirects to the genus page).
 
   `legacy_name` keeps the old row's name as it was, for review and replay.
   """
@@ -18,7 +21,7 @@ defmodule Gallformers.Taxa.LegacyId do
 
   alias Gallformers.Taxa.Taxon
 
-  @type kind :: :taxonomy | :gall_inducer
+  @type kind :: :taxonomy | :gall_inducer | :genus_placeholder
 
   @type t :: %__MODULE__{
           id: integer() | nil,
@@ -31,7 +34,7 @@ defmodule Gallformers.Taxa.LegacyId do
         }
 
   schema "legacy_taxon_ids" do
-    field :kind, Ecto.Enum, values: [:taxonomy, :gall_inducer]
+    field :kind, Ecto.Enum, values: [:taxonomy, :gall_inducer, :genus_placeholder]
     field :legacy_id, :integer
     field :legacy_name, :string
 

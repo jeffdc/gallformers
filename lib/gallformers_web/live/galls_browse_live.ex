@@ -1,19 +1,21 @@
 defmodule GallformersWeb.GallsBrowseLive do
   @moduledoc """
-  Browse all gall species organized by Family > Genus > Species.
+  Browse all Galls organized by their Inducer's Family > Genus > Gall
+  (`Gallformers.Catalog.gall_tree/0`).
 
-  Includes a toggle to switch between described and undescribed galls.
-  Uses a tree UI with search filtering and smart expand.
+  Includes a toggle to switch to the undescribed Galls
+  (`Gallformers.Catalog.undescribed_gall_tree/0`). Uses a tree UI with
+  search filtering and smart expand.
   """
   use GallformersWeb, :live_view
 
-  alias Gallformers.Galls
+  alias Gallformers.Catalog
   alias GallformersWeb.BrowseHelpers
   alias GallformersWeb.TreeComponents
 
   @impl true
   def mount(_params, _session, socket) do
-    galls_tree = Galls.get_galls_tree()
+    galls_tree = Catalog.gall_tree()
 
     {:ok,
      assign(socket,
@@ -64,7 +66,7 @@ defmodule GallformersWeb.GallsBrowseLive do
     # Lazy-load undescribed tree on first toggle
     socket =
       if new_showing && is_nil(socket.assigns.undescribed_tree) do
-        assign(socket, undescribed_tree: Galls.get_undescribed_tree())
+        assign(socket, undescribed_tree: Catalog.undescribed_gall_tree())
       else
         socket
       end

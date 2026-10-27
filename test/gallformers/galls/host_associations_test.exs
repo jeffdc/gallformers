@@ -3,7 +3,7 @@ defmodule Gallformers.Galls.HostAssociationsTest do
 
   alias Gallformers.Galls
   alias Gallformers.Galls.GallHost
-  alias Gallformers.Plants
+  alias Gallformers.Galls.HostAssociations
 
   # ============================================
   # Test helpers — create own data, no seed IDs
@@ -72,22 +72,6 @@ defmodule Gallformers.Galls.HostAssociationsTest do
   # Queries — single record
   # ============================================
 
-  describe "get_gall_host/1" do
-    test "returns the record when it exists" do
-      gall = create_gall("Andricus test")
-      host = create_host("Quercus test")
-
-      {:ok, relation} =
-        Galls.create_gall_host(%{gall_species_id: gall.id, host_species_id: host.id})
-
-      assert Galls.get_gall_host(relation.id) == relation
-    end
-
-    test "returns nil when not found" do
-      assert Galls.get_gall_host(0) == nil
-    end
-  end
-
   describe "get_hosts_for_gall/1" do
     test "returns hosts with relation ID and name" do
       gall = create_gall("Andricus test")
@@ -155,52 +139,6 @@ defmodule Gallformers.Galls.HostAssociationsTest do
     end
   end
 
-  describe "only_placeholder_hosts?/1" do
-    test "returns true when every host is a genus placeholder" do
-      gall = create_gall("Only placeholders gall")
-      ph1 = create_placeholder_host("Quercus only ph1 spp")
-      ph2 = create_placeholder_host("Carya only ph2 spp")
-
-      Galls.create_gall_host(%{gall_species_id: gall.id, host_species_id: ph1.id})
-      Galls.create_gall_host(%{gall_species_id: gall.id, host_species_id: ph2.id})
-
-      assert gall.id |> Galls.get_hosts_for_gall() |> Galls.only_placeholder_hosts?() == true
-    end
-
-    test "returns false when at least one host is a real species" do
-      gall = create_gall("Mixed hosts gall")
-      ph = create_placeholder_host("Quercus mixed ph spp")
-      real = create_host("Quercus mixed real")
-
-      Galls.create_gall_host(%{gall_species_id: gall.id, host_species_id: ph.id})
-      Galls.create_gall_host(%{gall_species_id: gall.id, host_species_id: real.id})
-
-      assert gall.id |> Galls.get_hosts_for_gall() |> Galls.only_placeholder_hosts?() == false
-    end
-
-    test "returns false for an empty host list" do
-      assert Galls.only_placeholder_hosts?([]) == false
-    end
-  end
-
-  describe "get_galls_for_host/1" do
-    test "returns galls for a host" do
-      host = create_host("Quercus test")
-      gall = create_gall("Andricus test")
-
-      Galls.create_gall_host(%{gall_species_id: gall.id, host_species_id: host.id})
-
-      galls = Plants.get_galls_for_host(host.id)
-      assert length(galls) == 1
-      assert hd(galls).name == "Andricus test"
-    end
-
-    test "returns empty list for host with no galls" do
-      host = create_host("Lonely host")
-      assert Plants.get_galls_for_host(host.id) == []
-    end
-  end
-
   describe "get_host_species_ids_for_gall/1" do
     test "returns just the host IDs" do
       gall = create_gall("Andricus test")
@@ -223,62 +161,9 @@ defmodule Gallformers.Galls.HostAssociationsTest do
   # Queries — batch
   # ============================================
 
-  describe "get_hosts_for_galls/1" do
-    test "returns empty map for empty list" do
-      assert Galls.get_hosts_for_galls([]) == %{}
-    end
-
-    test "groups hosts by gall ID" do
-      gall1 = create_gall("Gall one")
-      gall2 = create_gall("Gall two")
-      host_a = create_host("Host A")
-      host_b = create_host("Host B")
-
-      Galls.create_gall_host(%{gall_species_id: gall1.id, host_species_id: host_a.id})
-      Galls.create_gall_host(%{gall_species_id: gall2.id, host_species_id: host_b.id})
-
-      result = Galls.get_hosts_for_galls([gall1.id, gall2.id])
-
-      assert length(result[gall1.id]) == 1
-      assert hd(result[gall1.id]).host_name == "Host A"
-      assert length(result[gall2.id]) == 1
-      assert hd(result[gall2.id]).host_name == "Host B"
-    end
-
-    test "gall with no hosts is absent from result map" do
-      gall = create_gall("No hosts")
-      result = Galls.get_hosts_for_galls([gall.id])
-      refute Map.has_key?(result, gall.id)
-    end
-  end
-
-  describe "get_gall_counts_for_hosts/1" do
-    test "returns empty map for empty list" do
-      assert Plants.get_gall_counts_for_hosts([]) == %{}
-    end
-
-    test "returns count of galls per host" do
-      host = create_host("Popular host")
-      gall1 = create_gall("Gall one")
-      gall2 = create_gall("Gall two")
-
-      Galls.create_gall_host(%{gall_species_id: gall1.id, host_species_id: host.id})
-      Galls.create_gall_host(%{gall_species_id: gall2.id, host_species_id: host.id})
-
-      result = Plants.get_gall_counts_for_hosts([host.id])
-      assert result[host.id] == 2
-    end
-
-    test "host with no galls is absent from result" do
-      host = create_host("No galls")
-      result = Plants.get_gall_counts_for_hosts([host.id])
-      refute Map.has_key?(result, host.id)
-    end
-  end
-
   describe "get_host_counts_for_galls/1" do
     test "returns empty map for empty list" do
-      assert Galls.get_host_counts_for_galls([]) == %{}
+      assert HostAssociations.get_host_counts_for_galls([]) == %{}
     end
 
     test "returns count of hosts per gall" do
@@ -291,7 +176,7 @@ defmodule Gallformers.Galls.HostAssociationsTest do
       Galls.create_gall_host(%{gall_species_id: gall.id, host_species_id: host2.id})
       Galls.create_gall_host(%{gall_species_id: gall.id, host_species_id: host3.id})
 
-      result = Galls.get_host_counts_for_galls([gall.id])
+      result = HostAssociations.get_host_counts_for_galls([gall.id])
       assert result[gall.id] == 3
     end
   end
@@ -340,7 +225,7 @@ defmodule Gallformers.Galls.HostAssociationsTest do
 
       assert {:ok, deleted} = Galls.remove_host_from_gall(relation.id)
       assert deleted.id == relation.id
-      assert Galls.get_gall_host(relation.id) == nil
+      assert Repo.get(GallHost, relation.id) == nil
     end
 
     test "broadcasts species change" do
@@ -371,7 +256,7 @@ defmodule Gallformers.Galls.HostAssociationsTest do
         Galls.create_gall_host(%{gall_species_id: gall.id, host_species_id: host.id})
 
       assert {:ok, _} = Galls.delete_gall_host(relation.id)
-      assert Galls.get_gall_host(relation.id) == nil
+      assert Repo.get(GallHost, relation.id) == nil
     end
 
     test "returns error for nonexistent ID" do
@@ -430,7 +315,9 @@ defmodule Gallformers.Galls.HostAssociationsTest do
                Galls.save_gall_host_changes(gall.id, [], MapSet.new(), range_entries)
 
       # Verify range was set
-      range_ids = Gallformers.Ranges.get_gall_range_place_ids(gall.id)
+      range_ids =
+        gall.id |> Gallformers.Ranges.get_gall_range_with_precision() |> Enum.map(& &1.place_id)
+
       assert place.id in range_ids
     end
 

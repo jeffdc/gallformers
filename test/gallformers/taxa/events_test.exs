@@ -76,7 +76,7 @@ defmodule Gallformers.Taxa.EventsTest do
 
   defp parent_id(taxon), do: Taxa.get_taxon!(taxon.id).parent_id
 
-  defp audit_change_count, do: Repo.aggregate(Carbonite.Change, :count)
+  defp audit_change_count, do: Repo.aggregate(test_audit_changes(), :count)
 
   setup do
     family = taxon_fixture(rank: :family, name: "Cynipidae")

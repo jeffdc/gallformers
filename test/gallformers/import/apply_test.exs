@@ -14,6 +14,7 @@ defmodule Gallformers.Import.ApplyTest do
   import Gallformers.TaxaFixtures
 
   alias Gallformers.Catalog
+  alias Gallformers.Catalog.Facts.AliasFact
   alias Gallformers.Facts
   alias Gallformers.Import
   alias Gallformers.Import.BatchStatement
@@ -29,7 +30,9 @@ defmodule Gallformers.Import.ApplyTest do
     quercus = plant_fixture(name: "Quercus", rank: :genus)
     lobata = plant_fixture(name: "Quercus lobata", parent: quercus)
     douglasii = plant_fixture(name: "Quercus douglasii", parent: quercus)
-    andricus = taxon_fixture(name: "Andricus", rank: :genus, kingdom: "Animalia")
+    # The converted seeds' genus Andricus (old taxonomy row 33): another of
+    # that name would make "Andricus" ambiguous.
+    andricus = Taxa.get_by_legacy_id(:taxonomy, 33)
     wasp = taxon_fixture(name: "Andricus quercuscalifornicus", parent: andricus)
     torymus = taxon_fixture(name: "Torymus", rank: :genus, kingdom: "Animalia")
 
@@ -88,7 +91,7 @@ defmodule Gallformers.Import.ApplyTest do
     )
   end
 
-  defp change_count, do: Repo.aggregate(Carbonite.Change, :count)
+  defp change_count, do: Repo.aggregate(test_audit_changes(), :count)
 
   defp put_place!(code, name) do
     Repo.insert_all("place", [%{name: name, code: code, type: "state"}], on_conflict: :nothing)
@@ -218,6 +221,51 @@ defmodule Gallformers.Import.ApplyTest do
       |> approve!()
 
       assert Facts.get_fact!(parasitoid.fact_id).standing == :current
+    end
+
+    test "an alias Fact is a common name; one already held keeps its kind", ctx do
+      {:ok, _} =
+        Catalog.assert_alias(
+          test_actor(),
+          %{gall_id: ctx.gall.id, name: "Big stem gall", kind: :former_label},
+          confirm(ctx.legacy)
+        )
+
+      alias_fact = fn id, name ->
+        %{
+          "id" => id,
+          "stance" => "confirm",
+          "kind" => "alias",
+          "gall" => "g1",
+          "name" => name,
+          "evidence" => [
+            %{
+              "item" => "#/texts/1",
+              "quote" => "produced by the agamic generation of Andricus quercuscalifornicus"
+            }
+          ]
+        }
+      end
+
+      batch =
+        Map.update!(
+          gall_batch(),
+          "facts",
+          &(&1 ++ [alias_fact.("f9", "the large stem gall"), alias_fact.("f10", "big stem gall")])
+        )
+
+      package(gall: batch) |> with_review() |> deliver!() |> approve!()
+
+      aliases =
+        Repo.all(
+          from(a in AliasFact,
+            where: a.gall_id == ^ctx.gall.id,
+            order_by: a.name,
+            select: {a.name, a.kind}
+          )
+        )
+
+      assert aliases == [{"Big stem gall", :former_label}, {"the large stem gall", :common_name}]
     end
 
     test "re-applying a batch changes nothing" do

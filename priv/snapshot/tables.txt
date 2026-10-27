@@ -124,6 +124,10 @@ public            range_facts
 public            occurrence_facts
 public            alias_facts
 public            description_facts
+# Old gall IDs excluded as non-galls, for their URLs' redirect.
+public            non_gall_redirects
+# The ID tool's per-Gall lookup table (a read model of the public tables).
+public            gall_index
 
 # Made in the snapshot only (priv/snapshot/public_snapshot.sql).
 derived           gall_notes

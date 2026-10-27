@@ -87,6 +87,19 @@ defmodule Gallformers.DataCase do
   end
 
   @doc """
+  The audit trail's changes (`Carbonite.Change`) made by the running test, as
+  a query to narrow further: those of its sandbox transaction. The test
+  database already holds the catalog migration's changes (`make test-db`
+  converts the seeds with it), so a test asserting on the changes it made
+  reads only its own.
+  """
+  def test_audit_changes do
+    import Ecto.Query, only: [from: 2]
+
+    from(c in Carbonite.Change, where: c.transaction_xact_id == fragment("pg_current_xact_id()"))
+  end
+
+  @doc """
   A helper that transforms changeset errors into a map of messages.
 
       assert {:error, changeset} = Accounts.create_user(%{password: "short"})

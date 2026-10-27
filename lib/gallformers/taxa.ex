@@ -35,7 +35,7 @@ defmodule Gallformers.Taxa do
   `Audit` and `Facts` only.
   """
   use Boundary,
-    deps: [Gallformers.Audit, Gallformers.Facts, Gallformers.Repo],
+    deps: [Gallformers.Audit, Gallformers.Facts, Gallformers.Repo, Gallformers.TextMatch],
     exports: [
       ActFacts,
       ActFacts.CommonNameFact,
@@ -49,8 +49,10 @@ defmodule Gallformers.Taxa do
       LegacyId,
       NameNormalizer,
       Rank,
+      ReadModels.HostPage,
       Taxon,
-      TaxonName
+      TaxonName,
+      TreeBuilder
     ]
 
   import Ecto.Query
@@ -71,6 +73,9 @@ defmodule Gallformers.Taxa do
   alias Gallformers.Taxa.Events
   alias Gallformers.Taxa.LegacyId
   alias Gallformers.Taxa.NameNormalizer
+  alias Gallformers.Taxa.ReadModels.Browse
+  alias Gallformers.Taxa.ReadModels.HostPage
+  alias Gallformers.Taxa.ReadModels.Search
   alias Gallformers.Taxa.Taxon
   alias Gallformers.Taxa.TaxonName
   alias Gallformers.Taxa.Tree
@@ -86,9 +91,9 @@ defmodule Gallformers.Taxa do
 
   `attrs` (atom keys): `:rank`, `:origin` (`:curated | :powo`) and `:name`
   are required; `:parent_id` (nil for a root), `:kingdom` (taken from the
-  parent when not given), the name's `:sensu` and `:authorship`, and `:id`
-  for a migrated plant keeping its species ID (otherwise the shared
-  sequence gives one).
+  parent when not given), the name's `:sensu` and `:authorship`, a plant's
+  editorial `:datacomplete` and `:abundance_id`, and `:id` for a migrated
+  plant keeping its species ID (otherwise the shared sequence gives one).
 
   The parent is checked by the tree validator (`Gallformers.Taxa.Tree`).
   On error nothing is written and the changeset says why.
@@ -387,6 +392,38 @@ defmodule Gallformers.Taxa do
     |> Repo.all()
   end
 
+  @typedoc "A taxon in a lineage: its ID, accepted name and rank."
+  @type lineage_entry :: %{taxon_id: integer(), name: String.t(), rank: Gallformers.Taxa.Rank.t()}
+
+  @doc """
+  `taxon` and the taxa above it, root first, each with its accepted name and
+  rank (a breadcrumb).
+  """
+  @spec lineage(taxon_ref()) :: [lineage_entry()]
+  def lineage(taxon) do
+    from(t in Taxon,
+      join: a in Ancestry,
+      on: a.ancestor_id == t.id,
+      join: n in TaxonName,
+      on: n.taxon_id == t.id and n.status == :accepted,
+      where: a.descendant_id == ^taxon_id(taxon),
+      order_by: [desc: a.depth],
+      select: %{taxon_id: t.id, name: n.name, rank: t.rank}
+    )
+    |> Repo.all()
+  end
+
+  @doc "A taxon's synonyms (not its accepted name), in the order added."
+  @spec list_synonyms(taxon_ref()) :: [TaxonName.t()]
+  def list_synonyms(taxon) do
+    Repo.all(
+      from(n in TaxonName,
+        where: n.taxon_id == ^taxon_id(taxon) and n.status == :synonym,
+        order_by: n.id
+      )
+    )
+  end
+
   @doc "The taxa below `taxon`, nearest first."
   @spec descendants(taxon_ref()) :: [Taxon.t()]
   def descendants(taxon) do
@@ -398,6 +435,156 @@ defmodule Gallformers.Taxa do
     )
     |> Repo.all()
   end
+
+  # -- read models -------------------------------------------------------------
+
+  @doc """
+  What the Host page shows of plant taxon `id`
+  (`Gallformers.Taxa.ReadModels.HostPage`), or `:not_found` when there is no
+  such taxon or it is not a plant at species rank or below.
+  """
+  @spec host_page(integer()) :: {:ok, HostPage.t()} | :not_found
+  def host_page(id) when is_integer(id), do: HostPage.for_taxon(id)
+
+  # Rank pages and the Hosts browse tree (`Gallformers.Taxa.ReadModels.Browse`).
+
+  @doc """
+  The taxa of `rank` whose accepted name is `name`, by ID (a rank page's
+  lookup). Names are not unique: a genus name can be used in two kingdoms.
+  """
+  @spec get_by_name(String.t(), Gallformers.Taxa.Rank.t()) :: [Taxon.t()]
+  defdelegate get_by_name(name, rank), to: Browse
+
+  @doc "The taxa directly under a taxon, by name, with their ranks and common names."
+  @spec children_with_ranks(integer()) :: [Browse.child()]
+  defdelegate children_with_ranks(taxon_id), to: Browse
+
+  @doc "Each taxon's direct children (as `children_with_ranks/1`), by parent ID."
+  @spec children_by_parent([integer()]) :: %{integer() => [Browse.child()]}
+  defdelegate children_by_parent(taxon_ids), to: Browse
+
+  @doc """
+  How many plants (Plantae at species rank or below) each taxon's subtree
+  holds, itself included, by taxon ID.
+  """
+  @spec count_plants_under([integer()]) :: %{integer() => non_neg_integer()}
+  defdelegate count_plants_under(taxon_ids), to: Browse
+
+  @doc "The plants in a taxon's subtree, by name, each with its first common name."
+  @spec list_plants_under(integer()) :: [Browse.plant()]
+  defdelegate list_plants_under(taxon_id), to: Browse
+
+  @doc "Each taxon's lineage (as `lineage/1`), by taxon ID."
+  @spec lineages([integer()]) :: %{integer() => [lineage_entry()]}
+  defdelegate lineages(taxon_ids), to: Browse
+
+  @doc "Each taxon's ID and the IDs of the taxa below it, by taxon ID."
+  @spec subtree_ids([integer()]) :: %{integer() => [integer()]}
+  defdelegate subtree_ids(taxon_ids), to: Browse
+
+  @doc "Each taxon's common names, in the order added, by taxon ID (taxa without any left out)."
+  @spec common_names([integer()]) :: %{integer() => [String.t()]}
+  defdelegate common_names(taxon_ids), to: Browse
+
+  @doc """
+  The Hosts browse tree: plant families → genera → plants, by name, in the
+  `Gallformers.Taxa.TreeBuilder` shape.
+  """
+  @spec plant_tree() :: [map()]
+  defdelegate plant_tree(), to: Browse
+
+  # Site-wide counts and the sitemap (`Gallformers.Taxa.ReadModels.Site`).
+
+  @doc "How many plants (Plantae at species rank or below) there are."
+  @spec count_plants() :: non_neg_integer()
+  defdelegate count_plants(), to: Gallformers.Taxa.ReadModels.Site
+
+  @doc "How many plants, and how many plant families and genera hold at least one."
+  @spec plant_counts() :: Gallformers.Taxa.ReadModels.Site.plant_counts()
+  defdelegate plant_counts(), to: Gallformers.Taxa.ReadModels.Site
+
+  @doc "Every plant's ID, ascending."
+  @spec list_plant_ids() :: [integer()]
+  defdelegate list_plant_ids(), to: Gallformers.Taxa.ReadModels.Site
+
+  @doc "The taxa at ranks with a page, as `%{rank, name}`, each name and rank once."
+  @spec list_rank_pages() :: [Gallformers.Taxa.ReadModels.Site.rank_page()]
+  defdelegate list_rank_pages(), to: Gallformers.Taxa.ReadModels.Site
+
+  # API v2 (`Gallformers.Taxa.ReadModels.Api`).
+
+  @doc """
+  A page of plants (Plantae at species rank or below), by accepted name,
+  each `%{id, name, datacomplete}`, with the `total` in all. Options: `:q`
+  (found as `search_ids/2` finds taxa), `:limit` (nil for all), `:offset`.
+  """
+  @spec paginate_plants(keyword()) :: Gallformers.Taxa.ReadModels.Api.page(map())
+  defdelegate paginate_plants(opts), to: Gallformers.Taxa.ReadModels.Api
+
+  @doc """
+  A page of the taxa of `rank`, by accepted name, each with its parent ID and
+  its common names as `description`, with the `total` in all. Options as
+  `paginate_plants/1`.
+  """
+  @spec paginate_taxa(Gallformers.Taxa.Rank.t(), keyword()) ::
+          Gallformers.Taxa.ReadModels.Api.page(Gallformers.Taxa.ReadModels.Api.summary())
+  defdelegate paginate_taxa(rank, opts), to: Gallformers.Taxa.ReadModels.Api
+
+  @doc "One taxon as `paginate_taxa/2` lists it, or nil."
+  @spec taxon_summary(integer()) :: Gallformers.Taxa.ReadModels.Api.summary() | nil
+  defdelegate taxon_summary(id), to: Gallformers.Taxa.ReadModels.Api
+
+  @doc "Every section with its genus and how many plants it holds, by genus name and name."
+  @spec list_sections() :: [Gallformers.Taxa.ReadModels.Api.section()]
+  defdelegate list_sections(), to: Gallformers.Taxa.ReadModels.Api
+
+  @doc """
+  Each taxon's synonyms as `%{id, name, sensu}`, in the order added, by taxon
+  ID (taxa without any left out).
+  """
+  @spec list_synonyms_by_taxon([integer()]) :: %{
+          integer() => [Gallformers.Taxa.ReadModels.Api.synonym()]
+        }
+  defdelegate list_synonyms_by_taxon(taxon_ids), to: Gallformers.Taxa.ReadModels.Api
+
+  # Typeaheads (`Gallformers.Taxa.ReadModels.Search`).
+
+  @doc """
+  Plants (Plantae at species rank or below) whose accepted name, synonyms
+  or common names match every word of `query`, at most `limit`: an exact
+  name first, then names starting with the query, then the rest, each by
+  accepted name. Each with its rank, data-complete flag and `aliases`
+  (synonyms, then common names).
+  """
+  @spec search_plants(String.t(), pos_integer()) :: [Search.plant()]
+  defdelegate search_plants(query, limit), to: Search, as: :plants
+
+  @doc """
+  Genera, subgenera and sections whose name (accepted or synonym) starts
+  with `query` or whose common name contains it, at most `limit`, genera
+  first, each by name, with its common names as `description`. Options:
+  `:kingdom` (e.g. `"Plantae"`).
+  """
+  @spec search_genera_and_sections(String.t(), pos_integer(), keyword()) :: [Search.group()]
+  defdelegate search_genera_and_sections(query, limit, opts \\ []),
+    to: Search,
+    as: :genera_and_sections
+
+  # Global search (`Gallformers.Taxa.ReadModels.Search`).
+
+  @doc """
+  Taxa one of whose names (accepted, synonym or common) holds every word
+  of `query` (a word may also be in the accepted name), by accepted name,
+  each with its rank, kingdom, parent ID, data-complete flag and `aliases`
+  (synonyms, then common names). Options: `:ranks` (a list of ranks),
+  `:kingdom` (e.g. `"Plantae"`).
+  """
+  @spec search(String.t(), keyword()) :: [Search.hit()]
+  defdelegate search(query, opts \\ []), to: Search, as: :taxa
+
+  @doc "The IDs of the taxa `search/2` finds, unordered."
+  @spec search_ids(String.t(), keyword()) :: [integer()]
+  defdelegate search_ids(query, opts \\ []), to: Search, as: :taxon_ids
 
   # -- taxonomic-act Facts -----------------------------------------------------
 

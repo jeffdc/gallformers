@@ -44,6 +44,10 @@ defmodule Gallformers.Taxa.Rank do
   @spec all() :: [t()]
   def all, do: @ranks
 
+  @doc "Species and the ranks below it (an organism, not a group)."
+  @spec species_and_below() :: [t()]
+  def species_and_below, do: [:species, :subspecies, :variety, :form]
+
   @doc "Whether `rank` ranks strictly below `other`."
   @spec below?(t(), t()) :: boolean()
   def below?(rank, other), do: Map.fetch!(@positions, rank) > Map.fetch!(@positions, other)

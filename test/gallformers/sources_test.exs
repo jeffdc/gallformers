@@ -7,6 +7,13 @@ defmodule Gallformers.SourcesTest do
   alias Gallformers.Sources
   alias Gallformers.Species.Species
 
+  describe "list_sources_by_id/1" do
+    test "the Sources with the given IDs, by ID; unknown IDs are left out" do
+      assert [%{id: 58}, %{id: 59}] = Sources.list_sources_by_id([59, 58, 999_999])
+      assert Sources.list_sources_by_id([]) == []
+    end
+  end
+
   describe "has_sources?/1" do
     test "returns false when species has no sources" do
       {:ok, species} =

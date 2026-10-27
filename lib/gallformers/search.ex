@@ -2,220 +2,61 @@ defmodule Gallformers.Search do
   @moduledoc """
   The Search context.
 
-  Provides functions for searching across species, hosts, and other entities.
+  The global search (`global_search/2`, the search page and the API's
+  `/search`) reads Galls from `Gallformers.Catalog` and plants and higher
+  taxa from `Gallformers.Taxa` (`803b` Task 11); glossary entries, Sources
+  and places from their own tables.
   """
   use Boundary,
     deps: [
+      Gallformers.Catalog,
       Gallformers.Repo,
-      Gallformers.Species,
+      Gallformers.Ranges,
       Gallformers.Sources,
       Gallformers.Glossaries,
       Gallformers.Places,
-      Gallformers.Taxonomy,
+      Gallformers.Taxa,
       Gallformers.TextMatch
     ],
     exports: :all
 
   import Ecto.Query
 
-  alias Gallformers.Galls.GallTraits
+  alias Gallformers.Catalog
   alias Gallformers.Glossaries.Glossary
   alias Gallformers.Places
   alias Gallformers.Places.Place
+  alias Gallformers.Ranges.HostRange
   alias Gallformers.Repo
   alias Gallformers.Search.Ranking
   alias Gallformers.Sources.Source
-  alias Gallformers.Species.{Alias, Species}
-  alias Gallformers.Taxonomy.Taxonomy
+  alias Gallformers.Taxa
+  alias Gallformers.Taxa.Rank
   alias Gallformers.TextMatch
 
-  @doc """
-  Searches galls by name (partial match).
-  Returns the same fields as Species.list_galls for API compatibility.
-  """
-  @spec search_galls(String.t()) :: [map()]
-  def search_galls(query) do
-    name_filter = TextMatch.build_filter(query, [:name])
-
-    from(s in Species,
-      join: gt in GallTraits,
-      on: gt.species_id == s.id,
-      left_join: a in Gallformers.Species.Abundance,
-      on: s.abundance_id == a.id,
-      where: s.taxoncode == "gall",
-      where: ^name_filter,
-      order_by: s.name,
-      select: %{
-        id: s.id,
-        name: s.name,
-        taxoncode: s.taxoncode,
-        datacomplete: s.datacomplete,
-        abundance_id: s.abundance_id,
-        abundance_name: a.abundance,
-        detachable: gt.detachable,
-        undescribed: gt.undescribed
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Searches galls by name with pagination.
-  Returns the same fields as Species.list_galls_paginated for API compatibility.
-  """
-  @spec search_galls_paginated(String.t(), integer(), integer()) :: [map()]
-  def search_galls_paginated(query, limit, offset) do
-    name_filter = TextMatch.build_filter(query, [:name])
-
-    from(s in Species,
-      join: gt in GallTraits,
-      on: gt.species_id == s.id,
-      left_join: a in Gallformers.Species.Abundance,
-      on: s.abundance_id == a.id,
-      where: s.taxoncode == "gall",
-      where: ^name_filter,
-      order_by: s.name,
-      limit: ^limit,
-      offset: ^offset,
-      select: %{
-        id: s.id,
-        name: s.name,
-        taxoncode: s.taxoncode,
-        datacomplete: s.datacomplete,
-        abundance_id: s.abundance_id,
-        abundance_name: a.abundance,
-        detachable: gt.detachable,
-        undescribed: gt.undescribed
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Returns the count of galls matching a search query.
-  """
-  @spec count_search_galls(String.t()) :: integer()
-  def count_search_galls(query) do
-    name_filter = TextMatch.build_filter(query, [:name])
-
-    from(s in Species,
-      where: s.taxoncode == "gall",
-      where: ^name_filter,
-      select: count(s.id)
-    )
-    |> Repo.one()
-  end
-
-  @doc """
-  Searches hosts by name (partial match).
-  Returns fields expected by the host API controller.
-  """
-  @spec search_hosts(String.t()) :: [map()]
-  def search_hosts(query) do
-    name_filter = TextMatch.build_filter(query, [:name])
-
-    from(s in Species,
-      where: s.taxoncode == "plant",
-      where: ^name_filter,
-      order_by: s.name,
-      select: %{
-        id: s.id,
-        name: s.name,
-        taxoncode: s.taxoncode,
-        datacomplete: s.datacomplete
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Searches hosts by name with pagination.
-  Returns fields expected by the host API controller.
-  """
-  @spec search_hosts_paginated(String.t(), integer(), integer()) :: [map()]
-  def search_hosts_paginated(query, limit, offset) do
-    name_filter = TextMatch.build_filter(query, [:name])
-
-    from(s in Species,
-      where: s.taxoncode == "plant",
-      where: ^name_filter,
-      order_by: s.name,
-      limit: ^limit,
-      offset: ^offset,
-      select: %{
-        id: s.id,
-        name: s.name,
-        taxoncode: s.taxoncode,
-        datacomplete: s.datacomplete
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Returns the count of hosts matching a search query.
-  """
-  @spec count_search_hosts(String.t()) :: integer()
-  def count_search_hosts(query) do
-    name_filter = TextMatch.build_filter(query, [:name])
-
-    from(s in Species,
-      where: s.taxoncode == "plant",
-      where: ^name_filter,
-      select: count(s.id)
-    )
-    |> Repo.one()
-  end
-
-  @doc """
-  Searches all species (galls and hosts) by name.
-  """
-  @spec search_all(String.t()) :: [map()]
-  def search_all(query) do
-    name_filter = TextMatch.build_filter(query, [:name])
-
-    from(s in Species,
-      where: ^name_filter,
-      order_by: s.name,
-      select: %{
-        id: s.id,
-        name: s.name,
-        taxoncode: s.taxoncode
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Returns galls that share the same binomial name prefix.
-
-  Related galls share the same genus + species epithet but have additional qualifiers.
-  Example: "Andricus quercuscalifornicus agamic" and "Andricus quercuscalifornicus sexual"
-  """
-  @spec get_related_galls(integer(), String.t()) :: [map()]
-  def get_related_galls(exclude_id, name_prefix) do
-    from(s in Species,
-      where:
-        s.taxoncode == "gall" and
-          like(s.name, ^"#{name_prefix}%") and
-          s.id != ^exclude_id,
-      order_by: s.name,
-      select: %{
-        id: s.id,
-        name: s.name,
-        taxoncode: s.taxoncode
-      }
-    )
-    |> Repo.all()
-  end
+  # The ranks with a public page (`GallformersWeb.TaxonomyURL`): the
+  # taxonomy results.
+  @page_ranks [:family, :subfamily, :tribe, :subtribe, :genus, :section]
 
   @doc """
   Performs a global search across all entity types.
 
-  Returns a map with results grouped by type. When `continent_code` is provided,
-  gall and host results are filtered to species with host ranges in that continent's
-  descendant places. Other result types (glossary, sources, taxonomy, places)
-  are not filtered.
+  Returns a map with results grouped by type, each group ranked by match
+  quality (`Gallformers.Search.Ranking`):
+
+    * `galls` — `Gallformers.Catalog.search_galls/2`: display name, alias
+      Facts, the Inducer's names;
+    * `hosts` — plants (Plantae at species rank or below) from
+      `Gallformers.Taxa.search/2`: accepted names, synonyms, common names;
+    * `taxonomy` — taxa at the ranks with a public page (family, subfamily,
+      tribe, subtribe, genus, section) from `Gallformers.Taxa.search/2`,
+      with their parent when it too has a page;
+    * `glossary`, `sources`, `places`.
+
+  When `continent_code` names a place, galls are kept when their potential
+  range (`gall_index`) meets the continent's places or is everywhere, and
+  hosts when they have a `host_range` row there. Other result types are not
+  filtered.
   """
   @spec global_search(String.t(), String.t() | nil) :: map()
   def global_search(query, continent_code \\ nil) when is_binary(query) do
@@ -228,27 +69,90 @@ defmodule Gallformers.Search do
 
   defp do_global_search(query, continent_code) do
     search_terms = Ranking.parse_query(query)
-
-    galls = search_galls_with_aliases(query)
-    hosts = search_hosts_with_aliases(query)
-
-    {galls, hosts} =
-      if continent_code do
-        {filter_galls_by_continent(galls, continent_code),
-         filter_hosts_by_continent(hosts, continent_code)}
-      else
-        {galls, hosts}
-      end
+    place_ids = continent_code && continent_descendant_ids(continent_code)
 
     %{
-      galls: galls,
-      hosts: hosts,
+      galls: galls(query, place_ids) |> Ranking.add_scores_and_sort(search_terms),
+      hosts: hosts(query, place_ids) |> Ranking.add_scores_and_sort(search_terms),
       glossary: search_glossary(query) |> Ranking.add_scores_and_sort(search_terms),
       sources: search_sources(query) |> Ranking.add_scores_and_sort(search_terms),
-      taxonomy: search_taxonomy(query) |> Ranking.add_scores_and_sort(search_terms),
+      taxonomy: taxonomy(query) |> Ranking.add_scores_and_sort(search_terms),
       places: search_places(query) |> Ranking.add_scores_and_sort(search_terms)
     }
   end
+
+  defp galls(query, place_ids) do
+    for gall <- Catalog.search_galls(query, place_ids: place_ids) do
+      %{
+        id: gall.id,
+        name: gall.name,
+        type: "gall",
+        undescribed: gall.undescribed,
+        aliases: gall.aliases
+      }
+    end
+  end
+
+  defp hosts(query, place_ids) do
+    query
+    |> Taxa.search(kingdom: "Plantae", ranks: Rank.species_and_below())
+    |> in_places(place_ids)
+    |> Enum.map(
+      &%{id: &1.id, name: &1.name, type: "host", genus_placeholder: false, aliases: &1.aliases}
+    )
+  end
+
+  # The plants with a `host_range` row at one of `place_ids` (all of them for nil).
+  defp in_places(plants, nil), do: plants
+  defp in_places([], _place_ids), do: []
+
+  defp in_places(plants, place_ids) do
+    found =
+      from(hr in HostRange,
+        where: hr.taxon_id in ^Enum.map(plants, & &1.id) and hr.place_id in ^place_ids,
+        distinct: true,
+        select: hr.taxon_id
+      )
+      |> Repo.all()
+      |> MapSet.new()
+
+    Enum.filter(plants, &MapSet.member?(found, &1.id))
+  end
+
+  # Taxa at the ranks with a public page, in the shape of the old taxonomy
+  # results: `type` "family", "genus", "section" or "intermediate" (with its
+  # `rank`, e.g. "Tribe"), common names as `description`, and the parent
+  # when its rank has a page too.
+  defp taxonomy(query) do
+    taxa = Taxa.search(query, ranks: @page_ranks)
+    parents = taxa |> Enum.map(& &1.parent_id) |> Enum.reject(&is_nil/1) |> Taxa.lineages()
+    common_names = taxa |> Enum.map(& &1.id) |> Taxa.common_names()
+
+    for taxon <- taxa do
+      {type, rank} = type_and_rank(taxon.rank)
+      parent = parents |> Map.get(taxon.parent_id, []) |> List.last()
+
+      {parent_type, parent_rank} =
+        if parent && parent.rank in @page_ranks, do: type_and_rank(parent.rank), else: {nil, nil}
+
+      %{
+        id: taxon.id,
+        name: taxon.name,
+        type: type,
+        rank: rank,
+        description: describe(Map.get(common_names, taxon.id, [])),
+        parent_name: parent_type && parent.name,
+        parent_type: parent_type,
+        parent_rank: parent_rank
+      }
+    end
+  end
+
+  defp type_and_rank(rank) when rank in [:family, :genus, :section], do: {to_string(rank), nil}
+  defp type_and_rank(rank), do: {"intermediate", rank |> to_string() |> String.capitalize()}
+
+  defp describe([]), do: nil
+  defp describe(names), do: Enum.join(names, ", ")
 
   @doc """
   Returns empty search results.
@@ -263,112 +167,6 @@ defmodule Gallformers.Search do
       taxonomy: [],
       places: []
     }
-  end
-
-  @doc """
-  Searches galls by name or alias using ILIKE matching.
-  """
-  @spec search_galls_with_aliases(String.t()) :: [map()]
-  def search_galls_with_aliases(query) do
-    search_galls_with_aliases_like(query)
-  end
-
-  # ILIKE-based gall search with alias matching
-  defp search_galls_with_aliases_like(query) do
-    name_filter = TextMatch.build_filter(query, [:name])
-    search_terms = Ranking.parse_query(query)
-
-    # Search by species name
-    name_results =
-      from(s in Species,
-        join: gt in GallTraits,
-        on: gt.species_id == s.id,
-        where: s.taxoncode == "gall",
-        where: ^name_filter,
-        order_by: s.name,
-        select: %{
-          id: s.id,
-          name: s.name,
-          type: "gall",
-          undescribed: gt.undescribed
-        }
-      )
-      |> Repo.all()
-
-    # Search by alias name and return the parent species
-    alias_results =
-      from(a in Alias,
-        join: s in assoc(a, :species),
-        join: gt in GallTraits,
-        on: gt.species_id == s.id,
-        where: s.taxoncode == "gall",
-        where: ^name_filter,
-        order_by: s.name,
-        select: %{
-          id: s.id,
-          name: s.name,
-          type: "gall",
-          undescribed: gt.undescribed
-        }
-      )
-      |> Repo.all()
-
-    # Merge and deduplicate, then load all aliases for each species
-    (name_results ++ alias_results)
-    |> Enum.uniq_by(& &1.id)
-    |> load_all_aliases_for_species()
-    |> Ranking.add_scores_and_sort(search_terms)
-  end
-
-  @doc """
-  Searches hosts by name or alias using ILIKE matching.
-  """
-  @spec search_hosts_with_aliases(String.t()) :: [map()]
-  def search_hosts_with_aliases(query) do
-    search_hosts_with_aliases_like(query)
-  end
-
-  # ILIKE-based host search with alias matching
-  defp search_hosts_with_aliases_like(query) do
-    name_filter = TextMatch.build_filter(query, [:name])
-    search_terms = Ranking.parse_query(query)
-
-    # Search by species name
-    name_results =
-      from(s in Species,
-        where: s.taxoncode == "plant",
-        where: ^name_filter,
-        order_by: s.name,
-        select: %{
-          id: s.id,
-          name: s.name,
-          type: "host",
-          genus_placeholder: s.genus_placeholder
-        }
-      )
-      |> Repo.all()
-
-    # Search by alias name
-    alias_results =
-      from(a in Alias,
-        join: s in assoc(a, :species),
-        where: s.taxoncode == "plant",
-        where: ^name_filter,
-        order_by: s.name,
-        select: %{
-          id: s.id,
-          name: s.name,
-          type: "host",
-          genus_placeholder: s.genus_placeholder
-        }
-      )
-      |> Repo.all()
-
-    # Merge and deduplicate, then load all aliases for each species
-    (name_results ++ alias_results)
-    |> Enum.uniq_by(& &1.id)
-    |> load_all_aliases_for_species()
-    |> Ranking.add_scores_and_sort(search_terms)
   end
 
   @doc """
@@ -413,42 +211,6 @@ defmodule Gallformers.Search do
   end
 
   @doc """
-  Searches taxonomy entries (genus, family, intermediate, section) by name or description.
-
-  Excludes placeholder entries (is_placeholder = true) that have no children,
-  since empty placeholders serve no purpose in search results. Placeholders
-  with children are kept so users can find species under them.
-  """
-  @spec search_taxonomy(String.t()) :: [map()]
-  def search_taxonomy(query) do
-    name_desc_filter = TextMatch.build_filter(query, [:name, :description])
-
-    from(t in Taxonomy,
-      left_join: parent in assoc(t, :parent),
-      left_join: st in "species_taxonomy",
-      on: st.taxonomy_id == t.id,
-      where: t.type in ["genus", "family", "intermediate", "section"],
-      where: ^name_desc_filter,
-      # Exclude placeholders with no species (handle NULL/0 as false)
-      where:
-        not (fragment("coalesce(?, false)", t.is_placeholder) == true and is_nil(st.species_id)),
-      group_by: [t.id, parent.id],
-      order_by: [t.type, t.name],
-      select: %{
-        id: t.id,
-        name: t.name,
-        type: t.type,
-        rank: t.rank,
-        description: t.description,
-        parent_name: parent.name,
-        parent_type: parent.type,
-        parent_rank: parent.rank
-      }
-    )
-    |> Repo.all()
-  end
-
-  @doc """
   Searches places by name or code.
   """
   @spec search_places(String.t()) :: [map()]
@@ -468,95 +230,11 @@ defmodule Gallformers.Search do
     |> Repo.all()
   end
 
-  # Filters gall results to those whose hosts have ranges in the continent's descendants.
-  # Uses gallhost join to find which galls have hosts in the continent.
-  defp filter_galls_by_continent([], _continent_code), do: []
-
-  defp filter_galls_by_continent(results, continent_code) do
-    continent_desc_ids = continent_descendant_ids(continent_code)
-
-    if continent_desc_ids == nil do
-      results
-    else
-      gall_ids = Enum.map(results, & &1.id)
-
-      galls_in_continent =
-        from(gr in "gall_range",
-          where: gr.species_id in ^gall_ids and gr.place_id in ^continent_desc_ids,
-          select: gr.species_id
-        )
-        |> Repo.all()
-        |> MapSet.new()
-
-      # Galls with no range data should appear in every region
-      galls_without_range =
-        from(s in Species,
-          left_join: gr in "gall_range",
-          on: gr.species_id == s.id,
-          where: s.id in ^gall_ids and is_nil(gr.species_id),
-          select: s.id
-        )
-        |> Repo.all()
-        |> MapSet.new()
-
-      Enum.filter(results, fn r ->
-        MapSet.member?(galls_in_continent, r.id) or MapSet.member?(galls_without_range, r.id)
-      end)
-    end
-  end
-
-  # Filters host results to those with host_range entries in the continent's descendants.
-  defp filter_hosts_by_continent([], _continent_code), do: []
-
-  defp filter_hosts_by_continent(results, continent_code) do
-    continent_desc_ids = continent_descendant_ids(continent_code)
-
-    if continent_desc_ids == nil do
-      results
-    else
-      host_ids = Enum.map(results, & &1.id)
-
-      hosts_in_continent =
-        from(hr in "host_range",
-          where: hr.species_id in ^host_ids and hr.place_id in ^continent_desc_ids,
-          select: hr.species_id
-        )
-        |> Repo.all()
-        |> MapSet.new()
-
-      Enum.filter(results, &MapSet.member?(hosts_in_continent, &1.id))
-    end
-  end
-
-  # Returns descendant IDs for a continent code, or nil if invalid.
+  # The IDs of a continent's places (its descendants), or nil for an unknown code.
   defp continent_descendant_ids(continent_code) do
     case Places.get_place_by_code(continent_code) do
       nil -> nil
       continent -> Places.descendant_ids(continent.id)
     end
-  end
-
-  # Loads all aliases for each species in the results list
-  defp load_all_aliases_for_species(results) when results == [], do: []
-
-  defp load_all_aliases_for_species(results) do
-    species_ids = Enum.map(results, & &1.id)
-
-    # Fetch all aliases for these species via the alias_species join table
-    alias_map =
-      from(a in Alias,
-        join: as in "alias_species",
-        on: as.alias_id == a.id,
-        where: as.species_id in ^species_ids,
-        select: {as.species_id, a.name}
-      )
-      |> Repo.all()
-      |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
-
-    # Add aliases to each result
-    Enum.map(results, fn result ->
-      aliases = Map.get(alias_map, result.id, [])
-      Map.put(result, :aliases, aliases)
-    end)
   end
 end

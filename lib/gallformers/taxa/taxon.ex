@@ -8,6 +8,9 @@ defmodule Gallformers.Taxa.Taxon do
       `Gallformers.Taxa.place/3`, which validates the tree.
     * `origin` — `:curated` (gall formers and associates) or `:powo` (plants).
     * `kingdom` — `"Plantae"` for plants; set for others when known.
+    * `datacomplete`, `abundance_id` — editorial carry-overs from today's
+      plant rows, set on plants only (`803b` decision 6): every gall known
+      on the plant is in the database; how common it is.
 
   Its names (one accepted, any synonyms) are `Gallformers.Taxa.TaxonName`s.
   `matched_name` is filled by `Gallformers.Taxa.resolve_name/2` with the
@@ -28,6 +31,8 @@ defmodule Gallformers.Taxa.Taxon do
           parent_id: integer() | nil,
           origin: origin() | nil,
           kingdom: String.t() | nil,
+          datacomplete: boolean(),
+          abundance_id: integer() | nil,
           parent: t() | Ecto.Association.NotLoaded.t() | nil,
           names: [TaxonName.t()] | Ecto.Association.NotLoaded.t(),
           common_names: [CommonName.t()] | Ecto.Association.NotLoaded.t(),
@@ -40,6 +45,9 @@ defmodule Gallformers.Taxa.Taxon do
     field :rank, Ecto.Enum, values: Rank.all()
     field :origin, Ecto.Enum, values: [:curated, :powo]
     field :kingdom, :string
+    field :datacomplete, :boolean, default: false
+    # A foreign key to `abundance`, known by ID.
+    field :abundance_id, :integer
     field :matched_name, :any, virtual: true
 
     belongs_to :parent, __MODULE__
@@ -52,15 +60,17 @@ defmodule Gallformers.Taxa.Taxon do
   @doc """
   Creates a changeset for a new taxon (its names are added separately).
   `attrs` may give `:id` (a migrated plant keeping its species ID);
-  otherwise the sequence gives one.
+  otherwise the sequence gives one. A plant's editorial flags
+  (`:datacomplete`, `:abundance_id`) may be given too.
   """
   @spec create_changeset(t(), map()) :: Ecto.Changeset.t()
   def create_changeset(taxon, attrs) do
     taxon
-    |> cast(attrs, [:id, :rank, :parent_id, :origin, :kingdom])
+    |> cast(attrs, [:id, :rank, :parent_id, :origin, :kingdom, :datacomplete, :abundance_id])
     |> validate_required([:rank, :origin])
     |> check_constraint(:kingdom, name: :taxa_kingdom_present, message: "can't be blank")
     |> foreign_key_constraint(:parent_id)
+    |> foreign_key_constraint(:abundance_id)
   end
 
   @doc "Creates a changeset moving the taxon under `parent_id` (nil for a root)."

@@ -3,74 +3,48 @@ defmodule Gallformers.Galls.SummaryTest do
 
   alias Gallformers.Galls.Summary
 
-  describe "from_db_filters/2" do
-    test "converts database filter format to summary format" do
-      db_filters = %{
-        shapes: [%{id: 1, field: "spherical"}],
-        colors: [%{id: 2, field: "red"}, %{id: 3, field: "brown"}],
-        textures: [%{id: 4, field: "hairy"}],
-        plant_parts: [%{id: 5, field: "leaf"}],
-        seasons: [%{id: 6, field: "spring"}],
-        alignments: [],
-        walls: [],
-        cells: [],
-        forms: [%{id: 7, field: "gall"}]
+  describe "from_traits/1" do
+    test "converts a Gall's Traits by Trait (GallSummary.traits) to summary format" do
+      traits = %{
+        "shape" => ["sphere"],
+        "color" => ["brown", "red"],
+        "texture" => ["hairy"],
+        "plant_part" => ["lower leaf"],
+        "season" => ["Spring"],
+        "alignment" => ["erect"],
+        "walls" => ["thin"],
+        "cells" => ["monothalamous"],
+        "form" => ["oak apple"],
+        "detachable" => ["detachable"]
       }
 
-      # Detachable is stored as integer in gall: 0=unknown, 1=integral, 2=detachable, 3=both
-      result = Summary.from_db_filters(db_filters, 2)
-
-      assert result.shapes == ["spherical"]
-      assert result.colors == ["red", "brown"]
-      assert result.textures == ["hairy"]
-      assert result.plant_parts == ["leaf"]
-      assert result.seasons == ["spring"]
-      assert result.detachable == "detachable"
-      assert result.forms == ["gall"]
+      assert Summary.from_traits(traits) == %{
+               shapes: ["sphere"],
+               colors: ["brown", "red"],
+               textures: ["hairy"],
+               plant_parts: ["lower leaf"],
+               seasons: ["Spring"],
+               alignments: ["erect"],
+               walls: ["thin"],
+               cells: ["monothalamous"],
+               forms: ["oak apple"],
+               detachable: "detachable"
+             }
     end
 
-    test "handles empty filter lists" do
-      db_filters = %{
-        shapes: [],
-        colors: [],
-        textures: [],
-        plant_parts: [],
-        seasons: [],
-        alignments: [],
-        walls: [],
-        cells: [],
-        forms: []
-      }
+    test "missing Traits are empty and an unknown detachable is none" do
+      assert %{shapes: [], forms: [], detachable: nil} = Summary.from_traits(%{})
 
-      result = Summary.from_db_filters(db_filters, 0)
-
-      assert result.shapes == []
-      assert result.colors == []
-      assert result.detachable == nil
+      assert Summary.from_traits(%{"detachable" => ["unknown"]}).detachable == nil
     end
 
-    test "converts detachable integers correctly" do
-      db_filters = %{
-        shapes: [],
-        colors: [],
-        plant_parts: [],
-        textures: [],
-        forms: [],
-        seasons: [],
-        alignments: [],
-        walls: [],
-        cells: []
-      }
+    test "feeds the summary sentence" do
+      summary =
+        %{"shape" => ["sphere"], "color" => ["red"], "detachable" => ["integral"]}
+        |> Summary.from_traits()
+        |> Summary.generate()
 
-      assert Summary.from_db_filters(db_filters, 0).detachable == nil
-      assert Summary.from_db_filters(db_filters, 1).detachable == "integral"
-      assert Summary.from_db_filters(db_filters, 2).detachable == "detachable"
-      assert Summary.from_db_filters(db_filters, 3).detachable == "both"
-    end
-
-    test "handles nil db_filters" do
-      result = Summary.from_db_filters(nil, 2)
-      assert result == %{}
+      assert summary == "A sphere, red gall. Integral to host."
     end
   end
 
