@@ -3,7 +3,7 @@ status: raw
 created: 2026-10-24
 updated: 2026-10-27
 epic: taxonomy
-relates: [8567, 9449, 3272, 803b, a856]
+relates: [8567, 9449, 3272, 803b, a856, 2c8c]
 ---
 
 # Taxogall: program overview and punchlist
@@ -65,7 +65,7 @@ Domain language: `docs/domain/domain-model.md`. Design and rules: `8567`. Migrat
 **Front-end:**
 
 9. **Public pages re-pointed in place (`b5bd` M3; design in `803b`):** Gall, Host, taxon ranks, Source, place, browse; ID tool parity (season filter wording to "forms and grows"); search; name builder (`86e7`); minimal API; redirects and the gall-lookalikes Article; sitemap. **Built and committed 2026-10-27 (67378c93; e2e fix 2b3dd12d), except the name builder (`86e7`, not in `803b`'s plan) — **built 2026-10-27, uncommitted: 18 overrides left of 1,323; see `86e7` Status**; see `803b` Status.** The e2e browser suite's Playwright breakage (pre-existing since #593) is fixed on `taxogall`: Elixir test libraries and npm Playwright upgraded together.
-10. **New minimal admin (`b5bd` M3, `8567` rule 12; inventory and plan in `a856`):** taxonomy admin, images, a note editor for each Gall's Gallformers note (`20e5`), and only what else proves unavoidable; retire the old Gall/Host/gall–host/range/Source forms.
+10. **New minimal admin (`b5bd` M3, `8567` rule 12; inventory and design in `a856` — review queue and batch screens are part of this step). Built 2026-10-27 (uncommitted): review queue, Gall page, taxonomy admin with the Host range editor carried over, Source editor; old screens and old domain modules deleted; see `a856` Status.** taxonomy admin, images, a note editor for each Gall's Gallformers note (`20e5`), and only what else proves unavoidable; retire the old Gall/Host/gall–host/range/Source forms.
 
 **Release:**
 
