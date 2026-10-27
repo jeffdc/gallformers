@@ -123,6 +123,13 @@ config :gallformers, Gallformers.Taxa.Events, listeners: [Gallformers.Catalog.Ta
 # Facts never references its listeners.
 config :gallformers, Gallformers.Facts.Events, listeners: [Gallformers.Catalog.FactListener]
 
+# The old-domain admin screens (Galls, Hosts, gall–host, ranges, taxonomy,
+# sections, Sources, species–sources, images, filter terms) write only the old
+# tables, so on taxogall they are off until their replacements land: their
+# routes show "being rebuilt" and links to them are hidden. On in test so their
+# tests keep running. See GallformersWeb.LegacyAdmin and matter a856.
+config :gallformers, legacy_admin_enabled: false
+
 # Configure Ueberauth for Auth0 authentication
 # Client ID and secret are set in runtime.exs from environment variables
 config :ueberauth, Ueberauth,

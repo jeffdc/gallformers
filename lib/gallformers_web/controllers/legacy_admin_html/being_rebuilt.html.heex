@@ -1,0 +1,13 @@
+<Layouts.admin flash={@flash} current_user={@current_user}>
+  <.alert variant="info" id="legacy-admin-notice" class="max-w-2xl">
+    <:title>{GallformersWeb.LegacyAdmin.notice()}</:title>
+    This screen edited the old data model, which the new back-end no longer reads, so it is
+    turned off until its replacement lands. Most data changes now arrive as import batches.
+  </.alert>
+
+  <p class="mt-6">
+    <.link href={~p"/admin"} class="text-gf-maroon hover:underline">
+      <.icon name="ph-arrow-left" class="h-4 w-4 inline" /> Back to the admin dashboard
+    </.link>
+  </p>
+</Layouts.admin>

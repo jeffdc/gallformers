@@ -9,11 +9,16 @@ defmodule GallformersWeb.SourceLive do
 
   alias Gallformers.{Catalog, Images, Sources}
   alias Gallformers.Images.Image
+  alias GallformersWeb.LegacyAdmin
 
   @page_size 20
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
+    # The admin edit link goes to an old-domain screen: shown only while
+    # those are enabled (matter a856).
+    socket = assign(socket, :legacy_admin?, LegacyAdmin.enabled?())
+
     case Integer.parse(id) do
       {source_id, ""} ->
         load_source(socket, source_id)
@@ -140,7 +145,7 @@ defmodule GallformersWeb.SourceLive do
                 <div class="flex items-center gap-2">
                   <h1 class="text-2xl font-bold text-gf-maroon">{@source.title}</h1>
                   <.link
-                    :if={@current_user}
+                    :if={@current_user && @legacy_admin?}
                     href={~p"/admin/sources/#{@source.id}"}
                     class="text-gray-400 hover:text-gf-maroon"
                     title="Edit in admin"

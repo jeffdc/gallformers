@@ -90,6 +90,13 @@ defmodule GallformersWeb.DataDisplayComponents do
       |> assign(:images_json, prepare_images_json(assigns.images))
       |> assign(:first_image, List.first(assigns.images) || %{})
       |> assign(:image_count, length(assigns.images))
+      # The image admin is an old-domain screen: linked only while those are
+      # enabled (matter a856).
+      |> assign(
+        :admin_links?,
+        assigns.current_user != nil and assigns.species_id != nil and
+          GallformersWeb.LegacyAdmin.enabled?()
+      )
 
     ~H"""
     <div
@@ -198,7 +205,7 @@ defmodule GallformersWeb.DataDisplayComponents do
           ⓘ
         </button>
         <.link
-          :if={@current_user && @species_id}
+          :if={@admin_links?}
           href={"/admin/images?species_id=#{@species_id}"}
           class="px-2 py-1 text-sm border border-gray-300 rounded bg-white hover:bg-gray-50"
           aria-label={gettext("Edit images")}
@@ -388,7 +395,7 @@ defmodule GallformersWeb.DataDisplayComponents do
           class="w-full h-full object-contain"
         />
       </div>
-      <div :if={@current_user && @species_id} class="mt-2 flex justify-center">
+      <div :if={@admin_links?} class="mt-2 flex justify-center">
         <.link
           href={"/admin/images?species_id=#{@species_id}"}
           class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gf-maroon"
@@ -406,7 +413,7 @@ defmodule GallformersWeb.DataDisplayComponents do
           <p>{gettext("No images available")}</p>
         </div>
       </div>
-      <div :if={@current_user && @species_id} class="mt-2 flex justify-center">
+      <div :if={@admin_links?} class="mt-2 flex justify-center">
         <.link
           href={"/admin/images?species_id=#{@species_id}"}
           class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gf-maroon"

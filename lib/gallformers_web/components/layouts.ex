@@ -514,17 +514,25 @@ defmodule GallformersWeb.Layouts do
   slot :inner_block, required: true
 
   def admin(assigns) do
-    admin_nav_links = [
-      %{href: "/admin", label: "Dashboard", icon: "ph-house"},
-      %{href: "/admin/galls", label: "Galls", icon: "gf-gall"},
-      %{href: "/admin/hosts", label: "Hosts", icon: "gf-host"},
-      %{href: "/admin/sources", label: "Sources", icon: "gf-source"},
-      %{href: "/admin/images", label: "Images", icon: "ph-image"},
-      %{href: "/admin/taxonomy", label: "Taxonomy", icon: "gf-taxon"},
-      %{href: "/admin/glossary", label: "Glossary", icon: "gf-entry"},
-      %{href: "/admin/articles", label: "Articles", icon: "ph-article"},
-      %{href: "/admin/keys", label: "Keys", icon: "ph-tree-structure"}
-    ]
+    legacy_admin? = GallformersWeb.LegacyAdmin.enabled?()
+
+    # `legacy: true` marks the old-domain screens, hidden while they are
+    # disabled (GallformersWeb.LegacyAdmin).
+    admin_nav_links =
+      Enum.filter(
+        [
+          %{href: "/admin", label: "Dashboard", icon: "ph-house"},
+          %{href: "/admin/galls", label: "Galls", icon: "gf-gall", legacy: true},
+          %{href: "/admin/hosts", label: "Hosts", icon: "gf-host", legacy: true},
+          %{href: "/admin/sources", label: "Sources", icon: "gf-source", legacy: true},
+          %{href: "/admin/images", label: "Images", icon: "ph-image", legacy: true},
+          %{href: "/admin/taxonomy", label: "Taxonomy", icon: "gf-taxon", legacy: true},
+          %{href: "/admin/glossary", label: "Glossary", icon: "gf-entry"},
+          %{href: "/admin/articles", label: "Articles", icon: "ph-article"},
+          %{href: "/admin/keys", label: "Keys", icon: "ph-tree-structure"}
+        ],
+        &(legacy_admin? or not Map.get(&1, :legacy, false))
+      )
 
     superadmin_nav_links = []
 

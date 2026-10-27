@@ -42,6 +42,12 @@ defmodule GallformersWeb.Router do
     plug GallformersWeb.Plugs.RequireOperator
   end
 
+  # The old-domain admin screens, disabled on taxogall until their
+  # replacements land (matter a856). Piped after :admin / :superadmin.
+  pipeline :legacy_admin do
+    plug GallformersWeb.Plugs.RequireLegacyAdmin
+  end
+
   defp fetch_current_user(conn, _opts) do
     FetchCurrentUser.call(conn, [])
   end
@@ -82,52 +88,10 @@ defmodule GallformersWeb.Router do
 
     live "/", Admin.DashboardLive
 
-    # Gall admin
-    live "/galls", Admin.GallLive.Index, :index
-    live "/galls/new", Admin.GallLive.Form, :new
-    live "/galls/undescribed", Admin.GallLive.Undescribed, :new
-    live "/galls/:id", Admin.GallLive.Form, :edit
-
-    # Gall-Host mapping admin
-    live "/gallhost", Admin.GallHostLive, :index
-
-    # Gall range review
-    live "/gall-range", Admin.GallRangeLive
-
-    # Host range review
-    live "/host-range", Admin.HostRangeLive
-
-    # Host admin
-    live "/hosts", Admin.HostLive.Index, :index
-    live "/hosts/new", Admin.HostLive.Form, :new
-    live "/hosts/:id", Admin.HostLive.Form, :edit
-
-    # Taxonomy admin
-    live "/taxonomy", Admin.TaxonomyLive.Index, :index
-    live "/taxonomy/new", Admin.TaxonomyLive.Form, :new
-    live "/taxonomy/:id", Admin.TaxonomyLive.Form, :edit
-
-    # Section admin (species mapping — creation/editing in taxonomy form)
-    live "/section", Admin.SectionLive.Form, :index
-    live "/section/:id", Admin.SectionLive.Form, :edit
-
-    # Source admin
-    live "/sources", Admin.SourceLive.Index, :index
-    live "/sources/new", Admin.SourceLive.Form, :new
-    live "/sources/:id", Admin.SourceLive.Form, :edit
-
-    # Species-Source mapping admin
-    live "/species-sources/add", Admin.SpeciesSourceLive.AddFromSource, :add
-    live "/species-sources/find", Admin.SpeciesSourceLive.QuickFind, :find
-
     # Glossary admin
     live "/glossary", Admin.GlossaryLive.Index, :index
     live "/glossary/new", Admin.GlossaryLive.Form, :new
     live "/glossary/:id", Admin.GlossaryLive.Form, :edit
-
-    # Images admin
-    live "/images", Admin.ImagesLive
-    live "/image-audit", Admin.ImageAuditLive
 
     # Articles admin
     live "/articles", Admin.ArticleLive.Index, :index
@@ -143,17 +107,79 @@ defmodule GallformersWeb.Router do
     live "/profile", Admin.ProfileLive
   end
 
+  # Old-domain admin screens (require admin role), disabled behind
+  # GallformersWeb.LegacyAdmin (matter a856): the :legacy_admin plug stops
+  # HTTP requests, the on_mount hook stops live navigation and socket
+  # connects. Their own live_session also makes live navigation into them
+  # from the other admin screens reload over HTTP, through the plugs.
+  scope "/admin", GallformersWeb do
+    pipe_through [:browser, :admin, :legacy_admin]
+
+    live_session :legacy_admin, on_mount: {GallformersWeb.LegacyAdmin, :ensure_enabled} do
+      # Gall admin
+      live "/galls", Admin.GallLive.Index, :index
+      live "/galls/new", Admin.GallLive.Form, :new
+      live "/galls/undescribed", Admin.GallLive.Undescribed, :new
+      live "/galls/:id", Admin.GallLive.Form, :edit
+
+      # Gall-Host mapping admin
+      live "/gallhost", Admin.GallHostLive, :index
+
+      # Gall range review
+      live "/gall-range", Admin.GallRangeLive
+
+      # Host range review
+      live "/host-range", Admin.HostRangeLive
+
+      # Host admin
+      live "/hosts", Admin.HostLive.Index, :index
+      live "/hosts/new", Admin.HostLive.Form, :new
+      live "/hosts/:id", Admin.HostLive.Form, :edit
+
+      # Taxonomy admin
+      live "/taxonomy", Admin.TaxonomyLive.Index, :index
+      live "/taxonomy/new", Admin.TaxonomyLive.Form, :new
+      live "/taxonomy/:id", Admin.TaxonomyLive.Form, :edit
+
+      # Section admin (species mapping — creation/editing in taxonomy form)
+      live "/section", Admin.SectionLive.Form, :index
+      live "/section/:id", Admin.SectionLive.Form, :edit
+
+      # Source admin
+      live "/sources", Admin.SourceLive.Index, :index
+      live "/sources/new", Admin.SourceLive.Form, :new
+      live "/sources/:id", Admin.SourceLive.Form, :edit
+
+      # Species-Source mapping admin
+      live "/species-sources/add", Admin.SpeciesSourceLive.AddFromSource, :add
+      live "/species-sources/find", Admin.SpeciesSourceLive.QuickFind, :find
+
+      # Images admin
+      live "/images", Admin.ImagesLive
+      live "/image-audit", Admin.ImageAuditLive
+    end
+  end
+
   # Super admin routes (require superadmin role)
   scope "/admin", GallformersWeb do
     pipe_through [:browser, :superadmin]
 
-    # Filter terms admin (superadmin only)
-    live "/filter-terms", Admin.FilterTermsLive.Index, :index
-    live "/filter-terms/new", Admin.FilterTermsLive.Form, :new
-    live "/filter-terms/:id", Admin.FilterTermsLive.Form, :edit
-
     # User management (superadmin only)
     live "/users", Admin.UsersLive, :index
+  end
+
+  # Old-domain superadmin screens, disabled like the :legacy_admin ones above.
+  # A live_session of their own, so live navigation from an admin-only screen
+  # reloads over HTTP and passes the :superadmin plug.
+  scope "/admin", GallformersWeb do
+    pipe_through [:browser, :superadmin, :legacy_admin]
+
+    live_session :legacy_superadmin, on_mount: {GallformersWeb.LegacyAdmin, :ensure_enabled} do
+      # Filter terms admin (superadmin only)
+      live "/filter-terms", Admin.FilterTermsLive.Index, :index
+      live "/filter-terms/new", Admin.FilterTermsLive.Form, :new
+      live "/filter-terms/:id", Admin.FilterTermsLive.Form, :edit
+    end
   end
 
   # Operator routes (require operator role)

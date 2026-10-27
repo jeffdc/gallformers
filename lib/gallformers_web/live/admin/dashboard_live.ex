@@ -7,6 +7,7 @@ defmodule GallformersWeb.Admin.DashboardLive do
 
   alias Gallformers.{Galls, Images, Sources}
   alias Gallformers.Plants
+  alias GallformersWeb.LegacyAdmin
 
   @impl true
   def mount(_params, session, socket) do
@@ -15,6 +16,10 @@ defmodule GallformersWeb.Admin.DashboardLive do
     socket =
       socket
       |> assign(:current_user, current_user)
+      # The old-domain screens' cards show as being rebuilt while they are
+      # disabled (matter a856).
+      |> assign(:legacy_off, not LegacyAdmin.enabled?())
+      |> assign(:rebuilt, LegacyAdmin.disabled_message())
       |> assign_stats()
 
     {:ok, socket}
@@ -47,43 +52,73 @@ defmodule GallformersWeb.Admin.DashboardLive do
           Quick Actions
         </h2>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <.action_card label="Create a New Gall" href="/admin/galls/new" icon="gf-gall" />
+          <.action_card
+            label="Create a New Gall"
+            href="/admin/galls/new"
+            icon="gf-gall"
+            disabled={@legacy_off}
+            disabled_message={@rebuilt}
+          />
           <.action_card
             label="Add an Undescribed Gall"
             href="/admin/galls/undescribed"
             icon="gf-gall"
+            disabled={@legacy_off}
+            disabled_message={@rebuilt}
           />
-          <.action_card label="Create a New Host" href="/admin/hosts/new" icon="gf-host" />
-          <.action_card label="Create a New Source" href="/admin/sources/new" icon="gf-source" />
+          <.action_card
+            label="Create a New Host"
+            href="/admin/hosts/new"
+            icon="gf-host"
+            disabled={@legacy_off}
+            disabled_message={@rebuilt}
+          />
+          <.action_card
+            label="Create a New Source"
+            href="/admin/sources/new"
+            icon="gf-source"
+            disabled={@legacy_off}
+            disabled_message={@rebuilt}
+          />
           <.action_card
             label="Manage Gall-Host Associations"
             href="/admin/gallhost"
             icon="ph-arrows-left-right"
             accent="blue"
+            disabled={@legacy_off}
+            disabled_message={@rebuilt}
           />
           <.action_card
             label="Review Gall Ranges"
             href="/admin/gall-range"
             icon="ph-map-trifold"
             accent="blue"
+            disabled={@legacy_off}
+            disabled_message={@rebuilt}
           />
           <.action_card
             label="Review Host Ranges"
             href="/admin/host-range"
             icon="ph-map-trifold"
             accent="blue"
+            disabled={@legacy_off}
+            disabled_message={@rebuilt}
           />
           <.action_card
             label="Bulk Add Species Descriptions from Sources"
             href="/admin/species-sources/add"
             icon="gf-source"
             accent="blue"
+            disabled={@legacy_off}
+            disabled_message={@rebuilt}
           />
           <.action_card
             label="Find and Edit Species-Source Mappings"
             href="/admin/species-sources/find"
             icon="ph-magnifying-glass"
             accent="blue"
+            disabled={@legacy_off}
+            disabled_message={@rebuilt}
           />
         </div>
       </div>
@@ -101,12 +136,16 @@ defmodule GallformersWeb.Admin.DashboardLive do
               href="/admin/taxonomy/new"
               icon="gf-taxon"
               accent="amber"
+              disabled={@legacy_off}
+              disabled_message={@rebuilt}
             />
             <.action_card
               label="Section Species"
               href={~p"/admin/section"}
               icon="gf-taxon"
               accent="amber"
+              disabled={@legacy_off}
+              disabled_message={@rebuilt}
             />
           </div>
         </div>
@@ -141,7 +180,11 @@ defmodule GallformersWeb.Admin.DashboardLive do
               icon="ph-detective"
               accent="green"
               disabled={true}
-              disabled_message="Disabled for a bit while Jeff looks into performance issues related to it."
+              disabled_message={
+                if @legacy_off,
+                  do: @rebuilt,
+                  else: "Disabled for a bit while Jeff looks into performance issues related to it."
+              }
             />
           </div>
         </div>
@@ -165,6 +208,8 @@ defmodule GallformersWeb.Admin.DashboardLive do
               icon="ph-funnel"
               accent="slate"
               small
+              disabled={@legacy_off}
+              disabled_message={@rebuilt}
             />
             <.action_card
               label="Jobs Dashboard"
@@ -185,16 +230,32 @@ defmodule GallformersWeb.Admin.DashboardLive do
       <% end %>
 
       <%!-- Stats --%>
-      <div class="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <.stat_card title="Galls" value={@stats.gall_count} icon="gf-gall" href="/admin/galls" />
-        <.stat_card title="Hosts" value={@stats.host_count} icon="gf-host" href="/admin/hosts" />
+      <%!-- The counts link to the old-domain screens only while those are enabled --%>
+      <div id="admin-stats" class="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <.stat_card
+          title="Galls"
+          value={@stats.gall_count}
+          icon="gf-gall"
+          href={if not @legacy_off, do: "/admin/galls"}
+        />
+        <.stat_card
+          title="Hosts"
+          value={@stats.host_count}
+          icon="gf-host"
+          href={if not @legacy_off, do: "/admin/hosts"}
+        />
         <.stat_card
           title="Sources"
           value={@stats.source_count}
           icon="gf-source"
-          href="/admin/sources"
+          href={if not @legacy_off, do: "/admin/sources"}
         />
-        <.stat_card title="Images" value={@stats.image_count} icon="ph-image" href="/admin/images" />
+        <.stat_card
+          title="Images"
+          value={@stats.image_count}
+          icon="ph-image"
+          href={if not @legacy_off, do: "/admin/images"}
+        />
       </div>
     </Layouts.admin>
     """
@@ -206,23 +267,40 @@ defmodule GallformersWeb.Admin.DashboardLive do
 
   attr :title, :string, required: true
   attr :icon, :string, required: true
-  attr :href, :string, required: true
+  attr :href, :string, default: nil, doc: "where the card links; nil renders it unlinked"
   attr :value, :integer, default: nil
 
   defp stat_card(assigns) do
     ~H"""
     <a
+      :if={@href}
       href={@href}
       class="flex items-center gap-3 rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 hover:bg-white hover:shadow-md hover:-translate-y-0.5 transition-all group"
     >
-      <div class="rounded-lg bg-gf-maroon/10 p-2">
-        <.icon name={@icon} class="h-5 w-5 text-gf-maroon" />
-      </div>
-      <div>
-        <div class="text-xs font-medium text-gray-500">{@title}</div>
-        <div :if={@value} class="text-xl font-bold text-gray-800">{format_number(@value)}</div>
-      </div>
+      <.stat_card_body title={@title} icon={@icon} value={@value} />
     </a>
+    <div
+      :if={!@href}
+      class="flex items-center gap-3 rounded-lg bg-gray-50 border border-gray-200 px-4 py-3"
+    >
+      <.stat_card_body title={@title} icon={@icon} value={@value} />
+    </div>
+    """
+  end
+
+  attr :title, :string, required: true
+  attr :icon, :string, required: true
+  attr :value, :integer, default: nil
+
+  defp stat_card_body(assigns) do
+    ~H"""
+    <div class="rounded-lg bg-gf-maroon/10 p-2">
+      <.icon name={@icon} class="h-5 w-5 text-gf-maroon" />
+    </div>
+    <div>
+      <div class="text-xs font-medium text-gray-500">{@title}</div>
+      <div :if={@value} class="text-xl font-bold text-gray-800">{format_number(@value)}</div>
+    </div>
     """
   end
 

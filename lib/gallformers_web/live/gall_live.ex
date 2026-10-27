@@ -18,6 +18,7 @@ defmodule GallformersWeb.GallLive do
 
   alias Gallformers.Catalog.ReadModels.GallPage
   alias Gallformers.Images.Image
+  alias GallformersWeb.LegacyAdmin
   alias GallformersWeb.LineageBreadcrumb
   alias GallformersWeb.SEO
 
@@ -33,6 +34,10 @@ defmodule GallformersWeb.GallLive do
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
+    # Admin edit links go to the old-domain screens: shown only while those
+    # are enabled (matter a856).
+    socket = assign(socket, :legacy_admin?, LegacyAdmin.enabled?())
+
     case Integer.parse(id) do
       {gall_id, ""} ->
         load_gall(socket, gall_id)
@@ -372,7 +377,7 @@ defmodule GallformersWeb.GallLive do
                     </em>
                   </h2>
                   <.link
-                    :if={@current_user}
+                    :if={@current_user && @legacy_admin?}
                     href={~p"/admin/galls/#{@gall.id}"}
                     class="text-gray-400 hover:text-gf-maroon"
                     title="Edit in admin"
@@ -462,7 +467,7 @@ defmodule GallformersWeb.GallLive do
                     </span>
                   </div>
                   <.link
-                    :if={@current_user}
+                    :if={@current_user && @legacy_admin?}
                     href={~p"/admin/gallhost?id=#{@gall.id}"}
                     class="text-gray-400 hover:text-gf-maroon"
                     title="Edit gall-host mappings"
@@ -636,7 +641,7 @@ defmodule GallformersWeb.GallLive do
             <div class="flex items-center gap-2 mb-2">
               <h3 class="font-semibold">Further Information ({length(@sources)})</h3>
               <.link
-                :if={@current_user}
+                :if={@current_user && @legacy_admin?}
                 href={~p"/admin/species-sources/add?species_id=#{@gall.id}"}
                 class="text-gray-400 hover:text-gf-maroon"
                 title="Add source mapping"
@@ -684,7 +689,7 @@ defmodule GallformersWeb.GallLive do
                     <.icon name="ph-link" class="h-4 w-4 inline-block align-text-bottom" />
                   </button>
                   <.link
-                    :if={@current_user}
+                    :if={@current_user && @legacy_admin?}
                     href={
                       ~p"/admin/species-sources/find?species_id=#{@gall.id}&source_id=#{source.id}"
                     }

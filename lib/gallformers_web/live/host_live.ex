@@ -12,6 +12,7 @@ defmodule GallformersWeb.HostLive do
   alias Gallformers.{Catalog, Images, Places, Ranges, Taxa}
   alias Gallformers.Images.Image
   alias Gallformers.Taxa.ReadModels.HostPage
+  alias GallformersWeb.LegacyAdmin
   alias GallformersWeb.LineageBreadcrumb
   alias GallformersWeb.SEO
 
@@ -20,6 +21,10 @@ defmodule GallformersWeb.HostLive do
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
+    # Admin edit links go to the old-domain screens: shown only while those
+    # are enabled (matter a856).
+    socket = assign(socket, :legacy_admin?, LegacyAdmin.enabled?())
+
     case Integer.parse(id) do
       {host_id, ""} -> load_host(socket, host_id)
       _ -> {:ok, not_found(socket, "Invalid host ID")}
@@ -240,7 +245,7 @@ defmodule GallformersWeb.HostLive do
                     </.link>
                   </h2>
                   <.link
-                    :if={@current_user}
+                    :if={@current_user && @legacy_admin?}
                     href={~p"/admin/hosts/#{@host.id}"}
                     class="text-gray-400 hover:text-gf-maroon"
                     title="Edit in admin"
@@ -305,7 +310,7 @@ defmodule GallformersWeb.HostLive do
                               />
                             </div>
                           </th>
-                          <th :if={@current_user} class="w-10"></th>
+                          <th :if={@current_user && @legacy_admin?} class="w-10"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -336,7 +341,7 @@ defmodule GallformersWeb.HostLive do
                               </span>
                             <% end %>
                           </td>
-                          <td :if={@current_user} class="text-center">
+                          <td :if={@current_user && @legacy_admin?} class="text-center">
                             <.link
                               href={~p"/admin/gallhost?id=#{gall.id}"}
                               class="text-gray-400 hover:text-gf-maroon"
