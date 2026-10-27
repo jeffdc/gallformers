@@ -64,7 +64,7 @@ Domain language: `docs/domain/domain-model.md`. Design and rules: `8567`. Migrat
 
 **Front-end:**
 
-9. **Public pages re-pointed in place (`b5bd` M3; design in `803b`):** Gall, Host, taxon ranks, Source, place, browse; ID tool parity (season filter wording to "forms and grows"); search; name builder (`86e7`); minimal API; redirects and the gall-lookalikes Article; sitemap. **Built and committed 2026-10-27 (67378c93; e2e fix 2b3dd12d), except the name builder (`86e7`, not in `803b`'s plan — Galls keep today's names as `name_override`); see `803b` Status.** The e2e browser suite's Playwright breakage (pre-existing since #593) is fixed on `taxogall`: Elixir test libraries and npm Playwright upgraded together.
+9. **Public pages re-pointed in place (`b5bd` M3; design in `803b`):** Gall, Host, taxon ranks, Source, place, browse; ID tool parity (season filter wording to "forms and grows"); search; name builder (`86e7`); minimal API; redirects and the gall-lookalikes Article; sitemap. **Built and committed 2026-10-27 (67378c93; e2e fix 2b3dd12d), except the name builder (`86e7`, not in `803b`'s plan) — **built 2026-10-27, uncommitted: 18 overrides left of 1,323; see `86e7` Status**; see `803b` Status.** The e2e browser suite's Playwright breakage (pre-existing since #593) is fixed on `taxogall`: Elixir test libraries and npm Playwright upgraded together.
 10. **New minimal admin (`b5bd` M3, `8567` rule 12; inventory and plan in `a856`):** taxonomy admin, images, a note editor for each Gall's Gallformers note (`20e5`), and only what else proves unavoidable; retire the old Gall/Host/gall–host/range/Source forms.
 
 **Release:**
