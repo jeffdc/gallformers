@@ -160,21 +160,31 @@ defmodule GallformersWeb.Router do
     end
   end
 
-  # Super admin routes (require superadmin role)
+  # Super admin routes (require superadmin role).
+  #
+  # Plugs don't run on live navigation, so the role-restricted screens get
+  # live sessions of their own: navigating into them from another admin
+  # screen reloads over HTTP, through the plugs, and the on_mount hook checks
+  # the role whenever one of them mounts.
   scope "/admin", GallformersWeb do
     pipe_through [:browser, :superadmin]
 
-    # User management (superadmin only)
-    live "/users", Admin.UsersLive, :index
+    live_session :superadmin, on_mount: {GallformersWeb.Live.UserAuth, :require_superadmin} do
+      # User management (superadmin only)
+      live "/users", Admin.UsersLive, :index
+    end
   end
 
-  # Old-domain superadmin screens, disabled like the :legacy_admin ones above.
-  # A live_session of their own, so live navigation from an admin-only screen
-  # reloads over HTTP and passes the :superadmin plug.
+  # Old-domain superadmin screens, disabled like the :legacy_admin ones above,
+  # with the superadmin role check of the :superadmin session.
   scope "/admin", GallformersWeb do
     pipe_through [:browser, :superadmin, :legacy_admin]
 
-    live_session :legacy_superadmin, on_mount: {GallformersWeb.LegacyAdmin, :ensure_enabled} do
+    live_session :legacy_superadmin,
+      on_mount: [
+        {GallformersWeb.Live.UserAuth, :require_superadmin},
+        {GallformersWeb.LegacyAdmin, :ensure_enabled}
+      ] do
       # Filter terms admin (superadmin only)
       live "/filter-terms", Admin.FilterTermsLive.Index, :index
       live "/filter-terms/new", Admin.FilterTermsLive.Form, :new
@@ -182,11 +192,14 @@ defmodule GallformersWeb.Router do
     end
   end
 
-  # Operator routes (require operator role)
+  # Operator routes (require operator role), in their own live session like
+  # the superadmin routes above.
   scope "/admin", GallformersWeb do
     pipe_through [:browser, :operator]
 
-    live "/ops", Admin.OpsLive, :index
+    live_session :operator, on_mount: {GallformersWeb.Live.UserAuth, :require_operator} do
+      live "/ops", Admin.OpsLive, :index
+    end
   end
 
   # Public routes
