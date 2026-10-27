@@ -138,24 +138,34 @@ defmodule GallformersWeb.Router do
     live "/profile", Admin.ProfileLive
   end
 
-  # Super admin routes (require superadmin role)
+  # Super admin routes (require superadmin role).
+  #
+  # Plugs don't run on live navigation, so the role-restricted screens get
+  # live sessions of their own: navigating into them from another admin
+  # screen reloads over HTTP, through the plugs, and the on_mount hook checks
+  # the role whenever one of them mounts.
   scope "/admin", GallformersWeb do
     pipe_through [:browser, :superadmin]
 
-    # Filter terms admin (superadmin only)
-    live "/filter-terms", Admin.FilterTermsLive.Index, :index
-    live "/filter-terms/new", Admin.FilterTermsLive.Form, :new
-    live "/filter-terms/:id", Admin.FilterTermsLive.Form, :edit
+    live_session :superadmin, on_mount: {GallformersWeb.Live.UserAuth, :require_superadmin} do
+      # Filter terms admin (superadmin only)
+      live "/filter-terms", Admin.FilterTermsLive.Index, :index
+      live "/filter-terms/new", Admin.FilterTermsLive.Form, :new
+      live "/filter-terms/:id", Admin.FilterTermsLive.Form, :edit
 
-    # User management (superadmin only)
-    live "/users", Admin.UsersLive, :index
+      # User management (superadmin only)
+      live "/users", Admin.UsersLive, :index
+    end
   end
 
-  # Operator routes (require operator role)
+  # Operator routes (require operator role), in their own live session like
+  # the superadmin routes above.
   scope "/admin", GallformersWeb do
     pipe_through [:browser, :operator]
 
-    live "/ops", Admin.OpsLive, :index
+    live_session :operator, on_mount: {GallformersWeb.Live.UserAuth, :require_operator} do
+      live "/ops", Admin.OpsLive, :index
+    end
   end
 
   # Public routes
